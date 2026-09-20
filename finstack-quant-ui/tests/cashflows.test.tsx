@@ -114,7 +114,7 @@ it("pins authoritative fixture sources and exact current native exports", () => 
   }
 });
 it.each(fixture.cases.filter((c) => c.cashflows !== null))(
-  "displays and copies exact native $type text at both densities",
+  "tables and copies exact native $type cashflows at both densities",
   async (entry) => {
     const request = exportRequest(entry.request);
     const tree = (density: "compact" | "comfortable") => (
@@ -124,6 +124,27 @@ it.each(fixture.cases.filter((c) => c.cashflows !== null))(
     );
     const { rerender } = render(tree("compact"));
     const viewer = screen.getByRole("region", { name: "Cashflows" });
+    await waitFor(() =>
+      expect(
+        within(viewer).getByRole("table", { name: "Cashflow schedule" }),
+      ).toBeTruthy(),
+    );
+    const nativeRows = JSON.parse(entry.cashflows!).flows;
+    expect(viewer.querySelectorAll("tbody tr")).toHaveLength(nativeRows.length);
+    expect(viewer.querySelector("details")!.open).toBe(false);
+    expect(viewer.querySelector("details")!.className).toContain(
+      "print:hidden",
+    );
+    const rows = viewer.querySelectorAll("tbody tr");
+    for (const [i, row] of nativeRows.entries()) {
+      expect(rows[i].children[0].firstElementChild?.textContent).toBe(row.date);
+      expect(rows[i].children[1].textContent).toBe(row.kind);
+      expect(rows[i].children[2].textContent).toContain(`${row.currency} `);
+      expect(
+        rows[i].children[rows[i].children.length - 1].textContent,
+      ).toContain(`${JSON.parse(entry.cashflows!).currency} `);
+    }
+    fireEvent.click(within(viewer).getByText("Original JSON", { exact: true }));
     fireEvent.click(within(viewer).getByRole("button", { name: "Original" }));
     await waitFor(() =>
       expect(viewer.querySelector("pre")?.textContent).toBe(entry.cashflows),
@@ -179,6 +200,7 @@ it("shows loading, then the actual unsupported error without changing caller val
   expect(screen.getByLabelText("Selected model").textContent).toBe(
     entry.request.model,
   );
+  fireEvent.click(within(viewer).getByText("Original JSON", { exact: true }));
   expect(
     (within(viewer).getByRole("button", { name: "Copy" }) as HTMLButtonElement)
       .disabled,
@@ -216,3 +238,73 @@ it("snapshots every export input and separates worker sessions in the query key"
   expect(original.model).toBe("discounting");
   query.clear();
 });
+
+function suppliedExport(text: string) {
+  call.mockImplementation((method, request) =>
+    method === "cashflows" ? Promise.resolve(text) : invoke(method, request),
+  );
+  return render(
+    <FinstackQueryProvider>
+      <CashflowViewer request={exportRequest(fixture.cases[0].request)} />
+    </FinstackQueryProvider>,
+  );
+}
+it("preserves wide signed tokens, row currencies, zero and absent diagnostics without summing or rounding", async () => {
+  const json = `{"instrument_id":"EXACT","currency":"USD","model":"discounting","as_of":"2025-01-01","total_pv":9007199254740993.123456789,"reconciles_with_base_value":false,"flows":[{"date":"2026-01-01","kind":"fixed","currency":"EUR","amount":-9007199254740993.123456789,"accrual_factor":0,"year_fraction":1.00000000000000001,"discount_factor":0,"discount_curve_id":"EUR-OIS","pv":0,"rate":0,"survival_probability":0}]}`;
+  suppliedExport(json);
+  const table = await screen.findByRole("table", { name: "Cashflow schedule" });
+  expect(
+    within(table).getByTitle("-9007199254740993.123456789").textContent,
+  ).toBe("EUR -9,007,199,254,740,993.123456789");
+  expect(
+    within(table).getByTitle("9007199254740993.123456789").textContent,
+  ).toBe("USD 9,007,199,254,740,993.123456789");
+  expect(within(table).getByTitle("1.00000000000000001").textContent).toBe(
+    "1.00000000000000001",
+  );
+  expect(
+    within(table).getByRole("columnheader", { name: "PV · USD" }),
+  ).toBeTruthy();
+  expect(
+    within(table)
+      .getAllByText("Survival")
+      .every((node) => node.nextElementSibling?.textContent === "0"),
+  ).toBe(true);
+  expect(screen.getByText("Not reconciled to base value")).toBeTruthy();
+  const totalRow = table.querySelector("tfoot tr")!;
+  expect(totalRow.children).toHaveLength(4);
+  expect(totalRow.children[2].textContent).toBe(
+    "USD 9,007,199,254,740,993.123456789",
+  );
+  expect(totalRow.children[3].textContent).toBe("");
+});
+it("omits absent optional columns and retains zero total for an empty native schedule", async () => {
+  const envelope = JSON.parse(fixture.cases[0].cashflows!);
+  envelope.flows = [];
+  envelope.total_pv = 0;
+  suppliedExport(JSON.stringify(envelope));
+  await screen.findByText("No cashflows returned.");
+  expect(screen.queryByRole("table")).toBeNull();
+  expect(screen.getByText("Total PV · USD 0")).toBeTruthy();
+});
+it.each([
+  "not JSON",
+  '{"flows":[]}',
+  fixture.cases[0].cashflows!.replace(
+    '"amount":-1000000.0',
+    '"amount":"-1000000.0"',
+  ),
+])(
+  "rejects malformed/unsupported envelopes visibly and preserves the source",
+  async (text) => {
+    suppliedExport(text);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/^Cashflow table unavailable:/);
+    expect(screen.queryByRole("table")).toBeNull();
+    fireEvent.click(screen.getByText("Original JSON", { exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(text),
+    );
+  },
+);

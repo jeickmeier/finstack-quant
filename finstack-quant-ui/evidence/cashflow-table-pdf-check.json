@@ -1,0 +1,140 @@
+[
+  {
+    "file": "bond-A4.pdf",
+    "sha256": "12ebc9a8ac173c990af4e5d2bd2b9d46209fd3f262418bb803e3963512584741",
+    "pages": 3,
+    "pageSizes": [
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {
+      "1.307944151889478e-13": true,
+      "0.989751844932828": true,
+      "-103.45856181590352": true,
+      "0": true
+    },
+    "cashflowRows": 4,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+IBMPlexSans-Medium",
+      "EAAAAA+IBMPlexMono-Medium",
+      "FAAAAA+Times-Roman"
+    ],
+    "maxUprightFontSize": 17.999999250000002,
+    "images": 0,
+    "vectorPaths": 118
+  },
+  {
+    "file": "bond-Letter.pdf",
+    "sha256": "bc94cbbe1a5d19336593552388e9ffd4b6e02d8491b9aed65368c35ebb0f57d6",
+    "pages": 3,
+    "pageSizes": [
+      [612, 792],
+      [612, 792],
+      [612, 792]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {
+      "1.307944151889478e-13": true,
+      "0.989751844932828": true,
+      "-103.45856181590352": true,
+      "0": true
+    },
+    "cashflowRows": 4,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+IBMPlexSans-Medium",
+      "EAAAAA+Times-Roman",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 104
+  },
+  {
+    "file": "xccy_swap-A4.pdf",
+    "sha256": "fb5bf9198975e6e09544cbfee95e9c6b12515db396248c3b4ccd0d4d941a340f",
+    "pages": 7,
+    "pageSizes": [
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {},
+    "cashflowRows": 44,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+Times-Roman",
+      "EAAAAA+IBMPlexSans-Medium",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 294
+  },
+  {
+    "file": "xccy_swap-Letter.pdf",
+    "sha256": "c5fcb3c13c13e3403443b7cfeff93547cfd00b6e1a999bc465ad8c52763c54a6",
+    "pages": 7,
+    "pageSizes": [
+      [612, 792],
+      [612, 792],
+      [612, 792],
+      [612, 792],
+      [612, 792],
+      [612, 792],
+      [612, 792]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true
+    },
+    "measureWordMatches": {},
+    "cashflowRows": 44,
+    "cashflowCellsMatch": true,
+    "cashflowFooterMatches": true,
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+Times-Roman",
+      "EAAAAA+IBMPlexSans-Medium",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 294
+  }
+]

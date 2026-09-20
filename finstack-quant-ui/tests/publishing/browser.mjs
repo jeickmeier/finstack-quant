@@ -83,7 +83,7 @@ export async function verifyPublishing(page, evidence, repo) {
       await requestViewer.locator("pre").textContent(),
     );
     await workbench
-      .getByRole("tab", { name: "3 Cashflow JSON", exact: true })
+      .getByRole("tab", { name: "3 Cashflows", exact: true })
       .click();
     await workbench.getByRole("tab", { name: "2 Market", exact: true }).click();
     await workbench.getByLabel("Search market fields").fill("/curves/0");
@@ -166,6 +166,16 @@ export async function verifyPublishing(page, evidence, repo) {
         name: "Cashflows",
         exact: true,
       });
+      const schedule = cashflows.getByRole("table", {
+        name: "Cashflow schedule",
+        exact: true,
+      });
+      await expect(schedule).toBeVisible();
+      await expect(schedule.locator("tbody tr")).toHaveCount(
+        JSON.parse(expected).flows.length,
+      );
+      await expect(cashflows.locator("pre")).toBeHidden();
+      await cashflows.getByText("Original JSON", { exact: true }).click();
       await cashflows
         .getByRole("button", { name: "Original", exact: true })
         .click();
@@ -184,7 +194,6 @@ export async function verifyPublishing(page, evidence, repo) {
           exact: true,
         }),
         workbench.getByRole("region", { name: "Market snapshot", exact: true }),
-        cashflows,
       ])
         await viewer
           .getByRole("button", { name: "Formatted", exact: true })
@@ -200,20 +209,29 @@ export async function verifyPublishing(page, evidence, repo) {
         await workbench.getByRole("button").filter({ visible: true }).count(),
         0,
       );
-      const printSource = cashflows.locator("[data-json-print-source]");
-      await expect(printSource).toBeVisible();
+      await expect(cashflows.locator("[data-json-print-source]")).toBeHidden();
       await expect(cashflows.locator("pre")).toBeHidden();
-      assert.equal(await printSource.textContent(), expected);
-      const geometry = await printSource.evaluate((node) => ({
-        wrap: getComputedStyle(node).whiteSpace,
+      await expect(schedule).toBeVisible();
+      const cashflowRows = await schedule
+        .locator("tbody tr")
+        .evaluateAll((rows) =>
+          rows.map((row) =>
+            [...row.querySelectorAll("td")]
+              .filter((cell) => getComputedStyle(cell).display !== "none")
+              .map((cell) => cell.innerText),
+          ),
+        );
+      const cashflowFooter = await schedule.locator("tfoot").innerText();
+      const geometry = await schedule.evaluate((node) => ({
         overflow: node.scrollWidth > node.clientWidth,
-        maxHeight: getComputedStyle(node).maxHeight,
+        rows: node.querySelectorAll("tbody tr").length,
       }));
-      assert.deepEqual(geometry, {
-        wrap: "pre-wrap",
-        overflow: false,
-        maxHeight: "none",
-      });
+      assert.equal(
+        geometry.overflow,
+        false,
+        "Printed table must fit its paper width",
+      );
+      assert.equal(geometry.rows, JSON.parse(expected).flows.length);
       const printedFigures = await page.evaluate(() =>
         window.readPrintFigureGeometry(),
       );
@@ -257,7 +275,7 @@ export async function verifyPublishing(page, evidence, repo) {
       await writeFile(
         path.join(evidence, `${kind}-${format}-text.json`),
         JSON.stringify(
-          { instrument, market, cashflows: expected, measureValues },
+          { instrument, market, cashflowRows, cashflowFooter, measureValues },
           null,
           2,
         ) + "\n",
@@ -265,6 +283,10 @@ export async function verifyPublishing(page, evidence, repo) {
       await page.emulateMedia({ media: "screen" });
       await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
       await expect(workbench).not.toHaveAttribute("data-printing");
+      // Printing restores the disclosure state; close the source before the
+      // next format so its default table check starts from the same UI state.
+      await cashflows.getByText("Original JSON", { exact: true }).click();
+      await expect(cashflows.locator("pre")).toBeHidden();
       await expect(
         workbench.getByRole("tab", { name: "2 Market", exact: true }),
       ).toHaveAttribute("aria-selected", "true");
@@ -301,6 +323,6 @@ export async function verifyPublishing(page, evidence, repo) {
     ) + "\n",
   );
   return [
-    "A4/Letter bond and mixed-currency reports reuse completed components; exact native text/downloads; standalone publication SVG/PNG",
+    "A4/Letter bond and mixed-currency reports print complete cashflow tables; exact native downloads; standalone publication SVG/PNG",
   ];
 }

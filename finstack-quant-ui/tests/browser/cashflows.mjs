@@ -97,6 +97,13 @@ try {
       entry.request.model,
     );
     if (entry.cashflows !== null) {
+      await viewer.getByRole("table", { name: "Cashflow schedule" }).waitFor();
+      assert.equal(
+        await viewer.locator("tbody tr").count(),
+        JSON.parse(entry.cashflows).flows.length,
+      );
+      if ((await viewer.locator("details").getAttribute("open")) === null)
+        await viewer.getByText("Original JSON", { exact: true }).click();
       await viewer
         .getByRole("button", { name: "Original", exact: true })
         .click();
@@ -128,26 +135,17 @@ try {
         assert.deepEqual(audit.violations, []);
       }
       await page.emulateMedia({ media: "print" });
-      const printSource = viewer.locator("[data-json-print-source]");
-      assert.equal(await printSource.isVisible(), true);
-      assert.equal(await viewer.locator("pre").isVisible(), false);
-      const print = await printSource.evaluate((node) => ({
-        text: node.textContent,
-        wrap: getComputedStyle(node).whiteSpace,
-        maxHeight: getComputedStyle(node).maxHeight,
-      }));
       assert.equal(
-        await printSource.evaluate(
-          (node) => node.scrollWidth <= node.clientWidth,
-        ),
+        await viewer
+          .getByRole("table", { name: "Cashflow schedule" })
+          .isVisible(),
         true,
-        "Printed raw JSON must wrap within the page width",
       );
-      assert.deepEqual(print, {
-        text: entry.cashflows,
-        wrap: "pre-wrap",
-        maxHeight: "none",
-      });
+      assert.equal(
+        await viewer.locator("[data-json-print-source]").isVisible(),
+        false,
+      );
+      assert.equal(await viewer.locator("pre").isVisible(), false);
       assert.equal(
         await viewer
           .getByRole("button", { name: "Copy", exact: true })
@@ -166,6 +164,41 @@ try {
         });
       }
       await page.emulateMedia({ media: "screen" });
+      await page.setViewportSize({ width: 390, height: 844 });
+      const table = viewer.getByRole("table", { name: "Cashflow schedule" });
+      const scroller = viewer.locator('[data-slot="table-container"]');
+      assert.equal(
+        await scroller.evaluate((node) => node.scrollWidth > node.clientWidth),
+        true,
+      );
+      await table.focus();
+      assert.equal(
+        await table.evaluate((node) => document.activeElement === node),
+        true,
+      );
+      const scrollBefore = await scroller.evaluate((node) => node.scrollLeft);
+      await page.keyboard.press("ArrowRight");
+      await page.waitForFunction(
+        (before) =>
+          document.querySelector(
+            '[aria-label="Cashflows"] [data-slot="table-container"]',
+          ).scrollLeft > before,
+        scrollBefore,
+      );
+      for (const viewport of [
+        { width: 390, height: 844 },
+        { width: 1440, height: 1700 },
+      ]) {
+        await page.setViewportSize(viewport);
+        const audit = await page.evaluate(() => window.axe.run(document));
+        assert.deepEqual(audit.violations, []);
+        accessibility.push({
+          type: entry.type,
+          viewport,
+          keyboardScroll: true,
+          violations: audit.violations,
+        });
+      }
     } else {
       await viewer.getByRole("alert").waitFor();
       assert.equal(
@@ -180,6 +213,8 @@ try {
         await page.getByLabel("Selected model").textContent(),
         entry.request.model,
       );
+      if ((await viewer.locator("details").getAttribute("open")) === null)
+        await viewer.getByText("Original JSON", { exact: true }).click();
       assert.equal(
         await viewer
           .getByRole("button", { name: "Copy", exact: true })
@@ -206,7 +241,7 @@ try {
     checks,
     accessibility,
     failures,
-    print: "Original text wraps without clipping; toolbar hidden",
+    print: "Native cashflow table visible; raw source and toolbar hidden",
     verdict: "pass",
   };
   await writeFile(

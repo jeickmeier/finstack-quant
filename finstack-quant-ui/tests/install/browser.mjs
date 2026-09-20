@@ -16,6 +16,15 @@ export async function verifyItem(page, item, evidence, repo) {
       (entry) => entry.type === "xccy_swap",
     ).cashflows;
     const viewer = page.getByRole("region", { name: "Cashflows", exact: true });
+    await expect(
+      viewer.getByRole("table", { name: "Cashflow schedule" }),
+    ).toBeVisible();
+    assert.equal(
+      await viewer.locator("tbody tr").count(),
+      JSON.parse(expected).flows.length,
+    );
+    assert.equal(await viewer.locator("details").getAttribute("open"), null);
+    await viewer.getByText("Original JSON", { exact: true }).click();
     await viewer.getByRole("button", { name: "Original", exact: true }).click();
     await expect(viewer.locator("pre")).toHaveText(expected);
     assert.equal(await viewer.locator("pre").textContent(), expected);

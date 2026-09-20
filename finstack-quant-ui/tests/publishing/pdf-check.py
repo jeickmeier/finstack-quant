@@ -22,7 +22,16 @@ for name in ("bond-A4", "bond-Letter", "xccy_swap-A4", "xccy_swap-Letter"):
         )
         compact = lambda value: re.sub(r"\s+", "", value)
         matches = {key: compact(expected[key]) in compact(raw)
-                   for key in ("instrument", "market", "cashflows")}
+                   for key in ("instrument", "market")}
+        # Whole words catch numeric tokens split across lines or clipped. Only
+        # visible table cells are expected; hidden original JSON cannot mask them.
+        printed_words = {word["text"] for page in doc.pages for word in page.extract_words()}
+        cashflow_matches = [
+            all(word in printed_words for value in row if value for word in value.split())
+            for row in expected["cashflowRows"]
+        ]
+        footer_matches = all(word in printed_words for word in expected["cashflowFooter"].split())
+        assert cashflow_matches and all(cashflow_matches) and footer_matches, f"{name}: printed cashflow words or total missing"
         # Numbers in the visible measure tables must remain whole words. JSON
         # text is excluded so an intact raw dump cannot hide crushed columns.
         measure_words = {
@@ -55,6 +64,8 @@ for name in ("bond-A4", "bond-Letter", "xccy_swap-A4", "xccy_swap-Letter"):
         reports.append({"file": file.name, "sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
                         "pages": len(doc.pages), "pageSizes": sizes, "textMatches": matches,
                         "measureWordMatches": measure_matches,
+                        "cashflowRows": len(cashflow_matches), "cashflowCellsMatch": all(cashflow_matches),
+                        "cashflowFooterMatches": footer_matches,
                         "outside": outside, "fonts": fonts, "maxUprightFontSize": max_upright_font_size, "images": images, "vectorPaths": vectors})
 (root / "pdf-check.json").write_text(json.dumps(reports, indent=2) + "\n")
 print(f"{len(reports)} reports passed text, font, vector and page-bound checks.")

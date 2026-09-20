@@ -566,7 +566,7 @@ export function PricingWorkbench({
                   className="max-w-full flex-wrap"
                   style={{ height: "auto", minHeight: "2rem" }}
                 >
-                  <TabsTrigger value="cashflows">3 Cashflow JSON</TabsTrigger>
+                  <TabsTrigger value="cashflows">3 Cashflows</TabsTrigger>
                   <TabsTrigger value="diagnostics">4 Diagnostics</TabsTrigger>
                   <TabsTrigger value="trace">5 Trace</TabsTrigger>
                   <TabsTrigger value="request">Request</TabsTrigger>

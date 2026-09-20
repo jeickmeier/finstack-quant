@@ -184,7 +184,7 @@ try {
     }
     if (entry.id.startsWith("cashflows-")) {
       await results
-        .getByRole("tab", { name: "3 Cashflow JSON", exact: true })
+        .getByRole("tab", { name: "3 Cashflows", exact: true })
         .click();
       const viewer = results.getByRole("region", {
         name: "Cashflows",
@@ -197,6 +197,15 @@ try {
           `Cashflows unavailable: ${entry.error}`,
         );
       } else {
+        await viewer
+          .getByRole("table", { name: "Cashflow schedule" })
+          .waitFor();
+        assert.equal(
+          await viewer.locator("tbody tr").count(),
+          JSON.parse(entry.cashflows).flows.length,
+        );
+        if ((await viewer.locator("details").getAttribute("open")) === null)
+          await viewer.getByText("Original JSON", { exact: true }).click();
         await original(viewer);
         await page.waitForFunction(
           (text) =>

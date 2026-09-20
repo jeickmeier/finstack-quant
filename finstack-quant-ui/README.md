@@ -230,7 +230,7 @@ reset or changing that URL creates a fresh worker and query session.
 strings remain unchanged, including wide integer tokens. Results are structured
 clone values; export through the worker's `exportResult` method for native
 canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns original native JSON
-text. `CashflowViewer` composes that hook with exact copy/print presentation;
+text. `CashflowViewer` presents its native rows in a table, with exact JSON copy/download in a secondary disclosure;
 unsupported export preserves caller pricing/model state and shows the native error.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useValidateInstrument` takes canonical text and a caller-owned revision; its
@@ -440,7 +440,7 @@ It exercises the real worker, edited inputs, wide integers, structured failures,
 font/worker/WASM assets, native-result agreement and exact cashflow output.
 Standalone chart and financial-wrapper checks use their public callbacks, tooltip
 props and shared SVG/PNG handles. `CashflowViewer` offers an exact-text JSON
-download; it does not parse or reserialize the native export.
+download; its presentation adapter parses numeric tokens losslessly, without reserializing exports or computing financial values.
 
 Set `REGISTRY_INSTALL_EVIDENCE` and `REGISTRY_SMOKE_DIR` to retain matrix and
 composition reports, logs, screenshots and exports. Failed applications are kept
@@ -455,13 +455,15 @@ job's fresh native packages and runs the complete gate.
 ## Printing completed valuations
 
 Use **Print report** after the workbench reports **Priced**. It captures that
-completed request and result, waits for the existing raw-cashflow query and fonts,
+completed request and result, waits for the native cashflow query and fonts,
 and opens the browser print dialog. Choose A4 or Letter; shared rules use 12 mm
 margins, a light theme, wrapping JSON and repeating table headers. Instrument,
-market, valuation, measures and raw cashflows reuse the existing components.
+market, valuation, measures and the cashflow table reuse the existing components.
 Closing the dialog restores the prior tabs and disclosure state. Unsupported
-cashflow requests retain the native error. Downloaded cashflow JSON remains exact;
-printing adds line wrapping and no currency conversion or typed cashflow table.
+cashflow requests retain the native error. The cashflow table preserves row-currency
+amounts separately from reporting-currency PV and shows the supplied total without
+recalculating it. Original JSON remains available in a collapsed disclosure for
+exact copy/download; printed reports show the table instead of the raw export.
 
 `mise run ui-publish-check` builds a fresh installed workbench consumer, generates
 four PDFs, verifies native download identity, checks offline SVG/PNG reopening

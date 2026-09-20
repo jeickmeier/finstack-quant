@@ -94,9 +94,9 @@ const displays = [
       "ValuationInstrumentsNamespace",
       "instrumentCashflowsJson",
     ],
-    route: "original-text",
+    route: "native-json-table",
     convention:
-      "Original Rust JSON string including native row currency and reporting-currency PV; never parse/recompute in the viewer.",
+      "CashflowRow presentation adapter from valuations/src/instruments/common_impl/cashflow_export.rs. Lossless tokens, native row currency and reporting-currency PV; Rust supplies total and reconciliation. Original JSON export stays unchanged.",
     deferred: "cashflow-declarations",
   },
   {
@@ -338,7 +338,7 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
         "machine-readable-units":
           "Generic values stay raw; do not infer units from names or decimal refs.",
         "cashflow-declarations":
-          "Original text only until the library publishes rows. Live FX-swap output contains mixed EUR/USD rows; the facade comment claiming mixed-currency schedules throw is stale.",
+          "No public typed WASM cashflow return. The viewer validates a presentation-only adapter against canonical Rust CashflowRow and native fixtures; it does not add a native API.",
         "weak-detail-declarations":
           "Unknown host details remain raw. Actual structured-credit num_paths is bigint; the typed Monte Carlo path counts are number. Never infer unknown host shapes from wire integer formats.",
         "full-state-curve-evaluation":

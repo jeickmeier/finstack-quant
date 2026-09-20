@@ -1,0 +1,144 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "cashflow-viewer",
+    "json-viewer",
+    "finstack-base",
+    "finstack-theme",
+    "button",
+    "use-cashflows",
+    "use-finstack",
+    "finstack-worker",
+    "finstack-codec",
+    "contract-market-context-state",
+    "finstack-format",
+    "finstack-host",
+    "contract-valuation-result",
+    "table",
+    "badge",
+    "use-price-instrument"
+  ],
+  "checks": [
+    {
+      "type": "bond",
+      "exactNativeText": true,
+      "nativeError": null,
+      "valuationRetained": true,
+      "selectedModel": "discounting"
+    },
+    {
+      "type": "fx_swap",
+      "exactNativeText": true,
+      "nativeError": null,
+      "valuationRetained": true,
+      "selectedModel": "discounting"
+    },
+    {
+      "type": "xccy_swap",
+      "exactNativeText": true,
+      "nativeError": null,
+      "valuationRetained": true,
+      "selectedModel": "discounting"
+    },
+    {
+      "type": "equity_option",
+      "exactNativeText": false,
+      "nativeError": "Validation error: model 'black76' not supported for instrument_cashflows; supported: 'discounting', 'hazard_rate'",
+      "valuationRetained": true,
+      "selectedModel": "black76"
+    }
+  ],
+  "accessibility": [
+    {
+      "type": "bond",
+      "density": "compact",
+      "violations": []
+    },
+    {
+      "type": "bond",
+      "density": "comfortable",
+      "violations": []
+    },
+    {
+      "type": "bond",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "keyboardScroll": true,
+      "violations": []
+    },
+    {
+      "type": "bond",
+      "viewport": {
+        "width": 1440,
+        "height": 1700
+      },
+      "keyboardScroll": true,
+      "violations": []
+    },
+    {
+      "type": "fx_swap",
+      "density": "compact",
+      "violations": []
+    },
+    {
+      "type": "fx_swap",
+      "density": "comfortable",
+      "violations": []
+    },
+    {
+      "type": "fx_swap",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "keyboardScroll": true,
+      "violations": []
+    },
+    {
+      "type": "fx_swap",
+      "viewport": {
+        "width": 1440,
+        "height": 1700
+      },
+      "keyboardScroll": true,
+      "violations": []
+    },
+    {
+      "type": "xccy_swap",
+      "density": "compact",
+      "violations": []
+    },
+    {
+      "type": "xccy_swap",
+      "density": "comfortable",
+      "violations": []
+    },
+    {
+      "type": "xccy_swap",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "keyboardScroll": true,
+      "violations": []
+    },
+    {
+      "type": "xccy_swap",
+      "viewport": {
+        "width": 1440,
+        "height": 1700
+      },
+      "keyboardScroll": true,
+      "violations": []
+    },
+    {
+      "type": "equity_option",
+      "violations": []
+    }
+  ],
+  "failures": [],
+  "print": "Native cashflow table visible; raw source and toolbar hidden",
+  "verdict": "pass"
+}

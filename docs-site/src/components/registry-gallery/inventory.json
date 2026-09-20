@@ -143,7 +143,7 @@
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
-      "docs": "Exact native cashflow JSON through the shared worker with loading, unavailable/error, copy and print states. Requires FinstackQueryProvider. Caller pricing and model state remain intact; no typed rows or totals are inferred."
+      "docs": "Native cashflow table through the shared worker, with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download in a secondary disclosure. Requires FinstackQueryProvider. Caller pricing and model state remain intact."
     },
     {
       "name": "monte-carlo-diagnostics",

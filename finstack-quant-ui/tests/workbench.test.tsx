@@ -378,7 +378,7 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
       entry.pricedValue,
     );
-    await userEvent.click(screen.getByRole("tab", { name: "3 Cashflow JSON" }));
+    await userEvent.click(screen.getByRole("tab", { name: "3 Cashflows" }));
     const viewer = await screen.findByRole("region", { name: "Cashflows" });
     if (entry.error)
       await waitFor(() =>
@@ -386,11 +386,16 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
           `Cashflows unavailable: ${entry.error}`,
         ),
       );
-    else
+    else {
+      await within(viewer).findByRole("table", { name: "Cashflow schedule" });
+      fireEvent.click(
+        within(viewer).getByText("Original JSON", { exact: true }),
+      );
       await waitFor(() => {
         showOriginal(viewer);
         expect(viewer.querySelector("pre")!.textContent).toBe(entry.cashflows);
       });
+    }
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
       entry.pricedValue,
     );
@@ -543,7 +548,7 @@ it("prepares one completed cashflow snapshot before printing and restores the in
     ).toBe("true");
     expect(
       screen
-        .getByRole("tab", { name: "3 Cashflow JSON" })
+        .getByRole("tab", { name: "3 Cashflows" })
         .getAttribute("aria-selected"),
     ).toBe("true");
   } finally {
@@ -585,7 +590,7 @@ it("keeps shortcuts within the focused workbench and leaves field typing intact"
   ).toBe("true");
   expect(
     within(right)
-      .getByRole("tab", { name: "3 Cashflow JSON" })
+      .getByRole("tab", { name: "3 Cashflows" })
       .getAttribute("aria-selected"),
   ).toBe("true");
   first.unmount();
