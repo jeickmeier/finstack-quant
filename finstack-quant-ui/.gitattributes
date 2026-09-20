@@ -1,2 +1,4 @@
 src/generated/** linguist-generated=true
 src/contract-provenance.json linguist-generated=true
+registry/theme/registry.json linguist-generated=true
+registry/theme/finstack-theme/theme.css linguist-generated=true

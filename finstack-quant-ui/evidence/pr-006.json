@@ -1,0 +1,111 @@
+{
+  "browser": "145.0.7632.6",
+  "faces": [
+    {
+      "spec": "400 14px \"IBM Plex Sans\"",
+      "count": 1,
+      "loaded": true
+    },
+    {
+      "spec": "italic 400 14px \"IBM Plex Sans\"",
+      "count": 1,
+      "loaded": true
+    },
+    {
+      "spec": "500 14px \"IBM Plex Sans\"",
+      "count": 1,
+      "loaded": true
+    },
+    {
+      "spec": "600 14px \"IBM Plex Sans\"",
+      "count": 1,
+      "loaded": true
+    },
+    {
+      "spec": "400 14px \"IBM Plex Mono\"",
+      "count": 1,
+      "loaded": true
+    },
+    {
+      "spec": "500 14px \"IBM Plex Mono\"",
+      "count": 1,
+      "loaded": true
+    }
+  ],
+  "fonts": [
+    {
+      "url": "/assets/ibm-plex-sans-latin-400-normal-CDDApCn2.woff2",
+      "status": 200
+    },
+    {
+      "url": "/assets/ibm-plex-sans-latin-500-normal-6ng42L7E.woff2",
+      "status": 200
+    },
+    {
+      "url": "/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2",
+      "status": 200
+    },
+    {
+      "url": "/assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2",
+      "status": 200
+    },
+    {
+      "url": "/assets/ibm-plex-sans-latin-400-italic-CZTNEAuW.woff2",
+      "status": 200
+    },
+    {
+      "url": "/assets/ibm-plex-sans-latin-600-normal-CuJfVYMP.woff2",
+      "status": 200
+    }
+  ],
+  "modes": [
+    {
+      "theme": "light",
+      "density": "compact",
+      "background": "rgb(250, 249, 246)",
+      "font": "\"IBM Plex Sans\", sans-serif",
+      "row": 28,
+      "field": 30,
+      "primary": "#086c61"
+    },
+    {
+      "theme": "light",
+      "density": "comfortable",
+      "background": "rgb(250, 249, 246)",
+      "font": "\"IBM Plex Sans\", sans-serif",
+      "row": 36,
+      "field": 36,
+      "primary": "#086c61"
+    },
+    {
+      "theme": "dark",
+      "density": "compact",
+      "background": "rgb(18, 27, 25)",
+      "font": "\"IBM Plex Sans\", sans-serif",
+      "row": 28,
+      "field": 30,
+      "primary": "#73c7b7"
+    },
+    {
+      "theme": "dark",
+      "density": "comfortable",
+      "background": "rgb(18, 27, 25)",
+      "font": "\"IBM Plex Sans\", sans-serif",
+      "row": 36,
+      "field": 36,
+      "primary": "#73c7b7"
+    }
+  ],
+  "tenant": [
+    {
+      "theme": "light",
+      "primary": "#5146a5"
+    },
+    {
+      "theme": "dark",
+      "primary": "#b7acf2"
+    }
+  ],
+  "failures": [],
+  "verdict": "pass"
+}

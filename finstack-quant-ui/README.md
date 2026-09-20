@@ -147,3 +147,17 @@ without duplicating generated source. No visual placeholders are published.
 imports, and type-checks files extracted from a fresh CLI build in a temporary
 consumer without path aliases. Package dependencies are supplied from the locked
 installation; a complete network install matrix is a later slice.
+
+## Shared theme
+
+Install `@finstack/finstack-theme`, then import `styles/finstack/theme.css` after
+Tailwind. Set `data-theme="light"` or `"dark"` and `data-density="compact"` or
+`"comfortable"` on the application root. Compact is the default. UI, table and
+chart wrappers share these properties; numeric text uses `finstack-numeric`.
+Tenant CSS loads after the theme and overrides the same variables.
+
+The single token source includes the Fontsource package versions, selected faces
+and SIL OFL-1.1 licences. `ui-gen` emits CSS and registry metadata; `ui-check`
+checks drift, literal colours/fonts and contrast, including the tenant example.
+`npm run test:theme:browser` builds and statically serves an installed theme
+fixture, checking actual font loading and the theme/density switches.

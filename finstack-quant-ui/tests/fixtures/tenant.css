@@ -1,0 +1,11 @@
+:root,
+[data-theme="light"] {
+  --primary: #5146a5;
+  --primary-foreground: #ffffff;
+  --ring: #5146a5;
+}
+[data-theme="dark"] {
+  --primary: #b7acf2;
+  --primary-foreground: #181526;
+  --ring: #b7acf2;
+}

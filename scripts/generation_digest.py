@@ -22,6 +22,8 @@ DEFAULT_PATHS = (
     Path("finstack-quant-ui/src/generated"),
     Path("finstack-quant-ui/src/contract-provenance.json"),
     Path("finstack-quant-ui/registry.json"),
+    Path("finstack-quant-ui/registry/theme/registry.json"),
+    Path("finstack-quant-ui/registry/theme/finstack-theme/theme.css"),
 )
 DEFAULT_MANIFEST_PATHS = (
     Path("finstack-quant/valuations/tests/instruments/json_examples"),
@@ -29,6 +31,8 @@ DEFAULT_MANIFEST_PATHS = (
     Path("finstack-quant-ui/src/generated"),
     Path("finstack-quant-ui/src/contract-provenance.json"),
     Path("finstack-quant-ui/registry.json"),
+    Path("finstack-quant-ui/registry/theme/registry.json"),
+    Path("finstack-quant-ui/registry/theme/finstack-theme/theme.css"),
 )
 DEFAULT_MANIFEST = Path("scripts/generated-artifacts.txt")
 
