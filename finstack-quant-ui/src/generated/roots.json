@@ -1,0 +1,407 @@
+[
+  {
+    "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
+    "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
+    "schema": "schemas/calibration.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_asian_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_asian_option.schema.json",
+    "schema": "schemas/commodity_asian_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_forward.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_forward.schema.json",
+    "schema": "schemas/commodity_forward.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_future_option.schema.json",
+    "schema": "schemas/commodity_future_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_future.schema.json",
+    "schema": "schemas/commodity_future.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_option.schema.json",
+    "schema": "schemas/commodity_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_spread_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_spread_option.schema.json",
+    "schema": "schemas/commodity_spread_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_swap.schema.json",
+    "schema": "schemas/commodity_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_swaption.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/commodity/commodity_swaption.schema.json",
+    "schema": "schemas/commodity_swaption.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
+    "schema": "schemas/composite.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_index.schema.json",
+    "schema": "schemas/cds_index.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_option.schema.json",
+    "schema": "schemas/cds_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/cds_tranche.schema.json",
+    "schema": "schemas/cds_tranche.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
+    "schema": "schemas/credit_default_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/autocallable.schema.json",
+    "schema": "schemas/autocallable.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/cliquet_option.schema.json",
+    "schema": "schemas/cliquet_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/discounted_cash_flow.schema.json",
+    "schema": "schemas/discounted_cash_flow.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity_future_option.schema.json",
+    "schema": "schemas/equity_future_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity_future.schema.json",
+    "schema": "schemas/equity_future.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity_option.schema.json",
+    "schema": "schemas/equity_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_total_return_future.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity_total_return_future.schema.json",
+    "schema": "schemas/equity_total_return_future.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/equity.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/equity.schema.json",
+    "schema": "schemas/equity.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
+    "schema": "schemas/levered_real_estate_equity.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/private_markets_fund.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/private_markets_fund.schema.json",
+    "schema": "schemas/private_markets_fund.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/real_estate_asset.schema.json",
+    "schema": "schemas/real_estate_asset.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/trs_equity.schema.json",
+    "schema": "schemas/trs_equity.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/variance_swap.schema.json",
+    "schema": "schemas/variance_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/volatility_index_future_option.schema.json",
+    "schema": "schemas/volatility_index_future_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/equity/volatility_index_future.schema.json",
+    "schema": "schemas/volatility_index_future.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/asian_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/asian_option.schema.json",
+    "schema": "schemas/asian_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/barrier_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/barrier_option.schema.json",
+    "schema": "schemas/barrier_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
+    "schema": "schemas/basket.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/callable_range_accrual.schema.json",
+    "schema": "schemas/callable_range_accrual.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/lookback_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/lookback_option.schema.json",
+    "schema": "schemas/lookback_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/range_accrual.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/range_accrual.schema.json",
+    "schema": "schemas/range_accrual.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/snowball.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/snowball.schema.json",
+    "schema": "schemas/snowball.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/tarn.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/exotics/tarn.schema.json",
+    "schema": "schemas/tarn.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/agency_cmo.schema.json",
+    "schema": "schemas/agency_cmo.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/agency_mbs_passthrough.schema.json",
+    "schema": "schemas/agency_mbs_passthrough.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/agency_tba.schema.json",
+    "schema": "schemas/agency_tba.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
+    "schema": "schemas/asset_backed_facility.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond_future.schema.json",
+    "schema": "schemas/bond_future.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond.schema.json",
+    "schema": "schemas/bond.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/convertible_bond.schema.json",
+    "schema": "schemas/convertible_bond.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/dollar_roll.schema.json",
+    "schema": "schemas/dollar_roll.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/inflation_linked_bond.schema.json",
+    "schema": "schemas/inflation_linked_bond.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/revolving_credit.schema.json",
+    "schema": "schemas/revolving_credit.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
+    "schema": "schemas/structured_credit.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/term_loan.schema.json",
+    "schema": "schemas/term_loan.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/trs_fixed_income_index.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/trs_fixed_income_index.schema.json",
+    "schema": "schemas/trs_fixed_income_index.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_barrier_option.schema.json",
+    "schema": "schemas/fx_barrier_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_digital_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_digital_option.schema.json",
+    "schema": "schemas/fx_digital_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_forward.schema.json",
+    "schema": "schemas/fx_forward.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_future_option.schema.json",
+    "schema": "schemas/fx_future_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_future.schema.json",
+    "schema": "schemas/fx_future.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_option.schema.json",
+    "schema": "schemas/fx_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_spot.schema.json",
+    "schema": "schemas/fx_spot.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_swap.schema.json",
+    "schema": "schemas/fx_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_touch_option.schema.json",
+    "schema": "schemas/fx_touch_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/fx_variance_swap.schema.json",
+    "schema": "schemas/fx_variance_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/ndf.schema.json",
+    "schema": "schemas/ndf.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/fx/quanto_option.schema.json",
+    "schema": "schemas/quanto_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/basis_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/basis_swap.schema.json",
+    "schema": "schemas/basis_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/bermudan_swaption.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/bermudan_swaption.schema.json",
+    "schema": "schemas/bermudan_swaption.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/cap_floor.schema.json",
+    "schema": "schemas/cap_floor.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_option.schema.json",
+    "schema": "schemas/cms_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_spread_option.schema.json",
+    "schema": "schemas/cms_spread_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_swap.schema.json",
+    "schema": "schemas/cms_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/deposit.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/deposit.schema.json",
+    "schema": "schemas/deposit.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/forward_rate_agreement.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/forward_rate_agreement.schema.json",
+    "schema": "schemas/forward_rate_agreement.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_cap_floor.schema.json",
+    "schema": "schemas/inflation_cap_floor.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_swap.schema.json",
+    "schema": "schemas/inflation_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future_option.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/interest_rate_future_option.schema.json",
+    "schema": "schemas/interest_rate_future_option.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/interest_rate_future.schema.json",
+    "schema": "schemas/interest_rate_future.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/interest_rate_swap.schema.json",
+    "schema": "schemas/interest_rate_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/repo.schema.json",
+    "schema": "schemas/repo.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/swaption.schema.json",
+    "schema": "schemas/swaption.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/xccy_swap.schema.json",
+    "schema": "schemas/xccy_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
+    "source": "finstack-quant/valuations/schemas/instruments/1/rates/yoy_inflation_swap.schema.json",
+    "schema": "schemas/yoy_inflation_swap.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+    "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
+    "schema": "schemas/market_context_state.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
+    "source": "finstack-quant/valuations/schemas/results/1/valuation_result.schema.json",
+    "schema": "schemas/valuation_result.json"
+  }
+]

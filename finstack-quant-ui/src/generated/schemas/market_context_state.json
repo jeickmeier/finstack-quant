@@ -1,0 +1,3296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Canonical v1 persisted snapshot of a complete market-data context.",
+  "examples": [
+    {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "hierarchy": null,
+      "inflation_indices": [],
+      "prices": {},
+      "schema_version": 1,
+      "series": [],
+      "surfaces": [],
+      "vol_cubes": []
+    }
+  ],
+  "properties": {
+    "collateral": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Collateral CSA mappings",
+      "type": "object"
+    },
+    "credit_indices": {
+      "description": "Credit index aggregates (references curves by ID)",
+      "items": {
+        "$ref": "#/$defs/d_4ad1b3e6968748946cee"
+      },
+      "type": "array"
+    },
+    "curves": {
+      "description": "All curves (discount, forward, hazard, inflation, base correlation)",
+      "items": {
+        "$ref": "#/$defs/d_a33b682660a7dfa1ea09"
+      },
+      "type": "array"
+    },
+    "dividends": {
+      "description": "Dividend schedules",
+      "items": {
+        "$ref": "#/$defs/d_1c77a48708b4a54d6160"
+      },
+      "type": "array"
+    },
+    "fx": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_fcf72b7d10aedbfe8482"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "FX matrix state (optional)"
+    },
+    "fx_delta_vol_surfaces": {
+      "description": "FX delta-quoted volatility surfaces",
+      "items": {
+        "$ref": "#/$defs/d_a154a0f59b6758a0e791"
+      },
+      "type": "array"
+    },
+    "hierarchy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_c190532de37b361cba38"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Market data hierarchy snapshot, or `null` when no hierarchy is configured.\n\nThe key is mandatory but its value is nullable: `deserialize_with` makes\nserde demand the key, and the struct-level `required` extension keeps it\nmandatory in the schema without stripping the `null` branch."
+    },
+    "inflation_indices": {
+      "description": "Inflation indices",
+      "items": {
+        "$ref": "#/$defs/d_e771e792357014c84cb9"
+      },
+      "type": "array"
+    },
+    "prices": {
+      "additionalProperties": {
+        "$ref": "#/$defs/d_ccdcf39725b3a38d5e6e"
+      },
+      "description": "Market scalars and prices",
+      "type": "object"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/d_400f0f60dc5a6032c150",
+      "description": "Required schema version. Only version `1` is accepted."
+    },
+    "series": {
+      "description": "Generic time series",
+      "items": {
+        "$ref": "#/$defs/d_7631522c7759bd704ba6"
+      },
+      "type": "array"
+    },
+    "surfaces": {
+      "description": "Volatility surfaces",
+      "items": {
+        "$ref": "#/$defs/d_9d04eee9f565b9c40882"
+      },
+      "type": "array"
+    },
+    "vol_cubes": {
+      "description": "SABR volatility cubes",
+      "items": {
+        "$ref": "#/$defs/d_8292ddf9415f5b0b91bb"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "curves",
+    "surfaces",
+    "prices",
+    "series",
+    "inflation_indices",
+    "dividends",
+    "credit_indices",
+    "fx_delta_vol_surfaces",
+    "vol_cubes",
+    "collateral",
+    "hierarchy"
+  ],
+  "title": "Market Context State",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+  "$defs": {
+    "d_061b61ce4cbde8c30057": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/d_1ed5efdf996631ea5784",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
+    "d_07856c27d945226b86ed": {
+      "description": "A dated dividend event.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+          "description": "Ex-dividend date."
+        },
+        "kind": {
+          "$ref": "#/$defs/d_1975b7627eb8a20fd7c3",
+          "description": "Event kind."
+        }
+      },
+      "required": [
+        "date",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "d_14c856f170a7fa5ec480": {
+      "description": "Enum of supported interpolation styles. The default is `Linear`.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Linear interpolation in values.",
+          "type": "string"
+        },
+        {
+          "const": "log_linear",
+          "description": "Log‐linear interpolation of positive values.",
+          "type": "string"
+        },
+        {
+          "const": "monotone_convex",
+          "description": "Monotone‐convex interpolation of positive, non-increasing values.",
+          "type": "string"
+        },
+        {
+          "const": "cubic_hermite",
+          "description": "Cubic Hermite interpolation (monotone-preserving slopes).",
+          "type": "string"
+        },
+        {
+          "const": "piecewise_quadratic_forward",
+          "description": "Piecewise quadratic forwards (C¹ forwards and C² log discount factors).",
+          "type": "string"
+        }
+      ]
+    },
+    "d_17ffcd7842a3f40268b1": {
+      "additionalProperties": false,
+      "description": "Typed conventions required to replay a rate-curve calibration.",
+      "properties": {
+        "currency": {
+          "$ref": "#/$defs/d_b6a74bd737ef1567b144",
+          "description": "Currency of the calibrated curve."
+        },
+        "curve_day_count": {
+          "$ref": "#/$defs/d_ac3149b00d5253379c16",
+          "description": "Day count used for the curve's time axis."
+        },
+        "method": {
+          "$ref": "#/$defs/d_e94fd584c7a9c31df19d",
+          "description": "Numerical calibration method."
+        },
+        "ois_compounding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_687d85aab3f98d958ef7"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional OIS floating-leg compounding override."
+        },
+        "quotes": {
+          "description": "Complete typed quote set required for exact replay.",
+          "items": {
+            "$ref": "#/$defs/d_7648df53fa77f2541b06"
+          },
+          "type": "array"
+        },
+        "role": {
+          "$ref": "#/$defs/d_48766f6cb460f23a8724",
+          "description": "Discount/projection role and linked curve identifier."
+        }
+      },
+      "required": [
+        "currency",
+        "method",
+        "curve_day_count",
+        "role",
+        "quotes"
+      ],
+      "type": "object"
+    },
+    "d_1975b7627eb8a20fd7c3": {
+      "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount.",
+          "properties": {
+            "cash": {
+              "$ref": "#/$defs/d_d99050870612e8bfc3d3"
+            }
+          },
+          "required": [
+            "cash"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments.",
+          "properties": {
+            "yield": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "yield"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held.",
+          "properties": {
+            "stock": {
+              "properties": {
+                "ratio": {
+                  "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "ratio"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "stock"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_1a06a0fdbb3b25f44f0d": {
+      "description": "Typed maturity specification retained from an original market quote.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Relative tenor resolved from the calibration base date.",
+          "properties": {
+            "tenor": {
+              "$ref": "#/$defs/d_061b61ce4cbde8c30057"
+            }
+          },
+          "required": [
+            "tenor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Absolute calendar date.",
+          "properties": {
+            "date": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456"
+            }
+          },
+          "required": [
+            "date"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_1c77a48708b4a54d6160": {
+      "additionalProperties": false,
+      "description": "Dividend schedule for an equity or ETF underlying.\n\nContains a time-ordered sequence of dividend events used for pricing equity\nderivatives and calculating total return. The schedule can be referenced by\nmultiple instruments via its [`CurveId`] in the market context.\n\n# Usage in Pricing\n\n- **Discrete dividends**: Subtract PV of future dividends from spot for option pricing\n- **Ex-dividend adjustments**: Reduce forward price by dividend amount\n- **Dividend futures**: Sum dividends in contract period\n- **Total return**: Include dividend reinvestment in performance\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::dividends::DividendSchedule;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet schedule = DividendSchedule::builder(\"AAPL-DIVS\")\n    .underlying(\"AAPL\")\n    .currency(Currency::USD)\n    .cash(\n        Date::from_calendar_date(2025, Month::March, 15).expect(\"Valid date\"),\n        Money::new(0.24, Currency::USD).expect(\"valid money fixture\")\n    ).build().expect(\"Valid dividends\");\n\nassert_eq!(schedule.get_events().len(), 1);\n```",
+      "properties": {
+        "currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Quote currency for cash dividends (optional metadata)."
+        },
+        "events": {
+          "description": "Sorted events by date (ascending).",
+          "items": {
+            "$ref": "#/$defs/d_07856c27d945226b86ed"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+          "description": "Unique identifier of this schedule in the market context."
+        },
+        "underlying": {
+          "description": "Optional display symbol/ticker for convenience.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "events"
+      ],
+      "type": "object"
+    },
+    "d_1ec33fbdab11dd6751bf": {
+      "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources.",
+      "oneOf": [
+        {
+          "const": "cashflow_date",
+          "description": "Use spot/forward on the cashflow date.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "Use period end date.",
+          "type": "string"
+        },
+        {
+          "const": "period_average",
+          "description": "Use an average over the period.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_1ed5efdf996631ea5784": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    },
+    "d_21e7c0751f339b65c465": {
+      "description": "Serialized identifier for an interest-rate futures convention.",
+      "type": "string"
+    },
+    "d_268127561c9d65277399": {
+      "additionalProperties": false,
+      "description": "One atomic quote binding retained for hazard calibration replay.",
+      "properties": {
+        "pillar_date": {
+          "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+          "description": "Contractual pillar date resolved from the quote and CDS conventions."
+        },
+        "pillar_time": {
+          "description": "Frozen year-fraction pillar time used by the original solve.",
+          "format": "double",
+          "type": "number"
+        },
+        "quote": {
+          "description": "Exact serialized typed CDS quote."
+        }
+      },
+      "required": [
+        "quote",
+        "pillar_date",
+        "pillar_time"
+      ],
+      "type": "object"
+    },
+    "d_29287993dab35875106b": {
+      "description": "Quoting convention of the volatilities stored on a [`VolSurface`].\n\nThe same `vol_surface_id` channel is read by consumers with very different\nexpectations: rates calibrations typically read normal (Bachelier, absolute)\nvols on an `expiry × tenor` ATM matrix, while equity/FX/swaption smile\nconsumers read Black (lognormal, relative) vols on `expiry × strike`. The\nstored numbers are an order of magnitude apart (e.g. 0.008 normal vs 0.20\nBlack), so misreading one as the other silently mis-prices. Tagging the\nquote type lets consumers enforce their convention via\n[`VolSurface::require_quote_type`].",
+      "oneOf": [
+        {
+          "const": "black_lognormal",
+          "description": "Black (lognormal) implied volatility, relative units (the default).",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Normal (Bachelier) implied volatility, absolute rate units.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_33ee2f2e4664717e30ef": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "d_400f0f60dc5a6032c150": {
+      "description": "Numeric schema revision for contracts whose sole supported revision is v1.",
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "d_42ed66bb80d77e9fa456": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "d_467e0d727ff2ae92c819": {
+      "additionalProperties": false,
+      "description": "A single node in the market data hierarchy tree.\n\nNodes form a tree: each has a name, optional key-value tags for cross-cutting\nqueries, ordered children, and leaf `CurveId` references.",
+      "properties": {
+        "children": {
+          "additionalProperties": {
+            "$ref": "#/$defs/d_467e0d727ff2ae92c819"
+          },
+          "description": "Child nodes, keyed by their name. The key becomes the child's `name`\nduring deserialization. Insertion order is preserved.",
+          "type": "object"
+        },
+        "curves": {
+          "description": "Curves attached directly to this node. Serialized as `curves`.",
+          "items": {
+            "$ref": "#/$defs/d_33ee2f2e4664717e30ef"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Free-form key/value labels on this node, used for selection and\nreporting. Insertion order is preserved.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "d_48549691c341fd7f3116": {
+      "description": "Exact decimal encoded only as a JSON string.",
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "type": "string"
+    },
+    "d_48766f6cb460f23a8724": {
+      "description": "Role of a curve and its linked rate-curve identifier during calibration.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Discount curve, linked to the projection curve used to price its instruments.",
+          "properties": {
+            "discount": {
+              "properties": {
+                "projection_curve_id": {
+                  "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+                  "description": "Projection curve identifier used by the calibration instruments."
+                }
+              },
+              "required": [
+                "projection_curve_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "discount"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Projection curve, linked to the discount curve used to price its instruments.",
+          "properties": {
+            "projection": {
+              "properties": {
+                "discount_curve_id": {
+                  "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+                  "description": "Discount curve identifier used by the calibration instruments."
+                }
+              },
+              "required": [
+                "discount_curve_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "projection"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_4ad1b3e6968748946cee": {
+      "additionalProperties": false,
+      "description": "Serializable state for credit index data.\n\nInstead of serializing `Arc<Curve>` directly, we store curve IDs that\nreference curves present in the `MarketContextState`.",
+      "properties": {
+        "base_correlation_curve_id": {
+          "description": "ID of the base correlation curve (must exist in context curves)",
+          "type": "string"
+        },
+        "id": {
+          "description": "Unique identifier for this credit index",
+          "type": "string"
+        },
+        "index_credit_curve_id": {
+          "description": "ID of the index hazard curve (must exist in context curves)",
+          "type": "string"
+        },
+        "issuer_credit_curve_ids": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Optional map of issuer ID → hazard curve ID",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "issuer_recovery_rates": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Optional map of issuer ID → recovery rate",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "issuer_weights": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Optional map of issuer ID → weight",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "num_constituents": {
+          "description": "Number of constituents",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recovery_rate": {
+          "description": "Recovery rate",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "num_constituents",
+        "recovery_rate",
+        "index_credit_curve_id",
+        "base_correlation_curve_id"
+      ],
+      "type": "object"
+    },
+    "d_62ea2337bc6d3ab04194": {
+      "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation.",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_687d85aab3f98d958ef7": {
+      "description": "OIS floating-leg compounding convention used during calibration.",
+      "oneOf": [
+        {
+          "const": "simple",
+          "description": "Simple term-rate accrual.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Daily compounding in arrears, optionally with a lookback or observation shift.",
+          "properties": {
+            "compounded_in_arrears": {
+              "properties": {
+                "lookback_days": {
+                  "description": "Business-day lookback applied to rate observations.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_in_arrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Daily compounding with an ISDA observation shift.",
+          "properties": {
+            "compounded_with_observation_shift": {
+              "properties": {
+                "shift_days": {
+                  "description": "Business days by which observations and accrual weights are shifted.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_observation_shift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Daily compounding with the final observed rate held through a cutoff window.",
+          "properties": {
+            "compounded_with_rate_cutoff": {
+              "properties": {
+                "cutoff_days": {
+                  "description": "Number of business days in the rate-cutoff window.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_rate_cutoff"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_7294ceac8716eaa72c7a": {
+      "description": "Interpolation method for reporting par spreads stored on the curve.\n\nApplies only to *par-spread* readouts (the spreads quoted at calibration\npillars), not to the underlying hazard rates. Hazard interpolation always\nfollows piecewise-constant survival. Use `LogLinear` when spreads span\nmultiple decades (e.g. high-yield issuers) so interpolation stays in\nlog-space; otherwise the default `Linear` is fine.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Linear interpolation in spread space",
+          "type": "string"
+        },
+        {
+          "const": "log_linear",
+          "description": "Log-linear interpolation when spreads are strictly positive",
+          "type": "string"
+        }
+      ]
+    },
+    "d_7631522c7759bd704ba6": {
+      "additionalProperties": false,
+      "description": "Date-indexed time series with flexible interpolation.\n\nProvides lightweight storage for historical or forecast data with step or\nlinear interpolation. Unlike full term structures, this is optimized for\nsparse, irregularly-spaced observations.\n\n# Storage\n\nUses columnar format with parallel arrays:\n- Dates stored as i32 (days since Unix epoch) for compact size\n- Values stored as f64\n- Binary search for O(log n) lookup\n\n# Interpolation\n\n- **Step**: Last observation carried forward (LOCF)\n- **Linear**: Linear interpolation between observations\n\n# Use Cases\n\n- **Economic indicators**: GDP, unemployment rate, PMI\n- **Credit metrics**: Historical credit spreads, CDS levels\n- **Commodity fundamentals**: Inventory levels, production data\n- **Any sparse time series**: Where full curve infrastructure is overkill\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"US-UNEMPLOYMENT\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 3.7),\n        (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 3.9),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\")\n.with_interpolation(SeriesInterpolation::Linear);\n\nlet mid = Date::from_calendar_date(2024, Month::February, 14).expect(\"Valid date\");\nlet interpolated = series.value_on(mid).expect(\"Value lookup should succeed\");\nassert!(interpolated > 3.7 && interpolated < 3.9);\n```",
+      "properties": {
+        "currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional currency"
+        },
+        "id": {
+          "description": "Series identifier",
+          "type": "string"
+        },
+        "interpolation": {
+          "$ref": "#/$defs/d_f9d22f9148b706cb0598",
+          "description": "Interpolation method"
+        },
+        "observations": {
+          "description": "Observations as (date, value) pairs",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/d_42ed66bb80d77e9fa456"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "observations",
+        "interpolation"
+      ],
+      "type": "object"
+    },
+    "d_7648df53fa77f2541b06": {
+      "description": "Lossless rate quote representation used by calibration replay.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Money-market deposit quote.",
+          "properties": {
+            "deposit": {
+              "additionalProperties": false,
+              "properties": {
+                "index_id": {
+                  "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+                  "description": "Referenced rate index."
+                },
+                "pillar": {
+                  "$ref": "#/$defs/d_1a06a0fdbb3b25f44f0d",
+                  "description": "Relative-tenor or absolute-date pillar."
+                },
+                "rate": {
+                  "description": "Quoted deposit rate.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "index_id",
+                "pillar",
+                "rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "deposit"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Forward-rate agreement quote.",
+          "properties": {
+            "fra": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "$ref": "#/$defs/d_1a06a0fdbb3b25f44f0d",
+                  "description": "FRA end pillar."
+                },
+                "index_id": {
+                  "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+                  "description": "Referenced rate index."
+                },
+                "rate": {
+                  "description": "Quoted FRA rate.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "start": {
+                  "$ref": "#/$defs/d_1a06a0fdbb3b25f44f0d",
+                  "description": "FRA start pillar."
+                }
+              },
+              "required": [
+                "index_id",
+                "start",
+                "end",
+                "rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "fra"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Interest-rate futures quote.",
+          "properties": {
+            "futures": {
+              "additionalProperties": false,
+              "properties": {
+                "contract": {
+                  "$ref": "#/$defs/d_21e7c0751f339b65c465",
+                  "description": "Convention-registry identifier for the futures contract."
+                },
+                "convexity_adjustment": {
+                  "description": "Optional pre-computed convexity adjustment.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "expiry": {
+                  "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+                  "description": "Futures expiry date."
+                },
+                "price": {
+                  "description": "Quoted futures price.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "contract",
+                "expiry",
+                "price"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "futures"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Interest-rate swap quote.",
+          "properties": {
+            "swap": {
+              "additionalProperties": false,
+              "properties": {
+                "index_id": {
+                  "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+                  "description": "Referenced floating-rate index."
+                },
+                "pillar": {
+                  "$ref": "#/$defs/d_1a06a0fdbb3b25f44f0d",
+                  "description": "Relative-tenor or absolute-date maturity pillar."
+                },
+                "rate": {
+                  "description": "Quoted fixed rate.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "spread_decimal": {
+                  "description": "Optional floating-leg spread.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "index_id",
+                "pillar",
+                "rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "swap"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Tenor-basis spread quote versus the linked discount curve.",
+          "properties": {
+            "basis": {
+              "additionalProperties": false,
+              "properties": {
+                "index_id": {
+                  "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+                  "description": "Referenced projection-rate index."
+                },
+                "pillar": {
+                  "$ref": "#/$defs/d_1a06a0fdbb3b25f44f0d",
+                  "description": "Relative-tenor or absolute-date maturity pillar."
+                },
+                "spread_decimal": {
+                  "description": "Quoted basis spread in decimal form.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "index_id",
+                "pillar",
+                "spread_decimal"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "basis"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_7fbd5a62c7c39ad98666": {
+      "additionalProperties": false,
+      "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.\n\nControls triangulation and caching.",
+      "properties": {
+        "cache_capacity": {
+          "default": 256,
+          "description": "Maximum number of provider-observed quotes retained in the LRU cache.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "enable_triangulation": {
+          "default": true,
+          "description": "Whether to enable automatic triangulation for missing rates.\n\nWhen enabled, the matrix will attempt `from -> pivot -> to` and will not\nsearch multi-hop paths or alternative pivots.",
+          "type": "boolean"
+        },
+        "pivot_currency": {
+          "$ref": "#/$defs/d_b6a74bd737ef1567b144",
+          "default": "USD",
+          "description": "Pivot currency for triangulation fallback (typically USD).\n\nCurrent limitation: triangulation uses this single configured pivot only.\nIf a market convention requires a different routing currency for a given\npair, callers must seed that direct quote explicitly instead of relying on\nautomatic cross construction."
+        }
+      },
+      "type": "object"
+    },
+    "d_8292ddf9415f5b0b91bb": {
+      "additionalProperties": false,
+      "description": "SABR volatility cube on an expiry x tenor grid.\n\nEach grid node stores a [`SabrParameterData`] and a forward rate. The\ninterpolation mode records how a models-layer evaluator should combine\nnodes; core performs structural validation only.",
+      "properties": {
+        "expiries": {
+          "description": "Option expiries in years, strictly increasing. Indexes the first axis.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "forwards": {
+          "description": "Row-major: forwards[expiry_idx * n_tenors + tenor_idx]",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Identifier the cube is registered and looked up under.",
+          "type": "string"
+        },
+        "interpolation_mode": {
+          "$ref": "#/$defs/d_9ba58a59f23c169d3a67",
+          "description": "How volatilities are interpolated between the cube's grid points."
+        },
+        "params": {
+          "description": "Row-major: params[expiry_idx * n_tenors + tenor_idx]",
+          "items": {
+            "$ref": "#/$defs/d_a550785704f9d0f9db7a"
+          },
+          "type": "array"
+        },
+        "tenors": {
+          "description": "Underlying swap tenors in years, strictly increasing. Indexes the\nsecond axis.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "expiries",
+        "tenors",
+        "params",
+        "forwards",
+        "interpolation_mode"
+      ],
+      "type": "object"
+    },
+    "d_86124daa1d76a07e8682": {
+      "description": "Extrapolation policy for evaluation outside the knot range.\n\nAll [`InterpolationStrategy`](super::traits::InterpolationStrategy)\nimplementations honour this policy at both ends of the knot range.\nChoose based on what behaviour the downstream pricer expects:\n\n- `FlatZero` (default): hold the boundary value constant. Safe for\n  discount factors and survival probabilities.\n- `FlatForward`: extend the boundary slope. Useful for forward-rate\n  curves where extrapolated rates should track the local term-structure\n  slope.\n- `Nan`: refuse to extrapolate; return `NaN` and require the caller to\n  detect and handle out-of-range queries explicitly. Recommended for\n  production risk systems.\n\n`#[non_exhaustive]` so that future policies (e.g. linear-zero,\nasymptotic) can be added without breaking downstream code.",
+      "oneOf": [
+        {
+          "const": "flat_zero",
+          "description": "Constant value extension.",
+          "type": "string"
+        },
+        {
+          "const": "flat_forward",
+          "description": "Tangent/forward extension using boundary slope.",
+          "type": "string"
+        },
+        {
+          "const": "none",
+          "description": "Return `NaN` for queries outside the knot range.\n\nUse this to prevent silent extrapolation in production risk systems\nwhere extrapolated values should be explicitly opted-in.\nCallers should check `.is_nan()` on the result and handle accordingly.\n\n# When to Use\n\n- Risk management systems where extrapolated values are unreliable\n- Validation pipelines where out-of-range queries indicate data errors\n- Any context where silent extrapolation could mask problems\n\n# Note\n\nSince interpolation returns `f64` (not `Result`), this policy returns\n`f64::NAN` rather than an error. This avoids changing the hot-path\nsignature while still making out-of-range queries detectable.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_92582eaaa8147270716a": {
+      "description": "Semantic meaning of the secondary axis on a [`VolSurface`].\n\nMost option surfaces are defined on `expiry × strike`, but some calibration\nworkflows materialize ATM matrices on `expiry × tenor`. Keeping the axis type\nexplicit prevents consumers from accidentally interpreting tenor buckets as\nstrikes.",
+      "oneOf": [
+        {
+          "const": "strike",
+          "description": "The secondary axis is strike/moneyness.",
+          "type": "string"
+        },
+        {
+          "const": "tenor",
+          "description": "The secondary axis is swap tenor or another maturity-style bucket.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_9ba58a59f23c169d3a67": {
+      "description": "Interpolation contract for vol surfaces.",
+      "oneOf": [
+        {
+          "const": "vol",
+          "description": "Interpolate implied volatility directly (the default).\n\nThis is the most literal choice when market quotes are already given as\nimplied volatilities on the stored grid and you want local interpolation\nin quote space.\n\n# ⚠️ Not calendar-arbitrage-safe across expiry\n\nLinear-in-vol interpolation along the **expiry** axis does not preserve\nmonotonicity of total variance `σ²·t`, so an off-grid vol read between\ntwo expiry pillars can imply *decreasing* total variance with time —\ni.e. calendar arbitrage — even when the pillar grid is itself\narbitrage-free. For arbitrage-sensitive workflows (Dupire local vol,\nno-arb checks, term-structure interpolation) select\n[`TotalVariance`](Self::TotalVariance) via\n[`VolSurface::with_interpolation_mode`]. Use this default when\nquote-space fidelity at the pillars is the governing convention.",
+          "type": "string"
+        },
+        {
+          "const": "total_variance",
+          "description": "Interpolate total variance `sigma^2 * t`, then convert back to implied vol.\n\nPreferred when blending across expiries: total variance behaves more\nlinearly in time and preserves the no-arbitrage intuition for variance\naccumulation, avoiding the calendar-arbitrage trap of linear-in-vol\ninterpolation (see [`Vol`](Self::Vol)).",
+          "type": "string"
+        }
+      ]
+    },
+    "d_9d04eee9f565b9c40882": {
+      "additionalProperties": false,
+      "description": "Volatility surface defined on expiry × strike grid.\n\nInternally stores volatilities in row-major order as a boxed slice.",
+      "properties": {
+        "expiries": {
+          "description": "Expiry times in years",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Surface identifier",
+          "type": "string"
+        },
+        "interpolation_mode": {
+          "$ref": "#/$defs/d_9ba58a59f23c169d3a67",
+          "description": "Interpolation contract."
+        },
+        "quote_type": {
+          "$ref": "#/$defs/d_29287993dab35875106b",
+          "description": "Quote convention."
+        },
+        "secondary_axis": {
+          "$ref": "#/$defs/d_92582eaaa8147270716a",
+          "description": "Semantic meaning of the secondary axis."
+        },
+        "strikes": {
+          "description": "Strike prices",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "vols_row_major": {
+          "description": "Volatility values in row-major order",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "expiries",
+        "strikes",
+        "secondary_axis",
+        "quote_type",
+        "interpolation_mode",
+        "vols_row_major"
+      ],
+      "type": "object"
+    },
+    "d_a154a0f59b6758a0e791": {
+      "additionalProperties": false,
+      "description": "Delta-quoted FX volatility surface.\n\nStores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,\n25-delta butterfly) across multiple expiries. Models-layer functions\nperform delta conversion and volatility evaluation.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;\n\nlet surface = FxDeltaVolSurface::new(\n    \"EURUSD-DELTA-VOL\",\n    vec![0.25, 0.5, 1.0],\n    vec![0.08, 0.085, 0.09],\n    vec![0.01, 0.012, 0.015],\n    vec![0.005, 0.006, 0.007],\n    None,\n).expect(\"surface should build\");\n\nassert_eq!(surface.num_expiries(), 3);\nassert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);\n```",
+      "properties": {
+        "atm_vols": {
+          "description": "ATM delta-neutral straddle vols per expiry.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "bf_10d": {
+          "description": "Optional 10-delta butterfly per expiry.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "bf_25d": {
+          "description": "25-delta butterfly per expiry.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "expiries": {
+          "description": "Expiry times in years.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/d_33ee2f2e4664717e30ef",
+          "description": "Surface identifier."
+        },
+        "rr_10d": {
+          "description": "Optional 10-delta risk reversal per expiry.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "rr_25d": {
+          "description": "25-delta risk reversal per expiry.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "expiries",
+        "atm_vols",
+        "rr_25d",
+        "bf_25d"
+      ],
+      "type": "object"
+    },
+    "d_a33b682660a7dfa1ea09": {
+      "description": "Serializable state representation for any curve type.\n\nProduced when persisting market data snapshots through serde.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Discount curve state",
+          "properties": {
+            "allow_non_monotonic": {
+              "description": "Whether non-monotonic DFs are allowed (dangerous override)",
+              "type": "boolean"
+            },
+            "base": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date"
+            },
+            "calibration_ois_cutoff_days": {
+              "description": "OIS cut-off (business days) the curve was calibrated under, if any.",
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "description": "Day count convention for discount time basis"
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/d_86124daa1d76a07e8682",
+              "description": "Extrapolation policy"
+            },
+            "fx_policy": {
+              "description": "Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "description": "Curve identifier",
+              "type": "string"
+            },
+            "interp_style": {
+              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
+              "description": "Interpolation style"
+            },
+            "knot_points": {
+              "description": "Time/value pairs used to construct the curve",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "min_forward_rate": {
+              "description": "Minimum forward rate floor (if set)",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "min_forward_tenor": {
+              "description": "Minimum tenor for forward rate calculations",
+              "format": "double",
+              "type": "number"
+            },
+            "rate_calibration": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_17ffcd7842a3f40268b1"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact typed calibration replay recipe."
+            },
+            "type": {
+              "const": "discount",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base",
+            "day_count",
+            "knot_points",
+            "interp_style",
+            "extrapolation",
+            "allow_non_monotonic",
+            "min_forward_tenor"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Forward curve state",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date"
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "description": "Day count convention"
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/d_86124daa1d76a07e8682",
+              "description": "Extrapolation policy"
+            },
+            "fx_policy": {
+              "description": "Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "description": "Curve identifier",
+              "type": "string"
+            },
+            "interp_style": {
+              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
+              "description": "Interpolation style"
+            },
+            "knot_points": {
+              "description": "Time/value pairs used to construct the curve",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "projection_grid": {
+              "description": "Optional contractual reset/end-date boundaries.\n\n`None` selects fixed numeric-tenor discount-factor stepping.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "rate_calibration": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_17ffcd7842a3f40268b1"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact typed calibration replay recipe."
+            },
+            "reset_lag": {
+              "description": "Reset lag in business days",
+              "format": "int32",
+              "type": "integer"
+            },
+            "tenor": {
+              "description": "Index tenor in years",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "forward",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base",
+            "reset_lag",
+            "day_count",
+            "tenor",
+            "knot_points",
+            "interp_style",
+            "extrapolation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Hazard curve state",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date"
+            },
+            "currency": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Currency"
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "description": "Day count convention"
+            },
+            "fx_policy": {
+              "default": null,
+              "description": "Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hazard_calibration": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_a9791cac4c0854b02bbe"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Exact calibration replay inputs."
+            },
+            "id": {
+              "description": "Curve identifier",
+              "type": "string"
+            },
+            "issuer": {
+              "description": "Optional issuer",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "knot_points": {
+              "description": "Time/value pairs used to construct the curve",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "par_interp": {
+              "$ref": "#/$defs/d_7294ceac8716eaa72c7a",
+              "default": "linear",
+              "description": "Par interpolation method"
+            },
+            "par_points": {
+              "description": "Par spread points for reporting",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "recovery_rate": {
+              "description": "Recovery rate",
+              "format": "double",
+              "type": "number"
+            },
+            "seniority": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_b205675b4d5addcd52ba"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Seniority"
+            },
+            "survival_interp": {
+              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
+              "default": "log_linear",
+              "description": "Survival-probability interpolation style between pillars"
+            },
+            "type": {
+              "const": "hazard",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base",
+            "knot_points",
+            "recovery_rate",
+            "day_count",
+            "par_points"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Inflation curve state",
+          "properties": {
+            "base_cpi": {
+              "description": "Base CPI level at t=0",
+              "format": "double",
+              "type": "number"
+            },
+            "base_date": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date"
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "default": "act_365f",
+              "description": "Day count convention"
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/d_86124daa1d76a07e8682",
+              "description": "Extrapolation policy"
+            },
+            "id": {
+              "description": "Curve identifier",
+              "type": "string"
+            },
+            "indexation_lag_months": {
+              "default": 3,
+              "description": "Indexation lag in months",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "interp_style": {
+              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
+              "description": "Interpolation style"
+            },
+            "knot_points": {
+              "description": "Time/value pairs used to construct the curve",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "inflation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base_cpi",
+            "base_date",
+            "knot_points",
+            "interp_style",
+            "extrapolation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "BaseCorrelation curve state",
+          "properties": {
+            "correlations": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "detachment_points": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "id": {
+              "$ref": "#/$defs/d_33ee2f2e4664717e30ef"
+            },
+            "type": {
+              "const": "base_correlation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "detachment_points",
+            "correlations"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Price curve state",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date"
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "description": "Day count convention"
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/d_86124daa1d76a07e8682",
+              "description": "Extrapolation policy"
+            },
+            "id": {
+              "description": "Curve identifier",
+              "type": "string"
+            },
+            "interp_style": {
+              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
+              "description": "Interpolation style"
+            },
+            "knot_points": {
+              "description": "Time/value pairs used to construct the curve",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "spot_level": {
+              "description": "Spot index level (volatility index curves)",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "spot_price": {
+              "description": "Spot price (signed price curves)",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "price",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base",
+            "day_count",
+            "knot_points",
+            "interp_style",
+            "extrapolation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "VolIndex curve state",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date"
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "description": "Day count convention"
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/d_86124daa1d76a07e8682",
+              "description": "Extrapolation policy"
+            },
+            "id": {
+              "description": "Curve identifier",
+              "type": "string"
+            },
+            "interp_style": {
+              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
+              "description": "Interpolation style"
+            },
+            "knot_points": {
+              "description": "Time/value pairs used to construct the curve",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "spot_level": {
+              "description": "Spot index level (volatility index curves)",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "spot_price": {
+              "description": "Spot price (signed price curves)",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "vol_index",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base",
+            "day_count",
+            "knot_points",
+            "interp_style",
+            "extrapolation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "BasisSpread curve state",
+          "properties": {
+            "base": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date."
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "description": "Day count convention."
+            },
+            "extrapolation": {
+              "$ref": "#/$defs/d_86124daa1d76a07e8682",
+              "description": "Extrapolation policy."
+            },
+            "id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "interp_style": {
+              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
+              "description": "Interpolation style."
+            },
+            "knot_points": {
+              "description": "Time/value pairs used to construct the curve.",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "basis_spread",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base",
+            "day_count",
+            "knot_points",
+            "interp_style",
+            "extrapolation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Parametric curve state",
+          "properties": {
+            "base_date": {
+              "$ref": "#/$defs/d_42ed66bb80d77e9fa456",
+              "description": "Base date."
+            },
+            "day_count": {
+              "$ref": "#/$defs/d_ac3149b00d5253379c16",
+              "description": "Day count convention."
+            },
+            "id": {
+              "description": "Curve identifier.",
+              "type": "string"
+            },
+            "model": {
+              "$ref": "#/$defs/d_fe18010fa6c9de5d3f03",
+              "description": "Nelson-Siegel model parameters."
+            },
+            "type": {
+              "const": "parametric",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "base_date",
+            "day_count",
+            "model"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_a550785704f9d0f9db7a": {
+      "additionalProperties": false,
+      "description": "Data-only SABR parameters for one volatility-cube node.\n\nThis type records calibrated market data. SABR evaluation, interpolation,\ncalibration, and convention conversion are owned by\n`finstack-quant-models`.",
+      "properties": {
+        "alpha": {
+          "format": "double",
+          "type": "number"
+        },
+        "beta": {
+          "format": "double",
+          "type": "number"
+        },
+        "nu": {
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "format": "double",
+          "type": "number"
+        },
+        "shift": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "alpha",
+        "beta",
+        "rho",
+        "nu"
+      ],
+      "type": "object"
+    },
+    "d_a9791cac4c0854b02bbe": {
+      "description": "Exact valuation-layer inputs required to replay a hazard-curve calibration.\n\nThe core market-data crate stores these payloads without interpreting them;\nthe calibration crate deserializes them back into its canonical\n`HazardCurveParams`, typed CDS quotes, and `CalibrationConfig`. Keeping the\ncomplete serde payloads avoids replacing date pillars with rounded tenors or\nsilently substituting current defaults for the original solver policy.",
+      "properties": {
+        "calibration_config": {
+          "description": "Exact serialized `CalibrationConfig`, including solver and validation policy."
+        },
+        "calibration_inputs": {
+          "description": "Original par-spread or upfront inputs used to calibrate the curve.",
+          "items": {
+            "$ref": "#/$defs/d_268127561c9d65277399"
+          },
+          "type": "array"
+        },
+        "hazard_params": {
+          "description": "Exact serialized `HazardCurveParams` used for the original solve."
+        },
+        "spread_risk_inputs": {
+          "description": "Par-spread-only inputs used for quote-space spread risk.",
+          "items": {
+            "$ref": "#/$defs/d_268127561c9d65277399"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hazard_params",
+        "calibration_inputs",
+        "spread_risk_inputs",
+        "calibration_config"
+      ],
+      "type": "object"
+    },
+    "d_ac3149b00d5253379c16": {
+      "description": "Supported day-count conventions with industry-standard definitions.\n\nEach variant implements a specific day count convention as defined by\nISDA, ICMA, or local market conventions. The conventions determine how\ninterest accrues between payment dates.\n\n# Standards References\n\nImplementations follow:\n- **ISDA**: 2006 ISDA Definitions, Section 4.16\n- **ICMA**: ICMA Rule Book, Rule 251\n- **ISO**: ISO 20022 Day Count Fraction Codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\n// Actual/360 - money market convention\nlet yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\n// 30/360 - bond convention\nlet yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\nassert!(yf_360 > yf_30360); // Act/360 has larger denominator\n```",
+      "oneOf": [
+        {
+          "const": "one_one",
+          "description": "One unit per contractual accrual period, irrespective of its length.\nInflation fixed legs compound across annual periods using this convention.\nEmpty intervals return zero and reversed intervals are rejected, as for\nall day counts in this API.",
+          "type": "string"
+        },
+        {
+          "const": "act_360",
+          "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "act_365f",
+          "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English\n\n# Usage\n\nStandard for:\n- GBP money markets (SONIA)\n- Cable (GBP/USD) FX transactions\n- Some Commonwealth bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2026, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365F.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert!((yf - 1.0).abs() < 1e-9); // 365 days / 365 = 1.0\n```",
+          "type": "string"
+        },
+        {
+          "const": "act_365l",
+          "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency supplied via [`DayCountContext`]:\n\n- **Annual** (or no frequency supplied): 366 if February 29 falls in\n  the interval `(start, end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the period END date falls in a leap year,\n  else 365.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "30_360",
+          "description": "30/360 US (Bond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with US market adjustments.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)\n  — primary reference for this implementation, including the February\n  end-of-month rule\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA\n\n# SIA/PSA vs ISDA\n\nThis implementation follows the SIA/PSA convention, which includes a\nFebruary end-of-month rule: when both the start date and the end date\nfall on the last day of February, D₂ is changed to 30. ISDA 2006\n§4.16(f) specifies a slightly different set of adjustment rules that\nomit this February-EOM logic. Both are commonly referred to as\n\"30/360 US\", but they can produce different day counts for periods\nthat start or end on the last day of February.\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere (SIA/PSA rules):\n  D₁' = 30                       if D₁ is 31 or last day of February\n  D₂' = 30                       if D₂ is 31 and D₁' = 30\n  D₂' = 30                       if D₂ is last day of Feb and D₁ is last day of Feb\n  otherwise D₁' = D₁, D₂' = D₂\n```\n\n# Usage\n\nStandard for:\n- US corporate bonds\n- US municipal bonds\n- US agency debt\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::February, 28).expect(\"Valid date\");\n\nlet yf = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats Jan 31 as day 30, Feb 28 as day 28: 28 days / 360\nassert_eq!(yf, 28.0 / 360.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "30e_360",
+          "description": "30E/360 (Eurobond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with European adjustments.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = min(D₁, 30)\n  D₂' = min(D₂, 30)\n```\n\n# Usage\n\nStandard for:\n- Eurobonds\n- International bonds\n- Some interest rate swaps\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::March, 31).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats both 31st as day 30: 60 days / 360\nassert_eq!(yf, 60.0 / 360.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "30e_360_isda",
+          "description": "30E/360 (ISDA) day count convention.\n\nAssumes 30 days per month and 360 days per year with the ISDA 2006\n§4.16(h) last-day-of-month adjustments (including end-of-February).\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = 30 if D₁ is the last day of its month (incl. end of February)\n  D₂' = 30 if D₂ is 31, or if D₂ is the last day of February and the\n        period does not end on the termination (maturity) date\n```\n\n# Termination-date exception\n\nISDA §4.16(h) keeps D₂ unadjusted when the period ends on the\ntermination date and that date is the last day of February. Because\nSet [`DayCountContext::end_is_termination_date`] for the final period\nto maturity; ordinary coupon periods leave it false.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// ISDA §4.16(h): both end-of-Feb and Aug 31 count as day 30.\nlet start = Date::from_calendar_date(2011, Month::August, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2012, Month::February, 29).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360Isda.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 180.0 / 360.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "30_360_it",
+          "description": "30/360 Italian day count convention.\n\nAssumes 30 days per month and 360 days per year. Day 31 becomes 30,\nand any February day after the 27th becomes 30 (QuantLib\n`Thirty360::Italian`).\n\n# Formula\n\n```text\nD1' = 30 if D1 == 31 or (month == Feb and D1 > 27)\nD2' = 30 if D2 == 31 or (month == Feb and D2 > 27)\ndays = 360*(Y2-Y1) + 30*(M2-M1) + (D2'-D1')\nyear_fraction = days / 360\n```\n\nDistinct from US SIA (February EOM only when both ends are February\nEOM) and 30E/360 (no February-after-27 rule).\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::February, 28).expect(\"Valid date\");\n\nlet yf = DayCount::Thirty360It.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// D1=31→30, Feb 28>27 → D2=30: 30 days / 360\nassert_eq!(yf, 30.0 / 360.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "nl_365",
+          "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `[start, end)` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "act_act",
+          "description": "Actual/Actual (ISDA) day count convention.\n\nUses actual days in numerator and actual days in the containing year(s)\nas denominator, splitting across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act\n\n# Algorithm\n\nFor a period spanning multiple calendar years:\n1. Split period at year boundaries\n2. For each year segment: (days in segment) / (days in that year)\n3. Sum the year fractions\n\n# Usage\n\nStandard for:\n- US Treasury bonds\n- Interest rate swaps (USD, EUR fixed legs)\n- Government bonds in many markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period spanning year boundary (leap year 2024)\nlet start = Date::from_calendar_date(2024, Month::July, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\nlet yf = DayCount::ActAct.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 184/366 (Jul-Dec 2024 in leap year) + 365/365 (all of 2025)\nassert!((yf - 1.0).abs() < 0.01);\n```\n\n# References\n\n- ISDA (2006). \"2006 ISDA Definitions.\" Section 4.16(b). `docs/REFERENCES.md#isda-2006-definitions`",
+          "type": "string"
+        },
+        {
+          "const": "act_act_isma",
+          "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\"",
+          "type": "string"
+        },
+        {
+          "const": "act_act_afb",
+          "description": "Actual/Actual AFB (Association Française des Banques) day count.\n\nAlso known as Actual/Actual Euro. QuantLib `ActualActual::AFB`.\nWalks whole years **backwards from `end`** until the candidate is\nbefore `start`. Each accepted year-step adds `1.0`. A year-step that\nlands on 28 February of a leap year is bumped to 29 February. The\nresidual fraction is `days(start, residual_end) / den`, where `den`\nis 366 if 29 February lies in `[start, residual_end)`, else 365.\n\nNo [`DayCountContext`] is required.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::ActActAfb.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (29 February lies in the residual period)\nassert_eq!(yf, 29.0 / 366.0);\n```",
+          "type": "string"
+        },
+        {
+          "const": "bus_252",
+          "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252\n\n# Market Convention\n\n- **Brazil**: Standard for BRL-denominated instruments (ANBIMA)\n- **Also used**: Some equity derivatives and variance swaps\n- **Basis**: 252 represents typical trading days per year\n\n# Requirements\n\nRequires `calendar` in [`DayCountContext`] to determine business days.\n\n# Performance\n\nIterates each calendar day in the range to check business-day status,\ngiving O(n) cost where n is the number of calendar days between the\ndates. For 30Y instruments this is ~11,000 iterations.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse finstack_quant_core::dates::calendar::NYSE;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 6).expect(\"Valid date\"); // Monday\nlet end = Date::from_calendar_date(2025, Month::January, 13).expect(\"Valid date\"); // Next Monday\n\nlet yf = DayCount::Bus252.year_fraction(\n    start,\n    end,\n    DayCountContext { calendar: Some(&NYSE), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// 5 business days / 252\nassert!((yf * 252.0 - 5.0).abs() < 0.1);\n```",
+          "type": "string"
+        }
+      ]
+    },
+    "d_b205675b4d5addcd52ba": {
+      "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n`finstack_quant_models::credit::lgd::seniority`.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
+      "oneOf": [
+        {
+          "const": "senior_secured",
+          "description": "Senior secured debt",
+          "type": "string"
+        },
+        {
+          "const": "senior",
+          "description": "Senior unsecured debt",
+          "type": "string"
+        },
+        {
+          "const": "subordinated",
+          "description": "Subordinated debt",
+          "type": "string"
+        },
+        {
+          "const": "junior",
+          "description": "Junior/mezzanine debt",
+          "type": "string"
+        }
+      ]
+    },
+    "d_b6a74bd737ef1567b144": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "d_c190532de37b361cba38": {
+      "description": "The top-level market data hierarchy containing root nodes.\n\nEach root represents a major asset class or category (e.g., \"Rates\", \"Credit\",\n\"FX\", \"Equity\", \"Volatility\"). The hierarchy is fully serializable and can be\nloaded from JSON configuration files.",
+      "properties": {
+        "roots": {
+          "additionalProperties": {
+            "$ref": "#/$defs/d_467e0d727ff2ae92c819"
+          },
+          "description": "Top-level nodes, keyed by their name. The key becomes each node's\n`name` during deserialization. Insertion order is preserved.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "roots"
+      ],
+      "type": "object"
+    },
+    "d_c4332f1bbc1cebe4fd90": {
+      "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Lag by specified number of months.\n\nStandard: 3 months for TIPS and most inflation-linked bonds.",
+          "properties": {
+            "months": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "months"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Lag by specified number of calendar days.\n\nAlternative specification for non-standard contracts.",
+          "properties": {
+            "days": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "days"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "none",
+          "description": "No lag applied.\n\nUsed for inflation swaps where forecast indices are used.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ccdcf39725b3a38d5e6e": {
+      "description": "Single market observable that doesn't require a full curve.\n\nRepresents point-in-time market data like spot prices, spreads, or unitless\nparameters. Stored in [`MarketContext`](crate::market_data::context::MarketContext)\nalongside curves for simple lookups.\n\n# Use Cases\n\n- **Spot prices**: Equity spots, commodity prices, FX spots\n- **Recovery rates**: Credit recovery assumptions (unitless)\n- **Correlation parameters**: Equity-FX correlation, basis correlations\n- **Spreads**: Credit spreads, basis spreads (unitless or monetary)\n- **Multipliers**: Beta, vega notionals, adjustment factors\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::MarketScalar;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// Equity beta (unitless)\nlet beta = MarketScalar::Unitless(1.2);\n\n// Spot price (with currency)\nlet spot = MarketScalar::Price(Money::new(152.75, Currency::USD).expect(\"valid money fixture\"));\n\nassert!(matches!(beta, MarketScalar::Unitless(_)));\nif let MarketScalar::Price(m) = spot {\n    assert_eq!(m.currency(), Currency::USD);\n}\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "unitless": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "unitless"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "price": {
+              "$ref": "#/$defs/d_d99050870612e8bfc3d3"
+            }
+          },
+          "required": [
+            "price"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_d99050870612e8bfc3d3": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/d_48549691c341fd7f3116",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/d_b6a74bd737ef1567b144",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "d_e771e792357014c84cb9": {
+      "additionalProperties": false,
+      "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Historical index levels by publication date\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Publication lag (typically 3 months for TIPS)\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`",
+      "properties": {
+        "currency": {
+          "$ref": "#/$defs/d_b6a74bd737ef1567b144",
+          "description": "Currency"
+        },
+        "id": {
+          "description": "Unique identifier",
+          "type": "string"
+        },
+        "interpolation": {
+          "$ref": "#/$defs/d_62ea2337bc6d3ab04194",
+          "description": "Interpolation method"
+        },
+        "lag": {
+          "$ref": "#/$defs/d_c4332f1bbc1cebe4fd90",
+          "description": "Lag policy"
+        },
+        "observations": {
+          "description": "Observations as (date, value) pairs",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/d_42ed66bb80d77e9fa456"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "seasonality": {
+          "description": "Optional seasonality factors",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 12,
+          "minItems": 12,
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "currency",
+        "observations",
+        "interpolation",
+        "lag"
+      ],
+      "type": "object"
+    },
+    "d_e94fd584c7a9c31df19d": {
+      "description": "Numerical method used to calibrate a rate curve.",
+      "oneOf": [
+        {
+          "const": "bootstrap",
+          "description": "Sequential bootstrap.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Simultaneous solve of all curve parameters.",
+          "properties": {
+            "global_solve": {
+              "properties": {
+                "use_analytical_jacobian": {
+                  "description": "Whether the original solve requested its specialized Jacobian.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "use_analytical_jacobian"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "global_solve"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_f9d22f9148b706cb0598": {
+      "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between observed points",
+          "type": "string"
+        }
+      ]
+    },
+    "d_fcf72b7d10aedbfe8482": {
+      "additionalProperties": false,
+      "description": "Serializable state of an FxMatrix.\nContains the configuration and cached quotes that can be persisted and restored.",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/d_7fbd5a62c7c39ad98666",
+          "description": "Matrix configuration, including pivot and cache capacity."
+        },
+        "pinned_quotes": {
+          "description": "Pinned, date/policy-scoped quotes as `(from, to, on, policy, rate)`.\n\nRequired: a snapshot that omits it would silently re-derive those\ndates from the provider instead of restoring the pinned fixings.",
+          "items": {
+            "maxItems": 5,
+            "minItems": 5,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+              },
+              {
+                "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/d_1ec33fbdab11dd6751bf"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "provider_quotes": {
+          "description": "Captured provider quotes, below explicit global and date/policy-pinned\nquotes in lookup priority. Market-context restoration uses these to\nrebuild a quote-only provider; arbitrary live provider behavior is not\nserialized. Required even when the provider has no snapshot quotes.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+              },
+              {
+                "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "quotes": {
+          "description": "Pair-global quotes as source, target, rate tuples.",
+          "items": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+              },
+              {
+                "$ref": "#/$defs/d_b6a74bd737ef1567b144"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "config",
+        "quotes",
+        "provider_quotes",
+        "pinned_quotes"
+      ],
+      "type": "object"
+    },
+    "d_fe18010fa6c9de5d3f03": {
+      "description": "Nelson-Siegel model parameters.\n\nStores either the 4-parameter NS or 6-parameter NSS specification.",
+      "oneOf": [
+        {
+          "description": "Four-parameter Nelson-Siegel.",
+          "properties": {
+            "beta0": {
+              "description": "Long-term rate level.",
+              "format": "double",
+              "type": "number"
+            },
+            "beta1": {
+              "description": "Short-term component.",
+              "format": "double",
+              "type": "number"
+            },
+            "beta2": {
+              "description": "Medium-term hump.",
+              "format": "double",
+              "type": "number"
+            },
+            "tau": {
+              "description": "Decay factor (must be > 0).",
+              "format": "double",
+              "type": "number"
+            },
+            "variant": {
+              "const": "ns",
+              "type": "string"
+            }
+          },
+          "required": [
+            "variant",
+            "beta0",
+            "beta1",
+            "beta2",
+            "tau"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Six-parameter Nelson-Siegel-Svensson.",
+          "properties": {
+            "beta0": {
+              "description": "Long-term rate level.",
+              "format": "double",
+              "type": "number"
+            },
+            "beta1": {
+              "description": "Short-term component.",
+              "format": "double",
+              "type": "number"
+            },
+            "beta2": {
+              "description": "Medium-term hump.",
+              "format": "double",
+              "type": "number"
+            },
+            "beta3": {
+              "description": "Second hump.",
+              "format": "double",
+              "type": "number"
+            },
+            "tau1": {
+              "description": "First decay factor (must be > 0).",
+              "format": "double",
+              "type": "number"
+            },
+            "tau2": {
+              "description": "Second decay factor (must be > 0, ≠ τ₁).",
+              "format": "double",
+              "type": "number"
+            },
+            "variant": {
+              "const": "nss",
+              "type": "string"
+            }
+          },
+          "required": [
+            "variant",
+            "beta0",
+            "beta1",
+            "beta2",
+            "beta3",
+            "tau1",
+            "tau2"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  }
+}

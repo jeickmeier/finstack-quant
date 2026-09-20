@@ -1,0 +1,42 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "currency": "USD",
+      "flows": [
+        [
+          "2026-01-01",
+          5000000.0
+        ],
+        [
+          "2027-01-01",
+          5750000.0
+        ],
+        [
+          "2028-01-01",
+          6500000.0
+        ],
+        [
+          "2029-01-01",
+          7250000.0
+        ],
+        [
+          "2030-01-01",
+          8000000.0
+        ]
+      ],
+      "id": "DCF-TECH-CO",
+      "mid_year_convention": true,
+      "net_debt": 15000000.0,
+      "shares_outstanding": 10000000.0,
+      "terminal_value": {
+        "growth_rate": 0.02,
+        "type": "gordon_growth"
+      },
+      "valuation_date": "2025-01-01",
+      "wacc": 0.1
+    },
+    "type": "discounted_cash_flow"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

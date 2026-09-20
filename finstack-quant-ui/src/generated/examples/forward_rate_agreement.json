@@ -1,0 +1,23 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "fixed_rate": "0.045",
+      "fixing_date": "2024-04-01",
+      "forward_curve_id": "USD-SOFR-3M",
+      "id": "FRA-3X6-USD",
+      "maturity": "2024-07-03",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "reset_lag": 2,
+      "side": "receive",
+      "start_date": "2024-04-03"
+    },
+    "type": "forward_rate_agreement"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

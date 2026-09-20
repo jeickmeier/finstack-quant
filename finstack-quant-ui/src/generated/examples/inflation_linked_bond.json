@@ -1,0 +1,35 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_date": "2024-01-15",
+      "base_index": 100.0,
+      "business_day_convention": "unadjusted",
+      "calendar_id": null,
+      "day_count": "act_act_isma",
+      "deflation_protection": "maturity_only",
+      "discount_curve_id": "USD-OIS",
+      "frequency": {
+        "count": 6,
+        "unit": "months"
+      },
+      "id": "TIPS-10Y",
+      "indexation_method": "tips",
+      "inflation_index_id": "US-CPI",
+      "issue_date": "2024-01-15",
+      "lag": {
+        "months": 3
+      },
+      "maturity": "2034-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "quoted_clean": null,
+      "real_coupon": "0.025",
+      "stub": "none"
+    },
+    "type": "inflation_linked_bond"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

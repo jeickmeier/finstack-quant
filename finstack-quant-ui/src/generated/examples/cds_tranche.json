@@ -1,0 +1,34 @@
+{
+  "instrument": {
+    "spec": {
+      "accumulated_loss": 0.0,
+      "attach_pct": 0.0,
+      "attributes": {},
+      "business_day_convention": "following",
+      "calendar_id": null,
+      "credit_index_id": "CDX.NA.IG.HAZARD",
+      "day_count": "act_360",
+      "detach_pct": 3.0,
+      "discount_curve_id": "USD-OIS",
+      "effective_date": null,
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "id": "CDXIG-42-0X3",
+      "index_name": "CDX.NA.IG",
+      "maturity": "2029-12-20",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "running_coupon_bp": 100.0,
+      "series": 42,
+      "side": "buy_protection",
+      "standard_imm_dates": true,
+      "upfront": null
+    },
+    "type": "cds_tranche"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

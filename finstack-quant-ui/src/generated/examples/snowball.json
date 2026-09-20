@@ -1,0 +1,37 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "callable": null,
+      "coupon_cap": null,
+      "coupon_dates": [
+        "2026-06-30",
+        "2026-12-31",
+        "2027-06-30",
+        "2027-12-31",
+        "2028-06-30",
+        "2028-12-31"
+      ],
+      "coupon_floor": 0.0,
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "fixed_rate": 0.05,
+      "floating_index_id": "USD-SOFR-6M",
+      "floating_tenor": {
+        "count": 6,
+        "unit": "months"
+      },
+      "id": "SNOWBALL-USD-3Y",
+      "initial_coupon": 0.03,
+      "leverage": 1.0,
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "variant": "snowball",
+      "vol_surface_id": "USD-SOFR-HW-VOL"
+    },
+    "type": "snowball"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

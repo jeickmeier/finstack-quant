@@ -1,0 +1,29 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "business_day_convention": "modified_following",
+      "commodity_type": "Energy",
+      "currency": "USD",
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "expiry": "2025-06-15",
+      "fixed_price": 3.5,
+      "forward_curve_id": "NG-FORWARD",
+      "id": "NG-SWAPTION-2025",
+      "notional": 10000.0,
+      "option_type": "call",
+      "swap_end": "2026-06-30",
+      "swap_frequency": {
+        "count": 1,
+        "unit": "months"
+      },
+      "swap_start": "2025-07-01",
+      "ticker": "NG",
+      "unit": "MMBTU",
+      "vol_surface_id": "NG-VOL"
+    },
+    "type": "commodity_swaption"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

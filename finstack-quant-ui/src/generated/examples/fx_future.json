@@ -1,0 +1,26 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_currency": "EUR",
+      "domestic_discount_curve_id": "USD-OIS",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "id": "CME-6E-DEC26",
+      "quote_currency": "USD",
+      "terms": {
+        "contracts": 4.0,
+        "currency": "USD",
+        "entry_price": 1.1,
+        "last_trading_date": "2026-12-14",
+        "multiplier": 125000.0,
+        "position": "long",
+        "settlement": {
+          "type": "cash"
+        },
+        "settlement_date": "2026-12-16"
+      }
+    },
+    "type": "fx_future"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

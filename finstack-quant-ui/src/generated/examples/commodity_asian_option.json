@@ -1,0 +1,32 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "averaging_method": "arithmetic",
+      "commodity_type": "Energy",
+      "currency": "USD",
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "expiry": "2025-07-02",
+      "fixing_dates": [
+        "2025-01-31",
+        "2025-02-28",
+        "2025-03-31",
+        "2025-04-30",
+        "2025-05-31",
+        "2025-06-30"
+      ],
+      "forward_curve_id": "CL-FORWARD",
+      "id": "WTI-ASIAN-6M",
+      "option_type": "call",
+      "quantity": 1000.0,
+      "realized_fixings": [],
+      "strike": 75.0,
+      "ticker": "CL",
+      "unit": "BBL",
+      "vol_surface_id": "CL-VOL"
+    },
+    "type": "commodity_asian_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

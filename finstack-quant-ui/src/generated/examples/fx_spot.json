@@ -1,0 +1,22 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_calendar_id": null,
+      "base_currency": "EUR",
+      "business_day_convention": "modified_following",
+      "id": "EURUSD",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "quote_calendar_id": null,
+      "quote_currency": "USD",
+      "settlement": null,
+      "settlement_lag_days": 2,
+      "spot_rate": 1.1
+    },
+    "type": "fx_spot"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

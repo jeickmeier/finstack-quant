@@ -1,0 +1,58 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "id": "XCCY-USDEUR-5Y",
+      "leg1": {
+        "allow_calendar_fallback": true,
+        "business_day_convention": "modified_following",
+        "compounding": "simple",
+        "currency": "USD",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2029-01-03",
+        "forward_curve_id": "USD-SOFR-3M",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "payment_lag_days": 0,
+        "side": "receive",
+        "spread_bp": "0",
+        "start": "2024-01-03",
+        "stub": "short_front"
+      },
+      "leg2": {
+        "allow_calendar_fallback": true,
+        "business_day_convention": "modified_following",
+        "compounding": "simple",
+        "currency": "EUR",
+        "day_count": "act_360",
+        "discount_curve_id": "EUR-OIS",
+        "end": "2029-01-03",
+        "forward_curve_id": "EUR-EURIBOR-3M",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "notional": {
+          "amount": "9200000",
+          "currency": "EUR"
+        },
+        "payment_lag_days": 0,
+        "side": "pay",
+        "spread_bp": "10",
+        "start": "2024-01-03",
+        "stub": "short_front"
+      },
+      "notional_exchange": "initial_and_final",
+      "reporting_currency": "USD"
+    },
+    "type": "xccy_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,30 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {
+        "meta": {
+          "pair": "USDCNY"
+        },
+        "tags": [
+          "ndf"
+        ]
+      },
+      "base_currency": "CNY",
+      "contract_rate": 7.25,
+      "domestic_discount_curve_id": "USD-OIS",
+      "fixing_date": "2025-03-13",
+      "fixing_source_enum": "PBOC",
+      "forward_rate_override": 7.25,
+      "id": "USDCNY-NDF-3M",
+      "maturity": "2025-03-15",
+      "notional": {
+        "amount": "10000000",
+        "currency": "CNY"
+      },
+      "quote_convention": "base_per_settlement",
+      "settlement_currency": "USD"
+    },
+    "type": "ndf"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

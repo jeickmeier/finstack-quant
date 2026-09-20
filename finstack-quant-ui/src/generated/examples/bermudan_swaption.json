@@ -1,0 +1,82 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "bermudan_schedule": {
+        "exercise_dates": [
+          "2029-01-17",
+          "2029-07-17",
+          "2030-01-17",
+          "2030-07-17",
+          "2031-01-17",
+          "2031-07-17",
+          "2032-01-19",
+          "2032-07-19",
+          "2033-01-17",
+          "2033-07-18",
+          "2034-01-17",
+          "2034-07-17",
+          "2035-01-17",
+          "2035-07-17",
+          "2036-01-17",
+          "2036-07-17"
+        ],
+        "lockout_end": null,
+        "notice_days": 0
+      },
+      "bermudan_type": "co_terminal",
+      "id": "BERM-10NC2-USD",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "settlement": "physical",
+      "underlying_fixed_leg": {
+        "business_day_convention": "modified_following",
+        "calendar_id": null,
+        "compounding_simple": true,
+        "day_count": "30_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2037-01-17",
+        "end_of_month": false,
+        "frequency": {
+          "count": 6,
+          "unit": "months"
+        },
+        "par_method": null,
+        "payment_lag_days": 0,
+        "rate": "0.03",
+        "start": "2027-01-17",
+        "stub": "none"
+      },
+      "underlying_float_leg": {
+        "business_day_convention": "modified_following",
+        "calendar_id": null,
+        "compounding": {
+          "compounded_in_arrears": {
+            "lookback_days": 0
+          }
+        },
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2037-01-17",
+        "end_of_month": false,
+        "fixing_calendar_id": null,
+        "forward_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "payment_lag_days": 0,
+        "reset_lag_days": 0,
+        "spread_bp": "0",
+        "start": "2027-01-17",
+        "stub": "none"
+      },
+      "vol_surface_id": "USD-SWPNVOL"
+    },
+    "type": "bermudan_swaption"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

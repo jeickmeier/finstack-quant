@@ -1,0 +1,53 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "fixed": {
+        "business_day_convention": "modified_following",
+        "calendar_id": "usny",
+        "compounding_simple": true,
+        "day_count": "30_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2029-01-02",
+        "end_of_month": false,
+        "frequency": {
+          "count": 6,
+          "unit": "months"
+        },
+        "par_method": null,
+        "payment_lag_days": 0,
+        "rate": "0.04",
+        "start": "2024-01-02",
+        "stub": "short_front"
+      },
+      "float": {
+        "business_day_convention": "modified_following",
+        "calendar_id": "usny",
+        "compounding": "simple",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2029-01-02",
+        "end_of_month": false,
+        "fixing_calendar_id": "usny",
+        "forward_curve_id": "USD-SOFR-3M",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "payment_lag_days": 0,
+        "reset_lag_days": 2,
+        "spread_bp": "0",
+        "start": "2024-01-02",
+        "stub": "short_front"
+      },
+      "id": "IRS-5Y-USD-STD",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "side": "pay"
+    },
+    "type": "interest_rate_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

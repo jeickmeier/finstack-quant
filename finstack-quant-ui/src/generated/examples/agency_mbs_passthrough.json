@@ -1,0 +1,46 @@
+{
+  "instrument": {
+    "spec": {
+      "agency": "FNMA",
+      "attributes": {
+        "meta": {
+          "program": "fnma"
+        },
+        "tags": [
+          "agency",
+          "mbs"
+        ]
+      },
+      "current_face": {
+        "amount": "950000",
+        "currency": "USD"
+      },
+      "current_factor": 0.95,
+      "day_count": "30_360",
+      "discount_curve_id": "USD-OIS",
+      "guarantee_fee_rate": 0.0025,
+      "id": "FN-MA1234",
+      "issue_date": "2022-01-01",
+      "maturity": "2052-01-01",
+      "original_face": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pass_through_rate": 0.04,
+      "pool_id": "MA1234",
+      "pool_type": "generic",
+      "prepayment_model": {
+        "cpr": 0.06,
+        "curve": {
+          "curve": "psa",
+          "speed_multiplier": 1.0
+        }
+      },
+      "servicing_fee_rate": 0.0025,
+      "wac": 0.045,
+      "wam": 348
+    },
+    "type": "agency_mbs_passthrough"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

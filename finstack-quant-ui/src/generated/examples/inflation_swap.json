@@ -1,0 +1,28 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_cpi": null,
+      "business_day_convention": "following",
+      "calendar_id": null,
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "fixed_rate": "0.02",
+      "id": "INFLSWAP-USD-5Y",
+      "inflation_index_id": "US-CPI",
+      "interpolation_override": null,
+      "lag_override": {
+        "months": 3
+      },
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "start_date": "2024-01-15"
+    },
+    "type": "inflation_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

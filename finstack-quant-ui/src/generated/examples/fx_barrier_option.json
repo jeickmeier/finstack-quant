@@ -1,0 +1,32 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "barrier": 1.2,
+      "barrier_type": "up_and_out",
+      "base_currency": "EUR",
+      "day_count": "act_365f",
+      "domestic_discount_curve_id": "USD-OIS",
+      "expiry": "2024-12-20",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "fx_spot_id": "EURUSD-SPOT",
+      "id": "FXBAR-EURUSD-UO-CALL",
+      "monitoring": {
+        "type": "continuous"
+      },
+      "monitoring_start_date": "2024-01-01",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "option_type": "call",
+      "quote_currency": "USD",
+      "rebate": null,
+      "rebate_timing": "at_hit",
+      "strike": 1.1,
+      "vol_surface_id": "EURUSD-VOL"
+    },
+    "type": "fx_barrier_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

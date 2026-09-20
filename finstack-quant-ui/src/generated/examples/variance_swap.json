@@ -1,0 +1,35 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "close_series_id": null,
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "high_series_id": null,
+      "id": "VARSPX-1Y",
+      "low_series_id": null,
+      "maturity": "2025-01-01",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "observation_business_day_convention": "following",
+      "observation_calendar_id": "USNY",
+      "observation_end_of_month": false,
+      "observation_frequency": {
+        "count": 1,
+        "unit": "days"
+      },
+      "open_series_id": null,
+      "price_series_policy": "adjusted",
+      "realized_var_method": "close_to_close",
+      "settlement_date": null,
+      "side": "receive",
+      "start_date": "2024-01-01",
+      "strike_variance": 0.04,
+      "underlying_ticker": "SPX"
+    },
+    "type": "variance_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,39 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_calendar_id": "TARGET2",
+      "base_currency": "EUR",
+      "close_series_id": null,
+      "day_count": "act_365f",
+      "domestic_discount_curve_id": "USD-OIS",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "high_series_id": null,
+      "id": "FXVAR-EURUSD-1Y",
+      "low_series_id": null,
+      "maturity": "2025-01-02",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "observation_business_day_convention": "following",
+      "observation_end_of_month": false,
+      "observation_frequency": {
+        "count": 1,
+        "unit": "days"
+      },
+      "open_series_id": null,
+      "quote_calendar_id": "USNY",
+      "quote_currency": "USD",
+      "realized_var_method": "close_to_close",
+      "settlement_date": null,
+      "side": "receive",
+      "spot_id": "EURUSD",
+      "start_date": "2024-01-02",
+      "strike_variance": 0.04,
+      "vol_surface_id": "EURUSD-VOL"
+    },
+    "type": "fx_variance_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

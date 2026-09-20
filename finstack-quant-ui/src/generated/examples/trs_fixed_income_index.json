@@ -1,0 +1,46 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "financing": {
+        "compounding": "term_rate",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": "100"
+      },
+      "id": "TRS-US-CORP-1Y",
+      "initial_level": null,
+      "notional": {
+        "amount": "5000000",
+        "currency": "USD"
+      },
+      "schedule": {
+        "end": "2025-01-01",
+        "params": {
+          "business_day_convention": "following",
+          "calendar_id": "weekends_only",
+          "day_count": "act_360",
+          "end_of_month": false,
+          "frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "stub": "none"
+        },
+        "start": "2024-01-01"
+      },
+      "side": "receive_total_return",
+      "underlying": {
+        "base_currency": "USD",
+        "contract_size": 1.0,
+        "duration_id": "US-CORP-DURATION",
+        "index_id": "US-CORP-INDEX",
+        "yield_id": "US-CORP-YIELD"
+      }
+    },
+    "type": "trs_fixed_income_index"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

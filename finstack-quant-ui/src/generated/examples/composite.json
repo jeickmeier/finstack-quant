@@ -1,0 +1,77 @@
+{
+  "instrument": {
+    "spec": {
+      "spec": {
+        "attributes": {},
+        "capital": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "id": "COMPOSITE-EXAMPLE",
+        "legs": [
+          {
+            "instrument": {
+              "spec": {
+                "attributes": {},
+                "currency": "USD",
+                "discount_curve_id": "USD",
+                "discrete_dividends": [],
+                "div_yield_id": null,
+                "id": "COMPOSITE-LONG",
+                "price_id": null,
+                "price_quote": 100.0,
+                "shares": 1.0,
+                "ticker": "LONG"
+              },
+              "type": "equity"
+            },
+            "instrument_id": "COMPOSITE-LONG",
+            "weight": 1.0
+          },
+          {
+            "instrument": {
+              "spec": {
+                "attributes": {},
+                "currency": "USD",
+                "discount_curve_id": "USD",
+                "discrete_dividends": [],
+                "div_yield_id": null,
+                "id": "COMPOSITE-SHORT",
+                "price_id": null,
+                "price_quote": 90.0,
+                "shares": 1.0,
+                "ticker": "SHORT"
+              },
+              "type": "equity"
+            },
+            "instrument_id": "COMPOSITE-SHORT",
+            "weight": -1.0
+          }
+        ],
+        "rebalance_rule": {
+          "kind": "manual"
+        },
+        "reporting_currency": "USD",
+        "weighting_method": {
+          "kind": "fixed_quantity"
+        }
+      },
+      "state": {
+        "effective_date": "2025-01-01",
+        "resolved_legs": [
+          {
+            "instrument_id": "COMPOSITE-LONG",
+            "quantity": 1.0
+          },
+          {
+            "instrument_id": "COMPOSITE-SHORT",
+            "quantity": -1.0
+          }
+        ],
+        "weighting_inputs": {}
+      }
+    },
+    "type": "composite"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

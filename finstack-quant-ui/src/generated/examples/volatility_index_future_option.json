@@ -1,0 +1,33 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "id": "VSTOXX-FUTURE-OPTION-EXAMPLE",
+      "terms": {
+        "contracts": 1.0,
+        "currency": "EUR",
+        "day_count": "act_365f",
+        "discount_curve_id": "EUR-OIS",
+        "exercise_style": "american",
+        "expiry": "2026-12-16",
+        "futures_price": 20.0,
+        "model": "black76",
+        "multiplier": 100.0,
+        "option_reference_price": 2.0,
+        "option_type": "call",
+        "position": "long",
+        "premium_style": "futures_style",
+        "settlement": {
+          "type": "future",
+          "underlying_last_trading_date": "2026-12-16",
+          "underlying_settlement_date": "2026-12-16"
+        },
+        "strike": 20.0,
+        "underlying": "FVS",
+        "volatility": 0.5
+      }
+    },
+    "type": "volatility_index_future_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

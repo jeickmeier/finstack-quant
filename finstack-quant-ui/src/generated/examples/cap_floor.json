@@ -1,0 +1,33 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "business_day_convention": "modified_following",
+      "calendar_id": null,
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "exercise_style": "european",
+      "forward_curve_id": "USD-SOFR-3M",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "id": "IRCAP-USD-5Y-3PCT",
+      "maturity": "2029-01-03",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "rate_option_type": "cap",
+      "settlement": "cash",
+      "start_date": "2024-01-03",
+      "strike": "0.03",
+      "stub": "short_front",
+      "vol_shift": 0.0,
+      "vol_surface_id": "USD-CAPFLOOR-VOL",
+      "vol_type": "auto"
+    },
+    "type": "cap_floor"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

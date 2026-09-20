@@ -1,0 +1,72 @@
+{
+  "instrument": {
+    "spec": {
+      "agency": "FNMA",
+      "attributes": {
+        "meta": {
+          "deal": "fnr-2024-1"
+        },
+        "tags": [
+          "agency",
+          "cmo"
+        ]
+      },
+      "collateral_wac": 0.045,
+      "collateral_wam": 360,
+      "deal_name": "FNR 2024-1",
+      "discount_curve_id": "USD-OIS",
+      "id": "FNR-2024-1-A",
+      "issue_date": "2024-01-01",
+      "reference_tranche_id": "A",
+      "waterfall": {
+        "pro_rata_same_priority": false,
+        "tranches": [
+          {
+            "coupon": 0.035,
+            "current_face": {
+              "amount": "40000000",
+              "currency": "USD"
+            },
+            "id": "A",
+            "original_face": {
+              "amount": "40000000",
+              "currency": "USD"
+            },
+            "priority": 1,
+            "tranche_type": "sequential"
+          },
+          {
+            "coupon": 0.04,
+            "current_face": {
+              "amount": "30000000",
+              "currency": "USD"
+            },
+            "id": "B",
+            "original_face": {
+              "amount": "30000000",
+              "currency": "USD"
+            },
+            "priority": 2,
+            "tranche_type": "sequential"
+          },
+          {
+            "coupon": 0.04,
+            "current_face": {
+              "amount": "30000000",
+              "currency": "USD"
+            },
+            "id": "C",
+            "original_face": {
+              "amount": "30000000",
+              "currency": "USD"
+            },
+            "priority": 3,
+            "tranche_type": "sequential"
+          }
+        ]
+      }
+    },
+    "type": "agency_cmo"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

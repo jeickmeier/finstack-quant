@@ -1,0 +1,32 @@
+{
+  "instrument": {
+    "spec": {
+      "agency": "FNMA",
+      "attributes": {
+        "meta": {
+          "program": "fnma"
+        },
+        "tags": [
+          "agency",
+          "dollar_roll"
+        ]
+      },
+      "back_price": 98.0,
+      "back_settlement_month": 4,
+      "back_settlement_year": 2026,
+      "coupon": 0.04,
+      "discount_curve_id": "USD-OIS",
+      "front_price": 98.5,
+      "front_settlement_month": 3,
+      "front_settlement_year": 2026,
+      "id": "FN30-4.0-ROLL-0326-0426",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "term": "thirty_year"
+    },
+    "type": "dollar_roll"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

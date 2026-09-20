@@ -1,0 +1,61 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "call_provision": {
+        "call_dates": [
+          "2026-06-30",
+          "2026-09-30",
+          "2026-12-31"
+        ],
+        "call_price": 1.0,
+        "lockout_periods": 1
+      },
+      "id": "CALLABLE-RA-SOFR-1Y",
+      "range_accrual": {
+        "accrual_start_date": "2025-12-31",
+        "attributes": {},
+        "bounds_type": "absolute",
+        "coupon_rate": 0.065,
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "div_yield_id": null,
+        "id": "CALLABLE-RA-SOFR-1Y-RANGE",
+        "lower_bound": 0.04,
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "observation_dates": [
+          "2026-01-31",
+          "2026-02-28",
+          "2026-03-31",
+          "2026-04-30",
+          "2026-05-31",
+          "2026-06-30",
+          "2026-07-31",
+          "2026-08-31",
+          "2026-09-30",
+          "2026-10-31",
+          "2026-11-30",
+          "2026-12-31"
+        ],
+        "past_fixings_in_range": null,
+        "payment_date": null,
+        "projection_curve_id": "USD-OIS",
+        "rate_index_id": "SOFR",
+        "reference_tenor": {
+          "count": 3,
+          "unit": "months"
+        },
+        "spot_id": "SOFR-RATE",
+        "total_past_observations": null,
+        "underlying_ticker": "SOFR",
+        "upper_bound": 0.06,
+        "vol_surface_id": "SOFR-VOL"
+      }
+    },
+    "type": "callable_range_accrual"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,28 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_currency": "EUR",
+      "day_count": "act_365f",
+      "domestic_discount_curve_id": "USD-OIS",
+      "expiry": "2030-06-21",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "id": "FXDIG-EURUSD-CALL",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "option_type": "call",
+      "payout_amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "payout_type": "cash_or_nothing",
+      "quote_currency": "USD",
+      "strike": 1.12,
+      "vol_surface_id": "EURUSD-VOL"
+    },
+    "type": "fx_digital_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

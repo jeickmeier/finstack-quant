@@ -1,0 +1,34 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {
+        "meta": {
+          "sector": "natural-gas"
+        },
+        "tags": [
+          "energy"
+        ]
+      },
+      "business_day_convention": "modified_following",
+      "commodity_type": "Energy",
+      "currency": "USD",
+      "discount_curve_id": "USD-OIS",
+      "fixed_price": "3.5",
+      "floating_index_id": "NG-SPOT-AVG",
+      "frequency": {
+        "count": 1,
+        "unit": "months"
+      },
+      "id": "NG-SWAP-2025",
+      "maturity": "2025-12-31",
+      "quantity": 10000.0,
+      "realized_fixings": [],
+      "side": "pay",
+      "start_date": "2025-01-01",
+      "ticker": "NG",
+      "unit": "MMBTU"
+    },
+    "type": "commodity_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

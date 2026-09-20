@@ -1,0 +1,32 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "cds_maturity": "2030-06-20",
+      "credit_curve_id": "CORP-HAZARD",
+      "discount_curve_id": "USD-OIS",
+      "exercise_style": "european",
+      "expiry": "2025-06-20",
+      "id": "CDSOPT-CALL-CORP-5Y",
+      "index_factor": null,
+      "knockout": false,
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "protection_start_convention": "spot",
+      "recovery_rate": 0.4,
+      "settlement": "cash",
+      "strike": {
+        "spread": "0.01"
+      },
+      "underlying_cds_coupon": null,
+      "underlying_convention": "isda_na",
+      "underlying_is_index": false,
+      "vol_surface_id": "CDSOPT-VOL"
+    },
+    "type": "cds_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

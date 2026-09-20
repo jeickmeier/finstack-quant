@@ -1,0 +1,27 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIV",
+      "expiry": "2024-12-20",
+      "id": "LOOKBACK-SPX-FIXED-CALL",
+      "lookback_type": "fixed_strike",
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "observed_max": null,
+      "observed_min": null,
+      "option_type": "call",
+      "spot_id": "SPX-SPOT",
+      "strike": 4500.0,
+      "underlying_ticker": "SPX",
+      "use_gobet_miri": false,
+      "vol_surface_id": "SPX-VOL"
+    },
+    "type": "lookback_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

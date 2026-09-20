@@ -1,0 +1,33 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "averaging_method": "arithmetic",
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIV",
+      "expiry": "2024-06-30",
+      "fixing_dates": [
+        "2024-01-31",
+        "2024-02-29",
+        "2024-03-31",
+        "2024-04-30",
+        "2024-05-31",
+        "2024-06-30"
+      ],
+      "id": "ASIAN-SPX-ARITH-6M",
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "past_fixings": [],
+      "spot_id": "SPX-SPOT",
+      "strike": 4500.0,
+      "underlying_ticker": "SPX",
+      "vol_surface_id": "SPX-VOL"
+    },
+    "type": "asian_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

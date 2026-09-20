@@ -1,0 +1,33 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "business_day_convention": "modified_following",
+      "calendar_id": null,
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "id": "INFLCAP-USD-5Y",
+      "inflation_index_id": "US-CPI",
+      "interpolation_override": null,
+      "lag_override": {
+        "months": 3
+      },
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "option_type": "cap",
+      "start_date": "2024-01-15",
+      "strike": "0.03",
+      "stub": "short_front",
+      "vol_surface_id": "USD-INFL-VOL"
+    },
+    "type": "inflation_cap_floor"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

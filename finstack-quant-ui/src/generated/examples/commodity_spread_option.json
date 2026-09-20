@@ -1,0 +1,22 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "correlation": 0.85,
+      "currency": "USD",
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "expiry": "2025-09-15",
+      "id": "WTI-RBOB-CRACK-SPREAD",
+      "leg1_forward_curve_id": "RBOB-FORWARD",
+      "leg1_vol_surface_id": "RBOB-VOL",
+      "leg2_forward_curve_id": "WTI-FORWARD",
+      "leg2_vol_surface_id": "WTI-VOL",
+      "notional": 10000.0,
+      "option_type": "call",
+      "strike": 5.0
+    },
+    "type": "commodity_spread_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

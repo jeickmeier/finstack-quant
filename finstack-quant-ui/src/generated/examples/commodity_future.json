@@ -1,0 +1,33 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "id": "SGX-IRON-ORE-DEC26",
+      "price_curve_id": "IRON-ORE-FORWARD",
+      "settlement": {
+        "fixing_dates": [
+          "2026-12-29",
+          "2026-12-30",
+          "2026-12-31"
+        ],
+        "realized_fixings": [],
+        "type": "arithmetic_average"
+      },
+      "terms": {
+        "contracts": 10.0,
+        "currency": "USD",
+        "entry_price": 105.25,
+        "last_trading_date": "2026-12-31",
+        "multiplier": 100.0,
+        "position": "long",
+        "settlement": {
+          "type": "cash"
+        },
+        "settlement_date": "2027-01-04"
+      },
+      "underlying": "TSI-62-FE"
+    },
+    "type": "commodity_future"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

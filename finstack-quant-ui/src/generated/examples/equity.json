@@ -1,0 +1,18 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "currency": "USD",
+      "discount_curve_id": "USD",
+      "discrete_dividends": [],
+      "div_yield_id": "AAPL-DIV",
+      "id": "EQUITY-AAPL",
+      "price_id": "AAPL-SPOT",
+      "price_quote": null,
+      "shares": 100.0,
+      "ticker": "AAPL"
+    },
+    "type": "equity"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

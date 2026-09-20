@@ -1,0 +1,48 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "dividend_settlement": "on_dividend_date",
+      "dividend_tax_rate": 0.0,
+      "financing": {
+        "compounding": "term_rate",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": "75"
+      },
+      "id": "TRS-SPX-1Y",
+      "initial_level": null,
+      "notional": {
+        "amount": "5000000",
+        "currency": "USD"
+      },
+      "schedule": {
+        "end": "2025-01-01",
+        "params": {
+          "business_day_convention": "following",
+          "calendar_id": "weekends_only",
+          "day_count": "act_360",
+          "end_of_month": false,
+          "frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "stub": "none"
+        },
+        "start": "2024-01-01"
+      },
+      "side": "receive_total_return",
+      "underlying": {
+        "contract_size": 1.0,
+        "currency": "USD",
+        "div_yield_id": "SPX-DIV",
+        "spot_id": "SPX-SPOT",
+        "ticker": "SPX"
+      }
+    },
+    "type": "trs_equity"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

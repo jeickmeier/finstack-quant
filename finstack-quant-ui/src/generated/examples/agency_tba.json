@@ -1,0 +1,29 @@
+{
+  "instrument": {
+    "spec": {
+      "agency": "FNMA",
+      "attributes": {
+        "meta": {
+          "program": "fnma"
+        },
+        "tags": [
+          "agency",
+          "tba"
+        ]
+      },
+      "coupon": 0.04,
+      "discount_curve_id": "USD-OIS",
+      "id": "FN30-4.0-202703",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "settlement_month": 3,
+      "settlement_year": 2027,
+      "term": "thirty_year",
+      "trade_price": 98.5
+    },
+    "type": "agency_tba"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,49 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "constituents": [
+        {
+          "id": "EQ-AAPL",
+          "reference": {
+            "kind": "market_data",
+            "value": {
+              "asset_type": "equity",
+              "price_id": "AAPL-SPOT"
+            }
+          },
+          "ticker": "AAPL",
+          "units": null,
+          "weight": 0.6
+        },
+        {
+          "id": "BOND-UST10",
+          "reference": {
+            "kind": "market_data",
+            "value": {
+              "asset_type": "bond",
+              "price_id": "UST10Y-PRICE"
+            }
+          },
+          "ticker": "UST10Y",
+          "units": null,
+          "weight": 0.4
+        }
+      ],
+      "currency": "USD",
+      "discount_curve_id": "USD-OIS",
+      "expense_ratio": 0.0025,
+      "id": "BASKET-60-40",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pricing_config": {
+        "days_in_year": 365.25,
+        "fx_policy": "cashflow_date"
+      }
+    },
+    "type": "basket"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,37 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "coupon_dates": [
+        "2026-06-30",
+        "2026-12-31",
+        "2027-06-30",
+        "2027-12-31",
+        "2028-06-30",
+        "2028-12-31",
+        "2029-06-30",
+        "2029-12-31",
+        "2030-06-30",
+        "2030-12-31"
+      ],
+      "coupon_floor": 0.0,
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "fixed_rate": 0.06,
+      "floating_index_id": "USD-SOFR-6M",
+      "floating_tenor": {
+        "count": 6,
+        "unit": "months"
+      },
+      "id": "TARN-USD-5Y",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "target_coupon": 0.15,
+      "vol_surface_id": "USD-SOFR-HW-VOL"
+    },
+    "type": "tarn"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

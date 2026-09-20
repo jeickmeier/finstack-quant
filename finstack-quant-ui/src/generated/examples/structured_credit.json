@@ -1,0 +1,163 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "behavior_overrides": {
+        "cdr_annual": null,
+        "cpr_annual": null,
+        "psa_speed_multiplier": null,
+        "recovery_lag_months": null,
+        "recovery_rate": null,
+        "reinvestment_price": null,
+        "sda_speed_multiplier": null
+      },
+      "closing_date": "2024-01-01",
+      "credit_factors": {},
+      "deal_metadata": {
+        "manager_id": null,
+        "master_servicer_id": null,
+        "servicer_id": null,
+        "special_servicer_id": null,
+        "trustee_id": null
+      },
+      "deal_type": "clo",
+      "default_spec": {
+        "cdr": 0.02,
+        "curve": null
+      },
+      "discount_curve_id": "USD-OIS",
+      "first_payment_date": "2024-04-01",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "hedge_swaps": [],
+      "id": "CLO-EXAMPLE",
+      "market_conditions": {
+        "refi_rate": 0.04
+      },
+      "maturity": "2034-01-01",
+      "payment_calendar_id": "nyse",
+      "pool": {
+        "assets": [
+          {
+            "acquisition_date": null,
+            "asset_type": {
+              "industry": null,
+              "type": "high_yield_bond"
+            },
+            "balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "contractual_payment": null,
+            "credit_quality": null,
+            "day_count": "act_360",
+            "default_date": null,
+            "id": "COLLATERAL-1",
+            "index_id": null,
+            "industry": null,
+            "is_defaulted": false,
+            "maturity": "2034-01-01",
+            "mdr_override": null,
+            "obligor_id": null,
+            "origination_date": null,
+            "purchase_price": null,
+            "rate": 0.07,
+            "recovery_amount": null,
+            "recovery_rate": null,
+            "smm_override": null,
+            "spread_bp": null
+          }
+        ],
+        "base_currency": "USD",
+        "collection_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_defaults": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_prepayments": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_recoveries": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_scheduled_amortization": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "deal_type": "clo",
+        "excess_spread_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "id": "POOL-1",
+        "reinvestment_period": null,
+        "rep_lines": null,
+        "reserve_account": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "prepayment_spec": {
+        "cpr": 0.2,
+        "curve": null
+      },
+      "recovery_spec": {
+        "rate": 0.6,
+        "recovery_lag": 12
+      },
+      "tranches": {
+        "total_size": {
+          "amount": "100000000",
+          "currency": "USD"
+        },
+        "tranches": [
+          {
+            "attachment_point": 0.0,
+            "attributes": {},
+            "behavior_type": "standard",
+            "coupon": {
+              "fixed": {
+                "rate": 0.06
+              }
+            },
+            "current_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "day_count": "act_360",
+            "deferred_interest": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "detachment_point": 100.0,
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "ic_trigger": null,
+            "id": "CLONOTES-A",
+            "maturity": "2034-01-01",
+            "oc_trigger": null,
+            "original_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "payment_priority": 1,
+            "pik_enabled": false,
+            "rating": null,
+            "seniority": "senior"
+          }
+        ]
+      }
+    },
+    "type": "structured_credit"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

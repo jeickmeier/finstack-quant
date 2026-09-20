@@ -1,0 +1,34 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_currency": "JPY",
+      "correlation": -0.2,
+      "day_count": "act_365f",
+      "div_yield_id": "NKY-DIV",
+      "domestic_discount_curve_id": "USD-OIS",
+      "equity_strike": {
+        "amount": "35000",
+        "currency": "JPY"
+      },
+      "expiry": "2030-06-21",
+      "foreign_discount_curve_id": "JPY-OIS",
+      "fx_rate_id": "JPYUSD-SPOT",
+      "fx_vol_id": "JPYUSD-VOL",
+      "id": "QUANTO-NKY-USD-CALL",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "payoff_fx_rate": 0.007142857142857143,
+      "quote_currency": "USD",
+      "spot_id": "NKY-SPOT",
+      "underlying_quantity": 4000.0,
+      "underlying_ticker": "NKY",
+      "vol_surface_id": "NKY-VOL"
+    },
+    "type": "quanto_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

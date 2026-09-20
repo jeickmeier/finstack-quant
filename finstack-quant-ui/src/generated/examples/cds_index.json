@@ -1,0 +1,43 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "constituents": [],
+      "convention": "isda_na",
+      "id": "CDX-IG-42",
+      "index_factor": 1.0,
+      "index_name": "CDX.NA.IG",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "num_constituents": 125,
+      "premium": {
+        "business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2029-12-20",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "spread_bp": "60",
+        "standard_imm_dates": true,
+        "start": "2024-03-20",
+        "stub": "short_front"
+      },
+      "pricing": "single_curve",
+      "protection": {
+        "credit_curve_id": "CDX.NA.IG.HAZARD",
+        "recovery_rate": 0.4,
+        "settlement_delay": 3
+      },
+      "series": 42,
+      "side": "pay",
+      "version": 1
+    },
+    "type": "cds_index"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

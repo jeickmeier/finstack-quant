@@ -1,0 +1,35 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIV",
+      "expiry": "2024-12-31",
+      "global_cap": 0.2,
+      "global_floor": 0.0,
+      "id": "CLIQ-SPX-QTR",
+      "initial_level": null,
+      "local_cap": 0.05,
+      "local_floor": 0.0,
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "past_fixings": [],
+      "path_model": "atm_term_gbm",
+      "payoff_type": "additive",
+      "reset_dates": [
+        "2024-03-29",
+        "2024-06-28",
+        "2024-09-30",
+        "2024-12-31"
+      ],
+      "spot_id": "SPX-SPOT",
+      "underlying_ticker": "SPX",
+      "vol_surface_id": "SPX-VOL"
+    },
+    "type": "cliquet_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

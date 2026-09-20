@@ -1,0 +1,44 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "call_put": null,
+      "conversion": {
+        "anti_dilution": "none",
+        "dilution_events": [],
+        "dividend_adjustment": "none",
+        "policy": "voluntary",
+        "price": null,
+        "ratio": 25.0
+      },
+      "credit_curve_id": "USD-CREDIT-BBB",
+      "discount_curve_id": "USD-IG",
+      "fixed_coupon": {
+        "business_day_convention": "following",
+        "calendar_id": "weekends_only",
+        "coupon_type": "cash",
+        "day_count": "30_360",
+        "end_of_month": false,
+        "frequency": {
+          "count": 6,
+          "unit": "months"
+        },
+        "payment_lag_days": 0,
+        "rate": "0.02",
+        "stub": "none"
+      },
+      "floating_coupon": null,
+      "id": "CB-TECH-5Y",
+      "issue_date": "2024-01-15",
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "recovery_rate": 0.0,
+      "underlying_equity_id": "TECH"
+    },
+    "type": "convertible_bond"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

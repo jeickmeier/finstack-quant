@@ -1,0 +1,36 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "barrier": {
+        "amount": "5000",
+        "currency": "USD"
+      },
+      "barrier_type": "up_and_out",
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIV",
+      "expiry": "2024-12-20",
+      "id": "BAR-SPX-UO-CALL",
+      "monitoring": {
+        "type": "continuous"
+      },
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "rebate": {
+        "amount": "50",
+        "currency": "USD"
+      },
+      "rebate_timing": "at_hit",
+      "spot_id": "SPX-SPOT",
+      "strike": 4500.0,
+      "underlying_ticker": "SPX",
+      "vol_surface_id": "SPX-VOL"
+    },
+    "type": "barrier_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

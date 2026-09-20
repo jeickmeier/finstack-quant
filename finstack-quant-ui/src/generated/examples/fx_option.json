@@ -1,0 +1,28 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "base_currency": "EUR",
+      "day_count": "act_365f",
+      "delta_convention": {
+        "kind": "forward",
+        "premium_currency": "USD",
+        "venue": "generic_interbank"
+      },
+      "domestic_discount_curve_id": "USD-OIS",
+      "expiry": "2030-06-21",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "id": "FXOPT-EURUSD-CALL",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "option_type": "call",
+      "quote_currency": "USD",
+      "strike": 1.12,
+      "vol_surface_id": "EURUSD-VOL"
+    },
+    "type": "fx_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,31 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "id": "COMMODITY-FUTURE-OPTION-EXAMPLE",
+      "terms": {
+        "contracts": 1.0,
+        "currency": "USD",
+        "day_count": "act_365f",
+        "discount_curve_id": "USD-OIS",
+        "exercise_style": "european",
+        "expiry": "2026-12-14",
+        "futures_price": 100.0,
+        "model": "black76",
+        "multiplier": 1.0,
+        "option_type": "call",
+        "position": "long",
+        "premium_style": "premium_paid",
+        "settlement": {
+          "payment_date": "2026-12-14",
+          "type": "cash"
+        },
+        "strike": 100.0,
+        "underlying": "UNDERLYING-FUTURE",
+        "volatility": 0.2
+      }
+    },
+    "type": "commodity_future_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

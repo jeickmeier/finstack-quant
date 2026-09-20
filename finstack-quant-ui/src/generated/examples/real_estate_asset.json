@@ -1,0 +1,39 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "currency": "USD",
+      "day_count": "act_365f",
+      "discount_rate": 0.08,
+      "id": "RE-OFFICE-DCF",
+      "noi_schedule": [
+        [
+          "2026-01-01",
+          100000.0
+        ],
+        [
+          "2027-01-01",
+          100000.0
+        ],
+        [
+          "2028-01-01",
+          100000.0
+        ],
+        [
+          "2029-01-01",
+          100000.0
+        ],
+        [
+          "2030-01-01",
+          100000.0
+        ]
+      ],
+      "property_type": "office",
+      "terminal_cap_rate": 0.055,
+      "valuation_date": "2025-01-01",
+      "valuation_method": "dcf"
+    },
+    "type": "real_estate_asset"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

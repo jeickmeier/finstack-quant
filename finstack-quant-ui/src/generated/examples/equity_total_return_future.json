@@ -1,0 +1,28 @@
+{
+  "instrument": {
+    "spec": {
+      "accrued_distributions_id": "TESX-ACCRUED-DISTRIBUTIONS",
+      "accrued_funding_id": "TESX-ACCRUED-FUNDING",
+      "attributes": {},
+      "id": "EUREX-TESX-DEC27",
+      "spot_id": "SX5E-CLOSE",
+      "spread_basis_points_id": "TESX-SPREAD-BPS",
+      "spread_day_count": "act_360",
+      "terms": {
+        "contracts": 100.0,
+        "currency": "EUR",
+        "entry_price": 5250.0,
+        "last_trading_date": "2027-12-16",
+        "multiplier": 10.0,
+        "position": "long",
+        "settlement": {
+          "type": "cash"
+        },
+        "settlement_date": "2027-12-17"
+      },
+      "underlying_ticker": "SX5E"
+    },
+    "type": "equity_total_return_future"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,63 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "autocall_barriers": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "cap_level": 1.5,
+      "coupon_barriers": [
+        0.7,
+        0.7,
+        0.7,
+        0.7
+      ],
+      "coupons": [
+        0.02,
+        0.02,
+        0.02,
+        0.02
+      ],
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIV",
+      "expiry": "2024-12-31",
+      "final_barrier": 0.6,
+      "final_payoff_type": {
+        "participation": {
+          "rate": 1.0
+        }
+      },
+      "id": "AUTO-SPX-QTR",
+      "initial_level": null,
+      "memory_coupons": false,
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "observation_dates": [
+        "2024-03-29",
+        "2024-06-28",
+        "2024-09-30",
+        "2024-12-31"
+      ],
+      "participation_rate": 1.0,
+      "past_fixings": [],
+      "path_model": "atm_term_gbm",
+      "payment_dates": [
+        "2024-03-29",
+        "2024-06-28",
+        "2024-09-30",
+        "2024-12-31"
+      ],
+      "spot_id": "SPX-SPOT",
+      "underlying_ticker": "SPX",
+      "vol_surface_id": "SPX-VOL"
+    },
+    "type": "autocallable"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

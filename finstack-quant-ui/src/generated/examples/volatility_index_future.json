@@ -1,0 +1,27 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "contract_specs": {
+        "index_id": "VIX",
+        "multiplier": 1000.0,
+        "tick_size": 0.05,
+        "tick_value": 50.0
+      },
+      "discount_curve_id": "USD-OIS",
+      "expiry": "2025-03-19",
+      "id": "VIX-FUT-2025M03",
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "position": "long",
+      "quoted_price": 21.5,
+      "settlement_date": "2025-03-19",
+      "settlement_fixing": null,
+      "vol_index_curve_id": "VIX"
+    },
+    "type": "volatility_index_future"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

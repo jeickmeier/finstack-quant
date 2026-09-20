@@ -1,0 +1,42 @@
+{
+  "instrument": {
+    "spec": {
+      "accrual_start_date": "2023-12-31",
+      "attributes": {},
+      "bounds_type": "relative_to_initial_spot",
+      "coupon_rate": 0.08,
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIV",
+      "id": "RANGE-SPX-1Y",
+      "lower_bound": 0.95,
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "observation_dates": [
+        "2024-01-31",
+        "2024-02-29",
+        "2024-03-31",
+        "2024-04-30",
+        "2024-05-31",
+        "2024-06-30",
+        "2024-07-31",
+        "2024-08-31",
+        "2024-09-30",
+        "2024-10-31",
+        "2024-11-30",
+        "2024-12-31"
+      ],
+      "past_fixings_in_range": null,
+      "payment_date": null,
+      "spot_id": "SPX-SPOT",
+      "total_past_observations": null,
+      "underlying_ticker": "SPX",
+      "upper_bound": 1.05,
+      "vol_surface_id": "SPX-VOL"
+    },
+    "type": "range_accrual"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

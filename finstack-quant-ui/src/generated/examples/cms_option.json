@@ -1,0 +1,41 @@
+{
+  "instrument": {
+    "spec": {
+      "accrual_fractions": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "attributes": {},
+      "cms_tenor": 10.0,
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "fixing_dates": [
+        "2025-03-20",
+        "2025-06-20",
+        "2025-09-22",
+        "2025-12-22"
+      ],
+      "forward_curve_id": "USD-LIBOR-3M",
+      "id": "CMSOPT-10Y-USD",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "payment_dates": [
+        "2025-06-20",
+        "2025-09-22",
+        "2025-12-22",
+        "2026-03-20"
+      ],
+      "strike": "0.025",
+      "swap_convention": "usd_sofr",
+      "swap_float_day_count": "act_360",
+      "vol_surface_id": "USD-CMS10Y-VOL"
+    },
+    "type": "cms_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

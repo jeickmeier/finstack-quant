@@ -1,0 +1,30 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "business_day_convention": "following",
+      "calendar_id": "usny",
+      "cash_amount": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "collateral": {
+        "collateral_type": "general",
+        "instrument_id": "UST-10Y",
+        "market_value_id": "UST_10Y_PRICE",
+        "quantity": 10000.0
+      },
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "haircut": 0.02,
+      "id": "REPO-GC-7D",
+      "maturity": "2024-01-09",
+      "repo_rate": "0.0525",
+      "repo_type": "term",
+      "start_date": "2024-01-02",
+      "triparty": false
+    },
+    "type": "repo"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

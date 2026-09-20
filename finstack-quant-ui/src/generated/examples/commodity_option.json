@@ -1,0 +1,25 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "commodity_type": "Energy",
+      "currency": "USD",
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "exercise_style": "european",
+      "expiry": "2025-06-15",
+      "forward_curve_id": "WTI-FORWARD",
+      "id": "WTI-OPT-2025M06",
+      "multiplier": 1.0,
+      "option_type": "call",
+      "quantity": 1000.0,
+      "settlement": "cash",
+      "strike": 75.0,
+      "ticker": "CL",
+      "unit": "BBL",
+      "vol_surface_id": "WTI-VOL"
+    },
+    "type": "commodity_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

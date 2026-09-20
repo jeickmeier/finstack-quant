@@ -1,0 +1,27 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {
+        "meta": {
+          "pair": "EURUSD"
+        },
+        "tags": [
+          "fx"
+        ]
+      },
+      "base_currency": "EUR",
+      "contract_rate": 1.12,
+      "domestic_discount_curve_id": "USD-OIS",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "id": "EURUSD-FWD-6M",
+      "maturity": "2025-06-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "quote_currency": "USD"
+    },
+    "type": "fx_forward"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

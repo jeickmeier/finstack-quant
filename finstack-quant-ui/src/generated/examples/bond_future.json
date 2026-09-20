@@ -1,0 +1,41 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "contract_specs": {
+        "calendar_id": "nyse",
+        "contract_size": 100000.0,
+        "repo_day_count": "act_360",
+        "settlement_days": 2,
+        "standard_coupon": 0.06,
+        "standard_maturity_years": 10.0,
+        "tick_size": 0.015625,
+        "tick_value": 15.625
+      },
+      "ctd_bond_id": "US91282CJL54",
+      "deliverable_basket": [
+        {
+          "bond_id": "US91282CJL54",
+          "conversion_factor": 0.8234
+        },
+        {
+          "bond_id": "US91282CHT18",
+          "conversion_factor": 0.7915
+        }
+      ],
+      "delivery_end": "2025-09-30",
+      "delivery_start": "2025-09-22",
+      "discount_curve_id": "USD-TREASURY",
+      "expiry": "2025-09-19",
+      "id": "TYU5",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "position": "long",
+      "quoted_price": 112.25
+    },
+    "type": "bond_future"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

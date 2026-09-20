@@ -1,0 +1,33 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "expiry_date": "2027-03-29",
+      "forward_curve_id": "USD-SOFR-3M",
+      "id": "CMS-SPREAD-10Y2Y",
+      "long_cms_tenor": {
+        "count": 10,
+        "unit": "years"
+      },
+      "long_vol_surface_id": "USD-SWAPTION-VOL-10Y",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "payment_date": "2027-03-31",
+      "short_cms_tenor": {
+        "count": 2,
+        "unit": "years"
+      },
+      "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
+      "spread_correlation": 0.85,
+      "strike": 0.005,
+      "swap_convention": "usd_sofr"
+    },
+    "type": "cms_spread_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

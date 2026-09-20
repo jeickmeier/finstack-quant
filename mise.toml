@@ -995,3 +995,16 @@ uv run --no-sync python docs-site/gen/build_site.py
 [tasks.docs-site-dev]
 description = "Open the local analyst documentation development server"
 run = "npm --prefix docs-site run dev"
+
+# Component registry: independent checks, no Rust/Python/workspace test fan-out.
+[tasks.ui-sync]
+description = "Install locked component-registry dependencies without lifecycle builds"
+run = "npm --prefix finstack-quant-ui ci --ignore-scripts"
+
+[tasks.ui-gen]
+description = "Generate offline UI schemas, wire types, metadata, and lazy catalogue"
+run = "npm --prefix finstack-quant-ui run generate"
+
+[tasks.ui-check]
+description = "Check component-registry generation drift, types, and focused tests"
+run = "npm --prefix finstack-quant-ui run check"

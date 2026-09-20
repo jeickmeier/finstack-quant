@@ -1,0 +1,52 @@
+{
+  "instrument": {
+    "spec": {
+      "allow_calendar_fallback": false,
+      "allow_same_curve": false,
+      "attributes": {},
+      "id": "BASIS-SWAP-USD-3M1M-5Y",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "primary_leg": {
+        "business_day_convention": "modified_following",
+        "calendar_id": "weekends_only",
+        "compounding": "simple",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2029-01-03",
+        "forward_curve_id": "USD-SOFR-3M",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "payment_lag_days": 0,
+        "reset_lag_days": 0,
+        "spread_bp": "5",
+        "start": "2024-01-03",
+        "stub": "short_front"
+      },
+      "reference_leg": {
+        "business_day_convention": "modified_following",
+        "calendar_id": "weekends_only",
+        "compounding": "simple",
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2029-01-03",
+        "forward_curve_id": "USD-SOFR-1M",
+        "frequency": {
+          "count": 1,
+          "unit": "months"
+        },
+        "payment_lag_days": 0,
+        "reset_lag_days": 0,
+        "spread_bp": "0",
+        "start": "2024-01-03",
+        "stub": "short_front"
+      }
+    },
+    "type": "basis_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

@@ -1,0 +1,58 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "cms_accrual_fractions": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "cms_day_count": "act_365f",
+      "cms_fixing_dates": [
+        "2025-03-20",
+        "2025-06-20",
+        "2025-09-22",
+        "2025-12-22"
+      ],
+      "cms_payment_dates": [
+        "2025-06-20",
+        "2025-09-22",
+        "2025-12-22",
+        "2026-03-20"
+      ],
+      "cms_spread": 0.0,
+      "cms_tenor": 10.0,
+      "discount_curve_id": "USD-OIS",
+      "forward_curve_id": "USD-LIBOR-3M",
+      "funding_leg": {
+        "accrual_fractions": [
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ],
+        "day_count": "30_360",
+        "payment_dates": [
+          "2025-06-20",
+          "2025-09-22",
+          "2025-12-22",
+          "2026-03-20"
+        ],
+        "rate": 0.03,
+        "type": "fixed"
+      },
+      "id": "CMSSWAP-10Y-USD",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "swap_convention": "usd_sofr",
+      "swap_float_day_count": "act_360",
+      "vol_surface_id": "USD-CMS10Y-VOL"
+    },
+    "type": "cms_swap"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

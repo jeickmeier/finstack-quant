@@ -1,0 +1,64 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "cash_settlement_method": "collateralized_cash_price",
+      "exercise_style": "european",
+      "expiry": "2027-01-15",
+      "id": "SWPN-1Yx5Y-USD",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "sabr_params": null,
+      "settlement": "cash",
+      "underlying_fixed_leg": {
+        "business_day_convention": "modified_following",
+        "calendar_id": null,
+        "compounding_simple": true,
+        "day_count": "30_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2032-01-17",
+        "end_of_month": false,
+        "frequency": {
+          "count": 6,
+          "unit": "months"
+        },
+        "par_method": null,
+        "payment_lag_days": 0,
+        "rate": "0.03",
+        "start": "2027-01-17",
+        "stub": "none"
+      },
+      "underlying_float_leg": {
+        "business_day_convention": "modified_following",
+        "calendar_id": null,
+        "compounding": {
+          "compounded_in_arrears": {
+            "lookback_days": 0
+          }
+        },
+        "day_count": "act_360",
+        "discount_curve_id": "USD-OIS",
+        "end": "2032-01-17",
+        "end_of_month": false,
+        "fixing_calendar_id": null,
+        "forward_curve_id": "USD-OIS",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "payment_lag_days": 0,
+        "reset_lag_days": 0,
+        "spread_bp": "0",
+        "start": "2027-01-17",
+        "stub": "none"
+      },
+      "vol_model": "black",
+      "vol_surface_id": "USD-SWPNVOL"
+    },
+    "type": "swaption"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

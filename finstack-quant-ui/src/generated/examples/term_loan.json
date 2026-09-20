@@ -1,0 +1,44 @@
+{
+  "instrument": {
+    "spec": {
+      "amortization": {
+        "percent_per_period": {
+          "bp": 250
+        }
+      },
+      "attributes": {},
+      "business_day_convention": "modified_following",
+      "calendar_id": null,
+      "call_schedule": null,
+      "coupon_type": "cash",
+      "covenants": null,
+      "credit_curve_id": null,
+      "currency": "USD",
+      "day_count": "act_360",
+      "ddtl": null,
+      "discount_curve_id": "USD-OIS",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "id": "TERM-LOAN-USD-5Y",
+      "issue_date": "2024-01-01",
+      "maturity": "2029-01-01",
+      "notional_limit": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "oid_eir": null,
+      "rate": {
+        "fixed": {
+          "rate_bp": 600
+        }
+      },
+      "settlement_days": 2,
+      "stub": "none",
+      "upfront_fee": null
+    },
+    "type": "term_loan"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

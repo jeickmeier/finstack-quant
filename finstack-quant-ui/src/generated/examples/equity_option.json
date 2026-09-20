@@ -1,0 +1,27 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "day_count": "act_365f",
+      "discount_curve_id": "USD-OIS",
+      "discrete_dividends": [],
+      "div_yield_id": "EQUITY-DIVYIELD",
+      "exercise_style": "european",
+      "expiry": "2024-06-21",
+      "id": "SPX-CALL-4500",
+      "notional": {
+        "amount": "100",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "settlement": "cash",
+      "spot_id": "EQUITY-SPOT",
+      "strike": 4500.0,
+      "theta_day_basis": "calendar_365",
+      "underlying_ticker": "SPX",
+      "vol_surface_id": "EQUITY-VOL"
+    },
+    "type": "equity_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

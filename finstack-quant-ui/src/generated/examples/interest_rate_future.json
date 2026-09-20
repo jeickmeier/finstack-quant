@@ -1,0 +1,32 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "contract_specs": {
+        "convexity_adjustment": 0.0,
+        "delivery_months": 3,
+        "face_value": 1000000.0,
+        "tick_size": 0.0025,
+        "tick_value": 6.25
+      },
+      "day_count": "act_360",
+      "discount_curve_id": "USD-OIS",
+      "expiry": "2025-03-17",
+      "fixing_date": "2025-03-17",
+      "forward_curve_id": "USD-SOFR-3M",
+      "id": "IRF-ED-3M-MAR25",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "period_end": "2025-06-18",
+      "period_start": "2025-03-19",
+      "position": "long",
+      "quoted_price": 95.5,
+      "rate_averaging": "term",
+      "vol_surface_id": null
+    },
+    "type": "interest_rate_future"
+  },
+  "schema": "finstack_quant.instrument/1"
+}

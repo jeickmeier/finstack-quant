@@ -1,0 +1,26 @@
+{
+  "instrument": {
+    "spec": {
+      "attributes": {},
+      "barrier_direction": "down",
+      "barrier_level": 1.05,
+      "base_currency": "EUR",
+      "day_count": "act_365f",
+      "domestic_discount_curve_id": "USD-OIS",
+      "expiry": "2030-06-21",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "id": "FXTOUCH-EURUSD-OT",
+      "monitoring_start_date": "2024-01-01",
+      "payout_amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "payout_timing": "at_expiry",
+      "quote_currency": "USD",
+      "touch_type": "one_touch",
+      "vol_surface_id": "EURUSD-VOL"
+    },
+    "type": "fx_touch_option"
+  },
+  "schema": "finstack_quant.instrument/1"
+}
