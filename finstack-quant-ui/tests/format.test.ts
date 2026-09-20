@@ -164,3 +164,12 @@ it("provides native Table v9 definitions with raw accessors and presentation met
     ),
   ).toBe(true);
 });
+
+it("preserves canonical scientific decimal values in display conversion", () => {
+  expect(groupDecimal("1.2345e3")).toBe("1,234.5");
+  expect(formatRate("1.23e-7", presentation)).toEqual({
+    text: "0.00123",
+    unit: "bp",
+  });
+  expect(rateToWire("0.00123", presentation)).toBe("0.000000123");
+});

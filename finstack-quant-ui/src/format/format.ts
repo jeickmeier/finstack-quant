@@ -26,7 +26,8 @@ export function formatRaw(
 }
 /** Group exact decimal digits for the registry's en-US display; no numeric conversion. */
 export function groupDecimal(value: string): string {
-  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
+  const normalized = /[eE]/.test(value) ? new Big(value).toFixed() : value;
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(normalized);
   if (!match) throw new TypeError("Expected a decimal string");
   const [, sign, integer, fraction] = match;
   return (
@@ -81,12 +82,17 @@ export function convertRate(
   if (!Object.hasOwn(powers, from) || !Object.hasOwn(powers, to))
     throw new TypeError("Unsupported rate presentation unit");
   const shift = powers[to] - powers[from];
-  const fraction = /^-?\d+(?:\.(\d+))?$/.exec(value);
+  const fraction = /^-?\d+(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(value);
   if (!fraction)
     throw new TypeError("Expected decimal text for rate presentation");
   return new Big(value)
     .times(`1e${shift}`)
-    .toFixed(Math.max(0, (fraction[1]?.length ?? 0) - shift));
+    .toFixed(
+      Math.max(
+        0,
+        (fraction[1]?.length ?? 0) - Number(fraction[2] ?? 0) - shift,
+      ),
+    );
 }
 /** Display an explicitly contracted rate, or preserve raw text with unavailable units. */
 export function formatRate(
