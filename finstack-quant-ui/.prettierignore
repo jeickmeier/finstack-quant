@@ -9,3 +9,6 @@ public/r
 
 test-results/
 playwright-report/
+
+# Preserve the official shadcn CLI output byte-for-byte.
+components/ui/

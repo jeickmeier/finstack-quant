@@ -43,7 +43,13 @@
         "@finstack/calibration-fit-chart",
         "@finstack/use-calibrate",
         "@finstack/use-scenario-table",
-        "@finstack/scenario-heatmap"
+        "@finstack/scenario-heatmap",
+        "button",
+        "label",
+        "popover",
+        "select",
+        "tabs",
+        "textarea"
       ],
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.8.0"]
     }

@@ -153,7 +153,7 @@ it("embeds the existing components, debounces complete requests and retains edit
   await within(results).findByText("USD 1,042,500");
   const amount = screen.getByRole("textbox", { name: "Amount" });
   fireEvent.change(amount, { target: { value: "1000000.123456789" } });
-  await userEvent.click(screen.getByText("Settings", { selector: "summary" }));
+  await userEvent.click(screen.getByRole("button", { name: "Settings" }));
   const overrides = ' {"theta_period":"1W"} ';
   const history = '{"base_date":"2025-01-01","window_days":2,"scenarios":[]}';
   fireEvent.change(screen.getByRole("textbox", { name: "Pricing overrides" }), {
@@ -201,7 +201,7 @@ it("retains the completed context during invalid edits, native pricing failure a
   expect(prices()).toHaveLength(1);
   expect(screen.getByText("USD 1,042,500")).toBeTruthy();
   fireEvent.change(amount, { target: { value: "1000000" } });
-  await userEvent.click(screen.getByText("Settings", { selector: "summary" }));
+  await userEvent.click(screen.getByRole("button", { name: "Settings" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Pricing overrides" }), {
     target: { value: '{"unknown_seed":18446744073709551615}' },
   });

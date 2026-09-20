@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { shadcnItems, copyShadcn } from "../scripts/shadcn.mjs";
 import {
   mkdtemp,
   mkdir,
@@ -67,6 +68,19 @@ describe("registry dependency boundaries", () => {
       checkGraph([{ ...entry("a"), registryDependencies: ["b"] }, entry("b")]),
     ).toThrow(/namespace/);
   });
+  it("requires stock imports to be declared as upstream dependencies", () => {
+    const a = entry("a");
+    const content = new Map([
+      ["a.ts", 'export { RadioGroup } from "@/components/ui/radio-group";'],
+    ]);
+    expect(() => checkImports([a], content)).toThrow(/Unresolved installed/);
+    expect(() =>
+      checkImports([{ ...a, registryDependencies: ["radio-group"] }], content),
+    ).not.toThrow();
+    expect(() =>
+      checkImports([{ ...a, registryDependencies: ["input"] }], content),
+    ).toThrow(/Unresolved installed/);
+  });
   it("requires installed imports to belong to the importing item's closure", () => {
     const content = new Map([
       ["a.ts", 'export * from "./b";'],
@@ -131,6 +145,13 @@ it.each([false, true])(
           if (/\.(?:tsx?|mts)$/.test(target)) files.push(target);
         }
       }
+      files.push(
+        ...(await copyShadcn(
+          root,
+          src ? path.join(consumer, "src") : consumer,
+          [...shadcnItems.keys()],
+        )),
+      );
       const program = ts.createProgram(files, {
         target: ts.ScriptTarget.ES2022,
         jsx: ts.JsxEmit.ReactJSX,

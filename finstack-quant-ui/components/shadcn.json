@@ -1,0 +1,214 @@
+{
+  "style": "base-nova",
+  "cliVersion": "4.21.0",
+  "items": [
+    {
+      "name": "badge",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/badge.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "ccc20021cdcbf0fb23c0d4d28f1da4adde8e51ba59f4b11dd2722ed97a5ee3a4",
+      "files": [
+        {
+          "path": "components/ui/badge.tsx",
+          "sha256": "d9fb280e266119c4b62a4c518e63152de27b094c68d3e5f8929d05bfb0c1bc6c"
+        }
+      ]
+    },
+    {
+      "name": "button",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/button.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "9ba7e870178813f0552b818a913a2792fb500c779e36395740b4973e3025d427",
+      "files": [
+        {
+          "path": "components/ui/button.tsx",
+          "sha256": "313353436d0fcc8e44ab470adb614b9fd013d28626f624328ea0d66d41a6c81b"
+        }
+      ]
+    },
+    {
+      "name": "calendar",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/calendar.json",
+      "registryDependencies": ["button"],
+      "dependencies": ["cn", "react-day-picker@latest", "date-fns"],
+      "sourceSha256": "cc9ff16599d1664cec2d6a91ba82d0927953d8eedd51a7d56bba48a6522c28eb",
+      "files": [
+        {
+          "path": "components/ui/calendar.tsx",
+          "sha256": "f27bdee7bff15b40047071310ff6b6ea6f77f2b7d0a35011f593708ca09e3934"
+        }
+      ]
+    },
+    {
+      "name": "checkbox",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/checkbox.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "e6df7b595f25a7ee97c3fb94e0ddc35998f74c98b990d3030e485905ec677178",
+      "files": [
+        {
+          "path": "components/ui/checkbox.tsx",
+          "sha256": "d1b341a2b439da009e42388cde8a829adcf55ecb0d447449271aacad752e73ba"
+        }
+      ]
+    },
+    {
+      "name": "combobox",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/combobox.json",
+      "registryDependencies": ["button", "input-group"],
+      "dependencies": ["cn", "@base-ui/react"],
+      "sourceSha256": "d4b9231b00428269f6fa42bf3e26714f15c69245f35b62d1bbae6d1a4853d314",
+      "files": [
+        {
+          "path": "components/ui/combobox.tsx",
+          "sha256": "ccc44c4aa4afca181f04a174359689b1cd55989f511271ac738c79c881e90010"
+        }
+      ]
+    },
+    {
+      "name": "field",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/field.json",
+      "registryDependencies": ["label", "separator"],
+      "dependencies": ["cn"],
+      "sourceSha256": "586110f5563cbb5dc0929207ee34361f1349cf2f816465799c60b98821e4cedc",
+      "files": [
+        {
+          "path": "components/ui/field.tsx",
+          "sha256": "8e54d2838051eeb741f6925863b690c98928b25bbb26f3cd26a5b75121d06acb"
+        }
+      ]
+    },
+    {
+      "name": "input-group",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/input-group.json",
+      "registryDependencies": ["button", "input", "textarea"],
+      "dependencies": ["cn"],
+      "sourceSha256": "acf9c5497a6c844dee87fbd4afefb6cd8be9ce50d050d14d58a340d955e517a1",
+      "files": [
+        {
+          "path": "components/ui/input-group.tsx",
+          "sha256": "7e768d41f247b1a4a3b0d214453dbeb1c2150aba500f5c0037b0285dfbe6a899"
+        }
+      ]
+    },
+    {
+      "name": "input",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/input.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "bbad1bba130ac9750a61844eeb8f043e8a710846e07689fa85398b80a46c2741",
+      "files": [
+        {
+          "path": "components/ui/input.tsx",
+          "sha256": "dab990dfefa0ba78854ab6602ad074270dba9d7d1262184d9bfbb62bd990903b"
+        }
+      ]
+    },
+    {
+      "name": "label",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/label.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "89b01e14fd39dceece9fa421e71e78ea83286bd43a2ca1c2f55d2e8d3958fff2",
+      "files": [
+        {
+          "path": "components/ui/label.tsx",
+          "sha256": "b3b7b21d2877838fc73713df48a47248392de04a3b3fafa8961369f33ab14530"
+        }
+      ]
+    },
+    {
+      "name": "popover",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/popover.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "ba5fe84f353f6c0fd2133a2ab893f5e8861fc60dc4dea548a7ec875acaa37b2c",
+      "files": [
+        {
+          "path": "components/ui/popover.tsx",
+          "sha256": "b6bc5045e7b67414816f813788b5f699d0cc5e4a23debe76c89a6ddb68079c26"
+        }
+      ]
+    },
+    {
+      "name": "radio-group",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/radio-group.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "874b30662ba338d06362491b663cae9198281a4bc385b6be6425f2de442384d7",
+      "files": [
+        {
+          "path": "components/ui/radio-group.tsx",
+          "sha256": "f779542f2370b82fcbb91278fb94f7ad4af59d0f36512633492604b27da48e8d"
+        }
+      ]
+    },
+    {
+      "name": "select",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/select.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "425e9b0a28b72617f18fabd75384050113295b88e7ba01c35bede2c72bd5d476",
+      "files": [
+        {
+          "path": "components/ui/select.tsx",
+          "sha256": "4ba225fb838887a2493a8908774f1294ffbc2030af1e372425c6de76f598f0eb"
+        }
+      ]
+    },
+    {
+      "name": "separator",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/separator.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "3ad65962485f464592201cb90017b3d52a5c9fe272ce41ee049485b4c42e0d76",
+      "files": [
+        {
+          "path": "components/ui/separator.tsx",
+          "sha256": "9a80ff8c110e0c55489509f4f82ebcc929c0174b59544047147b7134f86a54e7"
+        }
+      ]
+    },
+    {
+      "name": "table",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/table.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "054c89df40058a96723c9ed8cde6308e738f3a303fd19301ce94ade032306b60",
+      "files": [
+        {
+          "path": "components/ui/table.tsx",
+          "sha256": "749b0501e97591f8d7c9ef81366d636e4b47857a15a28e6cf3b87841232e74bf"
+        }
+      ]
+    },
+    {
+      "name": "tabs",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/tabs.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "b4552a0329dd9a6e2bfaf03405c133874df5a4930c7bb3dd84c9ab5c45b89402",
+      "files": [
+        {
+          "path": "components/ui/tabs.tsx",
+          "sha256": "958b817b256cffae986d046168b70dd0153d542b4c521ee8bbdda349010011ef"
+        }
+      ]
+    },
+    {
+      "name": "textarea",
+      "source": "https://ui.shadcn.com/r/styles/base-nova/textarea.json",
+      "registryDependencies": [],
+      "dependencies": ["cn"],
+      "sourceSha256": "8f01f6bc4ee556263bae7644e8b527022fa77ff203f33a258bb47142ef7d9c81",
+      "files": [
+        {
+          "path": "components/ui/textarea.tsx",
+          "sha256": "82601c91ffc6c727d924162c78d7cb853114bcced4e2eb922a68ca12d4239c0f"
+        }
+      ]
+    }
+  ]
+}

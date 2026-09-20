@@ -1,6 +1,20 @@
 "use client";
 import { useEffect, useId, useState } from "react";
-import { Combobox } from "@base-ui/react/combobox";
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxTrigger,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+  ComboboxGroup,
+  ComboboxLabel,
+  ComboboxCollection,
+  ComboboxEmpty,
+} from "@/components/ui/combobox";
+import { InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { instruments } from "@/lib/finstack/generated/instruments";
 type Entry = (typeof instruments)[number];
 const groups = [...Map.groupBy(instruments, (entry) => entry.group)].map(
@@ -52,8 +66,8 @@ export function InstrumentSelector({
     onValueChange(type);
   };
   return (
-    <div className="finstack-instrument-selector space-y-2">
-      <Combobox.Root
+    <div>
+      <Combobox
         items={groups}
         value={instruments.find((entry) => entry.type === value) ?? null}
         itemToStringLabel={(item: Entry) => item.title}
@@ -62,65 +76,58 @@ export function InstrumentSelector({
         }}
         openOnInputClick
       >
-        <label htmlFor={id} className="block text-sm">
-          Instrument type
-        </label>
-        <Combobox.Input
+        <Label htmlFor={id}>Instrument type</Label>
+        <ComboboxInput
           id={id}
           placeholder="Search instruments…"
-          className="finstack-field w-full rounded-sm border border-control-border bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
-        />
-        <Combobox.Portal>
-          <Combobox.Positioner sideOffset={4}>
-            <Combobox.Popup className="min-w-[var(--anchor-width)] rounded-md border border-control-border bg-card text-card-foreground shadow-[var(--elevation)]">
-              <Combobox.Empty className="p-2 text-sm">
-                No matching instrument
-              </Combobox.Empty>
-              <Combobox.List className="max-h-72 overflow-auto p-1">
-                {(group: { value: string; items: Entry[] }) => (
-                  <Combobox.Group key={group.value} items={group.items}>
-                    <Combobox.GroupLabel className="p-2 text-xs text-muted-foreground">
-                      {group.value.replaceAll("_", " ")}
-                    </Combobox.GroupLabel>
-                    <Combobox.Collection>
-                      {(entry: Entry) => (
-                        <Combobox.Item
-                          key={entry.type}
-                          value={entry}
-                          className="flex items-center justify-between gap-4 rounded-sm p-2 text-sm data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                        >
-                          <span>{entry.title}</span>
-                          <span
-                            aria-hidden
-                            className="rounded-sm border border-control-border px-1 text-xs text-muted-foreground"
-                          >
-                            {entry.group.replaceAll("_", " ")}
-                          </span>
-                        </Combobox.Item>
-                      )}
-                    </Combobox.Collection>
-                  </Combobox.Group>
-                )}
-              </Combobox.List>
-            </Combobox.Popup>
-          </Combobox.Positioner>
-        </Combobox.Portal>
-      </Combobox.Root>
-      {recent.length > 0 && (
-        <nav
-          aria-label="Recently used instruments"
-          className="flex flex-wrap items-center gap-2 text-xs"
+          showTrigger={false}
         >
-          <span className="text-muted-foreground">Recent</span>
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              size="icon-xs"
+              variant="ghost"
+              render={<ComboboxTrigger />}
+              aria-label="Show instrument types"
+            />
+          </InputGroupAddon>
+        </ComboboxInput>
+
+        <ComboboxContent>
+          <ComboboxEmpty>No matching instrument</ComboboxEmpty>
+          <ComboboxList>
+            {(group: { value: string; items: Entry[] }) => (
+              <ComboboxGroup key={group.value} items={group.items}>
+                <ComboboxLabel>
+                  {group.value.replaceAll("_", " ")}
+                </ComboboxLabel>
+                <ComboboxCollection>
+                  {(entry: Entry) => (
+                    <ComboboxItem key={entry.type} value={entry}>
+                      <span>{entry.title}</span>
+                      <span aria-hidden>
+                        {entry.group.replaceAll("_", " ")}
+                      </span>
+                    </ComboboxItem>
+                  )}
+                </ComboboxCollection>
+              </ComboboxGroup>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+      {recent.length > 0 && (
+        <nav aria-label="Recently used instruments">
+          <span>Recent</span>
           {recent.map((type) => (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               key={type}
               type="button"
               onClick={() => select(type)}
-              className="rounded-sm border border-control-border px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring"
             >
               {type}
-            </button>
+            </Button>
           ))}
         </nav>
       )}

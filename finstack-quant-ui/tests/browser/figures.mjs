@@ -26,6 +26,7 @@ try {
   );
   await build({
     root: consumer,
+    resolve: { alias: { "@": consumer } },
     configFile: false,
     logLevel: "error",
     css: { postcss: { plugins: [tailwind()] } },
@@ -50,6 +51,51 @@ try {
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
+  const presentation = await page.evaluate(() => ({
+    standard: window.figureProbe.presentation(),
+    mixed: window.figureProbe.presentation({
+      "text-lg": "1.5rem",
+      "text-base": "1.1em",
+      "text-sm": "calc(0.5rem + 3px)",
+      "text-xs": "9px",
+      spacing: "calc(0.25rem + 1px)",
+    }),
+    invalid: [
+      "initial",
+      "not-a-length",
+      "-1px",
+      "0px",
+      "1px invalid",
+      "var(--missing-figure-length)",
+    ].map((value) => {
+      try {
+        window.figureProbe.presentation({ "text-lg": value });
+        return null;
+      } catch (error) {
+        return error.message;
+      }
+    }),
+  }));
+  assert.deepEqual(presentation.standard, {
+    title: 18,
+    body: 16,
+    note: 14,
+    cell: 12,
+    spacing: 4,
+  });
+  assert.deepEqual(presentation.mixed, {
+    title: 24,
+    body: 22,
+    note: 11,
+    cell: 9,
+    spacing: 5,
+  });
+  assert(
+    presentation.invalid.every(
+      (message) => message === "Missing or invalid figure token: text-lg",
+    ),
+    "Missing, invalid, and nonpositive CSS lengths must reject",
+  );
   const exports = [];
   for (const name of ["numeric", "date", "category"])
     for (const width of [340, 900]) {
@@ -126,8 +172,18 @@ try {
                 : [];
             }),
           );
+          const unreadable = [...root.querySelectorAll("text")]
+            .filter(
+              (node) =>
+                node.textContent.trim() &&
+                Number.parseFloat(getComputedStyle(node).fontSize) < 8,
+            )
+            .map((node) => ({
+              text: node.textContent,
+              fontSize: getComputedStyle(node).fontSize,
+            }));
           host.remove();
-          return [...outside, ...overlaps];
+          return [...outside, ...overlaps, ...unreadable];
         },
         { svg, width, height: options.height },
       );
@@ -205,6 +261,7 @@ try {
   const report = {
     browser: browser.version(),
     installed,
+    presentation,
     exports,
     accessibility,
     failures,

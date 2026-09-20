@@ -1,5 +1,9 @@
 # Component registry design correction
 
+Historical evidence for commit `0fa56f72a`. The subsequent
+[stock shadcn composition correction](shadcn-composition.md) supersedes its
+bespoke control styling and records the current verification.
+
 The implementation drifted from the agreed component-registry mockups. This
 correction changes the shared registry components and their docs host, rather
 than adding a separate demo renderer.

@@ -1,7 +1,15 @@
 "use client";
-import { Select } from "@base-ui/react/select";
-import { Radio } from "@base-ui/react/radio";
-import { RadioGroup } from "@base-ui/react/radio-group";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectGroup,
+  SelectLabel,
+  SelectItem,
+} from "@/components/ui/select";
 import { FieldFrame, type FieldInfo } from "../field-frame/field-frame";
 export interface EnumOption {
   value: string;
@@ -17,7 +25,7 @@ export interface EnumFieldProps extends FieldInfo {
   disabled?: boolean;
   layout?: "select" | "radio";
 }
-/** Controlled enum choices supplied by the canonical caller, including variant descriptions. */
+/** Canonical supplied choices composed from unmodified shadcn controls. */
 export function EnumField({
   value,
   onValueChange,
@@ -36,75 +44,52 @@ export function EnumField({
             value={value}
             onValueChange={(next) => onValueChange(next)}
             disabled={disabled}
-            className="flex flex-wrap gap-3"
           >
-            {options.map((option) => (
-              <label
-                key={option.value}
-                title={option.description}
-                className="flex items-center gap-1 text-sm"
-              >
-                <Radio.Root
+            {options.map((option, index) => (
+              <div key={option.value} className="flex items-center gap-2">
+                <RadioGroupItem
+                  id={`${control.id}-${index}`}
                   value={option.value}
                   disabled={option.disabled}
-                  className="size-4 rounded-full border border-control-border data-checked:border-primary focus-visible:outline-2 focus-visible:outline-ring"
+                  aria-invalid={control["aria-invalid"]}
+                />
+                <Label
+                  htmlFor={`${control.id}-${index}`}
+                  title={option.description}
                 >
-                  <Radio.Indicator className="m-auto block size-2 rounded-full bg-primary" />
-                </Radio.Root>
-                {option.label}
-              </label>
+                  {option.label}
+                </Label>
+              </div>
             ))}
           </RadioGroup>
         ) : (
-          <Select.Root
+          <Select
             value={value || null}
             onValueChange={(next) => onValueChange(next ?? "")}
             disabled={disabled}
             items={options}
           >
-            <Select.Trigger
-              {...control}
-              className="finstack-field flex w-full items-center justify-between rounded-sm border border-control-border bg-background px-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              <Select.Value
-                className="min-w-0 truncate"
-                placeholder="Select…"
-              />
-              <Select.Icon className="shrink-0">⌄</Select.Icon>
-            </Select.Trigger>
-            <Select.Portal>
-              <Select.Positioner sideOffset={4}>
-                <Select.Popup className="max-h-72 min-w-[var(--anchor-width)] overflow-auto rounded-md border border-control-border bg-card p-1 text-card-foreground shadow-[var(--elevation)]">
-                  <Select.List>
-                    {[...groups].map(([group, items]) => (
-                      <Select.Group key={group}>
-                        {group && (
-                          <Select.GroupLabel className="p-2 text-xs text-muted-foreground">
-                            {group}
-                          </Select.GroupLabel>
-                        )}
-                        {items.map((option) => (
-                          <Select.Item
-                            key={option.value}
-                            value={option.value}
-                            disabled={option.disabled}
-                            className="rounded-sm p-2 text-sm data-highlighted:bg-accent data-highlighted:text-accent-foreground"
-                          >
-                            <Select.ItemText>{option.label}</Select.ItemText>
-                            {option.description && (
-                              <span className="block max-w-sm line-clamp-2 whitespace-pre-wrap text-xs text-muted-foreground">
-                                {option.description}
-                              </span>
-                            )}
-                          </Select.Item>
-                        ))}
-                      </Select.Group>
-                    ))}
-                  </Select.List>
-                </Select.Popup>
-              </Select.Positioner>
-            </Select.Portal>
-          </Select.Root>
+            <SelectTrigger {...control}>
+              <SelectValue placeholder="Select…" />
+            </SelectTrigger>
+            <SelectContent>
+              {[...groups].map(([group, items]) => (
+                <SelectGroup key={group}>
+                  {group && <SelectLabel>{group}</SelectLabel>}
+                  {items.map((option) => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      disabled={option.disabled}
+                      title={option.description}
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         )
       }
     </FieldFrame>

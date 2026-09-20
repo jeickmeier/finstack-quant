@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { loadRegistry } from "shadcn/registry";
+import { shadcnItems, shadcnClosure, checkShadcn } from "./shadcn.mjs";
 
 const tiers = {
   "registry:ui": 1,
@@ -46,6 +47,7 @@ export function checkGraph(items) {
     visiting.add(name);
     const closure = new Set([name]);
     for (const reference of item.registryDependencies ?? []) {
+      if (shadcnItems.has(reference)) continue;
       if (!reference.startsWith("@finstack/"))
         throw new Error(
           `Dependency must use @finstack namespace: ${reference}`,
@@ -70,6 +72,11 @@ export function checkImports(items, contents) {
   const { byName, owners, closures } = checkGraph(items);
   for (const item of items) {
     const closure = closures.get(item.name);
+    const stock = shadcnClosure(
+      [...closure]
+        .flatMap((name) => byName.get(name).registryDependencies ?? [])
+        .filter((name) => shadcnItems.has(name)),
+    );
     const packages = new Set(
       [...closure]
         .flatMap((name) => [
@@ -85,6 +92,15 @@ export function checkImports(items, contents) {
         throw new Error(`Missing installed content: ${file.target}`);
       const imports = ts.preProcessFile(source, true, true).importedFiles;
       for (const { fileName: specifier } of imports) {
+        if (specifier.startsWith("@base-ui/"))
+          throw new Error(
+            `Compose stock shadcn components instead of raw Base UI: ${file.target}`,
+          );
+        if (
+          specifier.startsWith("@/components/ui/") &&
+          stock.has(specifier.slice("@/components/ui/".length))
+        )
+          continue;
         if (specifier.startsWith(".") || specifier.startsWith("@/")) {
           const base = specifier.startsWith("@/")
             ? specifier.slice(2)
@@ -118,6 +134,7 @@ export function checkImports(items, contents) {
 }
 
 export async function checkRegistry(cwd) {
+  await checkShadcn(cwd);
   const registry = await loadRegistry({ cwd });
   const contents = new Map();
   const sources = new Set();

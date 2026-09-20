@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { instruments } from "@/lib/finstack/generated/instruments";
 import { InstrumentSelector } from "./instrument-selector";
@@ -69,16 +70,18 @@ export function InstrumentForm(props: {
           }}
         />
         {module && (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            className="rounded-sm border border-border px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+
             onClick={() => {
               props.onValidated?.(null);
               setExample((n) => n + 1);
             }}
           >
             Load example
-          </button>
+          </Button>
         )}
       </header>
       {!instruments.some((entry) => entry.type === props.type) ? (

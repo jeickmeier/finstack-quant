@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
 import type { ReactNode } from "react";
 import {
@@ -14,10 +17,6 @@ import {
 } from "@/components/finstack/primitives/enum-field/enum-field";
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
   createFormHookContexts();
-export const fieldClass =
-  "finstack-field w-full rounded-sm border border-control-border bg-background px-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring";
-export const buttonClass =
-  "rounded-sm border border-control-border px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50";
 export function errorText(errors: readonly unknown[]): string | undefined {
   const messages = errors
     .flat(Infinity)
@@ -47,9 +46,9 @@ function TextField(
       error={errorText(field.state.meta.errors)}
     >
       {(control) => (
-        <input
+        <Input
           {...control}
-          className={fieldClass}
+
           inputMode={props.inputMode}
           value={String(field.state.value ?? "")}
           onBlur={field.handleBlur}
@@ -105,12 +104,12 @@ function BooleanField(props: FieldInfo) {
       error={errorText(field.state.meta.errors)}
     >
       {(control) => (
-        <input
+        <Checkbox
           {...control}
-          type="checkbox"
+
           checked={field.state.value ?? false}
           onBlur={field.handleBlur}
-          onChange={(event) => field.handleChange(event.target.checked)}
+          onCheckedChange={(checked) => field.handleChange(checked === true)}
         />
       )}
     </FieldFrame>
@@ -157,31 +156,37 @@ function ArrayField({
         >
           {children(index)}
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
-              className={buttonClass}
+
               onClick={() => field.removeValue(index)}
             >
               Remove {label} {index + 1}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
-              className={buttonClass}
+
               disabled={index === 0}
               onClick={() => field.moveValue(index, index - 1)}
             >
               Move {label} {index + 1} up
-            </button>
+            </Button>
           </div>
         </div>
       ))}
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
-        className={buttonClass}
+
         onClick={() => field.pushValue(create())}
       >
         Add {label}
-      </button>
+      </Button>
     </Fieldset>
   );
 }
@@ -202,9 +207,10 @@ function SubmitButton({
       }
     >
       {([canSubmit, submitting, validating]) => (
-        <button
+        <Button
+          size="sm"
           type="submit"
-          className={buttonClass}
+
           disabled={
             disabled ||
             (!allowInvalidSubmission && !canSubmit) ||
@@ -213,7 +219,7 @@ function SubmitButton({
           }
         >
           {submitting ? "Validating…" : label}
-        </button>
+        </Button>
       )}
     </form.Subscribe>
   );
@@ -221,9 +227,11 @@ function SubmitButton({
 function ResetButton({ onReset }: { onReset?: () => void }) {
   const form = useFormContext();
   return (
-    <button
+    <Button
+      variant="outline"
+      size="sm"
       type="button"
-      className={buttonClass}
+
       onClick={() => {
         onReset?.();
         form.reset();
@@ -231,7 +239,7 @@ function ResetButton({ onReset }: { onReset?: () => void }) {
       }}
     >
       Reset edits
-    </button>
+    </Button>
   );
 }
 /** Focus a mounted invalid control, otherwise the accessible summary. */
@@ -290,10 +298,12 @@ function ErrorSummary({ errors: extra = [] }: { errors?: readonly unknown[] }) {
                   errorText(meta.errors),
               )
               .map(([path]) => (
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   key={path}
                   type="button"
-                  className="block text-left underline focus-visible:outline-2 focus-visible:outline-ring"
+
                   onClick={(event) => {
                     const form = event.currentTarget.closest("form");
                     const field = [
@@ -309,7 +319,7 @@ function ErrorSummary({ errors: extra = [] }: { errors?: readonly unknown[] }) {
                   }}
                 >
                   {path}
-                </button>
+                </Button>
               ))}
           </div>
         ) : null;

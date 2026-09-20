@@ -16,7 +16,10 @@
         "@finstack/field-frame",
         "@finstack/decimal-input",
         "@finstack/date-input",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "button",
+        "checkbox",
+        "input"
       ],
       "dependencies": ["@tanstack/react-form@1.33.5", "react@19.2.8"]
     }

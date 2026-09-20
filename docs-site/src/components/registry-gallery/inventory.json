@@ -98,7 +98,7 @@
     {
       "name": "id-combobox",
       "type": "registry:ui",
-      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Uses Base UI Autocomplete, its free-text combobox API, with virtualized supplied suggestions."
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred."
     },
     {
       "name": "finstack-chart",

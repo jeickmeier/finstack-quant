@@ -34,7 +34,10 @@
         "@finstack/curve-chart",
         "@finstack/use-linked-selection",
         "@finstack/finstack-codec",
-        "@finstack/contract-market-context-state"
+        "@finstack/contract-market-context-state",
+        "button",
+        "checkbox",
+        "label"
       ],
       "dependencies": ["@tanstack/charts@0.18.0", "@tanstack/react-table@9.2.4"]
     },
@@ -55,7 +58,8 @@
         "@finstack/finstack-fixtures",
         "@finstack/use-instrument-validator",
         "@finstack/use-price-instrument",
-        "@finstack/json-viewer"
+        "@finstack/json-viewer",
+        "button"
       ]
     },
     {

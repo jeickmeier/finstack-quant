@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import fixture from "@/lib/finstack/fixtures/results/bond.json";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
@@ -55,7 +56,7 @@ function Forms() {
         loading={models.isPending || metrics.isPending}
         error={models.error?.message ?? metrics.error?.message}
       />
-      <button
+      <Button
         type="button"
         disabled={
           !instrument ||
@@ -64,7 +65,6 @@ function Forms() {
             jsonError(params.pricingOptions) || jsonError(params.marketHistory),
           )
         }
-        className="rounded-sm border border-border px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
         onClick={() =>
           setRequest({
             instrumentJson: instrument!,
@@ -74,7 +74,7 @@ function Forms() {
         }
       >
         Price supplied request
-      </button>
+      </Button>
       <JsonViewer
         label="Submitted request"
         text={request ? JSON.stringify(request) : null}

@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useState, type ReactNode } from "react";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import fixture from "@/lib/finstack/fixtures/results/bond.json";
@@ -28,9 +31,15 @@ function DeferredField({
   const [open, setOpen] = useState(false);
   return (
     <div className="space-y-2">
-      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <Button
+        variant="outline"
+        size="sm"
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
         {open ? "Close" : "Edit"} {label}
-      </button>
+      </Button>
       {open && children()}
     </div>
   );
@@ -121,20 +130,26 @@ export function MarketContextForm({
     >
       <details>
         <summary className="text-sm">Import market</summary>
-        <label className="block text-sm">
+        <Label className="grid gap-2">
           Market or calibration result JSON
-          <textarea
+          <Textarea
             aria-label="Market or calibration result JSON"
             value={text}
             onChange={(event) => setText(event.target.value)}
-            className="block w-full min-h-24 rounded-sm border border-border bg-background p-2 font-mono text-xs"
           />
-        </label>
+        </Label>
         <div className="flex gap-3">
-          <button type="button" onClick={() => load(text)}>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => load(text)}
+          >
             Import JSON
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             onClick={() => {
               setText(fixture.request.marketJson);
@@ -142,7 +157,7 @@ export function MarketContextForm({
             }}
           >
             Load bond market example
-          </button>
+          </Button>
         </div>
       </details>
       {document.error && <p role="alert">{document.error}</p>}

@@ -13,13 +13,18 @@ export function themeOutput(tokens) {
       font.faces.map((face) => `@import "${font.package}/${face}";`),
     )
     .join("\n");
-  const css = `${imports}
+  const css = `@import "shadcn/tailwind.css";
+@import "tw-animate-css";
+${imports}
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
 :root { ${declarations(tokens.theme)} ${declarations(tokens.density.compact)} }
 :root, [data-theme="light"] { ${declarations(tokens.light)} }
-[data-theme="dark"] { ${declarations(tokens.dark)} }
+:root.dark, [data-theme="dark"] { ${declarations(tokens.dark)} }
 [data-density="compact"] { ${declarations(tokens.density.compact)} }
 [data-density="comfortable"] { ${declarations(tokens.density.comfortable)} }
-@theme inline { ${Object.keys(tokens.light)
+@theme inline { --radius-sm:calc(var(--radius) - 4px); --radius-md:calc(var(--radius) - 2px); --radius-lg:var(--radius); --radius-xl:calc(var(--radius) + 4px); ${Object.keys(
+    tokens.light,
+  )
     .map((key) => `--color-${key}: var(--${key});`)
     .join("\n")} }
 @theme { ${Object.keys(tokens.theme)
@@ -30,40 +35,29 @@ export function themeOutput(tokens) {
     .join("\n")} }
 @utility finstack-numeric { font-variant-numeric: var(--font-numeric-variant); }
 @utility finstack-row { min-height: var(--row-height); }
-@utility finstack-field { min-height: var(--field-height); }
 @utility finstack-surface { background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: var(--text-base); }
 .finstack-term-sheet { container-type:inline-size; }
-.finstack-editable-term { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:start; gap:var(--spacing); }
+.finstack-editable-term { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:var(--spacing); }
 .finstack-fieldset { padding:0; margin:0 0 calc(var(--spacing) * 3); border:0; }
 .finstack-fieldset > legend { float:left; margin-bottom:var(--spacing); }
 .finstack-fieldset > legend + * { clear:both; }
 .finstack-fieldset > details { padding:var(--spacing) 0; font-size:var(--text-xs); }
 .finstack-term-fields { min-width:0; }
-.finstack-term-sheet .finstack-field-frame { display:grid; grid-template-columns:minmax(100px,var(--term-width)) minmax(0,1fr); align-items:center; gap:0 calc(var(--spacing) * 2); min-height:var(--field-height); border-bottom:var(--table-rule-width) solid var(--border); }
+.finstack-term-sheet .finstack-field-frame { display:grid; grid-template-columns:minmax(100px,var(--term-width)) minmax(0,1fr); align-items:center; gap:0 calc(var(--spacing) * 2); padding-block:var(--spacing); }
 .finstack-term-sheet .finstack-field-frame > * { margin:0; }
 .finstack-term-sheet .finstack-field-frame > [role=alert] { grid-column:2; padding:var(--spacing) 0; }
-.finstack-term-sheet .finstack-field-label { align-self:start; min-height:var(--field-height); }
-.finstack-term-sheet .finstack-field-label label { overflow-wrap:anywhere; }
-.finstack-term-sheet .finstack-field { border-color:transparent; border-radius:var(--radius-sm); background:transparent; font-size:var(--text-sm); padding-inline:var(--spacing); }
-.finstack-term-sheet .finstack-field:hover { border-bottom-color:var(--control-border); background:var(--accent); }
-.finstack-term-sheet .finstack-field:focus-visible { background:var(--background); border-color:var(--ring); }
-.finstack-term-sheet .finstack-field[aria-invalid=true] { border-color:var(--error); }
-.finstack-term-sheet .finstack-field-control input { font-family:var(--font-mono); }
+.finstack-term-sheet .finstack-field-label { align-self:center; }
 .finstack-term-sheet .finstack-fieldset .finstack-fieldset { padding-top:calc(var(--spacing) * 2); }
 .finstack-term-sheet .finstack-optional-term > span { color:var(--muted-foreground); }
-.finstack-term-sheet .finstack-optional-term button { border:0; color:var(--primary); font-size:var(--text-xs); }
 .finstack-schema-root > legend { display:none; }
 .finstack-schema-root > details { margin-bottom:calc(var(--spacing) * 2); }
 .finstack-instrument-header { display:flex; flex-wrap:wrap; align-items:center; gap:calc(var(--spacing) * 3); border-bottom:var(--border-width) solid var(--border); padding-bottom:calc(var(--spacing) * 2); }
 .finstack-instrument-header .finstack-instrument-selector { flex:1; min-width:220px; }
-.finstack-instrument-selector > label { display:inline-block; margin-right:calc(var(--spacing) * 2); }
-.finstack-instrument-selector > input { display:inline-block; width:min(240px,100%); }
 .finstack-pricing-params { display:flex; flex-direction:column; gap:calc(var(--spacing) * 3); }
 .finstack-pricing-context { display:flex; flex-wrap:wrap; align-items:center; gap:calc(var(--spacing) * 3); }
 .finstack-pricing-context .finstack-field-frame { display:flex; align-items:center; gap:calc(var(--spacing) * 2); }
 .finstack-pricing-context .finstack-field-frame > * { margin:0; }
-.finstack-pricing-context .finstack-field-control { width:150px; }
-.finstack-pricing-context button[role=combobox] { min-width:0; max-width:160px; overflow:hidden; }
+.finstack-pricing-context__date .finstack-field-control { width:180px; }
 .finstack-pricing-context .finstack-field-label { white-space:nowrap; }
 .finstack-pricing-metrics { display:grid; gap:calc(var(--spacing) * 2); }
 .finstack-pricing-advanced { display:grid; gap:calc(var(--spacing) * 4); }
@@ -78,14 +72,8 @@ export function themeOutput(tokens) {
 .finstack-workbench { display:flex; flex-direction:column; min-width:0; background:var(--background); }
 .finstack-workbench__bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--border); }
 .finstack-workbench__brand { font-family:var(--font-mono); font-size:14px; font-weight:500; color:var(--primary); }
-.finstack-workbench__tabs { display:flex; align-items:center; gap:4px; }
-.finstack-workbench__tabs button { white-space:nowrap; padding:7px 9px; border-bottom:2px solid transparent; font-size:12.5px; }
-.finstack-workbench__tabs button[data-active] { border-color:var(--primary); color:var(--primary); }
-.finstack-workbench__tabs button:focus-visible { outline:2px solid var(--ring); outline-offset:-2px; }
+.finstack-workbench__tabs { max-width:100%; overflow-x:auto; }
 .finstack-workbench__context { margin-left:auto; }
-.finstack-workbench__settings { position:relative; }
-.finstack-workbench__settings > summary { cursor:pointer; padding:5px 8px; border:1px solid var(--control-border); border-radius:var(--radius-sm); }
-.finstack-workbench__settings[open] > div { position:absolute; z-index:20; right:0; top:36px; width:min(420px,85vw); max-height:60vh; overflow:auto; background:var(--background); border:1px solid var(--control-border); padding:16px; box-shadow:var(--elevation); }
 .finstack-workbench__inputs,.finstack-workbench__panel { min-width:0; min-height:0; }
 .finstack-workbench__panel { padding:12px 16px; }
 .finstack-workbench__results { display:grid; grid-template-columns:minmax(0,1fr); min-height:0; border-top:1px solid var(--border); }
@@ -98,9 +86,7 @@ export function themeOutput(tokens) {
 .finstack-market { container-type:inline-size; min-width:0; }
 .finstack-market__layout { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; }
 .finstack-market__rail { min-width:0; font-size:12.5px; }
-.finstack-market__rail input { width:100%; min-width:0; margin:4px 0 12px; height:var(--field-height); }
 .finstack-market__category { padding:6px 0; border-bottom:1px solid var(--border); }
-.finstack-market__rail button[aria-pressed=true] { color:var(--primary); background:var(--accent); box-shadow:inset 2px 0 var(--primary); }
 .finstack-market__selected { min-width:0; }
 .finstack-market__selected > header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; margin-bottom:12px; }
 .finstack-market__selected > header h2 { font-family:var(--font-mono); font-size:12.5px; }
@@ -110,7 +96,7 @@ export function themeOutput(tokens) {
 @container (min-width:960px) {
 [data-registry-focus] .finstack-workbench { height:calc(100dvh - 2px); min-height:620px; }
 .finstack-workbench { height:min(820px,calc(100dvh - 56px)); min-height:620px; display:grid; grid-template-rows:auto minmax(0,52fr) minmax(0,48fr) auto; }
-.finstack-workbench__bar { flex-wrap:nowrap; gap:6px; }
+.finstack-workbench__bar { gap:6px; }
 .finstack-workbench__inputs { overflow:hidden; }
 .finstack-workbench__panel { height:100%; overflow:auto; }
 .finstack-workbench__results { grid-template-columns:minmax(0,38fr) minmax(0,62fr); overflow:hidden; }
@@ -150,7 +136,11 @@ export function themeOutput(tokens) {
     name: "finstack-theme",
     type: "registry:theme",
     docs: "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Tenant styles override the same properties after this stylesheet. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files.",
-    dependencies: tokens.fonts.map((font) => `${font.package}@${font.version}`),
+    dependencies: [
+      "shadcn@4.21.0",
+      "tw-animate-css@1.4.0",
+      ...tokens.fonts.map((font) => `${font.package}@${font.version}`),
+    ],
     files: [
       {
         path: "finstack-theme/theme.css",

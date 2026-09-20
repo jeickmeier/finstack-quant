@@ -1,0 +1,112 @@
+[
+  {
+    "file": "bond-A4.pdf",
+    "sha256": "833946cc836b085e0a65b8720e990188c947d7b83ceb6e37714a89d43ade657b",
+    "pages": 3,
+    "pageSizes": [
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true,
+      "cashflows": true
+    },
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+IBMPlexSans-Medium",
+      "EAAAAA+Times-Roman",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999250000002,
+    "images": 0,
+    "vectorPaths": 76
+  },
+  {
+    "file": "bond-Letter.pdf",
+    "sha256": "b6aee6bfceee6b5373a035692f127a06ab937a930183e0b84907d2fdfb263fb4",
+    "pages": 3,
+    "pageSizes": [
+      [612, 792],
+      [612, 792],
+      [612, 792]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true,
+      "cashflows": true
+    },
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+IBMPlexSans-Medium",
+      "EAAAAA+Times-Roman",
+      "FAAAAA+IBMPlexMono-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 80
+  },
+  {
+    "file": "xccy_swap-A4.pdf",
+    "sha256": "937c02b5d26d6619fb84c079148fc222ec247b4368cdb27ea500323a62b6126e",
+    "pages": 5,
+    "pageSizes": [
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88],
+      [595.91998, 842.88]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true,
+      "cashflows": true
+    },
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+Times-Roman",
+      "EAAAAA+IBMPlexSans-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 48
+  },
+  {
+    "file": "xccy_swap-Letter.pdf",
+    "sha256": "facfb80a3543f22fab744ec8b05a04b53ff3d69ef7362134ab9ba10acd6b4bd0",
+    "pages": 5,
+    "pageSizes": [
+      [612, 792],
+      [612, 792],
+      [612, 792],
+      [612, 792],
+      [612, 792]
+    ],
+    "textMatches": {
+      "instrument": true,
+      "market": true,
+      "cashflows": true
+    },
+    "outside": [],
+    "fonts": [
+      "AAAAAA+IBMPlexSans-Regular",
+      "BAAAAA+IBMPlexSans-SemiBold",
+      "CAAAAA+IBMPlexMono-Regular",
+      "DAAAAA+Times-Roman",
+      "EAAAAA+IBMPlexSans-Medium"
+    ],
+    "maxUprightFontSize": 17.999999249999973,
+    "images": 0,
+    "vectorPaths": 48
+  }
+]

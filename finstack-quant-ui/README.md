@@ -128,9 +128,15 @@ Brotli bytes and returns a failing exit code when the raw optimized limit is exc
 ## Registry distribution
 
 `mise run ui-build` uses shadcn 4.21.0 and writes installable JSON to `public/r`.
-`finstack-base` pins Base UI 1.8.0, React 19.2.8 and Tailwind 4.3.3. The registry
-is Base UI only; the accepted `new-york` config does not select upstream Radix
-components. Add our namespaced items, not upstream primitive names.
+`finstack-base` pins Base UI 1.8.0, React 19.2.8 and Tailwind 4.3.3. Financial
+components compose the official shadcn Base UI components using `base-nova`.
+Their `registryDependencies` install upstream controls under `components/ui`;
+our namespaced items own financial presentation, state and block composition.
+Upstream component source is unmodified. Use supported component variants and
+application CSS variables; do not override control internals, sizing or indicators.
+The docs and offline fixtures use verified CLI output whose source URLs and
+SHA-256 hashes are recorded in `components/shadcn.json`. `ui-check` rejects
+modified stock source and direct Base UI imports from domain components.
 
 Every generated contract has one owner and installs under `lib/finstack` with
 relative imports. `instrument-catalogue` depends on all instrument modules for

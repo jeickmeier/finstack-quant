@@ -1,4 +1,14 @@
 "use client";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import type { CalibrationReport as NativeReport } from "finstack-quant-wasm";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalibrationForm } from "@/components/finstack/components/calibration-form/calibration-form";
@@ -99,17 +109,19 @@ export function CalibrationPanel({
     <section aria-label="Calibration workflow" className="space-y-4">
       <details>
         <summary>Import calibration envelope</summary>
-        <label className="block">
+        <Label className="grid gap-2">
           Calibration envelope JSON
-          <textarea
+          <Textarea
             aria-label="Calibration envelope JSON"
-            className="block w-full border border-border bg-background p-2 font-mono"
+
             rows={6}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
           />
-        </label>
-        <button
+        </Label>
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           onClick={() => {
             abort.current?.abort();
@@ -123,7 +135,7 @@ export function CalibrationPanel({
           }}
         >
           Load envelope
-        </button>
+        </Button>
       </details>
       {!document ? (
         <p>Load a complete canonical calibration envelope to begin.</p>
@@ -155,25 +167,37 @@ export function CalibrationPanel({
       {result && (
         <>
           <p>Reports reflect the last submitted envelope.</p>
-          <label>
+          <Label>
             Calibration report
-            <select
-              aria-label="Calibration report"
+            <Select
+              items={[
+                { value: "plan", label: "Plan" },
+                ...Object.keys(result.step_reports).map((id) => ({
+                  value: `step/${id}`,
+                  label: id,
+                })),
+              ]}
               value={selection}
-              onChange={(event) => {
-                setSelection(event.target.value);
-                link.select(null);
+              onValueChange={(value) => {
+                if (value) {
+                  setSelection(value);
+                  link.select(null);
+                }
               }}
-              className="ml-2 border border-border bg-background"
             >
-              <option value="plan">Plan</option>
-              {Object.keys(result.step_reports).map((id) => (
-                <option key={id} value={`step/${id}`}>
-                  {id}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger aria-label="Calibration report">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="plan">Plan</SelectItem>
+                {Object.keys(result.step_reports).map((id) => (
+                  <SelectItem key={id} value={`step/${id}`}>
+                    {id}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Label>
           <CalibrationReport
             stepId={stepId ?? "Plan"}
             report={report}
@@ -192,13 +216,15 @@ export function CalibrationPanel({
             label="Native calibration result"
             text={serializeHost(solve.data)}
           />
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
             disabled={applying || validated !== request || !validated}
             onClick={() => void apply()}
           >
             Use calibrated market
-          </button>
+          </Button>
         </>
       )}
       {applying && <p role="status">Validating calibrated market…</p>}

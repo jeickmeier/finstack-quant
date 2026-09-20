@@ -1,4 +1,6 @@
 "use client";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
 import { parse } from "lossless-json";
 import { DateInput } from "../../primitives/date-input/date-input";
@@ -41,22 +43,22 @@ function JsonInput({
         help="Original JSON text is sent unchanged. Native validation checks its meaning."
       >
         {(control) => (
-          <textarea
+          <Textarea
             {...control}
             rows={3}
             value={value ?? ""}
             onChange={(event) => onValueChange(event.target.value)}
-            className="w-full rounded-sm border border-control-border bg-background p-2 font-mono text-xs focus-visible:outline-2 focus-visible:outline-ring"
           />
         )}
       </FieldFrame>
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
         onClick={() => onValueChange(undefined)}
-        className="rounded-sm border border-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
       >
         Omit {label.toLowerCase()}
-      </button>
+      </Button>
       <details>
         <summary className="text-sm">View {label.toLowerCase()}</summary>
         <JsonViewer label={`${label} JSON`} text={value} />
@@ -98,21 +100,27 @@ export function PricingParamsForm({
       {error && <p role="alert">{error}</p>}
       {sections.includes("context") && (
         <div className="finstack-pricing-context">
-          <DateInput
-            label="As of"
-            value={value.asOf}
-            onValueChange={(asOf) => onValueChange({ ...value, asOf })}
-          />
-          <ModelPicker
-            label="Pricing model"
-            value={value.model ?? ""}
-            onValueChange={(model) => onValueChange({ ...value, model })}
-            options={(models[instrumentType] ?? []).map((model) => ({
-              value: model,
-              label: model,
-            }))}
-            disabled={loading}
-          />
+          <div className="finstack-pricing-context__date w-fit max-w-full">
+            <DateInput
+              orientation="horizontal"
+              label="As of"
+              value={value.asOf}
+              onValueChange={(asOf) => onValueChange({ ...value, asOf })}
+            />
+          </div>
+          <div className="w-fit max-w-full">
+            <ModelPicker
+              orientation="horizontal"
+              label="Pricing model"
+              value={value.model ?? ""}
+              onValueChange={(model) => onValueChange({ ...value, model })}
+              options={(models[instrumentType] ?? []).map((model) => ({
+                value: model,
+                label: model,
+              }))}
+              disabled={loading}
+            />
+          </div>
           {!loading &&
             value.model &&
             !(models[instrumentType] ?? []).includes(value.model) && (
@@ -133,13 +141,15 @@ export function PricingParamsForm({
             )}
             disabled={loading}
           />
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             type="button"
-            className="rounded-sm border border-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+
             onClick={() => onValueChange({ ...value, metrics: undefined })}
           >
             Omit metric selection
-          </button>
+          </Button>
         </div>
       )}
       {sections.includes("advanced") && (

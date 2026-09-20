@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState } from "react";
 import { dot } from "@tanstack/charts";
 import { decorative } from "@tanstack/charts/mark/decorative";
@@ -50,8 +53,6 @@ const addresses = new Map(
     }),
   ),
 );
-const button =
-  "rounded-sm border border-border px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring";
 /** Explicit correspondence over original stored knots, with no curve evaluation. */
 export function CurveLinkExample({
   label = "Linked stored curves",
@@ -93,12 +94,14 @@ export function CurveLinkExample({
         id: "action",
         header: "Details",
         cell: ({ row }: { row: { original: Discount } }) => (
-          <button
-            className={button}
+          <Button
+            variant="outline"
+            size="sm"
+
             onClick={() => setDetail(`Inspect ${row.original.id}`)}
           >
             Inspect {row.original.id}
-          </button>
+          </Button>
         ),
       },
     ],
@@ -128,8 +131,10 @@ export function CurveLinkExample({
     <section aria-label={label} className="space-y-3">
       <h2 className="text-lg font-semibold">Stored curve correspondence</h2>
       <div className="flex flex-wrap gap-2">
-        <button
-          className={button}
+        <Button
+          variant="outline"
+          size="sm"
+
           onClick={() =>
             link.select(
               pointKey({
@@ -140,24 +145,27 @@ export function CurveLinkExample({
           }
         >
           Select overlay point
-        </button>
-        <button className={button} onClick={link.clear}>
+        </Button>
+        <Button variant="outline" size="sm" onClick={link.clear}>
           Clear
-        </button>
-        <button className={button} onClick={() => setReverse(!reverse)}>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setReverse(!reverse)}
+        >
           Reverse rows
-        </button>
-        <button className={button} onClick={() => setRemove(!remove)}>
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setRemove(!remove)}>
           Toggle overlay
-        </button>
-        <label>
-          <input
-            type="checkbox"
+        </Button>
+        <Label>
+          <Checkbox
             checked={reject}
-            onChange={(event) => setReject(event.target.checked)}
+            onCheckedChange={(checked) => setReject(checked === true)}
           />{" "}
           Reject proposals
-        </label>
+        </Label>
       </div>
       <output data-link-status>
         Accepted: {accepted ?? "none"}; proposals: {proposals}; activations:{" "}

@@ -105,13 +105,20 @@ export function MeasuresGrid(props: MeasuresGridProps) {
       )}
       {grouped.length ? (
         grouped.map(({ group, rows }) => (
-          <FinstackTable
+          <section
             key={group}
-            data={rows}
-            columns={columns}
-            getRowId={(row) => row.key}
-            caption={`${group} measures`}
-          />
+            className="space-y-2"
+            aria-label={`${group} measures`}
+          >
+            <h3 className="text-sm font-medium">{group} measures</h3>
+            <FinstackTable
+              data={rows}
+              columns={columns}
+              getRowId={(row) => row.key}
+              caption={`${group} measures`}
+              captionVisibility="sr-only"
+            />
+          </section>
         ))
       ) : (
         <p role="status" className="text-sm text-muted-foreground">

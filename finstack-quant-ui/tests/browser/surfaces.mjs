@@ -150,17 +150,21 @@ try {
     "true",
   );
   await heatmap.press("Escape");
-  await surface
-    .getByLabel("Stored coordinate")
-    .selectOption(JSON.stringify(["Supplied surface", 2, 120]));
+  await surface.getByRole("combobox", { name: "Stored coordinate" }).click();
+  await page
+    .getByRole("option", { name: "Expiry (years) 2 · Strike 120", exact: true })
+    .click();
   assert.equal(
     await output.textContent(),
     JSON.stringify(["Supplied surface", 2, 120]),
   );
   await page.getByText("Select middle externally", { exact: true }).click();
   assert.equal(
-    await surface.getByLabel("Stored coordinate").inputValue(),
-    JSON.stringify(["Supplied surface", 1, 100]),
+    await surface
+      .getByRole("combobox", { name: "Stored coordinate" })
+      .locator("[data-slot=select-value]")
+      .textContent(),
+    "Expiry (years) 1 · Strike 100",
   );
   const exports = [];
   for (const theme of ["light", "dark"]) {

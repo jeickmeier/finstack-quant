@@ -7,6 +7,7 @@ import path from "node:path";
 import { build } from "vite";
 import tailwind from "@tailwindcss/postcss";
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import { serveExport } from "./static-server.mjs";
 import { installBuilt } from "./consumer.mjs";
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -102,11 +103,9 @@ try {
       .isVisible(),
   );
   await page.keyboard.press("Escape");
-  assert(
-    await page
-      .getByRole("button", { name: "Exact decimal help" })
-      .evaluate((el) => el === document.activeElement),
-  );
+  await expect(
+    page.getByRole("button", { name: "Exact decimal help" }),
+  ).toBeFocused();
   const id = page.getByRole("combobox", { name: "Identifier" });
   await id.click();
   await page.getByRole("option").first().waitFor();
@@ -133,6 +132,9 @@ try {
   assert((await model.textContent()).includes("Beta"));
   await page.getByRole("button", { name: "As of calendar" }).click();
   await page.getByRole("button", { name: /February 28/ }).click();
+  await expect(
+    page.getByRole("button", { name: /February 28/ }),
+  ).not.toBeVisible();
   assert.equal(
     await page
       .getByRole("textbox", { name: "As of", exact: true })
@@ -143,6 +145,24 @@ try {
   assert.equal(await page.locator("pre").textContent(), text);
   await page.getByRole("button", { name: "Copy", exact: true }).click();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), text);
+  const wideTable = page.getByRole("table", { name: "Wide supplied values" });
+  await page.locator("#wide-table-start").focus();
+  await page.keyboard.press("Tab");
+  await expect(wideTable).toBeFocused();
+  const tableScroll = wideTable.locator("..");
+  assert.equal(await tableScroll.getAttribute("data-slot"), "table-container");
+  assert(
+    await tableScroll.evaluate((node) => node.scrollWidth > node.clientWidth),
+  );
+  await page.keyboard.press("ArrowRight");
+  await expect
+    .poll(() => tableScroll.evaluate((node) => node.scrollLeft))
+    .toBeGreaterThan(0);
+  const keyboardTableScroll = await tableScroll.evaluate((node) => ({
+    scrollLeft: node.scrollLeft,
+    scrollWidth: node.scrollWidth,
+    clientWidth: node.clientWidth,
+  }));
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
@@ -156,6 +176,18 @@ try {
         },
         { theme, density },
       );
+      await page.evaluate(async () => {
+        document.body.getBoundingClientRect();
+        await Promise.all(
+          document
+            .getAnimations()
+            .filter(
+              (animation) =>
+                animation.effect?.getTiming().iterations !== Infinity,
+            )
+            .map((animation) => animation.finished.catch(() => {})),
+        );
+      });
       const result = await page.evaluate(() => window.axe.run(document));
       accessibility.push({
         theme,
@@ -188,6 +220,7 @@ try {
     browser: browser.version(),
     installed,
     visibleOptions,
+    keyboardTableScroll,
     accessibility,
     failures,
     verdict: "pass",

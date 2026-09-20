@@ -67,10 +67,10 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 6rem; }
 body { margin: 0; color: var(--ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
-button, a, summary { -webkit-tap-highlight-color: transparent; }
-a, button, summary { outline-offset: 5px; }
-a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--site-accent); }
-button, summary { cursor: pointer; }
+:where(button, a, summary):not(:where([data-slot], [data-slot] *, .finstack-surface *)) { -webkit-tap-highlight-color: transparent; }
+:where(a, button, summary):not(:where([data-slot], [data-slot] *, .finstack-surface *)) { outline-offset: 5px; }
+:where(a, button, summary):not(:where([data-slot], [data-slot] *, .finstack-surface *)):focus-visible { outline: 2px solid var(--site-accent); }
+:where(button, summary):not(:where([data-slot], [data-slot] *, .finstack-surface *)) { cursor: pointer; }
 .skip-link { position: fixed; top: -100px; left: 16px; z-index: 100; padding: 12px 18px; background: var(--color-fd-primary); color: var(--color-fd-primary-foreground); }
 .skip-link:focus { top: 12px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 650; letter-spacing: -.7px; white-space: nowrap; }

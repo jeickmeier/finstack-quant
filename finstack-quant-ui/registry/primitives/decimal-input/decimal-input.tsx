@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Input } from "@base-ui/react/input";
+import { Input } from "@/components/ui/input";
 import { FieldFrame, type FieldInfo } from "../field-frame/field-frame";
 import { groupDecimal } from "@/lib/finstack/format/format";
 import contracts from "@/lib/finstack/generated/primitive-contracts.json";
@@ -61,10 +61,9 @@ export function DecimalInput({
             pattern={pattern}
             data-scale={scale}
             value={focused ? value : display}
-            onValueChange={(next) => onValueChange(next)}
+            onChange={(event) => onValueChange(event.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            className="finstack-field finstack-numeric w-full min-w-0 rounded-sm border border-control-border bg-background px-2 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           />
           {suffix && (
             <span className="text-xs text-muted-foreground">{suffix}</span>

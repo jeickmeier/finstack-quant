@@ -1,4 +1,13 @@
 "use client";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { useMemo, type Ref } from "react";
 import {
   defineChart,
@@ -117,32 +126,45 @@ export function SurfaceView<T extends SurfacePoint>(
             <p>No nodes supplied</p>
           )}
           <div className="flex flex-wrap gap-2 text-xs">
-            <label>
+            <Label>
               {props.mode === "stored"
                 ? "Stored coordinate"
                 : "Evaluated coordinate"}
-              <select
-                aria-label={
-                  props.mode === "stored"
-                    ? "Stored coordinate"
-                    : "Evaluated coordinate"
-                }
-                value={accepted.selectedKey ?? ""}
-                onChange={(event) => link.select(event.target.value || null)}
-                className="ml-2 max-w-full rounded-sm border border-border bg-background px-2"
+              <Select
+                items={nodes.map((node) => ({
+                  value: node.key,
+                  label: `${labels.expiry} ${node.expiry} · ${labels.secondary} ${node.secondary}`,
+                }))}
+                value={accepted.selectedKey}
+                onValueChange={(value) => link.select(value || null)}
               >
-                <option value="">Choose a node</option>
-                {nodes.map((node) => (
-                  <option key={node.key} value={node.key}>
-                    {labels.expiry} {node.expiry} · {labels.secondary}{" "}
-                    {node.secondary}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" onClick={link.clear}>
+                <SelectTrigger
+                  aria-label={
+                    props.mode === "stored"
+                      ? "Stored coordinate"
+                      : "Evaluated coordinate"
+                  }
+                >
+                  <SelectValue placeholder="Choose a node" />
+                </SelectTrigger>
+                <SelectContent>
+                  {nodes.map((node) => (
+                    <SelectItem key={node.key} value={node.key}>
+                      {labels.expiry} {node.expiry} · {labels.secondary}{" "}
+                      {node.secondary}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Label>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={link.clear}
+            >
               Clear selected node
-            </button>
+            </Button>
           </div>
         </div>
         <div className="grid min-w-0 gap-3">

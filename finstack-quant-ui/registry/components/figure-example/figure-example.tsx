@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/ui/button";
 import { useRef, useState } from "react";
 import {
   defineChart,
@@ -125,18 +126,22 @@ export function FigureExample() {
   return (
     <section className="space-y-2 font-sans text-foreground">
       <div className="flex gap-2 print:hidden">
-        <button
-          className="rounded-sm border border-border px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring"
+        <Button
+          variant="outline"
+          size="sm"
+
           onClick={() => void download("svg")}
         >
           Download SVG
-        </button>
-        <button
-          className="rounded-sm border border-border px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring"
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+
           onClick={() => void download("png")}
         >
           Download PNG · 1800 × 1200
-        </button>
+        </Button>
       </div>
       {error && (
         <p role="alert" className="text-error">

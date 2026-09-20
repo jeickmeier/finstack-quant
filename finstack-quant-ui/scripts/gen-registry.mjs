@@ -3,6 +3,9 @@ import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import prettier from "prettier";
 
+import ts from "typescript";
+import { shadcnItems } from "./shadcn.mjs";
+
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (path) => readFile(`${root}${path}`, "utf8").then(JSON.parse);
 const roots = await read("src/generated/roots.json");
@@ -143,6 +146,26 @@ const items = [
     ["finstack-quant-wasm@0.8.0"],
   ),
 ];
+for (const entry of items) {
+  const stock = new Set();
+  for (const source of entry.files ?? []) {
+    if (!/\.[cm]?[jt]sx?$/.test(source.path)) continue;
+    const content = await readFile(`${root}${source.path}`, "utf8");
+    for (const { fileName } of ts.preProcessFile(content, true, true)
+      .importedFiles)
+      if (fileName.startsWith("@/components/ui/")) {
+        const name = fileName.slice("@/components/ui/".length);
+        if (!shadcnItems.has(name))
+          throw Error(`Unknown shadcn dependency: ${name}`);
+        stock.add(name);
+      }
+  }
+  if (stock.size)
+    entry.registryDependencies = [
+      ...(entry.registryDependencies ?? []),
+      ...[...stock].sort(),
+    ];
+}
 const output = await prettier.format(
   JSON.stringify({
     $schema: "https://ui.shadcn.com/schema/registry.json",

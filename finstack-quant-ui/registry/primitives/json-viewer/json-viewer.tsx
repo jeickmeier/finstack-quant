@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { parse, stringify } from "lossless-json";
-import { Button } from "@base-ui/react/button";
+import { Button } from "@/components/ui/button";
 /** Read-only JSON with lossless formatted or original presentation.
  * Formatting preserves numeric tokens; invalid JSON (including duplicate keys)
  * remains in Original view. Copy, download and compact print retain the supplied bytes.
@@ -58,14 +58,16 @@ export function JsonViewer({
             aria-pressed={formatted}
             disabled={presentation.formatted === null}
             onClick={() => setView("formatted")}
-            className="rounded-sm px-2 text-xs text-muted-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            variant="ghost"
+            size="sm"
           >
             Formatted
           </Button>
           <Button
             aria-pressed={!formatted}
             onClick={() => setView("original")}
-            className="rounded-sm px-2 text-xs text-muted-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            variant="ghost"
+            size="sm"
           >
             Original
           </Button>
@@ -80,14 +82,12 @@ export function JsonViewer({
               setCopyStatus({ text, message: "Copy failed" });
             }
           }}
-          className="rounded-sm border border-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+          variant="outline"
+          size="sm"
         >
           Copy
         </Button>
-        <Button
-          onClick={() => window.print()}
-          className="rounded-sm border border-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
-        >
+        <Button onClick={() => window.print()} variant="outline" size="sm">
           Print
         </Button>
         {downloadName && (
@@ -103,7 +103,8 @@ export function JsonViewer({
               anchor.click();
               setTimeout(() => URL.revokeObjectURL(url), 1000);
             }}
-            className="rounded-sm border border-border px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+            variant="outline"
+            size="sm"
           >
             Download
           </Button>

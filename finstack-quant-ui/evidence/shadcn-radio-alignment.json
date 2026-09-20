@@ -1,0 +1,22 @@
+[
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "offset": {
+      "x": 0,
+      "y": 0
+    }
+  }
+]

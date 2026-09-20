@@ -33,12 +33,32 @@ export interface FigurePresentation {
 export function readPresentation(element: HTMLElement): FigurePresentation {
   const css = getComputedStyle(element);
   const token = (name: string) => css.getPropertyValue(`--${name}`).trim();
-  const number = (name: string) => {
-    const value = Number.parseFloat(token(name));
-    if (!Number.isFinite(value) || value <= 0)
-      throw new Error(`Missing figure token: ${name}`);
-    return value;
-  };
+  // CSS variables retain their units; native chart dimensions require CSS pixels.
+  const lengths: Record<string, number> = {};
+  const probe = element.ownerDocument.createElement("span");
+  probe.style.cssText =
+    "all:initial;position:fixed;visibility:hidden;pointer-events:none;height:0;";
+  probe.style.fontSize = css.fontSize;
+  element.append(probe);
+  try {
+    for (const name of [
+      "text-xs",
+      "text-lg",
+      "text-base",
+      "text-sm",
+      "spacing",
+    ]) {
+      const supplied = token(name);
+      probe.style.width = "0px";
+      probe.style.width = supplied;
+      const value = Number.parseFloat(getComputedStyle(probe).width);
+      if (!supplied || !Number.isFinite(value) || value <= 0)
+        throw new Error(`Missing or invalid figure token: ${name}`);
+      lengths[name] = value;
+    }
+  } finally {
+    probe.remove();
+  }
   const canvas = element.ownerDocument.createElement("canvas").getContext("2d");
   if (!canvas) throw new Error("Figure text measurement requires Canvas 2D");
   const measureText: ChartTextMeasurer = (text, options) => {
@@ -69,7 +89,7 @@ export function readPresentation(element: HTMLElement): FigurePresentation {
     cellText: {
       light: token("cell-light"),
       dark: token("cell-dark"),
-      size: number("text-xs"),
+      size: lengths["text-xs"],
     },
     ramps: {
       sequential: Array.from({ length: 9 }, (_, i) =>
@@ -80,10 +100,10 @@ export function readPresentation(element: HTMLElement): FigurePresentation {
       ),
     },
     fontFamily: css.fontFamily,
-    titleSize: number("text-lg"),
-    bodySize: number("text-base"),
-    noteSize: number("text-sm"),
-    spacing: number("spacing"),
+    titleSize: lengths["text-lg"],
+    bodySize: lengths["text-base"],
+    noteSize: lengths["text-sm"],
+    spacing: lengths.spacing,
     measureText,
   };
 }

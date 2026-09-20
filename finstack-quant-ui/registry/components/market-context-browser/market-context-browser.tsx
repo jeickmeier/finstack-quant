@@ -1,4 +1,14 @@
 "use client";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useMemo, useState, type ReactNode } from "react";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
@@ -50,11 +60,13 @@ function EntryBranch({
   const [open, setOpen] = useState(entry.path.length === 1);
   if (visible && !visible.has(entry.key)) return null;
   const button = (
-    <button
+    <Button
+      variant={entry.key === selectedKey ? "secondary" : "ghost"}
+      size="sm"
       type="button"
       aria-pressed={entry.key === selectedKey}
       onClick={() => onSelect(entry.key)}
-      className="min-w-0 flex-1 break-words rounded-sm px-2 py-1 text-left focus-visible:outline-2 focus-visible:outline-ring"
+
       aria-label={`Inspect ${marketPointer(entry.path)}`}
     >
       {entry.path.length === 1
@@ -70,7 +82,7 @@ function EntryBranch({
       {entry.path.length > 1 && !entry.children.length
         ? `: ${entry.value === undefined ? "Unavailable" : serializeHost(entry.value)}`
         : ""}
-    </button>
+    </Button>
   );
   const expanded = searching || open;
   return (
@@ -82,16 +94,17 @@ function EntryBranch({
     >
       <div className="flex items-start">
         {entry.children.length > 0 && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             type="button"
             aria-expanded={expanded}
             aria-label={`${expanded ? "Collapse" : "Expand"} ${marketPointer(entry.path)}`}
             disabled={searching}
             onClick={() => setOpen(!open)}
-            className="rounded-sm px-1 focus-visible:outline-2 focus-visible:outline-ring"
           >
             {expanded ? "−" : "+"}
-          </button>
+          </Button>
         )}
         {button}
       </div>
@@ -207,38 +220,42 @@ export function MarketContextBrowser({
     >
       <div className="finstack-market__layout">
         <aside className="finstack-market__rail print:hidden">
-          <label className="text-xs text-muted-foreground">
+          <Label className="mb-3 grid gap-2">
             Search market fields
-            <input
+            <Input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="rounded-sm border border-border bg-background px-2 text-foreground"
             />
-          </label>
-          <label className="finstack-market__category-picker mb-2 text-xs text-muted-foreground">
+          </Label>
+          <Label className="finstack-market__category-picker mb-3">
             Market category
-            <select
-              className="mt-1 w-full rounded-sm border border-border bg-background px-2 py-1.5 text-foreground"
-              value={String(selected?.path[0] ?? "")}
-              onChange={(event) => {
+            <Select
+              items={entries.map((entry) => ({
+                value: String(entry.path[0]),
+                label: `${entry.label.replaceAll("_", " ")} · ${entry.children.length}`,
+              }))}
+              value={selected ? String(selected.path[0]) : null}
+              onValueChange={(value) => {
                 const category = entries.find(
-                  (entry) => String(entry.path[0]) === event.target.value,
+                  (entry) => String(entry.path[0]) === value,
                 );
                 if (category)
                   link.select(category.children[0]?.key ?? category.key);
               }}
             >
-              <option value="" disabled>
-                Choose a category
-              </option>
-              {entries.map((entry) => (
-                <option key={entry.key} value={String(entry.path[0])}>
-                  {entry.label.replaceAll("_", " ")} · {entry.children.length}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger className="w-full" aria-label="Market category">
+                <SelectValue placeholder="Choose a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {entries.map((entry) => (
+                  <SelectItem key={entry.key} value={String(entry.path[0])}>
+                    {entry.label.replaceAll("_", " ")} · {entry.children.length}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Label>
           <nav aria-label="Market fields" data-searching={!!query}>
             <ul>
               {entries.map((entry) => (

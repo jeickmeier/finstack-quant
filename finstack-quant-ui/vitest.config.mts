@@ -5,6 +5,9 @@ export default defineConfig({
   test: { maxWorkers: 4, exclude: [...configDefaults.exclude, "tests/e2e/**"] },
   resolve: {
     alias: {
+      "@/components/ui": fileURLToPath(
+        new URL("./components/ui", import.meta.url),
+      ),
       "@/lib/finstack/form": fileURLToPath(
         new URL("./registry/lib/finstack-form/form.tsx", import.meta.url),
       ),

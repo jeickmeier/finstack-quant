@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import type { RoundingStamp } from "@/lib/finstack/format/format";
 const record = (value: unknown): Record<string, unknown> | undefined =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -59,10 +60,7 @@ export function StampBadge({
   ];
   const renderFields = (entries: typeof fields) =>
     entries.map(([label, value]) => (
-      <div
-        key={String(label)}
-        className="rounded-sm border border-border px-1 font-mono text-xs text-muted-foreground"
-      >
+      <Badge key={String(label)} variant="outline" render={<div />}>
         <dt className="inline">{String(label)}: </dt>
         <dd className="inline">
           {typeof value === "string" ||
@@ -71,7 +69,7 @@ export function StampBadge({
             ? String(value)
             : "Unavailable"}
         </dd>
-      </div>
+      </Badge>
     ));
   if (!compact)
     return (

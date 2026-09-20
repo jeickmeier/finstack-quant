@@ -6,6 +6,8 @@
       "type": "registry:theme",
       "docs": "Shared light/dark theme. Import styles/finstack/theme.css after Tailwind. Set data-theme and data-density on the app root. Tenant styles override the same properties after this stylesheet. IBM Plex Sans and Mono are supplied by pinned Fontsource packages under SIL OFL-1.1; no font binaries are copied into registry files.",
       "dependencies": [
+        "shadcn@4.21.0",
+        "tw-animate-css@1.4.0",
         "@fontsource/ibm-plex-sans@5.3.0",
         "@fontsource/ibm-plex-mono@5.3.0"
       ],
@@ -20,15 +22,7 @@
         "theme": {
           "font-sans": "\"IBM Plex Sans\", sans-serif",
           "font-mono": "\"IBM Plex Mono\", monospace",
-          "text-xs": "11px",
-          "text-sm": "12.5px",
-          "text-base": "14px",
-          "text-lg": "16px",
-          "text-xl": "20px",
-          "text-2xl": "26px",
           "spacing": "4px",
-          "radius-sm": "4px",
-          "radius-md": "6px",
           "border-width": "1px",
           "table-rule-width": "0.5px",
           "grid-opacity": "0.4",
@@ -43,13 +37,14 @@
           "workbench-input-size": "52%",
           "workbench-result-size": "48%",
           "font-numeric-variant": "tabular-nums slashed-zero",
-          "elevation": "0 8px 24px color-mix(in srgb, var(--foreground) 15%, transparent)"
+          "elevation": "0 8px 24px color-mix(in srgb, var(--foreground) 15%, transparent)",
+          "radius": "0.625rem"
         },
         "light": {
           "background": "#faf9f6",
-          "foreground": "#202b29",
+          "foreground": "#0b1311",
           "card": "#ffffff",
-          "card-foreground": "#202b29",
+          "card-foreground": "#0b1311",
           "muted": "#eeefeb",
           "muted-foreground": "#59645f",
           "border": "#d7e0dc",
@@ -84,7 +79,12 @@
           "diverging-positive": "#176848",
           "cell-light": "#ffffff",
           "cell-dark": "#000000",
-          "control-border": "#86928c"
+          "input": "#86928c",
+          "popover": "#ffffff",
+          "popover-foreground": "#0b1311",
+          "secondary": "#eeefeb",
+          "secondary-foreground": "#0b1311",
+          "destructive": "#b1272d"
         },
         "dark": {
           "background": "#121b19",
@@ -125,7 +125,12 @@
           "diverging-positive": "#77cc9d",
           "cell-light": "#ffffff",
           "cell-dark": "#000000",
-          "control-border": "#6b8074"
+          "input": "#6b8074",
+          "popover": "#18231f",
+          "popover-foreground": "#e6ede8",
+          "secondary": "#26342e",
+          "secondary-foreground": "#e6ede8",
+          "destructive": "#f18d94"
         }
       }
     }

@@ -1,8 +1,14 @@
 "use client";
 import { useContext, useState, useRef, type ReactNode } from "react";
-import { Popover } from "@base-ui/react/popover";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverTitle,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { useStore } from "@tanstack/react-form";
-import { Fieldset, buttonClass } from "@/lib/finstack/form";
+import { Fieldset } from "@/lib/finstack/form";
 import { EnumField } from "../../primitives/enum-field/enum-field";
 import { FieldRendererContext } from "./field-renderer";
 import { discriminator } from "./discriminator";
@@ -30,24 +36,18 @@ function TermActions({
   return (
     <div className="finstack-editable-term">
       <div className="min-w-0">{content}</div>
-      <Popover.Root>
-        <Popover.Trigger
+      <Popover>
+        <PopoverTrigger
           aria-label={`${label} options`}
-          className="finstack-field self-start px-1 text-muted-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+          render={<Button variant="ghost" size="icon-xs" />}
         >
           ⋯
-        </Popover.Trigger>
-        <Popover.Portal>
-          <Popover.Positioner sideOffset={4}>
-            <Popover.Popup className="flex flex-col gap-1 rounded-md border border-border bg-card p-2 text-card-foreground shadow-[var(--elevation)]">
-              <Popover.Title className="text-xs text-muted-foreground">
-                {label}
-              </Popover.Title>
-              {children}
-            </Popover.Popup>
-          </Popover.Positioner>
-        </Popover.Portal>
-      </Popover.Root>
+        </PopoverTrigger>
+        <PopoverContent>
+          <PopoverTitle>{label}</PopoverTitle>
+          {children}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -103,9 +103,10 @@ export function RenderField({
     return (
       <div className="finstack-optional-term flex min-w-0 flex-wrap items-center gap-2 border-b border-border py-1 text-sm">
         <span>{label}</span>
-        <button
+        <Button
           type="button"
-          className={buttonClass}
+          variant="outline"
+          size="sm"
           onClick={() =>
             form.setFieldValue(
               path,
@@ -114,24 +115,26 @@ export function RenderField({
           }
         >
           Add {label.toLowerCase()}
-        </button>
+        </Button>
         {!required && value !== undefined && (
-          <button
+          <Button
             type="button"
-            className={buttonClass}
+            variant="outline"
+            size="sm"
             onClick={() => form.setFieldValue(path, undefined)}
           >
             Omit {label.toLowerCase()}
-          </button>
+          </Button>
         )}
         {nonNull && value === undefined && (
-          <button
+          <Button
             type="button"
-            className={buttonClass}
+            variant="outline"
+            size="sm"
             onClick={() => form.setFieldValue(path, null)}
           >
             Set {label.toLowerCase()} to null
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -157,21 +160,23 @@ export function RenderField({
         }
       >
         {!required && (
-          <button
+          <Button
             type="button"
-            className={buttonClass}
+            variant="outline"
+            size="sm"
             onClick={() => form.setFieldValue(path, undefined)}
           >
             Omit {label.toLowerCase()}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="button"
-          className={buttonClass}
+          variant="outline"
+          size="sm"
           onClick={() => form.setFieldValue(path, null)}
         >
           Clear {label.toLowerCase()}
-        </button>
+        </Button>
       </TermActions>
     );
   if (Object.hasOwn(schema, "const")) return null;
@@ -223,13 +228,14 @@ export function RenderField({
           />
         }
       >
-        <button
+        <Button
           type="button"
-          className={buttonClass}
+          variant="outline"
+          size="sm"
           onClick={() => form.setFieldValue(path, undefined)}
         >
           Omit {label.toLowerCase()}
-        </button>
+        </Button>
       </TermActions>
     );
   const union = discriminator(module.schema, resolved);
@@ -422,15 +428,16 @@ export function RenderField({
             .map(render)}
         </div>
         {layout === "basic" && secondary.length > 0 && (
-          <button
+          <Button
             type="button"
-            className="py-1 text-xs text-primary focus-visible:outline-2 focus-visible:outline-ring"
+            variant="ghost"
+            size="sm"
             aria-expanded={more}
             onClick={() => setMore(!more)}
           >
             {more ? "Fewer" : "More"} {label.toLowerCase()} fields (
             {secondary.length})
-          </button>
+          </Button>
         )}
       </>
     );

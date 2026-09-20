@@ -75,6 +75,7 @@ export function RegistryGallery() {
   const block = item?.type === "registry:block";
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.dataset.density = density;
   }, [theme, density]);
   const href = (item: string, nextTheme = theme, nextDensity = density) =>

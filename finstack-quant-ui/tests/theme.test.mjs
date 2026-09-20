@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { themeOutput, generateTheme } from "../scripts/gen-theme.mjs";
 import {
   checkContrast,
+  checkStockContrast,
   checkLiterals,
   tenantPalettes,
 } from "../scripts/check-tokens.mjs";
@@ -41,7 +42,7 @@ it("keeps contrast in the default and single-stylesheet tenant themes", async ()
   expect(() =>
     checkContrast({
       ...tokens.light,
-      "control-border": tokens.light.background,
+      input: tokens.light.background,
     }),
   ).toThrow(/Contrast/);
   expect(() =>
@@ -54,6 +55,21 @@ it("keeps contrast in the default and single-stylesheet tenant themes", async ()
     checkContrast({ ...tokens.light, foreground: "rgba(0,0,0,0.1)" }),
   ).toThrow(/opaque/);
 });
+it("keeps stock inactive Tabs contrast after opacity compositing", async () => {
+  const css = await readFile(
+    new URL("./fixtures/tenant.css", import.meta.url),
+    "utf8",
+  );
+  for (const palettes of [tokens, tenantPalettes(tokens, css)])
+    for (const mode of ["light", "dark"])
+      expect(() => checkStockContrast(palettes[mode], mode)).not.toThrow();
+  const previous = { ...tokens.light, foreground: "#202b29" };
+  expect(() => checkContrast(previous)).not.toThrow();
+  expect(() => checkStockContrast(previous, "light")).toThrow(
+    /Stock Tabs contrast/,
+  );
+});
+
 it.each([
   [".a { border: 1px solid red; }", "test.css"],
   [".a { --font-sans: Georgia, serif; }", "test.css"],

@@ -1,5 +1,15 @@
 "use client";
 import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+} from "@/components/ui/table";
+import {
   tableFeatures,
   rowSelectionFeature,
   cellSelectionFeature,
@@ -25,6 +35,8 @@ export interface FinstackTableProps<
   columns: ColumnDef<{}, TData, any>[];
   getRowId: (row: TData) => string;
   caption: string;
+  /** Keep the accessible caption when a visible domain heading already names the table. */
+  captionVisibility?: "visible" | "sr-only";
   loading?: boolean;
   error?: string;
   emptyState?: ReactNode;
@@ -73,13 +85,14 @@ export function FinstackTable<TData extends RowData, TValue = unknown>(
   props: FinstackTableProps<TData, TValue>,
 ) {
   // Native feature registration belongs to an instance and cannot change in place.
-  return <TableBody key={props.link ? "linked" : "core"} {...props} />;
+  return <TableContent key={props.link ? "linked" : "core"} {...props} />;
 }
-function TableBody<TData extends RowData, TValue>({
+function TableContent<TData extends RowData, TValue>({
   data,
   columns,
   getRowId,
   caption,
+  captionVisibility = "visible",
   loading,
   error,
   emptyState = "No rows supplied",
@@ -130,36 +143,38 @@ function TableBody<TData extends RowData, TValue>({
   });
   return (
     <div
-      className="overflow-auto font-sans text-base text-foreground"
+      className="min-w-0 font-sans text-base text-foreground"
       aria-busy={loading}
       data-density={density}
     >
-      <table
-        className="w-full border-collapse text-sm"
+      <Table
+        tabIndex={0}
         role={link ? "grid" : undefined}
         aria-multiselectable={link ? false : undefined}
       >
-        <caption className="text-left text-sm text-muted-foreground">
+        <TableCaption
+          className={captionVisibility === "sr-only" ? "sr-only" : undefined}
+        >
           {caption}
-        </caption>
-        <thead className="sticky top-0 bg-card">
-          <tr>
+        </TableCaption>
+        <TableHeader>
+          <TableRow>
             {table.getLeafHeaders().map((header) => (
-              <th
+              <TableHead
                 key={header.id}
                 scope="col"
-                className={`border-b border-border px-2 text-left font-medium ${(header.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
+                className={`${(header.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
               >
                 <table.FlexRender header={header} />
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {table.getRowModel().rows.map((row) => (
-            <tr
+            <TableRow
               key={row.id}
-              className="h-[var(--row-height)] border-border [border-bottom-width:var(--table-rule-width)] data-[linked=true]:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
+              className="data-[linked=true]:bg-accent focus-visible:outline-2 focus-visible:outline-ring"
               data-linked={
                 link &&
                 link.selectedKey !== null &&
@@ -184,7 +199,7 @@ function TableBody<TData extends RowData, TValue>({
               }
             >
               {row.getAllCells().map((cell) => (
-                <td
+                <TableCell
                   key={cell.id}
                   className={`px-2 data-[linked=true]:bg-accent data-[linked=true]:outline data-[linked=true]:outline-1 data-[linked=true]:outline-primary focus-visible:outline-2 focus-visible:outline-ring ${(cell.column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
                   data-linked={
@@ -229,26 +244,26 @@ function TableBody<TData extends RowData, TValue>({
                   }}
                 >
                   <table.FlexRender cell={cell} />
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
+        </TableBody>
         {totals && (
-          <tfoot>
-            <tr>
+          <TableFooter>
+            <TableRow>
               {table.getAllLeafColumns().map((column) => (
-                <td
+                <TableCell
                   key={column.id}
-                  className={`border-t border-border px-2 font-medium ${(column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
+                  className={`${(column.columnDef.meta as ColumnPresentation | undefined)?.className ?? ""}`}
                 >
                   {totals[column.id]}
-                </td>
+                </TableCell>
               ))}
-            </tr>
-          </tfoot>
+            </TableRow>
+          </TableFooter>
         )}
-      </table>
+      </Table>
       {error ? (
         <p role="alert" className="text-error">
           {error}

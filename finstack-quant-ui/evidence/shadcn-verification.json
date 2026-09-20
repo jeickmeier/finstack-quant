@@ -1,0 +1,105 @@
+{
+  "scope": "Stock shadcn composition correction; pending PR-039 distribution excluded",
+  "stock": {
+    "style": "base-nova",
+    "cliVersion": "4.21.0",
+    "components": 16,
+    "hashIntegrity": "pass",
+    "actualCliInstalledDocsByteIdentity": "pass"
+  },
+  "radio": {
+    "originalCenterOffset": {
+      "x": 0,
+      "y": -3
+    },
+    "correctedCenterOffset": {
+      "x": 0,
+      "y": 0
+    },
+    "regressionWidths": [1440, 375],
+    "themes": ["light", "dark"],
+    "keyboard": "pass"
+  },
+  "registry": {
+    "isolatedFullRun": {
+      "files": 42,
+      "tests": 563,
+      "durationSeconds": 80.19
+    },
+    "finalScopedRegressions": {
+      "tableAndFigureTests": 15,
+      "themeTests": 14
+    },
+    "generation": "pass",
+    "format": "pass",
+    "typecheck": "pass",
+    "contrastIncludingStockOpacity": "pass",
+    "installedImportClosures": 150,
+    "review": "pass"
+  },
+  "gallery": {
+    "acceptedBaselines": {
+      "startTime": "2026-09-20T15:01:13.212Z",
+      "duration": 226393.014,
+      "expected": 210,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "verifiedWithoutUpdates": {
+      "startTime": "2026-09-20T15:05:00.226Z",
+      "duration": 220998.19999999998,
+      "expected": 210,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "primitiveBrowser": {
+    "verdict": "pass",
+    "identifierSuggestions": 10000,
+    "exactDecimals": true,
+    "keyboardTableScroll": true,
+    "accessibilityModes": 4
+  },
+  "figureBrowser": {
+    "verdict": "pass",
+    "exports": 6,
+    "cssLengthUnits": ["rem", "em", "px", "calc"],
+    "invalidLengthRejection": true,
+    "accessibilityModes": 4
+  },
+  "publishing": {
+    "freshInstalledWorkbench": "pass",
+    "reports": [
+      {
+        "file": "bond-A4.pdf",
+        "pages": 3,
+        "sha256": "833946cc836b085e0a65b8720e990188c947d7b83ceb6e37714a89d43ade657b"
+      },
+      {
+        "file": "bond-Letter.pdf",
+        "pages": 3,
+        "sha256": "b6aee6bfceee6b5373a035692f127a06ab937a930183e0b84907d2fdfb263fb4"
+      },
+      {
+        "file": "xccy_swap-A4.pdf",
+        "pages": 5,
+        "sha256": "937c02b5d26d6619fb84c079148fc222ec247b4368cdb27ea500323a62b6126e"
+      },
+      {
+        "file": "xccy_swap-Letter.pdf",
+        "pages": 5,
+        "sha256": "facfb80a3543f22fab744ec8b05a04b53ff3d69ef7362134ab9ba10acd6b4bd0"
+      }
+    ],
+    "pagesVisuallyInspected": 16,
+    "offlineExport": "pass"
+  },
+  "nativeArtifact": {
+    "bytes": 21534873,
+    "sha256": "afe247bad5421dce0e95aae10e09d4ee48fbd544205cafe9334e789915ca88bf",
+    "unchanged": true
+  },
+  "fullLibrarySuitesRun": false
+}

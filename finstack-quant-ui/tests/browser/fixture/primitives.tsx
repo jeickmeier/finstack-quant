@@ -12,6 +12,7 @@ import {
   type KnotEdit,
 } from "./components/finstack/primitives/knot-table/knot-table";
 import { JsonViewer } from "./components/finstack/primitives/json-viewer/json-viewer";
+import { FinstackTable } from "./components/finstack/primitives/finstack-table/finstack-table";
 import { MoneyValue } from "./components/finstack/primitives/money-value/money-value";
 import data from "./data.json";
 const options = Array.from(
@@ -123,6 +124,43 @@ function App() {
       </section>
       <section className="rounded-md border border-border bg-card p-4">
         <JsonViewer label="Original supplied JSON" text={data.text} />
+      </section>
+      <section
+        className="w-80 max-w-full"
+        aria-label="Wide read-only table regression"
+      >
+        <h2 id="wide-table-start" tabIndex={-1}>
+          Wide read-only values
+        </h2>
+        <FinstackTable
+          caption="Wide supplied values"
+          data={[
+            {
+              id: "row-1",
+              first: "12345678901234567890.1234",
+              second: "98765432109876543210.4321",
+              third: "18446744073709551615",
+            },
+          ]}
+          columns={[
+            {
+              id: "first",
+              accessorKey: "first",
+              header: "First supplied coordinate",
+            },
+            {
+              id: "second",
+              accessorKey: "second",
+              header: "Second supplied coordinate",
+            },
+            {
+              id: "third",
+              accessorKey: "third",
+              header: "Third supplied coordinate",
+            },
+          ]}
+          getRowId={(row) => row.id}
+        />
       </section>
       <output aria-label="Accepted ID" className="font-mono text-sm">
         {id}

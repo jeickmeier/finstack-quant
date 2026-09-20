@@ -19,7 +19,10 @@
       ],
       "registryDependencies": [
         "@finstack/finstack-chart",
-        "@finstack/use-linked-selection"
+        "@finstack/use-linked-selection",
+        "button",
+        "checkbox",
+        "label"
       ]
     },
     {
@@ -61,7 +64,9 @@
       "registryDependencies": [
         "@finstack/finstack-form",
         "@finstack/finstack-codec",
-        "@finstack/enum-field"
+        "@finstack/enum-field",
+        "button",
+        "popover"
       ],
       "dependencies": ["react@19.2.8", "zod@4.6.5"]
     },
@@ -144,7 +149,11 @@
       "registryDependencies": [
         "@finstack/schema-form",
         "@finstack/instrument-catalogue",
-        "@finstack/json-viewer"
+        "@finstack/json-viewer",
+        "button",
+        "combobox",
+        "input-group",
+        "label"
       ],
       "dependencies": ["react@19.2.8", "@base-ui/react@1.8.0"]
     },
@@ -164,7 +173,9 @@
         "@finstack/model-picker",
         "@finstack/metric-picker",
         "@finstack/field-frame",
-        "@finstack/json-viewer"
+        "@finstack/json-viewer",
+        "button",
+        "textarea"
       ],
       "dependencies": ["lossless-json@4.3.1"]
     },
@@ -285,7 +296,10 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
         "@finstack/contract-market-context-state",
-        "@finstack/finstack-fixtures"
+        "@finstack/finstack-fixtures",
+        "button",
+        "label",
+        "textarea"
       ],
       "dependencies": ["react@19.2.8", "lossless-json@4.3.1"]
     },
@@ -314,7 +328,10 @@
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
         "@finstack/use-linked-selection",
-        "@finstack/contract-market-context-state"
+        "@finstack/contract-market-context-state",
+        "button",
+        "label",
+        "select"
       ],
       "dependencies": ["react@19.2.8"]
     },
@@ -419,7 +436,11 @@
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
         "@finstack/use-linked-selection",
-        "@finstack/contract-market-context-state"
+        "@finstack/contract-market-context-state",
+        "button",
+        "input",
+        "label",
+        "select"
       ],
       "dependencies": ["react@19.2.8"]
     },

@@ -81,9 +81,15 @@ it("shares table/control/external selection and clears removed coordinates witho
   }
   const view = render(<App />);
   fireEvent.click(screen.getByRole("cell", { name: "0.24" }));
+  expect(screen.getByLabelText("key").textContent).toBe(
+    surfaceNodes(storedSurface)[4]!.key,
+  );
+  const labels = surfaceLabels(storedSurface);
   expect(
-    (screen.getByLabelText("Stored coordinate") as HTMLSelectElement).value,
-  ).toBe(surfaceNodes(storedSurface)[4]!.key);
+    screen
+      .getByRole("combobox", { name: "Stored coordinate" })
+      .querySelector("[data-slot=select-value]")!.textContent,
+  ).toBe(`${labels.expiry} 1 · ${labels.secondary} 100`);
   expect(
     screen.getByRole("img", { name: "Supplied surface row slice" }),
   ).toBeTruthy();
@@ -106,8 +112,10 @@ it("shares table/control/external selection and clears removed coordinates witho
     />,
   );
   expect(
-    (screen.getByLabelText("Stored coordinate") as HTMLSelectElement).value,
-  ).toBe("");
+    screen
+      .getByRole("combobox", { name: "Stored coordinate" })
+      .querySelector("[data-slot=select-value]")!.textContent,
+  ).toBe("Choose a node");
   expect(changed).toHaveBeenCalledTimes(3);
   expect(
     screen.queryByRole("img", { name: "Supplied surface row slice" }),

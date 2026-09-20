@@ -195,8 +195,9 @@ try {
       const step = Object.keys(value.result.step_reports)[0];
       if (step) {
         await panel
-          .getByLabel("Calibration report", { exact: true })
-          .selectOption(`step/${step}`);
+          .getByRole("combobox", { name: "Calibration report", exact: true })
+          .click();
+        await page.getByRole("option", { name: step, exact: true }).click();
         await panel
           .getByRole("region", {
             name: `${step} calibration report`,

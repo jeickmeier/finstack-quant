@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { parse, wcagContrast } from "culori";
+import { converter, parse, wcagContrast } from "culori";
 import ts from "typescript";
 import postcss from "postcss";
 
@@ -32,13 +32,13 @@ export function checkContrast(palette) {
     ])
       check(fg, bg, 4.5);
     for (const mark of [
-      "control-border",
+      "input",
       "ring",
       ...Array.from({ length: 6 }, (_, i) => `chart-${i + 1}`),
     ])
       check(mark, bg, 3);
   }
-  for (const bg of ["primary", "accent", "card"])
+  for (const bg of ["primary", "accent", "card", "popover", "secondary"])
     check(`${bg}-foreground`, bg, 4.5);
   check("muted-foreground", "muted", 4.5);
   for (const fill of Object.keys(palette).filter((key) =>
@@ -51,6 +51,26 @@ export function checkContrast(palette) {
       ) < 4.5
     )
       throw new Error(`Cell text contrast: ${fill}`);
+  }
+}
+
+// Stock Tabs use foreground/60 in light mode and muted-foreground in dark mode.
+export function checkStockContrast(palette, mode) {
+  const rgb = converter("rgb");
+  const foreground = rgb(
+    palette[mode === "light" ? "foreground" : "muted-foreground"],
+  );
+  const opacity = mode === "light" ? 0.6 : 1;
+  for (const key of ["muted", "background"]) {
+    const background = rgb(palette[key]);
+    const painted = {
+      mode: "rgb",
+      r: foreground.r * opacity + background.r * (1 - opacity),
+      g: foreground.g * opacity + background.g * (1 - opacity),
+      b: foreground.b * opacity + background.b * (1 - opacity),
+    };
+    if (wcagContrast(painted, background) < 4.5)
+      throw new Error(`Stock Tabs contrast below 4.5: ${mode}/${key}`);
   }
 }
 
@@ -125,12 +145,18 @@ export async function checkTokens(root) {
     Object.keys(tokens.dark).sort().join()
   )
     throw new Error("Light/dark token keys differ");
-  for (const mode of ["light", "dark"]) checkContrast(tokens[mode]);
+  for (const mode of ["light", "dark"]) {
+    checkContrast(tokens[mode]);
+    checkStockContrast(tokens[mode], mode);
+  }
   const tenant = tenantPalettes(
     tokens,
     await readFile(path.join(root, "tests/fixtures/tenant.css"), "utf8"),
   );
-  for (const palette of Object.values(tenant)) checkContrast(palette);
+  for (const [mode, palette] of Object.entries(tenant)) {
+    checkContrast(palette);
+    checkStockContrast(palette, mode);
+  }
   for (const directory of ["src", "registry"]) {
     const files = await readdir(path.join(root, directory), {
       recursive: true,

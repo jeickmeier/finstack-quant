@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useCallback, type Ref } from "react";
 import { defineChart, dot, lineY, crosshair } from "@tanstack/charts";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
@@ -18,8 +21,6 @@ const observations = [
   { id: "c", x: 3, y: 15, label: "Third observation" },
 ];
 type Observation = (typeof observations)[number];
-const button =
-  "rounded-sm border border-border px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring";
 
 /** Two compatible supplied-data charts, one accepted key and a parent-local native cursor. */
 export function LinkedFigureExample({ ref }: { ref?: Ref<FigureHandle> } = {}) {
@@ -104,26 +105,37 @@ export function LinkedFigureExample({ ref }: { ref?: Ref<FigureHandle> } = {}) {
     >
       <h2 className="text-base font-semibold">Linked observations</h2>
       <div className="flex flex-wrap gap-2">
-        <button className={button} onClick={() => selection.select("b")}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => selection.select("b")}
+        >
           Select second observation
-        </button>
-        <button className={button} onClick={selection.clear}>
+        </Button>
+        <Button variant="outline" size="sm" onClick={selection.clear}>
           Clear selection
-        </button>
-        <button className={button} onClick={() => setReversed(!reversed)}>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setReversed(!reversed)}
+        >
           Reverse observations
-        </button>
-        <button className={button} onClick={() => setRemoved(!removed)}>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setRemoved(!removed)}
+        >
           Toggle second observation
-        </button>
-        <label>
-          <input
-            type="checkbox"
+        </Button>
+        <Label>
+          <Checkbox
             checked={reject}
-            onChange={(event) => setReject(event.target.checked)}
+            onCheckedChange={(checked) => setReject(checked === true)}
           />{" "}
           Reject selection proposals
-        </label>
+        </Label>
       </div>
       <p data-selection-status="" aria-live="polite">
         Accepted: {accepted ?? "none"}; detail: {detail ?? "none"}
@@ -144,15 +156,17 @@ export function LinkedFigureExample({ ref }: { ref?: Ref<FigureHandle> } = {}) {
           <>
             {defaultBody}
             {pinned && primaryPoint && (
-              <button
-                className={button}
+              <Button
+                variant="outline"
+                size="sm"
+
                 onClick={() => {
                   setDetail(primaryPoint.datum.id);
                   dismiss();
                 }}
               >
                 Open observation details
-              </button>
+              </Button>
             )}
           </>
         )}

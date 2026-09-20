@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { shadcnItems, copyShadcn } from "../../scripts/shadcn.mjs";
 /** Extract a fresh pinned CLI build and its declared closure into consumer-owned targets. */
 export async function installBuilt(root, consumer, names) {
   const output = path.join(consumer, "r");
@@ -18,6 +19,11 @@ export async function installBuilt(root, consumer, names) {
   const installed = new Set();
   async function install(name) {
     if (installed.has(name)) return;
+    if (shadcnItems.has(name)) {
+      await copyShadcn(root, consumer, [name]);
+      installed.add(name);
+      return;
+    }
     const item = JSON.parse(
       await readFile(path.join(output, `${name}.json`), "utf8"),
     );

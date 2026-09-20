@@ -5,19 +5,17 @@
       "name": "finstack-base",
       "type": "registry:base",
       "extends": "none",
-      "docs": "Base UI only. Uses @base-ui/react 1.8.0 and React 19 with Tailwind v4 CSS variables. Install finstack-theme for visual items; contracts install independently.",
+      "docs": "Uses unmodified official shadcn Base UI components in the base-nova style. Financial fields and blocks compose installed components under components/ui. Import finstack-theme for application tokens and layout; contracts install independently.",
       "dependencies": [
         "@base-ui/react@1.8.0",
         "react@19.2.8",
-        "react-dom@19.2.8"
+        "react-dom@19.2.8",
+        "class-variance-authority@0.7.1",
+        "lucide-react@1.47.0",
+        "cn@0.3.0"
       ],
       "devDependencies": ["tailwindcss@4.3.3", "@tailwindcss/postcss@4.3.3"],
-      "config": {
-        "style": "new-york",
-        "tailwind": {
-          "cssVariables": true
-        }
-      }
+      "config": { "style": "base-nova", "tailwind": { "cssVariables": true } }
     }
   ]
 }

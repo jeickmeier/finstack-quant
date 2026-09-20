@@ -1,6 +1,20 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Tabs } from "@base-ui/react/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import type { ValuationResult } from "finstack-quant-wasm";
 import { InstrumentForm } from "@/components/finstack/components/instrument-form/instrument-form";
 import {
@@ -235,7 +249,7 @@ export function PricingWorkbench({
       data-theme={printSnapshot ? "light" : theme}
       data-density={currentDensity}
     >
-      <Tabs.Root
+      <Tabs
         value={printSnapshot ? "market" : activeTab}
         onValueChange={setActiveTab}
       >
@@ -281,18 +295,18 @@ export function PricingWorkbench({
         >
           <header className="finstack-workbench__bar print:hidden">
             <h2 className="finstack-workbench__brand">finstack</h2>
-            <Tabs.List
+            <TabsList
               aria-label="Pricing inputs"
               className="finstack-workbench__tabs"
             >
-              <Tabs.Tab value="instrument">1 Instrument</Tabs.Tab>
-              <Tabs.Tab value="market">2 Market</Tabs.Tab>
-              <Tabs.Tab value="calibrate">Calibrate</Tabs.Tab>
-            </Tabs.List>
+              <TabsTrigger value="instrument">1 Instrument</TabsTrigger>
+              <TabsTrigger value="market">2 Market</TabsTrigger>
+              <TabsTrigger value="calibrate">Calibrate</TabsTrigger>
+            </TabsList>
             <div className="finstack-workbench__context">{pricingContext}</div>
-            <button
+            <Button
+              size="sm"
               type="button"
-              className="rounded-sm bg-primary px-3 py-1.5 text-primary-foreground focus-visible:outline-2 focus-visible:outline-ring"
               disabled={!candidate || price.isFetching}
               onClick={() => {
                 if (request === candidate) void price.refetch();
@@ -300,63 +314,82 @@ export function PricingWorkbench({
               }}
             >
               Price
-            </button>
-            <details className="finstack-workbench__settings">
-              <summary>Settings</summary>
-              <div className="space-y-4">
-                <PricingParamsForm
-                  value={params}
-                  onValueChange={setParams}
-                  instrumentType={type}
-                  models={models.data ?? {}}
-                  metrics={metrics.data ?? {}}
-                  loading={models.isPending || metrics.isPending}
-                  error={models.error?.message ?? metrics.error?.message}
-                  sections={["metrics", "advanced"]}
-                />
-                <label className="flex items-center justify-between gap-3">
-                  Density
-                  <select
-                    aria-label="Workbench density"
-                    value={currentDensity}
-                    onChange={(event) => {
-                      document.documentElement.dataset.density =
-                        event.target.value;
-                      setCurrentDensity(
-                        event.target.value as typeof currentDensity,
+            </Button>
+            <Popover>
+              <PopoverTrigger render={<Button variant="outline" size="sm" />}>
+                Settings
+              </PopoverTrigger>
+              <PopoverContent align="end">
+                <div className="max-h-[60vh] space-y-4 overflow-auto">
+                  <PricingParamsForm
+                    value={params}
+                    onValueChange={setParams}
+                    instrumentType={type}
+                    models={models.data ?? {}}
+                    metrics={metrics.data ?? {}}
+                    loading={models.isPending || metrics.isPending}
+                    error={models.error?.message ?? metrics.error?.message}
+                    sections={["metrics", "advanced"]}
+                  />
+                  <Label className="flex items-center justify-between gap-3">
+                    Density
+                    <Select
+                      items={[
+                        { value: "compact", label: "Compact" },
+                        { value: "comfortable", label: "Comfortable" },
+                      ]}
+                      value={currentDensity}
+                      onValueChange={(value) => {
+                        if (value !== "compact" && value !== "comfortable")
+                          return;
+                        document.documentElement.dataset.density = value;
+                        setCurrentDensity(value);
+                      }}
+                    >
+                      <SelectTrigger aria-label="Workbench density">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="compact">Compact</SelectItem>
+                        <SelectItem value="comfortable">Comfortable</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={(event) => {
+                      const inherited = event.currentTarget
+                        .closest("[data-theme]")
+                        ?.getAttribute("data-theme");
+                      const nextTheme =
+                        (theme ?? inherited) === "dark" ? "light" : "dark";
+                      document.documentElement.dataset.theme = nextTheme;
+                      document.documentElement.classList.toggle(
+                        "dark",
+                        nextTheme === "dark",
                       );
+                      setTheme(nextTheme);
                     }}
                   >
-                    <option value="compact">Compact</option>
-                    <option value="comfortable">Comfortable</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    const inherited = event.currentTarget
-                      .closest("[data-theme]")
-                      ?.getAttribute("data-theme");
-                    const nextTheme =
-                      (theme ?? inherited) === "dark" ? "light" : "dark";
-                    document.documentElement.dataset.theme = nextTheme;
-                    setTheme(nextTheme);
-                  }}
-                >
-                  Toggle theme
-                </button>
-              </div>
-            </details>
-            <button
+                    Toggle theme
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
-              className="rounded-sm border border-border px-3 py-1"
+
               disabled={
                 !completed || status !== "Priced" || printSnapshot !== null
               }
               onClick={() => setPrintSnapshot(completed)}
             >
               {printSnapshot ? "Preparing report…" : "Print report"}
-            </button>{" "}
+            </Button>{" "}
             <p
               role="status"
               aria-live="polite"
@@ -378,7 +411,7 @@ export function PricingWorkbench({
                 density={currentDensity}
               />
             )}
-            <Tabs.Panel
+            <TabsContent
               value="instrument"
               keepMounted
               className="finstack-workbench__panel print:hidden"
@@ -395,25 +428,25 @@ export function PricingWorkbench({
                 onValidated={setInstrument}
                 onSubmit={setInstrument}
               />
-            </Tabs.Panel>
-            <Tabs.Panel
+            </TabsContent>
+            <TabsContent
               value="market"
               keepMounted
               className="finstack-workbench__panel"
             >
-              <Tabs.Root
+              <Tabs
                 value={printSnapshot ? "view" : marketTab}
                 onValueChange={setMarketTab}
               >
-                <Tabs.List
+                <TabsList
                   aria-label="Market mode"
                   className="finstack-workbench__tabs mb-2 print:hidden"
                 >
-                  <Tabs.Tab value="view">View market</Tabs.Tab>
-                  <Tabs.Tab value="edit">Edit market</Tabs.Tab>
-                  <Tabs.Tab value="json">Snapshot JSON</Tabs.Tab>
-                </Tabs.List>
-                <Tabs.Panel value="edit" keepMounted className="print:hidden">
+                  <TabsTrigger value="view">View market</TabsTrigger>
+                  <TabsTrigger value="edit">Edit market</TabsTrigger>
+                  <TabsTrigger value="json">Snapshot JSON</TabsTrigger>
+                </TabsList>
+                <TabsContent value="edit" keepMounted className="print:hidden">
                   <MarketContextForm
                     key={marketDocument.revision}
                     defaultJson={marketDocument.json}
@@ -421,15 +454,15 @@ export function PricingWorkbench({
                     onValidated={acceptMarket}
                     onSubmit={acceptMarket}
                   />
-                </Tabs.Panel>
-                <Tabs.Panel value="json" className="print:hidden">
+                </TabsContent>
+                <TabsContent value="json" className="print:hidden">
                   <JsonViewer
                     label="Market snapshot"
                     text={market?.json ?? initial.marketJson}
                     density={currentDensity}
                   />
-                </Tabs.Panel>
-                <Tabs.Panel value="view" keepMounted>
+                </TabsContent>
+                <TabsContent value="view" keepMounted>
                   {printSnapshot && (
                     <JsonViewer
                       label="Market snapshot"
@@ -471,10 +504,10 @@ export function PricingWorkbench({
                   ) : (
                     <p role="status">Preparing validated market…</p>
                   )}
-                </Tabs.Panel>
-              </Tabs.Root>
-            </Tabs.Panel>
-            <Tabs.Panel
+                </TabsContent>
+              </Tabs>
+            </TabsContent>
+            <TabsContent
               value="calibrate"
               keepMounted
               className="finstack-workbench__panel print:hidden"
@@ -490,7 +523,7 @@ export function PricingWorkbench({
                   }));
                 }}
               />
-            </Tabs.Panel>
+            </TabsContent>
           </section>
           <section aria-label="Results" className="finstack-workbench__results">
             <div className="finstack-workbench__summary">
@@ -516,22 +549,24 @@ export function PricingWorkbench({
                 </div>
               )}
             </div>
-            <Tabs.Root
+            <Tabs
               value={printSnapshot ? "cashflows" : resultTab}
               onValueChange={setResultTab}
               className="finstack-workbench__detail"
             >
-              <Tabs.List
+              <TabsList
                 aria-label="Result views"
-                className="finstack-workbench__tabs border-b border-border print:hidden"
+                className="finstack-workbench__tabs print:hidden"
               >
-                <Tabs.Tab value="cashflows">3 Cashflow JSON</Tabs.Tab>
-                <Tabs.Tab value="diagnostics">4 Diagnostics</Tabs.Tab>
-                <Tabs.Tab value="trace">5 Trace</Tabs.Tab>
-                <Tabs.Tab value="request">Request</Tabs.Tab>
-                {scenario && <Tabs.Tab value="scenarios">Scenarios</Tabs.Tab>}
-              </Tabs.List>
-              <Tabs.Panel value="cashflows" keepMounted>
+                <TabsTrigger value="cashflows">3 Cashflow JSON</TabsTrigger>
+                <TabsTrigger value="diagnostics">4 Diagnostics</TabsTrigger>
+                <TabsTrigger value="trace">5 Trace</TabsTrigger>
+                <TabsTrigger value="request">Request</TabsTrigger>
+                {scenario && (
+                  <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
+                )}
+              </TabsList>
+              <TabsContent value="cashflows" keepMounted>
                 {shown ? (
                   <CashflowViewer
                     density={currentDensity}
@@ -547,8 +582,8 @@ export function PricingWorkbench({
                     Cashflows will appear after a valid valuation.
                   </p>
                 )}
-              </Tabs.Panel>
-              <Tabs.Panel value="diagnostics" className="print:hidden">
+              </TabsContent>
+              <TabsContent value="diagnostics" className="print:hidden">
                 {shown ? (
                   <ValuationDetails
                     result={shown.result}
@@ -558,8 +593,8 @@ export function PricingWorkbench({
                 ) : (
                   <p>No valuation details returned</p>
                 )}
-              </Tabs.Panel>
-              <Tabs.Panel value="trace" className="print:hidden">
+              </TabsContent>
+              <TabsContent value="trace" className="print:hidden">
                 {shown?.result.explanation != null ? (
                   <ExplanationTrace
                     value={shown.result.explanation}
@@ -570,8 +605,8 @@ export function PricingWorkbench({
                     No explanation trace returned
                   </p>
                 )}
-              </Tabs.Panel>
-              <Tabs.Panel value="request" className="print:hidden">
+              </TabsContent>
+              <TabsContent value="request" className="print:hidden">
                 <details
                   open={instrumentOpen}
                   onToggle={(event) =>
@@ -589,8 +624,8 @@ export function PricingWorkbench({
                   label="Last priced request JSON"
                   text={completed ? JSON.stringify(completed.request) : null}
                 />
-              </Tabs.Panel>
-              <Tabs.Panel value="scenarios" className="print:hidden">
+              </TabsContent>
+              <TabsContent value="scenarios" className="print:hidden">
                 {scenario &&
                 completed &&
                 JSON.parse(completed.request.instrumentJson).instrument
@@ -617,8 +652,8 @@ export function PricingWorkbench({
                 ) : (
                   <p>Scenario prices are unavailable for this instrument.</p>
                 )}
-              </Tabs.Panel>
-            </Tabs.Root>
+              </TabsContent>
+            </Tabs>
           </section>
           <footer className="finstack-workbench__status print:hidden">
             <span>
@@ -637,7 +672,7 @@ export function PricingWorkbench({
             </span>
           </footer>
         </section>
-      </Tabs.Root>
+      </Tabs>
     </div>
   );
 }

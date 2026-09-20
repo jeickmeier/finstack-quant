@@ -14,7 +14,8 @@
       "@/lib/finstack/*": ["src/*"],
       "@/hooks/*": ["registry/hooks/*"],
       "@/components/finstack/*": ["registry/*"],
-      "@/lib/finstack/form": ["registry/lib/finstack-form/form.tsx"]
+      "@/lib/finstack/form": ["registry/lib/finstack-form/form.tsx"],
+      "@/components/ui/*": ["components/ui/*"]
     },
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
@@ -23,7 +24,8 @@
     "tests/**/*.ts",
     "registry/**/*.ts",
     "registry/**/*.tsx",
-    "tests/**/*.tsx"
+    "tests/**/*.tsx",
+    "components/**/*.tsx"
   ],
   "exclude": ["tests/browser/fixture", "tests/install/fixture"]
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { readPresentation } from "./components/finstack/primitives/finstack-chart/presentation";
 import { createRoot } from "react-dom/client";
 import { defineChart, lineY, dot, text, ruleY } from "@tanstack/charts";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
@@ -86,6 +87,25 @@ function App() {
     category = useRef<FigureHandle>(null);
   useEffect(() => {
     (window as any).figureProbe = {
+      presentation(tokens: Record<string, string> = {}) {
+        const host = document.createElement("div");
+        host.style.fontSize = "20px";
+        for (const [name, value] of Object.entries(tokens))
+          host.style.setProperty(`--${name}`, value);
+        document.body.append(host);
+        try {
+          const value = readPresentation(host);
+          return {
+            title: value.titleSize,
+            body: value.bodySize,
+            note: value.noteSize,
+            cell: value.cellText.size,
+            spacing: value.spacing,
+          };
+        } finally {
+          host.remove();
+        }
+      },
       async export(name: string, format: "svg" | "png", options: any) {
         const handle = ({ numeric, date, category } as const)[name as "numeric"]
           .current!;
