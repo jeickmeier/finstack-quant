@@ -6,6 +6,7 @@ import type {
   PriceRequest,
   CashflowRequest,
 } from "../../workers/finstack-contract";
+export type { PriceRequest } from "../../workers/finstack-contract";
 /** Snapshot every input without parsing JSON, filling financial defaults or collapsing selections. */
 export function priceOptions(
   client: FinstackClient | null,

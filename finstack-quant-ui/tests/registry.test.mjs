@@ -89,60 +89,71 @@ describe("registry dependency boundaries", () => {
   });
 });
 
-it("type-checks the installed corpus without workspace aliases", async () => {
-  const root = fileURLToPath(new URL("../", import.meta.url));
-  const registry = await checkRegistry(root);
-  const consumer = await mkdtemp(path.join(root, ".consumer-"));
-  try {
-    await symlink(
-      path.join(root, "node_modules"),
-      path.join(consumer, "node_modules"),
-      "dir",
-    );
-    await promisify(execFile)(
-      process.execPath,
-      [
-        path.join(root, "node_modules/shadcn/dist/index.js"),
-        "build",
-        "--output",
-        path.join(consumer, "r"),
-      ],
-      { cwd: root },
-    );
-    const files = [];
-    for (const entry of registry.items) {
-      const item = JSON.parse(
-        await readFile(path.join(consumer, "r", `${entry.name}.json`), "utf8"),
+it.each([false, true])(
+  "type-checks the installed corpus without workspace aliases (src=%s)",
+  async (src) => {
+    const root = fileURLToPath(new URL("../", import.meta.url));
+    const registry = await checkRegistry(root);
+    const consumer = await mkdtemp(path.join(root, ".consumer-"));
+    try {
+      await symlink(
+        path.join(root, "node_modules"),
+        path.join(consumer, "node_modules"),
+        "dir",
       );
-      for (const file of item.files ?? []) {
-        const target = path.join(consumer, file.target.replace(/^~\//, ""));
-        await mkdir(path.dirname(target), { recursive: true });
-        expect(typeof file.content).toBe("string");
-        await writeFile(target, file.content);
-        if (/\.(?:tsx?|mts)$/.test(target)) files.push(target);
+      await promisify(execFile)(
+        process.execPath,
+        [
+          path.join(root, "node_modules/shadcn/dist/index.js"),
+          "build",
+          "--output",
+          path.join(consumer, "r"),
+        ],
+        { cwd: root },
+      );
+      const files = [];
+      for (const entry of registry.items) {
+        const item = JSON.parse(
+          await readFile(
+            path.join(consumer, "r", `${entry.name}.json`),
+            "utf8",
+          ),
+        );
+        for (const file of item.files ?? []) {
+          const target = path.join(
+            consumer,
+            src && !file.target.startsWith("~/") ? "src" : "",
+            file.target.replace(/^~\//, ""),
+          );
+          await mkdir(path.dirname(target), { recursive: true });
+          expect(typeof file.content).toBe("string");
+          await writeFile(target, file.content);
+          if (/\.(?:tsx?|mts)$/.test(target)) files.push(target);
+        }
       }
+      const program = ts.createProgram(files, {
+        target: ts.ScriptTarget.ES2022,
+        jsx: ts.JsxEmit.ReactJSX,
+        lib: ["lib.es2024.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
+        baseUrl: consumer,
+        paths: { "@/*": [src ? "./src/*" : "./*"] },
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        strict: true,
+        resolveJsonModule: true,
+        skipLibCheck: true,
+        noEmit: true,
+      });
+      const diagnostics = ts.getPreEmitDiagnostics(program);
+      expect(
+        diagnostics.map(
+          (d) =>
+            `${d.file?.fileName}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`,
+        ),
+      ).toEqual([]);
+    } finally {
+      await rm(consumer, { recursive: true, force: true });
     }
-    const program = ts.createProgram(files, {
-      target: ts.ScriptTarget.ES2022,
-      jsx: ts.JsxEmit.ReactJSX,
-      lib: ["lib.es2024.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
-      baseUrl: consumer,
-      paths: { "@/*": ["./*"] },
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-      strict: true,
-      resolveJsonModule: true,
-      skipLibCheck: true,
-      noEmit: true,
-    });
-    const diagnostics = ts.getPreEmitDiagnostics(program);
-    expect(
-      diagnostics.map(
-        (d) =>
-          `${d.file?.fileName}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`,
-      ),
-    ).toEqual([]);
-  } finally {
-    await rm(consumer, { recursive: true, force: true });
-  }
-}, 60_000);
+  },
+  60_000,
+);

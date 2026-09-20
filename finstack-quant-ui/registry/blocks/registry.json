@@ -1,4 +1,28 @@
 {
   "$schema": "https://ui.shadcn.com/schema/registry.json",
-  "items": []
+  "items": [
+    {
+      "name": "pricing-workbench",
+      "type": "registry:block",
+      "docs": "Embeddable bond workbench. Wrap PricingWorkbench with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Hooks, workers and components follow the consumer source directory. Host owns the route. defaultRequest supplies initial canonical bond/market JSON and complete parameters; remount for a different document. Input edits debounce complete requests. Unsupported instruments cannot price; results retain their last completed request context.",
+      "files": [
+        {
+          "path": "pricing-workbench/pricing-workbench.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/blocks/pricing-workbench/pricing-workbench.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/instrument-form",
+        "@finstack/pricing-params-form",
+        "@finstack/curve-chart",
+        "@finstack/measures-grid",
+        "@finstack/json-viewer",
+        "@finstack/use-instrument-validator",
+        "@finstack/use-price-instrument",
+        "@finstack/finstack-fixtures"
+      ],
+      "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.8.0"]
+    }
+  ]
 }

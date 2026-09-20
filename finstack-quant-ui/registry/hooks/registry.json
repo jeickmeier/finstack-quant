@@ -4,17 +4,17 @@
     {
       "name": "use-finstack",
       "type": "registry:hook",
-      "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks install at project-root targets; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
+      "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks follow the consumer source directory; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
       "files": [
         {
           "path": "use-finstack/use-finstack.tsx",
           "type": "registry:hook",
-          "target": "~/hooks/use-finstack/use-finstack.tsx"
+          "target": "hooks/use-finstack/use-finstack.tsx"
         },
         {
           "path": "use-finstack/client.ts",
           "type": "registry:hook",
-          "target": "~/hooks/use-finstack/client.ts"
+          "target": "hooks/use-finstack/client.ts"
         }
       ],
       "registryDependencies": ["@finstack/finstack-worker"],
@@ -23,12 +23,12 @@
     {
       "name": "use-price-instrument",
       "type": "registry:hook",
-      "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks install at project-root targets; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
+      "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks follow the consumer source directory; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
       "files": [
         {
           "path": "use-price-instrument/use-price-instrument.ts",
           "type": "registry:hook",
-          "target": "~/hooks/use-price-instrument/use-price-instrument.ts"
+          "target": "hooks/use-price-instrument/use-price-instrument.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
@@ -37,12 +37,12 @@
     {
       "name": "use-validate-instrument",
       "type": "registry:hook",
-      "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks install at project-root targets; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
+      "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks follow the consumer source directory; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
       "files": [
         {
           "path": "use-validate-instrument/use-validate-instrument.ts",
           "type": "registry:hook",
-          "target": "~/hooks/use-validate-instrument/use-validate-instrument.ts"
+          "target": "hooks/use-validate-instrument/use-validate-instrument.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],
@@ -69,7 +69,7 @@
         {
           "path": "use-instrument-validator/use-instrument-validator.ts",
           "type": "registry:hook",
-          "target": "~/hooks/use-instrument-validator/use-instrument-validator.ts"
+          "target": "hooks/use-instrument-validator/use-instrument-validator.ts"
         }
       ],
       "registryDependencies": ["@finstack/use-finstack"],

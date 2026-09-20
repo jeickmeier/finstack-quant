@@ -77,7 +77,7 @@ function Forms() {
       </button>
       <JsonViewer
         label="Submitted request"
-        text={request ? serializeHost(request) : null}
+        text={request ? JSON.stringify(request) : null}
       />
       <JsonViewer
         label="Pricing result"
