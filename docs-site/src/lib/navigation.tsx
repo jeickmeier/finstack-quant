@@ -21,6 +21,7 @@ export function getNavigation(): PageTree.Root {
       { type: 'page', name: 'Companion labs', url: '/labs' },
       { type: 'folder', name: 'Component registry', defaultOpen: false, children: [
         { type: 'page', name: 'Installation and MCP', url: '/docs/registry/distribution' },
+        { type: 'page', name: 'Upgrading', url: '/docs/registry/upgrading' },
         { type: 'page', name: 'Primitives', url: '/docs/registry/primitives' },
         { type: 'page', name: 'Individual components', url: '/docs/registry/components' },
         { type: 'page', name: 'Blocks · Pricing workbench', url: '/docs/registry/workbench' },

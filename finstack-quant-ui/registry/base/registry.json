@@ -17,7 +17,7 @@
       "devDependencies": ["tailwindcss@4.3.3", "@tailwindcss/postcss@4.3.3"],
       "config": { "style": "base-nova", "tailwind": { "cssVariables": true } },
       "categories": [],
-      "meta": { "version": "0.1.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     }
   ]
 }

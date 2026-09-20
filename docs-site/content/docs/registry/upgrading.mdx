@@ -1,0 +1,63 @@
+---
+title: Upgrade registry items
+description: Re-add copied source items and review their dependency changes together.
+---
+
+Registry items are copied source. Updating a package does not update those files.
+Upgrade by re-adding the items you use; no in-place update or compatibility layer
+is provided. The registry's version and matching WASM version are included in
+each item's metadata.
+
+Version **0.2.0** is prepared for publication. Public installation is available
+only after the registry has merged and deployed from `master`. Until then, use
+the local source workflow below.
+
+## Review and re-add
+
+Commit your application's current source first. Review each item's metadata and
+the CLI preview, including changes to shared dependencies. Once the public
+registry is deployed, a presentation-only item can be reviewed and re-added with:
+
+```sh
+npx --yes shadcn@4.21.0 view @finstack/finstack-chart
+npx --yes shadcn@4.21.0 add @finstack/finstack-chart --dry-run
+npm_config_ignore_scripts=true npx --yes shadcn@4.21.0 add @finstack/finstack-chart --overwrite
+```
+
+`--overwrite` replaces installed files and can discard your edits. Review the
+resulting source, dependency and lockfile diff. Reapply application-specific
+behavior in compositions, then run your application's type, build and interaction
+checks. Remove obsolete copied files and imports after reviewing the diff; the
+CLI does not promise to remove files that disappeared from an item's manifest.
+
+## Native-backed items
+
+The matching WASM package is still distributed through the source checkout.
+Use the same checkout for native packages and registry sources, then run from
+that checkout:
+
+```sh
+UV_NO_SYNC=1 mise run wasm-pkg
+mise run ui-build
+mise exec -- node finstack-quant-ui/scripts/install-local.mjs /absolute/path/to/next-app
+```
+
+The local installer re-adds the workbench and its dependency closure with
+overwrite enabled. Additional item names can follow the application path.
+It substitutes the absolute local WASM package path and restores the application's
+registry namespace afterward. Review your saved changes before running it.
+See [installation and MCP](/docs/registry/distribution) for the initial consumer setup.
+
+## Stock controls and native contracts
+
+Version 0.2.0 composes unmodified shadcn Base UI `base-nova` controls. Remove
+selectors that depend on the previous custom control internals. Keep the stock
+controls unchanged; compose them into application components and use theme
+variables for presentation. Re-add related items together so shared hooks,
+contracts and theme files remain consistent.
+
+A valuation-version warning indicates that the returned native version differs
+from the version compiled into the installed hooks. Align the native package and
+re-add the items. The warning does not convert or reinterpret the result.
+Original cashflow JSON and unresolved result details remain raw; an upgrade does
+not add financial units, inferred types or calculations absent from native output.

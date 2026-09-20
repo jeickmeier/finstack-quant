@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Component source registry 0.2.0 (2026-09-20)
+
+- Prepares 150 registry items for financial forms, views and a composed pricing
+  workbench using existing WASM contracts and unmodified shadcn controls. See the
+  [UI changelog](finstack-quant-ui/CHANGELOG.md) and
+  [upgrade instructions](docs-site/content/docs/registry/upgrading.mdx).
+- No Rust, Python or WASM calculation/API additions are claimed. Typed cashflow
+  rows, inferred units, full-state curve evaluation, plain volatility-surface
+  off-grid evaluation, absent financial aggregates, unresolved detail contracts
+  and quote-space calibration fits remain excluded. Scenario-price documentation
+  drift remains upstream. [Release evidence](finstack-quant-ui/evidence/pr-040.md)
+  records the outstanding installation and public-deployment gates; publication
+  remains restricted to `master`.
+
 ### Requested metrics never go missing; windowed formulas work on money (2026-09-19)
 
 #### Fixed

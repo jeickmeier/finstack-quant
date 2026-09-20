@@ -54,7 +54,7 @@
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.8.0"],
       "categories": ["Blocks"],
       "meta": {
-        "version": "0.1.0",
+        "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
