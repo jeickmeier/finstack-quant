@@ -296,3 +296,17 @@ under fields where mapped, with remaining native errors in the summary.
 The shared field kit is available through `useAppForm`. Bond-subset evidence is
 recorded in [PR-012](evidence/pr-012.md); complete cross-instrument rendering and
 field-error mapping remain separate planned slices.
+
+## Supplied valuation results
+
+`ValuationSummary` displays a supplied result's value, instrument ID, as-of date
+and calculation stamps. `compact` controls presentation; `compareTo` retains an
+independent result with its own currency and metadata. `density` accepts the shared
+compact/comfortable modes. Missing metadata does not create rounding or FX defaults.
+
+`MeasuresGrid` composes that context with the unlinked table. Pass `groups` from
+`listStandardMetricsGrouped`; fully qualified keys are retained. Measures are raw,
+with “Unit unavailable” unless `units` or `comparisonUnits` supplies a label and
+source for that complete key. Neither component calculates differences, totals,
+ratios or currency conversions. See [PR-013 evidence](evidence/pr-013.md) and the
+retained native bond result fixture.

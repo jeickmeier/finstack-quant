@@ -281,7 +281,8 @@
       "registryDependencies": [
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
-        "@finstack/contract-valuation-result"
+        "@finstack/contract-valuation-result",
+        "@finstack/finstack-format"
       ]
     },
     {

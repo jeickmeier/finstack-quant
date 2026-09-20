@@ -54,6 +54,42 @@
         "@finstack/enum-field"
       ],
       "dependencies": ["react@19.2.8", "zod@4.6.5"]
+    },
+    {
+      "name": "valuation-summary",
+      "type": "registry:component",
+      "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available.",
+      "files": [
+        {
+          "path": "valuation-summary/valuation-summary.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/valuation-summary/valuation-summary.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/money-value",
+        "@finstack/stamp-badge"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.8.0"]
+    },
+    {
+      "name": "measures-grid",
+      "type": "registry:component",
+      "docs": "Displays supplied valuation context and raw measures. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available.",
+      "files": [
+        {
+          "path": "measures-grid/measures-grid.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/measures-grid/measures-grid.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/valuation-summary",
+        "@finstack/measure-value",
+        "@finstack/finstack-table",
+        "@finstack/finstack-format"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4"]
     }
   ]
 }

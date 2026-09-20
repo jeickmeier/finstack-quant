@@ -1,0 +1,64 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "measures-grid",
+    "valuation-summary",
+    "money-value",
+    "finstack-base",
+    "finstack-theme",
+    "finstack-format",
+    "finstack-codec",
+    "finstack-host",
+    "contract-valuation-result",
+    "stamp-badge",
+    "measure-value",
+    "finstack-table"
+  ],
+  "accessibility": [
+    {
+      "theme": "light",
+      "density": "compact",
+      "violations": []
+    },
+    {
+      "theme": "light",
+      "density": "comfortable",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "density": "compact",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "density": "comfortable",
+      "violations": []
+    }
+  ],
+  "heights": [
+    {
+      "theme": "light",
+      "density": "compact",
+      "height": 28
+    },
+    {
+      "theme": "light",
+      "density": "comfortable",
+      "height": 36
+    },
+    {
+      "theme": "dark",
+      "density": "compact",
+      "height": 28
+    },
+    {
+      "theme": "dark",
+      "density": "comfortable",
+      "height": 36
+    }
+  ],
+  "failures": [],
+  "wasmRequests": 0,
+  "verdict": "pass"
+}
