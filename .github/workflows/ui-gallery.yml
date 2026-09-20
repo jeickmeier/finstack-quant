@@ -64,7 +64,7 @@ jobs:
           npm --prefix docs-site ci --ignore-scripts
       - name: Install pinned headless Chromium
         timeout-minutes: 5
-        run: npm --prefix finstack-quant-ui exec -- playwright install chromium --only-shell
+        run: DEBUG=pw:install npm --prefix finstack-quant-ui exec -- playwright install chromium --only-shell
       - name: Build native packages for the registry consumer
         run: mise run wasm-pkg
       - name: Retain freshly built native packages for isolated installation
@@ -122,7 +122,7 @@ jobs:
           npm --prefix docs-site ci --ignore-scripts
       - name: Install pinned headless Chromium
         timeout-minutes: 5
-        run: npm --prefix finstack-quant-ui exec -- playwright install chromium --only-shell
+        run: DEBUG=pw:install npm --prefix finstack-quant-ui exec -- playwright install chromium --only-shell
       - name: Check every isolated item before composing production consumers
         run: mise run ui-install
       - name: Retain complete install and composition evidence
