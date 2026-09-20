@@ -58,6 +58,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: registry-gallery
+      - name: Install locked consumer dependencies
+        run: |
+          npm --prefix finstack-quant-ui ci --ignore-scripts
+          npm --prefix docs-site ci --ignore-scripts
+      - name: Install pinned headless Chromium
+        timeout-minutes: 5
+        run: npm --prefix finstack-quant-ui exec -- playwright install chromium --only-shell
       - name: Build native packages for the registry consumer
         run: mise run wasm-pkg
       - name: Retain freshly built native packages for isolated installation
@@ -69,11 +76,6 @@ jobs:
             finstack-quant-wasm/pkg-node
           compression-level: 0
           include-hidden-files: true
-      - name: Install locked consumer dependencies
-        run: |
-          npm --prefix finstack-quant-ui ci --ignore-scripts
-          npm --prefix docs-site ci --ignore-scripts
-          npm --prefix finstack-quant-ui exec -- playwright install chromium
       - name: Check registry and export production gallery
         run: |
           mise run ui-check
@@ -118,7 +120,9 @@ jobs:
         run: |
           npm --prefix finstack-quant-ui ci --ignore-scripts
           npm --prefix docs-site ci --ignore-scripts
-          npm --prefix finstack-quant-ui exec -- playwright install chromium
+      - name: Install pinned headless Chromium
+        timeout-minutes: 5
+        run: npm --prefix finstack-quant-ui exec -- playwright install chromium --only-shell
       - name: Check every isolated item before composing production consumers
         run: mise run ui-install
       - name: Retain complete install and composition evidence
