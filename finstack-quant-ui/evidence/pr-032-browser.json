@@ -1,0 +1,55 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "calibration-form",
+    "schema-form",
+    "finstack-form",
+    "field-frame",
+    "finstack-base",
+    "finstack-theme",
+    "decimal-input",
+    "finstack-format",
+    "finstack-codec",
+    "finstack-host",
+    "contract-valuation-result",
+    "primitive-contracts",
+    "date-input",
+    "enum-field",
+    "contract-calibration",
+    "use-calibrate",
+    "use-finstack",
+    "finstack-worker",
+    "contract-market-context-state",
+    "use-price-instrument",
+    "market-context-browser",
+    "curve-chart",
+    "finstack-chart",
+    "finstack-views",
+    "vol-surface-chart",
+    "finstack-table",
+    "use-linked-selection",
+    "fx-delta-quotes",
+    "json-viewer",
+    "fx-matrix-grid"
+  ],
+  "nativeCases": [
+    "initial",
+    "edited",
+    "static-error",
+    "target-error",
+    "solver-error"
+  ],
+  "accessibility": [
+    {
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "theme": "dark",
+      "violations": []
+    }
+  ],
+  "wasmRequests": 1,
+  "failures": [],
+  "verdict": "pass"
+}

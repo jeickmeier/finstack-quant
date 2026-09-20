@@ -60,6 +60,11 @@ const service = createService({
       getFxDeltaVol: wasm.getFxDeltaVol,
     },
   },
+  calibration: {
+    calibrate: wasm.calibrate,
+    dryRun: wasm.dryRun,
+    validateCalibrationJson: wasm.validateCalibrationJson,
+  },
   valuations: {
     Market,
     validateValuationResultJson: wasm.validateValuationResultJson,

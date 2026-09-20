@@ -130,6 +130,20 @@
       ],
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
+    },
+    {
+      "name": "use-calibrate",
+      "type": "registry:hook",
+      "docs": "Full-envelope native calibration, static diagnostics and canonical validation through FinstackQueryProvider. Null disables a request; exact envelope and worker session own query identity. Structured native errors and complete result fields are preserved.",
+      "files": [
+        {
+          "path": "use-calibrate/use-calibrate.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-calibrate/use-calibrate.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"]
     }
   ]
 }

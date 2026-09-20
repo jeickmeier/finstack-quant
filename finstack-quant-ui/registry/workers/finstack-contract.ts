@@ -1,5 +1,8 @@
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
-import type { ValuationResult } from "finstack-quant-wasm";
+import type {
+  ValuationResult,
+  CalibrationResultEnvelope,
+} from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
   readonly instrumentJson: string;
@@ -57,6 +60,10 @@ export interface WorkerApi {
   ): Promise<Envelope<{ revision: string | number; json: string }>>;
   /** Canonicalize the complete market through its native constructor. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
+  /** Full envelope includes prior_market, quote sets, data and every plan setting. */
+  validateCalibration(envelopeJson: string): Promise<Envelope<string>>;
+  dryRun(envelopeJson: string): Promise<Envelope<string>>;
+  calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;
   sampleFxDelta(request: FxDeltaSampleRequest): Promise<Envelope<number[]>>;
   cashflows(request: CashflowRequest): Promise<Envelope<string>>;

@@ -415,6 +415,29 @@
         "@finstack/contract-market-context-state"
       ],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "calibration-form",
+      "type": "registry:component",
+      "docs": "Editable canonical calibration envelope from the generated root, step and MarketQuote contracts. Requires explicit defaultJson and native validate callback; onSubmit receives canonical JSON only. Remount for a new document. No solver or business defaults are inferred.",
+      "files": [
+        {
+          "path": "calibration-form/calibration-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/calibration-form/calibration-form.tsx"
+        },
+        {
+          "path": "calibration-form/calibration.ts",
+          "type": "registry:component",
+          "target": "components/finstack/components/calibration-form/calibration.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/schema-form",
+        "@finstack/contract-calibration",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["react@19.2.8"]
     }
   ]
 }

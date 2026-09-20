@@ -1,4 +1,10 @@
-import type { core, valuations, models, Market } from "finstack-quant-wasm";
+import type {
+  core,
+  valuations,
+  models,
+  calibration,
+  Market,
+} from "finstack-quant-wasm";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { errorValue, type Envelope, type WorkerApi } from "./finstack-contract";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
@@ -14,6 +20,10 @@ export function createService(native: {
       "getFxDeltaVol" | "getCubeVol" | "getCubeNormalVol"
     >;
   };
+  calibration: Pick<
+    typeof calibration,
+    "calibrate" | "dryRun" | "validateCalibrationJson"
+  >;
   valuations: Pick<
     typeof valuations,
     "Market" | "instruments" | "validateValuationResultJson"
@@ -85,6 +95,15 @@ export function createService(native: {
           handle.free();
         }
       });
+    },
+    validateCalibration(json) {
+      return result(() => native.calibration.validateCalibrationJson(json));
+    },
+    dryRun(json) {
+      return result(() => native.calibration.dryRun(json));
+    },
+    calibrate(json) {
+      return result(() => native.calibration.calibrate(json));
     },
     sampleCube(request) {
       return result(() => {
