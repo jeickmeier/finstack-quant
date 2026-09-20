@@ -106,8 +106,18 @@ export function initialValue(
     throw new Error("Schema nesting exceeds the supported form depth");
   const { schema, pointer } = resolve(root, location);
   if (Object.hasOwn(schema, "const")) return schema.const;
-  if (Object.hasOwn(schema, "default")) return structuredClone(schema.default);
+  if (Object.hasOwn(schema, "default"))
+    return editValue(
+      root,
+      { schema, pointer },
+      structuredClone(schema.default),
+    );
   if (nullable(root, { schema, pointer })) return null;
+  if (
+    schema.type === "object" &&
+    typeof schema.additionalProperties === "object"
+  )
+    return [];
   if (schema.type === "object")
     return Object.fromEntries(
       (schema.required ?? []).map((key) => [
@@ -136,6 +146,69 @@ export function initialValue(
   return "";
 }
 
+/** Represent open maps as key/value rows so punctuation in keys never becomes a form path. */
+export function editValue(
+  root: Schema,
+  location: SchemaLocation,
+  value: unknown,
+): unknown {
+  if (value == null) return value;
+  const { schema, pointer } = resolve(root, location);
+  const nonNull = nullable(root, { schema, pointer });
+  if (nonNull) return editValue(root, nonNull, value);
+  const branches = schema.oneOf ?? schema.anyOf;
+  if (branches) {
+    const branch = branches.find((node) => matchesBranch(root, node, value));
+    return branch ? editValue(root, { schema: branch, pointer }, value) : value;
+  }
+  if (
+    schema.type === "object" &&
+    (typeof value !== "object" || Array.isArray(value))
+  )
+    return value;
+  if (
+    schema.type === "object" &&
+    typeof schema.additionalProperties === "object"
+  )
+    return Object.entries(objectValue(value)).map(([key, item]) => ({
+      key,
+      value: editValue(
+        root,
+        {
+          schema: schema.additionalProperties as Schema,
+          pointer: `${pointer}/additionalProperties`,
+        },
+        item,
+      ),
+    }));
+  if (schema.type === "object")
+    return Object.fromEntries(
+      Object.entries(objectValue(value)).map(([key, item]) => [
+        key,
+        editValue(
+          root,
+          {
+            schema: schema.properties?.[key] ?? {},
+            pointer: `${pointer}/properties/${key}`,
+          },
+          item,
+        ),
+      ]),
+    );
+  if (schema.type === "array" && Array.isArray(value))
+    return value.map((item, index) =>
+      editValue(
+        root,
+        {
+          schema: schema.prefixItems?.[index] ?? schema.items ?? {},
+          pointer: `${pointer}/items`,
+        },
+        item,
+      ),
+    );
+  return value;
+}
+
 /** Convert numeric edit text at validation/output boundaries; preserve working text and exact decimal strings. */
 export function workingValue(
   root: Schema,
@@ -152,6 +225,32 @@ export function workingValue(
     return match
       ? workingValue(root, { schema: match, pointer }, value)
       : value;
+  }
+  if (
+    schema.type === "object" &&
+    typeof schema.additionalProperties === "object" &&
+    Array.isArray(value)
+  ) {
+    const keys = new Set<string>();
+    return Object.fromEntries(
+      value.map((entry) => {
+        const row = objectValue(entry);
+        if (typeof row.key !== "string" || keys.has(row.key))
+          throw new Error(`Duplicate or invalid map key: ${String(row.key)}`);
+        keys.add(row.key);
+        return [
+          row.key,
+          workingValue(
+            root,
+            {
+              schema: schema.additionalProperties as Schema,
+              pointer: `${pointer}/additionalProperties`,
+            },
+            row.value,
+          ),
+        ];
+      }),
+    );
   }
   if (
     schema.type === "object" &&
@@ -229,8 +328,20 @@ export function matchesBranch(
       ([key, property]) =>
         object[key] === (property.const ?? property.enum?.[0]),
     );
+  if (schema.type === "array") return Array.isArray(value);
+  if (
+    schema.type === "object" &&
+    typeof schema.additionalProperties === "object" &&
+    Array.isArray(value)
+  )
+    return true;
   if (schema.type === "object")
-    return (schema.required ?? []).every((key) => Object.hasOwn(object, key));
+    return (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      (schema.required ?? []).every((key) => Object.hasOwn(object, key))
+    );
   return schema.type === typeof value;
 }
 export function structuralValidator(module: InstrumentModule) {

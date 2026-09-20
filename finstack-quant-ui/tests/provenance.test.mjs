@@ -95,6 +95,7 @@ it("includes every UI generated artifact in the repository manifest", async () =
     "finstack-quant-ui/registry.json",
     "finstack-quant-ui/registry/theme/registry.json",
     "finstack-quant-ui/registry/theme/finstack-theme/theme.css",
+    "finstack-quant-ui/tests/instruments/encoding-report.json",
   ];
   for await (const path of glob("finstack-quant-ui/src/generated/**/*", {
     cwd: repo,

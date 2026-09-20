@@ -13,8 +13,8 @@
     "./views": "./src/views.ts"
   },
   "scripts": {
-    "generate": "node scripts/gen.mjs && node scripts/gen-registry.mjs && node scripts/gen-theme.mjs",
-    "check:generated": "node scripts/gen.mjs --check && node scripts/gen-registry.mjs --check && node scripts/gen-theme.mjs --check",
+    "generate": "node scripts/gen.mjs && node scripts/gen-registry.mjs && node scripts/gen-theme.mjs && node scripts/encoding-report.mjs",
+    "check:generated": "node scripts/gen.mjs --check && node scripts/gen-registry.mjs --check && node scripts/gen-theme.mjs --check && node scripts/encoding-report.mjs --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run check:generated && npm run format:check && npm run check:tokens && npm run check:registry && npm run typecheck && npm test",

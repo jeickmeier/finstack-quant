@@ -25,7 +25,7 @@
     {
       "name": "schema-form",
       "type": "registry:component",
-      "docs": "Bond-subset generated schema form. Supply a lazy generated instrument module and useInstrumentValidator from the shared worker; canonical JSON is emitted only on valid submit. Basic mode hides defaulted fields. Broader renderer coverage remains gated.",
+      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates.",
       "files": [
         {
           "path": "schema-form/schema-form.tsx",

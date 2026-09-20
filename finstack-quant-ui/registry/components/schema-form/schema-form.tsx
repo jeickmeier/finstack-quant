@@ -6,6 +6,7 @@ import { RenderField } from "./render-field";
 import {
   structuralValidator,
   objectValue,
+  editValue,
   type InstrumentModule,
 } from "./schema";
 export type { InstrumentModule };
@@ -14,7 +15,7 @@ export interface FieldFilter {
   deny?: readonly string[];
 }
 export interface SchemaFormProps {
-  /** Lazily import the generated instrument module; only bond-subset coverage is accepted here. */
+  /** Lazily import the generated instrument module; the shared renderer follows its reachable schema. */
   module: InstrumentModule;
   /** Initial working host values; changing this prop does not reset an active edit. Remount for another instrument. */
   defaultValues?: Record<string, unknown>;
@@ -33,8 +34,15 @@ function useSchemaForm(props: SchemaFormProps) {
     () => structuralValidator(props.module),
     [props.module],
   );
-  const [initial] = useState(() =>
-    structuredClone(props.defaultValues ?? objectValue(props.module.example)),
+  const [initial] = useState(
+    () =>
+      editValue(
+        props.module.schema,
+        { schema: props.module.schema, pointer: "#" },
+        structuredClone(
+          props.defaultValues ?? objectValue(props.module.example),
+        ),
+      ) as Record<string, unknown>,
   );
   const notify = useRef(props.onValidated);
   notify.current = props.onValidated;
@@ -116,7 +124,7 @@ function useSchemaForm(props: SchemaFormProps) {
   return { form, submitError, native };
 }
 export type SchemaFormApi = ReturnType<typeof useSchemaForm>["form"];
-/** Schema-driven bond term sheet with structural change and abort-aware native validation. */
+/** Schema-driven instrument term sheet with structural change and abort-aware native validation. */
 export function SchemaForm(props: SchemaFormProps) {
   const { form, submitError, native } = useSchemaForm(props);
   return (

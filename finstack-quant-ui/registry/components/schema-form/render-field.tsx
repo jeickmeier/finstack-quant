@@ -15,7 +15,7 @@ import {
 } from "./schema";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
 
-/** Bond-subset renderer over generated structure; the module codec owns validation. */
+/** Shared renderer over generated structure; the module codec owns validation. */
 export function RenderField({
   module,
   form,
@@ -71,6 +71,24 @@ export function RenderField({
         >
           Add {label.toLowerCase()}
         </button>
+        {!required && value !== undefined && (
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => form.setFieldValue(path, undefined)}
+          >
+            Omit {label.toLowerCase()}
+          </button>
+        )}
+        {nonNull && value === undefined && (
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => form.setFieldValue(path, null)}
+          >
+            Set {label.toLowerCase()} to null
+          </button>
+        )}
       </div>
     );
   if (nonNull)
@@ -80,6 +98,15 @@ export function RenderField({
           {...{ module, form, path, label, value, layout, fields }}
           location={nonNull}
         />
+        {!required && (
+          <button
+            type="button"
+            className={buttonClass}
+            onClick={() => form.setFieldValue(path, undefined)}
+          >
+            Omit {label.toLowerCase()}
+          </button>
+        )}
         <button
           type="button"
           className={buttonClass}
@@ -157,6 +184,52 @@ export function RenderField({
         )}
       </form.AppField>
     );
+  if (
+    schema.type === "object" &&
+    typeof schema.additionalProperties === "object"
+  ) {
+    const valueSchema = schema.additionalProperties;
+    return (
+      <form.AppField name={path} mode="array">
+        {(field) => (
+          <field.ArrayField
+            label={label}
+            create={() => ({
+              key: "",
+              value: initialValue(module.schema, {
+                schema: valueSchema,
+                pointer: `${pointer}/additionalProperties`,
+              }),
+            })}
+          >
+            {(index) => (
+              <div className="grid gap-3 md:grid-cols-2">
+                <form.AppField name={`${path}[${index}].key`}>
+                  {(keyField) => (
+                    <keyField.TextField label={`${label} key ${index + 1}`} />
+                  )}
+                </form.AppField>
+                <RenderField
+                  {...{ module, form, layout, fields }}
+                  location={{
+                    schema: valueSchema,
+                    pointer: `${pointer}/additionalProperties`,
+                  }}
+                  path={`${path}[${index}].value`}
+                  label={`${label} value ${index + 1}`}
+                  value={
+                    Array.isArray(value)
+                      ? objectValue(value[index]).value
+                      : undefined
+                  }
+                />
+              </div>
+            )}
+          </field.ArrayField>
+        )}
+      </form.AppField>
+    );
+  }
   if (schema.type === "object") {
     const properties = propertiesOf(schema);
     const primary = properties.filter(
@@ -275,7 +348,7 @@ export function RenderField({
           );
         return (
           <p className="text-sm text-muted-foreground">
-            {label}: this schema construct is outside the bond editor subset.
+            {label}: unsupported generated schema construct.
           </p>
         );
       }}
