@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "curves": [
+    {
+      "type": "basis_spread",
+      "id": "BASIS_SPREAD",
+      "base": "2025-01-01",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 10],
+        [1, 12],
+        [5, 15]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "base_correlation",
+      "id": "CORRELATION",
+      "detachment_points": [0.03, 0.07, 0.1],
+      "correlations": [0.2, 0.3, 0.4]
+    },
+    {
+      "type": "inflation",
+      "id": "CPI",
+      "base_cpi": 300,
+      "base_date": "2025-01-01",
+      "day_count": "act_365f",
+      "indexation_lag_months": 3,
+      "knot_points": [
+        [0, 300],
+        [1, 306],
+        [5, 330]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "forward",
+      "id": "FORWARD",
+      "base": "2025-01-01",
+      "reset_lag": 2,
+      "day_count": "act_365f",
+      "tenor": 0.25,
+      "knot_points": [
+        [0, 0.03],
+        [1, 0.031],
+        [5, 0.04]
+      ],
+      "projection_grid": null,
+      "interp_style": "linear",
+      "extrapolation": "flat_forward",
+      "rate_calibration": null,
+      "fx_policy": null
+    },
+    {
+      "type": "hazard",
+      "id": "HZ",
+      "base": "2025-01-01",
+      "knot_points": [
+        [0, 0.02],
+        [40, 0.02]
+      ],
+      "recovery_rate": 0.4,
+      "issuer": null,
+      "seniority": null,
+      "currency": null,
+      "day_count": "act_365f",
+      "par_points": [],
+      "par_interp": "linear",
+      "survival_interp": "log_linear",
+      "hazard_calibration": null,
+      "fx_policy": null
+    },
+    {
+      "type": "parametric",
+      "id": "NS",
+      "base_date": "2025-01-01",
+      "day_count": "act_365f",
+      "model": {
+        "variant": "ns",
+        "beta0": 0.02,
+        "beta1": -0.01,
+        "beta2": 0.005,
+        "tau": 1.5
+      }
+    },
+    {
+      "type": "discount",
+      "id": "OVERLAY",
+      "base": "2025-01-01",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [1, 0.9512345678901234],
+        [5, 0.8]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.0001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "price",
+      "id": "PRICE",
+      "base": "2025-01-01",
+      "day_count": "act_365f",
+      "spot_price": 10,
+      "knot_points": [
+        [0, 10],
+        [1, 12],
+        [5, 15]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    },
+    {
+      "type": "discount",
+      "id": "USD-OIS",
+      "base": "2025-01-01",
+      "day_count": "act_365f",
+      "knot_points": [
+        [0, 1],
+        [40, 1]
+      ],
+      "interp_style": "log_linear",
+      "extrapolation": "flat_forward",
+      "min_forward_rate": null,
+      "allow_non_monotonic": false,
+      "min_forward_tenor": 0.000001,
+      "rate_calibration": null,
+      "calibration_ois_cutoff_days": null,
+      "fx_policy": null
+    },
+    {
+      "type": "vol_index",
+      "id": "VOL_INDEX",
+      "base": "2025-01-01",
+      "day_count": "act_365f",
+      "spot_level": 10,
+      "knot_points": [
+        [0, 10],
+        [1, 12],
+        [5, 15]
+      ],
+      "interp_style": "linear",
+      "extrapolation": "flat_forward"
+    }
+  ],
+  "fx": null,
+  "surfaces": [],
+  "prices": {},
+  "series": [],
+  "inflation_indices": [],
+  "dividends": [],
+  "credit_indices": [],
+  "fx_delta_vol_surfaces": [],
+  "vol_cubes": [],
+  "collateral": {},
+  "hierarchy": null
+}

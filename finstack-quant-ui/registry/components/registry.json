@@ -90,6 +90,23 @@
         "@finstack/finstack-format"
       ],
       "dependencies": ["@tanstack/react-table@9.2.4"]
+    },
+    {
+      "name": "curve-chart",
+      "type": "registry:component",
+      "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine.",
+      "files": [
+        {
+          "path": "curve-chart/curve-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/curve-chart/curve-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/contract-market-context-state",
+        "@finstack/finstack-views"
+      ]
     }
   ]
 }
