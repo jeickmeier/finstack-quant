@@ -1,0 +1,55 @@
+{
+  "browser": "145.0.7632.6",
+  "installed": [
+    "valuation-details",
+    "json-viewer",
+    "finstack-base",
+    "finstack-theme",
+    "finstack-codec",
+    "finstack-host",
+    "contract-valuation-result",
+    "monte-carlo-diagnostics",
+    "explanation-trace",
+    "covenant-report"
+  ],
+  "checks": [
+    {
+      "type": "commodity_option",
+      "detailType": "monte_carlo",
+      "exactCopy": true,
+      "violations": []
+    },
+    {
+      "type": "composite",
+      "detailType": "composite",
+      "exactCopy": true,
+      "violations": []
+    },
+    {
+      "type": "credit_default_swap",
+      "detailType": "credit_derivative",
+      "exactCopy": true,
+      "violations": []
+    },
+    {
+      "type": "fx_option",
+      "detailType": "fx",
+      "exactCopy": true,
+      "violations": []
+    },
+    {
+      "type": "structured_credit",
+      "detailType": "structured_credit_stochastic",
+      "exactCopy": true,
+      "violations": []
+    },
+    {
+      "type": "bond",
+      "detailType": "monte_carlo",
+      "exactCopy": true,
+      "violations": []
+    }
+  ],
+  "failures": [],
+  "verdict": "pass"
+}

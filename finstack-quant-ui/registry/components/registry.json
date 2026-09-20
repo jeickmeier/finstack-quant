@@ -168,6 +168,84 @@
         "@finstack/use-cashflows"
       ],
       "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "monte-carlo-diagnostics",
+      "type": "registry:component",
+      "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
+      "files": [
+        {
+          "path": "monte-carlo-diagnostics/monte-carlo-diagnostics.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/monte-carlo-diagnostics/monte-carlo-diagnostics.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-host"
+      ],
+      "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "explanation-trace",
+      "type": "registry:component",
+      "docs": "Optional original valuation explanation rendered losslessly; its published host shape is unknown, so no steps or severity are inferred.",
+      "files": [
+        {
+          "path": "explanation-trace/explanation-trace.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/explanation-trace/explanation-trace.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "covenant-report",
+      "type": "registry:component",
+      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
+      "files": [
+        {
+          "path": "covenant-report/covenant-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/covenant-report/covenant-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["react@19.2.8"]
+    },
+    {
+      "name": "valuation-details",
+      "type": "registry:component",
+      "docs": "Lazy native result detail routing. Only Monte Carlo has a complete published host shape; composite, credit, FX and structured-credit payloads stay raw. Unknown tags show a warning; full result metadata and nullable fields remain available.",
+      "files": [
+        {
+          "path": "valuation-details/valuation-details.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/valuation-details/valuation-details.tsx"
+        },
+        {
+          "path": "valuation-details/raw-details.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/valuation-details/raw-details.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-host",
+        "@finstack/monte-carlo-diagnostics",
+        "@finstack/explanation-trace",
+        "@finstack/covenant-report"
+      ],
+      "dependencies": ["react@19.2.8"]
     }
   ]
 }
