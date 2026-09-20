@@ -312,3 +312,30 @@ with “Unit unavailable” unless `units` or `comparisonUnits` supplies a label
 source for that complete key. Neither component calculates differences, totals,
 ratios or currency conversions. See [PR-013 evidence](evidence/pr-013.md) and the
 retained native bond result fixture.
+
+## Returned structured-credit scenarios
+
+With the `@finstack` registry namespace configured, install the standalone component:
+
+```sh
+npx shadcn@4.21.0 add @finstack/scenario-heatmap
+```
+
+```tsx
+import { ScenarioHeatmapExample } from "@/components/finstack/components/scenario-heatmap/example";
+
+// table is the unchanged result of structuredCreditTrancheScenarioTable.
+// Choose an explicit display extent containing every supplied price and par 100.
+<ScenarioHeatmapExample table={table} priceDomain={[80, 140]} />;
+```
+
+`ScenarioHeatmap` accepts controlled `severity` and `onSeverityChange`, optional
+shared `link`, publication text, annotations, tooltip/callback props and a
+`figureRef` for the existing complete SVG/PNG export API. CPR, CDR and severity
+remain their returned decimal values. Color is the returned clean settlement
+price as a percentage of **current tranche balance**, with 100 as par. The Rust
+`ScenarioCell.price` contract owns this wording; the facade's original-balance
+comment remains an upstream documentation exclusion. No rebasing, normalization
+or WAL/writedown overlay is performed. Neither the component nor its example
+requires a worker or workbench block. Native fixture provenance, including a
+factor-adjusted tranche, is in [PR-034 evidence](evidence/pr-034.md).

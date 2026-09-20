@@ -1,0 +1,550 @@
+{
+  "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
+  "instrumentSha256": "cc1a176fcd909c465387054949c5a84c050fd1d4bdfd9295e934a9db4616985a",
+  "marketSource": "finstack-quant-ui/tests/instruments/pricing-market.json",
+  "marketSha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474",
+  "asOf": "2024-01-01",
+  "trancheId": "CLONOTES-A",
+  "grid": {
+    "cprs": [0, 0.05, 0.15],
+    "cdrs": [0, 0.03],
+    "severities": [0.2, 0.6],
+    "recovery_lag": null
+  },
+  "cases": [
+    {
+      "name": "original",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "base_currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond",
+                    "industry": null
+                  },
+                  "balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "index_id": null,
+                  "maturity": "2034-01-01",
+                  "credit_quality": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "is_defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "CLONOTES-A",
+                  "attachment_point": 0,
+                  "detachment_point": 100,
+                  "behavior_type": "standard",
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.06
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "payment_priority": 1,
+                  "attributes": {}
+                }
+              ],
+              "total_size": {
+                "amount": "100000000",
+                "currency": "USD"
+              }
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "payment_calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "cpr": 0.2,
+              "curve": null
+            },
+            "default_spec": {
+              "cdr": 0.02,
+              "curve": null
+            },
+            "recovery_spec": {
+              "rate": 0.6,
+              "recovery_lag": 12
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "credit_factors": {},
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "behavior_overrides": {
+              "cpr_annual": null,
+              "psa_speed_multiplier": null,
+              "cdr_annual": null,
+              "sda_speed_multiplier": null,
+              "recovery_rate": null,
+              "recovery_lag_months": null,
+              "reinvestment_price": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "table": {
+        "tranche_id": "CLONOTES-A",
+        "cells": [
+          {
+            "cpr": 0,
+            "cdr": 0,
+            "severity": 0.2,
+            "price": 126.33688090011323,
+            "wal": 10.013698630136986,
+            "writedown": 0
+          },
+          {
+            "cpr": 0,
+            "cdr": 0,
+            "severity": 0.6,
+            "price": 126.33688090011323,
+            "wal": 10.013698630136986,
+            "writedown": 0
+          },
+          {
+            "cpr": 0,
+            "cdr": 0.03,
+            "severity": 0.2,
+            "price": 120.27150541592792,
+            "wal": 9.10637136689875,
+            "writedown": 5251517.46210136
+          },
+          {
+            "cpr": 0,
+            "cdr": 0.03,
+            "severity": 0.6,
+            "price": 113.30441797016893,
+            "wal": 9.504261814427144,
+            "writedown": 16155115.81889618
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0,
+            "severity": 0.2,
+            "price": 120.99233525077065,
+            "wal": 7.882919163137898,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0,
+            "severity": 0.6,
+            "price": 120.99233525077065,
+            "wal": 7.882919163137898,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0.03,
+            "severity": 0.2,
+            "price": 116.4511084298189,
+            "wal": 7.199600142347672,
+            "writedown": 4188232.902808971
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0.03,
+            "severity": 0.6,
+            "price": 110.67574320535746,
+            "wal": 7.348827548004143,
+            "writedown": 13314544.15736848
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0,
+            "severity": 0.2,
+            "price": 113.7844384207223,
+            "wal": 5.0480080151370075,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0,
+            "severity": 0.6,
+            "price": 113.7844384207223,
+            "wal": 5.0480080151370075,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0.03,
+            "severity": 0.2,
+            "price": 111.16042867475495,
+            "wal": 4.684418460200601,
+            "writedown": 2791702.619818632
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0.03,
+            "severity": 0.6,
+            "price": 107.00688175311517,
+            "wal": 4.638881546080826,
+            "writedown": 9476020.72192627
+          }
+        ]
+      }
+    },
+    {
+      "name": "factor-adjusted",
+      "instrument": {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+          "type": "structured_credit",
+          "spec": {
+            "id": "CLO-EXAMPLE",
+            "deal_type": "clo",
+            "pool": {
+              "id": "POOL-1",
+              "deal_type": "clo",
+              "base_currency": "USD",
+              "assets": [
+                {
+                  "id": "COLLATERAL-1",
+                  "asset_type": {
+                    "type": "high_yield_bond",
+                    "industry": null
+                  },
+                  "balance": {
+                    "amount": "50000000",
+                    "currency": "USD"
+                  },
+                  "rate": 0.07,
+                  "spread_bp": null,
+                  "index_id": null,
+                  "maturity": "2034-01-01",
+                  "credit_quality": null,
+                  "industry": null,
+                  "obligor_id": null,
+                  "is_defaulted": false,
+                  "recovery_amount": null,
+                  "default_date": null,
+                  "purchase_price": null,
+                  "acquisition_date": null,
+                  "origination_date": null,
+                  "day_count": "act_360",
+                  "smm_override": null,
+                  "mdr_override": null,
+                  "recovery_rate": null,
+                  "contractual_payment": null
+                }
+              ],
+              "cumulative_defaults": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_recoveries": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_prepayments": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "cumulative_scheduled_amortization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reinvestment_period": null,
+              "collection_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "rep_lines": null
+            },
+            "tranches": {
+              "tranches": [
+                {
+                  "id": "CLONOTES-A",
+                  "attachment_point": 0,
+                  "detachment_point": 100,
+                  "behavior_type": "standard",
+                  "seniority": "senior",
+                  "rating": null,
+                  "original_balance": {
+                    "amount": "100000000",
+                    "currency": "USD"
+                  },
+                  "current_balance": {
+                    "amount": "50000000",
+                    "currency": "USD"
+                  },
+                  "coupon": {
+                    "fixed": {
+                      "rate": 0.06
+                    }
+                  },
+                  "oc_trigger": null,
+                  "ic_trigger": null,
+                  "frequency": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "day_count": "act_360",
+                  "deferred_interest": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "pik_enabled": false,
+                  "maturity": "2034-01-01",
+                  "payment_priority": 1,
+                  "attributes": {}
+                }
+              ],
+              "total_size": {
+                "amount": "100000000",
+                "currency": "USD"
+              }
+            },
+            "closing_date": "2024-01-01",
+            "first_payment_date": "2024-04-01",
+            "maturity": "2034-01-01",
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "payment_calendar_id": "nyse",
+            "discount_curve_id": "USD-OIS",
+            "attributes": {},
+            "prepayment_spec": {
+              "cpr": 0.2,
+              "curve": null
+            },
+            "default_spec": {
+              "cdr": 0.02,
+              "curve": null
+            },
+            "recovery_spec": {
+              "rate": 0.6,
+              "recovery_lag": 12
+            },
+            "market_conditions": {
+              "refi_rate": 0.04
+            },
+            "credit_factors": {},
+            "deal_metadata": {
+              "manager_id": null,
+              "servicer_id": null,
+              "master_servicer_id": null,
+              "special_servicer_id": null,
+              "trustee_id": null
+            },
+            "behavior_overrides": {
+              "cpr_annual": null,
+              "psa_speed_multiplier": null,
+              "cdr_annual": null,
+              "sda_speed_multiplier": null,
+              "recovery_rate": null,
+              "recovery_lag_months": null,
+              "reinvestment_price": null
+            },
+            "hedge_swaps": []
+          }
+        }
+      },
+      "table": {
+        "tranche_id": "CLONOTES-A",
+        "cells": [
+          {
+            "cpr": 0,
+            "cdr": 0,
+            "severity": 0.2,
+            "price": 126.33688090011321,
+            "wal": 10.013698630136986,
+            "writedown": 0
+          },
+          {
+            "cpr": 0,
+            "cdr": 0,
+            "severity": 0.6,
+            "price": 126.33688090011321,
+            "wal": 10.013698630136986,
+            "writedown": 0
+          },
+          {
+            "cpr": 0,
+            "cdr": 0.03,
+            "severity": 0.2,
+            "price": 120.2715054159279,
+            "wal": 9.106371366898752,
+            "writedown": 2625758.731050682
+          },
+          {
+            "cpr": 0,
+            "cdr": 0.03,
+            "severity": 0.6,
+            "price": 113.30441797016893,
+            "wal": 9.504261814427144,
+            "writedown": 8077557.90944811
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0,
+            "severity": 0.2,
+            "price": 120.9923352507706,
+            "wal": 7.882919163137897,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0,
+            "severity": 0.6,
+            "price": 120.9923352507706,
+            "wal": 7.882919163137897,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0.03,
+            "severity": 0.2,
+            "price": 116.45110842981892,
+            "wal": 7.199600142347673,
+            "writedown": 2094116.451404486
+          },
+          {
+            "cpr": 0.05,
+            "cdr": 0.03,
+            "severity": 0.6,
+            "price": 110.67574320535749,
+            "wal": 7.348827548004143,
+            "writedown": 6657272.07868425
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0,
+            "severity": 0.2,
+            "price": 113.78443842072232,
+            "wal": 5.048008015137008,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0,
+            "severity": 0.6,
+            "price": 113.78443842072232,
+            "wal": 5.048008015137008,
+            "writedown": 0
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0.03,
+            "severity": 0.2,
+            "price": 111.16042867475493,
+            "wal": 4.684418460200602,
+            "writedown": 1395851.309909307
+          },
+          {
+            "cpr": 0.15,
+            "cdr": 0.03,
+            "severity": 0.6,
+            "price": 107.00688175311515,
+            "wal": 4.638881546080826,
+            "writedown": 4738010.36096312
+          }
+        ]
+      }
+    }
+  ]
+}

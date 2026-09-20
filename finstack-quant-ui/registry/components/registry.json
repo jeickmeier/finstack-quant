@@ -480,6 +480,32 @@
         "@finstack/contract-calibration"
       ],
       "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"]
+    },
+    {
+      "name": "scenario-heatmap",
+      "type": "registry:component",
+      "docs": "Display returned ScenarioTable prices at original CPR/CDR coordinates, with an explicitly controlled severity and priceDomain straddling the canonical par reference 100. Prices are clean settlement percentages of current tranche balance per Rust ScenarioCell.price. Optional shared linking, callbacks, tooltip body, annotations and complete figure exports. No valuation, rebasing or WAL/writedown overlay.",
+      "files": [
+        {
+          "path": "scenario-heatmap/scenario-heatmap.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/scenario-heatmap/scenario-heatmap.tsx"
+        },
+        {
+          "path": "scenario-heatmap/example.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/components/scenario-heatmap/example.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/enum-field",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/use-linked-selection"
+      ],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"]
     }
   ]
 }
