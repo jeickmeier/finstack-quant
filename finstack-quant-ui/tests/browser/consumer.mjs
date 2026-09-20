@@ -25,7 +25,7 @@ export async function installBuilt(root, consumer, names) {
     for (const dependency of item.registryDependencies ?? [])
       await install(dependency.replace("@finstack/", ""));
     for (const file of item.files ?? []) {
-      const target = path.join(consumer, file.target);
+      const target = path.join(consumer, file.target.replace(/^~\//, ""));
       await mkdir(path.dirname(target), { recursive: true });
       await writeFile(target, file.content);
     }

@@ -115,7 +115,7 @@ it("type-checks the installed corpus without workspace aliases", async () => {
         await readFile(path.join(consumer, "r", `${entry.name}.json`), "utf8"),
       );
       for (const file of item.files ?? []) {
-        const target = path.join(consumer, file.target);
+        const target = path.join(consumer, file.target.replace(/^~\//, ""));
         await mkdir(path.dirname(target), { recursive: true });
         expect(typeof file.content).toBe("string");
         await writeFile(target, file.content);

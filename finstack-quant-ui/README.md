@@ -196,3 +196,35 @@ IDs; `KnotTable` reuses it. `JsonViewer` displays/copies the original supplied
 string and never parses it. `npm run test:primitives:browser` builds an isolated
 consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
 10,000-option virtualization, and runs axe in both themes and densities.
+
+## Worker and query boundary
+
+Install `@finstack/use-price-instrument` and/or `@finstack/use-validate-instrument`.
+They include `use-finstack` and the worker closure. Hooks install at project-root
+`hooks/<item>/`; the worker/service/contracts install at project-root `workers/`
+(the `~/` registry target intentionally stays outside an optional `src` folder).
+The worker uses the consumer's standard `@/lib/finstack` alias for the installed
+codec. The root registry owns these worker files because included indexes cannot
+traverse to sibling source directories.
+
+Use `FinstackQueryProvider` around a standalone feature, or `FinstackProvider`
+inside the application's existing `QueryClientProvider`. `useFinstack` exposes
+`starting`, `ready`, `error` and `reset`. Nothing initializes during SSR. One
+provider shares one worker; cleanup rejects pending calls and terminates it.
+Use the matching built `finstack-quant-wasm` package, linked locally until the
+release packaging slice. An optional `wasmUrl` selects a matching web artifact;
+reset or changing that URL creates a fresh worker and query session.
+
+`usePriceInstrument` requires the complete immutable request (`instrumentJson`,
+`marketJson`, `asOf`, `model`, `metrics`, `pricingOptions`, `marketHistory`). JSON
+strings remain unchanged, including wide integer tokens. Results are structured
+clone values; export through the worker's `exportResult` method for native
+canonical JSON. `useInstrumentCashflows` returns original native JSON text.
+`useModels`, `useMetrics`, and `useCalendars` return native option registries.
+`useValidateInstrument` takes canonical text and a caller-owned revision; its
+250ms debounce never exposes a different revision's validation error or result.
+
+Run `UV_NO_SYNC=1 mise run wasm-pkg` for scoped package builds; disabling uv
+synchronization prevents the final marker-file command from rebuilding Python.
+The production browser harness now exercises the installed provider and worker,
+not a separate probe implementation. See [PR-009 evidence](evidence/pr-009.md).

@@ -1,8 +1,17 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { cp, mkdir, mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  rm,
+  writeFile,
+  readFile,
+  symlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { installBuilt } from "./consumer.mjs";
 
 if (
   process.env.REGISTRY_MEASURE_FOOTPRINT === "1" &&
@@ -34,7 +43,42 @@ function run(command, args, env) {
 }
 try {
   await mkdir(resolve(fixture, "app/registry-probe"), { recursive: true });
-  for (const name of ["page.jsx", "probe.worker.js", "footprint.js"])
+  await installBuilt(resolve(repo, "finstack-quant-ui"), fixture, [
+    "use-finstack",
+  ]);
+  await mkdir(resolve(fixture, "node_modules/@tanstack"), { recursive: true });
+  await symlink(
+    resolve(repo, "finstack-quant-ui/node_modules/@tanstack/react-query"),
+    resolve(fixture, "node_modules/@tanstack/react-query"),
+    "dir",
+  );
+  for (const name of ["lossless-json", "zod", "comlink"])
+    await symlink(
+      resolve(repo, "finstack-quant-ui/node_modules", name),
+      resolve(fixture, "node_modules", name),
+      "dir",
+    );
+  await writeFile(
+    resolve(fixture, "tsconfig.json"),
+    JSON.stringify({
+      compilerOptions: {
+        jsx: "preserve",
+        target: "ES2022",
+        lib: ["DOM", "ES2024"],
+        module: "ESNext",
+        moduleResolution: "Bundler",
+        allowJs: true,
+        resolveJsonModule: true,
+        skipLibCheck: true,
+        strict: true,
+        noEmit: true,
+        esModuleInterop: true,
+        paths: { "@/*": ["./*"] },
+      },
+      exclude: ["node_modules", "r", "out"],
+    }),
+  );
+  for (const name of ["page.jsx", "footprint.js"])
     await cp(
       resolve(import.meta.dirname, "fixture", name),
       resolve(fixture, "app/registry-probe", name),

@@ -1,65 +1,70 @@
 "use client";
 import { useEffect, useState } from "react";
-import { wrap, releaseProxy } from "comlink";
+import {
+  FinstackProvider,
+  useFinstack,
+} from "../../hooks/use-finstack/use-finstack";
 
-export default function WorkerProbe() {
-  const [state, setState] = useState("starting");
+function Probe() {
+  const worker = useFinstack();
+  const [started] = useState(() => performance.now());
   useEffect(() => {
-    const worker = new Worker(new URL("./probe.worker.js", import.meta.url), {
-      type: "module",
-    });
-    const proxy = wrap(worker);
-    const failed = (event) => {
-      window.registryProbe.state = "failed";
-      window.registryProbe.initialization = {
-        ok: false,
-        error: { name: "WorkerError", message: event.message, kind: "worker" },
-      };
-      setState("failed");
-    };
-    worker.addEventListener("error", failed);
-    const wasmUrl =
-      new URLSearchParams(location.search).get("wasm") ?? undefined;
+    const proxy = Object.fromEntries(
+      [
+        "price",
+        "cashflows",
+        "exportResult",
+        "models",
+        "metrics",
+        "calendars",
+        "validate",
+      ].map((method) => [
+        method,
+        (...args) =>
+          worker.client
+            .call(method, ...args)
+            .then((value) => ({ ok: true, value }))
+            .catch((error) => ({ ok: false, error: error.payload })),
+      ]),
+    );
     window.registryProbe = {
       proxy,
-      state: "starting",
+      state: worker.status === "error" ? "failed" : worker.status,
+      initialization:
+        worker.status === "ready"
+          ? { ok: true, value: { state: "ready", worker: true } }
+          : worker.error
+            ? { ok: false, error: worker.error.payload }
+            : undefined,
+      initializationMs: performance.now() - started,
       instrumentTypes: async () =>
         (await import("./footprint.js")).instrumentTypes(),
       measureInstrument: async (type) =>
         (await import("./footprint.js")).measureInstrument(type),
     };
-    const initializationStarted = performance.now();
-    proxy
-      .initialize(wasmUrl)
-      .then((value) => {
-        window.registryProbe.initializationMs =
-          performance.now() - initializationStarted;
-        window.registryProbe.initialization = value;
-        window.registryProbe.state = value.ok ? "ready" : "failed";
-        setState(window.registryProbe.state);
-      })
-      .catch((error) => {
-        window.registryProbe.state = "failed";
-        window.registryProbe.initialization = {
-          ok: false,
-          error: {
-            name: error.name,
-            message: error.message,
-            kind: "transport",
-          },
-        };
-        setState("failed");
-      });
     return () => {
       delete window.registryProbe;
-      proxy[releaseProxy]();
-      worker.terminate();
     };
-  }, []);
+  }, [worker.status, worker.client, worker.error, started]);
   return (
     <main id="main-content">
       <h1>Component registry worker probe</h1>
-      <output data-testid="worker-state">{state}</output>
+      <output data-testid="worker-state">{worker.status}</output>
     </main>
+  );
+}
+export default function WorkerProbe() {
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    setConfig({
+      wasmUrl: new URLSearchParams(location.search).get("wasm") ?? undefined,
+    });
+  }, []);
+  return config ? (
+    <FinstackProvider wasmUrl={config.wasmUrl}>
+      <Probe />
+    </FinstackProvider>
+  ) : (
+    <main id="main-content">Starting worker…</main>
   );
 }

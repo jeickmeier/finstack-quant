@@ -40,6 +40,22 @@ const contracts = roots.map(({ schema }) => {
   );
 });
 const items = [
+  {
+    name: "finstack-worker",
+    type: "registry:file",
+    docs: "Installs the worker and its service/contracts at project-root workers/. Initialize through FinstackProvider in the browser; install the matching local WASM package. Only existing native facade calls run here.",
+    files: [
+      "finstack.worker.ts",
+      "finstack-service.ts",
+      "finstack-contract.ts",
+    ].map((name) => ({
+      path: `registry/workers/${name}`,
+      type: "registry:file",
+      target: `~/workers/${name}`,
+    })),
+    registryDependencies: ["@finstack/finstack-codec"],
+    dependencies: ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],
+  },
   item("primitive-contracts", ["generated/primitive-contracts.json"]),
   item(
     "finstack-format",
