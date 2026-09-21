@@ -12,7 +12,10 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-details-"));
 let browser, server, page;
 try {
-  const installed = await installBuilt(root, consumer, ["valuation-details"]);
+  const installed = await installBuilt(root, consumer, [
+    "valuation-details",
+    "contract-valuation-result",
+  ]);
   await writeFile(
     path.join(consumer, "main.tsx"),
     await readFile(new URL("./fixture/details.tsx", import.meta.url)),
@@ -26,7 +29,7 @@ try {
     path.join(consumer, "restore.ts"),
     (
       await readFile(path.join(root, "tests/details/restore.ts"), "utf8")
-    ).replace("../../src/host", "./lib/finstack/host"),
+    ).replaceAll("../../src/", "./lib/finstack/"),
   );
 
   const modules = await buildConsumer(consumer, { title: "Cashflow exports" });

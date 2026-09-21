@@ -146,10 +146,18 @@ it("uses the exact native option registries and canonicalizes instrument text", 
 it("keeps four native handles, refreshes recency, frees evictions until worker termination", async () => {
   const local = await startWorker();
   try {
-    const markets = Array.from(
-      { length: 5 },
-      (_, i) => requests.bond.marketJson + " ".repeat(i),
-    );
+    const markets = Array.from({ length: 5 }, (_, i) => {
+      const state = JSON.parse(requests.bond.marketJson);
+      state.curves.find(
+        (curve) => curve.type === "discount",
+      ).knot_points[1][1] -= i * 0.01;
+      const handle = new native.Market(JSON.stringify(state));
+      try {
+        return handle.toJson();
+      } finally {
+        handle.free();
+      }
+    });
     for (const marketJson of markets.slice(0, 4))
       unwrap(await local.proxy.price({ ...requests.bond, marketJson }));
     unwrap(
@@ -213,5 +221,56 @@ it("exports identical host values and rejects non-bigint seeds through both boun
       exportValuation(value, native.validateValuationResultJson),
     ).toThrow();
     expect((await proxy.exportResult(value)).ok).toBe(false);
+  }
+});
+
+it("retains validated canonical markets for pricing and cashflows and frees equivalent duplicates", async () => {
+  const local = await startWorker();
+  try {
+    const canonical = unwrap(
+      await local.proxy.validateMarket(requests.bond.marketJson),
+    );
+    const request = { ...requests.bond, marketJson: canonical };
+    unwrap(await local.proxy.price(request));
+    unwrap(await local.proxy.cashflows(request));
+    expect(await local.proxy.resources()).toMatchObject({
+      constructed: 1,
+      freed: 0,
+    });
+    expect(unwrap(await local.proxy.validateMarket(canonical + " "))).toBe(
+      canonical,
+    );
+    expect(await local.proxy.resources()).toMatchObject({
+      constructed: 2,
+      freed: 1,
+    });
+    expect((await local.proxy.validateMarket("{")).ok).toBe(false);
+    unwrap(await local.proxy.price(request));
+    expect(await local.proxy.resources()).toMatchObject({
+      constructed: 2,
+      freed: 1,
+    });
+  } finally {
+    await local.close();
+  }
+});
+
+it("frees failed canonicalization handles without caching them", async () => {
+  const local = await startWorker({ failMarketSerialization: true });
+  try {
+    for (let i = 1; i <= 2; i++) {
+      expect(
+        await local.proxy.validateMarket(requests.bond.marketJson),
+      ).toMatchObject({
+        ok: false,
+        error: { name: "TypeError", message: "Market serialization failed" },
+      });
+      expect(await local.proxy.resources()).toMatchObject({
+        constructed: i,
+        freed: i,
+      });
+    }
+  } finally {
+    await local.close();
   }
 });

@@ -15,14 +15,10 @@ import {
 } from "@testing-library/react";
 import { ValuationDetails } from "../registry/components/valuation-details/valuation-details";
 import { CovenantReport } from "../registry/components/covenant-report/covenant-report";
-import {
-  adaptValuation,
-  exportValuation,
-  valuationCodec,
-  type ValuationResult,
-} from "../src/host";
+import { adaptValuation, exportValuation } from "../src/host";
 import { serializeHost } from "../src/codec.mjs";
-import { restore } from "./details/restore";
+import type { ValuationResult } from "finstack-quant-wasm";
+import { restore, valuationCodec } from "./details/restore";
 import fixture from "./details/cases.json";
 const native = createRequire(import.meta.url)(
   "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -196,7 +192,7 @@ it("shows absence distinctly and preserves actual native covenant reports withou
   cleanup();
   const absent = restore(fixture.cases[0]);
   delete absent.details;
-  absent.explanation = null;
+  delete absent.explanation;
   absent.covenants = null;
   render(<ValuationDetails result={absent} />);
   expect(screen.getByText("No valuation details returned")).toBeTruthy();
@@ -206,12 +202,12 @@ it("shows absence distinctly and preserves actual native covenant reports withou
 it("preserves optional canonical trace and covenant sections as raw transport", async () => {
   // Core explain.rs test_trace_serialization supplies this trace shape and values.
   // Pricing's facade has no ExplainOpts input: this validates transport, not a generated pricing trace.
-  const explanation = {
+  const explanation: NonNullable<ValuationResult["explanation"]> = {
     type: "calibration",
     entries: [
       {
         kind: "calibration_iteration",
-        iteration: 0,
+        iteration: 0n,
         residual: 0.005,
         knots_updated: ["2025-01-15"],
         converged: false,

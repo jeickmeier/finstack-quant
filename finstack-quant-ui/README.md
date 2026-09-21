@@ -236,8 +236,8 @@ reset or changing that URL creates a fresh worker and query session.
 strings remain unchanged, including wide integer tokens. Results are structured
 clone values; export through the worker's `exportResult` method for native
 canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns original native JSON
-text. `CashflowViewer` presents its native rows in a table, with exact JSON copy/download in a secondary disclosure;
-unsupported export preserves caller pricing/model state and shows the native error.
+text. `CashflowViewer` accepts that text plus optional loading/error props and needs no provider. It presents native rows in a table, with exact JSON copy/download in a secondary disclosure;
+unsupported export preserves caller pricing/model state and shows the native error. The workbench owns one cashflow query for both display and its print snapshot.
 `useModels`, `useMetrics`, and `useCalendars` return native option registries.
 `useInstrumentValidator` accepts canonical text and an optional abort signal;
 `SchemaForm` owns the 250ms debounce and prevents superseded responses from
@@ -417,6 +417,18 @@ same check locally; local-host success does not close the public-site gate.
 exports `/registry-gallery/` with the production Next build. The generated
 inventory and import harness follow the registry catalogue; `mise run ui-check`
 rejects stale copies. Fixtures preserve their source-file hashes.
+
+For interactive review, `mise run ui-docs-dev` installs the catalogue and starts
+the docs-site Next.js server. Open
+[http://localhost:3000/registry-gallery/](http://localhost:3000/registry-gallery/)
+once it is ready. If the catalogue is already installed and unchanged, reuse
+`mise run docs-site-dev` and the same gallery URL.
+
+To exercise a running development server, use
+`REGISTRY_GALLERY_URL=http://localhost:3000 mise run ui-e2e -- workbench-controls.spec.ts radio-alignment.spec.ts`.
+These checks cover opaque select/calendar popups, value changes, radio labels,
+keyboard selection and visible selected indicators. The docs stylesheet explicitly
+registers the gitignored installed component directories as Tailwind sources.
 
 Run `mise run ui-e2e` after the build. The suite verifies light/dark and
 compact/comfortable screenshots, serious/critical axe findings, nonvisual imports,

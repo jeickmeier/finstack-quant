@@ -1,7 +1,6 @@
 "use client";
 import { lazy, Suspense } from "react";
-import type { ValuationResult } from "@/lib/finstack/host";
-import { getDetailsView } from "@/lib/finstack/host";
+import type { ValuationResult } from "finstack-quant-wasm";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
 const MonteCarlo = lazy(() =>
@@ -37,7 +36,6 @@ export function ValuationDetails({
   includeExplanation?: boolean;
 }) {
   const details = result.details;
-  const view = details ? getDetailsView(details) : null;
   const unknown =
     details &&
     details.type !== "monte_carlo" &&
@@ -55,18 +53,18 @@ export function ValuationDetails({
         </p>
       )}
       <Suspense fallback={<p role="status">Loading result details…</p>}>
-        {view?.kind === "monte_carlo" ? (
+        {details?.type === "monte_carlo" ? (
           <MonteCarlo
-            data={view.value}
+            data={details.data}
             currency={result.value.currency}
             density={density}
           />
-        ) : view ? (
+        ) : details ? (
           <JsonViewer
-            text={view.text}
+            text={serializeHost(details.data)}
             label={
-              Object.hasOwn(rawLabels, view.type)
-                ? rawLabels[view.type]
+              Object.hasOwn(rawLabels, details.type)
+                ? rawLabels[details.type]
                 : "Unrecognized details JSON"
             }
             density={density}

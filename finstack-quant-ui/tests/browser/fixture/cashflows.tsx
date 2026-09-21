@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
 import { FinstackQueryProvider } from "./hooks/use-finstack/use-finstack";
+import { useCashflows } from "./hooks/use-cashflows/use-cashflows";
 import { usePriceInstrument } from "./hooks/use-price-instrument/use-price-instrument";
 import { CashflowViewer } from "./components/finstack/components/cashflow-viewer/cashflow-viewer";
 import fixture from "./fixture.json";
@@ -9,6 +10,7 @@ function App() {
   const [density, setDensity] = useState<"compact" | "comfortable">("compact");
   const { request } = fixture.cases[selected];
   const price = usePriceInstrument(request);
+  const cashflows = useCashflows(request);
   return (
     <main className="mx-auto max-w-6xl space-y-3 p-4">
       <h1>Native cashflow export</h1>
@@ -40,12 +42,9 @@ function App() {
       )}
       {price.error && <p role="alert">{price.error.message}</p>}
       <CashflowViewer
-        request={{
-          instrumentJson: request.instrumentJson,
-          marketJson: request.marketJson,
-          asOf: request.asOf,
-          model: request.model,
-        }}
+        text={cashflows.data}
+        loading={cashflows.isFetching || cashflows.workerStatus === "starting"}
+        error={cashflows.error?.message}
         density={density}
       />
     </main>

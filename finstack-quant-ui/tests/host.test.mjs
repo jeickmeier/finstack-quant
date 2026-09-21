@@ -5,12 +5,8 @@ import init, {
   models,
   valuations,
 } from "../../finstack-quant-wasm/index.js";
-import {
-  adaptValuation,
-  exportValuation,
-  valuationCodec,
-} from "../src/format/transport";
-import { getDetailsView } from "../src/host";
+import { adaptValuation, exportValuation } from "../src/host";
+import { valuationCodec } from "./details/restore";
 
 await init({
   module_or_path: await readFile(
@@ -127,11 +123,6 @@ it("covers every canonical detail variant through actual facade pricing", async 
         valuations.validateValuationResultJson,
       ),
     ).toBe(text);
-    const view = getDetailsView(result.details);
-    expect(view.value).toBe(result.details.data);
-    expect(view.kind).toBe(
-      result.details.type === "monte_carlo" ? "monte_carlo" : "raw",
-    );
   }
 });
 it("preserves the actual derived seed above 2^53 through clone and Rust export", () => {

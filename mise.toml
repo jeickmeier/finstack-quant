@@ -1041,6 +1041,14 @@ description = "Install the built catalogue into the docs consumer using the pinn
 depends = ["ui-build"]
 run = ["node finstack-quant-ui/scripts/gen-gallery.mjs", "node finstack-quant-ui/scripts/install-local.mjs docs-site"]
 
+[tasks.ui-docs-dev]
+description = "Install the registry into docs-site and serve /registry-gallery/ for browser review"
+depends = ["ui-docs-install"]
+run = """
+echo "Registry gallery: http://localhost:3000/registry-gallery/"
+npm --prefix docs-site run dev
+"""
+
 [tasks.ui-docs-check]
 description = "Type-check the installed registry and existing docs host"
 depends = ["ui-docs-install"]

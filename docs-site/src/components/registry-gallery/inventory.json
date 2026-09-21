@@ -133,7 +133,7 @@
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
-      "docs": "Native cashflow table through the shared worker, with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download in a secondary disclosure. Requires FinstackQueryProvider. Caller pricing and model state remain intact."
+      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required."
     },
     {
       "name": "monte-carlo-diagnostics",
@@ -143,7 +143,7 @@
     {
       "name": "explanation-trace",
       "type": "registry:component",
-      "docs": "Optional original valuation explanation rendered losslessly; its published host shape is unknown, so no steps or severity are inferred."
+      "docs": "Optional original valuation explanation rendered losslessly; no steps or severity are inferred."
     },
     {
       "name": "covenant-report",
@@ -668,7 +668,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/details/cases.json",
-      "sha256": "750e6aee52d58291fcc448b0e3e27cd807e5d4b2753ad533d0970d1ba674704a"
+      "sha256": "c4cfdce872dbc32568266bbea602190f7a45e7c3dee900f20dfb712761959280"
     }
   ]
 }

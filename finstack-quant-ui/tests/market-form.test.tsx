@@ -208,7 +208,7 @@ it("imports an actual native calibration envelope and canonical fixture, leaving
   fireEvent.click(screen.getByText("Import JSON"));
   expect(await submit(onSubmit)).toBe(canonical(bond.request.marketJson));
 });
-it("retains actual native domain errors and frees every successful validation handle", async () => {
+it("retains actual native domain errors and one canonical validation handle", async () => {
   const local = await startWorker();
   try {
     for (let i = 0; i < 3; i++)
@@ -220,7 +220,7 @@ it("retains actual native domain errors and frees every successful validation ha
         resources(): Promise<{ constructed: number; freed: number }>;
       }
     ).resources();
-    expect(resources).toMatchObject({ constructed: 3, freed: 3 });
+    expect(resources).toMatchObject({ constructed: 3, freed: 2 });
     const invalid = JSON.parse(bond.request.marketJson);
     invalid.curves[0].knot_points[1][1] = -1;
     let direct;

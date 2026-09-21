@@ -73,6 +73,22 @@ export async function visualHarness(repo, item) {
     [`examples/${item.name}.tsx`]: await example(`${item.name}.tsx`),
     "examples/props.ts": await example("props.ts"),
   };
+  if (["valuation-details", "monte-carlo-diagnostics"].includes(item.name)) {
+    // The example restores captured wire fixtures; the display item needs no result codec/schema.
+    extra[`examples/${item.name}.tsx`] = extra[
+      `examples/${item.name}.tsx`
+    ].replace(
+      "@/lib/finstack/generated/schemas/valuation_result.json",
+      "../valuation-result.schema.json",
+    );
+    extra["valuation-result.schema.json"] = await readFile(
+      path.join(
+        repo,
+        "finstack-quant-ui/src/generated/schemas/valuation_result.json",
+      ),
+      "utf8",
+    );
+  }
   if (!wrappers.has(item.name))
     return {
       source: `"use client";import {Example} from "./examples/${item.name}";export function InstalledItem(){return <Example/>;}`,

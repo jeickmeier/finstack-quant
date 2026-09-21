@@ -192,8 +192,7 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
         ]
       }
     },
@@ -253,22 +252,14 @@
           "path": "src/format/columns.ts",
           "type": "registry:file",
           "target": "lib/finstack/format/columns.ts"
-        },
-        {
-          "path": "src/format/transport.ts",
-          "type": "registry:file",
-          "target": "lib/finstack/format/transport.ts"
         }
       ],
-      "registryDependencies": [
-        "@finstack/finstack-codec",
-        "@finstack/finstack-host",
-        "@finstack/contract-valuation-result"
-      ],
+      "registryDependencies": ["@finstack/contract-valuation-result"],
       "dependencies": [
         "big.js@7.0.1",
         "@tanstack/react-table@9.2.4",
-        "@types/big.js@6.2.2"
+        "@types/big.js@6.2.2",
+        "finstack-quant-wasm@0.8.0"
       ],
       "categories": [],
       "meta": {
@@ -3955,19 +3946,10 @@
           "target": "lib/finstack/host.ts"
         }
       ],
-      "registryDependencies": [
-        "@finstack/finstack-codec",
-        "@finstack/contract-valuation-result"
-      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
       "dependencies": ["finstack-quant-wasm@0.8.0"],
       "categories": [],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.8.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
-        ]
-      }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     }
   ]
 }

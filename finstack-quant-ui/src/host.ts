@@ -1,17 +1,8 @@
-import type { ValuationDetails, ValuationResult } from "finstack-quant-wasm";
+import type { ValuationResult } from "finstack-quant-wasm";
 import { createWireCodec, serializeHost } from "./codec.mjs";
-import schema from "./generated/schemas/valuation_result.json";
 import hostSchema from "finstack-quant-wasm/contracts/valuation-result.schema.json";
 
-export type {
-  ValuationDetails,
-  ValuationResult,
-  MonteCarloValuationDetails,
-} from "finstack-quant-wasm";
-/** Cached adapter for the canonical result schema and its declared 64-bit host fields. */
-export const valuationCodec = createWireCodec(schema);
-
-const hostCodec = createWireCodec(hostSchema);
+let hostCodec: ReturnType<typeof createWireCodec> | undefined;
 
 /**
  * Validate native host fields against the Rust-derived WASM contract.
@@ -20,7 +11,9 @@ const hostCodec = createWireCodec(hostSchema);
  * @throws TypeError or ZodError for unsafe numbers or invalid published fields.
  */
 export function adaptValuation(result: ValuationResult): ValuationResult {
-  return hostCodec.fromHost(result) as ValuationResult;
+  return (hostCodec ??= createWireCodec(hostSchema)).fromHost(
+    result,
+  ) as ValuationResult;
 }
 
 /**
@@ -35,21 +28,4 @@ export function exportValuation(
   canonicalize: (text: string) => string,
 ): string {
   return canonicalize(serializeHost(adaptValuation(result)));
-}
-
-/**
- * Choose presentation from the native detail discriminator.
- * @param details - Unmodified details from the facade result.
- * @returns Monte Carlo diagnostics or a lossless raw preview for other detail data.
- * @throws TypeError if raw data contains an unsupported non-JSON host object.
- */
-export function getDetailsView(details: ValuationDetails) {
-  return details.type === "monte_carlo"
-    ? { kind: "monte_carlo" as const, value: details.data }
-    : {
-        kind: "raw" as const,
-        type: details.type,
-        value: details.data,
-        text: serializeHost(details.data),
-      };
 }

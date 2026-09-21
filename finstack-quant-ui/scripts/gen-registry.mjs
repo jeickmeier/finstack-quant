@@ -115,9 +115,14 @@ const items = [
   item("primitive-contracts", ["generated/primitive-contracts.json"]),
   item(
     "finstack-format",
-    ["format/format.ts", "format/columns.ts", "format/transport.ts"],
-    ["finstack-codec", "finstack-host", "contract-valuation-result"],
-    ["big.js@7.0.1", "@tanstack/react-table@9.2.4", "@types/big.js@6.2.2"],
+    ["format/format.ts", "format/columns.ts"],
+    ["contract-valuation-result"],
+    [
+      "big.js@7.0.1",
+      "@tanstack/react-table@9.2.4",
+      "@types/big.js@6.2.2",
+      "finstack-quant-wasm@0.8.0",
+    ],
   ),
   item(
     "finstack-codec",
@@ -144,7 +149,7 @@ const items = [
   item(
     "finstack-host",
     ["host.ts"],
-    ["finstack-codec", "contract-valuation-result"],
+    ["finstack-codec"],
     ["finstack-quant-wasm@0.8.0"],
   ),
 ];

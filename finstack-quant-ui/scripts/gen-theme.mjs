@@ -55,12 +55,6 @@ ${imports}
 .finstack-term-sheet .finstack-field-frame + .finstack-field-frame, .finstack-term-sheet .finstack-field-frame + .finstack-optional-term, .finstack-term-sheet .finstack-optional-term + .finstack-field-frame { border-top:var(--table-rule-width) solid var(--hairline); }
 .finstack-term-sheet .finstack-field-label [data-slot=field-label] { color:var(--muted-foreground); font-weight:400; font-size:var(--text-sm); letter-spacing:0.01em; }
 .finstack-term-sheet .finstack-field-frame[data-dirty] .finstack-field-label::after { content:''; width:6px; height:6px; border-radius:50%; background:var(--warning); flex:0 0 6px; }
-.finstack-term-sheet .finstack-field-control > [data-slot=input], .finstack-term-sheet .finstack-field-control [data-slot=input], .finstack-term-sheet .finstack-field-control [data-slot=select-trigger] { height:calc(var(--control-height) - 4px); min-height:0; border-color:transparent; background:transparent; box-shadow:none; padding-inline:var(--spacing); margin-inline-start:calc(-1 * var(--spacing)); font-size:var(--text-base); transition:border-color 120ms, background-color 120ms; }
-.finstack-term-sheet .finstack-field-control input[data-slot=input] { field-sizing:content; width:auto; min-width:8ch; max-width:100%; font-variant-numeric:var(--font-numeric-variant); }
-.finstack-term-sheet .finstack-field-control [data-slot=input]:hover, .finstack-term-sheet .finstack-field-control [data-slot=select-trigger]:hover { border-color:var(--border); background:var(--accent); }
-.finstack-term-sheet .finstack-field-control [data-slot=input]:focus-visible, .finstack-term-sheet .finstack-field-control [data-slot=select-trigger]:focus-visible { border-color:var(--ring); background:var(--background); }
-.finstack-term-sheet .finstack-field-control [data-slot=input][aria-invalid=true], .finstack-term-sheet .finstack-field-control [data-slot=select-trigger][aria-invalid=true] { border-color:var(--destructive); }
-.finstack-term-sheet [data-slot=radio-group] { display:flex; flex-wrap:wrap; gap:var(--spacing) calc(var(--spacing) * 4); }
 .finstack-term-sheet .finstack-optional-term { min-height:var(--row-height); border-bottom:0; }
 .finstack-term-sheet .finstack-optional-term > span { font-size:var(--text-sm); min-width:calc(var(--term-width) - var(--spacing) * 2); }
 .finstack-field-label [data-slot=button], .finstack-field-label [data-slot=popover-trigger] { width:14px; height:14px; min-width:0; padding:0; border:var(--border-width) solid var(--border); border-radius:50%; color:var(--muted-foreground); font-size:9px; font-weight:600; line-height:1; opacity:0.7; }
@@ -105,9 +99,7 @@ ${imports}
 .finstack-workbench { display:flex; flex-direction:column; min-width:0; background:var(--background); }
 .finstack-workbench__bar { display:flex; flex-wrap:wrap; align-items:center; gap:calc(var(--spacing) * 2); padding:calc(var(--spacing) * 2) calc(var(--spacing) * 3); border-bottom:var(--border-width) solid var(--border); }
 .finstack-workbench__id { font-family:var(--font-mono); font-size:var(--text-sm); color:var(--muted-foreground); white-space:nowrap; }
-.finstack-workbench__bar [data-slot=input], .finstack-workbench__bar [data-slot=select-trigger] { height:var(--control-height); min-height:0; }
-.finstack-workbench__bar .finstack-pricing-context__date .finstack-field-control { width:auto; }
-.finstack-workbench__bar .finstack-pricing-context__date [data-slot=input] { width:calc(10ch + var(--spacing) * 6); font-variant-numeric:var(--font-numeric-variant); }
+.finstack-workbench__bar .finstack-pricing-context__date .finstack-field-control { width:180px; }
 .finstack-kbd { display:inline-flex; align-items:center; justify-content:center; min-width:14px; height:14px; padding:0 3px; margin-right:calc(var(--spacing) * 0.5); border:var(--border-width) solid var(--border); border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:10px; line-height:1; color:var(--muted-foreground); background:var(--background); }
 [data-active] > .finstack-kbd, [aria-selected=true] > .finstack-kbd { color:var(--primary); border-color:var(--primary); }
 .finstack-workbench__stale { display:inline-flex; align-items:center; gap:calc(var(--spacing) * 1.5); font-size:var(--text-xs); color:var(--warning); }

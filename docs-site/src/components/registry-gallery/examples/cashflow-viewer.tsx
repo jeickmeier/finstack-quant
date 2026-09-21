@@ -6,5 +6,5 @@ const cashflows = data.cashflows.cases.find(
   (entry) => entry.type === "xccy_swap",
 )!;
 export function Example({ density = "compact" }: ExampleProps) {
-  return <CashflowViewer request={cashflows.request} density={density} />;
+  return <CashflowViewer text={cashflows.cashflows} density={density} />;
 }

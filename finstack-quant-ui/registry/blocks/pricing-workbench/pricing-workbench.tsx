@@ -144,15 +144,15 @@ export function PricingWorkbench({
   } | null>(null);
   const [printSnapshot, setPrintSnapshot] = useState<typeof completed>(null);
   const shown = printSnapshot ?? completed;
-  const printRequest = printSnapshot?.request ?? initial;
-  const printCashflows = useCashflows(
+  const cashflowRequest = shown?.request ?? initial;
+  const cashflows = useCashflows(
     {
-      instrumentJson: printRequest.instrumentJson,
-      marketJson: printRequest.marketJson,
-      asOf: printRequest.asOf,
-      model: printRequest.model ?? "default",
+      instrumentJson: cashflowRequest.instrumentJson,
+      marketJson: cashflowRequest.marketJson,
+      asOf: cashflowRequest.asOf,
+      model: cashflowRequest.model ?? "default",
     },
-    printSnapshot !== null,
+    shown !== null,
   );
   const printMarket = useMemo(
     () =>
@@ -169,8 +169,7 @@ export function PricingWorkbench({
     return () => window.removeEventListener("afterprint", finish);
   }, []);
   useEffect(() => {
-    if (!printSnapshot || printCashflows.isPending || printCashflows.isFetching)
-      return;
+    if (!printSnapshot || cashflows.isPending || cashflows.isFetching) return;
     let active = true;
     void document.fonts.ready.then(() =>
       requestAnimationFrame(() =>
@@ -182,7 +181,7 @@ export function PricingWorkbench({
     return () => {
       active = false;
     };
-  }, [printSnapshot, printCashflows.isPending, printCashflows.isFetching]);
+  }, [printSnapshot, cashflows.isPending, cashflows.isFetching]);
   const worker = useFinstack();
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
@@ -252,11 +251,8 @@ export function PricingWorkbench({
         : worker.status !== "ready" || (!candidate && !completed)
           ? "idle"
           : "pending";
-  const meta = shown?.result.meta as Record<string, unknown> | undefined;
-  const rounding =
-    meta && typeof meta.rounding === "object" && meta.rounding
-      ? (meta.rounding as Record<string, unknown>).mode
-      : undefined;
+  const meta = shown?.result.meta;
+  const rounding = meta?.rounding.mode;
   const pricingContext = (
     <PricingParamsForm
       value={params}
@@ -311,7 +307,7 @@ export function PricingWorkbench({
           data-stale={stale && !printSnapshot ? "" : undefined}
           data-printing={
             printSnapshot
-              ? printCashflows.isPending || printCashflows.isFetching
+              ? cashflows.isPending || cashflows.isFetching
                 ? "preparing"
                 : "ready"
               : undefined
@@ -629,12 +625,12 @@ export function PricingWorkbench({
                 {shown ? (
                   <CashflowViewer
                     density={currentDensity}
-                    request={{
-                      instrumentJson: shown.request.instrumentJson,
-                      marketJson: shown.request.marketJson,
-                      asOf: shown.request.asOf,
-                      model: shown.request.model ?? "default",
-                    }}
+                    text={cashflows.data}
+                    loading={
+                      cashflows.isFetching ||
+                      cashflows.workerStatus === "starting"
+                    }
+                    error={cashflows.error?.message}
                   />
                 ) : (
                   <p role="status" className="text-muted-foreground">

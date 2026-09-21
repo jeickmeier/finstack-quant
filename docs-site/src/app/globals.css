@@ -5,6 +5,9 @@
 @import '../styles/finstack/theme.css';
 
 @source '../../node_modules/fumadocs-ui/dist/**/*.js';
+/* Registry and shadcn components are installed into gitignored directories. */
+@source '../components/ui';
+@source '../components/finstack';
 
 
 

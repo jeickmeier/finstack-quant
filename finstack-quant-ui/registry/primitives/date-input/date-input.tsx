@@ -1,7 +1,11 @@
 "use client";
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import {
+  InputGroup,
+  InputGroupInput,
+  InputGroupAddon,
+  InputGroupButton,
+} from "@/components/ui/input-group";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -47,46 +51,48 @@ export function DateInput({
   return (
     <FieldFrame {...field}>
       {(control) => (
-        <div className="flex items-center gap-2">
-          <Input
-            {...control}
-            value={value}
-            onChange={(event) => onValueChange(event.target.value)}
-            placeholder="YYYY-MM-DD"
-            min={min}
-            max={max}
-            disabled={disabled}
-          />
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger
+        <Popover open={open} onOpenChange={setOpen}>
+          <InputGroup>
+            <InputGroupInput
+              {...control}
+              value={value}
+              onChange={(event) => onValueChange(event.target.value)}
+              placeholder="YYYY-MM-DD"
+              min={min}
+              max={max}
               disabled={disabled}
-              aria-label={`${field.label} calendar`}
-              render={<Button variant="outline" size="icon" />}
-            >
-              <CalendarIcon />
-            </PopoverTrigger>
-            <PopoverContent>
-              <PopoverTitle>{field.label}</PopoverTitle>
-              <Calendar
-                mode="single"
-                timeZone="UTC"
-                selected={selected}
-                defaultMonth={selected}
-                onSelect={(date) => {
-                  if (date) onValueChange(iso(date));
-                  setOpen(false);
-                }}
-                disabled={range}
-                modifiers={{
-                  businessDay:
-                    businessDays?.map((text) => parse(text)!).filter(Boolean) ??
-                    [],
-                }}
-                modifiersClassNames={{ businessDay: "underline" }}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+            />
+            <InputGroupAddon align="inline-end">
+              <PopoverTrigger
+                disabled={disabled}
+                aria-label={`${field.label} calendar`}
+                render={<InputGroupButton size="icon-xs" />}
+              >
+                <CalendarIcon />
+              </PopoverTrigger>
+            </InputGroupAddon>
+          </InputGroup>
+          <PopoverContent align="end" className="w-auto p-0">
+            <PopoverTitle className="sr-only">{field.label}</PopoverTitle>
+            <Calendar
+              mode="single"
+              timeZone="UTC"
+              selected={selected}
+              defaultMonth={selected}
+              onSelect={(date) => {
+                if (date) onValueChange(iso(date));
+                setOpen(false);
+              }}
+              disabled={range}
+              modifiers={{
+                businessDay:
+                  businessDays?.map((text) => parse(text)!).filter(Boolean) ??
+                  [],
+              }}
+              modifiersClassNames={{ businessDay: "underline" }}
+            />
+          </PopoverContent>
+        </Popover>
       )}
     </FieldFrame>
   );

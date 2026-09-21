@@ -1,5 +1,5 @@
 "use client";
-import type { MonteCarloValuationDetails } from "@/lib/finstack/host";
+import type { MonteCarloValuationDetails } from "finstack-quant-wasm";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 /** Published native diagnostics; counts, flags, seed and uncertainty remain unmodified. */

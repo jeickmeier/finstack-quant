@@ -1,4 +1,7 @@
-import { valuationCodec, type ValuationResult } from "../../src/host";
+import type { ValuationResult } from "finstack-quant-wasm";
+import { createWireCodec } from "../../src/codec.mjs";
+import schema from "../../src/generated/schemas/valuation_result.json";
+export const valuationCodec = createWireCodec(schema);
 /** Restore only transport kinds recorded from the actual facade, never guessed domain fields. */
 export function restore(entry: {
   resultJson: string;

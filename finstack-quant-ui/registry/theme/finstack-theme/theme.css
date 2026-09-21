@@ -322,55 +322,6 @@
   background: var(--warning);
   flex: 0 0 6px;
 }
-.finstack-term-sheet .finstack-field-control > [data-slot="input"],
-.finstack-term-sheet .finstack-field-control [data-slot="input"],
-.finstack-term-sheet .finstack-field-control [data-slot="select-trigger"] {
-  height: calc(var(--control-height) - 4px);
-  min-height: 0;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  padding-inline: var(--spacing);
-  margin-inline-start: calc(-1 * var(--spacing));
-  font-size: var(--text-base);
-  transition:
-    border-color 120ms,
-    background-color 120ms;
-}
-.finstack-term-sheet .finstack-field-control input[data-slot="input"] {
-  field-sizing: content;
-  width: auto;
-  min-width: 8ch;
-  max-width: 100%;
-  font-variant-numeric: var(--font-numeric-variant);
-}
-.finstack-term-sheet .finstack-field-control [data-slot="input"]:hover,
-.finstack-term-sheet
-  .finstack-field-control
-  [data-slot="select-trigger"]:hover {
-  border-color: var(--border);
-  background: var(--accent);
-}
-.finstack-term-sheet .finstack-field-control [data-slot="input"]:focus-visible,
-.finstack-term-sheet
-  .finstack-field-control
-  [data-slot="select-trigger"]:focus-visible {
-  border-color: var(--ring);
-  background: var(--background);
-}
-.finstack-term-sheet
-  .finstack-field-control
-  [data-slot="input"][aria-invalid="true"],
-.finstack-term-sheet
-  .finstack-field-control
-  [data-slot="select-trigger"][aria-invalid="true"] {
-  border-color: var(--destructive);
-}
-.finstack-term-sheet [data-slot="radio-group"] {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing) calc(var(--spacing) * 4);
-}
 .finstack-term-sheet .finstack-optional-term {
   min-height: var(--row-height);
   border-bottom: 0;
@@ -571,19 +522,10 @@
   color: var(--muted-foreground);
   white-space: nowrap;
 }
-.finstack-workbench__bar [data-slot="input"],
-.finstack-workbench__bar [data-slot="select-trigger"] {
-  height: var(--control-height);
-  min-height: 0;
-}
 .finstack-workbench__bar
   .finstack-pricing-context__date
   .finstack-field-control {
-  width: auto;
-}
-.finstack-workbench__bar .finstack-pricing-context__date [data-slot="input"] {
-  width: calc(10ch + var(--spacing) * 6);
-  font-variant-numeric: var(--font-numeric-variant);
+  width: 180px;
 }
 .finstack-kbd {
   display: inline-flex;

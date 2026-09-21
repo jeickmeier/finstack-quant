@@ -69,7 +69,7 @@ export function EnumField({
             disabled={disabled}
             items={options}
           >
-            <SelectTrigger {...control}>
+            <SelectTrigger {...control} className="w-full">
               <SelectValue placeholder="Select…" />
             </SelectTrigger>
             <SelectContent>

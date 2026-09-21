@@ -5460,7 +5460,8 @@ export interface MoneyValue {
 /**
  * Convergence and reproducibility diagnostics for a Monte Carlo valuation.
  */
-export type MonteCarloValuationDetails = import('./types/valuation-result').MonteCarloValuationDetails;
+export type MonteCarloValuationDetails =
+  import('./types/valuation-result').MonteCarloValuationDetails;
 
 /**
  * Model-specific native detail, generated from Rust with exact host integer representations.
@@ -5509,15 +5510,15 @@ export interface ValuationResult {
   /**
    * Policy stamps: numeric mode, rounding context, FX policy, timing.
    */
-  meta: Record<string, unknown>;
+  meta: import('./types/valuation-result').ValuationResult['meta'];
   /**
    * Covenant reports for instruments that carry covenants; `null` otherwise.
    */
-  covenants: Record<string, unknown> | null;
+  covenants: NonNullable<import('./types/valuation-result').ValuationResult['covenants']> | null;
   /**
    * Computation trace, present only when explain mode is enabled.
    */
-  explanation?: unknown;
+  explanation?: NonNullable<import('./types/valuation-result').ValuationResult['explanation']>;
 }
 
 /**
@@ -7628,9 +7629,7 @@ export interface VolatilityNamespace {
  * Volatility quoting convention (serde form of the Rust `VolatilityConvention` enum).
  */
 export type VolatilityConvention =
-  | 'normal'
-  | 'lognormal'
-  | { shifted_lognormal: { shift: number } };
+  'normal' | 'lognormal' | { shifted_lognormal: { shift: number } };
 
 /**
  * Gatheral SVI total-variance parameters `w(k) = a + b (rho (k - m) + sqrt((k - m)^2 + sigma^2))`.

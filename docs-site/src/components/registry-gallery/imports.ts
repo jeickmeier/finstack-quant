@@ -87,7 +87,6 @@ export const importHarnesses = {
     Promise.all([
       import("@/lib/finstack/format/format"),
       import("@/lib/finstack/format/columns"),
-      import("@/lib/finstack/format/transport"),
     ]).then((modules) => ({
       name: "finstack-format",
       modules: modules.length,

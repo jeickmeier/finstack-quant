@@ -377,3 +377,26 @@ it.each(["", "loaded"])(
     expect((note as HTMLInputElement).value).toBe("edited");
   },
 );
+
+it("normalizes each immutable edit once across errors, native validation and submission", async () => {
+  const codec = createWireCodec(bond.schema);
+  const normalize = vi.spyOn(codec.validator, "parse");
+  const stringify = vi.spyOn(codec, "stringify");
+  const module = { ...bond, codec };
+  const nativeValidate = vi.fn(validate);
+  const submit = vi.fn();
+  render(
+    <SchemaForm module={module} validate={nativeValidate} onSubmit={submit} />,
+  );
+  await waitFor(() => expect(nativeValidate).toHaveBeenCalledTimes(1));
+  expect(normalize).toHaveBeenCalledTimes(1);
+  const input = screen.getByRole("textbox", { name: "Settlement days" });
+  fireEvent.change(input, { target: { value: "2" } });
+  await waitFor(() => expect(nativeValidate).toHaveBeenCalledTimes(2));
+  expect(normalize).toHaveBeenCalledTimes(2);
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+  expect(normalize).toHaveBeenCalledTimes(2);
+  expect(nativeValidate).toHaveBeenCalledTimes(2);
+  expect(stringify).not.toHaveBeenCalled();
+});

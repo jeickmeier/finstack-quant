@@ -1,5 +1,7 @@
 import { defineConfig } from "playwright/test";
-const baseURL = `http://127.0.0.1:${process.env.REGISTRY_GALLERY_PORT ?? 4178}`;
+const baseURL =
+  process.env.REGISTRY_GALLERY_URL ??
+  `http://127.0.0.1:${process.env.REGISTRY_GALLERY_PORT ?? 4178}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   testMatch: "**/*.spec.ts",
@@ -28,10 +30,12 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   reporter: [["line"], ["json", { outputFile: "test-results/gallery.json" }]],
-  webServer: {
-    command: "node tests/e2e/serve.mjs",
-    url: `${baseURL}/registry-gallery`,
-    timeout: 30000,
-    reuseExistingServer: false,
-  },
+  webServer: process.env.REGISTRY_GALLERY_URL
+    ? undefined
+    : {
+        command: "node tests/e2e/serve.mjs",
+        url: `${baseURL}/registry-gallery`,
+        timeout: 30000,
+        reuseExistingServer: false,
+      },
 });

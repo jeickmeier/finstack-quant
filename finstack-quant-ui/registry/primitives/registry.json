@@ -388,10 +388,9 @@
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
         "@finstack/field-frame",
-        "button",
         "calendar",
-        "input",
-        "popover"
+        "popover",
+        "input-group"
       ],
       "categories": ["Primitive Components"],
       "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }

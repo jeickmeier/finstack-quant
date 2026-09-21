@@ -1,7 +1,7 @@
 "use client";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
-/** Optional original trace; the valuation host declaration leaves its shape unknown. */
+/** Optional original trace rendered losslessly without inferring steps or severity. */
 export function ExplanationTrace({
   value,
   density,

@@ -310,7 +310,7 @@
     {
       "name": "cashflow-viewer",
       "type": "registry:component",
-      "docs": "Native cashflow table through the shared worker, with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download in a secondary disclosure. Requires FinstackQueryProvider. Caller pricing and model state remain intact.",
+      "docs": "Supplied native cashflow JSON table with row-currency amounts and reporting-currency PV. Lossless numeric tokens; Rust supplies totals and reconciliation. Original JSON remains available for exact copy/download. Accepts text, loading and error props; no worker or query provider required.",
       "files": [
         {
           "path": "cashflow-viewer/cashflow-viewer.tsx",
@@ -325,11 +325,11 @@
       ],
       "registryDependencies": [
         "@finstack/json-viewer",
-        "@finstack/use-cashflows",
         "@finstack/finstack-format",
         "table",
         "badge",
-        "@finstack/contract-instrument-cashflow"
+        "@finstack/contract-instrument-cashflow",
+        "@finstack/finstack-codec"
       ],
       "dependencies": ["react@19.2.8", "lossless-json@4.3.1"],
       "categories": ["Individual Components"],
@@ -337,7 +337,6 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -356,23 +355,16 @@
       ],
       "registryDependencies": [
         "@finstack/json-viewer",
-        "@finstack/finstack-codec",
-        "@finstack/finstack-host"
+        "@finstack/finstack-codec"
       ],
-      "dependencies": ["react@19.2.8"],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
       "categories": ["Individual Components"],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.8.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
-        ]
-      }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
       "name": "explanation-trace",
       "type": "registry:component",
-      "docs": "Optional original valuation explanation rendered losslessly; its published host shape is unknown, so no steps or severity are inferred.",
+      "docs": "Optional original valuation explanation rendered losslessly; no steps or severity are inferred.",
       "files": [
         {
           "path": "explanation-trace/explanation-trace.tsx",
@@ -433,12 +425,11 @@
       "registryDependencies": [
         "@finstack/json-viewer",
         "@finstack/finstack-codec",
-        "@finstack/finstack-host",
         "@finstack/monte-carlo-diagnostics",
         "@finstack/explanation-trace",
         "@finstack/covenant-report"
       ],
-      "dependencies": ["react@19.2.8"],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",

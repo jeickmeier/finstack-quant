@@ -11,10 +11,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/finstack/format/format";
-import {
-  useCashflows,
-  type CashflowRequest,
-} from "@/hooks/use-cashflows/use-cashflows";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
 import { readCashflows } from "./cashflow-data";
 
@@ -37,27 +33,31 @@ const extraDiagnostics = [
 ] as const;
 /** Native cashflow schedule with exact numeric tokens and an unchanged JSON export. */
 export function CashflowViewer({
-  request,
+  text,
+  loading = false,
+  error: suppliedError,
   density = "compact",
 }: {
-  request: CashflowRequest;
+  /** Unmodified native cashflow JSON; no worker or query provider is required. */
+  text?: string | null;
+  loading?: boolean;
+  /** Native query error supplied by the owner of the request. */
+  error?: string | null;
   density?: "compact" | "comfortable";
 }) {
-  const query = useCashflows(request);
   const presentation = useMemo(() => {
-    if (!query.data) return {};
+    if (!text) return {};
     try {
-      return { schedule: readCashflows(query.data) };
+      return { schedule: readCashflows(text) };
     } catch (error) {
       return {
         error: `Cashflow table unavailable: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
-  }, [query.data]);
+  }, [text]);
   const schedule = presentation.schedule;
-  const loading = query.isFetching || query.workerStatus === "starting";
-  const error = query.error
-    ? `Cashflows unavailable: ${query.error.message}`
+  const error = suppliedError
+    ? `Cashflows unavailable: ${suppliedError}`
     : presentation.error;
   const columns = diagnostics.filter(([key]) =>
     schedule?.flows.some((row) => row[key] !== undefined),
@@ -285,7 +285,7 @@ export function CashflowViewer({
           <JsonViewer
             label="Cashflow JSON"
             downloadName="cashflows.json"
-            text={query.data}
+            text={text}
             density={density}
           />
         </div>

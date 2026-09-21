@@ -30,7 +30,7 @@ export function createService(native: {
   >;
 }): WorkerApi {
   let ready: Promise<unknown> | undefined;
-  const markets = new Map<string, Market>();
+  const markets = new Map<string, { json: string; handle: Market }>();
   const initialize = (url?: string) =>
     (ready ??= Promise.resolve().then(() => native.initialize(url)));
   async function result<T>(
@@ -44,16 +44,28 @@ export function createService(native: {
     }
   }
   function market(json: string) {
-    let handle = markets.get(json);
-    if (handle) markets.delete(json);
-    else handle = new native.valuations.Market(json);
-    markets.set(json, handle);
+    let entry = markets.get(json);
+    if (!entry) {
+      const handle = new native.valuations.Market(json);
+      let canonical: string;
+      try {
+        canonical = handle.toJson();
+      } catch (error) {
+        handle.free();
+        throw error;
+      }
+      entry = markets.get(canonical);
+      if (entry) handle.free();
+      else entry = { json: canonical, handle };
+    }
+    markets.delete(entry.json);
+    markets.set(entry.json, entry);
     if (markets.size > 4) {
       const oldest = markets.entries().next().value!;
       markets.delete(oldest[0]);
-      oldest[1].free();
+      oldest[1].handle.free();
     }
-    return handle;
+    return entry;
   }
   const instruments = native.valuations.instruments;
   return {
@@ -68,7 +80,7 @@ export function createService(native: {
       return result(() =>
         instruments.priceInstrumentWithMarket(
           request.instrumentJson,
-          market(request.marketJson),
+          market(request.marketJson).handle,
           request.asOf,
           // pricing.rs price_instrument uses exactly this default for an absent model.
           request.model ?? "default",
@@ -82,14 +94,7 @@ export function createService(native: {
       return result(() => instruments.validateInstrumentJson(instrumentJson));
     },
     validateMarket(json) {
-      return result(() => {
-        const handle = new native.valuations.Market(json);
-        try {
-          return handle.toJson();
-        } finally {
-          handle.free();
-        }
-      });
+      return result(() => market(json).json);
     },
     validateCalibration(json) {
       return result(() => native.calibration.validateCalibrationJson(json));
@@ -175,7 +180,7 @@ export function createService(native: {
       return result(() =>
         instruments.instrumentCashflowsWithMarketJson(
           request.instrumentJson,
-          market(request.marketJson),
+          market(request.marketJson).handle,
           request.asOf,
           request.model,
         ),

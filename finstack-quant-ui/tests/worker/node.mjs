@@ -12,6 +12,11 @@ class Market extends wasm.Market {
     super(json);
     constructed++;
   }
+  toJson() {
+    if (workerData.failMarketSerialization)
+      throw new TypeError("Market serialization failed");
+    return super.toJson();
+  }
   free() {
     super.free();
     freed++;

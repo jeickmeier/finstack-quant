@@ -50,7 +50,6 @@ const visualTypes = new Set([
   "registry:theme",
 ]);
 const workerVisuals = new Set([
-  "cashflow-viewer",
   "fx-surface-chart",
   "vol-cube-explorer",
   "pricing-workbench",

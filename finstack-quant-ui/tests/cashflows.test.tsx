@@ -24,7 +24,10 @@ import {
 import { QueryClient } from "@tanstack/react-query";
 import { FinstackQueryProvider } from "../registry/hooks/use-finstack/use-finstack";
 import type { FinstackClient } from "../registry/hooks/use-finstack/client";
-import { cashflowOptions } from "../registry/hooks/use-cashflows/use-cashflows";
+import {
+  cashflowOptions,
+  useCashflows,
+} from "../registry/hooks/use-cashflows/use-cashflows";
 import { CashflowViewer } from "../registry/components/cashflow-viewer/cashflow-viewer";
 import {
   unwrap,
@@ -116,11 +119,8 @@ it("pins authoritative fixture sources and exact current native exports", () => 
 it.each(fixture.cases.filter((c) => c.cashflows !== null))(
   "tables and copies exact native $type cashflows at both densities",
   async (entry) => {
-    const request = exportRequest(entry.request);
     const tree = (density: "compact" | "comfortable") => (
-      <FinstackQueryProvider>
-        <CashflowViewer request={request} density={density} />
-      </FinstackQueryProvider>
+      <CashflowViewer text={entry.cashflows} density={density} />
     );
     const { rerender } = render(tree("compact"));
     const viewer = screen.getByRole("region", { name: "Cashflows" });
@@ -162,7 +162,7 @@ it.each(fixture.cases.filter((c) => c.cashflows !== null))(
     }
     expect(
       call.mock.calls.filter(([method]) => method === "cashflows"),
-    ).toEqual([["cashflows", request]]);
+    ).toEqual([]);
   },
 );
 it("shows loading, then the actual unsupported error without changing caller valuation or model", async () => {
@@ -181,7 +181,7 @@ it("shows loading, then the actual unsupported error without changing caller val
     <FinstackQueryProvider>
       <output aria-label="Caller valuation">{entry.pricedValue.amount}</output>
       <output aria-label="Selected model">{entry.request.model}</output>
-      <CashflowViewer request={exportRequest(entry.request)} />
+      <ConnectedCashflows request={exportRequest(entry.request)} />
     </FinstackQueryProvider>,
   );
   const viewer = screen.getByRole("region", { name: "Cashflows" });
@@ -240,13 +240,16 @@ it("snapshots every export input and separates worker sessions in the query key"
 });
 
 function suppliedExport(text: string) {
-  call.mockImplementation((method, request) =>
-    method === "cashflows" ? Promise.resolve(text) : invoke(method, request),
-  );
-  return render(
-    <FinstackQueryProvider>
-      <CashflowViewer request={exportRequest(fixture.cases[0].request)} />
-    </FinstackQueryProvider>,
+  return render(<CashflowViewer text={text} />);
+}
+function ConnectedCashflows({ request }: { request: CashflowRequest }) {
+  const query = useCashflows(request);
+  return (
+    <CashflowViewer
+      text={query.data}
+      loading={query.isFetching || query.workerStatus === "starting"}
+      error={query.error?.message}
+    />
   );
 }
 it("preserves wide signed tokens, row currencies, zero and absent diagnostics without summing or rounding", async () => {

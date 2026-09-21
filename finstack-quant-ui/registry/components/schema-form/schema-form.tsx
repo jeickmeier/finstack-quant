@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { useStore } from "@tanstack/react-form";
 import { useAppForm, focusFormIssue } from "@/lib/finstack/form";
 import { FieldRendererContext, type FieldRenderer } from "./field-renderer";
@@ -38,10 +39,35 @@ export interface SchemaFormProps {
   onInputJson?: (json: string | null) => void;
 }
 function useSchemaForm(props: SchemaFormProps) {
-  const validator = useMemo(
-    () => structuralValidator(props.module),
-    [props.module],
-  );
+  const validator = useMemo(() => {
+    const schema = structuralValidator(props.module);
+    let snapshot: unknown;
+    let result: ReturnType<typeof schema.safeParse> | undefined;
+    const safeParse = (value: unknown) => {
+      // TanStack values are immutable snapshots. Share their transformed result
+      // across field errors, initial/reset validation, native checks and submit.
+      if (!result || snapshot !== value) {
+        snapshot = value;
+        result = schema.safeParse(value);
+      }
+      return result;
+    };
+    return {
+      safeParse,
+      hasSnapshot: (value: unknown) =>
+        result !== undefined && snapshot === value,
+      "~standard": {
+        version: 1 as const,
+        vendor: "finstack",
+        validate(value: unknown) {
+          const parsed = safeParse(value);
+          return parsed.success
+            ? { value: parsed.data }
+            : { issues: parsed.error.issues };
+        },
+      },
+    };
+  }, [props.module]);
   const [initial] = useState(
     () =>
       editValue(
@@ -69,8 +95,6 @@ function useSchemaForm(props: SchemaFormProps) {
     error: string | null;
   }>({ pending: true, error: null });
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const input = (value: unknown) =>
-    props.module.codec.stringify(validator.parse(value));
   const form = useAppForm({
     defaultValues: initial,
     listeners: {
@@ -92,7 +116,9 @@ function useSchemaForm(props: SchemaFormProps) {
       submission.current = controller;
       setSubmitError(null);
       try {
-        const text = input(value);
+        const structural = validator.safeParse(value);
+        if (!structural.success) throw structural.error;
+        const text = serializeHost(structural.data);
         const canonical =
           valid.current?.input === text &&
           valid.current.validate === props.validate
@@ -111,8 +137,8 @@ function useSchemaForm(props: SchemaFormProps) {
   useEffect(() => {
     const controller = new AbortController();
     request.current = controller;
-    // Structural errors remain in TanStack Form; cancelled native work cannot clear them.
-    void form.validate("change");
+    // Validate initial/reset values here; edits were already checked by TanStack.
+    if (!validator.hasSnapshot(values)) void form.validate("change");
     notify.current?.(null);
     notifyInput.current?.(null);
     setNative({ pending: true, error: null });
@@ -123,7 +149,7 @@ function useSchemaForm(props: SchemaFormProps) {
         return;
       }
       try {
-        const text = props.module.codec.stringify(structural.data);
+        const text = serializeHost(structural.data);
         notifyInput.current?.(text);
         const canonical = await props.validate(text, controller.signal);
         if (controller.signal.aborted) return;

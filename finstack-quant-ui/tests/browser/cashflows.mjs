@@ -15,6 +15,7 @@ try {
   const installed = await installBuilt(root, consumer, [
     "cashflow-viewer",
     "use-price-instrument",
+    "use-cashflows",
   ]);
   await writeFile(
     path.join(consumer, "main.tsx"),

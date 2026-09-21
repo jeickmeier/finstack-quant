@@ -7,6 +7,7 @@ import {
   type MaterializationPhases,
   type MaterializationReport,
   type WasmOwned,
+  type ValuationResult,
 } from '../../index.js';
 
 const numberValues: number[] = [0, 1, 1, 0.99];
@@ -104,3 +105,20 @@ features.rankToWeights([1, 2], ['d', 'd']);
 features.riskScaledWeights([1, -1], ['d', 'd'], [0.1, 0.1], {});
 // @ts-expect-error This helper does not accept transform parameters.
 features.rankToWeights([1, 2], ['d', 'd'], {});
+
+// Native output retains generated nested shapes and stricter emitted-field presence.
+declare const valuation: ValuationResult;
+const roundingMode: import('../../types/valuation-result').ValuationResult['meta']['rounding']['mode'] =
+  valuation.meta.rounding.mode;
+const covenantReports: NonNullable<
+  import('../../types/valuation-result').ValuationResult['covenants']
+> | null = valuation.covenants;
+const explanation: import('../../types/valuation-result').ExplanationTrace | undefined =
+  valuation.explanation;
+// @ts-expect-error Native absence is omitted, never null.
+valuation.explanation = null;
+// @ts-expect-error Native covenant field is always emitted.
+valuation.covenants = undefined;
+// @ts-expect-error Metadata is a complete canonical structure.
+valuation.meta = {};
+void [roundingMode, covenantReports, explanation];
