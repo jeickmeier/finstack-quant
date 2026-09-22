@@ -403,6 +403,21 @@
           "path": "blocks/pricing-workbench/scenario-panel.tsx",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/scenario-panel.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/workbench-status.ts",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/workbench-status.ts"
+        },
+        {
+          "path": "blocks/pricing-workbench/workbench-settings.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/workbench-settings.tsx"
+        },
+        {
+          "path": "blocks/pricing-workbench/use-print-report.ts",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/use-print-report.ts"
         }
       ],
       "registryDependencies": [

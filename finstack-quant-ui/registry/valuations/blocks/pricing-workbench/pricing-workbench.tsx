@@ -1,20 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import type { ValuationResult } from "finstack-quant-wasm";
 import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
 import {
@@ -59,6 +46,18 @@ import {
 import { returnedRounding } from "@/components/finstack/valuations/primitives/stamp-badge/stamp-badge";
 import { resolveModel } from "@/workers/finstack-contract";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
+import { workbenchStatus } from "./workbench-status";
+import { WorkbenchSettings } from "./workbench-settings";
+import { usePrintReport } from "./use-print-report";
+/** Type of the priced instrument. Invalid JSON yields an empty type instead of throwing during render. */
+function instrumentTypeOf(json: string): string {
+  try {
+    const value = JSON.parse(json).instrument?.type;
+    return typeof value === "string" ? value : "";
+  } catch {
+    return "";
+  }
+}
 /** Embed inside FinstackQueryProvider, or an existing QueryClientProvider + FinstackProvider. The host owns the route. */
 export function PricingWorkbench({
   defaultRequest,
@@ -96,14 +95,9 @@ export function PricingWorkbench({
   >;
 }) {
   const [initial] = useState(() => structuredClone(defaultRequest));
-  const [initialType] = useState(() => {
-    try {
-      const value = JSON.parse(initial.instrumentJson).instrument?.type;
-      return typeof value === "string" ? value : "";
-    } catch {
-      return "";
-    }
-  });
+  const [initialType] = useState(() =>
+    instrumentTypeOf(initial.instrumentJson),
+  );
   const [type, setType] = useState(defaultInstrumentType ?? initialType);
   const [scenariosOpen, setScenariosOpen] = useState(false);
   const [resultTab, setResultTab] = useState("cashflows");
@@ -145,8 +139,10 @@ export function PricingWorkbench({
   const [completed, setCompleted] = useState<{
     request: PriceRequest;
     result: ValuationResult;
+    instrumentType: string;
   } | null>(null);
-  const [printSnapshot, setPrintSnapshot] = useState<typeof completed>(null);
+  const { printSnapshot, startPrint, printing, syncPending } =
+    usePrintReport(completed);
   const shown = printSnapshot ?? completed;
   const measureMetadata = useMetricMetadata(
     Object.keys(shown?.result.measures ?? {}),
@@ -170,6 +166,14 @@ export function PricingWorkbench({
     },
     shown !== null,
   );
+  syncPending(
+    cashflows.isPending ||
+      cashflows.isFetching ||
+      measureMetadata.isPending ||
+      measureMetadata.isFetching ||
+      moneyFormat.isPending ||
+      moneyFormat.isFetching,
+  );
   const printMarket = useMemo(
     () =>
       printSnapshot
@@ -179,42 +183,6 @@ export function PricingWorkbench({
         : null,
     [printSnapshot],
   );
-  useEffect(() => {
-    const finish = () => setPrintSnapshot(null);
-    window.addEventListener("afterprint", finish);
-    return () => window.removeEventListener("afterprint", finish);
-  }, []);
-  useEffect(() => {
-    if (
-      !printSnapshot ||
-      cashflows.isPending ||
-      cashflows.isFetching ||
-      measureMetadata.isPending ||
-      measureMetadata.isFetching ||
-      moneyFormat.isPending ||
-      moneyFormat.isFetching
-    )
-      return;
-    let active = true;
-    void document.fonts.ready.then(() =>
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          if (active) window.print();
-        }),
-      ),
-    );
-    return () => {
-      active = false;
-    };
-  }, [
-    printSnapshot,
-    cashflows.isPending,
-    cashflows.isFetching,
-    measureMetadata.isPending,
-    measureMetadata.isFetching,
-    moneyFormat.isPending,
-    moneyFormat.isFetching,
-  ]);
   const worker = useFinstack();
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
@@ -245,45 +213,21 @@ export function PricingWorkbench({
     request !== null && request === candidate,
   );
   useEffect(() => {
-    if (request && price.data) setCompleted({ request, result: price.data });
+    if (request && price.data)
+      setCompleted({
+        request,
+        result: price.data,
+        instrumentType: instrumentTypeOf(request.instrumentJson),
+      });
   }, [request, price.data]);
-  const currentError = request === candidate ? price.error?.message : undefined;
-  // Results belong to `completed.request`; any newer candidate (or invalid edit) makes them stale.
-  const stale =
-    completed !== null &&
-    (candidate === null ||
-      candidate.instrumentJson !== completed.request.instrumentJson ||
-      candidate.marketJson !== completed.request.marketJson ||
-      candidate.asOf !== completed.request.asOf ||
-      candidate.model !== completed.request.model ||
-      JSON.stringify(candidate.metrics) !==
-        JSON.stringify(completed.request.metrics) ||
-      candidate.pricingOptions !== completed.request.pricingOptions ||
-      candidate.marketHistory !== completed.request.marketHistory);
-  const status =
-    worker.status !== "ready"
-      ? `Worker ${worker.status}`
-      : !candidate
-        ? completed
-          ? "Edits pending validation"
-          : "Waiting for valid inputs"
-        : request !== candidate
-          ? "Pricing queued"
-          : price.isFetching
-            ? "Pricing…"
-            : currentError
-              ? "Pricing failed"
-              : completed
-                ? "Priced"
-                : "Waiting for valuation";
-  const stateKind =
-    status === "Priced"
-      ? "priced"
-      : status === "Pricing failed"
-        ? "failed"
-        : worker.status !== "ready" || (!candidate && !completed)
-          ? "idle"
-          : "pending";
+  const { stale, status, stateKind, currentError } = workbenchStatus({
+    workerStatus: worker.status,
+    candidate,
+    request,
+    completed,
+    fetching: price.isFetching,
+    errorMessage: price.error?.message,
+  });
   const meta = shown?.result.meta;
   const rounding = meta?.rounding.mode;
   const pricingContext = (
@@ -384,80 +328,28 @@ export function PricingWorkbench({
             >
               Price
             </Button>
-            <Popover>
-              <PopoverTrigger render={<Button variant="outline" size="sm" />}>
-                Settings
-              </PopoverTrigger>
-              <PopoverContent align="end">
-                <div className="max-h-[60vh] space-y-4 overflow-auto">
-                  <PricingParamsForm
-                    value={params}
-                    onValueChange={setParams}
-                    instrumentType={type}
-                    models={models.data ?? {}}
-                    metrics={metrics.data ?? {}}
-                    loading={models.isPending || metrics.isPending}
-                    error={models.error?.message ?? metrics.error?.message}
-                    sections={["metrics", "advanced"]}
-                  />
-                  <Label className="flex items-center justify-between gap-3">
-                    Density
-                    <Select
-                      items={[
-                        { value: "compact", label: "Compact" },
-                        { value: "comfortable", label: "Comfortable" },
-                      ]}
-                      value={currentDensity}
-                      onValueChange={(value) => {
-                        if (value !== "compact" && value !== "comfortable")
-                          return;
-                        document.documentElement.dataset.density = value;
-                        setCurrentDensity(value);
-                      }}
-                    >
-                      <SelectTrigger aria-label="Workbench density">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="compact">Compact</SelectItem>
-                        <SelectItem value="comfortable">Comfortable</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    onClick={(event) => {
-                      const inherited = event.currentTarget
-                        .closest("[data-theme]")
-                        ?.getAttribute("data-theme");
-                      const nextTheme =
-                        (theme ?? inherited) === "dark" ? "light" : "dark";
-                      document.documentElement.dataset.theme = nextTheme;
-                      document.documentElement.classList.toggle(
-                        "dark",
-                        nextTheme === "dark",
-                      );
-                      setTheme(nextTheme);
-                    }}
-                  >
-                    Toggle theme
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <WorkbenchSettings
+              params={params}
+              onParamsChange={setParams}
+              instrumentType={type}
+              models={models.data ?? {}}
+              metrics={metrics.data ?? {}}
+              loading={models.isPending || metrics.isPending}
+              error={models.error?.message ?? metrics.error?.message}
+              density={currentDensity}
+              onDensityChange={setCurrentDensity}
+              theme={theme}
+              onThemeChange={setTheme}
+            />
             <Button
               variant="outline"
               size="sm"
               type="button"
 
-              disabled={
-                !completed || status !== "Priced" || printSnapshot !== null
-              }
-              onClick={() => setPrintSnapshot(completed)}
+              disabled={!completed || status !== "Priced" || printing}
+              onClick={startPrint}
             >
-              {printSnapshot ? "Preparing report…" : "Print report"}
+              {printing ? "Preparing report…" : "Print report"}
             </Button>{" "}
             <p
               role="status"
@@ -727,9 +619,7 @@ export function PricingWorkbench({
               </TabsContent>
               <TabsContent value="scenarios" className="print:hidden">
                 {scenario &&
-                completed &&
-                JSON.parse(completed.request.instrumentJson).instrument
-                  ?.type === "structured_credit" ? (
+                completed?.instrumentType === "structured_credit" ? (
                   <details
                     onToggle={(event) =>
                       setScenariosOpen(event.currentTarget.open)

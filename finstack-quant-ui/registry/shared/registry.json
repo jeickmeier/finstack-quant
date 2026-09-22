@@ -216,6 +216,11 @@
           "target": "components/finstack/shared/components/schema-form/render-field.tsx"
         },
         {
+          "path": "components/schema-form/field-chrome.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/shared/components/schema-form/field-chrome.tsx"
+        },
+        {
           "path": "components/schema-form/schema.ts",
           "type": "registry:component",
           "target": "components/finstack/shared/components/schema-form/schema.ts"

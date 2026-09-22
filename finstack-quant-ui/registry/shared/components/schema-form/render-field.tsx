@@ -1,11 +1,5 @@
 "use client";
-import { useContext, useState, useRef, type ReactNode } from "react";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverTitle,
-} from "@/components/ui/popover";
+import { useContext, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@tanstack/react-form";
 import { Fieldset } from "@/lib/finstack/form";
@@ -23,34 +17,7 @@ import {
   type SchemaLocation,
 } from "./schema";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
-
-function TermActions({
-  label,
-  content,
-  children,
-}: {
-  label: string;
-  content: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className="finstack-editable-term">
-      <div className="min-w-0">{content}</div>
-      <Popover>
-        <PopoverTrigger
-          aria-label={`${label} options`}
-          render={<Button variant="ghost" size="icon-xs" />}
-        >
-          ⋯
-        </PopoverTrigger>
-        <PopoverContent>
-          <PopoverTitle>{label}</PopoverTitle>
-          {children}
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
+import { nullableFieldChrome, optionalFieldChrome } from "./field-chrome";
 
 /** Shared renderer over generated structure; the module codec owns validation. */
 export function RenderField({
@@ -99,86 +66,25 @@ export function RenderField({
   const help = schema.description ?? metadata?.description;
   const info = { label, help };
   const nonNull = nullable(module.schema, resolved);
-  if ((!required && value === undefined) || (nonNull && value == null))
-    return (
-      <div className="finstack-optional-term flex min-w-0 flex-wrap items-center gap-2 border-b border-border py-1 text-sm">
-        <span>{label}</span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            form.setFieldValue(
-              path,
-              initialValue(module.schema, nonNull ?? resolved),
-            )
-          }
-        >
-          Add {label.toLowerCase()}
-        </Button>
-        {!required && value !== undefined && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => form.setFieldValue(path, undefined)}
-          >
-            Omit {label.toLowerCase()}
-          </Button>
-        )}
-        {nonNull && value === undefined && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => form.setFieldValue(path, null)}
-          >
-            Set {label.toLowerCase()} to null
-          </Button>
-        )}
-      </div>
-    );
-  if (nonNull)
-    return (
-      <TermActions
-        label={label}
-        content={
-          <RenderField
-            {...{
-              module,
-              form,
-              path,
-              label,
-              value,
-              layout,
-              fields,
-              skipOverride,
-              sectionless,
-            }}
-            location={nonNull}
-          />
-        }
-      >
-        {!required && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => form.setFieldValue(path, undefined)}
-          >
-            Omit {label.toLowerCase()}
-          </Button>
-        )}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => form.setFieldValue(path, null)}
-        >
-          Clear {label.toLowerCase()}
-        </Button>
-      </TermActions>
-    );
+  const renderField = (next: Parameters<typeof RenderField>[0]) => (
+    <RenderField {...next} />
+  );
+  const nullableChrome = nullableFieldChrome({
+    module,
+    form,
+    location,
+    path,
+    label,
+    value,
+    required,
+    layout,
+    fields,
+    skipOverride,
+    sectionless,
+    nonNull,
+    renderField,
+  });
+  if (nullableChrome) return nullableChrome;
   if (Object.hasOwn(schema, "const")) return null;
   const custom = skipOverride
     ? undefined
@@ -206,38 +112,22 @@ export function RenderField({
         ),
       });
   if (custom !== undefined) return custom;
-  if (!required && !nonNull)
-    return (
-      <TermActions
-        label={label}
-        content={
-          <RenderField
-            {...{
-              module,
-              form,
-              location,
-              path,
-              label,
-              value,
-              layout,
-              fields,
-              skipOverride,
-              sectionless,
-            }}
-            required
-          />
-        }
-      >
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => form.setFieldValue(path, undefined)}
-        >
-          Omit {label.toLowerCase()}
-        </Button>
-      </TermActions>
-    );
+  const optionalChrome = optionalFieldChrome({
+    module,
+    form,
+    location,
+    path,
+    label,
+    value,
+    required,
+    nonNull,
+    layout,
+    fields,
+    skipOverride,
+    sectionless,
+    renderField,
+  });
+  if (optionalChrome) return optionalChrome;
   const union = discriminator(module.schema, resolved);
   if (union) {
     const selected = union.selected(value);

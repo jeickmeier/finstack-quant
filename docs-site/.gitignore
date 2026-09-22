@@ -1,10 +1,6 @@
 # Consumer-owned copies are reinstalled from the built registry by ui-docs-install.
 /src/components/finstack/
-/src/hooks/shared/
-/src/hooks/core/
-/src/hooks/valuations/
-/src/hooks/calibration/
-/src/hooks/models/
+/src/hooks/
 /src/lib/finstack/
 /src/styles/finstack/
 /src/workers/

@@ -337,10 +337,11 @@ independent result with its own currency and metadata. `density` accepts the sha
 compact/comfortable modes. Missing metadata does not create rounding or FX defaults.
 
 `MeasuresGrid` composes that context with the unlinked table. Pass `groups` from
-`listStandardMetricsGrouped`; fully qualified keys are retained. Measures are raw,
-with “Unit unavailable” unless `units` or `comparisonUnits` supplies a label and
-source for that complete key. Neither component calculates differences, totals,
-ratios or currency conversions. See [PR-013 evidence](evidence/pr-013.md) and the
+`listStandardMetricsGrouped`; fully qualified keys are retained. Measures stay
+raw, with “Unit unavailable” unless `units` or `comparisonUnits` supplies a
+label and source for that complete key. Bucket bars are a display width within
+one returned series. The grid does not calculate differences, totals, or
+currency conversions. See [PR-013 evidence](evidence/pr-013.md) and the
 retained native bond result fixture.
 
 ## Returned structured-credit scenarios
