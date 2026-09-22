@@ -1,5 +1,5 @@
 import type { Ref } from "react";
-import type { FigureHandle } from "@/components/finstack/primitives/finstack-chart/finstack-chart";
+import type { FigureHandle } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 let figure: FigureHandle | null = null;
 export const captureFigure: Ref<FigureHandle> = (value) => {
   figure = value;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   TenorInput,
   type TenorEdit,
-} from "@/components/finstack/primitives/tenor-input/tenor-input";
+} from "@/components/finstack/core/primitives/tenor-input/tenor-input";
 
 export function Example(_props: ExampleProps) {
   const [tenor, setTenor] = useState<TenorEdit>({ count: 6, unit: "months" });

@@ -3,8 +3,8 @@ import data from "./registry-gallery/data.json";
 import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { PricingWorkbench } from "@/components/finstack/blocks/pricing-workbench/pricing-workbench";
-import { FinstackQueryProvider } from "@/hooks/use-finstack/use-finstack";
+import { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";
+import { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";
 function WorkbenchRoute() {
   const search = useSearchParams();
   const type = search.get("instrument") ?? undefined;

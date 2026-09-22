@@ -1,7 +1,7 @@
 "use client";
 import type { ExampleProps } from "./props";
 import { useState } from "react";
-import { FinstackTable } from "@/components/finstack/primitives/finstack-table/finstack-table";
+import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 
 export function Example({ density = "compact" }: ExampleProps) {
   const [activations, setActivations] = useState(0);

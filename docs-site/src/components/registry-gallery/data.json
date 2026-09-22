@@ -11749,7 +11749,7 @@
   "scenarios": {
     "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
     "instrumentSha256": "cc1a176fcd909c465387054949c5a84c050fd1d4bdfd9295e934a9db4616985a",
-    "marketSource": "finstack-quant-ui/tests/instruments/pricing-market.json",
+    "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
     "marketSha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474",
     "asOf": "2024-01-01",
     "trancheId": "CLONOTES-A",
@@ -12300,8 +12300,8 @@
     "description": "Actual native cashflow text, retained verbatim; no inferred row schema or financial reconciliation.",
     "sources": [
       {
-        "path": "finstack-quant-ui/tests/instruments/pricing-cases.json",
-        "sha256": "9ee1a0a00ba7a939764066bcea94e8ff45cb02e7c28c10594bbdc9021fc8b338"
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
+        "sha256": "2391b96e4d27c03b3ad1e001e33ea6df98fc38a4bdda6ce243baf9ed506ce5fa"
       },
       {
         "path": "finstack-quant-ui/src/fixtures/results/bond.json",
@@ -12312,7 +12312,7 @@
         "sha256": "9485cbaad3ea0c121625d0309c53676f60a5f9ffc64f3d4a679fc5a16f73bf3c"
       },
       {
-        "path": "finstack-quant-ui/tests/instruments/pricing-market.json",
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
         "sha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474"
       },
       {
@@ -12401,8 +12401,8 @@
     "description": "Actual native results. hostBigIntPaths record transport kinds emitted by the binding serializer, not domain types inferred from examples. Reconstruct through the canonical wire codec then restore these exact integer leaves; tests compare with a fresh native call.",
     "sources": [
       {
-        "path": "finstack-quant-ui/tests/instruments/pricing-cases.json",
-        "sha256": "9ee1a0a00ba7a939764066bcea94e8ff45cb02e7c28c10594bbdc9021fc8b338"
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
+        "sha256": "2391b96e4d27c03b3ad1e001e33ea6df98fc38a4bdda6ce243baf9ed506ce5fa"
       },
       {
         "path": "finstack-quant/valuations/tests/fixtures/valuation_binding_regressions.json",
@@ -12433,7 +12433,7 @@
         "sha256": "8b29b6253b5e9db3dbc750ffff5ae72e474332fb213b19432e88108f2d93dd58"
       },
       {
-        "path": "finstack-quant-ui/tests/instruments/pricing-market.json",
+        "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
         "sha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474"
       },
       {

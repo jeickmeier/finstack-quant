@@ -129,7 +129,7 @@ await cp(
 );
 await writeFile(
   path.join(external, "app/page.tsx"),
-  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/use-finstack/use-finstack";\nimport fixture from "./bond.json";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench defaultRequest={fixture.request} /></FinstackQueryProvider></main>; }\n',
+  '"use client";\nimport { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";\nimport { FinstackQueryProvider } from "@/hooks/shared/use-finstack/use-finstack";\nimport fixture from "./bond.json";\nexport default function Page() { return <main className="finstack-surface mx-auto max-w-6xl p-4"><h1>Bond pricing</h1><FinstackQueryProvider><PricingWorkbench defaultRequest={fixture.request} /></FinstackQueryProvider></main>; }\n',
 );
 const hash = createHash("sha256")
   .update(
@@ -154,7 +154,7 @@ if (process.env.REGISTRY_INSTALL_COMPOSITION === "1") {
   await mkdir(path.join(external, "app/registry-selection"));
   await writeFile(
     path.join(external, "app/registry-selection/page.tsx"),
-    '"use client";import {CurveLinkExample} from "@/components/finstack/components/curve-link-example/curve-link-example";export default function Page(){return <main className="finstack-surface"><h1>Independent selection composition</h1><CurveLinkExample/></main>}',
+    '"use client";import {CurveLinkExample} from "@/components/finstack/core/components/curve-link-example/curve-link-example";export default function Page(){return <main className="finstack-surface"><h1>Independent selection composition</h1><CurveLinkExample/></main>}',
   );
 }
 await installProbe(external);
@@ -189,7 +189,7 @@ for (const [consumer, route, build] of [
         : external;
     await run(
       process.execPath,
-      [path.join(import.meta.dirname, "workbench.mjs")],
+      [path.join(import.meta.dirname, "../valuations/browser/workbench.mjs")],
       repo,
       {
         REGISTRY_EXPORT_DIR: path.join(app, "out"),

@@ -151,7 +151,7 @@ export async function checkTokens(root) {
   }
   const tenant = tenantPalettes(
     tokens,
-    await readFile(path.join(root, "tests/fixtures/tenant.css"), "utf8"),
+    await readFile(path.join(root, "tests/shared/fixtures/tenant.css"), "utf8"),
   );
   for (const [mode, palette] of Object.entries(tenant)) {
     checkContrast(palette);

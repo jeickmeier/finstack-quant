@@ -250,7 +250,7 @@ async function installItem(index, item) {
       const native = workerVisuals.has(item.name);
       await writeFile(
         path.join(consumer, "app/page.tsx"),
-        `"use client";import {InstalledItem} from "./harness";${native ? 'import {FinstackQueryProvider} from "@/hooks/use-finstack/use-finstack";' : ""}export default function Page(){return <main className="finstack-surface" style={{padding:24,width:960}} data-installed-item=${JSON.stringify(item.name)}><h1>${item.name}</h1>${native ? "<FinstackQueryProvider>" : ""}<InstalledItem/>${native ? "</FinstackQueryProvider>" : ""}</main>}`,
+        `"use client";import {InstalledItem} from "./harness";${native ? 'import {FinstackQueryProvider} from "@/hooks/shared/use-finstack/use-finstack";' : ""}export default function Page(){return <main className="finstack-surface" style={{padding:24,width:960}} data-installed-item=${JSON.stringify(item.name)}><h1>${item.name}</h1>${native ? "<FinstackQueryProvider>" : ""}<InstalledItem/>${native ? "</FinstackQueryProvider>" : ""}</main>}`,
       );
     } else {
       const modules = (item.files ?? [])

@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { PricingWorkbench } from "@/components/finstack/blocks/pricing-workbench/pricing-workbench";
+import { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";
 import data from "../data.json";
 export function Example({
   density = "compact",

@@ -51,10 +51,10 @@ const items = [
     docs: "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
     files: [
       {
-        path: "registry/components/curve-link-example/curve-link-example.tsx",
+        path: "registry/core/components/curve-link-example/curve-link-example.tsx",
         type: "registry:component",
         target:
-          "components/finstack/components/curve-link-example/curve-link-example.tsx",
+          "components/finstack/core/components/curve-link-example/curve-link-example.tsx",
       },
       file("fixtures/curves/market.json"),
     ],
@@ -68,46 +68,6 @@ const items = [
     dependencies: ["@tanstack/charts@0.18.0", "@tanstack/react-table@9.2.4"],
   },
 
-  {
-    name: "pricing-forms-example",
-    type: "registry:component",
-    docs: "Standalone instrument and pricing forms with caller state and real shared worker hooks. Example installs at the consumer source directory under examples/ and receives the consumer-owned components alias. Fixture request derives from manifest-listed native instrument/market fixtures. No workbench block is imported.",
-    files: [
-      {
-        path: "registry/examples/pricing-forms.tsx",
-        type: "registry:component",
-        target: "examples/pricing-forms.tsx",
-      },
-    ],
-    registryDependencies: [
-      "@finstack/instrument-form",
-      "@finstack/pricing-params-form",
-      "@finstack/finstack-fixtures",
-      "@finstack/use-instrument-validator",
-      "@finstack/use-price-instrument",
-      "@finstack/json-viewer",
-    ],
-  },
-  {
-    name: "finstack-worker",
-    type: "registry:file",
-    docs: "Installs the worker and its service/contracts under the consumer source directory workers/. Initialize through FinstackProvider in the browser; install the matching local WASM package. Only existing native facade calls run here.",
-    files: [
-      "finstack.worker.ts",
-      "finstack-service.ts",
-      "finstack-contract.ts",
-    ].map((name) => ({
-      path: `registry/workers/${name}`,
-      type: "registry:file",
-      target: `workers/${name}`,
-    })),
-    registryDependencies: [
-      "@finstack/finstack-host",
-      "@finstack/finstack-format",
-      "@finstack/contract-market-context-state",
-    ],
-    dependencies: ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],
-  },
   item(
     "finstack-fixtures",
     ["fixtures/results/bond.json"],
@@ -182,12 +142,12 @@ const output = await prettier.format(
     include: [
       "base",
       "theme",
-      "primitives",
-      "components",
-      "blocks",
-      "hooks",
-      "lib",
-      "file",
+      "shared",
+      "core",
+      "valuations",
+      "calibration",
+      "covenants",
+      "models",
     ].map((category) => `registry/${category}/registry.json`),
     items,
   }),

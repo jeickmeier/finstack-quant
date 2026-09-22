@@ -1,7 +1,7 @@
 "use client";
 import type { ExampleProps } from "./props";
 import { useState } from "react";
-import { EnumField } from "@/components/finstack/primitives/enum-field/enum-field";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 const options = [
   { value: "alpha", label: "Alpha", group: "Supplied" },
   { value: "beta", label: "Beta", group: "Supplied" },

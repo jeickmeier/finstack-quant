@@ -5,7 +5,7 @@ import { useIsFetching } from "@tanstack/react-query";
 import {
   FinstackQueryProvider,
   useFinstack,
-} from "@/hooks/use-finstack/use-finstack";
+} from "@/hooks/shared/use-finstack/use-finstack";
 import { PrimitiveDemo } from "./primitives";
 import { ComponentDemo, nativeItems } from "./components";
 import { importHarnesses } from "./imports";

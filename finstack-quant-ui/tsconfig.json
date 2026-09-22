@@ -11,11 +11,15 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "@/lib/finstack/form": ["registry/shared/lib/finstack-form/form.tsx"],
       "@/lib/finstack/*": ["src/*"],
-      "@/hooks/*": ["registry/hooks/*"],
-      "@/workers/*": ["registry/workers/*"],
+      "@/hooks/shared/*": ["registry/shared/hooks/*"],
+      "@/hooks/core/*": ["registry/core/hooks/*"],
+      "@/hooks/valuations/*": ["registry/valuations/hooks/*"],
+      "@/hooks/calibration/*": ["registry/calibration/hooks/*"],
+      "@/hooks/models/*": ["registry/models/hooks/*"],
+      "@/workers/*": ["registry/shared/file/*"],
       "@/components/finstack/*": ["registry/*"],
-      "@/lib/finstack/form": ["registry/lib/finstack-form/form.tsx"],
       "@/components/ui/*": ["components/ui/*"]
     },
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
@@ -28,5 +32,9 @@
     "tests/**/*.tsx",
     "components/**/*.tsx"
   ],
-  "exclude": ["tests/browser/fixture", "tests/install/fixture"]
+  "exclude": [
+    "tests/browser/fixture",
+    "tests/*/browser/fixture",
+    "tests/install/fixture"
+  ]
 }

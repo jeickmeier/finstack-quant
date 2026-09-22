@@ -1,7 +1,7 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { FinstackChart } from "@/components/finstack/primitives/finstack-chart/finstack-chart";
-import { figureExample } from "@/components/finstack/components/figure-example/figure-data";
+import { FinstackChart } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
+import { figureExample } from "@/components/finstack/shared/chart/figure-example/figure-data";
 
 export function Example({ width = 880, publication = false }: ExampleProps) {
   return (

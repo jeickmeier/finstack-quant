@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { CalibrationForm } from "@/components/finstack/components/calibration-form/calibration-form";
+import { CalibrationForm } from "@/components/finstack/calibration/components/calibration-form/calibration-form";
 
 import data from "./data.json";
 const validate = async (json: string) => json;

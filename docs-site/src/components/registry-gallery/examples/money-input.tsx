@@ -1,7 +1,7 @@
 "use client";
 import type { ExampleProps } from "./props";
 import { useState } from "react";
-import { MoneyInput } from "@/components/finstack/primitives/money-input/money-input";
+import { MoneyInput } from "@/components/finstack/core/primitives/money-input/money-input";
 
 export function Example(_props: ExampleProps) {
   const [money, setMoney] = useState({

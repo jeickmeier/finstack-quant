@@ -1,7 +1,7 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { CalibrationFitChart } from "@/components/finstack/components/calibration-fit-chart/calibration-fit-chart";
-import { useLinkedSelection } from "@/hooks/use-linked-selection/use-linked-selection";
+import { CalibrationFitChart } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
+import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import type { CalibrationWire } from "@/lib/finstack/generated/types/calibration";
 import type { CalibrationReport as NativeReport } from "finstack-quant-wasm";
 import data from "../data.json";

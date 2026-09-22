@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   KnotTable,
   type KnotEdit,
-} from "@/components/finstack/primitives/knot-table/knot-table";
+} from "@/components/finstack/core/primitives/knot-table/knot-table";
 
 export function Example(_props: ExampleProps) {
   const [knots, setKnots] = useState<KnotEdit[]>([

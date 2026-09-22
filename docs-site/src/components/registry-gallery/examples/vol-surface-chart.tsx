@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { VolSurfaceChart } from "@/components/finstack/components/vol-surface-chart/vol-surface-chart";
+import { VolSurfaceChart } from "@/components/finstack/core/components/vol-surface-chart/vol-surface-chart";
 
 export function Example({
   width = 880,

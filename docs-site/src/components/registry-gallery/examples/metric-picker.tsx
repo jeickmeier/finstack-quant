@@ -1,7 +1,7 @@
 "use client";
 import type { ExampleProps } from "./props";
 import { useState } from "react";
-import { MetricPicker } from "@/components/finstack/primitives/metric-picker/metric-picker";
+import { MetricPicker } from "@/components/finstack/valuations/primitives/metric-picker/metric-picker";
 const options = [
   { value: "alpha", label: "Alpha", group: "Supplied" },
   { value: "beta", label: "Beta", group: "Supplied" },

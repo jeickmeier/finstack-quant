@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   FinstackProvider,
   useFinstack,
-} from "../../hooks/use-finstack/use-finstack";
+} from "../../hooks/shared/use-finstack/use-finstack";
 
 function Probe() {
   const worker = useFinstack();

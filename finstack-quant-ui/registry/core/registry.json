@@ -1,0 +1,517 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "decimal-input",
+      "type": "registry:ui",
+      "docs": "Controlled decimal-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/decimal-input/decimal-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/decimal-input/decimal-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame",
+        "@finstack/finstack-format",
+        "@finstack/primitive-contracts",
+        "input"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "money-input",
+      "type": "registry:ui",
+      "docs": "Controlled money-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/money-input/money-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/money-input/money-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/decimal-input",
+        "@finstack/enum-field"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "rate-input",
+      "type": "registry:ui",
+      "docs": "Controlled rate-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/rate-input/rate-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/rate-input/rate-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-codec",
+        "@finstack/decimal-input",
+        "@finstack/finstack-format"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "tenor-input",
+      "type": "registry:ui",
+      "docs": "Controlled tenor-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/tenor-input/tenor-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/tenor-input/tenor-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-codec",
+        "@finstack/decimal-input",
+        "@finstack/enum-field",
+        "@finstack/field-frame",
+        "@finstack/primitive-contracts"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "day-count-select",
+      "type": "registry:ui",
+      "docs": "Controlled day-count-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/day-count-select/day-count-select.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/day-count-select/day-count-select.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/enum-field",
+        "@finstack/primitive-contracts"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "bdc-select",
+      "type": "registry:ui",
+      "docs": "Controlled bdc-select primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/bdc-select/bdc-select.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/bdc-select/bdc-select.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/enum-field",
+        "@finstack/primitive-contracts"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "knot-table",
+      "type": "registry:ui",
+      "docs": "Controlled knot-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/knot-table/knot-table.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/knot-table/knot-table.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-codec",
+        "@finstack/finstack-table",
+        "@finstack/decimal-input"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "money-value",
+      "type": "registry:ui",
+      "docs": "Controlled money-value primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/money-value/money-value.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/money-value/money-value.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "date-input",
+      "type": "registry:ui",
+      "docs": "Controlled date-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/date-input/date-input.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/date-input/date-input.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame",
+        "calendar",
+        "popover",
+        "input-group"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "curve-chart",
+      "type": "registry:component",
+      "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine.",
+      "files": [
+        {
+          "path": "components/curve-chart/curve-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/curve-chart/curve-chart.tsx"
+        },
+        {
+          "path": "components/curve-chart/stored-curve-view.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/curve-chart/stored-curve-view.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/contract-market-context-state",
+        "@finstack/finstack-views",
+        "@finstack/finstack-table",
+        "@finstack/use-linked-selection"
+      ],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "market-context-form",
+      "type": "registry:component",
+      "docs": "Complete market editor using generated schema/meta and native validation. Edit curves, FX entries, prices, stored surfaces, SABR cubes and FX ATM/RR/BF quotes; other data stays read-only and is retained. Import canonical JSON or a calibration envelope final_market. Supply useMarketValidator and receive complete canonical JSON on submit.",
+      "files": [
+        {
+          "path": "components/market-context-form/market-context-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/market-context-form/market-context-form.tsx"
+        },
+        {
+          "path": "components/market-context-form/market.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/market-context-form/market.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/schema-form",
+        "@finstack/knot-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/contract-market-context-state",
+        "button",
+        "label",
+        "textarea"
+      ],
+      "dependencies": ["react@19.2.8", "lossless-json@4.3.1"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "vol-surface-chart",
+      "type": "registry:component",
+      "docs": "Canonical stored volatility heatmap, node table and exact row/column slices. Supply validated surface metadata and an explicit raw-unit color extent. Optional shared selection links caller controls; no interpolation or worker dependency. Import the shared theme. FX quote arrays remain separate from stored grids.",
+      "files": [
+        {
+          "path": "components/vol-surface-chart/vol-surface-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/vol-surface-chart/vol-surface-chart.tsx"
+        },
+        {
+          "path": "components/vol-surface-chart/stored.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/vol-surface-chart/stored.ts"
+        },
+        {
+          "path": "components/vol-surface-chart/surface-view.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/vol-surface-chart/surface-view.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/finstack-table",
+        "@finstack/use-linked-selection",
+        "@finstack/contract-market-context-state",
+        "button",
+        "label",
+        "select"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "fx-delta-quotes",
+      "type": "registry:component",
+      "docs": "Raw canonical FX ATM delta-neutral straddle, RR and BF quote arrays. Missing optional arrays remain missing. No forward, interpolation, strike grid or conversion is inferred.",
+      "files": [
+        {
+          "path": "components/fx-delta-quotes/fx-delta-quotes.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/fx-delta-quotes/fx-delta-quotes.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-table",
+        "@finstack/json-viewer",
+        "@finstack/contract-market-context-state",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "fx-surface-chart",
+      "type": "registry:component",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "files": [
+        {
+          "path": "components/fx-surface-chart/fx-surface-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/fx-surface-chart/fx-surface-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/vol-surface-chart",
+        "@finstack/fx-delta-quotes",
+        "@finstack/use-fx-delta-samples"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "vol-cube-explorer",
+      "type": "registry:component",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "files": [
+        {
+          "path": "components/vol-cube-explorer/vol-cube-explorer.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/vol-cube-explorer/vol-cube-explorer.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/use-cube-samples",
+        "@finstack/vol-surface-chart",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/decimal-input",
+        "@finstack/enum-field"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "fx-matrix-grid",
+      "type": "registry:component",
+      "docs": "Exact directed stored FX matrices separated by pair-global, provider and date/policy-pinned sources. Missing cells remain unavailable, undated tuples stay undated, and complete config/state exports remain unchanged. No priority resolution, inverse rates or triangulation.",
+      "files": [
+        {
+          "path": "components/fx-matrix-grid/fx-matrix-grid.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/fx-matrix-grid/fx-matrix-grid.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/contract-market-context-state"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "market-context-browser",
+      "type": "registry:component",
+      "docs": "Searchable disclosure tree over every actual market value and generated root fields. Inspect exact leaf JSON and matching stored curve/FX views. Optional surfaceOptions supplies explicit color extents; without them surface data remains raw. A host renderObject slot can supply evaluated views with explicit strike/forward/convention inputs. No worker is required for stored browsing. Parent accepts canonical market edits through market-context-form/use-market-validator.",
+      "files": [
+        {
+          "path": "components/market-context-browser/market-context-browser.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/market-context-browser/market-context-browser.tsx"
+        },
+        {
+          "path": "components/market-context-browser/tree.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/market-context-browser/tree.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/curve-chart",
+        "@finstack/vol-surface-chart",
+        "@finstack/fx-delta-quotes",
+        "@finstack/fx-matrix-grid",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/use-linked-selection",
+        "@finstack/contract-market-context-state",
+        "button",
+        "input",
+        "label",
+        "select"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-market-validator",
+      "type": "registry:hook",
+      "docs": "Canonicalize complete markets through the shared native worker. Aborted validations never replace active edits.",
+      "files": [
+        {
+          "path": "hooks/use-market-validator/use-market-validator.ts",
+          "type": "registry:hook",
+          "target": "hooks/core/use-market-validator/use-market-validator.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

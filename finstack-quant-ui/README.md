@@ -198,8 +198,12 @@ host (inside the worker for browser consumers). Column presets target Table
 
 ## Controlled primitives
 
-The controlled input and value primitives install under `components/finstack/primitives`, with a
-shared `field-frame`. Each declares its theme and actual dependency closure.
+The controlled input and value primitives install under
+`components/finstack/<crate>/primitives` (`core`, `valuations`, or `shared`).
+Shared chrome such as `field-frame` stays in `components/finstack/shared/primitives`.
+`FinstackTable` installs at `components/finstack/shared/table` and `FinstackChart`
+at `components/finstack/shared/chart`. Each item declares its theme and actual
+dependency closure.
 Cross-category imports use the consumer's standard `@/lib/finstack` alias;
 configure `@/*` to the application source root. The CLI handles `src` layouts.
 
@@ -224,11 +228,10 @@ consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
 
 Install `@finstack/use-price-instrument` and/or `@finstack/use-instrument-validator`.
 They include `use-finstack` and the worker closure. Hooks install at project-root
-`hooks/<item>/`; the worker/service/contracts install at project-root `workers/`
+`hooks/<crate>/<item>/`; the worker/service/contracts install at project-root `workers/`
 (the `~/` registry target intentionally stays outside an optional `src` folder).
 The worker uses the consumer's standard `@/lib/finstack` alias for the installed
-codec. The root registry owns these worker files because included indexes cannot
-traverse to sibling source directories.
+codec. The shared registry index owns these worker files.
 
 Use `FinstackQueryProvider` around a standalone feature, or `FinstackProvider`
 inside the application's existing `QueryClientProvider`. `useFinstack` exposes
@@ -349,7 +352,7 @@ npx shadcn@4.21.0 add @finstack/scenario-heatmap
 ```
 
 ```tsx
-import { ScenarioHeatmapPanel } from "@/components/finstack/components/scenario-heatmap/scenario-heatmap";
+import { ScenarioHeatmapPanel } from "@/components/finstack/valuations/components/scenario-heatmap/scenario-heatmap";
 
 // table is the unchanged result of structuredCreditTrancheScenarioTable.
 // Choose an explicit display extent containing every supplied price and par 100.

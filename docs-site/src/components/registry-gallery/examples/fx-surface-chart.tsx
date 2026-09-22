@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { FxSurfaceChart } from "@/components/finstack/components/fx-surface-chart/fx-surface-chart";
+import { FxSurfaceChart } from "@/components/finstack/core/components/fx-surface-chart/fx-surface-chart";
 const fx = {
   id: "EURUSD",
   expiries: [0.5, 1],

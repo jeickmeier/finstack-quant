@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { InstrumentForm } from "@/components/finstack/components/instrument-form/instrument-form";
+import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
 
 import data from "./data.json";
 const validate = async (json: string) => json;

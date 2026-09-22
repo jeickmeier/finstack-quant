@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { FxDeltaQuotes } from "@/components/finstack/components/fx-delta-quotes/fx-delta-quotes";
+import { FxDeltaQuotes } from "@/components/finstack/core/components/fx-delta-quotes/fx-delta-quotes";
 const fx = {
   id: "EURUSD",
   expiries: [0.5, 1],

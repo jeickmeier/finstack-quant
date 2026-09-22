@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { PricingWorkbench } from "@/components/finstack/blocks/pricing-workbench/pricing-workbench";
+import { PricingWorkbench } from "@/components/finstack/valuations/blocks/pricing-workbench/pricing-workbench";
 import {
   FinstackChart,
   type FigureHandle,
-} from "@/components/finstack/primitives/finstack-chart/finstack-chart";
+} from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import data from "./data.json";
 import { figureExample } from "./figure-data";
 export function InstalledItem() {

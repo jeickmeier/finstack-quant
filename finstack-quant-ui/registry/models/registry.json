@@ -1,0 +1,70 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "monte-carlo-diagnostics",
+      "type": "registry:component",
+      "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat.",
+      "files": [
+        {
+          "path": "components/monte-carlo-diagnostics/monte-carlo-diagnostics.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/monte-carlo-diagnostics/monte-carlo-diagnostics.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "use-fx-delta-samples",
+      "type": "registry:hook",
+      "docs": "Native FX delta-surface evaluation with complete immutable quote/coordinate/forward keys. Null means no sampling request. Requires FinstackQueryProvider; returns annualized Black decimal volatilities or native errors.",
+      "files": [
+        {
+          "path": "hooks/use-fx-delta-samples/use-fx-delta-samples.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-fx-delta-samples/use-fx-delta-samples.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-cube-samples",
+      "type": "registry:hook",
+      "docs": "Checked native cube evaluation with complete SABR/forward/interpolation/coordinate/convention query keys. Null disables sampling. Requires FinstackQueryProvider; no local model calculation or clamping.",
+      "files": [
+        {
+          "path": "hooks/use-cube-samples/use-cube-samples.ts",
+          "type": "registry:hook",
+          "target": "hooks/models/use-cube-samples/use-cube-samples.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

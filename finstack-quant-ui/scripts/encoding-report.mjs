@@ -184,7 +184,10 @@ const output = await prettier.format(
   JSON.stringify({ instrumentCount: records.length, instruments: records }),
   { parser: "json" },
 );
-const target = path.join(root, "tests/instruments/encoding-report.json");
+const target = path.join(
+  root,
+  "tests/valuations/instruments/encoding-report.json",
+);
 if (process.argv.includes("--check")) {
   if ((await readFile(target, "utf8")) !== output)
     throw new Error("Encoding report is stale");

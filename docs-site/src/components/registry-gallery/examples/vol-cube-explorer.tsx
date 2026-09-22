@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { VolCubeExplorer } from "@/components/finstack/components/vol-cube-explorer/vol-cube-explorer";
+import { VolCubeExplorer } from "@/components/finstack/core/components/vol-cube-explorer/vol-cube-explorer";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import data from "../data.json";
 const cubes = data.cubes.market as unknown as MarketContextStateWire;

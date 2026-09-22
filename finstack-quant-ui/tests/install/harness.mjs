@@ -45,7 +45,7 @@ export async function visualHarness(repo, item) {
         "figure-data.ts": await readFile(
           path.join(
             repo,
-            "finstack-quant-ui/registry/components/figure-example/figure-data.ts",
+            "finstack-quant-ui/registry/shared/chart/figure-example/figure-data.ts",
           ),
           "utf8",
         ),

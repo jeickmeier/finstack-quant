@@ -411,7 +411,7 @@ finstack-quant-ui/src/generated/types/volatility_index_future.ts
 finstack-quant-ui/src/generated/types/volatility_index_future_option.ts
 finstack-quant-ui/src/generated/types/xccy_swap.ts
 finstack-quant-ui/src/generated/types/yoy_inflation_swap.ts
-finstack-quant-ui/tests/instruments/encoding-report.json
+finstack-quant-ui/tests/valuations/instruments/encoding-report.json
 finstack-quant-wasm/schemas/host/1/valuation_result.schema.json
 finstack-quant-wasm/types/generated/BaseCorrelationParams.ts
 finstack-quant-wasm/types/generated/CalibrationConfig.ts

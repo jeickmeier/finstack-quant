@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { MonteCarloDiagnostics } from "@/components/finstack/components/monte-carlo-diagnostics/monte-carlo-diagnostics";
+import { MonteCarloDiagnostics } from "@/components/finstack/models/components/monte-carlo-diagnostics/monte-carlo-diagnostics";
 import type {
   ValuationResult,
   MonteCarloValuationDetails,

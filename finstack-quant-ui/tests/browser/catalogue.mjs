@@ -24,10 +24,10 @@ try {
           : [];
       const entry =
         mode === "installed"
-          ? "./components/finstack/components/instrument-form/instrument-form"
+          ? "./components/finstack/valuations/components/instrument-form/instrument-form"
           : path.join(
               root,
-              "registry/components/instrument-form/instrument-form.tsx",
+              "registry/valuations/components/instrument-form/instrument-form.tsx",
             );
       await writeFile(
         path.join(directory, "main.tsx"),
@@ -57,7 +57,7 @@ try {
               : {
                   "@/lib/finstack/form": path.join(
                     root,
-                    "registry/lib/finstack-form/form.tsx",
+                    "registry/shared/lib/finstack-form/form.tsx",
                   ),
                   "@/lib/finstack": path.join(root, "src"),
                 },

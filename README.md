@@ -63,6 +63,8 @@ finstack-quant/
 │   └── tests/                    # umbrella-level integration tests
 ├── finstack-quant-py/            # PyO3 bindings; builds the `finstack_quant` package
 ├── finstack-quant-wasm/          # wasm-bindgen bindings + hand-written JS facade
+├── finstack-quant-ui/            # shadcn registry; crate-first React components
+├── docs-site/                    # documentation site and registry gallery
 ├── benchmarks/                   # materialization benchmark fixtures and notes
 ├── docs/                         # references, contracts, serde policy, design notes
 ├── scripts/                      # generation and check scripts driven by mise tasks

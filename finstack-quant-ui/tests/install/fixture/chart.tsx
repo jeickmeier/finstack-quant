@@ -9,7 +9,7 @@ import {
   FinstackChart,
   chartSelection,
   type FigureHandle,
-} from "@/components/finstack/primitives/finstack-chart/finstack-chart";
+} from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import { figureExample } from "./figure-data";
 const points = [
   { id: "a", x: 1, y: 12 },

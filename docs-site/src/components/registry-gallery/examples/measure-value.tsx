@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { MeasureValue } from "@/components/finstack/primitives/measure-value/measure-value";
+import { MeasureValue } from "@/components/finstack/valuations/primitives/measure-value/measure-value";
 
 export function Example(_props: ExampleProps) {
   return (

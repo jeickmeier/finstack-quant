@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { ExplanationTrace } from "@/components/finstack/components/explanation-trace/explanation-trace";
+import { ExplanationTrace } from "@/components/finstack/valuations/components/explanation-trace/explanation-trace";
 
 export function Example({ density = "compact" }: ExampleProps) {
   return (

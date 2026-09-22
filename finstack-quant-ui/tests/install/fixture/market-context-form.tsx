@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { MarketContextForm } from "@/components/finstack/components/market-context-form/market-context-form";
+import { MarketContextForm } from "@/components/finstack/core/components/market-context-form/market-context-form";
 
 import data from "./data.json";
 const validate = async (json: string) => json;

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "calibration-form",
+      "type": "registry:component",
+      "docs": "Editable canonical calibration envelope from the generated root, step and MarketQuote contracts. Requires explicit defaultJson and native validate callback; onSubmit receives canonical JSON only. Remount for a new document. No solver or business defaults are inferred.",
+      "files": [
+        {
+          "path": "components/calibration-form/calibration-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/calibration/components/calibration-form/calibration-form.tsx"
+        },
+        {
+          "path": "components/calibration-form/calibration.ts",
+          "type": "registry:component",
+          "target": "components/finstack/calibration/components/calibration-form/calibration.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/schema-form",
+        "@finstack/contract-calibration",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "calibration-report",
+      "type": "registry:component",
+      "docs": "Present native report metrics, residual identities, diagnostics and structured failures without unit conversion. Accepts the published CalibrationReport; complete raw report metadata remains visible. Optional caller-owned linking uses [stepId, quoteId] keys.",
+      "files": [
+        {
+          "path": "components/calibration-report/calibration-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/calibration/components/calibration-report/calibration-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-table",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/use-linked-selection"
+      ],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "calibration-fit-chart",
+      "type": "registry:component",
+      "docs": "Plot signed returned residuals against zero in separate step and canonical quote-kind panels. Unmatched quote identities are isolated; missing quote-unit conventions are labeled solver units. Supports shared publication/export props, callbacks, tooltip slots and optional accepted selection.",
+      "files": [
+        {
+          "path": "components/calibration-fit-chart/calibration-fit-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart.tsx"
+        },
+        {
+          "path": "components/calibration-fit-chart/residuals.ts",
+          "type": "registry:component",
+          "target": "components/finstack/calibration/components/calibration-fit-chart/residuals.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/use-linked-selection",
+        "@finstack/contract-calibration"
+      ],
+      "dependencies": ["react@19.2.8", "finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-calibrate",
+      "type": "registry:hook",
+      "docs": "Full-envelope native calibration, static diagnostics and canonical validation through FinstackQueryProvider. Null disables a request; exact envelope and worker session own query identity. Structured native errors and complete result fields are preserved.",
+      "files": [
+        {
+          "path": "hooks/use-calibrate/use-calibrate.ts",
+          "type": "registry:hook",
+          "target": "hooks/calibration/use-calibrate/use-calibrate.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/use-finstack"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

@@ -7,70 +7,76 @@ export const importHarnesses = {
     })),
   "use-finstack": () =>
     Promise.all([
-      import("@/hooks/use-finstack/use-finstack"),
-      import("@/hooks/use-finstack/client"),
-      import("@/hooks/use-finstack/version"),
-      import("@/hooks/use-finstack/validation"),
-      import("@/hooks/use-finstack/snapshot"),
-      import("@/hooks/use-finstack/query"),
+      import("@/hooks/shared/use-finstack/use-finstack"),
+      import("@/hooks/shared/use-finstack/client"),
+      import("@/hooks/shared/use-finstack/version"),
+      import("@/hooks/shared/use-finstack/validation"),
+      import("@/hooks/shared/use-finstack/snapshot"),
+      import("@/hooks/shared/use-finstack/query"),
     ]).then((modules) => ({ name: "use-finstack", modules: modules.length })),
-  "use-price-instrument": () =>
-    Promise.all([
-      import("@/hooks/use-price-instrument/use-price-instrument"),
-    ]).then((modules) => ({
-      name: "use-price-instrument",
-      modules: modules.length,
-    })),
   "use-linked-selection": () =>
     Promise.all([
-      import("@/hooks/use-linked-selection/use-linked-selection"),
+      import("@/hooks/shared/use-linked-selection/use-linked-selection"),
     ]).then((modules) => ({
       name: "use-linked-selection",
       modules: modules.length,
     })),
-  "use-instrument-validator": () =>
-    Promise.all([
-      import("@/hooks/use-instrument-validator/use-instrument-validator"),
-    ]).then((modules) => ({
-      name: "use-instrument-validator",
-      modules: modules.length,
-    })),
-  "use-cashflows": () =>
-    Promise.all([import("@/hooks/use-cashflows/use-cashflows")]).then(
-      (modules) => ({ name: "use-cashflows", modules: modules.length }),
-    ),
-  "use-market-validator": () =>
-    Promise.all([
-      import("@/hooks/use-market-validator/use-market-validator"),
-    ]).then((modules) => ({
-      name: "use-market-validator",
-      modules: modules.length,
-    })),
-  "use-fx-delta-samples": () =>
-    Promise.all([
-      import("@/hooks/use-fx-delta-samples/use-fx-delta-samples"),
-    ]).then((modules) => ({
-      name: "use-fx-delta-samples",
-      modules: modules.length,
-    })),
-  "use-cube-samples": () =>
-    Promise.all([import("@/hooks/use-cube-samples/use-cube-samples")]).then(
-      (modules) => ({ name: "use-cube-samples", modules: modules.length }),
-    ),
-  "use-calibrate": () =>
-    Promise.all([import("@/hooks/use-calibrate/use-calibrate")]).then(
-      (modules) => ({ name: "use-calibrate", modules: modules.length }),
-    ),
-  "use-scenario-table": () =>
-    Promise.all([import("@/hooks/use-scenario-table/use-scenario-table")]).then(
-      (modules) => ({ name: "use-scenario-table", modules: modules.length }),
-    ),
   "finstack-worker": () =>
     Promise.all([
       import("@/workers/finstack-service"),
       import("@/workers/finstack-contract"),
     ]).then((modules) => ({
       name: "finstack-worker",
+      modules: modules.length,
+    })),
+  "use-market-validator": () =>
+    Promise.all([
+      import("@/hooks/core/use-market-validator/use-market-validator"),
+    ]).then((modules) => ({
+      name: "use-market-validator",
+      modules: modules.length,
+    })),
+  "use-price-instrument": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-price-instrument/use-price-instrument"),
+    ]).then((modules) => ({
+      name: "use-price-instrument",
+      modules: modules.length,
+    })),
+  "use-instrument-validator": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-instrument-validator/use-instrument-validator"),
+    ]).then((modules) => ({
+      name: "use-instrument-validator",
+      modules: modules.length,
+    })),
+  "use-cashflows": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-cashflows/use-cashflows"),
+    ]).then((modules) => ({ name: "use-cashflows", modules: modules.length })),
+  "use-scenario-table": () =>
+    Promise.all([
+      import("@/hooks/valuations/use-scenario-table/use-scenario-table"),
+    ]).then((modules) => ({
+      name: "use-scenario-table",
+      modules: modules.length,
+    })),
+  "use-calibrate": () =>
+    Promise.all([
+      import("@/hooks/calibration/use-calibrate/use-calibrate"),
+    ]).then((modules) => ({ name: "use-calibrate", modules: modules.length })),
+  "use-fx-delta-samples": () =>
+    Promise.all([
+      import("@/hooks/models/use-fx-delta-samples/use-fx-delta-samples"),
+    ]).then((modules) => ({
+      name: "use-fx-delta-samples",
+      modules: modules.length,
+    })),
+  "use-cube-samples": () =>
+    Promise.all([
+      import("@/hooks/models/use-cube-samples/use-cube-samples"),
+    ]).then((modules) => ({
+      name: "use-cube-samples",
       modules: modules.length,
     })),
   "finstack-fixtures": () =>

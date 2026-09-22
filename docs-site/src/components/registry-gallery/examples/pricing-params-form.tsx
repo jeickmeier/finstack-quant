@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   PricingParamsForm,
   type PricingParams,
-} from "@/components/finstack/components/pricing-params-form/pricing-params-form";
+} from "@/components/finstack/valuations/components/pricing-params-form/pricing-params-form";
 import data from "../data.json";
 
 export function Example(_props: ExampleProps) {

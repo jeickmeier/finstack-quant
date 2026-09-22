@@ -1,0 +1,30 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "covenant-report",
+      "type": "registry:component",
+      "docs": "Optional original valuation covenant payload rendered losslessly; no verdict or financial headroom is inferred.",
+      "files": [
+        {
+          "path": "components/covenant-report/covenant-report.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/covenants/components/covenant-report/covenant-report.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

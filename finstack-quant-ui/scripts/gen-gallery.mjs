@@ -20,12 +20,12 @@ const visual = registry.items
 const nonvisual = registry.items.filter((item) => !visualTypes.has(item.type));
 const sources = {
   bond: "src/fixtures/results/bond.json",
-  market: "tests/market-browser/cases.json",
-  cubes: "tests/cubes/cases.json",
+  market: "tests/core/market-browser/cases.json",
+  cubes: "tests/core/cubes/cases.json",
   calibration: "tests/calibration/cases.json",
-  scenarios: "tests/scenarios/cases.json",
-  cashflows: "tests/cashflows/cases.json",
-  details: "tests/details/cases.json",
+  scenarios: "tests/valuations/scenario-table/cases.json",
+  cashflows: "tests/valuations/cashflows/cases.json",
+  details: "tests/valuations/details/cases.json",
 };
 const data = {},
   provenance = [];

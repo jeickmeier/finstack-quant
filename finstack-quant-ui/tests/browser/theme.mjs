@@ -37,7 +37,7 @@ try {
   await mkdir(path.join(consumer, "public"));
   await writeFile(
     path.join(consumer, "public/tenant.css"),
-    await readFile(path.join(root, "tests/fixtures/tenant.css")),
+    await readFile(path.join(root, "tests/shared/fixtures/tenant.css")),
   );
 
   await buildConsumer(consumer, {

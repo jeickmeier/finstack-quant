@@ -1,0 +1,387 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "items": [
+    {
+      "name": "field-frame",
+      "type": "registry:ui",
+      "docs": "Controlled field-frame primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/field-frame/field-frame.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/primitives/field-frame/field-frame.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "button",
+        "field",
+        "popover"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "finstack-table",
+      "type": "registry:ui",
+      "docs": "Controlled finstack-table primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "table/finstack-table/finstack-table.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/table/finstack-table/finstack-table.tsx"
+        },
+        {
+          "path": "table/finstack-table/selection.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/table/finstack-table/selection.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/finstack-format",
+        "@finstack/use-linked-selection",
+        "table"
+      ],
+      "dependencies": ["@tanstack/react-table@9.2.4"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "enum-field",
+      "type": "registry:ui",
+      "docs": "Controlled enum-field primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/enum-field/enum-field.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/primitives/enum-field/enum-field.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame",
+        "label",
+        "radio-group",
+        "select"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "json-viewer",
+      "type": "registry:ui",
+      "docs": "Read-only JSON with lossless formatted presentation and an Original toggle. Numeric tokens remain exact. Invalid JSON, including duplicate keys, stays in Original view with a formatting notice. Copy and download always preserve the supplied bytes. Import the installed finstack theme; no worker or workbench is required.",
+      "files": [
+        {
+          "path": "primitives/json-viewer/json-viewer.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/primitives/json-viewer/json-viewer.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "button"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] },
+      "dependencies": ["lossless-json@4.3.1"]
+    },
+    {
+      "name": "id-combobox",
+      "type": "registry:ui",
+      "docs": "Controlled id-combobox primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required. Composes the stock shadcn Combobox with controlled free text, supplied filtered suggestions and TanStack list virtualization; IDs are never inferred.",
+      "files": [
+        {
+          "path": "primitives/id-combobox/id-combobox.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/primitives/id-combobox/id-combobox.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/field-frame",
+        "combobox",
+        "input-group"
+      ],
+      "dependencies": ["@tanstack/react-virtual@3.14.13"],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "finstack-chart",
+      "type": "registry:ui",
+      "docs": "Standalone native SVG publication figure with complete titles, captions, sources and exports. Supply native chart definitions for scale/axis/unit conventions and annotation marks. Import the theme; no WASM, forms, tables or worker runtime is required. Export needs a same-origin font stylesheet and explicit dimensions.",
+      "files": [
+        {
+          "path": "chart/finstack-chart/finstack-chart.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/chart/finstack-chart/finstack-chart.tsx"
+        },
+        {
+          "path": "chart/finstack-chart/presentation.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/chart/finstack-chart/presentation.ts"
+        },
+        {
+          "path": "chart/finstack-chart/figure.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/chart/finstack-chart/figure.ts"
+        },
+        {
+          "path": "chart/finstack-chart/export.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/chart/finstack-chart/export.ts"
+        },
+        {
+          "path": "chart/finstack-chart/selection.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/chart/finstack-chart/selection.ts"
+        },
+        {
+          "path": "chart/finstack-chart/heatmap.ts",
+          "type": "registry:ui",
+          "target": "components/finstack/shared/chart/finstack-chart/heatmap.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "d3-scale@4.0.2",
+        "@types/d3-scale@4.0.9",
+        "culori@4.0.2",
+        "@types/culori@4.0.1"
+      ],
+      "categories": ["Primitive Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "figure-example",
+      "type": "registry:component",
+      "docs": "Standalone supplied-data publication example. Uses the same figure props on screen and in explicit 900x600 vector / 1800x1200 pixel exports (6x4 inches at 300 PPI). The theme includes licensed fonts; install IBM Plex Sans in a desktop editor if it cannot use embedded webfonts.",
+      "files": [
+        {
+          "path": "chart/figure-example/figure-example.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/shared/chart/figure-example/figure-example.tsx"
+        },
+        {
+          "path": "chart/figure-example/linked-figures.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/shared/chart/figure-example/linked-figures.tsx"
+        },
+        {
+          "path": "chart/figure-example/figure-data.ts",
+          "type": "registry:component",
+          "target": "components/finstack/shared/chart/figure-example/figure-data.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-chart",
+        "@finstack/use-linked-selection",
+        "button",
+        "checkbox",
+        "label"
+      ],
+      "categories": ["Individual Components"],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "schema-form",
+      "type": "registry:component",
+      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates.",
+      "files": [
+        {
+          "path": "components/schema-form/schema-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/shared/components/schema-form/schema-form.tsx"
+        },
+        {
+          "path": "components/schema-form/render-field.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/shared/components/schema-form/render-field.tsx"
+        },
+        {
+          "path": "components/schema-form/schema.ts",
+          "type": "registry:component",
+          "target": "components/finstack/shared/components/schema-form/schema.ts"
+        },
+        {
+          "path": "components/schema-form/discriminator.ts",
+          "type": "registry:component",
+          "target": "components/finstack/shared/components/schema-form/discriminator.ts"
+        },
+        {
+          "path": "components/schema-form/issue-mapping.ts",
+          "type": "registry:component",
+          "target": "components/finstack/shared/components/schema-form/issue-mapping.ts"
+        },
+        {
+          "path": "components/schema-form/field-renderer.ts",
+          "type": "registry:component",
+          "target": "components/finstack/shared/components/schema-form/field-renderer.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-form",
+        "@finstack/finstack-codec",
+        "@finstack/enum-field",
+        "button",
+        "popover"
+      ],
+      "dependencies": ["react@19.2.8", "zod@4.6.5"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-finstack",
+      "type": "registry:hook",
+      "docs": "Browser-only shared worker and complete immutable queries. Wrap with FinstackQueryProvider, or FinstackProvider inside an existing QueryClientProvider. Worker and hooks follow the consumer source directory; the consumer owns its standard @/* source alias. Keep the matching local WASM package installed.",
+      "files": [
+        {
+          "path": "hooks/use-finstack/use-finstack.tsx",
+          "type": "registry:hook",
+          "target": "hooks/shared/use-finstack/use-finstack.tsx"
+        },
+        {
+          "path": "hooks/use-finstack/client.ts",
+          "type": "registry:hook",
+          "target": "hooks/shared/use-finstack/client.ts"
+        },
+        {
+          "path": "hooks/use-finstack/version.ts",
+          "type": "registry:hook",
+          "target": "hooks/shared/use-finstack/version.ts"
+        },
+        {
+          "path": "hooks/use-finstack/validation.ts",
+          "type": "registry:hook",
+          "target": "hooks/shared/use-finstack/validation.ts"
+        },
+        {
+          "path": "hooks/use-finstack/snapshot.ts",
+          "type": "registry:hook",
+          "target": "hooks/shared/use-finstack/snapshot.ts"
+        },
+        {
+          "path": "hooks/use-finstack/query.ts",
+          "type": "registry:hook",
+          "target": "hooks/shared/use-finstack/query.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-worker"],
+      "dependencies": ["@tanstack/react-query@5.103.1", "react@19.2.8"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "use-linked-selection",
+      "type": "registry:hook",
+      "docs": "React-only accepted string identity, controlled or locally owned. Pass null to clear; use stable supplied keys. Activation and focus are separate. The consumer owns its standard @/* source alias.",
+      "files": [
+        {
+          "path": "hooks/use-linked-selection/use-linked-selection.ts",
+          "type": "registry:hook",
+          "target": "hooks/shared/use-linked-selection/use-linked-selection.ts"
+        }
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": [],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "finstack-form",
+      "type": "registry:ui",
+      "docs": "Shared TanStack Form contexts bound to registry fields, array controls, error summary and submit/reset controls. Values remain working edits; canonical validation is a separate boundary.",
+      "files": [
+        {
+          "path": "lib/finstack-form/form.tsx",
+          "type": "registry:lib",
+          "target": "lib/finstack/form.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/field-frame",
+        "@finstack/decimal-input",
+        "@finstack/date-input",
+        "@finstack/enum-field",
+        "button",
+        "checkbox",
+        "input"
+      ],
+      "dependencies": ["@tanstack/react-form@1.33.5", "react@19.2.8"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "finstack-worker",
+      "type": "registry:file",
+      "docs": "Installs the worker and its service/contracts under the consumer source directory workers/. Initialize through FinstackProvider in the browser; install the matching local WASM package. Only existing native facade calls run here.",
+      "files": [
+        {
+          "path": "file/finstack.worker.ts",
+          "type": "registry:file",
+          "target": "workers/finstack.worker.ts"
+        },
+        {
+          "path": "file/finstack-service.ts",
+          "type": "registry:file",
+          "target": "workers/finstack-service.ts"
+        },
+        {
+          "path": "file/finstack-contract.ts",
+          "type": "registry:file",
+          "target": "workers/finstack-contract.ts"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-host",
+        "@finstack/finstack-format",
+        "@finstack/contract-market-context-state"
+      ],
+      "dependencies": ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    }
+  ]
+}

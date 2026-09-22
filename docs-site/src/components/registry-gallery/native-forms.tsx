@@ -1,13 +1,13 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { SchemaForm } from "@/components/finstack/components/schema-form/schema-form";
-import { InstrumentForm } from "@/components/finstack/components/instrument-form/instrument-form";
-import { MarketContextForm } from "@/components/finstack/components/market-context-form/market-context-form";
-import { CalibrationForm } from "@/components/finstack/components/calibration-form/calibration-form";
-import { useInstrumentValidator } from "@/hooks/use-instrument-validator/use-instrument-validator";
-import { useMarketValidator } from "@/hooks/use-market-validator/use-market-validator";
-import { useCalibrationValidator } from "@/hooks/use-calibrate/use-calibrate";
+import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
+import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
+import { MarketContextForm } from "@/components/finstack/core/components/market-context-form/market-context-form";
+import { CalibrationForm } from "@/components/finstack/calibration/components/calibration-form/calibration-form";
+import { useInstrumentValidator } from "@/hooks/valuations/use-instrument-validator/use-instrument-validator";
+import { useMarketValidator } from "@/hooks/core/use-market-validator/use-market-validator";
+import { useCalibrationValidator } from "@/hooks/calibration/use-calibrate/use-calibrate";
 import * as bond from "@/lib/finstack/generated/instrument/bond";
 import data from "./data.json";
 export function NativeForms({ name }: { name: string }) {

@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { JsonViewer } from "@/components/finstack/primitives/json-viewer/json-viewer";
+import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 
 export function Example({ density = "compact" }: ExampleProps) {
   return (

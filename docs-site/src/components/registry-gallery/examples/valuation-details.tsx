@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { ValuationDetails } from "@/components/finstack/components/valuation-details/valuation-details";
+import { ValuationDetails } from "@/components/finstack/valuations/components/valuation-details/valuation-details";
 import type { ValuationResult } from "finstack-quant-wasm";
 import { createWireCodec } from "@/lib/finstack/codec.mjs";
 import schema from "@/lib/finstack/generated/schemas/valuation_result.json";
