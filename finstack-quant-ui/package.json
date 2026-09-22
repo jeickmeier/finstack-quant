@@ -19,6 +19,7 @@
     "test": "vitest run",
     "check": "npm run check:generated && npm run format:check && npm run check:tokens && npm run check:registry && npm run typecheck && npm test",
     "format:check": "prettier --check .",
+    "format:fix": "prettier --write .",
     "test:browser": "node tests/browser/run.mjs",
     "test:footprint": "REGISTRY_MEASURE_FOOTPRINT=1 node tests/browser/run.mjs",
     "check:registry": "node scripts/check-registry.mjs",

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
 import { MeasuresGrid } from "./components/finstack/components/measures-grid/measures-grid";
+import type { MetricMetadata } from "finstack-quant-wasm";
 import fixture from "./fixture.json";
 function App() {
   const [density, setDensity] = useState<"compact" | "comfortable">("compact");
@@ -40,7 +41,9 @@ function App() {
       <MeasuresGrid
         result={fixture.result}
         compareTo={comparison}
-        groups={fixture.groups}
+        comparisonFormattedValue="EUR 987,654.32"
+        metadata={fixture.metadata as MetricMetadata[]}
+        comparisonMetadata={fixture.comparisonMetadata as MetricMetadata[]}
         density={density}
       />
     </main>

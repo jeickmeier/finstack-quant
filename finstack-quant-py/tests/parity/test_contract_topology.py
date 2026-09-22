@@ -1004,6 +1004,7 @@ def test_wasm_core_curve_member_pins_match_binding_source() -> None:
         "hazard_curve_members",
         "forward_curve_members",
         "vol_cube_members",
+        "fx_delta_vol_surface_members",
     ]:
         for js_name in block[member_key]:
             assert (

@@ -22,7 +22,9 @@ from finstack_quant.valuations.instruments import (
     InterestRateSwap,
     MarketHistory,
     MetricPricingOverrides,
+    metric_metadata,
     price_instrument,
+    validate_instrument_json,
 )
 
 AS_OF = datetime.date(2024, 1, 15)
@@ -332,3 +334,61 @@ def test_instrument_cashflows_accepts_typed_instrument_and_date() -> None:
     assert isinstance(frame, pd.DataFrame)
     assert len(frame) > 0
     assert envelope["total_pv"] == pytest.approx(price_instrument(_bond(), _market(), AS_OF).price, abs=0.01)
+
+
+def test_metric_metadata_describes_canonical_keys() -> None:
+    keys = [
+        "ytm",
+        "bucketed_dv01::A_x3a_x3aB::5y",
+        "custom_metric",
+        "pv01::USD-OIS",
+        "ytm",
+    ]
+    metadata = metric_metadata(keys)
+    assert [entry["key"] for entry in metadata] == keys
+    assert metadata[0] == {
+        "key": "ytm",
+        "metric": "ytm",
+        "components": [],
+        "unit": "decimal",
+        "group": "Pricing",
+        "bucketed": False,
+    }
+    assert metadata[1] == {
+        "key": "bucketed_dv01::A_x3a_x3aB::5y",
+        "metric": "bucketed_dv01",
+        "components": ["A::B", "5y"],
+        "unit": "currency",
+        "group": "Sensitivity",
+        "bucketed": True,
+    }
+    assert metadata[2] == {
+        "key": "custom_metric",
+        "metric": "custom_metric",
+        "components": [],
+        "unit": "unknown",
+        "group": None,
+        "bucketed": False,
+    }
+    assert metadata[3]["components"] == ["USD-OIS"]
+    assert metadata[3]["bucketed"] is False
+    assert metric_metadata([]) == []
+    with pytest.raises(ValueError):
+        metric_metadata(["pv01::USD_x2dOIS"])
+
+
+def test_validate_instrument_json_merges_overrides_before_validation() -> None:
+    document = json.loads(_bond().to_json())
+    document["instrument"]["spec"]["metric_pricing_overrides"] = {"theta_period": "invalid"}
+    raw = json.dumps(document)
+
+    with pytest.raises(ValueError):
+        validate_instrument_json(raw)
+    prepared = validate_instrument_json(raw, pricing_options='{"theta_period":"1W"}')
+    assert (
+        json.loads(prepared)["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"]
+        == "1W"
+    )
+    assert validate_instrument_json(prepared) == prepared
+    with pytest.raises(ValueError, match="invalid pricing options JSON"):
+        validate_instrument_json(raw, pricing_options="{")

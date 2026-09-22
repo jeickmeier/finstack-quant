@@ -145,6 +145,7 @@
       "registryDependencies": [
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
+        "@finstack/finstack-codec",
         "@finstack/decimal-input",
         "@finstack/finstack-format"
       ],
@@ -171,6 +172,7 @@
       "registryDependencies": [
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
+        "@finstack/finstack-codec",
         "@finstack/decimal-input",
         "@finstack/enum-field",
         "@finstack/field-frame",
@@ -264,6 +266,7 @@
       "registryDependencies": [
         "@finstack/finstack-base",
         "@finstack/finstack-theme",
+        "@finstack/finstack-codec",
         "@finstack/finstack-table",
         "@finstack/decimal-input"
       ],

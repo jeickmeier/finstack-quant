@@ -198,6 +198,104 @@ test('core.FxMatrix quote updates invalidate cached crosses', () => {
   }
 });
 
+test('core.Money.fromDecimalStr accepts exact fixed and scientific text', () => {
+  for (const [text, expected, currency] of [
+    ['12345678901234567890.12345', '12345678901234567890.12345', 'USD'],
+    ['1.2345e3', '1234.5', 'EUR'],
+    ['0.1e29', '10000000000000000000000000000', 'USD'],
+    ['-7.9228162514264337593543950335e28', '-79228162514264337593543950335', 'USD'],
+    ['0e999999', '0', 'USD'],
+  ]) {
+    const m = core.Money.fromDecimalStr(text, currency);
+    try {
+      assert.equal(m.amountDecimal(), expected);
+      assert.equal(m.currency.code, currency);
+    } finally {
+      m.free();
+    }
+  }
+  for (const [text, formatted] of [
+    ['1.00e-27', '0.0000000000000000000000000010'],
+    ['2000e-31', '0.0000000000000000000000000002'],
+  ]) {
+    const m = core.Money.fromDecimalStr(text, 'USD');
+    try {
+      assert.equal(m.formatWith(28, false), formatted);
+    } finally {
+      m.free();
+    }
+  }
+});
+
+test('core.Money.fromDecimalStr rejects inexact amounts', () => {
+  for (const text of [
+    '1.24500000000000000000000000001',
+    '1.23450000000000000000000000001e3',
+    'NaN',
+    '1e-29',
+    '1e29',
+    '1.23e-28',
+  ]) {
+    assert.throws(() => core.Money.fromDecimalStr(text, 'USD'), /exactly representable/);
+  }
+  assert.throws(() => core.Money.fromDecimalStr('1.0', 'NOPE'));
+});
+
+test('core.Money formatWith honours returned rounding modes', () => {
+  for (const [mode, amount, expected] of [
+    ['bankers', '1.245', 'USD 1.24'],
+    ['bankers', '1.255', 'USD 1.26'],
+    ['away_from_zero', '-1.245', 'USD -1.25'],
+    ['away_from_zero', '1.241', 'USD 1.24'],
+    ['toward_zero', '-1.259', 'USD -1.25'],
+    ['floor', '-1.241', 'USD -1.25'],
+    ['floor', '1.249', 'USD 1.24'],
+    ['ceil', '1.241', 'USD 1.25'],
+    ['ceil', '-1.249', 'USD -1.24'],
+  ]) {
+    const m = core.Money.fromDecimalStr(amount, 'USD');
+    try {
+      assert.equal(m.formatWith(2, true, ',', mode), expected);
+      assert.equal(m.amountDecimal(), amount);
+    } finally {
+      m.free();
+    }
+  }
+});
+
+test('core.Money formatWith applies native defaults and JPY zero scale', () => {
+  const usd = core.Money.fromDecimalStr('1234.567', 'USD');
+  try {
+    assert.equal(usd.formatWith(), 'USD 1234.57');
+    assert.equal(usd.formatWith(2, true, ','), 'USD 1,234.57');
+  } finally {
+    usd.free();
+  }
+  const jpy = core.Money.fromDecimalStr('1.5', 'JPY');
+  try {
+    assert.equal(jpy.formatWith(0), 'JPY 2');
+  } finally {
+    jpy.free();
+  }
+});
+
+test('core.Money formatWith rejects invalid options and still frees the handle', () => {
+  const m = core.Money.fromDecimalStr('1.245', 'USD');
+  try {
+    for (const decimals of [-1, 1.5, Number.NaN, Infinity, '2', 1_000_001]) {
+      assert.throws(
+        () => m.formatWith(decimals),
+        /non-negative integer|precision/,
+        `decimals=${decimals}`
+      );
+    }
+    assert.throws(() => m.formatWith(2, true, ',,'), /single character/);
+    assert.throws(() => m.formatWith(2, true, ',', 'half_up'));
+  } finally {
+    m.free();
+  }
+});
+
 test('core.FxMatrix rate returns FxRateResult with rate/triangulated getters', () => {
   const fx = new core.FxMatrix();
   const policy = core.FxConversionPolicy.cashflowDate();

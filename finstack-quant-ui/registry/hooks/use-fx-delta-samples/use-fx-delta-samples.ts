@@ -1,7 +1,7 @@
 "use client";
 import { requestSnapshot } from "../use-finstack/snapshot";
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import { useFinstack } from "../use-finstack/use-finstack";
+import { queryOptions } from "@tanstack/react-query";
+import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
 import type { FxDeltaSampleRequest } from "../../workers/finstack-contract";
 export type { FxDeltaSampleRequest } from "../../workers/finstack-contract";
@@ -22,20 +22,13 @@ export function fxDeltaOptions(
       return client.call("sampleFxDelta", snapshot);
     },
     enabled: client !== null && snapshot !== null,
-    staleTime: Infinity,
-    retry: false,
+    ...workerQueryPolicy,
   });
 }
 /** Native annualized Black decimal volatilities in coordinate order; errors are unchanged. */
 export function useFxDeltaSamples(request: FxDeltaSampleRequest | null) {
-  const worker = useFinstack();
-  const query = useQuery({
+  return useWorkerQuery((worker) => ({
     ...fxDeltaOptions(worker.client, worker.session, request),
     enabled: worker.status === "ready" && request !== null,
-  });
-  return {
-    ...query,
-    error: worker.error ?? query.error,
-    workerStatus: worker.status,
-  };
+  }));
 }

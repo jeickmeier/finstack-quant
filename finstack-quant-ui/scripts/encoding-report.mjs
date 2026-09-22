@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import prettier from "prettier";
+import { schemaAt } from "../src/schema.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = async (name) =>
   JSON.parse(await readFile(path.join(root, name), "utf8"));
@@ -11,9 +12,7 @@ const roots = (await read("src/generated/roots.json")).filter((item) =>
 const fixtures = await read("src/generated/fixtures.json");
 function resolve(root, node) {
   if (!node.$ref) return node;
-  let found = root;
-  for (const key of node.$ref.slice(2).split("/"))
-    found = found[key.replaceAll("~1", "/").replaceAll("~0", "~")];
+  const found = schemaAt(root, node.$ref);
   const { $ref, ...rest } = node;
   return { ...found, ...rest };
 }

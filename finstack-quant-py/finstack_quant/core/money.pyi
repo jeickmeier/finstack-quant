@@ -18,7 +18,7 @@ Example::
 Examples
 --------
 >>> from finstack_quant.core.money import Money
->>> Money(25.0, "USD").format()
+>>> Money(25.0, "USD").format_with()
 'USD 25.00'
 
 """
@@ -65,11 +65,11 @@ class Money:
     --------
     >>> from finstack_quant.core.money import Money
     >>> usd_100 = Money(100.0, "USD")
-    >>> usd_100.format()
+    >>> usd_100.format_with()
     'USD 100.00'
     >>> usd_100 * 1.5
     Money(150.0, 'USD')
-    >>> Money("1234567.891", "USD").format(group=",")
+    >>> Money("1234567.891", "USD").format_with(group=",")
     'USD 1,234,567.89'
     >>> Money(300.0, "USD") / Money(100.0, "USD")
     3.0
@@ -136,8 +136,52 @@ class Money:
         --------
         >>> from decimal import Decimal
         >>> from finstack_quant.core.money import Money
-        >>> Money.from_decimal(Decimal("1.25"), "USD").format()
+        >>> Money.from_decimal(Decimal("1.25"), "USD").format_with()
         'USD 1.25'
+
+        """
+        ...
+
+    @classmethod
+    def from_decimal_str(cls, amount: str, currency: Union[Currency, str]) -> Money:
+        """
+        Construct from exact decimal text, rejecting inexact amounts.
+
+        Unlike general ``Money`` construction or JSON deserialization, this
+        entry point never routes the amount through ``float`` or tolerates
+        lossy re-rendering: the text must be exactly representable as a Rust
+        ``Decimal`` (96-bit mantissa, at most 28 fractional digits). For
+        scientific input the mantissa itself must be exact before the
+        exponent is applied. The currency is a tag only; no FX conversion is
+        performed.
+
+        Parameters
+        ----------
+        amount : str
+            Exact decimal amount text in major currency units, in fixed-point
+            (``"1234.56"``) or scientific (``"1.2345e3"``) notation.
+        currency : Currency | str
+            Currency object or ISO-4217 code string.
+
+        Returns
+        -------
+        Money
+            Decimal-backed amount equal to the supplied text exactly.
+
+        Raises
+        ------
+        ValueError
+            If *amount* is malformed, non-finite, requires more precision
+            than ``Decimal`` can hold, or underflows its supported scale;
+            or if *currency* is invalid.
+        TypeError
+            If *amount* or *currency* has an unsupported host type.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.money import Money
+        >>> Money.from_decimal_str("1.245", "USD").amount_decimal
+        Decimal('1.245')
 
         """
         ...
@@ -221,7 +265,7 @@ class Money:
         """
         ...
 
-    def format(
+    def format_with(
         self,
         decimals: int | None = None,
         show_currency: bool = True,
@@ -237,7 +281,8 @@ class Money:
         Parameters
         ----------
         decimals : int | None
-            Number of decimal places. Defaults to the currency's minor units.
+            Number of decimal places, inclusive range ``0`` to ``1_000_000``.
+            Defaults to the currency's minor units.
         show_currency : bool
             Whether to prepend the currency code (default ``True``).
         group : str | None
@@ -255,8 +300,15 @@ class Money:
         Raises
         ------
         ValueError
-            If *group* is not a single character or *rounding* is an
+            If *decimals* exceeds the native precision bound of 1,000,000,
+            *group* is not a single character, or *rounding* is an
             unrecognised name.
+        OverflowError
+            If *decimals* is a negative integer or too large to fit the
+            native ``usize`` precision type.
+        TypeError
+            If *decimals*, *show_currency*, or *group* has an unsupported
+            host type (for example a non-integer precision).
         """
         ...
 
@@ -300,7 +352,7 @@ class Money:
         --------
         >>> from finstack_quant.core.money import Money
         >>> money = Money(25.0, "USD")
-        >>> Money.from_json(money.to_json()).format()
+        >>> Money.from_json(money.to_json()).format_with()
         'USD 25.00'
 
         """

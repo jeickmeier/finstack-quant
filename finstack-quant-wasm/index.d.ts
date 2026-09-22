@@ -371,6 +371,39 @@ export interface Money extends WasmOwned {
    */
   negate(): Money;
   /**
+   * Format the amount with explicit display options.
+   *
+   * `decimals` accepts `null`/`undefined` (currency ISO minor units) or a
+   * non-negative integer up to 1,000,000. `group` is an optional
+   * single-character thousands separator (e.g. `","`); `null`/`undefined`
+   * disables grouping. `rounding` accepts the canonical mode names
+   * (`"bankers"`, `"away_from_zero"`, `"toward_zero"`, `"floor"`,
+   * `"ceil"`); `null`/`undefined` selects bankers rounding. Formatting
+   * never mutates the stored amount.
+   *
+   * @example
+   * ```javascript
+   * const m = core.Money.fromDecimalStr("1234.567", "USD");
+   * try {
+   *   m.formatWith(2, true, ",", "bankers");  // "USD 1,234.57"
+   * } finally {
+   *   m.free();
+   * }
+   * ```
+   * @param decimals - JavaScript number of fractional digits, an integer in `0..=1_000_000`; null or undefined selects ISO minor units.
+   * @param showCurrency - Whether to prepend the ISO code; omitted means true.
+   * @param group - Optional single-character thousands separator; omitted means no grouping.
+   * @param rounding - Canonical lowercase rounding mode; omitted means bankers.
+   * @returns Formatted amount such as `"USD 1,234.57"`.
+   * @throws If `decimals` is not a non-negative integer or exceeds 1,000,000, if `group` is not a single character, or if `rounding` is not a recognised mode name.
+   */
+  formatWith(
+    decimals?: number | null,
+    showCurrency?: boolean | null,
+    group?: string | null,
+    rounding?: string | null
+  ): string;
+  /**
    * Default string representation (e.g. `"USD 10.00"`).
    *
    * @returns Formatted amount with currency code.
@@ -434,6 +467,31 @@ export interface MoneyConstructor {
    * @throws If `json` is malformed or fails strict schema validation.
    */
   fromJson(json: string): Money;
+  /**
+   * Construct from exact decimal text, rejecting inexact amounts.
+   *
+   * `amount` accepts fixed-point (`"1234.56"`) or scientific (`"1.2345e3"`)
+   * text and must be exactly representable as a Rust `Decimal` (96-bit
+   * mantissa, up to 28 fractional digits; the scientific mantissa must
+   * itself fit exactly). Inexact or underflowing amounts throw rather than
+   * being silently rounded, and the text never passes through `f64`. The
+   * currency is a tag only — no FX conversion is performed.
+   *
+   * @example
+   * ```javascript
+   * const m = core.Money.fromDecimalStr("1.245", "USD");
+   * try {
+   *   m.amountDecimal();  // "1.245"
+   * } finally {
+   *   m.free();
+   * }
+   * ```
+   * @param amount - Exact fixed-point or scientific decimal text in major currency units.
+   * @param currency - Case-insensitive ISO-4217 code; surrounding whitespace is trimmed.
+   * @returns The constructed `Money`.
+   * @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a recognised code.
+   */
+  fromDecimalStr(amount: string, currency: string): Money;
 }
 
 /**
@@ -1390,6 +1448,31 @@ export interface VolCubeConstructor {
     forwards: NumericArray,
     interpolationMode?: string
   ): VolCube;
+  /**
+   * Deserialize a canonical SABR cube state without flattening parameter nodes.
+   *
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const cube = core.VolCube.fromJson(
+   *   JSON.stringify({
+   *     id: "USD-SWAPTION",
+   *     expiries: [1],
+   *     tenors: [5],
+   *     params: [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift: null }],
+   *     forwards: [0.03],
+   *     interpolation_mode: "vol",
+   *   })
+   * );
+   * console.log(cube.id);
+   * cube.free();
+   * ```
+   * @param json - Canonical VolCube JSON containing id, expiry and tenor axes in years, row-major SABR nodes and decimal-rate forwards, and interpolation_mode. Missing or null node shifts remain absent; unknown fields are rejected.
+   * @returns A validated VolCube handle owned by the caller; release it with free().
+   * @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
+   */
+  fromJson(json: string): VolCube;
 }
 
 /**
@@ -1721,6 +1804,32 @@ export interface FxDeltaVolSurfaceConstructor {
     rr10d?: NumericArray,
     bf10d?: NumericArray
   ): FxDeltaVolSurface;
+  /**
+   * Deserialize canonical FX delta quotes without reconstructing positional arrays.
+   *
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const surface = core.FxDeltaVolSurface.fromJson(
+   *   JSON.stringify({
+   *     id: "EURUSD",
+   *     expiries: [1],
+   *     atm_vols: [0.12],
+   *     rr_25d: [0.01],
+   *     bf_25d: [0.002],
+   *     rr_10d: null,
+   *     bf_10d: null,
+   *   })
+   * );
+   * console.log(surface.id);
+   * surface.free();
+   * ```
+   * @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.
+   * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
+   * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
+   */
+  fromJson(json: string): FxDeltaVolSurface;
 }
 
 /**
@@ -5448,7 +5557,7 @@ export interface RevolvingCreditConstructor {
  */
 export interface MoneyValue {
   /**
-   * Exact decimal amount, rounded to the currency's ISO 4217 minor-unit scale.
+   * Exact major-unit decimal amount; display rounding is separate and explicit.
    */
   amount: string;
   /**
@@ -5590,6 +5699,36 @@ export interface ValuationMarketNamespace {
 }
 
 /**
+ * Canonical per-key metric interpretation for host presentation.
+ */
+export interface MetricMetadata {
+  /**
+   * Original canonical wire key, retained without renaming.
+   */
+  key: string;
+  /**
+   * Base metric name without composite coordinates.
+   */
+  metric: string;
+  /**
+   * Decoded coordinate labels in original order; empty for scalar metrics.
+   */
+  components: string[];
+  /**
+   * Native unit family; custom or calculator-dependent units remain unknown.
+   */
+  unit: 'currency' | 'decimal' | 'basis_points' | 'years' | 'percent' | 'dimensionless' | 'unknown';
+  /**
+   * Native display group; absent (`null`) for a non-standard base metric.
+   */
+  group: string | null;
+  /**
+   * Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
+   */
+  bucketed: boolean;
+}
+
+/**
  * Namespaced TypeScript entry points for valuation instruments calculations and types.
  * @example
  * ```typescript
@@ -5632,14 +5771,16 @@ export interface ValuationInstrumentsNamespace {
     quotedClean?: number | null
   ): string;
   /**
-   * Validate a canonical v1 instrument envelope.
+   * Validate a canonical v1 instrument envelope after optional metric-pricing
+   * overrides are merged by the canonical pricing path.
    *
    * Bare instrument payloads are rejected. Returns canonical re-serialized JSON.
    * @returns Canonical instrument envelope JSON after schema validation.
    * @param json - Required `finstack_quant.instrument/1` envelope.
-   * @throws Error - Throws a JavaScript exception if `json` is malformed, is not a canonical v1 instrument envelope, fails instrument validation, or cannot be canonically serialized.
+   * @param pricingOptions - Serialized metric-pricing override object merged before native instrument validation; `None` (omitted or null in JavaScript) retains the envelope configuration.
+   * @throws Error - Throws a JavaScript exception if the instrument or override JSON is malformed, the merged payload is not a canonical v1 instrument envelope, instrument validation fails, or the envelope cannot be canonically serialized.
    */
-  validateInstrumentJson(json: string): string;
+  validateInstrumentJson(json: string, pricingOptions?: string | null): string;
   /**
    * Price an instrument from its canonical envelope and return a `ValuationResult` object.
    *
@@ -5778,6 +5919,23 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws a JavaScript exception if the grouped metric registry cannot be converted to a JavaScript value.
    */
   listStandardMetricsGrouped(): Record<string, string[]>;
+  /**
+   * Describe canonical metric identifiers using Rust-owned units and coordinates.
+   * @example
+   * ```typescript
+   * import init, { valuations } from "finstack-quant-wasm";
+   * await init();
+   * const [ytm, bucket] = valuations.instruments.metricMetadata([
+   *   'ytm',
+   *   'bucketed_dv01::USD-OIS::10y',
+   * ]);
+   * console.log(ytm.unit, bucket.components, bucket.bucketed);
+   * ```
+   * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.
+   * @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+   * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
+   */
+  metricMetadata(keys: string[]): MetricMetadata[];
   /**
    * Z-spread-equivalent discount margin for a floating-rate tranche, returned in
    * decimal units (`0.015` = 150 bp).

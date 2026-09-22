@@ -180,13 +180,9 @@ impl<T: IntoJsError + ?Sized> IntoJsError for Box<T> {
 /// `"FinstackError"`. The `kind` property comes from [`IntoJsError`], i.e.
 /// from the error's type — never from its message text, so an identifier
 /// that happens to contain "not found" cannot change the classification.
+/// Convert an error with a `source()` chain into a structured `JsValue` error.
 pub fn to_js_err(e: impl IntoJsError) -> JsValue {
     structured_js_error("FinstackError", &e.js_message(), Some(e.js_kind()), None)
-}
-
-/// Convert an error with a `source()` chain into a structured `JsValue` error.
-pub fn to_js_error(e: &dyn std::error::Error) -> JsValue {
-    js_value_from_message(format_error_chain(e))
 }
 
 /// Serialize a value to a `JsValue` using JSON-compatible conventions.
@@ -348,20 +344,6 @@ fn validation_report_js_error(report: &finstack_quant_core::contract::Validation
 
 fn contract_error_without_report(message: &str, kind: &str) -> JsValue {
     structured_js_error("ContractValidationError", message, Some(kind), None)
-}
-
-fn js_value_from_message(msg: String) -> JsValue {
-    #[cfg(target_arch = "wasm32")]
-    {
-        let err = js_sys::Error::new(&msg);
-        err.set_name("FinstackError");
-        err.into()
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let _ = msg;
-        JsValue::NULL
-    }
 }
 
 /// Largest integer a JavaScript `number` (IEEE-754 double) can represent

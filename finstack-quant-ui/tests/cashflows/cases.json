@@ -7,7 +7,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "f9ce826f0c7625e00fa9f931e33700bb1ef3d7990e73f244dfe2b5e2492c36a9"
+      "sha256": "5c6dc15c81fbb218de42ea0dbb32b3575c85928df1aef71063e387abd5a57717"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",

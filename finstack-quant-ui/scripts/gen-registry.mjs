@@ -103,6 +103,7 @@ const items = [
     })),
     registryDependencies: [
       "@finstack/finstack-host",
+      "@finstack/finstack-format",
       "@finstack/contract-market-context-state",
     ],
     dependencies: ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],

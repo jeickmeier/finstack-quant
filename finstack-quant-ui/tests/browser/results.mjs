@@ -145,7 +145,7 @@ try {
     await page
       .getByText("Raw measure values · units unavailable", { exact: true })
       .count(),
-    1,
+    0,
   );
   const bars = await page.locator("[data-bucket-bar]").evaluateAll((nodes) =>
     nodes.map((track) => {

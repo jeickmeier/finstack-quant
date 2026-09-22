@@ -6,13 +6,15 @@ import type {
   Market,
 } from "finstack-quant-wasm";
 import { exportValuation } from "@/lib/finstack/host";
+import { serializeHost } from "@/lib/finstack/codec.mjs";
+import { formatMoney } from "@/lib/finstack/format/format";
 import { errorValue, type Envelope, type WorkerApi } from "./finstack-contract";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
 export function createService(native: {
   initialize: (wasmUrl?: string) => Promise<unknown>;
   core: Pick<
     typeof core,
-    "availableCalendars" | "FxDeltaVolSurface" | "VolCube"
+    "availableCalendars" | "FxDeltaVolSurface" | "Money" | "VolCube"
   >;
   models: {
     volatility: Pick<
@@ -77,21 +79,30 @@ export function createService(native: {
       }));
     },
     price(request) {
-      return result(() =>
-        instruments.priceInstrumentWithMarket(
+      return result(() => {
+        const instrument = instruments.validateInstrumentJson(
           request.instrumentJson,
+          request.pricingOptions,
+        );
+        return instruments.priceInstrumentWithMarket(
+          instrument,
           market(request.marketJson).handle,
           request.asOf,
           // pricing.rs price_instrument uses exactly this default for an absent model.
           request.model ?? "default",
           request.metrics == null ? request.metrics : [...request.metrics],
-          request.pricingOptions,
+          undefined,
           request.marketHistory,
-        ),
-      );
+        );
+      });
     },
     validate(instrumentJson) {
       return result(() => instruments.validateInstrumentJson(instrumentJson));
+    },
+    formatMoney(request) {
+      return result(() =>
+        formatMoney(request.value, request.rounding, native.core),
+      );
     },
     validateMarket(json) {
       return result(() => market(json).json);
@@ -107,7 +118,6 @@ export function createService(native: {
     },
     sampleCube(request) {
       return result(() => {
-        const c = request.cube;
         const evaluate =
           request.convention === "normal"
             ? native.models.volatility.getCubeNormalVol
@@ -116,19 +126,8 @@ export function createService(native: {
               : null;
         if (!evaluate)
           throw new RangeError("Unsupported cube output convention");
-        const handle = new native.core.VolCube(
-          c.id,
-          c.expiries,
-          c.tenors,
-          c.params.flatMap((p) => [
-            p.alpha,
-            p.beta,
-            p.rho,
-            p.nu,
-            p.shift ?? NaN,
-          ]),
-          c.forwards,
-          c.interpolation_mode,
+        const handle = native.core.VolCube.fromJson(
+          serializeHost(request.cube),
         );
         try {
           return request.coordinates.map((point) =>
@@ -141,15 +140,8 @@ export function createService(native: {
     },
     sampleFxDelta(request) {
       return result(() => {
-        const s = request.surface;
-        const handle = new native.core.FxDeltaVolSurface(
-          s.id,
-          s.expiries,
-          s.atm_vols,
-          s.rr_25d,
-          s.bf_25d,
-          s.rr_10d ?? undefined,
-          s.bf_10d ?? undefined,
+        const handle = native.core.FxDeltaVolSurface.fromJson(
+          serializeHost(request.surface),
         );
         try {
           return request.coordinates.map((c) =>
@@ -177,17 +169,22 @@ export function createService(native: {
       );
     },
     cashflows(request) {
-      return result(() =>
-        instruments.instrumentCashflowsWithMarketJson(
+      return result(() => {
+        const instrument = instruments.validateInstrumentJson(
           request.instrumentJson,
+        );
+        return instruments.instrumentCashflowsWithMarketJson(
+          instrument,
           market(request.marketJson).handle,
           request.asOf,
           request.model,
-        ),
-      );
+        );
+      });
     },
     models: () => result(() => instruments.listModelsGrouped()),
     metrics: () => result(() => instruments.listStandardMetricsGrouped()),
+    metricMetadata: (keys) =>
+      result(() => instruments.metricMetadata([...keys])),
     calendars: () => result(() => native.core.availableCalendars()),
     exportResult: (value) =>
       result(() =>

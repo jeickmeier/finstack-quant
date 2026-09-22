@@ -162,13 +162,20 @@ pub fn validate_typed_instrument_json(
 /// # Arguments
 ///
 /// * `json` - Required canonical v1 instrument envelope.
+/// * `pricing_options` - Optional metric-pricing override JSON merged by the
+///   canonical pricing path before instrument validation; `None` retains the
+///   envelope configuration.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` when parsing, instrument validation, or
-/// canonical serialization fails.
-pub fn validate_instrument_json(json: &str) -> finstack_quant_core::Result<String> {
-    let instrument = parse_instrument_from_json(json)?;
+/// Returns `Error::Validation` when parsing, metric-pricing override merging,
+/// instrument validation, or canonical serialization fails.
+pub fn validate_instrument_json(
+    json: &str,
+    pricing_options: Option<&str>,
+) -> finstack_quant_core::Result<String> {
+    let effective_json = instrument_json_for_pricing(json, pricing_options)?;
+    let instrument = parse_instrument_from_json(effective_json.as_ref())?;
     serde_json::to_string(&InstrumentEnvelope::new(instrument))
         .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
 }
@@ -195,6 +202,64 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
                     .map(|metric| metric.to_string())
                     .collect(),
             )
+        })
+        .collect()
+}
+
+/// Canonical per-key metric interpretation for host presentation.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct MetricMetadata {
+    /// Original canonical wire key, retained without renaming.
+    pub key: String,
+    /// Base metric name without composite coordinates.
+    pub metric: String,
+    /// Decoded coordinate labels in original order; empty for scalar metrics.
+    pub components: Vec<String>,
+    /// Native unit family; custom or calculator-dependent units remain unknown.
+    pub unit: crate::metrics::MetricUnit,
+    /// Native display group; absent for a non-standard base metric.
+    pub group: Option<String>,
+    /// Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.
+    pub bucketed: bool,
+}
+
+/// Describe canonical metric keys without computing or transforming their values.
+///
+/// # Arguments
+///
+/// * `keys` - Canonical wire metric keys in desired output order. Qualified keys
+///   retain their original spelling and use the native composite codec to decode
+///   coordinates. Custom names are accepted with unknown units and no group.
+///
+/// # Returns
+///
+/// One metadata record per input, retaining order and duplicates. Empty input
+/// returns an empty vector. Unit families do not imply a bump size or FX conversion.
+///
+/// # Errors
+///
+/// Returns an input error when a key uses malformed or obsolete composite encoding.
+pub fn metric_metadata(keys: &[String]) -> finstack_quant_core::Result<Vec<MetricMetadata>> {
+    keys.iter()
+        .map(|key| {
+            let id: MetricId = key.parse()?;
+            let base = id.base();
+            let components = id.decode_components(&base).unwrap_or_default();
+            let group = crate::metrics::MetricGroup::ALL
+                .iter()
+                .find(|group| group.metrics().contains(&base))
+                .map(|group| group.display_name().to_string());
+            let bucketed = (base == MetricId::BucketedDv01 || base == MetricId::BucketedCs01)
+                && components.len() == 2
+                && components.iter().all(|component| !component.is_empty());
+            Ok(MetricMetadata {
+                key: key.clone(),
+                metric: base.to_string(),
+                components,
+                unit: id.unit(),
+                group,
+                bucketed,
+            })
         })
         .collect()
 }
@@ -895,7 +960,7 @@ mod tests {
 
     #[test]
     fn validate_instrument_json_rejects_invalid_pricing_overrides() {
-        let err = validate_instrument_json(&equity_option_json_with_negative_vol_override())
+        let err = validate_instrument_json(&equity_option_json_with_negative_vol_override(), None)
             .expect_err("negative implied volatility override must be rejected");
         assert!(
             err.to_string().contains("NegativeValue") || err.to_string().contains("negative"),
@@ -919,7 +984,7 @@ mod tests {
 
     #[test]
     fn validate_instrument_json_rejects_domain_invariants() {
-        let err = validate_instrument_json(&equity_option_json_with_invalid_strike())
+        let err = validate_instrument_json(&equity_option_json_with_invalid_strike(), None)
             .expect_err("negative equity-option strike must be rejected");
         assert!(
             err.to_string().contains("strike") && err.to_string().contains("positive"),
@@ -932,7 +997,7 @@ mod tests {
         let mut cds_option = CDSOption::example().expect("CDS option");
         cds_option.exercise_style = crate::instruments::ExerciseStyle::American;
         let json = envelope_json(InstrumentJson::CDSOption(cds_option));
-        assert!(validate_instrument_json(&json)
+        assert!(validate_instrument_json(&json, None)
             .expect_err("unsupported exercise style must fail")
             .to_string()
             .contains("European"));
@@ -941,7 +1006,7 @@ mod tests {
         convertible.conversion.ratio = None;
         convertible.conversion.price = None;
         let json = envelope_json(InstrumentJson::ConvertibleBond(convertible));
-        assert!(validate_instrument_json(&json)
+        assert!(validate_instrument_json(&json, None)
             .expect_err("missing conversion terms must fail")
             .to_string()
             .contains("conversion.ratio"));
@@ -959,7 +1024,7 @@ mod tests {
                 },
             ]);
         let json = envelope_json(InstrumentJson::RevolvingCredit(facility));
-        assert!(validate_instrument_json(&json)
+        assert!(validate_instrument_json(&json, None)
             .expect_err("post-maturity draw must fail")
             .to_string()
             .contains("maturity"));
@@ -971,7 +1036,7 @@ mod tests {
         future.contract_specs.convexity_adjustment = None;
         future.vol_surface_id = None;
         let json = envelope_json(InstrumentJson::InterestRateFuture(future));
-        assert!(validate_instrument_json(&json)
+        assert!(validate_instrument_json(&json, None)
             .expect_err("missing convexity source must fail")
             .to_string()
             .contains("convexity_adjustment"));
@@ -979,7 +1044,7 @@ mod tests {
         let mut cmo = AgencyCmo::example().expect("CMO");
         cmo.reference_tranche_id = "MISSING".to_string();
         let json = envelope_json(InstrumentJson::AgencyCmo(cmo));
-        assert!(validate_instrument_json(&json)
+        assert!(validate_instrument_json(&json, None)
             .expect_err("unknown reference tranche must fail")
             .to_string()
             .contains("reference tranche"));
@@ -990,7 +1055,7 @@ mod tests {
         let mut loan = TermLoan::example().expect("term loan");
         loan.notional_limit = Money::from((-1_i64, Currency::USD));
         let json = envelope_json(InstrumentJson::TermLoan(loan));
-        assert!(validate_instrument_json(&json)
+        assert!(validate_instrument_json(&json, None)
             .expect_err("negative notional must fail")
             .to_string()
             .contains("notional_limit"));
@@ -1004,7 +1069,8 @@ mod tests {
             Value::from(0.6);
         let json = serde_json::to_string(&json).expect("json");
 
-        validate_instrument_json(&json).expect_err("LP and GP shares above 100% must be rejected");
+        validate_instrument_json(&json, None)
+            .expect_err("LP and GP shares above 100% must be rejected");
     }
 
     #[test]
@@ -1013,7 +1079,7 @@ mod tests {
         deal.cleanup_call_pct = Some(-0.5);
         let json = envelope_json(InstrumentJson::StructuredCredit(Box::new(deal)));
 
-        let err = validate_instrument_json(&json)
+        let err = validate_instrument_json(&json, None)
             .expect_err("cleanup-call threshold outside (0, 1) must be rejected");
         assert!(err.to_string().contains("cleanup_call_pct"));
     }
@@ -1033,10 +1099,35 @@ mod tests {
         let envelope = InstrumentEnvelope::new(InstrumentJson::Bond(bond));
         let json = serde_json::to_string(&envelope).expect("envelope json");
 
-        let canonical = validate_instrument_json(&json).expect("valid envelope");
+        let canonical = validate_instrument_json(&json, None).expect("valid envelope");
         let value: Value = serde_json::from_str(&canonical).expect("canonical json");
         assert_eq!(value["schema"], InstrumentEnvelope::CURRENT_SCHEMA);
         assert_eq!(value["instrument"]["type"], "bond");
+    }
+
+    #[test]
+    fn validate_instrument_json_merges_overrides_before_validation() {
+        let mut document: Value = serde_json::from_str(&bond_instrument_json()).expect("fixture");
+        document["instrument"]["spec"]["metric_pricing_overrides"] =
+            serde_json::json!({ "theta_period": "invalid" });
+        let json = document.to_string();
+
+        assert!(validate_instrument_json(&json, None).is_err());
+        let prepared = validate_instrument_json(&json, Some(r#"{"theta_period":"1W"}"#))
+            .expect("merged before validation");
+        let value: Value = serde_json::from_str(&prepared).expect("canonical");
+        assert_eq!(
+            value["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"],
+            "1W"
+        );
+        assert_eq!(
+            validate_instrument_json(&prepared, None).expect("valid"),
+            prepared
+        );
+        assert!(validate_instrument_json(&json, Some("{"))
+            .expect_err("bad options")
+            .to_string()
+            .contains("invalid pricing options JSON"));
     }
 
     #[test]
@@ -1350,5 +1441,53 @@ mod tests {
         .expect("metrics");
         assert_eq!(result.metric_str("dirty_price"), Some(dirty_price));
         assert_eq!(result.metric_str("vega"), Some(0.0));
+    }
+
+    #[test]
+    fn metric_metadata_describes_canonical_keys() {
+        let keys = vec![
+            "ytm".to_string(),
+            "bucketed_dv01::A_x3a_x3aB::5y".to_string(),
+            "custom_metric".to_string(),
+            "pv01::USD-OIS".to_string(),
+            "ytm".to_string(),
+        ];
+        let metadata = metric_metadata(&keys).expect("metadata");
+        assert_eq!(
+            metadata
+                .iter()
+                .map(|entry| entry.key.as_str())
+                .collect::<Vec<_>>(),
+            keys.iter().map(String::as_str).collect::<Vec<_>>()
+        );
+
+        let ytm = &metadata[0];
+        assert_eq!(ytm.metric, "ytm");
+        assert_eq!(ytm.unit, crate::metrics::MetricUnit::Decimal);
+        assert_eq!(ytm.group.as_deref(), Some("Pricing"));
+        assert!(ytm.components.is_empty());
+        assert!(!ytm.bucketed);
+
+        let bucketed = &metadata[1];
+        assert_eq!(bucketed.metric, "bucketed_dv01");
+        assert_eq!(bucketed.unit, crate::metrics::MetricUnit::Currency);
+        assert_eq!(bucketed.group.as_deref(), Some("Sensitivity"));
+        assert_eq!(bucketed.components, vec!["A::B", "5y"]);
+        assert!(bucketed.bucketed);
+
+        let custom = &metadata[2];
+        assert_eq!(custom.metric, "custom_metric");
+        assert_eq!(custom.unit, crate::metrics::MetricUnit::Unknown);
+        assert_eq!(custom.group, None);
+        assert!(!custom.bucketed);
+
+        let pv01 = &metadata[3];
+        assert_eq!(pv01.metric, "pv01");
+        assert_eq!(pv01.unit, crate::metrics::MetricUnit::Currency);
+        assert_eq!(pv01.components, vec!["USD-OIS"]);
+        assert!(!pv01.bucketed);
+
+        assert!(metric_metadata(&[]).expect("empty").is_empty());
+        assert!(metric_metadata(&["pv01::USD_x2dOIS".to_string()]).is_err());
     }
 }

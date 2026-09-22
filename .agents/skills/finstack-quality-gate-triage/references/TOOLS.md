@@ -31,6 +31,13 @@ Use repo-native checks first. External scanners are optional only when installed
 - Lint: `mise run wasm-lint`
 - Tests: `mise run wasm-test`
 
+## UI
+
+- Format: `mise run ui-fmt`
+- Typecheck: `mise run ui-typecheck`
+- Tests: `mise run ui-test`
+- Combined gate: `mise run ui-check`
+
 ## Broad Gates
 
 - Format: `mise run all-fmt`

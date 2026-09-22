@@ -392,6 +392,9 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run wasm-build` | Build the WASM package (web target) |
 | `mise run wasm-pkg` | Build the web and Node WASM packages |
 | `mise run wasm-test` | Run wasm-bindgen and Node facade tests |
+| `mise run ui-fmt` | Format the UI package with Prettier (mutating) |
+| `mise run ui-typecheck` | Type-check the UI package with `tsc` |
+| `mise run ui-test` | Run the UI Vitest suite |
 | `mise run wasm-gen-bindings` | Export TypeScript types from Rust |
 | `mise run goldens-test` | Run the Rust and Python golden-test layers |
 | `mise run rust-test-cov` | Rust tests with an HTML coverage report |

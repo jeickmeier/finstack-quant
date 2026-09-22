@@ -925,6 +925,23 @@ impl JsVolCube {
         })
     }
 
+    /// Deserialize a canonical SABR cube state without flattening parameter nodes.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical VolCube JSON containing id, expiry and tenor axes in years,
+    ///   row-major SABR nodes and decimal-rate forwards, and interpolation_mode.
+    ///   Missing or null node shifts remain absent; unknown fields are rejected.
+    /// @returns A validated VolCube handle owned by the caller; release it with free().
+    /// @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: &str) -> Result<JsVolCube, JsValue> {
+        let inner = serde_json::from_str::<RustVolCube>(json).map_err(to_js_err)?;
+        Ok(Self {
+            inner: Arc::new(inner),
+        })
+    }
+
     /// Interpolation contract used across the expiry axis.
     #[wasm_bindgen(getter, js_name = interpolationMode)]
     pub fn interpolation_mode(&self) -> Result<String, JsValue> {
@@ -1003,6 +1020,23 @@ impl JsFxDeltaVolSurface {
         .map_err(to_js_err)?;
         Ok(Self {
             inner: Arc::new(surface),
+        })
+    }
+
+    /// Deserialize canonical FX delta quotes without reconstructing positional arrays.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical FxDeltaVolSurface JSON with expiries in years and
+    ///   annualized decimal ATM, risk-reversal, and butterfly quotes. Optional
+    ///   10-delta wings must occur together; unknown fields are rejected.
+    /// @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
+    /// @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: &str) -> Result<JsFxDeltaVolSurface, JsValue> {
+        let inner = serde_json::from_str::<RustFxDeltaVolSurface>(json).map_err(to_js_err)?;
+        Ok(Self {
+            inner: Arc::new(inner),
         })
     }
 

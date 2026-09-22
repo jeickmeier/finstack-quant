@@ -12,6 +12,7 @@ import {
 } from "../registry/workers/finstack-contract";
 import { cubeOptions } from "../registry/hooks/use-cube-samples/use-cube-samples";
 import type { FinstackClient } from "../registry/hooks/use-finstack/client";
+import { serializeHost } from "../src/codec.mjs";
 import fixture from "./cubes/cases.json";
 const native = createRequire(import.meta.url)(
   "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -37,15 +38,7 @@ const request = (
   ],
 });
 function direct(r: CubeSampleRequest) {
-  const c = r.cube,
-    handle = new native.VolCube(
-      c.id,
-      c.expiries,
-      c.tenors,
-      c.params.flatMap((p) => [p.alpha, p.beta, p.rho, p.nu, p.shift ?? NaN]),
-      c.forwards,
-      c.interpolation_mode,
-    );
+  const handle = native.VolCube.fromJson(serializeHost(r.cube));
   try {
     return r.coordinates.map((p) =>
       (r.convention === "normal" ? native.getCubeNormalVol : native.getCubeVol)(
@@ -65,7 +58,7 @@ const resources = () =>
       resources(): Promise<{
         cubeConstructed: number;
         cubeFreed: number;
-        cubeParams: number[];
+        cubeJson: string;
       }>;
     }
   ).resources();
@@ -119,11 +112,13 @@ it("matches both checked evaluators for absent/present shifts and complete state
   expect(after.cubeConstructed - before.cubeConstructed).toBe(variants.length);
   expect(after.cubeFreed - before.cubeFreed).toBe(variants.length);
   await worker.proxy.sampleCube(request(normal));
-  expect((await resources()).cubeParams[4]).toBeNaN();
+  expect(JSON.parse((await resources()).cubeJson).params).toEqual(
+    normal.params,
+  );
   await worker.proxy.sampleCube(
     request(cubes.find((c) => c.id === "SHIFTED-BLACK")!),
   );
-  expect((await resources()).cubeParams[4]).toBe(0.03);
+  expect(JSON.parse((await resources()).cubeJson).params[0].shift).toBe(0.03);
 });
 it("preserves checked out-of-grid/model errors and frees successfully constructed handles", async () => {
   const good = request();

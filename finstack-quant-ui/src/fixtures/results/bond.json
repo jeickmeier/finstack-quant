@@ -10,10 +10,7 @@
     "schema_version": 1,
     "instrument_id": "US912828XG33",
     "as_of": "2025-01-01",
-    "value": {
-      "amount": "1042500",
-      "currency": "USD"
-    },
+    "value": { "amount": "1042500", "currency": "USD" },
     "measures": {
       "ytm": 1.307944151889478e-13,
       "dv01": -103.45856181590352,
@@ -37,14 +34,11 @@
         "mode": "bankers",
         "ingest_scale_by_currency": {},
         "output_scale_by_currency": {},
-        "tolerances": {
-          "rate_epsilon": 1e-12,
-          "generic_epsilon": 1e-10
-        },
+        "tolerances": { "rate_epsilon": 1e-12, "generic_epsilon": 1e-10 },
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-09-20T04:48:53.259000000Z",
+      "timestamp": "+002026-09-21T22:24:57.149000000Z",
       "version": "0.8.0"
     },
     "covenants": null
@@ -256,5 +250,185 @@
       "wam"
     ]
   },
-  "facadeWasmSha256": "2160856ce24d44a47325a4701c6b010b18a82381fb69fb2b93f8a731024324cd"
+  "metadata": [
+    {
+      "key": "ytm",
+      "metric": "ytm",
+      "components": [],
+      "unit": "decimal",
+      "group": "Pricing",
+      "bucketed": false
+    },
+    {
+      "key": "dv01",
+      "metric": "dv01",
+      "components": [],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": false
+    },
+    {
+      "key": "duration_mod",
+      "metric": "duration_mod",
+      "components": [],
+      "unit": "years",
+      "group": "Pricing",
+      "bucketed": false
+    },
+    {
+      "key": "bucketed_dv01",
+      "metric": "bucketed_dv01",
+      "components": [],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": false
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::10y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "10y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::15y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "15y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::1y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "1y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::20y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "20y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::2y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "2y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::30y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "30y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::3m",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "3m"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::3y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "3y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::5y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "5y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::6m",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "6m"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::7y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "7y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    }
+  ],
+  "comparisonMetadata": [
+    {
+      "key": "ytm",
+      "metric": "ytm",
+      "components": [],
+      "unit": "decimal",
+      "group": "Pricing",
+      "bucketed": false
+    },
+    {
+      "key": "bucketed_cs01::SYNTHETIC-CREDIT::1y",
+      "metric": "bucketed_cs01",
+      "components": ["SYNTHETIC-CREDIT", "1y"],
+      "unit": "currency",
+      "group": "Credit",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_cs01::SYNTHETIC-CREDIT::3y",
+      "metric": "bucketed_cs01",
+      "components": ["SYNTHETIC-CREDIT", "3y"],
+      "unit": "currency",
+      "group": "Credit",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_cs01::SYNTHETIC-CREDIT::5y",
+      "metric": "bucketed_cs01",
+      "components": ["SYNTHETIC-CREDIT", "5y"],
+      "unit": "currency",
+      "group": "Credit",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_cs01::SYNTHETIC-OTHER::1y",
+      "metric": "bucketed_cs01",
+      "components": ["SYNTHETIC-OTHER", "1y"],
+      "unit": "currency",
+      "group": "Credit",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::30y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "30y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    },
+    {
+      "key": "bucketed_dv01::USD-OIS::10y",
+      "metric": "bucketed_dv01",
+      "components": ["USD-OIS", "10y"],
+      "unit": "currency",
+      "group": "Sensitivity",
+      "bucketed": true
+    }
+  ],
+  "facadeWasmSha256": "c337193371d0c1bad964a50b93f1c4cfc5ae55fbfd79012f072873f1e128ad4b"
 }

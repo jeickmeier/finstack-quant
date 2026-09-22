@@ -56,6 +56,7 @@ it("pins fixture sources and restores exact current host transport for all five 
       createHash("sha256")
         .update(readFileSync(resolve(root, source.path)))
         .digest("hex"),
+      source.path,
     ).toBe(source.sha256);
   expect([...new Set(fixture.cases.map((c) => c.detailType))].sort()).toEqual([
     "composite",

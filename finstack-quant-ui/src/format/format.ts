@@ -36,33 +36,41 @@ export function groupDecimal(value: string): string {
     (fraction === undefined ? "" : `.${fraction}`)
   );
 }
+/** Native `core.Money` surface used for prepared display formatting; injected, never imported at render time. */
+export type MoneyApi = Pick<CoreNamespace, "Money">;
 /**
- * Format supplied money with its returned output scale and rounding mode.
+ * Display supplied money with its exact amount text; no rounding is applied at this boundary.
  * @param money - Exact major-unit amount string and supplied currency; neither is mutated.
- * @param stamp - Returned Rust rounding snapshot. Without an explicit currency scale, preserve all supplied digits.
- * @returns Currency-prefixed display text, never a canonical JSON document.
- * @throws TypeError for malformed amounts, scales or unsupported rounding stamps.
+ * @returns Currency-prefixed display text preserving every supplied digit, never a canonical JSON document.
+ * @throws TypeError for malformed amount text.
  */
-export function formatMoney(money: MoneyValue, stamp?: RoundingStamp): string {
-  let amount = money.amount;
+export function formatRawMoney(money: MoneyValue): string {
+  return `${money.currency} ${groupDecimal(money.amount)}`;
+}
+/**
+ * Format supplied money with its returned output scale and rounding mode through the native core.
+ * @param money - Exact major-unit amount string and supplied currency; neither is mutated.
+ * @param stamp - Returned Rust rounding snapshot. Without an explicit currency scale, all supplied digits are preserved — no ISO default is inferred at this boundary.
+ * @param native - Initialized native `core.Money` constructor; callers prepare text inside a worker or test host, never during renderer execution.
+ * @returns Currency-prefixed display text, never a canonical JSON document.
+ * @throws FinstackError for amount text that is not exactly representable as a Decimal or for invalid scale/rounding/grouping options.
+ * @throws TypeError when a present stamp carries a non-number scale or non-string mode.
+ */
+export function formatMoney(
+  money: MoneyValue,
+  stamp: RoundingStamp | undefined,
+  native: MoneyApi,
+): string {
   const scale = stamp?.output_scale_by_currency[money.currency];
-  if (scale !== undefined) {
-    if (!Number.isInteger(scale) || scale < 0)
-      throw new TypeError("Invalid returned output scale");
-    const decimal = new Big(amount);
-    const modes = {
-      bankers: Big.roundHalfEven,
-      away_from_zero: Big.roundHalfUp,
-      toward_zero: Big.roundDown,
-      floor: decimal.s < 0 ? Big.roundUp : Big.roundDown,
-      ceil: decimal.s > 0 ? Big.roundUp : Big.roundDown,
-    };
-    const rounding = modes[stamp!.mode];
-    if (rounding === undefined)
-      throw new TypeError("Unsupported returned rounding mode");
-    amount = decimal.toFixed(scale, rounding);
+  if (scale === undefined) return formatRawMoney(money);
+  if (typeof scale !== "number" || typeof stamp?.mode !== "string")
+    throw new TypeError("Invalid returned rounding stamp");
+  const value = native.Money.fromDecimalStr(money.amount, money.currency);
+  try {
+    return value.formatWith(scale, true, ",", stamp!.mode);
+  } finally {
+    value.free();
   }
-  return `${money.currency} ${groupDecimal(amount)}`;
 }
 /**
  * Convert presentation units exactly using the published core.Rate convention.

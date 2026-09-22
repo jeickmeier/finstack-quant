@@ -3,6 +3,7 @@ import { DecimalInput } from "../decimal-input/decimal-input";
 import { EnumField, type EnumOption } from "../enum-field/enum-field";
 import type { FieldInfo } from "../field-frame/field-frame";
 import contracts from "@/lib/finstack/generated/primitive-contracts.json";
+import { integerText, numericEdit } from "@/lib/finstack/schema.mjs";
 export interface TenorEdit {
   count: number | string;
   unit: string;
@@ -31,17 +32,10 @@ export function TenorInput({
       <DecimalInput
         label={`${label} count`}
         value={String(value.count)}
-        onValueChange={(text) => {
-          const count = Number(text);
-          onValueChange({
-            ...value,
-            count:
-              /^-?\d+$/.test(text) && Number.isSafeInteger(count)
-                ? count
-                : text,
-          });
-        }}
-        pattern={/^-?\d+$/.source}
+        onValueChange={(text) =>
+          onValueChange({ ...value, count: numericEdit(text, true) })
+        }
+        pattern={integerText.source}
         min={contracts.tenor.schema.properties.count.minimum}
         error={error}
         disabled={disabled}

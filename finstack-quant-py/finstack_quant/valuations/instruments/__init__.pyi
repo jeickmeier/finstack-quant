@@ -108,6 +108,7 @@ __all__ = [
     "list_models_grouped",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
+    "metric_metadata",
     "pretty_instrument_json",
     "price_instrument",
     "structured_credit_tranche_breakeven_cdr",
@@ -24181,7 +24182,7 @@ def bond_from_cashflows_json(
     """
     ...
 
-def validate_instrument_json(json: str) -> str:
+def validate_instrument_json(json: str, pricing_options: str | None = None) -> str:
     """
     Validate a canonical instrument envelope and return canonical JSON.
 
@@ -24190,17 +24191,23 @@ def validate_instrument_json(json: str) -> str:
     json : str
         A ``finstack_quant.instrument/1`` envelope. Bare instrument payloads
         are rejected.
+    pricing_options : str or None, optional
+        Optional metric-pricing override JSON merged by the canonical pricing
+        path before instrument validation; ``None`` (the default) retains the
+        envelope configuration.
 
     Returns
     -------
     str
-        Canonical pretty-printed instrument JSON after Rust serde validation.
+        Canonical serialized instrument JSON after Rust validation and
+        optional override merging.
 
     Raises
     ------
     ValueError
-        If the JSON is malformed, has an unknown instrument tag, or
-        fails instrument-specific validation.
+        If the JSON is malformed, ``pricing_options`` is invalid override
+        JSON, the merged payload has an unknown instrument tag, or
+        instrument-specific validation fails.
 
     Examples
     --------
@@ -24584,6 +24591,39 @@ def list_standard_metrics_grouped() -> dict[str, list[str]]:
     >>> grouped = list_standard_metrics_grouped()
     >>> ("Credit" in grouped, "Rates" in grouped)
     (True, True)
+    """
+    ...
+
+def metric_metadata(keys: list[str]) -> list[dict[str, Any]]:
+    """
+    Describe canonical metric keys using Rust-owned units and coordinates.
+
+    Parameters
+    ----------
+    keys : list[str]
+        Canonical scalar or qualified wire keys; input order and duplicates
+        are retained and qualified coordinates require the native composite
+        escaping. Custom names are accepted with unknown units and no group.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        One record per key with ``key``, ``metric``, ``components`` (decoded
+        coordinate labels in original order), ``unit`` (canonical unit family
+        string), ``group`` (native display group or ``None``) and
+        ``bucketed``. No prices are changed and a unit family does not imply
+        a bump size or FX conversion.
+
+    Raises
+    ------
+    ValueError
+        If a key uses malformed or obsolete composite encoding.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import metric_metadata
+    >>> metric_metadata(["ytm"])[0]["unit"]
+    'decimal'
     """
     ...
 

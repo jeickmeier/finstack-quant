@@ -1,10 +1,9 @@
 import type { AccessorFnColumnDef, RowData } from "@tanstack/react-table";
 import type { MoneyValue } from "finstack-quant-wasm";
 import {
-  formatMoney,
+  formatRawMoney,
   formatRate,
   formatSigned,
-  type RoundingStamp,
   type RatePresentation,
 } from "./format";
 
@@ -20,18 +19,19 @@ export type FormattedColumn<
 > = AccessorFnColumnDef<{}, TData, TValue> & {
   meta: ColumnPresentation;
 };
-/** Money column retaining currency on every row, including mixed-currency data. */
+/** Money column retaining currency on every row, including mixed-currency data. `displayText` only retrieves caller-precomputed text; no formatter runs during render. */
 export function moneyColumn<TData extends RowData>(
   id: string,
   accessorFn: (row: TData) => MoneyValue,
-  rounding?: (row: TData) => RoundingStamp | undefined,
+  displayText?: (row: TData) => string | undefined,
 ): FormattedColumn<TData, MoneyValue> {
   return {
     id,
     header: id,
     accessorFn,
     meta: { className: "text-right finstack-numeric" },
-    cell: (info) => formatMoney(info.getValue(), rounding?.(info.row.original)),
+    cell: (info) =>
+      displayText?.(info.row.original) ?? formatRawMoney(info.getValue()),
   };
 }
 /** Source-backed rate presentation; absent metadata leaves values raw with unavailable units. */

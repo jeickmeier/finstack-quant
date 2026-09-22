@@ -199,3 +199,78 @@ test('RevolvingCredit.priceWithPaths keeps every simulated path of a stochastic 
     /stochastic/i
   );
 });
+
+test('metricMetadata returns ordered native interpretation for canonical keys', () => {
+  const keys = ['ytm', 'bucketed_dv01::A_x3a_x3aB::5y', 'custom_metric', 'pv01::USD-OIS', 'ytm'];
+  assert.deepEqual(valuations.instruments.metricMetadata(keys), [
+    {
+      key: 'ytm',
+      metric: 'ytm',
+      components: [],
+      unit: 'decimal',
+      group: 'Pricing',
+      bucketed: false,
+    },
+    {
+      key: 'bucketed_dv01::A_x3a_x3aB::5y',
+      metric: 'bucketed_dv01',
+      components: ['A::B', '5y'],
+      unit: 'currency',
+      group: 'Sensitivity',
+      bucketed: true,
+    },
+    {
+      key: 'custom_metric',
+      metric: 'custom_metric',
+      components: [],
+      unit: 'unknown',
+      group: null,
+      bucketed: false,
+    },
+    {
+      key: 'pv01::USD-OIS',
+      metric: 'pv01',
+      components: ['USD-OIS'],
+      unit: 'currency',
+      group: 'Sensitivity',
+      bucketed: false,
+    },
+    {
+      key: 'ytm',
+      metric: 'ytm',
+      components: [],
+      unit: 'decimal',
+      group: 'Pricing',
+      bucketed: false,
+    },
+  ]);
+  assert.deepEqual(valuations.instruments.metricMetadata([]), []);
+  assert.throws(
+    () => valuations.instruments.metricMetadata(['pv01::USD_x2dOIS']),
+    (error) => error.name === 'FinstackError' && error.kind === 'validation'
+  );
+});
+
+test('validateInstrumentJson merges metric-pricing overrides before validation', () => {
+  const bondUrl = new URL(
+    '../../../finstack-quant/valuations/tests/instruments/json_examples/bond.json',
+    import.meta.url
+  );
+  const document = JSON.parse(readFileSync(bondUrl, 'utf8'));
+  document.instrument.spec.metric_pricing_overrides = { theta_period: 'invalid' };
+  const json = JSON.stringify(document);
+  assert.throws(
+    () => valuations.instruments.validateInstrumentJson(json),
+    (error) => error.name === 'FinstackError' && error.kind === 'validation'
+  );
+  const prepared = valuations.instruments.validateInstrumentJson(json, '{"theta_period":"1W"}');
+  assert.equal(JSON.parse(prepared).instrument.spec.metric_pricing_overrides.theta_period, '1W');
+  assert.equal(valuations.instruments.validateInstrumentJson(prepared), prepared);
+  assert.throws(
+    () => valuations.instruments.validateInstrumentJson(json, '{'),
+    (error) =>
+      error.name === 'FinstackError' &&
+      error.kind === 'validation' &&
+      error.message.includes('invalid pricing options JSON')
+  );
+});

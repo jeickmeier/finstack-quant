@@ -1,8 +1,11 @@
 "use client";
-import { useQuery, queryOptions } from "@tanstack/react-query";
-import { useFinstack } from "../use-finstack/use-finstack";
+import { queryOptions } from "@tanstack/react-query";
+import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
-import type { PriceRequest } from "../../workers/finstack-contract";
+import type {
+  MoneyFormatRequest,
+  PriceRequest,
+} from "../../workers/finstack-contract";
 export type { PriceRequest } from "../../workers/finstack-contract";
 /** Snapshot every input without parsing JSON, filling financial defaults or collapsing selections. */
 export function priceOptions(
@@ -24,41 +27,27 @@ export function priceOptions(
       return client.call("price", snapshot);
     },
     enabled: client !== null,
-    staleTime: Infinity,
-    retry: false,
+    ...workerQueryPolicy,
   });
 }
 /** Immutable pricing query. Supply the entire request and a Finstack/Query provider boundary. */
 export function usePriceInstrument(request: PriceRequest, enabled = true) {
-  const worker = useFinstack();
-  const query = useQuery({
+  return useWorkerQuery((worker) => ({
     ...priceOptions(worker.client, worker.session, request),
     enabled: worker.status === "ready" && enabled,
-  });
-  return {
-    ...query,
-    error: worker.error ?? query.error,
-    workerStatus: worker.status,
-  };
+  }));
 }
 /** Registry options are immutable within one initialized worker session. */
 function useOptions<T>(
   operation: "models" | "metrics" | "calendars",
   fetch: (client: FinstackClient) => Promise<T>,
 ) {
-  const worker = useFinstack();
-  const query = useQuery({
+  return useWorkerQuery((worker) => ({
     queryKey: ["finstack", worker.session, operation],
     queryFn: () => fetch(worker.client!),
     enabled: worker.status === "ready",
-    staleTime: Infinity,
-    retry: false,
-  });
-  return {
-    ...query,
-    error: worker.error ?? query.error,
-    workerStatus: worker.status,
-  };
+    ...workerQueryPolicy,
+  }));
 }
 /** Models grouped by instrument type, directly from the native pricer registry. */
 export function useModels() {
@@ -67,6 +56,26 @@ export function useModels() {
 /** Metrics grouped by native category, without local classifications. */
 export function useMetrics() {
   return useOptions("metrics", (client) => client.call("metrics"));
+}
+/** Native display text for an exact amount under its returned rounding stamp; the request is snapshotted without mutation. */
+export function useMoneyFormat(request: MoneyFormatRequest | null) {
+  const snapshot = request === null ? null : structuredClone(request);
+  return useWorkerQuery((worker) => ({
+    queryKey: ["finstack", worker.session, "formatMoney", snapshot] as const,
+    queryFn: () => worker.client!.call("formatMoney", snapshot!),
+    enabled: worker.status === "ready" && snapshot !== null,
+    ...workerQueryPolicy,
+  }));
+}
+/** Native per-key interpretation for the supplied metric keys; keys are snapshotted without parsing. */
+export function useMetricMetadata(keys: readonly string[], enabled = true) {
+  const snapshot = Object.freeze([...keys]);
+  return useWorkerQuery((worker) => ({
+    queryKey: ["finstack", worker.session, "metricMetadata", snapshot] as const,
+    queryFn: () => worker.client!.call("metricMetadata", snapshot),
+    enabled: worker.status === "ready" && enabled,
+    ...workerQueryPolicy,
+  }));
 }
 /** Canonical calendar identifiers from the native core registry. */
 export function useCalendars() {

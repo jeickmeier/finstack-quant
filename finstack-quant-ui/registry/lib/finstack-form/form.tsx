@@ -104,7 +104,8 @@ function SelectField(props: FieldInfo & { options: readonly EnumOption[] }) {
   );
 }
 function BooleanField(props: FieldInfo) {
-  const field = useFieldContext<boolean>();
+  const field = useFieldContext<boolean | undefined>();
+  const unanswered = typeof field.state.value !== "boolean";
   return (
     <FieldFrame
       {...props}
@@ -113,13 +114,26 @@ function BooleanField(props: FieldInfo) {
       error={errorText(field.state.meta.errors)}
     >
       {(control) => (
-        <Checkbox
-          {...control}
-
-          checked={field.state.value ?? false}
-          onBlur={field.handleBlur}
-          onCheckedChange={(checked) => field.handleChange(checked === true)}
-        />
+        <div className="flex items-center gap-2">
+          <Checkbox
+            {...control}
+            checked={field.state.value === true}
+            indeterminate={unanswered}
+            onBlur={field.handleBlur}
+            onCheckedChange={(checked) => field.handleChange(checked === true)}
+          />
+          {unanswered && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={`Set ${props.label.toLowerCase()} to false`}
+              onClick={() => field.handleChange(false)}
+            >
+              Set false
+            </Button>
+          )}
+        </div>
       )}
     </FieldFrame>
   );

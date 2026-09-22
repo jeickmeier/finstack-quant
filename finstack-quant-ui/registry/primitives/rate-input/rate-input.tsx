@@ -1,5 +1,5 @@
 "use client";
-import contracts from "@/lib/finstack/generated/primitive-contracts.json";
+import { numericEdit } from "@/lib/finstack/schema.mjs";
 import {
   DecimalInput,
   type DecimalInputProps,
@@ -44,14 +44,7 @@ export function RateInput({
         } catch {
           /* Keep incomplete editing text. */
         }
-        const number = Number(wire);
-        onValueChange(
-          representation === "number" &&
-            new RegExp(contracts.decimal.schema.pattern).test(wire) &&
-            Number.isFinite(number)
-            ? number
-            : wire,
-        );
+        onValueChange(representation === "number" ? numericEdit(wire) : wire);
       }}
     />
   );

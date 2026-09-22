@@ -53,7 +53,7 @@ fn decimal_type<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyType>> {
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.money import Money
-/// >>> Money("100.50", "USD").format()
+/// >>> Money("100.50", "USD").format_with()
 /// 'USD 100.50'
 #[pyclass(
     name = "Money",
@@ -207,6 +207,56 @@ impl PyMoney {
             .map_err(core_to_py)
     }
 
+    /// Construct from exact decimal text, rejecting inexact amounts.
+    ///
+    /// Unlike general ``Money`` construction or JSON deserialization, this
+    /// entry point never routes the amount through ``float`` or tolerates
+    /// lossy re-rendering: the text must be exactly representable as a Rust
+    /// ``Decimal`` (96-bit mantissa, at most 28 fractional digits). For
+    /// scientific input the mantissa itself must be exact and the exponent
+    /// is applied exactly on the coefficient and scale, discarding no
+    /// nonzero digit. The currency is a tag only; no FX conversion is
+    /// performed.
+    ///
+    /// Parameters
+    /// ----------
+    /// amount : str
+    ///     Exact decimal amount text in major currency units, in fixed-point
+    ///     (``"1234.56"``) or scientific (``"1.2345e3"``) notation.
+    /// currency : Currency | str
+    ///     Currency object or ISO-4217 code string.
+    ///
+    /// Returns
+    /// -------
+    /// Money
+    ///     Decimal-backed amount equal to the supplied text exactly.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If *amount* is malformed, non-finite, requires more precision
+    ///     than ``Decimal`` can hold, or its exponent cannot be applied
+    ///     within the supported scale; or if *currency* is invalid.
+    /// TypeError
+    ///     If *amount* or *currency* has an unsupported host type.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.core.money import Money
+    /// >>> Money.from_decimal_str("1.245", "USD").amount_decimal
+    /// Decimal('1.245')
+    #[classmethod]
+    #[pyo3(text_signature = "(cls, amount, currency)")]
+    fn from_decimal_str(
+        _cls: &Bound<'_, PyType>,
+        amount: &str,
+        currency: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Money::from_decimal_str(amount, extract_currency(currency)?)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
     /// Numeric amount as ``float`` (derived from the internal decimal representation).
     #[getter]
     fn amount(&self) -> f64 {
@@ -230,12 +280,13 @@ impl PyMoney {
 
     /// Format the amount.
     ///
-    /// ``decimals`` defaults to the currency's ISO minor units; ``group`` is
-    /// an optional thousands separator (``","``); ``rounding`` is a
-    /// ``RoundingMode`` or its name (default bankers).
+    /// ``decimals`` defaults to the currency's ISO minor units and is bounded
+    /// by the native maximum of 1,000,000; ``group`` is an optional thousands
+    /// separator (``","``); ``rounding`` is a ``RoundingMode`` or its name
+    /// (default bankers).
     #[pyo3(signature = (decimals=None, show_currency=true, group=None, rounding=None))]
     #[pyo3(text_signature = "(self, decimals=None, show_currency=True, group=None, rounding=None)")]
-    fn format(
+    fn format_with(
         &self,
         decimals: Option<usize>,
         show_currency: bool,
@@ -256,12 +307,8 @@ impl PyMoney {
             Some(mode) => extract_rounding_mode(mode)?,
             None => RoundingMode::Bankers,
         };
-        Ok(self.inner.format_with(FormatOpts {
-            decimals,
-            show_currency,
-            group,
-            rounding,
-        }))
+        let opts = FormatOpts::new(decimals, show_currency, group, rounding).map_err(core_to_py)?;
+        Ok(self.inner.format_with(opts))
     }
 
     /// Return a debug-style representation.

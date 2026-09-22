@@ -9,7 +9,7 @@
 //! JS surface lives under `valuations.instruments`.
 
 use super::pricing::parse_market_json;
-use crate::utils::{to_js_error, to_js_value};
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     self as rust_structured_credit, StructuredCredit,
 };
@@ -18,15 +18,13 @@ use wasm_bindgen::prelude::*;
 
 fn parse_structured_credit(instrument_json: &str) -> Result<StructuredCredit, JsValue> {
     match finstack_quant_valuations::pricer::json::parse_instrument_from_json(instrument_json)
-        .map_err(|error| to_js_error(&error))?
+        .map_err(to_js_err)?
     {
         InstrumentJson::StructuredCredit(deal) => Ok(*deal),
-        other => Err(to_js_error(&finstack_quant_core::Error::Validation(
-            format!(
-                "expected a structured_credit instrument, got {}",
-                other.type_tag()
-            ),
-        ))),
+        other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+            "expected a structured_credit instrument, got {}",
+            other.type_tag()
+        )))),
     }
 }
 
@@ -57,7 +55,7 @@ pub fn structured_credit_tranche_discount_margin(
     rust_structured_credit::structured_credit_tranche_discount_margin(
         &deal, tranche_id, &market, as_of, target_pv,
     )
-    .map_err(|e| to_js_error(&e))
+    .map_err(to_js_err)
 }
 
 /// Break-even constant default rate (CDR, decimal) for a tranche — the highest
@@ -85,7 +83,7 @@ pub fn structured_credit_tranche_breakeven_cdr(
     rust_structured_credit::structured_credit_tranche_breakeven_cdr(
         &deal, tranche_id, &market, as_of,
     )
-    .map_err(|e| to_js_error(&e))
+    .map_err(to_js_err)
 }
 
 /// Option-adjusted spread for a tranche; returns a typed `OasResult` object.
@@ -133,7 +131,7 @@ pub fn structured_credit_tranche_oas(
         as_of,
         config_json.as_deref(),
     )
-    .map_err(|e| to_js_error(&e))?;
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -172,7 +170,7 @@ pub fn structured_credit_tranche_scenario_table(
     let result = rust_structured_credit::structured_credit_tranche_scenario_table(
         &deal, tranche_id, &market, as_of, grid_json,
     )
-    .map_err(|e| to_js_error(&e))?;
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -218,7 +216,7 @@ pub fn structured_credit_tranche_metrics(
         as_of,
         market_price_pct,
     )
-    .map_err(|e| to_js_error(&e))?;
+    .map_err(to_js_err)?;
     to_js_value(&result)
 }
 

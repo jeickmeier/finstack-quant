@@ -51,9 +51,12 @@ import { useInstrumentValidator } from "@/hooks/use-instrument-validator/use-ins
 import {
   useModels,
   useMetrics,
+  useMetricMetadata,
+  useMoneyFormat,
   usePriceInstrument,
   type PriceRequest,
 } from "@/hooks/use-price-instrument/use-price-instrument";
+import { returnedRounding } from "@/components/finstack/primitives/stamp-badge/stamp-badge";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 /** Embed inside FinstackQueryProvider, or an existing QueryClientProvider + FinstackProvider. The host owns the route. */
 export function PricingWorkbench({
@@ -144,6 +147,18 @@ export function PricingWorkbench({
   } | null>(null);
   const [printSnapshot, setPrintSnapshot] = useState<typeof completed>(null);
   const shown = printSnapshot ?? completed;
+  const measureMetadata = useMetricMetadata(
+    Object.keys(shown?.result.measures ?? {}),
+    shown !== null,
+  );
+  const moneyFormat = useMoneyFormat(
+    shown
+      ? {
+          value: shown.result.value,
+          rounding: returnedRounding(shown.result.meta),
+        }
+      : null,
+  );
   const cashflowRequest = shown?.request ?? initial;
   const cashflows = useCashflows(
     {
@@ -169,7 +184,16 @@ export function PricingWorkbench({
     return () => window.removeEventListener("afterprint", finish);
   }, []);
   useEffect(() => {
-    if (!printSnapshot || cashflows.isPending || cashflows.isFetching) return;
+    if (
+      !printSnapshot ||
+      cashflows.isPending ||
+      cashflows.isFetching ||
+      measureMetadata.isPending ||
+      measureMetadata.isFetching ||
+      moneyFormat.isPending ||
+      moneyFormat.isFetching
+    )
+      return;
     let active = true;
     void document.fonts.ready.then(() =>
       requestAnimationFrame(() =>
@@ -181,7 +205,15 @@ export function PricingWorkbench({
     return () => {
       active = false;
     };
-  }, [printSnapshot, cashflows.isPending, cashflows.isFetching]);
+  }, [
+    printSnapshot,
+    cashflows.isPending,
+    cashflows.isFetching,
+    measureMetadata.isPending,
+    measureMetadata.isFetching,
+    moneyFormat.isPending,
+    moneyFormat.isFetching,
+  ]);
   const worker = useFinstack();
   const validate = useInstrumentValidator();
   const validateMarket = useMarketValidator();
@@ -307,7 +339,12 @@ export function PricingWorkbench({
           data-stale={stale && !printSnapshot ? "" : undefined}
           data-printing={
             printSnapshot
-              ? cashflows.isPending || cashflows.isFetching
+              ? cashflows.isPending ||
+                cashflows.isFetching ||
+                measureMetadata.isPending ||
+                measureMetadata.isFetching ||
+                moneyFormat.isPending ||
+                moneyFormat.isFetching
                 ? "preparing"
                 : "ready"
               : undefined
@@ -579,10 +616,17 @@ export function PricingWorkbench({
                 <MeasuresGrid
                   result={shown?.result}
                   model={shown ? (shown.request.model ?? "default") : undefined}
-                  groups={metrics.data ?? {}}
+                  formattedValue={moneyFormat.data}
+                  metadata={measureMetadata.data}
                   density={currentDensity}
                   loading={!printSnapshot && price.isFetching}
-                  error={printSnapshot ? undefined : currentError}
+                  error={
+                    printSnapshot
+                      ? undefined
+                      : (currentError ??
+                        measureMetadata.error?.message ??
+                        moneyFormat.error?.message)
+                  }
                 />
                 {printSnapshot && shown && (
                   <div className="hidden print:block">

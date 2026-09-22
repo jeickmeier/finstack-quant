@@ -1,4 +1,7 @@
 import { expect, it } from "vitest";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadRegistry } from "shadcn/registry";
 import { checkGraph } from "../scripts/check-registry.mjs";
@@ -38,4 +41,45 @@ it("derives canonical IDs and versions from the owned installed contracts", asyn
     wasmVersion: "8.7.6",
     schemaIds: ["https://example.test/canonical-bond"],
   });
+});
+it("reads the installed facade version without generated WASM package manifests", async () => {
+  const directory = await mkdtemp(
+    path.join(tmpdir(), "finstack-registry-metadata-"),
+  );
+  try {
+    const cwd = path.join(directory, "ui");
+    const packageDirectory = path.join(
+      directory,
+      "node_modules/finstack-quant-wasm",
+    );
+    await mkdir(path.join(cwd, "src/generated"), { recursive: true });
+    await mkdir(packageDirectory, { recursive: true });
+    const files = [
+      [
+        path.join(cwd, "package.json"),
+        { name: "registry-test", version: "1.2.3" },
+      ],
+      [
+        path.join(packageDirectory, "package.json"),
+        {
+          name: "finstack-quant-wasm",
+          version: "4.5.6",
+          exports: { "./package.json": "./package.json" },
+        },
+      ],
+      [path.join(cwd, "src/generated/roots.json"), []],
+      [path.join(cwd, "src/contract-provenance.json"), { entries: [] }],
+    ];
+    await Promise.all(
+      files.map(([file, value]) => writeFile(file, JSON.stringify(value))),
+    );
+    await expect(metadataInputs(cwd)).resolves.toEqual({
+      version: "1.2.3",
+      wasmVersion: "4.5.6",
+      roots: [],
+      provenance: { entries: [] },
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

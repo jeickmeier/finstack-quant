@@ -1,6 +1,6 @@
 import { isLosslessNumber, parse, stringify } from "lossless-json";
 import { z } from "zod";
-import { converterSchema, mapChildren } from "./schema.mjs";
+import { converterSchema, mapChildren, schemaAt } from "./schema.mjs";
 
 const wide = (schema) =>
   schema &&
@@ -163,11 +163,7 @@ export function createWireCodec(source) {
   function walk(node, value, host, path) {
     if (typeof node === "boolean") return value;
     if (node.$ref) {
-      const target =
-        node.$ref === "#"
-          ? schema
-          : schema.$defs[node.$ref.slice("#/$defs/".length)];
-      return walk(target, value, host, path);
+      return walk(schemaAt(schema, node.$ref), value, host, path);
     }
     if (value === null) return value;
     if (wide(node)) {

@@ -38,6 +38,8 @@
 - CI additionally runs OSV-Scanner across `Cargo.lock`, `uv.lock`, and `package-lock.json` for cross-ecosystem CVE coverage
 - Clippy runs with `-D warnings`; all warnings are treated as errors
 - Do not run `cargo test` or `cargo clippy` directly during agent work; use the scoped `mise run rust-*` tasks
+- UI valuation-detail fixtures pin WASM source hashes. After intentional source changes and rebuilding WASM, regenerate with `node finstack-quant-ui/tests/details/generate.mjs`, then refresh their gallery copies with `node finstack-quant-ui/scripts/gen-gallery.mjs`; verify with `mise run ui-test -- tests/details.test.tsx`.
+- UI cashflow and valuation-detail fixtures also pin the exact bytes of `finstack-quant-ui/src/fixtures/results/bond.json`. After changing or formatting that fixture, refresh its dependents with `node finstack-quant-ui/tests/cashflows/generate.mjs` and `node finstack-quant-ui/tests/details/generate.mjs`, review the result diffs, then run `node finstack-quant-ui/scripts/gen-gallery.mjs`. `ui-fmt` does not refresh these provenance hashes.
 
 ## Clippy Strictness
 

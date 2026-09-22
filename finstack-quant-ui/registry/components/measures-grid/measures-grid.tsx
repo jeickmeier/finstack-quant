@@ -6,9 +6,12 @@ import {
   type ValuationSummaryProps,
 } from "../valuation-summary/valuation-summary";
 import type { ColumnDef } from "@tanstack/react-table";
+import type { MetricMetadata } from "finstack-quant-wasm";
 export interface MeasuresGridProps extends ValuationSummaryProps {
-  /** Pass the groups returned by listStandardMetricsGrouped; no local financial taxonomy. */
-  groups: Readonly<Record<string, readonly string[]>>;
+  /** Rust-supplied per-key metadata for the primary result; absent records keep keys raw. */
+  metadata?: readonly MetricMetadata[];
+  /** Rust-supplied per-key metadata for the comparison result, independent of the primary sidecar. */
+  comparisonMetadata?: readonly MetricMetadata[];
   /** Optional source-backed units by complete metric key. Values are always displayed raw. */
   units?: Readonly<Record<string, { label: string; source: string }>>;
   comparisonUnits?: Readonly<Record<string, { label: string; source: string }>>;
@@ -18,24 +21,38 @@ type MeasureRow = {
   value: number | undefined;
   comparison: number | undefined;
 };
-/** Normalize display widths only; qualified native bucket labels remain opaque. */
+function measureUnit(
+  key: string,
+  metadata: readonly MetricMetadata[] | undefined,
+  units: MeasuresGridProps["units"],
+) {
+  const supplied = units?.[key];
+  if (supplied) return supplied;
+  const unit = metadata?.find((entry) => entry.key === key)?.unit;
+  return unit && unit !== "unknown"
+    ? {
+        label: unit,
+        source: "finstack_quant_valuations::pricer::metric_metadata",
+      }
+    : undefined;
+}
+/** Normalize display widths only; native descriptors decide bucket eligibility and series identity. */
 function bucketBars(
   measures: Record<string, number> | undefined,
   units: MeasuresGridProps["units"],
+  metadata: readonly MetricMetadata[] | undefined,
 ) {
   const series = new Map<string, [string, number][]>();
   for (const [key, value] of Object.entries(measures ?? {})) {
-    const parts = key.split("::");
-    if (
-      parts.length !== 3 ||
-      !["bucketed_dv01", "bucketed_cs01"].includes(parts[0]) ||
-      !parts[1] ||
-      !parts[2] ||
-      !Number.isFinite(value)
-    )
-      continue;
-    const unit = units?.[key];
-    const id = JSON.stringify([parts[0], parts[1], unit?.label, unit?.source]);
+    const descriptor = metadata?.find((entry) => entry.key === key);
+    if (!descriptor?.bucketed || !Number.isFinite(value)) continue;
+    const unit = measureUnit(key, metadata, units);
+    const id = JSON.stringify([
+      descriptor.metric,
+      descriptor.components[0],
+      unit?.label,
+      unit?.source,
+    ]);
     const entries = series.get(id) ?? [];
     entries.push([key, value]);
     series.set(id, entries);
@@ -74,9 +91,12 @@ function BucketBar({ ratio }: { ratio: number | undefined }) {
     </div>
   );
 }
-/** Group by the canonical metric family prefix while retaining the complete returned key. */
+/** Group by the Rust-supplied native group while retaining the complete returned key. */
 export function groupMeasures(
-  props: Pick<MeasuresGridProps, "result" | "compareTo" | "groups">,
+  props: Pick<
+    MeasuresGridProps,
+    "result" | "compareTo" | "metadata" | "comparisonMetadata"
+  >,
 ) {
   const grouped = new Map<string, MeasureRow[]>();
   const keys = new Set([
@@ -84,10 +104,10 @@ export function groupMeasures(
     ...Object.keys(props.compareTo?.measures ?? {}),
   ]);
   for (const key of keys) {
-    const matches = Object.entries(props.groups).filter(([, metrics]) =>
-      metrics.some((metric) => key === metric || key.startsWith(`${metric}::`)),
-    );
-    const group = matches.length === 1 ? matches[0][0] : "Group unavailable";
+    const group =
+      props.metadata?.find((entry) => entry.key === key)?.group ??
+      props.comparisonMetadata?.find((entry) => entry.key === key)?.group ??
+      "Group unavailable";
     const rows = grouped.get(group) ?? [];
     rows.push({
       key,
@@ -96,21 +116,26 @@ export function groupMeasures(
     });
     grouped.set(group, rows);
   }
-  return [...new Set([...Object.keys(props.groups), "Group unavailable"])]
-    .filter((group) => grouped.has(group))
-    .map((group) => ({ group, rows: grouped.get(group)! }));
+  return [...grouped].map(([group, rows]) => ({ group, rows }));
 }
 /** Supplied measures and independent comparison context, using the unlinked core table. */
 export function MeasuresGrid(props: MeasuresGridProps) {
   const grouped = groupMeasures(props);
-  const bars = bucketBars(props.result?.measures, props.units);
+  const bars = bucketBars(props.result?.measures, props.units, props.metadata);
   const comparisonBars = bucketBars(
     props.compareTo?.measures,
     props.comparisonUnits,
+    props.comparisonMetadata,
   );
   const noUnits =
     !Object.keys(props.units ?? {}).length &&
-    !Object.keys(props.comparisonUnits ?? {}).length;
+    !Object.keys(props.comparisonUnits ?? {}).length &&
+    !Object.keys(props.result?.measures ?? {}).some((key) =>
+      measureUnit(key, props.metadata, props.units),
+    ) &&
+    !Object.keys(props.compareTo?.measures ?? {}).some((key) =>
+      measureUnit(key, props.comparisonMetadata, props.comparisonUnits),
+    );
   const columns = (group: string): ColumnDef<{}, MeasureRow, any>[] => [
     {
       id: "key",
@@ -132,7 +157,11 @@ export function MeasuresGrid(props: MeasuresGridProps) {
         <>
           <MeasureValue
             value={context.row.original.value}
-            unit={props.units?.[context.row.original.key]}
+            unit={measureUnit(
+              context.row.original.key,
+              props.metadata,
+              props.units,
+            )}
             showUnavailableUnit={!noUnits}
           />
           <BucketBar ratio={bars.get(context.row.original.key)} />
@@ -151,7 +180,11 @@ export function MeasuresGrid(props: MeasuresGridProps) {
               <>
                 <MeasureValue
                   value={context.row.original.comparison}
-                  unit={props.comparisonUnits?.[context.row.original.key]}
+                  unit={measureUnit(
+                    context.row.original.key,
+                    props.comparisonMetadata,
+                    props.comparisonUnits,
+                  )}
                   showUnavailableUnit={!noUnits}
                 />
                 <BucketBar
@@ -170,6 +203,8 @@ export function MeasuresGrid(props: MeasuresGridProps) {
       <ValuationSummary
         result={props.result}
         compareTo={props.compareTo}
+        formattedValue={props.formattedValue}
+        comparisonFormattedValue={props.comparisonFormattedValue}
         compact
         model={props.model}
         comparisonModel={props.comparisonModel}

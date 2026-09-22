@@ -22,15 +22,15 @@ def test_decimal_preserves_19_digit_precision() -> None:
     # The whole point of the Decimal path is to avoid IEEE 754 rounding.
     raw = "1234567890.0123456789"
     m = Money.from_decimal(Decimal(raw), "USD")
-    # format() at 10 dp should round-trip the original literal exactly.
-    assert m.format(decimals=10, show_currency=False) == raw
+    # format_with() at 10 dp should round-trip the original literal exactly.
+    assert m.format_with(decimals=10, show_currency=False) == raw
 
 
 def test_decimal_via_polymorphic_constructor_matches_classmethod() -> None:
     raw = "987654321.123456789"
     m1 = Money(Decimal(raw), "USD")
     m2 = Money.from_decimal(Decimal(raw), "USD")
-    assert m1.format(decimals=9, show_currency=False) == m2.format(decimals=9, show_currency=False)
+    assert m1.format_with(decimals=9, show_currency=False) == m2.format_with(decimals=9, show_currency=False)
 
 
 def test_decimal_subclass_uses_decimal_path_not_float() -> None:
@@ -47,7 +47,7 @@ def test_decimal_subclass_uses_decimal_path_not_float() -> None:
     m = Money(HighPrecisionDecimal(raw), "USD")
     # If the subclass had been routed through f64, the trailing digits would
     # be lost.
-    assert m.format(decimals=10, show_currency=False) == raw
+    assert m.format_with(decimals=10, show_currency=False) == raw
 
 
 def test_decimal_infinity_rejected() -> None:
@@ -67,13 +67,13 @@ def test_decimal_nan_rejected() -> None:
 
 def test_float_input_still_works() -> None:
     m = Money(100.5, "USD")
-    # IEEE 754: 100.5 is exact, so format() must return the exact literal.
-    assert m.format(decimals=2, show_currency=False) == "100.50"
+    # IEEE 754: 100.5 is exact, so format_with() must return the exact literal.
+    assert m.format_with(decimals=2, show_currency=False) == "100.50"
 
 
 def test_int_input_still_works() -> None:
     m = Money(100, "USD")
-    assert m.format(decimals=2, show_currency=False) == "100.00"
+    assert m.format_with(decimals=2, show_currency=False) == "100.00"
 
 
 def test_invalid_string_raises_type_error() -> None:
@@ -96,3 +96,44 @@ def test_convert_at_rate_preserves_decimal_amount_and_retags_currency() -> None:
 
     with pytest.raises(ValueError, match=r"rate|positive"):
         Money(1, "USD").convert_at_rate("EUR", 0.0)
+
+
+def test_from_decimal_str_accepts_exact_text() -> None:
+    wide = Money.from_decimal_str("12345678901234567890.12345", "USD")
+    assert wide.amount_decimal == Decimal("12345678901234567890.12345")
+    assert wide.currency.code == "USD"
+    scientific = Money.from_decimal_str("1.2345e3", "EUR")
+    assert scientific.amount_decimal == Decimal("1234.5")
+    for amount in [
+        "0.1e29",
+        "1.00e-27",
+        "2000e-31",
+        "-7.9228162514264337593543950335e28",
+        "0e999999",
+    ]:
+        assert Money.from_decimal_str(amount, "USD").amount_decimal == Decimal(amount)
+
+
+def test_from_decimal_str_rejects_inexact_amounts() -> None:
+    for amount in [
+        "1.24500000000000000000000000001",
+        "1.23450000000000000000000000001e3",
+        "NaN",
+        "1e-29",
+        "1e29",
+        "1.23e-28",
+    ]:
+        with pytest.raises(ValueError, match="exactly representable"):
+            Money.from_decimal_str(amount, "USD")
+
+
+def test_from_decimal_str_rejects_bad_currency_and_wrong_types() -> None:
+    with pytest.raises(ValueError, match="Invalid currency code"):
+        Money.from_decimal_str("1.0", "NOT-A-CCY")
+    with pytest.raises(TypeError):
+        Money.from_decimal_str(1.0, "USD")  # type: ignore[arg-type]
+
+
+def test_format_with_rejects_precision_above_native_bound() -> None:
+    with pytest.raises(ValueError, match="formatting precision"):
+        Money(1.0, "USD").format_with(decimals=1_000_001)

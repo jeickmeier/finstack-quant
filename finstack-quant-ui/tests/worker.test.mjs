@@ -4,6 +4,7 @@ import { startWorker } from "./worker/harness.mjs";
 import { QueryClient } from "@tanstack/react-query";
 import { pricingCases } from "./browser/cases.mjs";
 import { exportValuation } from "../src/host";
+import { formatMoney, formatRawMoney } from "../src/format/format";
 import { priceOptions } from "../registry/hooks/use-price-instrument/use-price-instrument";
 import { errorValue, unwrap } from "../registry/workers/finstack-contract";
 const native = createRequire(import.meta.url)(
@@ -270,6 +271,124 @@ it("frees failed canonicalization handles without caching them", async () => {
         freed: i,
       });
     }
+  } finally {
+    await local.close();
+  }
+});
+it("keeps native instrument and override validation ahead of market errors", async () => {
+  for (const request of [
+    { ...requests.bond, instrumentJson: "{", marketJson: "{" },
+    { ...requests.bond, instrumentJson: "{}", marketJson: "{" },
+    { ...requests.bond, pricingOptions: "{", marketJson: "{" },
+  ])
+    same(await proxy.price(request), direct(request));
+  const document = JSON.parse(requests.bond.instrumentJson);
+  document.instrument.spec.metric_pricing_overrides = {
+    theta_period: "invalid",
+  };
+  const request = {
+    ...requests.bond,
+    instrumentJson: JSON.stringify(document),
+    pricingOptions: '{"theta_period":"1W"}',
+  };
+  same(await proxy.price(request), direct(request));
+  const bad = { ...requests.bond, instrumentJson: "{", marketJson: "{" };
+  let error;
+  try {
+    native.instrumentCashflowsJson(
+      bad.instrumentJson,
+      bad.marketJson,
+      bad.asOf,
+      bad.model,
+    );
+  } catch (e) {
+    error = errorValue(e);
+  }
+  expect(error).toBeTruthy();
+  expect(await proxy.cashflows(bad)).toEqual({ ok: false, error });
+});
+it("serves native metric metadata and exposes typed validation errors", async () => {
+  const keys = [
+    "ytm",
+    "bucketed_dv01::A_x3a_x3aB::5y",
+    "custom_metric",
+    "pv01::USD-OIS",
+    "ytm",
+  ];
+  expect(unwrap(await proxy.metricMetadata(keys))).toEqual(
+    native.metricMetadata(keys),
+  );
+  const failed = await proxy.metricMetadata(["pv01::USD_x2dOIS"]);
+  expect(failed.ok).toBe(false);
+  expect(failed.error.name).toBe("FinstackError");
+  expect(failed.error.kind).toBe("validation");
+});
+it("formats money natively through the worker and frees every constructed handle", async () => {
+  const local = await startWorker();
+  try {
+    const before = await local.proxy.resources();
+    const stamp = { mode: "bankers", output_scale_by_currency: { USD: 2 } };
+    const stamped = {
+      value: { amount: "1.245", currency: "USD" },
+      rounding: stamp,
+    };
+    expect(unwrap(await local.proxy.formatMoney(stamped))).toBe(
+      formatMoney(stamped.value, stamp, native),
+    );
+    expect(await local.proxy.resources()).toMatchObject({
+      moneyConstructed: before.moneyConstructed + 1,
+      moneyFreed: before.moneyFreed + 1,
+    });
+    const inexact = {
+      value: { amount: "1.24500000000000000000000000001", currency: "USD" },
+      rounding: stamp,
+    };
+    const failed = await local.proxy.formatMoney(inexact);
+    expect(failed.ok).toBe(false);
+    expect(failed.error.name).toBe("FinstackError");
+    expect(failed.error.kind).toBe("validation");
+    expect(await local.proxy.resources()).toMatchObject({
+      moneyConstructed: before.moneyConstructed + 1,
+      moneyFreed: before.moneyFreed + 1,
+    });
+    const badMode = {
+      value: { amount: "1.245", currency: "USD" },
+      rounding: { mode: "half_up", output_scale_by_currency: { USD: 2 } },
+    };
+    const badResult = await local.proxy.formatMoney(badMode);
+    expect(badResult.ok).toBe(false);
+    expect(badResult.error.kind).toBe("validation");
+    expect(await local.proxy.resources()).toMatchObject({
+      moneyConstructed: before.moneyConstructed + 2,
+      moneyFreed: before.moneyFreed + 2,
+    });
+    for (const rounding of [
+      { mode: undefined, output_scale_by_currency: { USD: 2 } },
+      { mode: null, output_scale_by_currency: { USD: 2 } },
+      { mode: "ceil", output_scale_by_currency: { USD: null } },
+      { mode: "ceil", output_scale_by_currency: { USD: "2" } },
+    ]) {
+      const malformed = await local.proxy.formatMoney({
+        value: { amount: "1.245", currency: "USD" },
+        rounding,
+      });
+      expect(malformed.ok).toBe(false);
+      expect(malformed.error.name).toBe("TypeError");
+    }
+    expect(await local.proxy.resources()).toMatchObject({
+      moneyConstructed: before.moneyConstructed + 2,
+      moneyFreed: before.moneyFreed + 2,
+    });
+    const wide = {
+      amount: "12345678901234567890.123456789",
+      currency: "USD",
+    };
+    const request = { value: wide };
+    expect(unwrap(await local.proxy.formatMoney(request))).toBe(
+      formatRawMoney(wide),
+    );
+    expect(wide.amount).toBe("12345678901234567890.123456789");
+    expect(request).toEqual({ value: wide });
   } finally {
     await local.close();
   }

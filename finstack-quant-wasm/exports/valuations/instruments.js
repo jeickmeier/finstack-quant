@@ -15,6 +15,7 @@ export const instruments = {
   listModelsGrouped: wasm.listModelsGrouped,
   listStandardMetrics: wasm.listStandardMetrics,
   listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
+  metricMetadata: wasm.metricMetadata,
   structuredCreditTrancheDiscountMargin: wasm.structuredCreditTrancheDiscountMargin,
   structuredCreditTrancheBreakevenCdr: wasm.structuredCreditTrancheBreakevenCdr,
   structuredCreditTrancheOas: wasm.structuredCreditTrancheOas,

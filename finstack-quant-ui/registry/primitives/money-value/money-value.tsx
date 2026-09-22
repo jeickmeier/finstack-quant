@@ -1,19 +1,20 @@
 import type { MoneyValue as Money } from "finstack-quant-wasm";
-import { formatMoney, type RoundingStamp } from "@/lib/finstack/format/format";
-/** Currency-tagged exact supplied money, using its returned rounding stamp for display only. */
+import { formatRawMoney } from "@/lib/finstack/format/format";
+/** Currency-tagged exact supplied money; displays caller-prepared text or the raw exact amount. No WASM initialization or provider is required. */
 export function MoneyValue({
   value,
-  rounding,
+  displayText,
   label,
   prominent = false,
 }: {
   value: Money | null | undefined;
-  rounding?: RoundingStamp;
+  /** Prepared display text for this exact money/currency (e.g. worker-formatted); the raw exact amount is shown when omitted. */
+  displayText?: string;
   label?: string;
   /** Emphasize the amount while keeping its supplied currency visible. */
   prominent?: boolean;
 }) {
-  const text = value ? formatMoney(value, rounding) : "—";
+  const text = value ? (displayText ?? formatRawMoney(value)) : "—";
   return (
     <span
       aria-label={label}

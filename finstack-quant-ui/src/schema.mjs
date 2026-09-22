@@ -1,4 +1,43 @@
 const pointer = (key) => key.replaceAll("~", "~0").replaceAll("/", "~1");
+
+/**
+ * Look up a local JSON Pointer against a schema root.
+ * Decodes `~1` before `~0`, returns the raw target with no sibling merge and
+ * no URI fetching. `"#"` returns the root; missing or inherited members
+ * return `undefined`; nonlocal references throw.
+ */
+export function schemaAt(root, reference) {
+  if (reference === "#") return root;
+  if (!reference.startsWith("#/"))
+    throw new Error(`Unsupported schema reference: ${reference}`);
+  let value = root;
+  for (const part of reference.slice(2).split("/")) {
+    const key = part.replaceAll("~1", "/").replaceAll("~0", "~");
+    if (!value || typeof value !== "object" || !Object.hasOwn(value, key))
+      return undefined;
+    value = value[key];
+  }
+  return value;
+}
+
+/** Complete signed-integer lexical form: no prefix, whitespace, or exponent. */
+export const integerText = /^-?\d+$/;
+
+/**
+ * Convert finite numeric edit text while preserving invalid or incomplete
+ * input verbatim. `integer` requires a safe integer; otherwise the text must
+ * be a finite JSON-number lexical form. No financial bounds are validated and
+ * decimal-string fields are unaffected.
+ */
+export function numericEdit(text, integer = false) {
+  const pattern = integer ? integerText : /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
+  const value = Number(text);
+  return pattern.test(text) &&
+    (integer ? Number.isSafeInteger(value) : Number.isFinite(value))
+    ? value
+    : text;
+}
+
 export const maps = new Set(["$defs", "properties", "patternProperties"]);
 export const arrays = new Set(["allOf", "anyOf", "oneOf", "prefixItems"]);
 export const singles = new Set([

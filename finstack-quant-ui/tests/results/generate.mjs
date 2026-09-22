@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+import prettier from "prettier";
 import { pricingCases } from "../browser/cases.mjs";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -21,6 +22,16 @@ const fixture = {
   request,
   result,
   groups: native.listStandardMetricsGrouped(),
+  metadata: native.metricMetadata(Object.keys(result.measures)),
+  comparisonMetadata: native.metricMetadata([
+    "ytm",
+    "bucketed_cs01::SYNTHETIC-CREDIT::1y",
+    "bucketed_cs01::SYNTHETIC-CREDIT::3y",
+    "bucketed_cs01::SYNTHETIC-CREDIT::5y",
+    "bucketed_cs01::SYNTHETIC-OTHER::1y",
+    "bucketed_dv01::USD-OIS::30y",
+    "bucketed_dv01::USD-OIS::10y",
+  ]),
   facadeWasmSha256: createHash("sha256")
     .update(
       await readFile(
@@ -34,6 +45,6 @@ const fixture = {
 };
 await writeFile(
   new URL("bond.json", root),
-  JSON.stringify(fixture, null, 2) + "\n",
+  await prettier.format(JSON.stringify(fixture), { parser: "json" }),
 );
 console.log("Generated native bond valuation fixture and metric groups.");

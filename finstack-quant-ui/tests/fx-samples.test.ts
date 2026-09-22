@@ -9,6 +9,7 @@ import {
 } from "../registry/workers/finstack-contract";
 import { fxDeltaOptions } from "../registry/hooks/use-fx-delta-samples/use-fx-delta-samples";
 import type { FinstackClient } from "../registry/hooks/use-finstack/client";
+import { serializeHost } from "../src/codec.mjs";
 import { fxQuotes } from "./surfaces/fixtures";
 const native = createRequire(import.meta.url)(
   "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -26,15 +27,8 @@ const request: FxDeltaSampleRequest = {
   ],
 };
 function direct(request: FxDeltaSampleRequest) {
-  const s = request.surface;
-  const surface = new native.FxDeltaVolSurface(
-    s.id,
-    s.expiries,
-    s.atm_vols,
-    s.rr_25d,
-    s.bf_25d,
-    s.rr_10d ?? undefined,
-    s.bf_10d ?? undefined,
+  const surface = native.FxDeltaVolSurface.fromJson(
+    serializeHost(request.surface),
   );
   try {
     return request.coordinates.map((c) =>

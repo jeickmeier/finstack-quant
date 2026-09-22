@@ -114,9 +114,9 @@ class TestMoney:
     def test_string_amount_and_format(self) -> None:
         m = Money("1234567.891", "USD")
         assert m.amount_decimal == Decimal("1234567.891")
-        assert m.format(group=",") == "USD 1,234,567.89"
-        assert m.format(decimals=0, show_currency=False, rounding="floor") == "1234567"
-        assert m.format(decimals=0, show_currency=False, rounding=RoundingMode.CEIL) == "1234568"
+        assert m.format_with(group=",") == "USD 1,234,567.89"
+        assert m.format_with(decimals=0, show_currency=False, rounding="floor") == "1234567"
+        assert m.format_with(decimals=0, show_currency=False, rounding=RoundingMode.CEIL) == "1234568"
 
     def test_division_and_rounding(self) -> None:
         assert Money(300.0, "USD") / Money(100.0, "USD") == 3.0

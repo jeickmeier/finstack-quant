@@ -374,6 +374,16 @@ it("value primitives show supplied values and explicit unavailable metadata", ()
   expect(screen.getByText("USD 1.23")).toBeTruthy();
   expect(screen.getByText("Metadata unavailable")).toBeTruthy();
 });
+it("shows caller-prepared money display text while the title keeps the raw source amount", () => {
+  render(
+    <MoneyValue
+      value={{ amount: "1.245", currency: "USD" }}
+      displayText="USD 1.24"
+    />,
+  );
+  const node = screen.getByTitle("1.245");
+  expect(node.textContent).toBe("USD 1.24");
+});
 it("formats JSON without losing numeric tokens and copies or downloads only the original bytes", async () => {
   const user = userEvent.setup();
   const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();

@@ -113,7 +113,7 @@
     {
       "name": "measures-grid",
       "type": "registry:component",
-      "docs": "Displays supplied valuation context and raw measures with decorative signed bars for qualified bucketed DV01/CS01 rows. Each metric family, identifier, supplied unit and valuation uses an independent visual scale. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric groups and explicit source-backed units when available."
+      "docs": "Displays supplied valuation context and raw measures with decorative signed bars for qualified bucketed DV01/CS01 rows. Each metric family, identifier, supplied unit and valuation uses an independent visual scale. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available."
     },
     {
       "name": "curve-chart",
@@ -644,7 +644,7 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "f9ce826f0c7625e00fa9f931e33700bb1ef3d7990e73f244dfe2b5e2492c36a9"
+      "sha256": "5c6dc15c81fbb218de42ea0dbb32b3575c85928df1aef71063e387abd5a57717"
     },
     {
       "path": "finstack-quant-ui/tests/market-browser/cases.json",
@@ -664,11 +664,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/cashflows/cases.json",
-      "sha256": "d32c246b6edbee85ad5253eb9c869c3844219302fd8590eaeccc62bc468a364e"
+      "sha256": "37d80576919628daef8ea8c02031312cefe267df77ff403bc2d1fbf99af6d1b4"
     },
     {
       "path": "finstack-quant-ui/tests/details/cases.json",
-      "sha256": "c4cfdce872dbc32568266bbea602190f7a45e7c3dee900f20dfb712761959280"
+      "sha256": "5075b924e83f216f125ea87855f4b0fdd2de9684cb9968857bee92b75f6f4773"
     }
   ]
 }

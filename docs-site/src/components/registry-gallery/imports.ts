@@ -12,6 +12,7 @@ export const importHarnesses = {
       import("@/hooks/use-finstack/version"),
       import("@/hooks/use-finstack/validation"),
       import("@/hooks/use-finstack/snapshot"),
+      import("@/hooks/use-finstack/query"),
     ]).then((modules) => ({ name: "use-finstack", modules: modules.length })),
   "use-price-instrument": () =>
     Promise.all([

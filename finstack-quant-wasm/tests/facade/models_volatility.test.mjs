@@ -116,3 +116,89 @@ test('clamped cube preserves small quotes and invalid model domains', () => {
   low.free();
   invalid.free();
 });
+
+test('canonical volatility state constructors preserve named parameters and optional wings', () => {
+  const c = {
+    id: 'STATE',
+    expiries: [1],
+    tenors: [5],
+    params: [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift: null }],
+    forwards: [0.03],
+    interpolation_mode: 'vol',
+  };
+  for (const shift of [null, 0.03]) {
+    c.params[0].shift = shift;
+    const fromJson = facade.core.VolCube.fromJson(JSON.stringify(c));
+    const positional = new facade.core.VolCube(
+      'STATE',
+      [1],
+      [5],
+      [0.03, 0.5, -0.2, 0.4, shift ?? Number.NaN],
+      [0.03],
+      'vol'
+    );
+    try {
+      assert.equal(
+        facade.models.volatility.getCubeVol(fromJson, 1, 5, 0.025),
+        facade.models.volatility.getCubeVol(positional, 1, 5, 0.025)
+      );
+      assert.equal(
+        facade.models.volatility.getCubeNormalVol(fromJson, 1, 5, 0.025),
+        facade.models.volatility.getCubeNormalVol(positional, 1, 5, 0.025)
+      );
+    } finally {
+      fromJson.free();
+      positional.free();
+    }
+  }
+  assert.throws(
+    () => facade.core.VolCube.fromJson(JSON.stringify({ ...c, unknown: true })),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(
+    () =>
+      facade.core.VolCube.fromJson(
+        JSON.stringify({ ...c, params: [{ ...c.params[0], alpha: -1 }] })
+      ),
+    (error) => error.kind === 'validation'
+  );
+  const s = {
+    id: 'FX-STATE',
+    expiries: [1],
+    atm_vols: [0.12],
+    rr_25d: [0.01],
+    bf_25d: [0.002],
+    rr_10d: null,
+    bf_10d: null,
+  };
+  for (const wings of [false, true]) {
+    const state = { ...s, rr_10d: wings ? [0.02] : null, bf_10d: wings ? [0.004] : null };
+    const fromJson = facade.core.FxDeltaVolSurface.fromJson(JSON.stringify(state));
+    const positional = new facade.core.FxDeltaVolSurface(
+      'FX-STATE',
+      [1],
+      [0.12],
+      [0.01],
+      [0.002],
+      wings ? [0.02] : undefined,
+      wings ? [0.004] : undefined
+    );
+    try {
+      assert.equal(
+        facade.models.volatility.getFxDeltaVol(fromJson, 1, 1.12, 1.1),
+        facade.models.volatility.getFxDeltaVol(positional, 1, 1.12, 1.1)
+      );
+    } finally {
+      fromJson.free();
+      positional.free();
+    }
+  }
+  assert.throws(
+    () => facade.core.FxDeltaVolSurface.fromJson(JSON.stringify({ ...s, rr_10d: [0.02] })),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(
+    () => facade.core.FxDeltaVolSurface.fromJson(JSON.stringify({ ...s, unknown: true })),
+    (error) => error.kind === 'validation'
+  );
+});

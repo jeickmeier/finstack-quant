@@ -130,7 +130,7 @@ settle = adjust(
     HolidayCalendar("usny"),
 )
 
-print(amount.format())   # 'USD 1000000.00'
+print(amount.format_with())   # 'USD 1000000.00'
 print(settle)            # 2025-01-06
 ```
 

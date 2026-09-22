@@ -6,6 +6,7 @@ import {
   formatRate,
   rateToWire,
   formatMoney,
+  formatRawMoney,
   groupDecimal,
   formatRaw,
   formatSigned,
@@ -68,7 +69,7 @@ it("groups decimal text exactly and preserves the wire string", () => {
   expect(groupDecimal("-0.00100")).toBe("-0.00100");
   expect(() => groupDecimal("1,000.00")).toThrow(/decimal/);
   const wire = { amount: "12345678901234567890.12345", currency: "USD" };
-  expect(formatMoney(wire)).toBe("USD 12,345,678,901,234,567,890.12345");
+  expect(formatRawMoney(wire)).toBe("USD 12,345,678,901,234,567,890.12345");
   expect(wire.amount).toBe("12345678901234567890.12345");
   const native = core.Money.fromJson(JSON.stringify(wire));
   try {
@@ -90,7 +91,7 @@ it.each([
 ] as const)("honours returned %s rounding for %s", (mode, amount, expected) => {
   const stamp: RoundingStamp = { mode, output_scale_by_currency: { USD: 2 } };
   const money = { amount, currency: "USD" };
-  expect(formatMoney(money, stamp)).toBe(expected);
+  expect(formatMoney(money, stamp, core)).toBe(expected);
   expect(money.amount).toBe(amount);
 });
 it("uses currency-specific stamps and preserves digits where no scale was returned", () => {
@@ -98,13 +99,52 @@ it("uses currency-specific stamps and preserves digits where no scale was return
     mode: "bankers",
     output_scale_by_currency: { USD: 4, JPY: 0 },
   };
-  expect(formatMoney({ amount: "1.23456", currency: "USD" }, stamp)).toBe(
+  expect(formatMoney({ amount: "1.23456", currency: "USD" }, stamp, core)).toBe(
     "USD 1.2346",
   );
-  expect(formatMoney({ amount: "1.5", currency: "JPY" }, stamp)).toBe("JPY 2");
-  expect(formatMoney({ amount: "1.23456", currency: "KWD" }, stamp)).toBe(
+  expect(formatMoney({ amount: "1.5", currency: "JPY" }, stamp, core)).toBe(
+    "JPY 2",
+  );
+  expect(formatMoney({ amount: "1.23456", currency: "KWD" }, stamp, core)).toBe(
     "KWD 1.23456",
   );
+});
+it("rejects inexact amount text through the native constructor", () => {
+  const stamp: RoundingStamp = {
+    mode: "bankers",
+    output_scale_by_currency: { USD: 2 },
+  };
+  expect(() =>
+    formatMoney(
+      { amount: "1.24500000000000000000000000001", currency: "USD" },
+      stamp,
+      core,
+    ),
+  ).toThrow(/exactly representable/);
+});
+it.each([
+  { mode: undefined, output_scale_by_currency: { USD: 2 } },
+  { mode: null, output_scale_by_currency: { USD: 2 } },
+  { mode: "ceil", output_scale_by_currency: { USD: null } },
+  { mode: "ceil", output_scale_by_currency: { USD: "2" } },
+])(
+  "rejects malformed returned stamp %j before native construction",
+  (stamp) => {
+    expect(() =>
+      formatMoney(
+        { amount: "1.245", currency: "USD" },
+        stamp as unknown as RoundingStamp,
+        core,
+      ),
+    ).toThrow(new TypeError("Invalid returned rounding stamp"));
+  },
+);
+it("keeps arbitrary-precision text raw without a scale stamp", () => {
+  const wide = { amount: "1.24500000000000000000000000001", currency: "USD" };
+  expect(formatRawMoney(wide)).toBe("USD 1.24500000000000000000000000001");
+  expect(
+    formatMoney(wide, { mode: "bankers", output_scale_by_currency: {} }, core),
+  ).toBe("USD 1.24500000000000000000000000001");
 });
 it.each(["1970-01-01", "1969-12-31", "2024-02-29", "0001-01-01", "9999-12-31"])(
   "uses native calendar conversion for %s",

@@ -89,6 +89,63 @@ impl Default for FormatOpts {
     }
 }
 
+impl FormatOpts {
+    /// Maximum supported display precision.
+    ///
+    /// Host bindings accept precision from untyped inputs, so the bound caps
+    /// the worst-case formatted string length before rounding work begins.
+    pub const MAX_DECIMALS: usize = 1_000_000;
+
+    /// Build checked formatting options, rejecting an excessive precision bound.
+    ///
+    /// # Arguments
+    ///
+    /// * `decimals` - Fractional digits to display; `None` selects the
+    ///   currency's ISO-4217 minor units. Must lie in `0..=Self::MAX_DECIMALS`.
+    /// * `show_currency` - Whether to prepend the ISO-4217 currency code.
+    /// * `group` - Optional single-character thousands separator (e.g.
+    ///   `Some(',')`); `None` disables grouping.
+    /// * `rounding` - Rounding mode applied to the displayed value.
+    ///
+    /// # Returns
+    ///
+    /// A validated [`FormatOpts`] carrying the supplied display options.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `decimals` exceeds
+    /// [`Self::MAX_DECIMALS`].
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::money::FormatOpts;
+    /// use finstack_quant_core::config::RoundingMode;
+    ///
+    /// let opts = FormatOpts::new(Some(2), true, Some(','), RoundingMode::Bankers)
+    ///     .expect("bounded precision");
+    /// assert_eq!(opts.decimals, Some(2));
+    /// ```
+    pub fn new(
+        decimals: Option<usize>,
+        show_currency: bool,
+        group: Option<char>,
+        rounding: RoundingMode,
+    ) -> Result<Self, Error> {
+        if decimals.is_some_and(|precision| precision > Self::MAX_DECIMALS) {
+            return Err(Error::Validation(format!(
+                "formatting precision exceeds {}",
+                Self::MAX_DECIMALS
+            )));
+        }
+        Ok(Self {
+            decimals,
+            show_currency,
+            group,
+            rounding,
+        })
+    }
+}
+
 /// Currency-tagged monetary amount with safe arithmetic.
 ///
 /// Values retain decimal precision independently of ISO 4217 display precision.
@@ -205,6 +262,100 @@ impl Money {
             return Err(Error::Input(InputError::ConversionOverflow));
         }
         Ok(Self { amount, currency })
+    }
+
+    /// Construct from exact decimal text, rejecting any inexact representation.
+    ///
+    /// `amount` is parsed directly as a `rust_decimal::Decimal` — fixed-point
+    /// text such as `"1234.56"` or scientific text such as `"1.2345e3"` —
+    /// without converting through `f64`. The text must be exactly
+    /// representable within Decimal's 96-bit mantissa and its maximum
+    /// fractional scale of 28 digits; values needing more precision are
+    /// rejected rather than silently rounded. For scientific input the
+    /// mantissa itself is validated with `Decimal::from_str_exact` and the
+    /// exponent is applied exactly on the integer coefficient and scale:
+    /// excessive target scales are reduced only by removing trailing
+    /// coefficient zeroes, so no nonzero digit is ever discarded, and
+    /// results beyond the 96-bit mantissa or 28-digit scale are rejected.
+    ///
+    /// The currency is a display/arithmetic tag only: no FX conversion is
+    /// performed. This constructor bypasses the general `Money` serde path,
+    /// which tolerates lossy re-rendering of over-precise amounts.
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - Exact decimal amount text in major currency units, in
+    ///   fixed-point or scientific notation.
+    /// * `currency` - ISO-4217 currency tag stored with the amount.
+    ///
+    /// # Returns
+    ///
+    /// A `Money` whose stored Decimal equals the supplied text exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when the text cannot be represented
+    /// exactly as a `Decimal` (malformed input, non-finite tokens, mantissa
+    /// precision beyond 96 bits, a malformed exponent, or an exponent whose
+    /// application would exceed the 28-digit scale or 96-bit mantissa), or
+    /// `InputError::ConversionOverflow` when the exact value cannot produce
+    /// the finite `f64` view used by [`Self::amount`].
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::money::Money;
+    /// use finstack_quant_core::currency::Currency;
+    ///
+    /// let money = Money::from_decimal_str("1.245", Currency::USD).expect("exact amount");
+    /// assert_eq!(money.amount_decimal().to_string(), "1.245");
+    /// ```
+    pub fn from_decimal_str(amount: &str, currency: Currency) -> Result<Self, Error> {
+        use rust_decimal::Decimal;
+        let invalid = |error| {
+            Error::Validation(format!(
+                "money amount must be exactly representable as Decimal: {error}"
+            ))
+        };
+        let out_of_range = || {
+            Error::Validation("money amount must be exactly representable as Decimal".to_string())
+        };
+        let decimal = if let Some((mantissa, exponent)) = amount.split_once(['e', 'E']) {
+            let parsed = Decimal::from_str_exact(mantissa).map_err(invalid)?;
+            let exponent = exponent.parse::<i64>().map_err(|error| {
+                Error::Validation(format!("invalid scientific exponent: {error}"))
+            })?;
+            let mut coefficient = parsed.mantissa();
+            if coefficient == 0 {
+                Decimal::ZERO
+            } else {
+                let mut scale = i64::from(parsed.scale())
+                    .checked_sub(exponent)
+                    .ok_or_else(out_of_range)?;
+                while scale > i64::from(Decimal::MAX_SCALE) && coefficient % 10 == 0 {
+                    coefficient /= 10;
+                    scale -= 1;
+                }
+                let scale = if scale < 0 {
+                    let shift = u32::try_from(scale.unsigned_abs()).map_err(|_| out_of_range())?;
+                    if shift > Decimal::MAX_SCALE {
+                        return Err(out_of_range());
+                    }
+                    coefficient = coefficient
+                        .checked_mul(10_i128.pow(shift))
+                        .ok_or_else(out_of_range)?;
+                    0
+                } else {
+                    u32::try_from(scale)
+                        .ok()
+                        .filter(|scale| *scale <= Decimal::MAX_SCALE)
+                        .ok_or_else(out_of_range)?
+                };
+                Decimal::try_from_i128_with_scale(coefficient, scale).map_err(invalid)?
+            }
+        } else {
+            Decimal::from_str_exact(amount).map_err(invalid)?
+        };
+        Self::from_decimal(decimal, currency)
     }
 
     /// Construct from an exact Decimal using the configured ingest rounding policy.
@@ -1248,5 +1399,133 @@ mod tests {
             .expect("1.00 is representable");
         assert_eq!(a, b);
         assert_eq!(hash_of(a), hash_of(b));
+    }
+
+    #[test]
+    fn money_format_from_decimal_str_accepts_exact_text() {
+        let wide =
+            Money::from_decimal_str("12345678901234567890.12345", Currency::USD).expect("exact");
+        assert_eq!(
+            wide.amount_decimal().to_string(),
+            "12345678901234567890.12345"
+        );
+        assert_eq!(wide.currency(), Currency::USD);
+        let scientific =
+            Money::from_decimal_str("1.2345e3", Currency::EUR).expect("exact scientific");
+        assert_eq!(scientific.amount_decimal().to_string(), "1234.5");
+        assert_eq!(scientific.currency(), Currency::EUR);
+        let promoted = Money::from_decimal_str("0.1e29", Currency::USD).expect("exact 1e28");
+        assert_eq!(
+            promoted.amount_decimal(),
+            rust_decimal::Decimal::try_from_i128_with_scale(10_i128.pow(28), 0)
+                .expect("1e28 is representable")
+        );
+        let tiny = Money::from_decimal_str("1.00e-27", Currency::USD).expect("exact 1e-27");
+        assert_eq!(tiny.amount_decimal(), rust_decimal::Decimal::new(1, 27));
+        assert_eq!(
+            tiny.format_with(
+                FormatOpts::new(Some(28), false, None, RoundingMode::Bankers)
+                    .expect("bounded opts")
+            ),
+            "0.0000000000000000000000000010"
+        );
+        let reduced = Money::from_decimal_str("2000e-31", Currency::USD).expect("exact 2e-28");
+        assert_eq!(reduced.amount_decimal(), rust_decimal::Decimal::new(2, 28));
+        assert_eq!(
+            reduced.format_with(
+                FormatOpts::new(Some(28), false, None, RoundingMode::Bankers)
+                    .expect("bounded opts")
+            ),
+            "0.0000000000000000000000000002"
+        );
+        let min = Money::from_decimal_str("-7.9228162514264337593543950335e28", Currency::USD)
+            .expect("exact Decimal minimum");
+        assert_eq!(min.amount_decimal(), rust_decimal::Decimal::MIN);
+        let zero = Money::from_decimal_str("0e999999", Currency::USD).expect("zero exponent");
+        assert_eq!(zero.amount_decimal(), rust_decimal::Decimal::ZERO);
+    }
+
+    #[test]
+    fn money_format_from_decimal_str_rejects_inexact_amounts() {
+        for amount in [
+            "1.24500000000000000000000000001",
+            "1.23450000000000000000000000001e3",
+            "NaN",
+            "1e-29",
+            "1e29",
+            "1.23e-28",
+        ] {
+            let result = Money::from_decimal_str(amount, Currency::USD);
+            assert!(
+                matches!(result, Err(Error::Validation(_))),
+                "expected validation error for {amount}: {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn money_format_opts_new_bounds_precision() {
+        assert!(FormatOpts::new(
+            Some(FormatOpts::MAX_DECIMALS),
+            true,
+            None,
+            RoundingMode::Bankers
+        )
+        .is_ok());
+        let result = FormatOpts::new(
+            Some(FormatOpts::MAX_DECIMALS + 1),
+            true,
+            None,
+            RoundingMode::Bankers,
+        );
+        assert!(matches!(result, Err(Error::Validation(_))));
+        assert!(
+            FormatOpts::new(None, true, Some(','), RoundingMode::Bankers)
+                .expect("unbounded precision")
+                .decimals
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn money_format_with_honours_returned_rounding_modes() {
+        let vectors: &[(&str, &str, RoundingMode, &str)] = &[
+            ("1.245", "USD 1.24", RoundingMode::Bankers, "bankers"),
+            ("1.255", "USD 1.26", RoundingMode::Bankers, "bankers"),
+            (
+                "-1.245",
+                "USD -1.25",
+                RoundingMode::AwayFromZero,
+                "away_from_zero",
+            ),
+            (
+                "1.241",
+                "USD 1.24",
+                RoundingMode::AwayFromZero,
+                "away_from_zero",
+            ),
+            (
+                "-1.259",
+                "USD -1.25",
+                RoundingMode::TowardZero,
+                "toward_zero",
+            ),
+            ("-1.241", "USD -1.25", RoundingMode::Floor, "floor"),
+            ("1.249", "USD 1.24", RoundingMode::Floor, "floor"),
+            ("1.241", "USD 1.25", RoundingMode::Ceil, "ceil"),
+            ("-1.249", "USD -1.24", RoundingMode::Ceil, "ceil"),
+        ];
+        for (amount, expected, mode, name) in vectors.iter().copied() {
+            let money =
+                Money::from_decimal_str(amount, Currency::USD).expect("exact vector amount");
+            let opts = FormatOpts::new(Some(2), true, Some(','), mode)
+                .expect("bounded formatting options");
+            assert_eq!(money.format_with(opts), expected, "{name} {amount}");
+            assert_eq!(
+                money.amount_decimal().to_string(),
+                amount,
+                "formatting must not mutate the stored amount"
+            );
+        }
     }
 }

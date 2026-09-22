@@ -130,7 +130,7 @@ export that is not in it is invisible to TypeScript users, and
   greps for offenders and fails the build; the only legal call site is inside
   `../utils/mod.rs`.
 
-- **Errors go through `to_js_err` / `to_js_error`**, which throw a real `Error` named
+- **Errors go through `to_js_err`**, which throws a real `Error` named
   `FinstackError` with a `kind` of `not_found` / `validation` / `computation`.
   Persisted-contract paths use `contract_to_js_error` and
   `materialization_to_js_error`, which select `kind` from the Rust enum variant

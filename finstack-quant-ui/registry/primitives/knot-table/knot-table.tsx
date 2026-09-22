@@ -1,5 +1,5 @@
 "use client";
-import contracts from "@/lib/finstack/generated/primitive-contracts.json";
+import { numericEdit } from "@/lib/finstack/schema.mjs";
 import { FinstackTable } from "../finstack-table/finstack-table";
 import { DecimalInput } from "../decimal-input/decimal-input";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -43,12 +43,7 @@ export function KnotTable({
           value={String(info.getValue())}
           min={index === 0 ? min : undefined}
           onValueChange={(text) => {
-            const number = Number(text);
-            const next =
-              new RegExp(contracts.decimal.schema.pattern).test(text) &&
-              Number.isFinite(number)
-                ? number
-                : text;
+            const next = numericEdit(text);
             onValueChange(
               data.map((row) =>
                 row.id === info.row.id

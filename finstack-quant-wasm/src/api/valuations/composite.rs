@@ -6,7 +6,7 @@
 //! at the post-trade financed value. There is no separate `initializeFixed`
 //! export; `initialize` resolves `fixed_quantity` without history.
 
-use crate::utils::{to_js_err, to_js_error, to_js_value};
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::composite::{
     CompositeHistoryEngine, CompositeInstrument, CompositeMarketObservation,
     CompositeRebalanceResult, CompositeSpec,
@@ -28,13 +28,13 @@ fn parse_spec(json: &str) -> Result<CompositeSpec, JsValue> {
 
 fn parse_composite(json: &str) -> Result<CompositeInstrument, JsValue> {
     match finstack_quant_valuations::pricer::json::parse_instrument_from_json(json)
-        .map_err(|error| to_js_error(&error))?
+        .map_err(to_js_err)?
     {
         InstrumentJson::Composite(instrument) => Ok(*instrument),
-        other => Err(JsValue::from_str(&format!(
+        other => Err(to_js_err(finstack_quant_core::Error::Validation(format!(
             "expected composite instrument envelope, found '{}'",
             other.type_tag()
-        ))),
+        )))),
     }
 }
 
@@ -95,7 +95,7 @@ pub fn initialize_composite(
     let history = parse_observations(history_json.as_deref())?;
     let result = spec
         .initialize(&market, date, &history)
-        .map_err(|error| to_js_error(&error))?;
+        .map_err(to_js_err)?;
     rebalance_value(result)
 }
 
@@ -136,7 +136,7 @@ pub fn rebalance_composite(
     let history = parse_observations(history_json.as_deref())?;
     let result = instrument
         .rebalance(&market, date, &history)
-        .map_err(|error| to_js_error(&error))?;
+        .map_err(to_js_err)?;
     rebalance_value(result)
 }
 
@@ -177,7 +177,7 @@ pub fn composite_primitive_exposures(
     let metrics = parse_metrics(metrics)?;
     let report = instrument
         .primitive_exposure_report(&market, date, &metrics)
-        .map_err(|error| to_js_error(&error))?;
+        .map_err(to_js_err)?;
     to_js_value(&report)
 }
 
@@ -208,7 +208,7 @@ pub fn composite_execution_trades(
         .transpose()?;
     let trades = instrument
         .execution_trades(previous.as_ref())
-        .map_err(|error| to_js_error(&error))?;
+        .map_err(to_js_err)?;
     to_js_value(&trades)
 }
 
@@ -253,7 +253,7 @@ pub fn composite_history_from_spec(
     let warmup = parse_observations(warmup_json.as_deref())?;
     let metrics = parse_metrics(metrics)?;
     let rows = CompositeHistoryEngine::run_from_spec(&spec, &warmup, &observations, &metrics)
-        .map_err(|error| to_js_error(&error))?;
+        .map_err(to_js_err)?;
     to_js_value(&rows)
 }
 
@@ -290,7 +290,7 @@ pub fn composite_history(
     let instrument = parse_composite(instrument_json)?;
     let observations = parse_observations(Some(observations_json))?;
     let metrics = parse_metrics(metrics)?;
-    let rows = CompositeHistoryEngine::run(&instrument, &observations, &metrics)
-        .map_err(|error| to_js_error(&error))?;
+    let rows =
+        CompositeHistoryEngine::run(&instrument, &observations, &metrics).map_err(to_js_err)?;
     to_js_value(&rows)
 }

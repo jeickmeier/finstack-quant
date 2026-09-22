@@ -8,12 +8,16 @@ This is a standalone Node 24 package with installable controlled primitives.
 mise run wasm-pkg
 mise run ui-sync
 mise run ui-gen
+mise run ui-fmt
+mise run ui-typecheck
+mise run ui-test
 mise run ui-check
 ```
 
 `ui-sync` installs the lockfile with lifecycle scripts disabled. The linked WASM
 package is built explicitly by `wasm-pkg`; dependency installation does not launch
-Rust or Python builds. `ui-check` checks generated drift, handwritten formatting,
+Rust or Python builds. Use `ui-fmt`, `ui-typecheck`, and `ui-test` while iterating;
+`ui-check` is the combined gate for generated drift, handwritten formatting,
 TypeScript and the package's Vitest tests. It does not run the library suites.
 
 ```ts
@@ -180,8 +184,11 @@ fixture, checking actual font loading and the theme/density switches.
 Scalar formatting is independent of WASM initialization. Import `transport`
 explicitly for canonical import/export; it reuses the existing adapters.
 
-`formatMoney` preserves the amount and uses returned per-currency rounding
-stamps for display. Without an explicit scale it preserves all supplied digits.
+`formatMoney` preserves the amount and applies returned per-currency rounding
+stamps through the native `core.Money` constructor supplied by the caller
+(inside the worker for browser consumers). Without an explicit scale it
+preserves all supplied digits; `formatRawMoney` is the same exact display
+without any stamp.
 `formatRate` requires a source-backed wire/display convention; absent metadata
 returns raw text and `unit: null`. Decimal conversions use exact decimal text;
 source strings remain the caller's state. Grouping currently uses en-US.

@@ -4,9 +4,9 @@
 # Run `mise install` once to provision all tools, then `mise run <task>`
 # (or `mise r <task>`) to drive the workflow. `mise tasks` lists everything.
 #
-# Naming convention: <domain>-<action>  (domains: rust, python, wasm, all)
-#   - `rust-*`, `python-*`, `wasm-*`  — single-language tasks
-#   - `all-*`                          — aggregates that fan out to all domains
+# Naming convention: <domain>-<action>  (domains: rust, python, wasm, ui, all)
+#   - `rust-*`, `python-*`, `wasm-*`, `ui-*`  — single-language tasks
+#   - `all-*`                          — aggregates that fan out to rust/python/wasm
 #   - `*-fmt`                          — reformats AND applies auto-fixes (mutating)
 #   - `*-lint`                         — check-only (CI-safe, no mutation)
 
@@ -1023,6 +1023,18 @@ run = "npm --prefix finstack-quant-ui ci --ignore-scripts"
 [tasks.ui-gen]
 description = "Generate offline UI schemas, wire types, metadata, and lazy catalogue"
 run = "npm --prefix finstack-quant-ui run generate"
+
+[tasks.ui-fmt]
+description = "Format + auto-fix UI/TS code (prettier --write, mutating)"
+run = "npm --prefix finstack-quant-ui run format:fix"
+
+[tasks.ui-typecheck]
+description = "Type-check the UI package with tsc"
+run = "npm --prefix finstack-quant-ui run typecheck"
+
+[tasks.ui-test]
+description = "Run UI Vitest tests"
+run = "npm --prefix finstack-quant-ui run test --"
 
 [tasks.ui-check]
 description = "Check component-registry generation drift, types, and focused tests"

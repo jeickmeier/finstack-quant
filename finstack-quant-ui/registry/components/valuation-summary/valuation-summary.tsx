@@ -1,9 +1,6 @@
 import type { ValuationResult } from "finstack-quant-wasm";
 import { MoneyValue } from "../../primitives/money-value/money-value";
-import {
-  StampBadge,
-  returnedRounding,
-} from "../../primitives/stamp-badge/stamp-badge";
+import { StampBadge } from "../../primitives/stamp-badge/stamp-badge";
 /** Plain supplied output; missing metadata is supported without applying policy defaults. */
 export type SuppliedValuation = Pick<
   ValuationResult,
@@ -13,6 +10,10 @@ export interface ValuationSummaryProps {
   result: SuppliedValuation | null | undefined;
   /** Independent supplied result; no differences, currency conversions or ratios are computed. */
   compareTo?: SuppliedValuation | null;
+  /** Prepared display text for `result.value`; the raw exact amount is shown when omitted. */
+  formattedValue?: string;
+  /** Prepared display text for `compareTo.value`; independent from `formattedValue`. */
+  comparisonFormattedValue?: string;
   compact?: boolean;
   /** Model from the completed pricing request; omitted when context is not supplied. */
   model?: string;
@@ -27,11 +28,13 @@ function Summary({
   label,
   compact,
   model,
+  displayText,
 }: {
   result: SuppliedValuation | null | undefined;
   label: string;
   compact?: boolean;
   model?: string;
+  displayText?: string;
 }) {
   return (
     <section
@@ -47,7 +50,7 @@ function Summary({
           <div className="finstack-valuation__value">
             <MoneyValue
               value={result.value}
-              rounding={returnedRounding(result.meta)}
+              displayText={displayText}
               prominent
             />
           </div>
@@ -79,6 +82,8 @@ function Summary({
 export function ValuationSummary({
   result,
   compareTo,
+  formattedValue,
+  comparisonFormattedValue,
   compact,
   density,
   model,
@@ -112,6 +117,7 @@ export function ValuationSummary({
           label="Valuation"
           compact={compact}
           model={model}
+          displayText={formattedValue}
         />
         {compareTo !== undefined && (
           <Summary
@@ -119,6 +125,7 @@ export function ValuationSummary({
             label="Comparison valuation"
             compact={compact}
             model={comparisonModel}
+            displayText={comparisonFormattedValue}
           />
         )}
       </div>

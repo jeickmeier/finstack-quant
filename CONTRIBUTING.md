@@ -35,6 +35,7 @@ For narrower changes, use the smallest relevant task first:
 | Rust libraries | `mise run rust-build`, `mise run rust-test` |
 | Python bindings | `mise run python-build`, `mise run python-test` |
 | WASM bindings | `mise run wasm-pkg`, `mise run wasm-test` |
+| UI registry | `mise run ui-fmt`, `mise run ui-typecheck`, `mise run ui-test` |
 | Examples | `mise run python-examples` |
 | Schemas | `mise run rust-check-schemas` |
 

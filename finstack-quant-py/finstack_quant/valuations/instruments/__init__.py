@@ -96,6 +96,7 @@ list_models = _valuations.instruments.list_models
 list_models_grouped = _valuations.instruments.list_models_grouped
 list_standard_metrics = _valuations.instruments.list_standard_metrics
 list_standard_metrics_grouped = _valuations.instruments.list_standard_metrics_grouped
+metric_metadata = _valuations.instruments.metric_metadata
 pretty_instrument_json = _valuations.instruments.pretty_instrument_json
 price_instrument = _valuations.instruments.price_instrument
 structured_credit_tranche_breakeven_cdr = _valuations.instruments.structured_credit_tranche_breakeven_cdr
@@ -189,6 +190,7 @@ __all__: list[str] = [
     "list_models_grouped",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
+    "metric_metadata",
     "pretty_instrument_json",
     "price_instrument",
     "structured_credit_tranche_breakeven_cdr",

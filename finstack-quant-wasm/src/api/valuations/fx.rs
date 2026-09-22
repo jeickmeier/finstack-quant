@@ -15,7 +15,7 @@ use super::pricing::{
     metric_value_with_context, parse_market_json, parse_pricing_instrument_json,
     price_result_with_context, standard_option_greeks_with_context,
 };
-use crate::utils::{to_js_err, to_js_error, to_js_value};
+use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::pricer::{
     instrument_envelope_from_spec, pretty_instrument_json, validate_typed_instrument_json,
 };
@@ -46,7 +46,7 @@ fn pretty_json(json: &str) -> Result<String, JsValue> {
 fn instrument_id_from_json(json: &str) -> Result<String, JsValue> {
     finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(json, None)
         .map(|instrument| instrument.as_instrument().id().to_string())
-        .map_err(|e| to_js_error(&e))
+        .map_err(to_js_err)
 }
 
 fn price_payload(

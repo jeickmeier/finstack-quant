@@ -8,7 +8,12 @@ import addFormats from "ajv-formats";
 import { compile } from "json-schema-to-typescript";
 import { bundleRoot, readContracts } from "../scripts/schema.mjs";
 import { discoverFixtures, repoRoot, writeGenerated } from "../scripts/gen.mjs";
-import { converterSchema } from "../src/schema.mjs";
+import {
+  converterSchema,
+  integerText,
+  numericEdit,
+  schemaAt,
+} from "../src/schema.mjs";
 
 const uri = (name) => `https://example.test/${name}.json`;
 const contracts = (entries) =>
@@ -394,4 +399,41 @@ it("fails closed on assertion combinations the pinned converter would ignore", (
   expect(() =>
     converterSchema({ type: "number", const: 0, minimum: 1 }),
   ).toThrow("literal");
+});
+
+it("schemaAt resolves local pointers with escaping and raw targets", () => {
+  const root = {
+    $defs: {
+      "a/b~": { type: "number" },
+      "~1": { type: "string" },
+    },
+    oneOf: [{ type: "number" }, { type: "string" }],
+    properties: { disabled: false },
+  };
+  const before = JSON.stringify(root);
+  expect(schemaAt(root, "#")).toBe(root);
+  expect(schemaAt(root, "#/$defs/a~1b~0")).toBe(root.$defs["a/b~"]);
+  expect(schemaAt(root, "#/$defs/~01")).toBe(root.$defs["~1"]);
+  expect(schemaAt(root, "#/properties/disabled")).toBe(false);
+  expect(schemaAt(root, "#/oneOf/0")).toBe(root.oneOf[0]);
+  expect(schemaAt(root, "#/properties/missing/nested")).toBeUndefined();
+  expect(schemaAt(root, "#/constructor")).toBeUndefined();
+  expect(() => schemaAt(root, "https://example.test/x.json")).toThrow(
+    "Unsupported schema reference",
+  );
+  expect(JSON.stringify(root)).toBe(before);
+});
+
+it("numericEdit converts only complete finite numeric text", () => {
+  for (const text of ["", "-", "1.", "1e", "0x10", " 1 ", "+1", "1e999"]) {
+    expect(numericEdit(text)).toBe(text);
+    expect(numericEdit(text, true)).toBe(text);
+  }
+  expect(numericEdit("1.25e2")).toBe(125);
+  expect(numericEdit("1.25e2", true)).toBe("1.25e2");
+  expect(numericEdit("9007199254740993", true)).toBe("9007199254740993");
+  expect(numericEdit("-9007199254740991", true)).toBe(-9007199254740991);
+  expect(Object.is(numericEdit("-0", true), -0)).toBe(true);
+  expect(integerText.test("0x10")).toBe(false);
+  expect(integerText.test("1e3")).toBe(false);
 });

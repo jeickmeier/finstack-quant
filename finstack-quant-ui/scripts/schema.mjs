@@ -9,6 +9,7 @@ import {
   arrays,
   singles,
   annotations,
+  schemaAt,
 } from "../src/schema.mjs";
 
 export const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
@@ -102,16 +103,10 @@ export async function bundleRoot(uri, contracts) {
       definitions[key] = null; // Reserve before visiting recursive targets.
       parser.$refs.get(identity); // Verify resolution through the maintained resolver.
       const [document, fragment] = identity.split("#");
-      const original = fragment
-        ? decodeURIComponent(fragment)
-            .slice(1)
-            .split("/")
-            .reduce(
-              (value, part) =>
-                value[part.replaceAll("~1", "/").replaceAll("~0", "~")],
-              contracts.get(document).schema,
-            )
-        : contracts.get(document).schema;
+      const original = schemaAt(
+        contracts.get(document).schema,
+        fragment ? `#${decodeURIComponent(fragment)}` : "#",
+      );
       definitions[key] = visit(original, identity, `#/$defs/${key}`);
     }
     return `#/$defs/${key}`;

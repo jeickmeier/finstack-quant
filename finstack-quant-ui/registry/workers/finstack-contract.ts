@@ -1,7 +1,10 @@
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
+import type { RoundingStamp } from "@/lib/finstack/format/format";
 import type {
   ValuationResult,
   CalibrationResultEnvelope,
+  MetricMetadata,
+  MoneyValue,
   ScenarioTable,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -13,6 +16,11 @@ export interface PriceRequest {
   readonly metrics?: readonly string[] | null;
   readonly pricingOptions?: string | null;
   readonly marketHistory?: string | null;
+}
+/** Exact source amount plus the returned rounding stamp; both are snapshotted verbatim and never recomputed. */
+export interface MoneyFormatRequest {
+  readonly value: MoneyValue;
+  readonly rounding?: RoundingStamp;
 }
 export interface ScenarioRequest {
   readonly instrumentJson: string;
@@ -60,6 +68,8 @@ export interface WorkerApi {
     wasmUrl?: string,
   ): Promise<Envelope<{ state: "ready"; worker: boolean }>>;
   price(request: PriceRequest): Promise<Envelope<ValuationResult>>;
+  /** Native display text for an exact amount under its returned rounding stamp. */
+  formatMoney(request: MoneyFormatRequest): Promise<Envelope<string>>;
   /** Validate and canonicalize instrument JSON through the native facade. */
   validate(instrumentJson: string): Promise<Envelope<string>>;
   /** Canonicalize the complete market through its native constructor. */
@@ -74,6 +84,8 @@ export interface WorkerApi {
   cashflows(request: CashflowRequest): Promise<Envelope<string>>;
   models(): Promise<Envelope<Record<string, string[]>>>;
   metrics(): Promise<Envelope<Record<string, string[]>>>;
+  /** Native per-key interpretation (units, decoded coordinates, groups) for metric keys. */
+  metricMetadata(keys: readonly string[]): Promise<Envelope<MetricMetadata[]>>;
   calendars(): Promise<Envelope<string[]>>;
   exportResult(value: ValuationResult): Promise<Envelope<string>>;
 }

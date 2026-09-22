@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import ts from "typescript";
+import { schemaAt } from "../src/schema.mjs";
 
 const base = "https://finstack_quant.dev/schemas/";
 const market = `${base}market_data/1/market_context_state.schema.json`;
@@ -11,6 +12,11 @@ const price = [
   "valuations.instruments.priceInstrument",
   "ValuationInstrumentsNamespace",
   "priceInstrument",
+];
+const metricMetadata = [
+  "valuations.instruments.metricMetadata",
+  "ValuationInstrumentsNamespace",
+  "metricMetadata",
 ];
 const displays = [
   {
@@ -55,11 +61,10 @@ const displays = [
     id: "measures-grid",
     schema: result,
     pointer: "#/properties/measures",
-    api: price,
-    route: "raw",
+    api: metricMetadata,
+    route: "native-metadata",
     convention:
-      "Returned values and qualified keys unchanged; unit unavailable.",
-    deferred: "machine-readable-units",
+      "Returned values and original keys unchanged; units, decoded coordinates, and groups come from Rust.",
   },
   {
     id: "valuation-details",
@@ -243,17 +248,7 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
   function schemaSource(uri, pointer) {
     const contract = contracts.get(uri);
     if (!contract) throw new Error(`Missing schema: ${uri}`);
-    const node =
-      pointer === "#"
-        ? contract.schema
-        : pointer
-            .slice(2)
-            .split("/")
-            .reduce(
-              (value, key) =>
-                value?.[key.replaceAll("~1", "/").replaceAll("~0", "~")],
-              contract.schema,
-            );
+    const node = schemaAt(contract.schema, pointer);
     if (node === undefined)
       throw new Error(`Missing schema pointer: ${uri}${pointer}`);
     return {

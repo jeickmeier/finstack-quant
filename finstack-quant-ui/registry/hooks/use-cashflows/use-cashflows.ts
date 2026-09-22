@@ -1,6 +1,6 @@
 "use client";
-import { useQuery, queryOptions } from "@tanstack/react-query";
-import { useFinstack } from "../use-finstack/use-finstack";
+import { queryOptions } from "@tanstack/react-query";
+import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
 import type { CashflowRequest } from "../../workers/finstack-contract";
 export type { CashflowRequest } from "../../workers/finstack-contract";
@@ -18,20 +18,13 @@ export function cashflowOptions(
       return client.call("cashflows", snapshot);
     },
     enabled: client !== null,
-    staleTime: Infinity,
-    retry: false,
+    ...workerQueryPolicy,
   });
 }
 /** Original native JSON text or actual native error; supply a Finstack/Query provider. */
 export function useCashflows(request: CashflowRequest, enabled = true) {
-  const worker = useFinstack();
-  const query = useQuery({
+  return useWorkerQuery((worker) => ({
     ...cashflowOptions(worker.client, worker.session, request),
     enabled: worker.status === "ready" && enabled,
-  });
-  return {
-    ...query,
-    error: worker.error ?? query.error,
-    workerStatus: worker.status,
-  };
+  }));
 }

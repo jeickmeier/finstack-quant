@@ -35,10 +35,10 @@ mod registry;
 pub use errors::{PricingError, PricingErrorContext};
 pub use json::{
     instrument_envelope_from_spec, list_models, list_models_grouped, list_standard_metrics,
-    list_standard_metrics_grouped, metric_value, parse_boxed_instrument_from_json,
+    list_standard_metrics_grouped, metric_metadata, metric_value, parse_boxed_instrument_from_json,
     parse_instrument_from_json, parse_model_key, present_standard_option_greeks,
     pretty_instrument_json, price_instrument, validate_instrument_json,
-    validate_typed_instrument_json, ParsedInstrument, STANDARD_OPTION_GREEKS,
+    validate_typed_instrument_json, MetricMetadata, ParsedInstrument, STANDARD_OPTION_GREEKS,
 };
 pub use keys::{InstrumentType, ModelKey, PricerKey};
 pub use registry::{expect_inst, Pricer, PricerRegistry, PricingDispatch};

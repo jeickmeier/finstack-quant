@@ -1,6 +1,6 @@
 "use client";
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import { useFinstack } from "../use-finstack/use-finstack";
+import { queryOptions } from "@tanstack/react-query";
+import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
 import type { ScenarioRequest } from "../../workers/finstack-contract";
 export type { ScenarioRequest } from "../../workers/finstack-contract";
@@ -21,16 +21,13 @@ export function scenarioOptions(
       return client.call("scenarioTable", snapshot);
     },
     enabled: client !== null && snapshot !== null,
-    staleTime: Infinity,
-    retry: false,
+    ...workerQueryPolicy,
   });
 }
 /** Exact native scenario table or structured failure. */
 export function useScenarioTable(request: ScenarioRequest | null) {
-  const worker = useFinstack(),
-    query = useQuery({
-      ...scenarioOptions(worker.client, worker.session, request),
-      enabled: worker.status === "ready" && request !== null,
-    });
-  return { ...query, error: worker.error ?? query.error };
+  return useWorkerQuery((worker) => ({
+    ...scenarioOptions(worker.client, worker.session, request),
+    enabled: worker.status === "ready" && request !== null,
+  }));
 }

@@ -15,9 +15,13 @@ import * as bond from "../src/generated/instrument/bond";
 import { createWireCodec } from "../src/codec.mjs";
 import { discriminator } from "../registry/components/schema-form/discriminator";
 import {
+  initialValue,
+  resolve,
   structuralValidator,
+  workingValue,
   type Schema,
 } from "../registry/components/schema-form/schema";
+import calibrationSchema from "../src/generated/schemas/calibration.json";
 afterEach(cleanup);
 const native = createRequire(import.meta.url)(
   "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
@@ -399,4 +403,151 @@ it("normalizes each immutable edit once across errors, native validation and sub
   expect(normalize).toHaveBeenCalledTimes(2);
   expect(nativeValidate).toHaveBeenCalledTimes(2);
   expect(stringify).not.toHaveBeenCalled();
+});
+it("keeps undeclared boolean defaults unanswered while preserving declared defaults", () => {
+  const schema: Schema = {
+    type: "object",
+    properties: {
+      choice: { type: "boolean" },
+      yes: { type: "boolean", default: true },
+      no: { type: "boolean", default: false },
+      optional: { type: "boolean" },
+    },
+    required: ["choice", "yes", "no"],
+  };
+  expect(initialValue(schema, { schema, pointer: "#" })).toEqual({
+    choice: undefined,
+    yes: true,
+    no: false,
+  });
+});
+it.each([true, false])(
+  "requires an explicit %s choice and restores unanswered state on reset",
+  async (choice) => {
+    const schema: Schema = {
+      type: "object",
+      properties: { choice: { type: "boolean" } },
+      required: ["choice"],
+    };
+    const module = {
+      schema,
+      metadata: [],
+      codec: createWireCodec({ ...schema }),
+      example: initialValue(schema, { schema, pointer: "#" }),
+    };
+    const validateChoice = vi.fn(async (json: string) => json);
+    const submit = vi.fn();
+    render(
+      <SchemaForm
+        module={module}
+        validate={validateChoice}
+        onSubmit={submit}
+      />,
+    );
+    const checkbox = screen.getByRole("checkbox", { name: "Choice" });
+    expect(checkbox.getAttribute("aria-checked")).toBe("mixed");
+    await waitFor(() =>
+      expect(checkbox.getAttribute("aria-invalid")).toBe("true"),
+    );
+    fireEvent.submit(checkbox.closest("form")!);
+    expect(submit).not.toHaveBeenCalled();
+    expect(validateChoice).not.toHaveBeenCalled();
+    if (choice) fireEvent.click(checkbox);
+    else
+      fireEvent.click(
+        screen.getByRole("button", { name: "Set choice to false" }),
+      );
+    await waitFor(() =>
+      expect(validateChoice).toHaveBeenCalledWith(
+        JSON.stringify({ choice }),
+        expect.any(AbortSignal),
+      ),
+    );
+    fireEvent.submit(checkbox.closest("form")!);
+    await waitFor(() =>
+      expect(submit).toHaveBeenCalledWith(JSON.stringify({ choice })),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reset edits" }));
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("checkbox", { name: "Choice" })
+          .getAttribute("aria-checked"),
+      ).toBe("mixed"),
+    );
+  },
+);
+it("requires an explicit is_cap answer in the generated cap_floor_vol schema", () => {
+  const find = (node: unknown): Schema | undefined => {
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = find(item);
+        if (found) return found;
+      }
+      return undefined;
+    }
+    if (!node || typeof node !== "object") return undefined;
+    const record = node as Record<string, unknown>;
+    const properties = record.properties as
+      Record<string, Schema | undefined> | undefined;
+    if (properties?.cap_floor_vol) return properties.cap_floor_vol;
+    for (const value of Object.values(record)) {
+      const found = find(value);
+      if (found) return found;
+    }
+    return undefined;
+  };
+  const capFloor = find(calibrationSchema);
+  expect(capFloor?.required).toContain("is_cap");
+  expect(capFloor?.properties?.is_cap?.type).toBe("boolean");
+  expect(capFloor?.properties?.is_cap).not.toHaveProperty("default");
+  const value = initialValue(calibrationSchema as Schema, {
+    schema: capFloor!,
+    pointer: "#",
+  }) as Record<string, unknown>;
+  expect(value.is_cap).toBeUndefined();
+});
+
+it("resolves escaped local references without mutating the input schema", () => {
+  const root: Schema = {
+    $defs: {
+      "a/b~": { $ref: "#/$defs/N", title: "target" },
+      N: { type: "number" },
+      C: { $ref: "#/$defs/C" },
+    },
+    type: "object",
+  };
+  const before = JSON.stringify(root);
+  const location = resolve(root, {
+    schema: { $ref: "#/$defs/a~1b~0", description: "local" },
+    pointer: "#",
+  });
+  expect(location.pointer).toBe("#/$defs/N");
+  expect(location.schema.type).toBe("number");
+  expect(location.schema.title).toBe("target");
+  expect(location.schema.description).toBe("local");
+  expect(() =>
+    resolve(root, { schema: { $ref: "#/$defs/C" }, pointer: "#" }),
+  ).toThrow("Unsupported schema reference");
+  expect(JSON.stringify(root)).toBe(before);
+});
+
+it("workingValue keeps wide integer tokens and incomplete edit text exact", () => {
+  const wide: Schema = { type: "integer", format: "int64" };
+  expect(
+    workingValue({}, { schema: wide, pointer: "#" }, "-9223372036854775808"),
+  ).toBe(-9223372036854775808n);
+  expect(
+    workingValue(
+      {},
+      { schema: { type: "string" }, pointer: "#" },
+      "9007199254740993.1234567890",
+    ),
+  ).toBe("9007199254740993.1234567890");
+  expect(
+    workingValue({}, { schema: { type: "integer" }, pointer: "#" }, "1."),
+  ).toBe("1.");
+  expect(
+    workingValue({}, { schema: { type: "number" }, pointer: "#" }, "1e"),
+  ).toBe("1e");
 });

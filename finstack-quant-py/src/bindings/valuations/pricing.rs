@@ -648,6 +648,41 @@ fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<Str
     finstack_quant_valuations::pricer::list_standard_metrics_grouped()
 }
 
+/// Describe canonical metric keys using Rust-owned units and coordinates.
+///
+/// Parameters
+/// ----------
+/// keys : list[str]
+///     Canonical scalar or qualified wire keys; input order and duplicates
+///     are retained and qualified coordinates require the native composite
+///     escaping. Custom names are accepted with unknown units and no group.
+///
+/// Returns
+/// -------
+/// list[dict[str, Any]]
+///     One record per key with ``key``, ``metric``, ``components`` (decoded
+///     coordinate labels in original order), ``unit`` (canonical unit family
+///     string), ``group`` (native display group or ``None``) and
+///     ``bucketed``. No prices are changed and a unit family does not imply
+///     a bump size or FX conversion.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If a key uses malformed or obsolete composite encoding.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.valuations.instruments import metric_metadata
+/// >>> metric_metadata(["ytm"])[0]["unit"]
+/// 'decimal'
+#[pyfunction]
+#[pyo3(text_signature = "(keys)")]
+fn metric_metadata<'py>(py: Python<'py>, keys: Vec<String>) -> PyResult<Bound<'py, PyAny>> {
+    let metadata = finstack_quant_valuations::pricer::metric_metadata(&keys).map_err(core_to_py)?;
+    serde_to_py(py, &metadata)
+}
+
 /// List every pricing model key registered in the standard pricer registry.
 ///
 /// The list is registry-derived rather than enum-derived: it reflects real
@@ -804,6 +839,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(list_models_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics_grouped, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(instrument_cashflows_json, m)?)?;
     Ok(())
 }

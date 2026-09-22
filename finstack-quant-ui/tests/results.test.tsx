@@ -11,13 +11,22 @@ import {
   MeasuresGrid,
   groupMeasures,
 } from "../registry/components/measures-grid/measures-grid";
+import type { MetricMetadata } from "finstack-quant-wasm";
 import { returnedRounding } from "../registry/primitives/stamp-badge/stamp-badge";
-import { formatMoney } from "../src/format/format";
+import { formatMoney, formatRawMoney } from "../src/format/format";
+const native = createRequire(import.meta.url)(
+  "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
+);
+const metadataFor = (measures: Record<string, number>) =>
+  Object.keys(measures).flatMap((key) => {
+    try {
+      return native.metricMetadata([key]);
+    } catch {
+      return [];
+    }
+  });
 afterEach(cleanup);
 it("matches the retained fixture against the real Node facade apart from wall-clock timestamp", () => {
-  const native = createRequire(import.meta.url)(
-    "../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
-  );
   const request = fixture.request;
   const current = native.priceInstrument(
     request.instrumentJson,
@@ -32,9 +41,9 @@ it("matches the retained fixture against the real Node facade apart from wall-cl
   expect(native.listStandardMetricsGrouped()).toEqual(fixture.groups);
 });
 it("renders all supplied values, stamps, dates and qualified keys without inferred units", () => {
-  render(<MeasuresGrid result={fixture.result} groups={fixture.groups} />);
+  render(<MeasuresGrid result={fixture.result} />);
   expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-    formatMoney(fixture.result.value, returnedRounding(fixture.result.meta)),
+    formatRawMoney(fixture.result.value),
   );
   for (const text of [
     fixture.result.instrument_id,
@@ -58,11 +67,31 @@ it("renders all supplied values, stamps, dates and qualified keys without inferr
     screen.getByText("Raw measure values · units unavailable"),
   ).toBeTruthy();
   expect(
-    groupMeasures({ result: fixture.result, groups: fixture.groups })
+    groupMeasures({ result: fixture.result })
       .flatMap((group) => group.rows)
       .map((row) => row.key)
       .sort(),
   ).toEqual(Object.keys(fixture.result.measures).sort());
+});
+it("renders Rust-supplied units and groups from native metric metadata", () => {
+  render(
+    <MeasuresGrid
+      result={fixture.result}
+      metadata={fixture.metadata as MetricMetadata[]}
+    />,
+  );
+  const ytm = screen.getByText("ytm").closest("tr")!;
+  expect(ytm.textContent).toContain("decimal");
+  const dv01 = screen.getByText("dv01").closest("tr")!;
+  expect(dv01.textContent).toContain("currency");
+  expect(screen.getByRole("columnheader", { name: "Pricing" })).toBeTruthy();
+  expect(
+    screen.getByRole("columnheader", { name: "Sensitivity" }),
+  ).toBeTruthy();
+  expect(
+    screen.queryByText("Raw measure values · units unavailable"),
+  ).toBeNull();
+  expect(screen.queryByText("Unit unavailable")).toBeNull();
 });
 it("keeps comparison currencies, dates and stamps independent and never calculates missing values", () => {
   const other: SuppliedValuation = {
@@ -81,7 +110,12 @@ it("keeps comparison currencies, dates and stamps independent and never calculat
     <MeasuresGrid
       result={fixture.result}
       compareTo={other}
-      groups={fixture.groups}
+      comparisonFormattedValue={formatMoney(
+        other.value,
+        returnedRounding(other.meta),
+        native,
+      )}
+      metadata={fixture.metadata as MetricMetadata[]}
     />,
   );
   const primary = screen.getByRole("region", {
@@ -125,18 +159,13 @@ it("handles missing and partial metadata without invented rounding or stamps", (
   view.rerender(<ValuationSummary result={{ ...result, meta: null }} />);
   expect(screen.getByText("Metadata unavailable")).toBeTruthy();
   view.rerender(
-    <MeasuresGrid
-      result={null}
-      groups={fixture.groups}
-      loading
-      error="Supplied failure"
-    />,
+    <MeasuresGrid result={null} loading error="Supplied failure" />,
   );
   expect(screen.getByText("No valuation supplied")).toBeTruthy();
   expect(screen.getByText("No measures supplied")).toBeTruthy();
   expect(screen.getByRole("alert").textContent).toBe("Supplied failure");
 });
-it("uses only explicit per-result units and puts unknown or ambiguous metric groups in the unavailable group", () => {
+it("uses only explicit per-result units and keeps ungrouped metrics in the unavailable group", () => {
   const result = {
     ...fixture.result,
     measures: { ytm: 0.043, "custom::key": -1 },
@@ -145,7 +174,7 @@ it("uses only explicit per-result units and puts unknown or ambiguous metric gro
     <MeasuresGrid
       result={result}
       compareTo={result}
-      groups={{ A: ["ytm"], B: ["ytm"] }}
+      metadata={metadataFor(result.measures)}
       units={{
         ytm: {
           label: "decimal rate",
@@ -175,7 +204,7 @@ it("retains independent supplied model context and exact large money while prese
       compareTo={{ ...result, instrument_id: "COMPARE" }}
       model="discounting"
       comparisonModel="independent-model"
-      groups={{ Pricing: ["ytm"] }}
+      metadata={metadataFor(result.measures)}
     />,
   );
   const primary = screen.getByRole("region", { name: "Valuation" });
@@ -198,7 +227,7 @@ it("retains independent supplied model context and exact large money while prese
       result={result}
       compareTo={result}
       model="discounting"
-      groups={{ Pricing: ["ytm"] }}
+      metadata={metadataFor(result.measures)}
     />,
   );
   expect(
@@ -208,7 +237,6 @@ it("retains independent supplied model context and exact large money while prese
   ).toBeNull();
 });
 
-const riskGroups = { Risk: ["bucketed_dv01", "bucketed_cs01", "cs01"] };
 function bucketCell(key: string, column = 1) {
   return screen.getByText(key, { exact: true }).closest("tr")!.children[
     column
@@ -235,14 +263,16 @@ it("draws signed qualified bucket rows, preserves opaque labels and leaves scala
     "bucketed_dv01::USD::bad": NaN,
     "bucketed_cs01::ACME::infinite": Infinity,
   };
+  const comparisonMeasures = { "bucketed_dv01::OTHER::1y": 2 };
   render(
     <MeasuresGrid
       result={{ ...fixture.result, measures }}
       compareTo={{
         ...fixture.result,
-        measures: { "bucketed_dv01::OTHER::1y": 2 },
+        measures: comparisonMeasures,
       }}
-      groups={riskGroups}
+      metadata={metadataFor(measures)}
+      comparisonMetadata={metadataFor(comparisonMeasures)}
     />,
   );
   for (const [key, value] of Object.entries(measures)) {
@@ -269,7 +299,9 @@ it("draws signed qualified bucket rows, preserves opaque labels and leaves scala
   ).toBe("50%");
   for (const key of Object.keys(measures).slice(4))
     expect(bucketCell(key).querySelector("[data-bucket-bar]")).toBeNull();
-  expect(bucketCell("bucketed_dv01::OTHER::1y").textContent).toBe("—");
+  expect(bucketCell("bucketed_dv01::OTHER::1y").textContent).toBe(
+    "—Unit unavailable",
+  );
   expect(
     bucketCell("bucketed_dv01::OTHER::1y").querySelector("[data-bucket-bar]"),
   ).toBeNull();
@@ -283,15 +315,20 @@ it("scales each risk family, exact identifier, valuation and currency independen
     "bucketed_cs01::A::1y": -2,
     "bucketed_cs01::A::2y": 1,
   };
+  const comparisonMeasures = {
+    "bucketed_dv01::A::1y": -1,
+    "bucketed_dv01::A::2y": 2,
+  };
   render(
     <MeasuresGrid
       result={{ ...fixture.result, measures }}
       compareTo={{
         ...fixture.result,
         value: { amount: "1", currency: "EUR" },
-        measures: { "bucketed_dv01::A::1y": -1, "bucketed_dv01::A::2y": 2 },
+        measures: comparisonMeasures,
       }}
-      groups={riskGroups}
+      metadata={metadataFor(measures)}
+      comparisonMetadata={metadataFor(comparisonMeasures)}
     />,
   );
   for (const key of [
@@ -327,7 +364,7 @@ it("separates supplied units and handles zero-only, huge and subnormal values wi
   render(
     <MeasuresGrid
       result={{ ...fixture.result, measures }}
-      groups={riskGroups}
+      metadata={metadataFor(measures)}
       units={{
         "bucketed_dv01::A::one": { label: "USD/bp", source: "native-one" },
         "bucketed_dv01::A::two": { label: "USD/bp", source: "native-one" },

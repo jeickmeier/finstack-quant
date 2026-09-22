@@ -1,7 +1,7 @@
 "use client";
 import { useNativeValidator } from "../use-finstack/validation";
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import { useFinstack } from "../use-finstack/use-finstack";
+import { queryOptions } from "@tanstack/react-query";
+import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
 import type { WorkerApi } from "../../workers/finstack-contract";
 import type { FinstackClient } from "../use-finstack/client";
 /** Immutable complete JSON identity: quote data, prior markets and every setting remain in the key. */
@@ -24,14 +24,12 @@ export function calibrationOptions<K extends "calibrate" | "dryRun">(
       );
     },
     enabled: client !== null && envelopeJson !== null,
-    staleTime: Infinity,
-    retry: false,
+    ...workerQueryPolicy,
   });
 }
 /** Pass null until the user requests a solve; returns the unchanged native result or structured failure. */
 export function useCalibrate(envelopeJson: string | null) {
-  const worker = useFinstack();
-  const query = useQuery({
+  return useWorkerQuery((worker) => ({
     ...calibrationOptions(
       worker.client,
       worker.session,
@@ -39,17 +37,11 @@ export function useCalibrate(envelopeJson: string | null) {
       envelopeJson,
     ),
     enabled: worker.status === "ready" && envelopeJson !== null,
-  });
-  return {
-    ...query,
-    error: worker.error ?? query.error,
-    workerStatus: worker.status,
-  };
+  }));
 }
 /** Static dependency/error report; no solver is invoked and returned JSON stays unchanged. */
 export function useCalibrationDryRun(envelopeJson: string | null) {
-  const worker = useFinstack();
-  const query = useQuery({
+  return useWorkerQuery((worker) => ({
     ...calibrationOptions(
       worker.client,
       worker.session,
@@ -57,12 +49,7 @@ export function useCalibrationDryRun(envelopeJson: string | null) {
       envelopeJson,
     ),
     enabled: worker.status === "ready" && envelopeJson !== null,
-  });
-  return {
-    ...query,
-    error: worker.error ?? query.error,
-    workerStatus: worker.status,
-  };
+  }));
 }
 /** Native canonicalization for CalibrationForm; a superseded validation cannot accept old edits. */
 export function useCalibrationValidator() {

@@ -12,9 +12,11 @@ import {
 import { renderToString } from "react-dom/server";
 import {
   FinstackProvider,
+  FinstackQueryProvider,
   useFinstack,
 } from "../registry/hooks/use-finstack/use-finstack";
 import { useInstrumentValidator } from "../registry/hooks/use-instrument-validator/use-instrument-validator";
+import { usePriceInstrument } from "../registry/hooks/use-price-instrument/use-price-instrument";
 import { FinstackError } from "../registry/workers/finstack-contract";
 const mocks = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("../registry/hooks/use-finstack/client", () => ({
@@ -215,4 +217,51 @@ it("warns once per returned mismatched WASM version without changing valuations"
     client.close();
     warn.mockRestore();
   }
+});
+it("shares query readiness, session isolation and explicit disabling", async () => {
+  const request = {
+    instrumentJson: "{}",
+    marketJson: "{}",
+    asOf: "2025-01-01",
+  };
+  const value = {
+    instrument_id: "POLICY",
+    value: { amount: "1.00", currency: "USD" },
+  };
+  call.mockImplementation(async (method: string) =>
+    method === "price" ? value : undefined,
+  );
+  const hook = renderHook(
+    ({ enabled }) => ({
+      query: usePriceInstrument(request, enabled),
+      worker: useFinstack(),
+    }),
+    {
+      initialProps: { enabled: false },
+      wrapper: ({ children }) => (
+        <FinstackQueryProvider>{children}</FinstackQueryProvider>
+      ),
+    },
+  );
+  await waitFor(() =>
+    expect(hook.result.current.query.workerStatus).toBe("ready"),
+  );
+  expect(call.mock.calls.filter(([method]) => method === "price")).toHaveLength(
+    0,
+  );
+  hook.rerender({ enabled: true });
+  await waitFor(() => expect(hook.result.current.query.data).toEqual(value));
+  expect(call.mock.calls.filter(([method]) => method === "price")).toHaveLength(
+    1,
+  );
+  const session = hook.result.current.worker.session;
+  act(() => hook.result.current.worker.reset());
+  await waitFor(() =>
+    expect(hook.result.current.worker.session).not.toBe(session),
+  );
+  await waitFor(() =>
+    expect(
+      call.mock.calls.filter(([method]) => method === "price"),
+    ).toHaveLength(2),
+  );
 });

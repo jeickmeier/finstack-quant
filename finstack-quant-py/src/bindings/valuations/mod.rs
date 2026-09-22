@@ -475,6 +475,10 @@ impl PyValuationResult {
 /// json : str
 ///     A ``finstack_quant.instrument/1`` envelope. Bare instrument payloads
 ///     are rejected.
+/// pricing_options : str or None, optional
+///     Optional metric-pricing override JSON merged by the canonical pricing
+///     path before instrument validation; ``None`` (the default) retains the
+///     envelope configuration.
 ///
 /// Returns
 /// -------
@@ -486,11 +490,13 @@ impl PyValuationResult {
 /// KeyError
 ///     If the envelope references an identifier that cannot be resolved.
 /// ValueError
-///     If ``json`` is malformed, is not a canonical v1 envelope, or fails
-///     instrument validation.
+///     If ``json`` or ``pricing_options`` is malformed, the merged payload is
+///     not a canonical v1 envelope, or instrument validation fails.
 #[pyfunction]
-fn validate_instrument_json(json: &str) -> PyResult<String> {
-    finstack_quant_valuations::pricer::validate_instrument_json(json)
+#[pyo3(signature = (json, pricing_options=None))]
+#[pyo3(text_signature = "(json, pricing_options=None)")]
+fn validate_instrument_json(json: &str, pricing_options: Option<&str>) -> PyResult<String> {
+    finstack_quant_valuations::pricer::validate_instrument_json(json, pricing_options)
         .map_err(crate::errors::core_to_py)
 }
 
@@ -710,6 +716,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "list_models_grouped",
         "list_standard_metrics",
         "list_standard_metrics_grouped",
+        "metric_metadata",
         "pretty_instrument_json",
         "price_instrument",
         "validate_instrument_json",

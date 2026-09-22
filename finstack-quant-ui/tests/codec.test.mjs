@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { createWireCodec } from "../src/codec.mjs";
 
+it("resolves escaped definition names without losing wide integer tokens", () => {
+  const codec = createWireCodec({
+    $defs: { "wide/~": { type: "integer", format: "uint64", minimum: 1 } },
+    type: "object",
+    properties: { value: { $ref: "#/$defs/wide~1~0" } },
+    required: ["value"],
+    additionalProperties: false,
+  });
+  const text = '{"value":18446744073709551615}';
+  expect(codec.parse(text)).toEqual({ value: 18446744073709551615n });
+  expect(codec.stringify(codec.parse(text))).toBe(text);
+  expect(() => codec.parse('{"value":0}')).toThrow();
+});
+
 const schema = {
   type: "object",
   properties: {

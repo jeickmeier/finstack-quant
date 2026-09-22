@@ -706,54 +706,23 @@
     },
     {
       "id": "measures-grid",
-      "route": "raw",
-      "convention": "Returned values and qualified keys unchanged; unit unavailable.",
-      "deferred": "machine-readable-units",
+      "route": "native-metadata",
+      "convention": "Returned values and original keys unchanged; units, decoded coordinates, and groups come from Rust.",
       "api": {
-        "name": "valuations.instruments.priceInstrument",
+        "name": "valuations.instruments.metricMetadata",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "ValuationInstrumentsNamespace",
-        "member": "priceInstrument",
+        "member": "metricMetadata",
         "inputs": [
           {
-            "name": "instrumentJson",
-            "type": "string",
+            "name": "keys",
+            "type": "string[]",
             "optional": false
-          },
-          {
-            "name": "marketJson",
-            "type": "string",
-            "optional": false
-          },
-          {
-            "name": "asOf",
-            "type": "string",
-            "optional": false
-          },
-          {
-            "name": "model",
-            "type": "string | null",
-            "optional": true
-          },
-          {
-            "name": "metrics",
-            "type": "string[] | null",
-            "optional": true
-          },
-          {
-            "name": "pricingOptions",
-            "type": "string | null",
-            "optional": true
-          },
-          {
-            "name": "marketHistory",
-            "type": "string | null",
-            "optional": true
           }
         ],
-        "returns": "ValuationResult",
-        "declaration": "/**\n   * Price an instrument from its canonical envelope and return a `ValuationResult` object.\n   *\n   * Pass `model = \"default\"` to use the instrument-native default model.\n   * Fields are readable directly (`result.value.amount`,\n   * `result.measures.dv01`). Monte Carlo results carry a lossless `bigint`\n   * seed; use a BigInt-aware replacer when stringifying them.\n   * For bonds, `\"discounting\"` is non-callable rates-only PV,\n   * `\"hazard_rate\"` is non-callable fractional recovery of par, `\"tree\"`\n   * values rates-only exercise rights, and `\"rates_credit\"` values joint\n   * rates-credit bonds including call, put, and return floors. Stochastic `\"rates_credit\"` runs add\n   * `type: \"monte_carlo\"` diagnostics to `result.details`.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Optional pricing-model identifier; omit for the instrument-native model.\n   * @param metrics - Optional canonical metric IDs such as `\"ytm\"`, `\"dv01\"`, `\"hvar\"`, or `\"expected_shortfall\"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.\n   * @param pricingOptions - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.\n   * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.\n   * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).\n   * @throws Error - Throws a JavaScript exception if an instrument, market, pricing-option, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.\n   */\n  priceInstrument(\n    instrumentJson: string,\n    marketJson: string,\n    asOf: string,\n    model?: string | null,\n    metrics?: string[] | null,\n    pricingOptions?: string | null,\n    marketHistory?: string | null\n  ): ValuationResult;",
-        "sha256": "5f7ad7c8c57ead20e82b1430dbb948a2ee627351bd6970e057ee9061baddb9d8"
+        "returns": "MetricMetadata[]",
+        "declaration": "/**\n   * Describe canonical metric identifiers using Rust-owned units and coordinates.\n   * @example\n   * ```typescript\n   * import init, { valuations } from \"finstack-quant-wasm\";\n   * await init();\n   * const [ytm, bucket] = valuations.instruments.metricMetadata([\n   *   'ytm',\n   *   'bucketed_dv01::USD-OIS::10y',\n   * ]);\n   * console.log(ytm.unit, bucket.components, bucket.bucketed);\n   * ```\n   * @param keys - Canonical scalar or qualified wire keys in output order. Custom keys retain unknown units; malformed or obsolete encodings are rejected.\n   * @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.\n   * @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.\n   */\n  metricMetadata(keys: string[]): MetricMetadata[];",
+        "sha256": "b25cd2446119e8ab6b24c6b241570844fbf58e80699456daa601fc2c97c400f2"
       },
       "schemas": [
         {
@@ -1307,8 +1276,8 @@
     {
       "name": "MoneyValue",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Currency-tagged monetary amount as carried on the wire.\n *\n * `amount` is an exact decimal **string** (not a JS number) so no precision is\n * lost crossing the boundary; parse it with `Number(...)` when a float is\n * acceptable.\n */\nexport interface MoneyValue {\n  /**\n   * Exact decimal amount, rounded to the currency's ISO 4217 minor-unit scale.\n   */\n  amount: string;\n  /**\n   * ISO 4217 currency code, e.g. `\"USD\"`.\n   */\n  currency: string;\n}",
-      "sha256": "16641e3d7387cea7b56eeadc4ac42be83d48e82ef6d7fe185f48be67fdaf101e"
+      "declaration": "/**\n * Currency-tagged monetary amount as carried on the wire.\n *\n * `amount` is an exact decimal **string** (not a JS number) so no precision is\n * lost crossing the boundary; parse it with `Number(...)` when a float is\n * acceptable.\n */\nexport interface MoneyValue {\n  /**\n   * Exact major-unit decimal amount; display rounding is separate and explicit.\n   */\n  amount: string;\n  /**\n   * ISO 4217 currency code, e.g. `\"USD\"`.\n   */\n  currency: string;\n}",
+      "sha256": "66c0b06a89afa738efb626f6f1c7c73503275a4bd802ac22ed0ee33c1e58215d"
     },
     {
       "name": "TrancheScenarioCell",
@@ -1319,14 +1288,14 @@
     {
       "name": "VolCubeConstructor",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * Data-only SABR volatility cube for swaption pricing.\n *\n * Stores calibrated parameter nodes and forwards on an expiry × tenor grid.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const cube = new core.VolCube(\n *   \"USD-SWAPTION\",\n *   [1],\n *   [5],\n *   [0.02, 0.5, -0.2, 0.4, Number.NaN],\n *   [0.03]\n * );\n * console.log(cube.id, cube.interpolationMode);\n * cube.free();\n * ```\n */\nexport interface VolCubeConstructor {\n  /**\n   * Construct a vol cube from a flat SABR parameter array.\n   *\n   * @returns A `VolCube` handle.\n   * @param id - Curve identifier.\n   * @param expiries - Option expiry axis in years (strictly increasing).\n   * @param tenors - Swap tenor axis in years (strictly increasing).\n   * @param paramsFlat - Row-major flat array of SABR parameters: `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`. Length must equal `expiries.len() * tenors.len() * 5`. Pass `NaN` for the shift element of a node to omit the shift.\n   * @param forwards - Row-major forward rates, one per grid node.\n   * @param interpolationMode - Volatility-surface interpolation mode used between quoted points.\n   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    tenors: NumericArray,\n    paramsFlat: NumericArray,\n    forwards: NumericArray,\n    interpolationMode?: string\n  ): VolCube;\n}",
-      "sha256": "6cec9e75dd55466ccd9b4d2f076966af58f0f8e55ab0dfd786103150dee788a8"
+      "declaration": "/**\n * Data-only SABR volatility cube for swaption pricing.\n *\n * Stores calibrated parameter nodes and forwards on an expiry × tenor grid.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const cube = new core.VolCube(\n *   \"USD-SWAPTION\",\n *   [1],\n *   [5],\n *   [0.02, 0.5, -0.2, 0.4, Number.NaN],\n *   [0.03]\n * );\n * console.log(cube.id, cube.interpolationMode);\n * cube.free();\n * ```\n */\nexport interface VolCubeConstructor {\n  /**\n   * Construct a vol cube from a flat SABR parameter array.\n   *\n   * @returns A `VolCube` handle.\n   * @param id - Curve identifier.\n   * @param expiries - Option expiry axis in years (strictly increasing).\n   * @param tenors - Swap tenor axis in years (strictly increasing).\n   * @param paramsFlat - Row-major flat array of SABR parameters: `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`. Length must equal `expiries.len() * tenors.len() * 5`. Pass `NaN` for the shift element of a node to omit the shift.\n   * @param forwards - Row-major forward rates, one per grid node.\n   * @param interpolationMode - Volatility-surface interpolation mode used between quoted points.\n   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    tenors: NumericArray,\n    paramsFlat: NumericArray,\n    forwards: NumericArray,\n    interpolationMode?: string\n  ): VolCube;\n  /**\n   * Deserialize a canonical SABR cube state without flattening parameter nodes.\n   *\n   * @example\n   * ```typescript\n   * import init, { core } from \"finstack-quant-wasm\";\n   * await init();\n   * const cube = core.VolCube.fromJson(\n   *   JSON.stringify({\n   *     id: \"USD-SWAPTION\",\n   *     expiries: [1],\n   *     tenors: [5],\n   *     params: [{ alpha: 0.03, beta: 0.5, rho: -0.2, nu: 0.4, shift: null }],\n   *     forwards: [0.03],\n   *     interpolation_mode: \"vol\",\n   *   })\n   * );\n   * console.log(cube.id);\n   * cube.free();\n   * ```\n   * @param json - Canonical VolCube JSON containing id, expiry and tenor axes in years, row-major SABR nodes and decimal-rate forwards, and interpolation_mode. Missing or null node shifts remain absent; unknown fields are rejected.\n   * @returns A validated VolCube handle owned by the caller; release it with free().\n   * @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.\n   */\n  fromJson(json: string): VolCube;\n}",
+      "sha256": "9845cd1e601b628403e82a0b0dd9af907aea9821cdeda38bfdaf2529362563b9"
     },
     {
       "name": "FxDeltaVolSurfaceConstructor",
       "source": "finstack-quant-wasm/index.d.ts",
-      "declaration": "/**\n * FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional\n * 10-delta wings).\n *\n * Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). The delta\n * convention is **forward delta (premium-unadjusted)**.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const surface = new core.FxDeltaVolSurface(\n *   \"EURUSD-VOL\",\n *   [1],\n *   [0.12],\n *   [0.01],\n *   [0.002]\n * );\n * console.log(surface.id, surface.numExpiries);\n * surface.free();\n * ```\n */\nexport interface FxDeltaVolSurfaceConstructor {\n  /**\n   * Construct an FX delta-quoted vol surface with 25-delta wings.\n   *\n   * Optional `rr10d` / `bf10d` add 10-delta wings for richer wing\n   * interpolation. Pass an empty array for both to omit; if one is\n   * provided, the other must be too.\n   *\n   * @returns An `FxDeltaVolSurface` handle.\n   * @param id - Stable surface identifier.\n   * @param expiries - Strictly increasing positive expiry times (years).\n   * @param atmVols - ATM delta-neutral straddle vols per expiry.\n   * @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).\n   * @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).\n   * @param rr10d - Optional 10-delta risk reversal per expiry.\n   * @param bf10d - Optional 10-delta butterfly per expiry.\n   * @throws Error - Throws a JavaScript exception if `rr10d` and `bf10d` are not both present or both absent; quote arrays are empty or have mismatched lengths; expiries are not finite, positive, and strictly increasing; ATM vols are not finite and positive; or any risk reversal or butterfly is non-finite.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    atmVols: NumericArray,\n    rr25d: NumericArray,\n    bf25d: NumericArray,\n    rr10d?: NumericArray,\n    bf10d?: NumericArray\n  ): FxDeltaVolSurface;\n}",
-      "sha256": "2a3263437a537c7d33f59512e70ed382e72d0681604daf3056ac03014a0dce66"
+      "declaration": "/**\n * FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional\n * 10-delta wings).\n *\n * Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). The delta\n * convention is **forward delta (premium-unadjusted)**.\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const surface = new core.FxDeltaVolSurface(\n *   \"EURUSD-VOL\",\n *   [1],\n *   [0.12],\n *   [0.01],\n *   [0.002]\n * );\n * console.log(surface.id, surface.numExpiries);\n * surface.free();\n * ```\n */\nexport interface FxDeltaVolSurfaceConstructor {\n  /**\n   * Construct an FX delta-quoted vol surface with 25-delta wings.\n   *\n   * Optional `rr10d` / `bf10d` add 10-delta wings for richer wing\n   * interpolation. Pass an empty array for both to omit; if one is\n   * provided, the other must be too.\n   *\n   * @returns An `FxDeltaVolSurface` handle.\n   * @param id - Stable surface identifier.\n   * @param expiries - Strictly increasing positive expiry times (years).\n   * @param atmVols - ATM delta-neutral straddle vols per expiry.\n   * @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).\n   * @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).\n   * @param rr10d - Optional 10-delta risk reversal per expiry.\n   * @param bf10d - Optional 10-delta butterfly per expiry.\n   * @throws Error - Throws a JavaScript exception if `rr10d` and `bf10d` are not both present or both absent; quote arrays are empty or have mismatched lengths; expiries are not finite, positive, and strictly increasing; ATM vols are not finite and positive; or any risk reversal or butterfly is non-finite.\n   */\n  new (\n    id: string,\n    expiries: NumericArray,\n    atmVols: NumericArray,\n    rr25d: NumericArray,\n    bf25d: NumericArray,\n    rr10d?: NumericArray,\n    bf10d?: NumericArray\n  ): FxDeltaVolSurface;\n  /**\n   * Deserialize canonical FX delta quotes without reconstructing positional arrays.\n   *\n   * @example\n   * ```typescript\n   * import init, { core } from \"finstack-quant-wasm\";\n   * await init();\n   * const surface = core.FxDeltaVolSurface.fromJson(\n   *   JSON.stringify({\n   *     id: \"EURUSD\",\n   *     expiries: [1],\n   *     atm_vols: [0.12],\n   *     rr_25d: [0.01],\n   *     bf_25d: [0.002],\n   *     rr_10d: null,\n   *     bf_10d: null,\n   *   })\n   * );\n   * console.log(surface.id);\n   * surface.free();\n   * ```\n   * @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.\n   * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().\n   * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.\n   */\n  fromJson(json: string): FxDeltaVolSurface;\n}",
+      "sha256": "588de864bd1fb6e86d207ab5c3b5a214e15131d286fe620e147511abbde173a5"
     }
   ],
   "hostContract": {

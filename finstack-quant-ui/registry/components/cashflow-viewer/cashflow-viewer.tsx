@@ -10,7 +10,7 @@ import {
   TableFooter,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatMoney } from "@/lib/finstack/format/format";
+import { formatRawMoney } from "@/lib/finstack/format/format";
 import { JsonViewer } from "../../primitives/json-viewer/json-viewer";
 import { readCashflows } from "./cashflow-data";
 
@@ -153,7 +153,7 @@ export function CashflowViewer({
                         title={row.amount}
                       >
                         <span className="whitespace-nowrap">
-                          {formatMoney({
+                          {formatRawMoney({
                             amount: row.amount,
                             currency: row.currency,
                           })}
@@ -197,7 +197,7 @@ export function CashflowViewer({
                         title={row.pv}
                       >
                         <span className="whitespace-nowrap">
-                          {formatMoney({
+                          {formatRawMoney({
                             amount: row.pv,
                             currency: schedule.currency,
                           })}
@@ -241,7 +241,7 @@ export function CashflowViewer({
                     </TableCell>
                     <TableCell className={numeric} title={schedule.total_pv}>
                       <span className="whitespace-nowrap">
-                        {formatMoney({
+                        {formatRawMoney({
                           amount: schedule.total_pv,
                           currency: schedule.currency,
                         })}
@@ -265,7 +265,7 @@ export function CashflowViewer({
             </Badge>
             <span>
               {!schedule.flows.length &&
-                `Total PV · ${formatMoney({ amount: schedule.total_pv, currency: schedule.currency })}`}
+                `Total PV · ${formatRawMoney({ amount: schedule.total_pv, currency: schedule.currency })}`}
             </span>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">

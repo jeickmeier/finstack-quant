@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { issuePathToFieldPath } from "./issue-mapping";
 import type { WireCodec } from "@/lib/finstack/codec.mjs";
+import { integerText, numericEdit, schemaAt } from "@/lib/finstack/schema.mjs";
 
 /** Generated schema shape used for presentation, not a second financial validator. */
 export interface Schema {
@@ -54,11 +55,7 @@ export function resolve(
     if (!ref.startsWith("#/") || seen.has(ref))
       throw new Error(`Unsupported schema reference: ${ref}`);
     seen.add(ref);
-    let target: unknown = root;
-    for (const part of ref.slice(2).split("/"))
-      target = (target as Record<string, unknown>)[
-        part.replaceAll("~1", "/").replaceAll("~0", "~")
-      ];
+    const target = schemaAt(root, ref);
     if (!target || typeof target !== "object")
       throw new Error(`Missing schema reference: ${ref}`);
     const { $ref: _, ...siblings } = schema;
@@ -191,7 +188,7 @@ export function initialValue(
         ),
       ) ?? []
     );
-  if (schema.type === "boolean") return false;
+  if (schema.type === "boolean") return undefined;
   return "";
 }
 
@@ -341,19 +338,13 @@ export function workingValue(
     typeof value === "string" &&
     (schema.type === "number" || schema.type === "integer")
   ) {
-    if (schema.type === "integer" && /^-?\d+$/.test(value)) {
-      if (["int64", "uint64"].includes(schema.format ?? ""))
-        return BigInt(value);
-      const result = Number(value);
-      return Number.isSafeInteger(result) ? result : value;
-    }
     if (
-      schema.type === "number" &&
-      /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(value)
-    ) {
-      const result = Number(value);
-      return Number.isFinite(result) ? result : value;
-    }
+      schema.type === "integer" &&
+      ["int64", "uint64"].includes(schema.format ?? "") &&
+      integerText.test(value)
+    )
+      return BigInt(value);
+    return numericEdit(value, schema.type === "integer");
   }
   return value;
 }

@@ -49,6 +49,9 @@ it("edits generated quotes, prior markets and settings and submits the exact nat
       onSubmit={onSubmit}
     />,
   );
+  const submit = screen.getByRole("button", {
+    name: "Calibrate",
+  }) as HTMLButtonElement;
   const field = (path: string) =>
     document.querySelector(
       `[data-field-path="${path}"] input`,
@@ -65,15 +68,8 @@ it("edits generated quotes, prior markets and settings and submits the exact nat
   ) as HTMLInputElement;
   expect(checkbox).toBeTruthy();
   fireEvent.click(checkbox);
-  await waitFor(
-    () =>
-      expect(
-        (screen.getByRole("button", { name: "Calibrate" }) as HTMLButtonElement)
-          .disabled,
-      ).toBe(false),
-    { timeout: 5000 },
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Calibrate" }));
+  await waitFor(() => expect(submit.disabled).toBe(false), { timeout: 5000 });
+  fireEvent.click(submit);
   await waitFor(() => expect(onSubmit).toHaveBeenCalled(), { timeout: 5000 });
   initial.market_data[0].rate = 0.0527;
   initial.prior_market[0].knot_points[1][1] = 0.0013;

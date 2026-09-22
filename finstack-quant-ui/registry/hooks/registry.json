@@ -30,6 +30,11 @@
           "path": "use-finstack/snapshot.ts",
           "type": "registry:hook",
           "target": "hooks/use-finstack/snapshot.ts"
+        },
+        {
+          "path": "use-finstack/query.ts",
+          "type": "registry:hook",
+          "target": "hooks/use-finstack/query.ts"
         }
       ],
       "registryDependencies": ["@finstack/finstack-worker"],
@@ -39,7 +44,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -61,7 +67,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -98,7 +105,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -120,7 +128,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -142,7 +151,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -164,7 +174,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -186,7 +197,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -208,7 +220,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },
@@ -230,7 +243,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     }

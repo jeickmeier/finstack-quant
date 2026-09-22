@@ -23,6 +23,7 @@ import {
   FinstackError,
   errorValue,
 } from "../registry/workers/finstack-contract";
+import { formatMoney } from "../src/format/format";
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("../registry/hooks/use-finstack/client", () => ({
   createClient: mock.createClient,
@@ -53,6 +54,8 @@ beforeEach(() => {
         return native.listModelsGrouped();
       case "metrics":
         return native.listStandardMetricsGrouped();
+      case "metricMetadata":
+        return native.metricMetadata(request);
       case "validate":
         return native.validateInstrumentJson(request);
       case "validateMarket": {
@@ -77,6 +80,8 @@ beforeEach(() => {
           request.asOf,
           request.gridJson,
         );
+      case "formatMoney":
+        return formatMoney(request.value, request.rounding, native);
       case "cashflows":
         return native.instrumentCashflowsJson(
           request.instrumentJson,
@@ -366,8 +371,10 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
   "keeps $type pricing intact with exact cashflow output or its actual native export error",
   async (entry) => {
     mount(entry.request);
-    await userEvent.click(screen.getByRole("tab", { name: "4 Diagnostics" }));
-    const result = await screen.findByRole(
+    const results = within(screen.getByRole("region", { name: "Results" }));
+    const tabs = within(results.getByRole("tablist", { name: "Result views" }));
+    await userEvent.click(tabs.getByRole("tab", { name: "4 Diagnostics" }));
+    const result = await results.findByRole(
       "region",
       { name: "Complete valuation result JSON", hidden: true },
       { timeout: 10000 },
@@ -375,8 +382,8 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
     expect(JSON.parse(result.querySelector("pre")!.textContent!).value).toEqual(
       entry.pricedValue,
     );
-    await userEvent.click(screen.getByRole("tab", { name: "3 Cashflows" }));
-    const viewer = await screen.findByRole("region", { name: "Cashflows" });
+    await userEvent.click(tabs.getByRole("tab", { name: "3 Cashflows" }));
+    const viewer = await results.findByRole("region", { name: "Cashflows" });
     if (entry.error)
       await waitFor(() =>
         expect(within(viewer).getByRole("alert").textContent).toBe(

@@ -184,6 +184,7 @@
       ],
       "registryDependencies": [
         "@finstack/finstack-host",
+        "@finstack/finstack-format",
         "@finstack/contract-market-context-state"
       ],
       "dependencies": ["finstack-quant-wasm@0.8.0", "comlink@4.4.2"],
@@ -192,7 +193,8 @@
         "version": "0.2.0",
         "wasmVersion": "0.8.0",
         "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json"
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
     },

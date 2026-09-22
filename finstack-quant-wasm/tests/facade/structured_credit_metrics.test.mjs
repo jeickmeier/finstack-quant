@@ -169,3 +169,37 @@ test('clean and dirty targets share coupon-crossing settlement', () => {
     );
   }
 });
+
+test('structured credit errors preserve typed classification', () => {
+  const f = fixture();
+  const tranche = f.instrument.instrument.spec.tranches.tranches[0].id;
+  const grid = JSON.stringify({ cprs: [0], cdrs: [0], severities: [0.4] });
+  const check = (kind) => (error) => {
+    assert.equal(error.name, 'FinstackError');
+    assert.equal(error.kind, kind);
+    assert.equal(typeof error.message, 'string');
+    return true;
+  };
+  assert.throws(
+    () =>
+      valuations.instruments.structuredCreditTrancheScenarioTable(
+        '{',
+        tranche,
+        '{}',
+        f.as_of,
+        grid
+      ),
+    check('validation')
+  );
+  assert.throws(
+    () =>
+      valuations.instruments.structuredCreditTrancheScenarioTable(
+        JSON.stringify(f.instrument),
+        tranche,
+        JSON.stringify({ ...f.market, curves: [] }),
+        f.as_of,
+        grid
+      ),
+    check('not_found')
+  );
+});

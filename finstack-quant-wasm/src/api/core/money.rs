@@ -2,7 +2,9 @@
 
 use crate::api::core::currency::JsCurrency;
 use crate::utils::to_js_err;
-use finstack_quant_core::money::Money as RustMoney;
+use finstack_quant_core::config::RoundingMode;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::money::{FormatOpts, Money as RustMoney};
 use wasm_bindgen::prelude::*;
 
 /// Currency-tagged monetary amount.
@@ -178,6 +180,73 @@ impl JsMoney {
             .map_err(to_js_err)
     }
 
+    /// Format the amount with explicit display options.
+    ///
+    /// `decimals` accepts `null`/`undefined` (currency ISO minor units) or a
+    /// non-negative integer up to 1,000,000. `group` is an optional
+    /// single-character thousands separator (e.g. `","`); `null`/`undefined`
+    /// disables grouping. `rounding` accepts the canonical mode names
+    /// (`"bankers"`, `"away_from_zero"`, `"toward_zero"`, `"floor"`,
+    /// `"ceil"`); `null`/`undefined` selects bankers rounding. Formatting
+    /// never mutates the stored amount.
+    ///
+    /// # Arguments
+    ///
+    /// * `decimals` - JavaScript number of fractional digits, an integer in
+    ///   `0..=1_000_000`; null or undefined selects ISO minor units.
+    /// * `show_currency` - Whether to prepend the ISO code; omitted means true.
+    /// * `group` - Optional single-character thousands separator; omitted means no grouping.
+    /// * `rounding` - Canonical lowercase rounding mode; omitted means bankers.
+    ///
+    /// @returns Formatted amount such as `"USD 1,234.57"`.
+    /// @throws If `decimals` is not a non-negative integer or exceeds 1,000,000, if `group` is not a single character, or if `rounding` is not a recognised mode name.
+    ///
+    /// @example
+    /// ```javascript
+    /// const m = core.Money.fromDecimalStr("1234.567", "USD");
+    /// try {
+    ///   m.formatWith(2, true, ",", "bankers");  // "USD 1,234.57"
+    /// } finally {
+    ///   m.free();
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = formatWith)]
+    pub fn format_with(
+        &self,
+        decimals: JsValue,
+        show_currency: Option<bool>,
+        group: Option<String>,
+        rounding: Option<String>,
+    ) -> Result<String, JsValue> {
+        let decimals = if decimals.is_null() || decimals.is_undefined() {
+            None
+        } else {
+            let value = decimals
+                .as_f64()
+                .filter(|v| v.is_finite() && *v >= 0.0 && v.fract() == 0.0 && *v <= u32::MAX as f64)
+                .ok_or_else(|| to_js_err("decimals must be a non-negative integer"))?;
+            Some(value as usize)
+        };
+        let group = match group {
+            None => None,
+            Some(sep) => {
+                let mut chars = sep.chars();
+                match (chars.next(), chars.next()) {
+                    (Some(c), None) => Some(c),
+                    _ => return Err(to_js_err("group must be a single character such as ','")),
+                }
+            }
+        };
+        let rounding = match rounding {
+            Some(mode) => serde_json::from_value::<RoundingMode>(serde_json::Value::String(mode))
+                .map_err(to_js_err)?,
+            None => RoundingMode::Bankers,
+        };
+        let opts = FormatOpts::new(decimals, show_currency.unwrap_or(true), group, rounding)
+            .map_err(to_js_err)?;
+        Ok(self.inner.format_with(opts))
+    }
+
     /// Default string representation (e.g. `"USD 10.00"`).
     ///
     /// @returns Formatted amount with currency code.
@@ -206,6 +275,40 @@ impl JsMoney {
     pub fn from_json(json: &str) -> Result<JsMoney, JsValue> {
         let inner: RustMoney = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsMoney { inner })
+    }
+
+    /// Construct from exact decimal text, rejecting inexact amounts.
+    ///
+    /// `amount` accepts fixed-point (`"1234.56"`) or scientific (`"1.2345e3"`)
+    /// text and must be exactly representable as a Rust `Decimal` (96-bit
+    /// mantissa, up to 28 fractional digits; the scientific mantissa must
+    /// itself fit exactly). Inexact or underflowing amounts throw rather than
+    /// being silently rounded, and the text never passes through `f64`. The
+    /// currency is a tag only — no FX conversion is performed.
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - Exact fixed-point or scientific decimal text in major currency units.
+    /// * `currency` - Case-insensitive ISO-4217 code; surrounding whitespace is trimmed.
+    ///
+    /// @returns The constructed `Money`.
+    /// @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a recognised code.
+    ///
+    /// @example
+    /// ```javascript
+    /// const m = core.Money.fromDecimalStr("1.245", "USD");
+    /// try {
+    ///   m.amountDecimal();  // "1.245"
+    /// } finally {
+    ///   m.free();
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = fromDecimalStr)]
+    pub fn from_decimal_str(amount: &str, currency: &str) -> Result<JsMoney, JsValue> {
+        let ccy = currency.trim().parse::<Currency>().map_err(to_js_err)?;
+        RustMoney::from_decimal_str(amount, ccy)
+            .map(|inner| JsMoney { inner })
+            .map_err(to_js_err)
     }
 }
 

@@ -151,3 +151,6 @@ instrument_tearsheet.html
 
 # Isolated component-registry production export fixtures
 /docs-site/.registry-probe-*/
+
+.worker-test-*/
+.consumer-test-*/

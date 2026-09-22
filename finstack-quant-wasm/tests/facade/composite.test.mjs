@@ -113,3 +113,26 @@ test('composite metric requests reject obsolete wire spellings', () => {
     /noncanonical/
   );
 });
+
+test('composite errors preserve typed classification', () => {
+  const initialized = facade.valuations.composite.initialize(spec, market, '2025-01-01');
+  const wrongType = structuredClone(initialized.instrument);
+  wrongType.instrument = equity('not found', 100);
+  assert.throws(
+    () => facade.valuations.composite.rebalance(wrongType, market, '2025-01-01'),
+    (error) => {
+      assert.equal(error.name, 'FinstackError');
+      assert.equal(error.kind, 'validation');
+      assert.match(error.message, /expected composite/);
+      return true;
+    }
+  );
+  assert.throws(
+    () => facade.valuations.composite.rebalance('{', market, '2025-01-01'),
+    (error) => {
+      assert.equal(error.name, 'FinstackError');
+      assert.equal(error.kind, 'validation');
+      return true;
+    }
+  );
+});

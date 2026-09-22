@@ -184,20 +184,32 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
     valuation_result_json(result)
 }
 
-/// Validate a canonical v1 instrument envelope.
+/// Validate a canonical v1 instrument envelope after optional metric-pricing
+/// overrides are merged by the canonical pricing path.
 ///
 /// Deserializes the input against the known instrument schema and
 /// returns the canonical (re-serialized) JSON.
-/// @param json - Required `finstack_quant.instrument/1` envelope.
+///
+/// # Arguments
+///
+/// * `json` - Required `finstack_quant.instrument/1` envelope.
+/// * `pricing_options` - Serialized metric-pricing override object merged before
+///   native instrument validation; `None` (omitted or null in JavaScript) retains
+///   the envelope configuration.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `json` is malformed, is not a canonical v1
-/// instrument envelope, fails instrument validation, or cannot be canonically
+/// Throws a JavaScript exception if the instrument or override JSON is
+/// malformed, the merged payload is not a canonical v1 instrument envelope,
+/// instrument validation fails, or the envelope cannot be canonically
 /// serialized.
 #[wasm_bindgen(js_name = validateInstrumentJson)]
-pub fn validate_instrument_json(json: &str) -> Result<String, JsValue> {
-    finstack_quant_valuations::pricer::validate_instrument_json(json).map_err(to_js_err)
+pub fn validate_instrument_json(
+    json: &str,
+    pricing_options: Option<String>,
+) -> Result<String, JsValue> {
+    finstack_quant_valuations::pricer::validate_instrument_json(json, pricing_options.as_deref())
+        .map_err(to_js_err)
 }
 
 /// Construct a canonical bond instrument envelope from a cashflow schedule.
@@ -365,6 +377,20 @@ pub fn list_standard_metrics() -> Result<JsValue, JsValue> {
 pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
     let map = finstack_quant_valuations::pricer::list_standard_metrics_grouped();
     to_js_value(&map)
+}
+
+/// Describe canonical metric identifiers using Rust-owned units and coordinates.
+///
+/// # Arguments
+///
+/// * `keys` - Canonical scalar or qualified wire keys in output order. Custom
+///   keys retain unknown units; malformed or obsolete encodings are rejected.
+/// @returns Ordered metadata records preserving original keys, decoded components, native unit families, display groups, and bucket eligibility.
+/// @throws Error - Throws a validation error for malformed canonical metric keys or a serialization error when conversion fails.
+#[wasm_bindgen(js_name = metricMetadata)]
+pub fn metric_metadata(keys: Vec<String>) -> Result<JsValue, JsValue> {
+    let metadata = finstack_quant_valuations::pricer::metric_metadata(&keys).map_err(to_js_err)?;
+    to_js_value(&metadata)
 }
 
 /// List every pricing model key registered in the standard pricer registry.
@@ -1008,21 +1034,21 @@ mod tests {
     #[test]
     fn validate_instrument_json_bond() {
         let json = bond_instrument_json();
-        let canonical = validate_instrument_json(&json).expect("validate");
+        let canonical = validate_instrument_json(&json, None).expect("validate");
         assert!(!canonical.is_empty());
     }
 
     #[test]
     fn validate_instrument_json_bermudan_swaption() {
         let json = bermudan_swaption_json();
-        let canonical = validate_instrument_json(&json).expect("validate");
+        let canonical = validate_instrument_json(&json, None).expect("validate");
         let parsed: serde_json::Value = serde_json::from_str(&canonical).expect("json");
         assert_eq!(parsed["instrument"]["type"], "bermudan_swaption");
     }
 
     #[test]
     fn validate_revolving_credit_rejects_invalid_floating_rate_spec() {
-        assert!(validate_instrument_json(&revolving_credit_json(true, false)).is_err());
+        assert!(validate_instrument_json(&revolving_credit_json(true, false), None).is_err());
     }
 
     #[test]
@@ -1263,7 +1289,7 @@ mod tests {
         let inst = return_floor_bond_instrument_json(floor_spec);
 
         // Validate round-trips through the binding
-        let canonical = validate_instrument_json(&inst).expect("validate");
+        let canonical = validate_instrument_json(&inst, None).expect("validate");
         assert!(
             canonical.contains("return_floor"),
             "return_floor survived round-trip"
