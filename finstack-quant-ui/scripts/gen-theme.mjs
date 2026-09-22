@@ -50,6 +50,10 @@ ${imports}
 .finstack-fieldset > legend { float:left; margin-bottom:var(--spacing); font-size:var(--text-sm); font-weight:500; letter-spacing:0.02em; }
 .finstack-fieldset > legend + * { clear:both; }
 .finstack-fieldset > details { padding:var(--spacing) 0; font-size:var(--text-xs); }
+.finstack-term-disclosure { margin-top:calc(var(--spacing) * 2); border-top:var(--table-rule-width) solid var(--hairline); padding-top:var(--spacing); }
+.finstack-fieldset > details.finstack-term-disclosure { font-size:var(--text-sm); padding-top:var(--spacing); }
+.finstack-term-disclosure > summary { cursor:pointer; width:fit-content; color:var(--muted-foreground); font-size:var(--text-sm); }
+.finstack-schema-root > .finstack-term-disclosure { column-span:all; }
 .finstack-term-fields { min-width:0; }
 .finstack-term-sheet .finstack-field-frame { display:grid; grid-template-columns:minmax(100px,var(--term-width)) minmax(0,1fr); align-items:center; gap:0 calc(var(--spacing) * 2); min-height:var(--row-height); padding-block:calc(var(--spacing) / 2); }
 .finstack-term-sheet .finstack-field-frame + .finstack-field-frame, .finstack-term-sheet .finstack-field-frame + .finstack-optional-term, .finstack-term-sheet .finstack-optional-term + .finstack-field-frame { border-top:var(--table-rule-width) solid var(--hairline); }
@@ -94,6 +98,7 @@ ${imports}
 .finstack-valuation__context > div { min-width:0; overflow-wrap:anywhere; }
 .finstack-valuation__context dt,.finstack-valuation__context dd { display:inline; }
 .finstack-measures { display:grid; gap:calc(var(--spacing) * 2); min-width:0; }
+.finstack-measures [data-slot="table-row"] { border-color:var(--hairline); }
 .finstack-measure-key { display:block; min-width:8ch; white-space:normal; overflow-wrap:anywhere; }
 .finstack-workbench-container { container-type: inline-size; min-width: 0; }
 .finstack-workbench { display:flex; flex-direction:column; min-width:0; background:var(--background); }

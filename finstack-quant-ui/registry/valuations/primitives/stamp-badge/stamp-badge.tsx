@@ -34,7 +34,7 @@ export function StampBadge({
   compact = false,
 }: {
   meta: Record<string, unknown> | null | undefined;
-  /** Keep primary policy badges visible and disclose the full stamp; print retains all fields. */
+  /** Disclose the full stamp in compact views; print retains all fields. */
   compact?: boolean;
 }) {
   if (!meta)
@@ -59,25 +59,15 @@ export function StampBadge({
       ([currency, scale]) => [`${currency} ingest decimals`, scale],
     ),
   ];
-  const short: Record<string, string> = {
-    "Numeric mode": "mode",
-    Rounding: "rounding",
-    "FX policy": "fx",
-    Version: "v",
-  };
-  const renderFields = (entries: typeof fields, quiet = false) =>
+  const renderFields = (entries: typeof fields) =>
     entries.map(([label, value]) => (
       <Badge
         key={String(label)}
-        variant={quiet ? "secondary" : "outline"}
+        variant="outline"
         className="rounded-md font-normal"
         render={<div />}
       >
-        <dt className={quiet ? "inline text-muted-foreground" : "inline"}>
-          {quiet
-            ? (short[String(label)] ?? String(label))
-            : `${String(label)}:`}{" "}
-        </dt>
+        <dt className="inline">{String(label)}: </dt>
         <dd className="inline finstack-numeric">
           {typeof value === "string" ||
           typeof value === "number" ||
@@ -95,31 +85,19 @@ export function StampBadge({
         {renderFields(fields)}
       </dl>
     );
-  const primary = new Set(["Numeric mode", "Rounding", "FX policy", "Version"]);
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <dl aria-label="Calculation policy" className="flex flex-wrap gap-1">
-          {renderFields(
-            fields.filter(
-              ([label, value]) =>
-                primary.has(String(label)) && value !== undefined,
-            ),
-            true,
-          )}
+      <details className="text-xs text-muted-foreground print:hidden">
+        <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-ring">
+          Full metadata
+        </summary>
+        <dl
+          aria-label="Calculation metadata"
+          className="mt-2 flex flex-wrap gap-1"
+        >
+          {renderFields(fields)}
         </dl>
-        <details className="text-xs text-muted-foreground">
-          <summary className="cursor-pointer focus-visible:outline-2 focus-visible:outline-ring">
-            Full metadata
-          </summary>
-          <dl
-            aria-label="Calculation metadata"
-            className="mt-2 flex flex-wrap gap-1"
-          >
-            {renderFields(fields)}
-          </dl>
-        </details>
-      </div>
+      </details>
       <dl
         aria-label="Printed calculation metadata"
         className="hidden flex-wrap gap-1 print:flex"

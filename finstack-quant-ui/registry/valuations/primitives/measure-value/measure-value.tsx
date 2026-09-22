@@ -8,6 +8,7 @@ export function MeasureValue({
   value,
   unit,
   precision,
+  displayText,
   signed = false,
   label,
   showUnavailableUnit = true,
@@ -15,6 +16,8 @@ export function MeasureValue({
   value: number | null | undefined;
   unit?: { label: string; source: string };
   precision?: number;
+  /** Optional shorter presentation; the exact returned value remains in the title. */
+  displayText?: string;
   signed?: boolean;
   label?: string;
   /** Hide only the missing-unit note when the enclosing table states it once. */
@@ -27,7 +30,9 @@ export function MeasureValue({
       : precision === undefined
         ? raw
         : value.toFixed(precision);
-  const signedText = signed && value != null ? formatSigned(exact) : exact;
+  const presented = displayText ?? exact;
+  const signedText =
+    signed && value != null ? formatSigned(presented) : presented;
   const text = /^[+-]?\d{4,}(\.\d+)?$/.test(signedText)
     ? signedText.startsWith("+")
       ? `+${groupDecimal(signedText.slice(1))}`
@@ -37,11 +42,25 @@ export function MeasureValue({
     throw new Error("Measure units require a canonical source");
   return (
     <span
-      aria-label={label}
+      aria-label={
+        label ??
+        (displayText && displayText !== raw
+          ? `${text}; exact value ${raw}`
+          : undefined)
+      }
       className="finstack-numeric font-sans text-foreground"
       title={raw}
     >
-      {text}
+      {displayText !== undefined && displayText !== raw ? (
+        <>
+          <span className="print:hidden">{text}</span>
+          <span aria-hidden="true" className="hidden print:inline">
+            {raw}
+          </span>
+        </>
+      ) : (
+        text
+      )}
       {(unit || showUnavailableUnit) && (
         <span className="finstack-na ml-1 text-xs whitespace-nowrap">
           {unit?.label ?? "Unit unavailable"}

@@ -46,6 +46,12 @@ try {
     firstPanel.x < secondPanel.x && firstPanel.y === secondPanel.y,
     "Comparison panels are side by side at desktop width",
   );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Compact" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
@@ -67,7 +73,19 @@ try {
         .first()
         .getAttribute("data-density");
       if (current !== density)
-        await page.getByRole("button", { name: "Toggle density" }).click();
+        await page
+          .getByRole("button", {
+            name: density === "compact" ? "Compact" : "Comfortable",
+          })
+          .click();
+      assert.equal(
+        await page
+          .getByRole("button", {
+            name: density === "compact" ? "Compact" : "Comfortable",
+          })
+          .getAttribute("aria-pressed"),
+        "true",
+      );
       const axe = await page.evaluate(() => window.axe.run(document));
       accessibility.push({
         theme,
@@ -131,66 +149,125 @@ try {
         .textContent()
     ).includes("EUR 987,654.32"),
   );
+  assert(
+    (await page.getByRole("note").textContent()).includes(
+      "Different currencies and valuation dates",
+    ),
+  );
+  assert.equal(
+    await page.getByText("Yield to maturity", { exact: true }).count(),
+    1,
+  );
+  assert.equal(
+    await page.getByText("Modified duration", { exact: true }).count(),
+    1,
+  );
+  assert.equal(
+    await page
+      .getByText("bucketed_dv01::USD-OIS::30y", { exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page.getByText("Unit unavailable", { exact: true }).count(),
+    0,
+  );
+  const dv01Toggle = page.getByRole("button", {
+    name: /^Bucketed DV01 · USD-OIS/,
+  });
+  assert.equal(await dv01Toggle.getAttribute("aria-expanded"), "false");
+  await dv01Toggle.click();
+  assert.equal(await dv01Toggle.getAttribute("aria-expanded"), "true");
+  const dv01Table = page.getByRole("table", {
+    name: "Sensitivity: Bucketed DV01 · USD-OIS",
+  });
+  const labels = () =>
+    dv01Table.locator("tbody tr td:first-child").allTextContents();
+  assert.deepEqual(await labels(), [
+    "3m",
+    "6m",
+    "1y",
+    "2y",
+    "3y",
+    "5y",
+    "7y",
+    "10y",
+    "15y",
+    "20y",
+    "30y",
+  ]);
+  assert.equal(await page.locator("[data-bucket-bar]").count(), 0);
+
+  await page.getByRole("button", { name: "Nonzero only" }).click();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Nonzero only" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  const filteredTenors = await labels();
+  assert(
+    !filteredTenors.includes("15y"),
+    "Both supplied zero values are hidden",
+  );
+  assert(
+    filteredTenors.includes("3m"),
+    "Zero with a missing comparison remains visible",
+  );
+  assert(
+    filteredTenors.includes("10y"),
+    "Zero with a nonzero comparison remains visible",
+  );
+  const creditTable = page.getByRole("table", {
+    name: "Credit: Bucketed CS01 · SYNTHETIC-CREDIT",
+  });
+  const creditRows = await creditTable
+    .locator("tbody tr")
+    .evaluateAll((rows) =>
+      rows.map((row) => [...row.cells].map((cell) => cell.textContent.trim())),
+    );
+  const creditFiveYear = creditRows.find((cells) => cells[0] === "5y");
+  assert(
+    creditFiveYear,
+    "Missing valuation with a zero comparison remains visible",
+  );
+  assert.equal(creditFiveYear[1], "—");
+  assert(creditFiveYear[2].startsWith("0"));
+  await page.getByRole("button", { name: "Show all" }).click();
+  assert((await labels()).includes("15y"));
+
+  await page.getByRole("button", { name: "Exact keys" }).click();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Exact keys" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
   assert.equal(
     await page
       .getByText("bucketed_dv01::USD-OIS::30y", { exact: true })
       .count(),
     1,
   );
-  assert.equal(
-    await page.getByText("Unit unavailable", { exact: true }).count(),
-    0,
-  );
+  await page.getByRole("button", { name: "Exact values" }).click();
   assert.equal(
     await page
-      .getByText("Raw measure values · units unavailable", { exact: true })
-      .count(),
-    0,
+      .getByRole("button", { name: "Exact values" })
+      .getAttribute("aria-pressed"),
+    "true",
   );
-  const bars = await page.locator("[data-bucket-bar]").evaluateAll((nodes) =>
-    nodes.map((track) => {
-      const cell = track.parentElement;
-      const rect = track.getBoundingClientRect();
-      const fill = track
-        .querySelector("[data-bucket-bar-fill]")
-        ?.getBoundingClientRect();
-      return {
-        key: cell.parentElement.cells[0].textContent,
-        column: cell.cellIndex,
-        raw: cell.querySelector(":scope > span[title]").getAttribute("title"),
-        hidden: track.getAttribute("aria-hidden"),
-        width: rect.width,
-        fill: fill
-          ? {
-              left: (fill.left - rect.left) / rect.width,
-              width: fill.width / rect.width,
-            }
-          : null,
-      };
-    }),
-  );
-  const bar = (key, column = 2) =>
-    bars.find((item) => item.key === key && item.column === column);
-  const near = (actual, expected) =>
-    assert(
-      Math.abs(actual - expected) < 0.002,
-      `${actual} differs from ${expected}`,
-    );
-  for (const [key, left, width, raw] of [
-    ["bucketed_cs01::SYNTHETIC-CREDIT::1y", 0, 0.5, "-100"],
-    ["bucketed_cs01::SYNTHETIC-CREDIT::3y", 0.5, 0.25, "50"],
-    ["bucketed_cs01::SYNTHETIC-OTHER::1y", 0.5, 0.5, "10"],
-    ["bucketed_dv01::USD-OIS::30y", 0.5, 0.5, "2"],
-    ["bucketed_dv01::USD-OIS::10y", 0.25, 0.25, "-1"],
-  ]) {
-    const item = bar(key);
-    near(item.fill.left, left);
-    near(item.fill.width, width);
-    assert.equal(item.raw, raw);
-  }
-  assert.equal(bar("bucketed_cs01::SYNTHETIC-CREDIT::5y").fill, null);
-  near(bar("bucketed_dv01::USD-OIS::30y", 1).fill.width, 0.5);
-  assert(bars.every((item) => item.hidden === "true" && item.width > 0));
+  const thirtyYearCells = await dv01Table
+    .locator("tbody tr")
+    .filter({
+      has: page.getByText("bucketed_dv01::USD-OIS::30y", { exact: true }),
+    })
+    .locator("td")
+    .allTextContents();
+  assert(thirtyYearCells[1].includes("-103.45856181590352"));
+  assert(thirtyYearCells[2].startsWith("2"));
+  await page.getByRole("button", { name: "Exact keys" }).click();
+  await page.getByRole("button", { name: "Exact values" }).click();
+  await dv01Toggle.click();
   assert.deepEqual(failures, []);
   assert(!requests.some((url) => url.endsWith(".wasm")));
   assert(
@@ -205,6 +282,33 @@ try {
       getComputedStyle(document.body).color,
   );
   await page.screenshot({ path: "/tmp/pr013-results.png", fullPage: true });
+  const printSectionId = await dv01Toggle.getAttribute("aria-controls");
+  await page.emulateMedia({ media: "print" });
+  const printSection = page.locator(`#${printSectionId}`);
+  const printSectionStyle = await printSection.evaluate((node) => ({
+    hidden: node.hidden,
+    display: getComputedStyle(node).display,
+  }));
+  assert(
+    await printSection.isVisible(),
+    `Collapsed buckets remain visible in print: ${JSON.stringify(printSectionStyle)}`,
+  );
+  const printedThirtyYear = printSection.locator("tbody tr").filter({
+    has: page.locator('[title="bucketed_dv01::USD-OIS::30y"]'),
+  });
+  const printValue = printedThirtyYear.locator(
+    'td:nth-child(2) span[aria-hidden="true"]',
+  );
+  assert.equal(await printValue.textContent(), "-103.45856181590352");
+  assert(await printValue.isVisible(), "Exact raw value is visible in print");
+  assert.equal(
+    await printedThirtyYear
+      .locator('td:nth-child(2) span[class~="print:hidden"]')
+      .isVisible(),
+    false,
+    "Rounded screen value is hidden in print",
+  );
+  await page.emulateMedia({ media: "screen" });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileLayout = await page.evaluate(() => ({
     viewport: innerWidth,
@@ -228,7 +332,19 @@ try {
     installed,
     accessibility,
     heights,
-    bars,
+    readableBucketOrder: [
+      "3m",
+      "6m",
+      "1y",
+      "2y",
+      "3y",
+      "5y",
+      "7y",
+      "10y",
+      "15y",
+      "20y",
+      "30y",
+    ],
     mobileAccessibilityViolations: mobileAxe.violations.length,
     mobileLayout,
     failures,

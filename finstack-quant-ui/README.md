@@ -332,17 +332,21 @@ field-error mapping remain separate planned slices.
 ## Supplied valuation results
 
 `ValuationSummary` displays a supplied result's value, instrument ID, as-of date
-and calculation stamps. `compact` controls presentation; `compareTo` retains an
-independent result with its own currency and metadata. `density` accepts the shared
-compact/comfortable modes. Missing metadata does not create rounding or FX defaults.
+and calculation stamps, with full metadata in a disclosure. `compact` controls
+presentation; `compareTo` retains an independent result with its own currency,
+date and metadata. `density` accepts the shared compact/comfortable modes. Missing
+metadata does not create rounding or FX defaults.
 
-`MeasuresGrid` composes that context with the unlinked table. Pass `groups` from
-`listStandardMetricsGrouped`; fully qualified keys are retained. Measures stay
-raw, with “Unit unavailable” unless `units` or `comparisonUnits` supplies a
-label and source for that complete key. Bucket bars are a display width within
-one returned series. The grid does not calculate differences, totals, or
-currency conversions. See [PR-013 evidence](evidence/pr-013.md) and the
-retained native bond result fixture.
+`MeasuresGrid` composes that context with the unlinked table. Native metric
+metadata supplies readable labels and groups qualified buckets by identifier with
+tenors in maturity order; unrecognized keys remain opaque. The Exact keys control
+reveals fully qualified keys. Values display six significant digits by default;
+Exact values and the value title retain the supplied precision. The nonzero view
+hides zero rows (both sides must be supplied and zero in a comparison); Show all
+reveals every row. Missing values remain distinct from zero. Units appear only when native
+metadata or `units`/`comparisonUnits` supplies a source-backed unit for the complete
+key. The grid does not calculate differences, totals or currency conversions. See
+[PR-013 evidence](evidence/pr-013.md) and the retained native bond result fixture.
 
 ## Returned structured-credit scenarios
 

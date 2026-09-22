@@ -510,6 +510,9 @@
   gap: calc(var(--spacing) * 2);
   min-width: 0;
 }
+.finstack-measures [data-slot="table-row"] {
+  border-color: var(--hairline);
+}
 .finstack-measure-key {
   display: block;
   min-width: 8ch;

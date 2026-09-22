@@ -55,20 +55,22 @@ function Summary({
             />
           </div>
           <dl className="finstack-valuation__context">
-            <div>
-              <dt>as of</dt> <dd className="font-mono">{result.as_of}</dd>
-            </div>
-            {model !== undefined && (
-              <div>
-                <dt>model</dt> <dd className="font-mono">{model}</dd>
-              </div>
-            )}
-            <div>
-              <dt className="sr-only">Instrument</dt>
+            <div className="flex flex-col gap-0.5">
+              <dt>Instrument</dt>
               <dd className="font-mono text-foreground">
                 {result.instrument_id}
               </dd>
             </div>
+            <div className="flex flex-col gap-0.5">
+              <dt>Valuation date</dt>
+              <dd className="font-mono text-foreground">{result.as_of}</dd>
+            </div>
+            {model !== undefined && (
+              <div className="flex flex-col gap-0.5">
+                <dt>Model</dt>
+                <dd className="font-mono text-foreground">{model}</dd>
+              </div>
+            )}
           </dl>
           <StampBadge meta={result.meta} compact />
         </>
@@ -91,6 +93,16 @@ export function ValuationSummary({
   loading,
   error,
 }: ValuationSummaryProps) {
+  const differentCurrencies =
+    result && compareTo && result.value.currency !== compareTo.value.currency;
+  const differentDates =
+    result && compareTo && result.as_of !== compareTo.as_of;
+  const contextDifference = [
+    differentCurrencies && "currencies",
+    differentDates && "valuation dates",
+  ]
+    .filter(Boolean)
+    .join(" and ");
   return (
     <div
       className="space-y-2 font-sans text-foreground"
@@ -129,6 +141,15 @@ export function ValuationSummary({
           />
         )}
       </div>
+      {contextDifference && (
+        <p
+          role="note"
+          className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          Different {contextDifference}. Each valuation is shown in its own
+          supplied context.
+        </p>
+      )}
     </div>
   );
 }

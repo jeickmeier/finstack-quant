@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { createRequire } from "node:module";
 import fixture from "../../src/fixtures/results/bond.json";
 import {
@@ -40,7 +46,7 @@ it("matches the retained fixture against the real Node facade apart from wall-cl
   expect({ ...current, meta }).toEqual({ ...fixture.result, meta: stored });
   expect(native.listStandardMetricsGrouped()).toEqual(fixture.groups);
 });
-it("renders all supplied values, stamps, dates and qualified keys without inferred units", () => {
+it("keeps every supplied key and raw value when metadata is unavailable", () => {
   render(<MeasuresGrid result={fixture.result} />);
   expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
     formatRawMoney(fixture.result.value),
@@ -60,11 +66,13 @@ it("renders all supplied values, stamps, dates and qualified keys without inferr
   expect(rows).toHaveLength(Object.keys(fixture.result.measures).length);
   for (const [key, value] of Object.entries(fixture.result.measures)) {
     const row = screen.getByText(key).closest("tr")!;
-    expect(row.textContent).toContain(String(value));
+    expect(
+      row.querySelector("td:nth-child(2) span[title]")?.getAttribute("title"),
+    ).toBe(String(value));
     expect(row.textContent).not.toContain("Unit unavailable");
   }
   expect(
-    screen.getByText("Raw measure values · units unavailable"),
+    screen.getByText(/Raw measure values · units unavailable/),
   ).toBeTruthy();
   expect(
     groupMeasures({ result: fixture.result })
@@ -80,16 +88,15 @@ it("renders Rust-supplied units and groups from native metric metadata", () => {
       metadata={fixture.metadata as MetricMetadata[]}
     />,
   );
-  const ytm = screen.getByText("ytm").closest("tr")!;
+  const ytm = screen.getByText("Yield to maturity").closest("tr")!;
   expect(ytm.textContent).toContain("decimal");
-  const dv01 = screen.getByText("dv01").closest("tr")!;
+  const dv01 = screen.getByText("DV01").closest("tr")!;
   expect(dv01.textContent).toContain("currency");
-  expect(screen.getByRole("columnheader", { name: "Pricing" })).toBeTruthy();
+  expect(screen.getByText("Modified duration")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Pricing" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Sensitivity" })).toBeTruthy();
   expect(
-    screen.getByRole("columnheader", { name: "Sensitivity" }),
-  ).toBeTruthy();
-  expect(
-    screen.queryByText("Raw measure values · units unavailable"),
+    screen.queryByText(/Raw measure values · units unavailable/),
   ).toBeNull();
   expect(screen.queryByText("Unit unavailable")).toBeNull();
 });
@@ -135,7 +142,7 @@ it("keeps comparison currencies, dates and stamps independent and never calculat
     "supplied-version",
   ])
     expect(comparison.textContent).toContain(value);
-  const row = screen.getByText("ytm").closest("tr")!;
+  const row = screen.getByText("Yield to maturity").closest("tr")!;
   expect(row.textContent).toContain("0.043");
   expect(row.textContent).not.toContain("4.3%");
   const missing = screen.getByText("other").closest("tr")!;
@@ -186,7 +193,7 @@ it("uses only explicit per-result units and keeps ungrouped metrics in the unava
   expect(
     screen.getByRole("table", { name: "Group unavailable measures" }),
   ).toBeTruthy();
-  const row = screen.getByText("ytm").closest("tr")!;
+  const row = screen.getByText("Yield to maturity").closest("tr")!;
   expect(row.textContent).toContain("0.043decimal rate");
   expect(row.textContent).toContain("0.043Unit unavailable");
 });
@@ -217,11 +224,8 @@ it("retains independent supplied model context and exact large money while prese
   expect(within(primary).getByText("discounting")).toBeTruthy();
   expect(within(primary).queryByText("independent-model")).toBeNull();
   expect(within(comparison).getByText("independent-model")).toBeTruthy();
-  expect(screen.getByRole("columnheader", { name: "Pricing" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Pricing" })).toBeTruthy();
   expect(screen.getByRole("table", { name: "Pricing measures" })).toBeTruthy();
-  expect(
-    screen.queryByRole("heading", { name: "Pricing measures" }),
-  ).toBeNull();
   view.rerender(
     <MeasuresGrid
       result={result}
@@ -237,164 +241,122 @@ it("retains independent supplied model context and exact large money while prese
   ).toBeNull();
 });
 
-function bucketCell(key: string, column = 1) {
-  return screen.getByText(key, { exact: true }).closest("tr")!.children[
-    column
-  ] as HTMLElement;
-}
-function bucketFill(key: string, column = 1) {
-  return bucketCell(key, column).querySelector<HTMLElement>(
-    "[data-bucket-bar-fill]",
-  );
-}
-it("draws signed qualified bucket rows, preserves opaque labels and leaves scalars/missing/nonfinite values ungraphed", () => {
-  const measures = {
-    "bucketed_dv01::USD_x3a_x3aOIS::5y": -100,
-    "bucketed_dv01::USD_x3a_x3aOIS::2y": 50,
-    "bucketed_dv01::USD_x3a_x3aOIS::zero": 0,
-    "bucketed_cs01::ACME::4y@2028-01-05@quote-1": -2,
-    "bucketed_dv01::USD_x3a_x3aOIS": 1000,
-    bucketed_dv01: 1000,
-    "cs01::ACME": -200,
-    "bucketed_dv01::USD::5y::extra": 200,
-    "bucketed_dv01::::5y": 200,
-    "bucketed_cs01::ACME::": 200,
-    "unrelated::ACME::5y": 200,
-    "bucketed_dv01::USD::bad": NaN,
-    "bucketed_cs01::ACME::infinite": Infinity,
-  };
-  const comparisonMeasures = { "bucketed_dv01::OTHER::1y": 2 };
+it("shortens measure values to six significant digits while retaining exact returned values", () => {
+  const measures = { ytm: 0.123456789, dv01: -103.45856181590352 };
   render(
     <MeasuresGrid
       result={{ ...fixture.result, measures }}
+      metadata={metadataFor(measures)}
+    />,
+  );
+  const ytm = screen.getByText("Yield to maturity").closest("tr")!;
+  const value = within(ytm).getByTitle("0.123456789");
+  expect(value.querySelector(".print\\:hidden")?.textContent).toBe("0.123457");
+  expect(value.getAttribute("aria-label")).toContain("exact value 0.123456789");
+  expect(
+    within(screen.getByText("DV01").closest("tr")!)
+      .getByTitle("-103.45856181590352")
+      .querySelector(".print\\:hidden")?.textContent,
+  ).toBe("-103.459");
+
+  const exact = screen.getByRole("button", { name: "Exact values" });
+  expect(exact.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(exact);
+  expect(exact.getAttribute("aria-pressed")).toBe("true");
+  expect(within(ytm).getByTitle("0.123456789").textContent).toContain(
+    "0.123456789",
+  );
+});
+
+it("sorts metadata-backed bucket tenors, collapses long groups and reveals exact keys", () => {
+  render(
+    <MeasuresGrid
+      result={fixture.result}
+      metadata={fixture.metadata as MetricMetadata[]}
+    />,
+  );
+  const bucket = screen.getByRole("button", {
+    name: /Bucketed DV01 · USD-OIS/,
+  });
+  const bucketPanel = document.getElementById(
+    bucket.getAttribute("aria-controls")!,
+  );
+  expect(bucket.getAttribute("aria-expanded")).toBe("false");
+  expect(bucketPanel?.classList.contains("hidden")).toBe(true);
+  fireEvent.click(bucket);
+  expect(bucket.getAttribute("aria-expanded")).toBe("true");
+  expect(bucketPanel?.classList.contains("hidden")).toBe(false);
+  const table = screen.getByRole("table", {
+    name: "Sensitivity: Bucketed DV01 · USD-OIS",
+  });
+  expect(
+    within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => row.querySelector("td:first-child span")?.textContent),
+  ).toEqual([
+    "3m",
+    "6m",
+    "1y",
+    "2y",
+    "3y",
+    "5y",
+    "7y",
+    "10y",
+    "15y",
+    "20y",
+    "30y",
+  ]);
+  expect(within(table).getByText("3m").getAttribute("title")).toBe(
+    "bucketed_dv01::USD-OIS::3m",
+  );
+
+  const exactKeys = screen.getByRole("button", { name: "Exact keys" });
+  expect(exactKeys.getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(exactKeys);
+  expect(exactKeys.getAttribute("aria-pressed")).toBe("true");
+  expect(within(table).getByText("bucketed_dv01::USD-OIS::3m")).toBeTruthy();
+  expect(screen.getByText("ytm")).toBeTruthy();
+  expect(screen.queryByText("Yield to maturity")).toBeNull();
+  expect(document.querySelector("[data-bucket-bar]")).toBeNull();
+
+  fireEvent.click(bucket);
+  expect(bucket.getAttribute("aria-expanded")).toBe("false");
+  expect(bucketPanel?.classList.contains("hidden")).toBe(true);
+});
+
+it("filters only supplied zero pairs and preserves rows with a missing comparison value", () => {
+  const primaryMeasures = { ytm: 0, dv01: 0 };
+  const comparisonMeasures = { ytm: 0, other: 0 };
+  render(
+    <MeasuresGrid
+      result={{ ...fixture.result, measures: primaryMeasures }}
       compareTo={{
         ...fixture.result,
+        instrument_id: "OTHER",
         measures: comparisonMeasures,
       }}
-      metadata={metadataFor(measures)}
+      metadata={metadataFor(primaryMeasures)}
       comparisonMetadata={metadataFor(comparisonMeasures)}
     />,
   );
-  for (const [key, value] of Object.entries(measures)) {
-    expect(
-      bucketCell(key)
-        .querySelector(":scope > span[title]")
-        ?.getAttribute("title"),
-    ).toBe(String(value));
-  }
-  expect(bucketFill("bucketed_dv01::USD_x3a_x3aOIS::5y")?.style.cssText).toBe(
-    "left: 0%; width: 50%;",
-  );
-  expect(bucketFill("bucketed_dv01::USD_x3a_x3aOIS::2y")?.style.cssText).toBe(
-    "left: 50%; width: 25%;",
-  );
-  expect(
-    bucketCell("bucketed_dv01::USD_x3a_x3aOIS::zero")
-      .querySelector("[data-bucket-bar]")
-      ?.getAttribute("aria-hidden"),
-  ).toBe("true");
-  expect(bucketFill("bucketed_dv01::USD_x3a_x3aOIS::zero")).toBeNull();
-  expect(
-    bucketFill("bucketed_cs01::ACME::4y@2028-01-05@quote-1")?.style.width,
-  ).toBe("50%");
-  for (const key of Object.keys(measures).slice(4))
-    expect(bucketCell(key).querySelector("[data-bucket-bar]")).toBeNull();
-  expect(bucketCell("bucketed_dv01::OTHER::1y").textContent).toBe(
-    "—Unit unavailable",
-  );
-  expect(
-    bucketCell("bucketed_dv01::OTHER::1y").querySelector("[data-bucket-bar]"),
-  ).toBeNull();
-});
-it("scales each risk family, exact identifier, valuation and currency independently", () => {
-  const measures = {
-    "bucketed_dv01::A::1y": -100,
-    "bucketed_dv01::A::2y": 50,
-    "bucketed_dv01::A_x3aB::1y": -1,
-    "bucketed_dv01::A_x5fx3aB::1y": 1000,
-    "bucketed_cs01::A::1y": -2,
-    "bucketed_cs01::A::2y": 1,
-  };
-  const comparisonMeasures = {
-    "bucketed_dv01::A::1y": -1,
-    "bucketed_dv01::A::2y": 2,
-  };
-  render(
-    <MeasuresGrid
-      result={{ ...fixture.result, measures }}
-      compareTo={{
-        ...fixture.result,
-        value: { amount: "1", currency: "EUR" },
-        measures: comparisonMeasures,
-      }}
-      metadata={metadataFor(measures)}
-      comparisonMetadata={metadataFor(comparisonMeasures)}
-    />,
-  );
-  for (const key of [
-    "bucketed_dv01::A::1y",
-    "bucketed_dv01::A_x3aB::1y",
-    "bucketed_dv01::A_x5fx3aB::1y",
-    "bucketed_cs01::A::1y",
-  ])
-    expect(bucketFill(key)?.style.width).toBe("50%");
-  expect(bucketFill("bucketed_cs01::A::2y")?.style.width).toBe("25%");
-  expect(bucketFill("bucketed_dv01::A::1y", 2)?.style.width).toBe("25%");
-  expect(bucketFill("bucketed_dv01::A::2y", 2)?.style.width).toBe("50%");
-  expect(
-    bucketCell("bucketed_cs01::A::1y", 2).querySelector("[data-bucket-bar]"),
-  ).toBeNull();
-  expect(
-    screen.getByRole("region", { name: "Comparison valuation" }).textContent,
-  ).toContain("EUR 1");
-});
-it("separates supplied units and handles zero-only, huge and subnormal values without invalid widths", () => {
-  const measures = {
-    "bucketed_dv01::A::one": 100,
-    "bucketed_dv01::A::two": 50,
-    "bucketed_dv01::A::other-unit": 1,
-    "bucketed_dv01::A::other-source": 2,
-    "bucketed_dv01::A::unknown-unit": 0.01,
-    "bucketed_cs01::huge::one": -Number.MAX_VALUE,
-    "bucketed_cs01::huge::two": Number.MAX_VALUE / 2,
-    "bucketed_cs01::tiny::one": Number.MIN_VALUE,
-    "bucketed_cs01::zero::one": 0,
-    "bucketed_cs01::zero::two": -0,
-  };
-  render(
-    <MeasuresGrid
-      result={{ ...fixture.result, measures }}
-      metadata={metadataFor(measures)}
-      units={{
-        "bucketed_dv01::A::one": { label: "USD/bp", source: "native-one" },
-        "bucketed_dv01::A::two": { label: "USD/bp", source: "native-one" },
-        "bucketed_dv01::A::other-unit": {
-          label: "EUR/bp",
-          source: "native-one",
-        },
-        "bucketed_dv01::A::other-source": {
-          label: "USD/bp",
-          source: "native-other",
-        },
-      }}
-    />,
-  );
-  expect(bucketFill("bucketed_dv01::A::two")?.style.width).toBe("25%");
-  for (const key of [
-    "bucketed_dv01::A::one",
-    "bucketed_dv01::A::other-unit",
-    "bucketed_dv01::A::other-source",
-    "bucketed_dv01::A::unknown-unit",
-    "bucketed_cs01::huge::one",
-    "bucketed_cs01::tiny::one",
-  ])
-    expect(bucketFill(key)?.style.width).toBe("50%");
-  expect(bucketFill("bucketed_cs01::huge::two")?.style.width).toBe("25%");
-  for (const key of ["bucketed_cs01::zero::one", "bucketed_cs01::zero::two"]) {
-    expect(bucketCell(key).querySelector("[data-bucket-bar]")).toBeTruthy();
-    expect(bucketFill(key)).toBeNull();
-  }
-  expect(
-    document.querySelector('[style*="NaN"], [style*="Infinity"]'),
-  ).toBeNull();
+  const showAll = screen.getByRole("button", { name: "Show all" });
+  const nonzero = screen.getByRole("button", { name: "Nonzero only" });
+  expect(showAll.getAttribute("aria-pressed")).toBe("true");
+  expect(nonzero.getAttribute("aria-pressed")).toBe("false");
+  expect(screen.getByText("Yield to maturity")).toBeTruthy();
+
+  fireEvent.click(nonzero);
+  expect(nonzero.getAttribute("aria-pressed")).toBe("true");
+  expect(showAll.getAttribute("aria-pressed")).toBe("false");
+  expect(screen.queryByText("Yield to maturity")).toBeNull();
+  const dv01 = screen.getByText("DV01").closest("tr")!;
+  expect(within(dv01).getAllByRole("cell")[2].textContent).toBe("—");
+  const other = screen.getByText("other").closest("tr")!;
+  expect(within(other).getAllByRole("cell")[1].textContent).toBe("—");
+  expect(other.textContent).toContain("0");
+
+  fireEvent.click(showAll);
+  expect(showAll.getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByText("Yield to maturity")).toBeTruthy();
 });

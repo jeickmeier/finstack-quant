@@ -19,6 +19,7 @@ function App() {
       "bucketed_cs01::SYNTHETIC-OTHER::1y": 10,
       "bucketed_dv01::USD-OIS::30y": 2,
       "bucketed_dv01::USD-OIS::10y": -1,
+      "bucketed_dv01::USD-OIS::15y": 0,
     },
     meta: {
       numeric_mode: "f64",
@@ -28,22 +29,44 @@ function App() {
     },
   };
   return (
-    <main className="mx-auto max-w-6xl space-y-3 p-4">
-      <h1>Supplied valuation results</h1>
-      <p>Comparison bucket values are synthetic display examples.</p>
-      <button
-        onClick={() =>
-          setDensity(density === "compact" ? "comfortable" : "compact")
-        }
+    <main className="mx-auto max-w-6xl space-y-4 p-4">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold">Valuation results</h1>
+        <p className="text-sm text-muted-foreground">
+          Supplied results with synthetic comparison bucket values.
+        </p>
+      </header>
+      <div
+        role="group"
+        aria-label="Table density"
+        className="flex items-center gap-1"
       >
-        Toggle density
-      </button>
+        <span className="mr-2 text-xs font-medium text-muted-foreground">
+          Density
+        </span>
+        {(["compact", "comfortable"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={density === option}
+            onClick={() => setDensity(option)}
+            className="min-h-8 rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-accent"
+          >
+            {option === "compact" ? "Compact" : "Comfortable"}
+          </button>
+        ))}
+      </div>
       <MeasuresGrid
         result={fixture.result}
         compareTo={comparison}
         comparisonFormattedValue="EUR 987,654.32"
         metadata={fixture.metadata as MetricMetadata[]}
-        comparisonMetadata={fixture.comparisonMetadata as MetricMetadata[]}
+        comparisonMetadata={[
+          ...(fixture.comparisonMetadata as MetricMetadata[]),
+          ...(fixture.metadata as MetricMetadata[]).filter(
+            (entry) => entry.key === "bucketed_dv01::USD-OIS::15y",
+          ),
+        ]}
         density={density}
       />
     </main>

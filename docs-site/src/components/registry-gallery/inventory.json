@@ -158,7 +158,7 @@
     {
       "name": "measures-grid",
       "type": "registry:component",
-      "docs": "Displays supplied valuation context and raw measures with decorative signed bars for qualified bucketed DV01/CS01 rows. Each metric family, identifier, supplied unit and valuation uses an independent visual scale. Comparisons retain independent currencies and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available."
+      "docs": "Displays supplied valuation context and measures. Native metric metadata provides readable labels and grouped, maturity-sorted bucket tenors; Exact keys reveals fully qualified keys. Values default to six significant digits, with Exact values and value titles retaining supplied precision. The nonzero view hides zero rows only when both sides are supplied and zero in a comparison; Show all reveals every row, and missing values remain distinct. Comparisons retain independent currencies, dates and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available."
     },
     {
       "name": "instrument-form",
