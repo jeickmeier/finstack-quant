@@ -6,7 +6,8 @@ import {
 } from "@/hooks/use-fx-delta-samples/use-fx-delta-samples";
 import { FxDeltaQuotes } from "../fx-delta-quotes/fx-delta-quotes";
 import {
-  SurfaceView,
+  EvaluatedSurfaceStatus,
+  evaluatedSurfaceNodes,
   type SurfaceViewProps,
 } from "../vol-surface-chart/surface-view";
 import type { SurfacePoint } from "../vol-surface-chart/stored";
@@ -39,21 +40,19 @@ export function FxSurfaceChart(props: FxSurfaceChartProps) {
     };
   }, [props.surface, props.coordinates]);
   const query = useFxDeltaSamples(request);
-  const nodes = useMemo<FxSamplePoint[]>(
+  const nodes = useMemo(
     () =>
-      request && query.data
-        ? request.coordinates.map((coordinate, i) => ({
-            coordinate,
-            expiry: coordinate.expiry,
-            secondary: coordinate.strike,
-            value: query.data![i]!,
-            key: JSON.stringify([
-              props.surface.id,
-              coordinate.expiry,
-              coordinate.strike,
-            ]),
-          }))
-        : [],
+      evaluatedSurfaceNodes(request, query.data, (coordinate, value) => ({
+        coordinate,
+        expiry: coordinate.expiry,
+        secondary: coordinate.strike,
+        value,
+        key: JSON.stringify([
+          props.surface.id,
+          coordinate.expiry,
+          coordinate.strike,
+        ]),
+      })),
     [request, query.data, props.surface.id],
   );
   return (
@@ -62,30 +61,29 @@ export function FxSurfaceChart(props: FxSurfaceChartProps) {
       className="space-y-4"
     >
       <FxDeltaQuotes surface={props.surface} />
-      {!request ? (
-        <p>
-          Supply an explicit forward for every expiry/strike coordinate to
-          evaluate volatility.
-        </p>
-      ) : query.error ? (
-        <p role="alert">{query.error.message}</p>
-      ) : query.data ? (
-        <SurfaceView
-          {...props}
-          id={props.surface.id}
-          mode="evaluated"
-          nodes={nodes}
-          revision={JSON.stringify(request)}
-          labels={{
-            expiry: "Expiry (years)",
-            secondary: "Strike (quote currency)",
-            value: "Evaluated Black/lognormal volatility (annualized decimal)",
-          }}
-          description="Native FX delta-surface evaluation at the supplied coordinates and explicit quote/base forwards. These values are evaluated samples, not stored quote nodes."
-        />
-      ) : (
-        <p role="status">Evaluating FX volatility…</p>
-      )}
+      <EvaluatedSurfaceStatus
+        {...props}
+        request={request}
+        error={query.error}
+        data={query.data}
+        missing={
+          <p>
+            Supply an explicit forward for every expiry/strike coordinate to
+            evaluate volatility.
+          </p>
+        }
+        pending="Evaluating FX volatility…"
+        id={props.surface.id}
+        mode="evaluated"
+        nodes={nodes}
+        revision={JSON.stringify(request)}
+        labels={{
+          expiry: "Expiry (years)",
+          secondary: "Strike (quote currency)",
+          value: "Evaluated Black/lognormal volatility (annualized decimal)",
+        }}
+        description="Native FX delta-surface evaluation at the supplied coordinates and explicit quote/base forwards. These values are evaluated samples, not stored quote nodes."
+      />
     </section>
   );
 }

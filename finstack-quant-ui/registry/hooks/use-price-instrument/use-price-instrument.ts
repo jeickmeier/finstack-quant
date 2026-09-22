@@ -1,6 +1,9 @@
 "use client";
-import { queryOptions } from "@tanstack/react-query";
-import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
+import {
+  useWorkerQuery,
+  workerQueryOptions,
+  workerQueryPolicy,
+} from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
 import type {
   MoneyFormatRequest,
@@ -20,14 +23,12 @@ export function priceOptions(
         ? request.metrics
         : Object.freeze([...request.metrics]),
   });
-  return queryOptions({
+  return workerQueryOptions({
+    client,
     queryKey: ["finstack", session, "price", snapshot] as const,
-    queryFn: () => {
-      if (!client) throw new Error("Worker is not ready");
-      return client.call("price", snapshot);
-    },
-    enabled: client !== null,
-    ...workerQueryPolicy,
+    ready: true,
+    missing: "Worker is not ready",
+    queryFn: (ready) => ready.call("price", snapshot),
   });
 }
 /** Immutable pricing query. Supply the entire request and a Finstack/Query provider boundary. */

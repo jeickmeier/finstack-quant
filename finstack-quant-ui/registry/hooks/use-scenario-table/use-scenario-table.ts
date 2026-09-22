@@ -1,6 +1,5 @@
 "use client";
-import { queryOptions } from "@tanstack/react-query";
-import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
+import { useWorkerQuery, workerQueryOptions } from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
 import type { ScenarioRequest } from "../../workers/finstack-contract";
 export type { ScenarioRequest } from "../../workers/finstack-contract";
@@ -11,17 +10,13 @@ export function scenarioOptions(
   request: ScenarioRequest | null,
 ) {
   const snapshot = request === null ? null : { ...request };
-  return queryOptions({
+  return workerQueryOptions({
+    client,
     queryKey: ["finstack", session, "scenarioTable", snapshot] as const,
-    queryFn: () => {
-      if (!client || !snapshot)
-        throw new Error(
-          "Scenario calculation requires an explicit request and ready worker",
-        );
-      return client.call("scenarioTable", snapshot);
-    },
-    enabled: client !== null && snapshot !== null,
-    ...workerQueryPolicy,
+    ready: snapshot !== null,
+    missing:
+      "Scenario calculation requires an explicit request and ready worker",
+    queryFn: (ready) => ready.call("scenarioTable", snapshot!),
   });
 }
 /** Exact native scenario table or structured failure. */

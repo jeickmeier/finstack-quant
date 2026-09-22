@@ -16,12 +16,12 @@ import { createChartRuntime } from "@tanstack/charts";
 import type { TrancheScenarioCell } from "finstack-quant-wasm";
 import {
   ScenarioHeatmap,
+  ScenarioHeatmapPanel,
   scenarioCells,
   scenarioPreset,
   scenarioKey,
   scenarioPriceLabel,
 } from "../registry/components/scenario-heatmap/scenario-heatmap";
-import { ScenarioHeatmapExample } from "../registry/components/scenario-heatmap/example";
 import { composeFigure } from "../registry/primitives/finstack-chart/figure";
 import tokens from "../registry/theme/finstack-theme/tokens.json";
 import { serializeHost } from "../src/codec.mjs";
@@ -202,9 +202,9 @@ it("selects exact supplied severity and preserves complete native JSON without o
     scenarioKey("other", table.cells[0]!),
   );
 });
-it("runs the independent example with no worker and handles an empty result", () => {
+it("runs the independent panel with no worker and handles an empty result", () => {
   const { rerender } = render(
-    <ScenarioHeatmapExample
+    <ScenarioHeatmapPanel
       table={fixture.cases[0]!.table}
       priceDomain={[80, 140]}
     />,
@@ -217,7 +217,7 @@ it("runs the independent example with no worker and handles an empty result", ()
     ),
   ).toBeTruthy();
   rerender(
-    <ScenarioHeatmapExample
+    <ScenarioHeatmapPanel
       key="empty"
       table={{ tranche_id: "empty", cells: [] }}
       priceDomain={[80, 140]}

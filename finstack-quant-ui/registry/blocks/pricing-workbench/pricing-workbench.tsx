@@ -57,6 +57,7 @@ import {
   type PriceRequest,
 } from "@/hooks/use-price-instrument/use-price-instrument";
 import { returnedRounding } from "@/components/finstack/primitives/stamp-badge/stamp-badge";
+import { resolveModel } from "@/workers/finstack-contract";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 /** Embed inside FinstackQueryProvider, or an existing QueryClientProvider + FinstackProvider. The host owns the route. */
 export function PricingWorkbench({
@@ -165,7 +166,7 @@ export function PricingWorkbench({
       instrumentJson: cashflowRequest.instrumentJson,
       marketJson: cashflowRequest.marketJson,
       asOf: cashflowRequest.asOf,
-      model: cashflowRequest.model ?? "default",
+      model: resolveModel(cashflowRequest.model),
     },
     shown !== null,
   );
@@ -615,7 +616,7 @@ export function PricingWorkbench({
               <div className="finstack-workbench__summary-body">
                 <MeasuresGrid
                   result={shown?.result}
-                  model={shown ? (shown.request.model ?? "default") : undefined}
+                  model={shown ? resolveModel(shown.request.model) : undefined}
                   formattedValue={moneyFormat.data}
                   metadata={measureMetadata.data}
                   density={currentDensity}
@@ -767,7 +768,7 @@ export function PricingWorkbench({
             <span>
               model{" "}
               <span className="font-mono">
-                {shown?.request.model ?? params.model ?? "default"}
+                {resolveModel(shown?.request.model ?? params.model)}
               </span>
             </span>
             {typeof meta?.numeric_mode === "string" && (

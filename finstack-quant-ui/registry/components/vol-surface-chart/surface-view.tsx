@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { useMemo, type Ref } from "react";
+import { useMemo, type ReactNode, type Ref } from "react";
 import {
   defineChart,
   dot,
@@ -48,6 +48,36 @@ export interface SurfaceViewProps<T extends SurfacePoint>
   colorDomain: readonly [number, number];
   annotations?: readonly ChartMark<T, ChartKey, ChartKey>[];
   figureRefs?: Partial<Record<"heatmap" | "row" | "column", Ref<FigureHandle>>>;
+}
+/** Map native samples onto surface points; empty until both request and values exist. */
+export function evaluatedSurfaceNodes<C, T extends SurfacePoint>(
+  request: { coordinates: readonly C[] } | null,
+  values: readonly number[] | undefined,
+  point: (coordinate: C, value: number) => T,
+): T[] {
+  return request && values
+    ? request.coordinates.map((coordinate, i) => point(coordinate, values[i]!))
+    : [];
+}
+/** Missing input, native error, evaluated chart, or pending sample. */
+export function EvaluatedSurfaceStatus<T extends SurfacePoint>({
+  request,
+  error,
+  data,
+  missing,
+  pending,
+  ...view
+}: SurfaceViewProps<T> & {
+  request: unknown;
+  error: { message: string } | null;
+  data: unknown;
+  missing: ReactNode;
+  pending: string;
+}) {
+  if (!request) return missing;
+  if (error) return <p role="alert">{error.message}</p>;
+  if (data) return <SurfaceView {...view} />;
+  return <p role="status">{pending}</p>;
 }
 /** Stored nodes, table and slices sharing one accepted selection and native chart primitives. */
 export function SurfaceView<T extends SurfacePoint>(

@@ -1,6 +1,5 @@
 "use client";
-import { queryOptions } from "@tanstack/react-query";
-import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
+import { useWorkerQuery, workerQueryOptions } from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
 import type { CashflowRequest } from "../../workers/finstack-contract";
 export type { CashflowRequest } from "../../workers/finstack-contract";
@@ -11,14 +10,12 @@ export function cashflowOptions(
   request: CashflowRequest,
 ) {
   const snapshot = Object.freeze({ ...request });
-  return queryOptions({
+  return workerQueryOptions({
+    client,
     queryKey: ["finstack", session, "cashflows", snapshot] as const,
-    queryFn: () => {
-      if (!client) throw new Error("Worker is not ready");
-      return client.call("cashflows", snapshot);
-    },
-    enabled: client !== null,
-    ...workerQueryPolicy,
+    ready: true,
+    missing: "Worker is not ready",
+    queryFn: (ready) => ready.call("cashflows", snapshot),
   });
 }
 /** Original native JSON text or actual native error; supply a Finstack/Query provider. */

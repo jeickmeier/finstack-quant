@@ -3,7 +3,7 @@ import {
   useScenarioTable,
   type ScenarioRequest,
 } from "@/hooks/use-scenario-table/use-scenario-table";
-import { ScenarioHeatmapExample } from "@/components/finstack/components/scenario-heatmap/example";
+import { ScenarioHeatmapPanel } from "@/components/finstack/components/scenario-heatmap/scenario-heatmap";
 /** A detail panel delegates all calculation and rendering to their component owners. */
 export function ScenarioPanel({
   request,
@@ -16,7 +16,7 @@ export function ScenarioPanel({
   return query.error ? (
     <p role="alert">{query.error.message}</p>
   ) : query.data ? (
-    <ScenarioHeatmapExample
+    <ScenarioHeatmapPanel
       key={JSON.stringify(request)}
       table={query.data}
       priceDomain={priceDomain}

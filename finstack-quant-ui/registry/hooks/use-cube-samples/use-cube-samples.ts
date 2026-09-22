@@ -1,7 +1,6 @@
 "use client";
 import { requestSnapshot } from "../use-finstack/snapshot";
-import { queryOptions } from "@tanstack/react-query";
-import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
+import { useWorkerQuery, workerQueryOptions } from "../use-finstack/query";
 import type { FinstackClient } from "../use-finstack/client";
 import type { CubeSampleRequest } from "../../workers/finstack-contract";
 export type { CubeSampleRequest } from "../../workers/finstack-contract";
@@ -12,17 +11,13 @@ export function cubeOptions(
   request: CubeSampleRequest | null,
 ) {
   const { snapshot, key } = requestSnapshot(request);
-  return queryOptions({
+  return workerQueryOptions({
+    client,
     queryKey: ["finstack", session, "sampleCube", key] as const,
-    queryFn: () => {
-      if (!client || !snapshot)
-        throw new Error(
-          "Cube sampling requires a ready worker and explicit coordinates/convention",
-        );
-      return client.call("sampleCube", snapshot);
-    },
-    enabled: client !== null && snapshot !== null,
-    ...workerQueryPolicy,
+    ready: snapshot !== null,
+    missing:
+      "Cube sampling requires a ready worker and explicit coordinates/convention",
+    queryFn: (ready) => ready.call("sampleCube", snapshot!),
   });
 }
 /** Native volatilities in the selected convention and coordinate order; errors are unchanged. */

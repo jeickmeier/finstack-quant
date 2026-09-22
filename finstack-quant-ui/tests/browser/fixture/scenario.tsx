@@ -2,9 +2,9 @@ import { useState, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ScenarioHeatmap,
+  ScenarioHeatmapPanel,
   scenarioKey,
 } from "./components/finstack/components/scenario-heatmap/scenario-heatmap";
-import { ScenarioHeatmapExample } from "./components/finstack/components/scenario-heatmap/example";
 import { useLinkedSelection } from "./hooks/use-linked-selection/use-linked-selection";
 import type { FigureHandle } from "./components/finstack/primitives/finstack-chart/finstack-chart";
 import fixture from "./fixture.json";
@@ -44,7 +44,7 @@ function App() {
         Toggle standalone example
       </button>
       {example ? (
-        <ScenarioHeatmapExample table={table} priceDomain={[80, 140]} />
+        <ScenarioHeatmapPanel table={table} priceDomain={[80, 140]} />
       ) : (
         <ScenarioHeatmap
           table={table}

@@ -349,11 +349,11 @@ npx shadcn@4.21.0 add @finstack/scenario-heatmap
 ```
 
 ```tsx
-import { ScenarioHeatmapExample } from "@/components/finstack/components/scenario-heatmap/example";
+import { ScenarioHeatmapPanel } from "@/components/finstack/components/scenario-heatmap/scenario-heatmap";
 
 // table is the unchanged result of structuredCreditTrancheScenarioTable.
 // Choose an explicit display extent containing every supplied price and par 100.
-<ScenarioHeatmapExample table={table} priceDomain={[80, 140]} />;
+<ScenarioHeatmapPanel table={table} priceDomain={[80, 140]} />;
 ```
 
 `ScenarioHeatmap` accepts controlled `severity` and `onSeverityChange`, optional
@@ -363,7 +363,7 @@ remain their returned decimal values. Color is the returned clean settlement
 price as a percentage of **current tranche balance**, with 100 as par. The Rust
 `ScenarioCell.price` contract owns this wording; the facade's original-balance
 comment remains an upstream documentation exclusion. No rebasing, normalization
-or WAL/writedown overlay is performed. Neither the component nor its example
+or WAL/writedown overlay is performed. Neither the component nor its panel
 requires a worker or workbench block. Native fixture provenance, including a
 factor-adjusted tranche, is in [PR-034 evidence](evidence/pr-034.md).
 

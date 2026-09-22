@@ -36,6 +36,10 @@ export interface CashflowRequest {
   readonly asOf: string;
   readonly model: string;
 }
+/** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
+export function resolveModel(model?: string | null): string {
+  return model ?? "default";
+}
 export interface FxDeltaSampleRequest {
   readonly surface: MarketContextStateWire["fx_delta_vol_surfaces"][number];
   /** Explicit years, strike and quote/base forward per sample, in original order. */

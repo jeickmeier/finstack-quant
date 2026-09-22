@@ -8,7 +8,12 @@ import type {
 import { exportValuation } from "@/lib/finstack/host";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { formatMoney } from "@/lib/finstack/format/format";
-import { errorValue, type Envelope, type WorkerApi } from "./finstack-contract";
+import {
+  errorValue,
+  resolveModel,
+  type Envelope,
+  type WorkerApi,
+} from "./finstack-contract";
 /** Dependencies are the published facade; injection permits the same service in a real Node worker. */
 export function createService(native: {
   initialize: (wasmUrl?: string) => Promise<unknown>;
@@ -88,8 +93,8 @@ export function createService(native: {
           instrument,
           market(request.marketJson).handle,
           request.asOf,
-          // pricing.rs price_instrument uses exactly this default for an absent model.
-          request.model ?? "default",
+          // Omitted models resolve centrally; pricing.rs price_instrument uses "default".
+          resolveModel(request.model),
           request.metrics == null ? request.metrics : [...request.metrics],
           undefined,
           request.marketHistory,
@@ -177,7 +182,7 @@ export function createService(native: {
           instrument,
           market(request.marketJson).handle,
           request.asOf,
-          request.model,
+          resolveModel(request.model),
         );
       });
     },

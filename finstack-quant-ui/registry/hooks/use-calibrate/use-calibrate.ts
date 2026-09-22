@@ -1,7 +1,6 @@
 "use client";
 import { useNativeValidator } from "../use-finstack/validation";
-import { queryOptions } from "@tanstack/react-query";
-import { useWorkerQuery, workerQueryPolicy } from "../use-finstack/query";
+import { useWorkerQuery, workerQueryOptions } from "../use-finstack/query";
 import type { WorkerApi } from "../../workers/finstack-contract";
 import type { FinstackClient } from "../use-finstack/client";
 /** Immutable complete JSON identity: quote data, prior markets and every setting remain in the key. */
@@ -11,20 +10,13 @@ export function calibrationOptions<K extends "calibrate" | "dryRun">(
   operation: K,
   envelopeJson: string | null,
 ) {
-  return queryOptions({
+  return workerQueryOptions({
+    client,
     queryKey: ["finstack", session, operation, envelopeJson] as const,
-    queryFn: () => {
-      if (!client || envelopeJson === null)
-        throw new Error(
-          "Calibration requires a ready worker and an explicit envelope",
-        );
-      return client.call(
-        operation,
-        ...([envelopeJson] as Parameters<WorkerApi[K]>),
-      );
-    },
-    enabled: client !== null && envelopeJson !== null,
-    ...workerQueryPolicy,
+    ready: envelopeJson !== null,
+    missing: "Calibration requires a ready worker and an explicit envelope",
+    queryFn: (ready) =>
+      ready.call(operation, ...([envelopeJson] as Parameters<WorkerApi[K]>)),
   });
 }
 /** Pass null until the user requests a solve; returns the unchanged native result or structured failure. */

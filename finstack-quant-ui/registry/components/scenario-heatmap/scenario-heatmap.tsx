@@ -1,9 +1,12 @@
 "use client";
-import { useMemo, type Ref } from "react";
+import { useMemo, useState, type Ref } from "react";
 import type { ScenarioTable, TrancheScenarioCell } from "finstack-quant-wasm";
 import type { ChartKey, ChartMark } from "@tanstack/charts";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
-import type { LinkedSelection } from "@/hooks/use-linked-selection/use-linked-selection";
+import {
+  useLinkedSelection,
+  type LinkedSelection,
+} from "@/hooks/use-linked-selection/use-linked-selection";
 import {
   FinstackChart,
   heatmap,
@@ -172,5 +175,28 @@ export function ScenarioHeatmap(props: ScenarioHeatmapProps) {
         text={serializeHost(table)}
       />
     </section>
+  );
+}
+/** Self-contained supplied-result view with owned severity and selection. Remount when loading a different table. */
+export function ScenarioHeatmapPanel({
+  table,
+  priceDomain,
+}: {
+  table: ScenarioTable;
+  priceDomain: readonly [number, number];
+}) {
+  const [severity, setSeverity] = useState(table.cells[0]?.severity),
+    link = useLinkedSelection();
+  if (severity === undefined) return <p>No returned scenario cells</p>;
+  return (
+    <ScenarioHeatmap
+      table={table}
+      severity={severity}
+      onSeverityChange={setSeverity}
+      priceDomain={priceDomain}
+      link={link}
+      caption="Original native scenario prices"
+      sources={[{ label: "structuredCreditTrancheScenarioTable" }]}
+    />
   );
 }

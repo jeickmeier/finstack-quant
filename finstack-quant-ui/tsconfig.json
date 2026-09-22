@@ -13,6 +13,7 @@
     "paths": {
       "@/lib/finstack/*": ["src/*"],
       "@/hooks/*": ["registry/hooks/*"],
+      "@/workers/*": ["registry/workers/*"],
       "@/components/finstack/*": ["registry/*"],
       "@/lib/finstack/form": ["registry/lib/finstack-form/form.tsx"],
       "@/components/ui/*": ["components/ui/*"]

@@ -770,11 +770,6 @@
           "path": "scenario-heatmap/scenario-heatmap.tsx",
           "type": "registry:component",
           "target": "components/finstack/components/scenario-heatmap/scenario-heatmap.tsx"
-        },
-        {
-          "path": "scenario-heatmap/example.tsx",
-          "type": "registry:component",
-          "target": "components/finstack/components/scenario-heatmap/example.tsx"
         }
       ],
       "registryDependencies": [

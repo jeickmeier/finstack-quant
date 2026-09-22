@@ -7,7 +7,8 @@ import {
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import contracts from "@/lib/finstack/generated/primitive-contracts.json";
 import {
-  SurfaceView,
+  EvaluatedSurfaceStatus,
+  evaluatedSurfaceNodes,
   type SurfaceViewProps,
 } from "../vol-surface-chart/surface-view";
 import type { SurfacePoint } from "../vol-surface-chart/stored";
@@ -62,21 +63,19 @@ export function VolCubeExplorer(props: VolCubeExplorerProps) {
     };
   }, [props.cube, props.coordinates, convention, strike]);
   const query = useCubeSamples(request);
-  const nodes = useMemo<CubePoint[]>(
+  const nodes = useMemo(
     () =>
-      request && query.data
-        ? request.coordinates.map((coordinate, i) => ({
-            coordinate,
-            expiry: coordinate.expiry,
-            secondary: coordinate.tenor,
-            value: query.data![i]!,
-            key: JSON.stringify([
-              props.cube.id,
-              coordinate.expiry,
-              coordinate.tenor,
-            ]),
-          }))
-        : [],
+      evaluatedSurfaceNodes(request, query.data, (coordinate, value) => ({
+        coordinate,
+        expiry: coordinate.expiry,
+        secondary: coordinate.tenor,
+        value,
+        key: JSON.stringify([
+          props.cube.id,
+          coordinate.expiry,
+          coordinate.tenor,
+        ]),
+      })),
     [request, query.data, props.cube.id],
   );
   const raw = useMemo(
@@ -156,28 +155,25 @@ export function VolCubeExplorer(props: VolCubeExplorerProps) {
         label="Complete cube state"
         text={serializeHost(props.cube)}
       />
-      {!request ? (
-        <p>Enter a finite absolute strike to evaluate the cube.</p>
-      ) : query.error ? (
-        <p role="alert">{query.error.message}</p>
-      ) : query.data ? (
-        <SurfaceView
-          {...props}
-          id={props.cube.id}
-          mode="evaluated"
-          nodes={nodes}
-          revision={JSON.stringify(request)}
-          colorDomain={props.colorDomains[convention]}
-          labels={{
-            expiry: "Expiry (years)",
-            secondary: "Tenor (years)",
-            value: valueLabel,
-          }}
-          description={`Native ${valueLabel} at absolute strike ${strike}. Samples use the selected checked evaluator; no coordinate clamping or forward-offset conversion.`}
-        />
-      ) : (
-        <p role="status">Evaluating volatility cube…</p>
-      )}
+      <EvaluatedSurfaceStatus
+        {...props}
+        request={request}
+        error={query.error}
+        data={query.data}
+        missing={<p>Enter a finite absolute strike to evaluate the cube.</p>}
+        pending="Evaluating volatility cube…"
+        id={props.cube.id}
+        mode="evaluated"
+        nodes={nodes}
+        revision={JSON.stringify(request)}
+        colorDomain={props.colorDomains[convention]}
+        labels={{
+          expiry: "Expiry (years)",
+          secondary: "Tenor (years)",
+          value: valueLabel,
+        }}
+        description={`Native ${valueLabel} at absolute strike ${strike}. Samples use the selected checked evaluator; no coordinate clamping or forward-offset conversion.`}
+      />
     </section>
   );
 }

@@ -18,6 +18,9 @@ export default defineConfig({
         new URL("./registry", import.meta.url),
       ),
       "@/hooks": fileURLToPath(new URL("./registry/hooks", import.meta.url)),
+      "@/workers": fileURLToPath(
+        new URL("./registry/workers", import.meta.url),
+      ),
       "@/lib/finstack": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },

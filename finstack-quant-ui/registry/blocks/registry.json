@@ -49,7 +49,8 @@
         "select",
         "tabs",
         "textarea",
-        "@finstack/use-cashflows"
+        "@finstack/use-cashflows",
+        "@finstack/finstack-worker"
       ],
       "dependencies": ["@base-ui/react@1.8.0", "finstack-quant-wasm@0.8.0"],
       "categories": ["Blocks"],
