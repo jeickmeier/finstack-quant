@@ -1,9 +1,10 @@
 "use client";
-import { useContext, useState, useRef } from "react";
+import { useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@tanstack/react-form";
 import { Fieldset } from "@/lib/finstack/form";
 import { EnumField } from "../../primitives/enum-field/enum-field";
+import { DISCLOSURE_ORDER, pinnedTerm, termDisclosure } from "./disclosure";
 import { FieldRendererContext } from "./field-renderer";
 import { discriminator } from "./discriminator";
 import {
@@ -18,6 +19,54 @@ import {
 } from "./schema";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
 import { nullableFieldChrome, optionalFieldChrome } from "./field-chrome";
+
+function TermDisclosure({
+  label,
+  count,
+  forceOpen,
+  children,
+}: {
+  label: string;
+  count: number;
+  forceOpen: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const focusedError = useRef(false);
+  useEffect(() => {
+    if (!forceOpen) {
+      focusedError.current = false;
+      return;
+    }
+    if (focusedError.current) return;
+    focusedError.current = true;
+    detailsRef.current
+      ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+      ?.focus();
+  }, [forceOpen]);
+  return (
+    <details
+      ref={detailsRef}
+      className="finstack-term-disclosure"
+      open={open || forceOpen}
+      onBeforeToggle={(event) => {
+        if (forceOpen && event.newState === "closed") event.preventDefault();
+      }}
+      onToggle={(event) => {
+        if (forceOpen && !event.currentTarget.open) {
+          event.currentTarget.open = true;
+          return;
+        }
+        const next = event.currentTarget.open;
+        setOpen((current) => (current === next ? current : next));
+      }}
+    >
+      <summary>{`${label} (${count})`}</summary>
+      {children}
+    </details>
+  );
+}
 
 /** Shared renderer over generated structure; the module codec owns validation. */
 export function RenderField({
@@ -45,9 +94,13 @@ export function RenderField({
   skipOverride?: boolean;
   sectionless?: boolean;
 }) {
-  const [more, setMore] = useState(false);
-  const visibleTerms = useRef(new Map<string, Set<string>>());
+  const placement = useRef(new Map<string, Map<string, string | null>>());
   const fieldMeta = useStore(form.store, (state) => state.fieldMeta);
+  const instrumentType = useStore(form.store, (state) => {
+    const instrument = (state.values as { instrument?: { type?: unknown } })
+      .instrument;
+    return typeof instrument?.type === "string" ? instrument.type : undefined;
+  });
   const render = useContext(FieldRendererContext);
   const within = (child: string, parent: string) =>
     child === parent ||
@@ -249,18 +302,8 @@ export function RenderField({
       (Array.isArray(entry)
         ? entry.length === 0
         : typeof entry === "object" && Object.values(entry).every(empty));
-    const secondaryTerm = ([key, node]: (typeof properties)[number]) => {
-      const fieldPath = path ? `${path}.${key}` : key;
-      if (
-        Object.entries(fieldMeta).some(
-          ([name, meta]) =>
-            within(name, fieldPath) && Boolean(meta?.errors.length),
-        )
-      )
-        return false;
+    const valueIsSecondary = ([key, node]: (typeof properties)[number]) => {
       const current = objectValue(value)[key];
-      // Keep supplied non-default values and invalid fields visible. Empty
-      // optional objects and nullable branches remain under More terms.
       if (
         Object.hasOwn(node, "default") &&
         (Object.is(current, node.default) ||
@@ -281,17 +324,42 @@ export function RenderField({
         (current != null && typeof current === "object")
       );
     };
-    // Once a term is visible through a supplied value, edit or error, keep it
-    // available for this editor session. Matching a default must not hide the
-    // control beneath the user's cursor. Each schema branch owns its own set.
-    let visible = visibleTerms.current.get(pointer);
-    if (!visible) {
-      visible = new Set<string>();
-      visibleTerms.current.set(pointer, visible);
+    const atInstrument =
+      path === "instrument.spec" || path.startsWith("instrument.spec.");
+    const siblingKeys = properties.map(([key]) => key);
+    let placed = placement.current.get(pointer);
+    if (!placed) {
+      placed = new Map();
+      placement.current.set(pointer, placed);
     }
-    for (const entry of properties)
-      if (!secondaryTerm(entry)) visible.add(entry[0]);
-    const secondary = properties.filter(([key]) => !visible.has(key));
+    for (const entry of properties) {
+      if (placed.has(entry[0])) continue;
+      const named =
+        layout === "basic" && atInstrument
+          ? termDisclosure(entry[0], {
+              atSpec: path === "instrument.spec",
+              instrumentType,
+              siblingKeys,
+            })
+          : null;
+      const pinned = layout === "basic" && atInstrument && pinnedTerm(entry[0]);
+      placed.set(
+        entry[0],
+        pinned
+          ? null
+          : (named ??
+              (layout === "basic" && valueIsSecondary(entry)
+                ? "Less common terms"
+                : null)),
+      );
+    }
+    const fieldHasError = (key: string) => {
+      const fieldPath = path ? `${path}.${key}` : key;
+      return Object.entries(fieldMeta).some(
+        ([name, meta]) =>
+          within(name, fieldPath) && Boolean(meta?.errors.length),
+      );
+    };
     const render = ([key, node]: (typeof properties)[number]) => (
       <RenderField
         key={key}
@@ -310,25 +378,36 @@ export function RenderField({
     );
     if (!path || (path === "instrument" && schema.properties?.spec))
       return <div className="min-w-0">{properties.map(render)}</div>;
+    const primary = properties.filter(([key]) => placed.get(key) == null);
+    const buckets = new Map<string, (typeof properties)[number][]>();
+    for (const entry of properties) {
+      const group = placed.get(entry[0]);
+      if (!group) continue;
+      const list = buckets.get(group) ?? [];
+      list.push(entry);
+      buckets.set(group, list);
+    }
+    const known = new Set<string>(DISCLOSURE_ORDER);
+    const groupNames = [
+      ...DISCLOSURE_ORDER.filter((name) => buckets.has(name)),
+      ...[...buckets.keys()].filter((name) => !known.has(name)),
+    ];
     const contents = (
       <>
-        <div className="finstack-term-fields">
-          {properties
-            .filter(([key]) => layout === "full" || more || visible.has(key))
-            .map(render)}
-        </div>
-        {layout === "basic" && secondary.length > 0 && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-expanded={more}
-            onClick={() => setMore(!more)}
-          >
-            {more ? "Fewer" : "More"} {label.toLowerCase()} fields (
-            {secondary.length})
-          </Button>
-        )}
+        <div className="finstack-term-fields">{primary.map(render)}</div>
+        {groupNames.map((name) => {
+          const entries = buckets.get(name) ?? [];
+          return (
+            <TermDisclosure
+              key={name}
+              label={name}
+              count={entries.length}
+              forceOpen={entries.some(([key]) => fieldHasError(key))}
+            >
+              <div className="finstack-term-fields">{entries.map(render)}</div>
+            </TermDisclosure>
+          );
+        })}
       </>
     );
     if (sectionless) return <div className="min-w-0">{contents}</div>;

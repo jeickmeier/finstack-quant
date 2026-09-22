@@ -10,8 +10,10 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRequire } from "node:module";
+import { termDisclosure } from "@/components/finstack/shared/components/schema-form/disclosure";
 import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
 import * as bond from "../../src/generated/instrument/bond";
+import * as equityOption from "../../src/generated/instrument/equity_option";
 import { createWireCodec } from "../../src/codec.mjs";
 import { discriminator } from "@/components/finstack/shared/components/schema-form/discriminator";
 import {
@@ -27,19 +29,65 @@ const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 ) as { validateInstrumentJson(json: string): string };
 const validate = async (json: string) => native.validateInstrumentJson(json);
+function summaries(name: RegExp) {
+  return [...document.querySelectorAll("summary")].filter((node) =>
+    name.test(node.textContent ?? ""),
+  );
+}
+it("keeps common bond terms on the sheet and conventions in collapsed disclosures", () => {
+  expect(termDisclosure("day_count", { atSpec: true, siblingKeys: [] })).toBe(
+    "Schedule conventions",
+  );
+  expect(
+    termDisclosure("discount_curve_id", { atSpec: true, siblingKeys: [] }),
+  ).toBe("Market links");
+  expect(
+    termDisclosure("spot_id", {
+      atSpec: true,
+      siblingKeys: ["underlying_ticker"],
+    }),
+  ).toBe("Market links");
+  expect(
+    termDisclosure("spot_id", { atSpec: true, siblingKeys: [] }),
+  ).toBeNull();
+  expect(
+    termDisclosure("pool", {
+      atSpec: true,
+      instrumentType: "structured_credit",
+      siblingKeys: [],
+    }),
+  ).toBe("Deal structure");
+  expect(
+    termDisclosure("fees", {
+      atSpec: true,
+      instrumentType: "revolving_credit",
+      siblingKeys: [],
+    }),
+  ).toBe("Facility terms");
+  expect(termDisclosure("rate", { atSpec: true, siblingKeys: [] })).toBeNull();
+  expect(
+    termDisclosure("id", {
+      atSpec: true,
+      instrumentType: "cds_option",
+      siblingKeys: [],
+    }),
+  ).toBeNull();
+});
 it("edits generated bond controls, shows decimal errors and emits native canonical JSON without replacing edits", async () => {
   const submit = vi.fn();
   render(<SchemaForm module={bond} validate={validate} onSubmit={submit} />);
+  const addCredit = screen.getByRole("button", { name: "Add credit curve id" });
+  expect(addCredit.closest("details")?.open).toBe(false);
   expect(
-    screen.queryByRole("button", { name: "Add credit curve id" }),
-  ).toBeNull();
-  expect(
-    (
-      screen.getByRole("textbox", {
-        name: "Settlement days",
-      }) as HTMLInputElement
-    ).value,
-  ).toBe("1");
+    addCredit.closest("details")?.querySelector("summary")?.textContent,
+  ).toMatch(/^Market links/);
+  expect(screen.getByRole("textbox", { name: "Rate" })).toBeTruthy();
+  expect(summaries(/^More /)).toEqual([]);
+  const settlement = screen.getByRole("textbox", {
+    name: "Settlement days",
+  }) as HTMLInputElement;
+  expect(settlement.closest("details")?.open).toBe(false);
+  expect(settlement.value).toBe("1");
   const amount = within(
     screen.getByRole("group", { name: "Notional" }),
   ).getByRole("textbox", { name: "Amount" });
@@ -69,15 +117,53 @@ it("edits generated bond controls, shows decimal errors and emits native canonic
   expect(JSON.parse(canonical).instrument.spec.notional.amount).toBe(
     "1234567.1234567890",
   );
+  expect(JSON.parse(canonical).instrument.spec.settlement_days).toBe(1);
+  expect(
+    JSON.parse(canonical).instrument.spec.cashflow_spec.fixed.day_count,
+  ).toBe("act_act_isma");
   expect((amount as HTMLInputElement).value).toBe("1234567.1234567890");
+});
+it("keeps a defaulted exercise style on the equity option sheet", () => {
+  render(
+    <SchemaForm
+      module={equityOption}
+      validate={validate}
+      onSubmit={() => {}}
+    />,
+  );
+  const style = screen.getByRole("combobox", { name: "Exercise style" });
+  expect(style.closest("details")).toBeNull();
+});
+it("opens a collapsed disclosure when its field is invalid", async () => {
+  render(<SchemaForm module={bond} validate={validate} onSubmit={() => {}} />);
+  const settlement = screen.getByRole("textbox", {
+    name: "Settlement days",
+  }) as HTMLInputElement;
+  const details = settlement.closest("details");
+  expect(details?.open).toBe(false);
+  fireEvent.change(settlement, { target: { value: "nope" } });
+  await waitFor(() =>
+    expect(settlement.getAttribute("aria-invalid")).toBe("true"),
+  );
+  expect(details?.open).toBe(true);
+  expect(document.activeElement).toBe(settlement);
+  details!.open = false;
+  details!.dispatchEvent(new Event("toggle", { bubbles: true }));
+  expect(details?.open).toBe(true);
+  expect(settlement.value).toBe("nope");
 });
 it("switches canonical external coupon branches, and exposes defaulted fields only on request", async () => {
   const user = userEvent.setup();
   render(<SchemaForm module={bond} validate={validate} onSubmit={() => {}} />);
-  await user.click(
-    screen.getByRole("button", { name: /^More instrument terms fields/ }),
-  );
-  expect(screen.getByRole("textbox", { name: "Settlement days" })).toBeTruthy();
+  const dayCount = screen.getByRole("combobox", { name: "Day count" });
+  expect(dayCount.closest("details")?.open).toBe(false);
+  for (const summary of summaries(/^Schedule conventions/))
+    await user.click(summary);
+  expect(
+    screen.getByRole("textbox", { name: "Settlement days" }).closest("details")
+      ?.open,
+  ).toBe(true);
+  expect(dayCount.closest("details")?.open).toBe(true);
   const types = screen.getByRole("radiogroup", { name: "Cashflow spec type" });
   await user.click(within(types).getByRole("radio", { name: "Floating" }));
   expect(
@@ -110,9 +196,7 @@ it("supports nullable references without inventing IDs and ignores stale native 
       onSubmit={() => {}}
     />,
   );
-  fireEvent.click(
-    screen.getByRole("button", { name: /^More instrument terms fields/ }),
-  );
+  fireEvent.click(summaries(/^Market links/)[0]!);
   fireEvent.click(screen.getByRole("button", { name: "Add credit curve id" }));
   const credit = screen.getByRole("textbox", { name: "Credit curve id" });
   expect((credit as HTMLInputElement).value).toBe("");
@@ -365,10 +449,7 @@ it.each(["", "loaded"])(
         onSubmit={() => {}}
       />,
     );
-    if (!initial)
-      await user.click(
-        screen.getByRole("button", { name: /^More terms fields/ }),
-      );
+    if (!initial) await user.click(summaries(/^Less common terms/)[0]!);
     const note = screen.getByRole("textbox", { name: "Note" });
     if (initial) {
       await user.clear(note);
@@ -394,7 +475,11 @@ it("normalizes each immutable edit once across errors, native validation and sub
   );
   await waitFor(() => expect(nativeValidate).toHaveBeenCalledTimes(1));
   expect(normalize).toHaveBeenCalledTimes(1);
-  const input = screen.getByRole("textbox", { name: "Settlement days" });
+  const input = screen.getByRole("textbox", {
+    name: "Settlement days",
+    hidden: true,
+  });
+  fireEvent.click(input.closest("details")!.querySelector("summary")!);
   fireEvent.change(input, { target: { value: "2" } });
   await waitFor(() => expect(nativeValidate).toHaveBeenCalledTimes(2));
   expect(normalize).toHaveBeenCalledTimes(2);

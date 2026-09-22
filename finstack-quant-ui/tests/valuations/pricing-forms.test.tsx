@@ -15,7 +15,6 @@ import { instruments } from "../../src/generated/instruments";
 import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
 import {
   PricingParamsForm,
-  jsonError,
   type PricingParams,
 } from "@/components/finstack/valuations/components/pricing-params-form/pricing-params-form";
 const native = createRequire(import.meta.url)(
@@ -114,7 +113,6 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
     asOf: "2025-01-01",
     model: "discounting",
     metrics: ["hidden_metric"],
-    pricingOptions: '{"seed":9007199254740993}',
     marketHistory: history,
   };
   const changes = vi.fn();
@@ -134,14 +132,17 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
     );
   }
   render(<App />);
-  const raw = screen.getByRole("textbox", { name: "Pricing overrides" });
-  const exact = ' { "seed" : 18446744073709551615 } ';
-  fireEvent.change(raw, { target: { value: exact } });
-  expect(changes.mock.calls.at(-1)?.[0]).toEqual({
-    ...initial,
-    pricingOptions: exact,
+  await userEvent.click(
+    screen.getByRole("button", { name: "Add theta period" }),
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Theta period" }), {
+    target: { value: "1W" },
   });
-  expect(jsonError(exact)).toBeUndefined();
+  await waitFor(() =>
+    expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBe(
+      '{"theta_period":"1W"}',
+    ),
+  );
   await userEvent.click(screen.getByRole("button", { name: "Metrics" }));
   await userEvent.click(screen.getByRole("checkbox", { name: /dv01/ }));
   expect(changes.mock.calls.at(-1)?.[0].metrics).toEqual([
@@ -157,9 +158,14 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
   await userEvent.click(screen.getByRole("checkbox", { name: /dv01/ }));
   expect(changes.mock.calls.at(-1)?.[0].metrics).toEqual([]);
   expect(changes.mock.calls.at(-1)?.[0].marketHistory).toBe(history);
-  fireEvent.change(raw, { target: { value: "{" } });
-  expect(raw.getAttribute("aria-invalid")).toBe("true");
-  expect((raw as HTMLTextAreaElement).value).toBe("{");
+  expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBe(
+    '{"theta_period":"1W"}',
+  );
+  const historyField = screen.getByRole("textbox", { name: "Market history" });
+  fireEvent.change(historyField, { target: { value: "{" } });
+  expect(historyField.getAttribute("aria-invalid")).toBe("true");
+  expect((historyField as HTMLTextAreaElement).value).toBe("{");
+  fireEvent.change(historyField, { target: { value: history } });
   await userEvent.click(
     screen.getByRole("button", { name: "Omit pricing overrides" }),
   );

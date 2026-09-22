@@ -57,9 +57,10 @@ try {
   assert(await amount.evaluate((node) => node === document.activeElement));
   assert(await price.isDisabled());
   await amount.fill("1000000.123456789");
+  await page.getByRole("button", { name: "Add theta period" }).click();
   await page
-    .getByRole("textbox", { name: "Pricing overrides", exact: true })
-    .fill(' { "theta_period" : "1W" } ');
+    .getByRole("textbox", { name: "Theta period", exact: true })
+    .fill("1W");
   const history = JSON.stringify({
     base_date: "2025-01-01",
     window_days: 2,
@@ -95,7 +96,11 @@ try {
   await page
     .getByRole("textbox", { name: "Market history", exact: true })
     .fill(history);
+  const metrics = page.getByRole("button", { name: "Metrics" });
+  await metrics.click();
   await page.getByRole("checkbox", { name: "hvar", exact: true }).check();
+  await metrics.click();
+  await page.waitForTimeout(400);
   await price.click();
   const output = page
     .getByRole("region", { name: "Pricing result" })
@@ -107,7 +112,7 @@ try {
       .locator("pre")
       .textContent(),
   );
-  assert.equal(submitted.pricingOptions, ' { "theta_period" : "1W" } ');
+  assert.equal(submitted.pricingOptions, '{"theta_period":"1W"}');
   assert.equal(submitted.marketHistory, history);
   assert.equal(
     JSON.parse(submitted.instrumentJson).instrument.spec.notional.amount,
@@ -129,13 +134,12 @@ try {
   const actual = JSON.parse(await output.textContent());
   direct.meta.timestamp = actual.meta.timestamp;
   assert.deepEqual(actual, direct);
-  // The editor preserves a full-width token; native validation rejects the unsupported override by name.
-  const overrides = page.getByRole("textbox", {
-    name: "Pricing overrides",
+  const theta = page.getByRole("textbox", {
+    name: "Theta period",
     exact: true,
   });
-  const wide = '{"unknown_seed":18446744073709551615}';
-  await overrides.fill(wide);
+  await theta.fill("nope");
+  await page.waitForTimeout(400);
   await price.click();
   await page
     .getByRole("region", { name: "Pricing result" })
@@ -148,7 +152,7 @@ try {
         .locator("pre")
         .textContent(),
     ).pricingOptions,
-    wide,
+    '{"theta_period":"nope"}',
   );
   assert(
     (
@@ -156,12 +160,9 @@ try {
         .getByRole("region", { name: "Pricing result" })
         .getByRole("alert")
         .textContent()
-    ).includes("unknown_seed"),
+    ).includes("Invalid input data"),
   );
-  await overrides.fill("{");
-  assert.equal(await overrides.getAttribute("aria-invalid"), "true");
-  assert(await price.isDisabled());
-  await overrides.fill("{}");
+  await page.getByRole("button", { name: "Omit pricing overrides" }).click();
   await page.getByRole("button", { name: "Load example" }).click();
   assert.notEqual(await amount.inputValue(), "1000000.123456789");
   await page.getByRole("combobox", { name: "Instrument type" }).click();
@@ -171,6 +172,9 @@ try {
   await page.getByRole("combobox", { name: "Instrument type" }).click();
   await page.getByRole("option", { name: "bond", exact: true }).click();
   await amount.waitFor();
+  await page.locator('[data-slot="combobox-list"]').waitFor({
+    state: "hidden",
+  });
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });
@@ -193,9 +197,9 @@ try {
     failures,
     checks: [
       "lazy bond and full catalogue",
-      "exact overrides and history",
+      "canonical theta override and exact history",
       "full request matches native hvar",
-      "wide token preserved and native error returned",
+      "invalid theta period is rejected",
       "invalid path focus",
       "example replacement",
     ],

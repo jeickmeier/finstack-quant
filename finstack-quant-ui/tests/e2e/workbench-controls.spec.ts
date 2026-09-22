@@ -59,6 +59,10 @@ for (const theme of ["light", "dark"])
       await expect(floating).toHaveAttribute("aria-checked", "true");
       await expect(fixed).toHaveAttribute("aria-checked", "false");
       await expectOpaque(floating);
+      await workbench
+        .locator("summary")
+        .filter({ hasText: "Schedule conventions (6)" })
+        .click();
       await expect(
         workbench.getByRole("combobox", { name: "Day count", exact: true }),
       ).toBeVisible();

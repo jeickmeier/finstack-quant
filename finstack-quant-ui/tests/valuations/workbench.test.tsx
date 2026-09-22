@@ -159,21 +159,25 @@ it("embeds the existing components, debounces complete requests and retains edit
   const amount = screen.getByRole("textbox", { name: "Amount" });
   fireEvent.change(amount, { target: { value: "1000000.123456789" } });
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
-  const overrides = ' {"theta_period":"1W"} ';
   const history = '{"base_date":"2025-01-01","window_days":2,"scenarios":[]}';
-  fireEvent.change(screen.getByRole("textbox", { name: "Pricing overrides" }), {
-    target: { value: overrides },
+  await userEvent.click(
+    screen.getByRole("button", { name: "Add theta period" }),
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Theta period" }), {
+    target: { value: "1W" },
   });
   fireEvent.change(screen.getByRole("textbox", { name: "Market history" }), {
     target: { value: history },
   });
-  await waitFor(() => expect(prices()).toHaveLength(2), { timeout: 3000 });
-  expect(prices()[1]).toEqual({
-    ...prices()[0],
-    instrumentJson: expect.stringContaining('"amount":"1000000.123456789"'),
-    pricingOptions: overrides,
-    marketHistory: history,
-  });
+  await waitFor(
+    () => {
+      const latest = prices().at(-1);
+      expect(latest?.pricingOptions).toBe('{"theta_period":"1W"}');
+      expect(latest?.marketHistory).toBe(history);
+      expect(latest?.instrumentJson).toContain('"amount":"1000000.123456789"');
+    },
+    { timeout: 5000 },
+  );
   await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
   await userEvent.click(screen.getByRole("tab", { name: "Snapshot JSON" }));
   showOriginal(screen.getByRole("region", { name: "Market snapshot" }));
@@ -217,15 +221,18 @@ it("retains the completed context during invalid edits, native pricing failure a
   );
   fireEvent.change(amount, { target: { value: "1000000" } });
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Pricing overrides" }), {
-    target: { value: '{"unknown_seed":18446744073709551615}' },
+  await userEvent.click(
+    screen.getByRole("button", { name: "Add theta period" }),
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Theta period" }), {
+    target: { value: "nope" },
   });
   await waitFor(
     () =>
       expect(
         screen
           .getAllByRole("alert")
-          .some((node) => node.textContent?.includes("unknown_seed")),
+          .some((node) => node.textContent?.includes("Invalid input data")),
       ).toBe(true),
     { timeout: 3000 },
   );

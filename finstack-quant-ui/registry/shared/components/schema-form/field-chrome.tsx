@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import {
   Popover,
   PopoverTrigger,
@@ -13,6 +13,9 @@ import {
   type SchemaLocation,
 } from "./schema";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
+
+/** Embedded editors can omit an explicit null, which is the same as leaving the field off the wire. */
+export const FormChromeContext = createContext({ explicitNull: true });
 
 type RenderProps = {
   module: InstrumentModule;
@@ -64,6 +67,7 @@ export function nullableFieldChrome(
   },
 ): ReactNode | null {
   const { required = true, value, nonNull, label, form, path, module } = props;
+  const { explicitNull } = useContext(FormChromeContext);
   if ((!required && value === undefined) || (nonNull && value == null))
     return (
       <div className="finstack-optional-term flex min-w-0 flex-wrap items-center gap-2 border-b border-border py-1 text-sm">
@@ -91,7 +95,7 @@ export function nullableFieldChrome(
             Omit {label.toLowerCase()}
           </Button>
         )}
-        {nonNull && value === undefined && (
+        {explicitNull && nonNull && value === undefined && (
           <Button
             type="button"
             variant="outline"

@@ -246,7 +246,7 @@
     {
       "name": "pricing-params-form",
       "type": "registry:component",
-      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Every supplied option/history string and omitted versus empty metric selection is preserved. JSON validation checks syntax only; native pricing owns financial validation.",
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation.",
       "files": [
         {
           "path": "components/pricing-params-form/pricing-params-form.tsx",
@@ -260,12 +260,21 @@
         "@finstack/metric-picker",
         "@finstack/field-frame",
         "@finstack/json-viewer",
+        "@finstack/schema-form",
+        "@finstack/contract-bond",
         "button",
         "textarea"
       ],
       "dependencies": ["lossless-json@4.3.1"],
       "categories": ["Individual Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     },
     {
       "name": "cashflow-viewer",

@@ -49,7 +49,10 @@ export function WorkbenchSettings({
       <PopoverTrigger render={<Button variant="outline" size="sm" />}>
         Settings
       </PopoverTrigger>
-      <PopoverContent align="end">
+      <PopoverContent
+        align="end"
+        className="w-[28rem] max-w-[calc(100vw-2rem)]"
+      >
         <div className="max-h-[60vh] space-y-4 overflow-auto">
           <PricingParamsForm
             value={params}

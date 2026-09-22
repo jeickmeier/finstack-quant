@@ -290,6 +290,24 @@
   padding: var(--spacing) 0;
   font-size: var(--text-xs);
 }
+.finstack-term-disclosure {
+  margin-top: calc(var(--spacing) * 2);
+  border-top: var(--table-rule-width) solid var(--hairline);
+  padding-top: var(--spacing);
+}
+.finstack-fieldset > details.finstack-term-disclosure {
+  font-size: var(--text-sm);
+  padding-top: var(--spacing);
+}
+.finstack-term-disclosure > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.finstack-schema-root > .finstack-term-disclosure {
+  column-span: all;
+}
 .finstack-term-fields {
   min-width: 0;
 }

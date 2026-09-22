@@ -4,6 +4,7 @@ import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { useStore } from "@tanstack/react-form";
 import { useAppForm, focusFormIssue } from "@/lib/finstack/form";
 import { FieldRendererContext, type FieldRenderer } from "./field-renderer";
+import { FormChromeContext } from "./field-chrome";
 import { RenderField } from "./render-field";
 import {
   structuralValidator,
@@ -37,6 +38,10 @@ export interface SchemaFormProps {
   onValidated?: (json: string | null) => void;
   /** Structurally valid working JSON before native acceptance; null immediately on edits. Useful for native dry-run diagnostics. */
   onInputJson?: (json: string | null) => void;
+  /** Render Apply and Reset. Embedded editors publish through onInputJson instead. */
+  actions?: boolean;
+  /** Show “Set to null” before a nullable field is added. */
+  explicitNull?: boolean;
 }
 function useSchemaForm(props: SchemaFormProps) {
   const validator = useMemo(() => {
@@ -196,34 +201,40 @@ export function SchemaForm(props: SchemaFormProps) {
         });
       }}
     >
-      <FieldRendererContext.Provider value={props.renderField}>
-        <form.AppForm>
-          <form.ErrorSummary errors={[submitError ?? native.error]} />
-          <form.Subscribe selector={(state) => state.values}>
-            {(value) => (
-              <RenderField
-                module={props.module}
-                form={form}
-                location={{ schema: props.module.schema, pointer: "#" }}
-                path=""
-                label={props.module.schema.title ?? "Instrument"}
-                value={value}
-                layout={props.layout ?? "basic"}
-                fields={props.fields}
-              />
+      <FormChromeContext.Provider
+        value={{ explicitNull: props.explicitNull ?? true }}
+      >
+        <FieldRendererContext.Provider value={props.renderField}>
+          <form.AppForm>
+            <form.ErrorSummary errors={[submitError ?? native.error]} />
+            <form.Subscribe selector={(state) => state.values}>
+              {(value) => (
+                <RenderField
+                  module={props.module}
+                  form={form}
+                  location={{ schema: props.module.schema, pointer: "#" }}
+                  path=""
+                  label={props.module.schema.title ?? "Instrument"}
+                  value={value}
+                  layout={props.layout ?? "basic"}
+                  fields={props.fields}
+                />
+              )}
+            </form.Subscribe>
+            {(props.actions ?? true) && (
+              <div className="flex flex-wrap gap-2 border-t border-border pt-2">
+                <form.SubmitButton
+                  label={props.submitLabel}
+                  variant={props.submitVariant}
+                  disabled={native.pending}
+                  allowInvalidSubmission
+                />
+                <form.ResetButton onReset={() => props.onValidated?.(null)} />
+              </div>
             )}
-          </form.Subscribe>
-          <div className="flex flex-wrap gap-2 border-t border-border pt-2">
-            <form.SubmitButton
-              label={props.submitLabel}
-              variant={props.submitVariant}
-              disabled={native.pending}
-              allowInvalidSubmission
-            />
-            <form.ResetButton onReset={() => props.onValidated?.(null)} />
-          </div>
-        </form.AppForm>
-      </FieldRendererContext.Provider>
+          </form.AppForm>
+        </FieldRendererContext.Provider>
+      </FormChromeContext.Provider>
     </form>
   );
 }

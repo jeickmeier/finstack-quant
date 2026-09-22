@@ -168,7 +168,7 @@
     {
       "name": "pricing-params-form",
       "type": "registry:component",
-      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Every supplied option/history string and omitted versus empty metric selection is preserved. JSON validation checks syntax only; native pricing owns financial validation."
+      "docs": "Standalone controlled pricing parameters. Supply native groups from useModels/useMetrics. Metric pricing overrides are edited from their schema and emitted as compact JSON. Market history text and omitted versus empty metric selection are preserved. JSON validation checks syntax only; native pricing owns financial validation."
     },
     {
       "name": "cashflow-viewer",

@@ -77,14 +77,17 @@ export function nullable(
       pointer: `${pointer}/${schema.anyOf ? "anyOf" : "oneOf"}/${index}`,
     };
   }
-  if (Array.isArray(schema.type) && schema.type.includes("null"))
-    return {
-      schema: {
-        ...schema,
-        type: schema.type.filter((type) => type !== "null")[0],
-      },
-      pointer,
+  if (Array.isArray(schema.type) && schema.type.includes("null")) {
+    // A null default is the omitted state. Add uses this branch and must
+    // receive an editable value, not another null.
+    const { default: fallback, ...rest } = schema;
+    const next: Schema = {
+      ...rest,
+      type: schema.type.filter((type) => type !== "null")[0],
     };
+    if (fallback != null) next.default = fallback;
+    return { schema: next, pointer };
+  }
   return null;
 }
 export const objectValue = (value: unknown): Record<string, unknown> =>

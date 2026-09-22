@@ -82,10 +82,12 @@ try {
     await page
       .getByRole("textbox", { name: "Settlement days", exact: true })
       .count(),
-    1,
+    0,
   );
   await page
-    .getByRole("button", { name: /^More instrument terms fields/ })
+    .locator("summary")
+    .filter({ hasText: /^Schedule conventions/ })
+    .last()
     .click();
   const settlement = page.getByRole("textbox", {
     name: "Settlement days",
