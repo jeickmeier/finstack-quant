@@ -38,6 +38,7 @@ curve evaluation, off-grid plain volatility-surface evaluation, absent aggregate
 uncontracted result-detail types and quote-space calibration fits remain excluded.
 Scenario-price documentation drift remains an upstream issue.
 
-See [release evidence](evidence/pr-040.md) for exact checks and open gates. Earlier
-installation evidence predates the final stock-control correction; it is not
-represented as a fresh complete matrix. Public CLI/MCP acceptance remains open.
+The complete final-source installation matrix and public CLI/MCP acceptance
+remain open until merge and deployment from `master`. Earlier installation
+results predate the final stock-control correction and are not a fresh complete
+matrix.

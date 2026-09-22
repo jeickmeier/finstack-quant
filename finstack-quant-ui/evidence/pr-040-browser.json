@@ -1,9 +1,0 @@
-{
-  "version": "0.2.0",
-  "wasmVersion": "0.8.0",
-  "registryItems": 150,
-  "upgradeRoute": "pass",
-  "distributionLink": "pass",
-  "runtimeErrors": [],
-  "scope": "served registry-only production export"
-}

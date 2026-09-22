@@ -112,19 +112,15 @@ and run `npm --prefix finstack-quant-ui run test:browser`. It checks root and
 `/finstack-quant` deployments and removes its temporary app afterward.
 `REGISTRY_SMOKE_DIR` selects a directory for JSON evidence.
 
-The fixture runs independently of the docs notebook publication suite. See the
-[PR-003 feasibility record](evidence/pr-003.md) for the actual docs export checks,
-configuration, browser version, and validation boundaries. The browser smoke test
-is separate from the fast `ui-check`; PR-004 owns optimized footprint acceptance.
+The fixture runs independently of the docs notebook publication suite. The browser
+smoke test is separate from the fast `ui-check`; the footprint gate below owns
+optimized-size acceptance.
 
 ## Browser footprint gate
 
-PR-004 measured all 78 instrument validators and the optimized `release-size`
-WASM package. The corpus completed and the optimized raw artifact is 21,534,873
-bytes against the user-authorized revised 25,000,000-byte limit. Browser
-feasibility passes; the original 10 MB failure is retained in the evidence.
-Compression does not waive this raw-byte gate. See the
-[PR-004 evidence and reproduction commands](evidence/pr-004.md).
+The footprint gate measures all 78 instrument validators and the optimized
+`release-size` WASM package. The optimized raw artifact is 21,534,873 bytes
+against the 25,000,000-byte limit. Compression does not waive this raw-byte gate.
 
 `mise run wasm-pkg` owns the optimized web build and records raw/optimized/gzip/
 Brotli measurements without a UI-specific limit. `mise run ui-size` checks the
@@ -256,7 +252,7 @@ replacing the current validation state.
 Run `UV_NO_SYNC=1 mise run wasm-pkg` for scoped package builds; disabling uv
 synchronization prevents the final marker-file command from rebuilding Python.
 The production browser harness now exercises the installed provider and worker,
-not a separate probe implementation. See [PR-009 evidence](evidence/pr-009.md).
+not a separate probe implementation.
 
 ## Publication figures
 
@@ -281,7 +277,6 @@ axes, legends and marks, without HTML overlays or rasterized marks.
 `npm run test:figures:browser` builds the installed example, exports narrow/wide
 numeric/date/category fixtures, checks text clipping/overlap, vector elements,
 font/style portability, exact raster dimensions, accessibility and no WASM loads.
-See [PR-010 evidence](evidence/pr-010.md) and [publishing verification](evidence/pr-038.md).
 Pages 14.5 places the complete SVG at 15.24 × 10.16 cm with IBM Plex Sans
 400/500/600 and Mono 400/500 installed. Keep it as a placed SVG: Pages
 “Break Apart” discards SVG text and axes. The exported SVG retains editable
@@ -305,7 +300,7 @@ Derive `chartSelection(binding, datum => datum.id)` on render and assign it to
 highlights without extra hit targets. `onSelect` only reports activation; writing
 accepted state again there would duplicate the native selection proposal. Shared
 cursors use a parent-owned native `createChartCursor`, with explicitly compatible
-coordinates. See the installable `LinkedFigureExample` and [PR-011 evidence](evidence/pr-011.md).
+coordinates. See the installable `LinkedFigureExample`.
 The hook imports only React; chart-only consumers load neither tables nor WASM.
 
 ## Bond schema form
@@ -325,9 +320,8 @@ exact decimal text and full-width integers retain their canonical representation
 `instrument.spec.notional.amount` and preserves hidden values. Schema errors appear
 under fields where mapped, with remaining native errors in the summary.
 
-The shared field kit is available through `useAppForm`. Bond-subset evidence is
-recorded in [PR-012](evidence/pr-012.md); complete cross-instrument rendering and
-field-error mapping remain separate planned slices.
+The shared field kit is available through `useAppForm`. Complete cross-instrument
+rendering and field-error mapping remain separate planned slices.
 
 ## Supplied valuation results
 
@@ -345,8 +339,8 @@ Exact values and the value title retain the supplied precision. The nonzero view
 hides zero rows (both sides must be supplied and zero in a comparison); Show all
 reveals every row. Missing values remain distinct from zero. Units appear only when native
 metadata or `units`/`comparisonUnits` supplies a source-backed unit for the complete
-key. The grid does not calculate differences, totals or currency conversions. See
-[PR-013 evidence](evidence/pr-013.md) and the retained native bond result fixture.
+key. The grid does not calculate differences, totals or currency conversions. The
+retained native bond result fixture is `src/fixtures/results/bond.json`.
 
 ## Returned structured-credit scenarios
 
@@ -372,8 +366,8 @@ price as a percentage of **current tranche balance**, with 100 as par. The Rust
 `ScenarioCell.price` contract owns this wording; the facade's original-balance
 comment remains an upstream documentation exclusion. No rebasing, normalization
 or WAL/writedown overlay is performed. Neither the component nor its panel
-requires a worker or workbench block. Native fixture provenance, including a
-factor-adjusted tranche, is in [PR-034 evidence](evidence/pr-034.md).
+requires a worker or workbench block. Native fixtures, including a factor-adjusted
+tranche, live in `tests/valuations/scenario-table/cases.json`.
 
 The complete workbench is installed with `npx shadcn@4.21.0 add @finstack/pricing-workbench`.
 Embed `PricingWorkbench` inside `FinstackQueryProvider`. Supply an explicit
@@ -451,7 +445,7 @@ publication layouts, accepted table/chart selection, pinned tooltip actions and
 bond-form keyboard submission. It serves the static export without a dev server.
 Playwright defaults to **no snapshot updates**. For an intentional visual change,
 run `mise run ui-e2e -- --update-snapshots`, inspect the changed PNGs, record the
-reason in PR evidence, and then rerun `mise run ui-e2e` without that flag.
+reason in the pull request, and then rerun `mise run ui-e2e` without that flag.
 Baselines use pinned Chromium 145, local Fontsource faces, UTC and en-US at 1×.
 Only the volatile calculation timestamp is masked. The CI gallery job uses macOS;
 these baselines do not certify rendering on other operating systems.

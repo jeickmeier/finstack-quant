@@ -17,20 +17,26 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { instruments } from "@/lib/finstack/generated/instruments";
 type Entry = (typeof instruments)[number];
-const groups = [...Map.groupBy(instruments, (entry) => entry.group)].map(
-  ([value, items]) => ({ value, items }),
-);
 const storageKey = "finstack.recent-instruments";
 /** Canonical choices only; storage contains at most six known type identifiers. */
 export function InstrumentSelector({
   value,
   onValueChange,
+  allowedTypes,
 }: {
   value: string;
   onValueChange(value: string): void;
+  /** When supplied, offer only instruments with a complete host-owned pricing example. */
+  allowedTypes?: readonly string[];
 }) {
   const id = useId();
   const [recent, setRecent] = useState<string[]>([]);
+  const available = allowedTypes
+    ? instruments.filter((entry) => allowedTypes.includes(entry.type))
+    : instruments;
+  const groups = [...Map.groupBy(available, (entry) => entry.group)].map(
+    ([value, items]) => ({ value, items }),
+  );
   useEffect(() => {
     try {
       const stored: unknown = JSON.parse(
@@ -69,7 +75,7 @@ export function InstrumentSelector({
     <div>
       <Combobox
         items={groups}
-        value={instruments.find((entry) => entry.type === value) ?? null}
+        value={available.find((entry) => entry.type === value) ?? null}
         itemToStringLabel={(item: Entry) => item.title}
         onValueChange={(item) => {
           if (item) select(item.type);
@@ -118,7 +124,7 @@ export function InstrumentSelector({
       {recent.length > 0 && (
         <nav aria-label="Recently used instruments">
           <span>Recent</span>
-          {recent.map((type) => (
+          {recent.filter((type) => available.some((entry) => entry.type === type)).map((type) => (
             <Button
               variant="ghost"
               size="sm"

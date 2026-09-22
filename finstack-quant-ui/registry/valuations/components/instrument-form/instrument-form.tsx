@@ -13,6 +13,7 @@ import {
 export function InstrumentForm(props: {
   type: string;
   onTypeChange(type: string): void;
+  allowedTypes?: readonly string[];
   /** Initial canonical JSON. Remount the component to load another document; active edits are retained. */
   defaultJson?: string;
   validate: SchemaFormProps["validate"];
@@ -65,6 +66,7 @@ export function InstrumentForm(props: {
       <header className="finstack-instrument-header">
         <InstrumentSelector
           value={props.type}
+          allowedTypes={props.allowedTypes}
           onValueChange={(type) => {
             props.onValidated?.(null);
             props.onTypeChange(type);

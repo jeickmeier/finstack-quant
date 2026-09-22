@@ -68,6 +68,7 @@ export function RegistryGallery() {
     density =
       search.get("density") === "comfortable" ? "comfortable" : "compact",
     variant = search.get("variant") ?? "default",
+    instrument = search.get("instrument") ?? undefined,
     publication = variant === "publication",
     focused = search.get("focus") === "1",
     width = search.get("width") === "narrow" ? 360 : publication ? 1000 : 880;
@@ -79,7 +80,7 @@ export function RegistryGallery() {
     document.documentElement.dataset.density = density;
   }, [theme, density]);
   const href = (item: string, nextTheme = theme, nextDensity = density) =>
-    `?${new URLSearchParams({ item, theme: nextTheme, density: nextDensity, ...(focused ? { focus: "1" } : {}), ...(variant !== "default" ? { variant } : {}) })}`;
+    `?${new URLSearchParams({ item, theme: nextTheme, density: nextDensity, ...(focused ? { focus: "1" } : {}), ...(variant !== "default" ? { variant } : {}), ...(item === "pricing-workbench" && instrument ? { instrument } : {}) })}`;
   const content = item ? (
     item.type === "registry:ui" || item.type === "registry:theme" ? (
       <PrimitiveDemo
@@ -94,7 +95,7 @@ export function RegistryGallery() {
         density={density}
         width={width}
         variant={variant}
-        instrument={search.get("instrument") ?? undefined}
+        instrument={instrument}
       />
     )
   ) : null;

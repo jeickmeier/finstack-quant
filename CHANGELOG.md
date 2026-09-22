@@ -12,9 +12,8 @@
   rows, inferred units, full-state curve evaluation, plain volatility-surface
   off-grid evaluation, absent financial aggregates, unresolved detail contracts
   and quote-space calibration fits remain excluded. Scenario-price documentation
-  drift remains upstream. [Release evidence](finstack-quant-ui/evidence/pr-040.md)
-  records the outstanding installation and public-deployment gates; publication
-  remains restricted to `master`.
+  drift remains upstream. The complete installation matrix and public CLI/MCP
+  checks remain open; publication remains restricted to `master`.
 
 ### Requested metrics never go missing; windowed formulas work on money (2026-09-19)
 

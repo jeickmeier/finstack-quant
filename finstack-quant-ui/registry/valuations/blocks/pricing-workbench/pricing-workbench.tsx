@@ -63,6 +63,8 @@ export function PricingWorkbench({
   defaultRequest,
   density = "compact",
   defaultInstrumentType,
+  exampleRequests,
+  onInstrumentTypeChange,
   defaultCalibrationJson,
   surfaceOptions,
   cubeOptions,
@@ -75,6 +77,10 @@ export function PricingWorkbench({
   density?: "compact" | "comfortable";
   /** Host-owned deep link selects this canonical example; supplied market/parameters stay explicit. */
   defaultInstrumentType?: string;
+  /** Complete host-owned examples. Selecting one replaces its instrument, market and pricing context together. */
+  exampleRequests?: Readonly<Record<string, PriceRequest>>;
+  /** Notify the host when a prepared instrument example is selected. */
+  onInstrumentTypeChange?: (type: string) => void;
   defaultCalibrationJson?: string;
   /** Explicit native tranche/grid inputs and display extent; evaluated on the completed structured-credit request only. */
   scenario?: {
@@ -99,6 +105,7 @@ export function PricingWorkbench({
     instrumentTypeOf(initial.instrumentJson),
   );
   const [type, setType] = useState(defaultInstrumentType ?? initialType);
+  const [instrumentRevision, setInstrumentRevision] = useState(0);
   const [scenariosOpen, setScenariosOpen] = useState(false);
   const [resultTab, setResultTab] = useState("cashflows");
   const [currentDensity, setCurrentDensity] = useState(density);
@@ -141,6 +148,34 @@ export function PricingWorkbench({
     result: ValuationResult;
     instrumentType: string;
   } | null>(null);
+  const selectType = useCallback(
+    (nextType: string) => {
+      const example = exampleRequests?.[nextType];
+      if (example) {
+        setInstrument(null);
+        setMarket(null);
+        setMarketReady(false);
+        setMarketDocument((current) => ({
+          json: example.marketJson,
+          revision: current.revision + 1,
+        }));
+        setParams({
+          asOf: example.asOf,
+          model: example.model,
+          metrics: example.metrics,
+          pricingOptions: example.pricingOptions,
+          marketHistory: example.marketHistory,
+        });
+        setRequest(null);
+        setCompleted(null);
+        setInstrumentRevision((current) => current + 1);
+        setResultTab("cashflows");
+      }
+      setType(nextType);
+      onInstrumentTypeChange?.(nextType);
+    },
+    [exampleRequests, onInstrumentTypeChange],
+  );
   const { printSnapshot, startPrint, printing, syncPending } =
     usePrintReport(completed);
   const shown = printSnapshot ?? completed;
@@ -379,12 +414,17 @@ export function PricingWorkbench({
               className="finstack-workbench__panel print:hidden"
             >
               <InstrumentForm
+                key={instrumentRevision}
                 type={type}
-                onTypeChange={setType}
+                onTypeChange={selectType}
+                allowedTypes={
+                  exampleRequests ? Object.keys(exampleRequests) : undefined
+                }
                 defaultJson={
-                  (defaultInstrumentType ?? initialType) === initialType
+                  exampleRequests?.[type]?.instrumentJson ??
+                  ((defaultInstrumentType ?? initialType) === initialType
                     ? initial.instrumentJson
-                    : undefined
+                    : undefined)
                 }
                 validate={validate}
                 onValidated={setInstrument}
