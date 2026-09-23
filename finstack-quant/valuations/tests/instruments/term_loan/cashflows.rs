@@ -898,3 +898,66 @@ mod margin_stepup_period_semantics {
         }
     }
 }
+
+/// Commitment fees accrue per sub-interval between draws but are paid once
+/// per period on its payment date. A 10M DDTL, 50 bp on undrawn, draws 5M on
+/// 2025-02-15 and closes on 2025-05-16:
+/// - Q1 (paid 2025-04-01): 10M × 0.5% × 45/360 + 5M × 0.5% × 45/360 = 9,375.
+/// - Q2 (paid 2025-07-01): 5M × 0.5% × 45/360 (Apr 1 → May 16) = 3,125.
+#[test]
+fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        CommitmentFeeBase, DdtlSpec,
+    };
+
+    let issue = date!(2025 - 01 - 01);
+    let loan = TermLoan::builder()
+        .id("TL-CF-FEEDATE".into())
+        .currency(Currency::USD)
+        .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("money"))
+        .issue_date(issue)
+        .maturity(date!(2026 - 01 - 01))
+        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .frequency(Tenor::quarterly())
+        .day_count(DayCount::Act360)
+        .business_day_convention(BusinessDayConvention::Unadjusted)
+        .calendar_id_opt(None)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .amortization(AmortizationSpec::None)
+        .coupon_type(CouponType::Cash)
+        .upfront_fee_opt(None)
+        .ddtl_opt(Some(DdtlSpec {
+            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("money"),
+            availability_start: issue,
+            availability_end: date!(2025 - 05 - 16),
+            draws: vec![DrawEvent {
+                date: date!(2025 - 02 - 15),
+                amount: Money::new(5_000_000.0, Currency::USD).expect("money"),
+            }],
+            commitment_step_downs: vec![],
+            usage_fee_bp: 0,
+            commitment_fee_bp: 50,
+            fee_base: CommitmentFeeBase::Undrawn,
+            oid_policy: None,
+        }))
+        .covenants_opt(None)
+        .attributes(Default::default())
+        .build()
+        .unwrap();
+
+    let schedule = loan
+        .cashflow_schedule(&build_market_context(), issue)
+        .expect("schedule");
+    let fees: Vec<(time::Date, f64)> = schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.kind == CFKind::CommitmentFee)
+        .map(|cf| (cf.date, cf.amount.amount()))
+        .collect();
+    assert_eq!(fees.len(), 2, "{fees:?}");
+    assert_eq!(fees[0].0, date!(2025 - 04 - 01));
+    assert!((fees[0].1 - 9_375.0).abs() < 1e-6, "{fees:?}");
+    assert_eq!(fees[1].0, date!(2025 - 07 - 01));
+    assert!((fees[1].1 - 3_125.0).abs() < 1e-6, "{fees:?}");
+}
