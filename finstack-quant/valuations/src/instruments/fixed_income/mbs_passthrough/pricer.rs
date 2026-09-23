@@ -45,6 +45,10 @@ pub struct MbsCashflow {
     pub ending_balance: f64,
     /// SMM used for this period
     pub smm: f64,
+    /// Year fraction of the accrual month on the pool day count (1/12 on
+    /// 30/360); investor interest is `beginning_balance × pass-through ×
+    /// accrual_fraction`.
+    pub accrual_fraction: f64,
 }
 
 /// One MBS projection with its canonical schedule and row diagnostics.
@@ -200,6 +204,7 @@ pub fn generate_cashflows(
             beginning_balance: balance,
             ending_balance,
             smm,
+            accrual_fraction: period_yf,
         });
 
         balance = ending_balance;

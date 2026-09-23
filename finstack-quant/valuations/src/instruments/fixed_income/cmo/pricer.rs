@@ -187,7 +187,8 @@ pub(crate) fn tranche_cashflows_on(
             // Interest conservation: the IO can never receive more than
             // the collateral interest delivered this period, so
             // IO + PO PV stays bounded by collateral PV.
-            let io_payment = (io_notional * io_tranche.coupon / 12.0).min(cf.interest);
+            let io_payment =
+                (io_notional * io_tranche.coupon * cf.accrual_fraction).min(cf.interest);
 
             tranche_cfs.push(TrancheCashflow {
                 payment_date: cf.payment_date,
@@ -211,6 +212,7 @@ pub(crate) fn tranche_cashflows_on(
                 cf.prepayment,
                 total_interest,
                 collateral_survival,
+                cf.accrual_fraction,
                 pac_context.as_ref(),
             )?;
 
@@ -701,6 +703,7 @@ mod tests {
                 cf.prepayment,
                 cf.interest,
                 collateral_survival(cf.beginning_balance, cf.ending_balance),
+                cf.accrual_fraction,
                 None,
             )
             .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -850,6 +853,27 @@ mod production_mortgage_audit {
             flows[0].interest
         );
         assert!((flows[0].interest - 142_916.666_666_67).abs() > 1.0);
+    }
+
+    /// Tranche coupons accrue on the collateral's day count. An Act/360 pool
+    /// valued 15 Jan 2024 (issued 1 Jan) accrues January over 31 days, so
+    /// class A (40mm, 3.5%) receives `40mm × 3.5% × 31/360 = 120_555.56`
+    /// rather than the flat `40mm × 3.5% / 12 = 116_666.67`.
+    #[test]
+    fn tranche_interest_uses_collateral_day_count() {
+        let as_of = date!(2024 - 01 - 15);
+        let mut cmo = AgencyCmo::example().expect("cmo");
+        let mut pool = resolve_collateral(&cmo, as_of).expect("collateral");
+        pool.day_count = DayCount::Act360;
+        cmo.collateral = Some(Box::new(pool));
+        let flows = generate_tranche_cashflows(&cmo, as_of, Some(1)).expect("flows");
+        let expected = 40_000_000.0 * 0.035 * 31.0 / 360.0;
+        assert!(
+            (flows[0].interest - expected).abs() < 1e-6,
+            "{} versus {expected}",
+            flows[0].interest
+        );
+        assert!((flows[0].interest - 116_666.666_666_67).abs() > 1.0);
     }
 
     /// The collateral backs exactly the principal tranches: a pool whose

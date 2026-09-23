@@ -124,6 +124,7 @@ pub fn execute_waterfall_with_pac(
         0.0,
         available_interest,
         1.0,
+        1.0 / 12.0,
         pac_context,
     )
 }
@@ -146,6 +147,9 @@ pub fn execute_waterfall_with_pac(
 /// * `collateral_survival` - Collateral ending/beginning balance ratio for
 ///   this period, in `[0, 1]`. An IO strip accrues on its current notional
 ///   and its notional is multiplied by this ratio at period end.
+/// * `accrual_fraction` - Year fraction of this period's accrual month on the
+///   collateral's day count (exactly 1/12 on 30/360). Tranche coupons and Z
+///   accretion accrue over it, like the collateral interest that funds them.
 /// * `pac_context` - Optional PAC schedule, period index, and realized PSA;
 ///   `None` applies no PAC collar constraint.
 ///
@@ -153,7 +157,7 @@ pub fn execute_waterfall_with_pac(
 ///
 /// While any current-pay (non-accrual) principal tranche is outstanding at the
 /// start of the period ("accretion phase"), an accrual tranche receives no
-/// cash. Its period accrual (`balance × coupon / 12`) is funded from the
+/// cash. Its period accrual (`balance × coupon × accrual_fraction`) is funded from the
 /// interest collections remaining after the current-pay coupons are paid,
 /// capitalized into its balance, and an equal amount is redirected as
 /// accretion-directed principal to the current-pay tranches in the normal
@@ -176,6 +180,7 @@ pub fn execute_waterfall_with_principal_breakdown(
     prepayment_principal: f64,
     available_interest: f64,
     collateral_survival: f64,
+    accrual_fraction: f64,
     pac_context: Option<&PacContext>,
 ) -> finstack_quant_core::Result<CmoWaterfallPeriodResult> {
     let mut remaining_principal = scheduled_principal + prepayment_principal;
@@ -220,8 +225,8 @@ pub fn execute_waterfall_with_principal_breakdown(
         if notional <= 0.0 {
             continue;
         }
-        // Interest = notional × coupon / 12
-        let monthly_interest = notional * tranche.coupon / 12.0;
+        // Interest accrues over the collateral's accrual fraction.
+        let monthly_interest = notional * tranche.coupon * accrual_fraction;
         let allocated_interest = monthly_interest.min(remaining_interest);
         remaining_interest -= allocated_interest;
         interest_allocations.insert(tranche.id.clone(), allocated_interest);
@@ -253,7 +258,7 @@ pub fn execute_waterfall_with_principal_breakdown(
             if balance <= 0.0 || tranche.coupon <= 0.0 {
                 continue;
             }
-            let accrual = balance * tranche.coupon / 12.0;
+            let accrual = balance * tranche.coupon * accrual_fraction;
             let funded = accrual.min(remaining_interest);
             remaining_interest -= funded;
             accretion_directed += funded;
@@ -817,6 +822,7 @@ mod tests {
             0.0,
             1_000.0,
             0.5,
+            1.0 / 12.0,
             None,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -947,6 +953,7 @@ mod tests {
             3_000.0,
             5_000.0,
             1.0,
+            1.0 / 12.0,
             Some(&pac_context),
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -969,6 +976,7 @@ mod tests {
             3_000.0,
             5_000.0,
             1.0,
+            1.0 / 12.0,
             Some(&pac_context),
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1055,6 +1063,7 @@ mod tests {
             0.0,
             900.0,
             1.0,
+            1.0 / 12.0,
             None,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1100,6 +1109,7 @@ mod tests {
             0.0,
             900.0,
             1.0,
+            1.0 / 12.0,
             None,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1152,6 +1162,7 @@ mod tests {
             0.0,
             400.0,
             1.0,
+            1.0 / 12.0,
             None,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1187,6 +1198,7 @@ mod tests {
             0.0,
             310.0,
             1.0,
+            1.0 / 12.0,
             None,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1222,9 +1234,16 @@ mod tests {
         let mut waterfall = CmoWaterfall::new(tranches);
         let tol = 1e-9;
 
-        let r =
-            execute_waterfall_with_principal_breakdown(&mut waterfall, 0.0, 0.0, 600.0, 1.0, None)
-                .expect("valid execute_waterfall_with_principal_breakdown fixture");
+        let r = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            0.0,
+            0.0,
+            600.0,
+            1.0,
+            1.0 / 12.0,
+            None,
+        )
+        .expect("valid execute_waterfall_with_principal_breakdown fixture");
         let a = r
             .allocations
             .iter()
@@ -1279,6 +1298,7 @@ mod tests {
                 prepay,
                 interest,
                 1.0,
+                1.0 / 12.0,
                 None,
             )
             .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1332,6 +1352,7 @@ mod tests {
             prepayment_pool,
             0.0, // interest irrelevant here
             1.0,
+            1.0 / 12.0,
             None,
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1439,6 +1460,7 @@ mod tests {
             prepayment_pool,
             0.0,
             1.0,
+            1.0 / 12.0,
             Some(&pac_context),
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1526,6 +1548,7 @@ mod tests {
             6_000.0,
             1_000.0,
             1.0,
+            1.0 / 12.0,
             Some(&pac_context),
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -1616,6 +1639,7 @@ mod tests {
             3_000.0, // prepayment
             5_000.0, // interest
             1.0,
+            1.0 / 12.0,
             Some(&pac_context),
         )
         .expect("valid execute_waterfall_with_principal_breakdown fixture");

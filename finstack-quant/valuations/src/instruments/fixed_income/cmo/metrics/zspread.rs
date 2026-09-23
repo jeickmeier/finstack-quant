@@ -36,22 +36,24 @@ pub(crate) fn calculate_tranche_zspread(
         ))
     })?;
 
+    // The clean quote plus accrued buys the settlement-month accrual onward;
+    // the collateral's prior-month in-flight P&I belongs to the seller.
+    let collateral = quote_basis_pool(&resolve_collateral(cmo, as_of)?, as_of)?;
+
+    // Tranche interest accrues on the collateral's day count.
     let month_start = Date::from_calendar_date(as_of.year(), as_of.month(), 1)
         .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
     let accrual_start = month_start.max(cmo.issue_date);
     let accrued = tranche.current_face.amount()
         * tranche.coupon
-        * DayCount::Thirty360.year_fraction(
+        * collateral.day_count.year_fraction(
             accrual_start.min(as_of),
             as_of,
             DayCountContext::default(),
         )?;
     let market_price = market_price_pct / 100.0 * tranche.current_face.amount() + accrued;
 
-    // The clean quote plus accrued buys the settlement-month accrual onward;
-    // the collateral's prior-month in-flight P&I belongs to the seller.
     // Cache cashflows outside the solver loop — they don't depend on spread.
-    let collateral = quote_basis_pool(&resolve_collateral(cmo, as_of)?, as_of)?;
     let tranche_cfs = tranche_cashflows_on(cmo, &collateral, as_of, None)?;
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
     let day_count = DayCount::Thirty360;

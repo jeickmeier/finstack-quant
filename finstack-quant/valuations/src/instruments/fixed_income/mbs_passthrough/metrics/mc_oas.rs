@@ -40,7 +40,7 @@ use crate::instruments::fixed_income::mbs_passthrough::pricer::{
 };
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use crate::instruments::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::{Error as CoreError, Result};
@@ -164,8 +164,9 @@ fn simulate_rate_paths(
 /// accrues on the pool's day-count fraction over the actual calendar month,
 /// and prepayment seasoning is measured at each accrual period end.
 struct McStepSchedule {
-    /// Extra discounting time (years) from each step's grid endpoint
-    /// `(m+1)/12` to the pool's actual payment date. May be negative:
+    /// Extra discounting time (years, on the discount curve's day count) from
+    /// each step's grid endpoint `(m+1)/12` to the pool's actual payment date.
+    /// May be negative:
     /// Walked-back in-flight
     /// periods pay before their grid endpoint. Combined with the cumulative
     /// grid discount factor this discounts each cashflow to its actual
@@ -189,6 +190,7 @@ fn mc_step_schedule(
     mbs: &AgencyMbsPassthrough,
     as_of: Date,
     num_steps: usize,
+    curve_day_count: DayCount,
 ) -> Result<McStepSchedule> {
     use finstack_quant_core::dates::{DateExt, DayCountContext};
 
@@ -202,7 +204,10 @@ fn mc_step_schedule(
         let period_start = start_month.add_months(m as i32);
         let accrual_end = period_start.add_months(1);
         let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
-        let t_pay = (payment_date - as_of).whole_days() as f64 / 365.25;
+        // Grid time is the curve's time axis (the HW1F θ(t) is fitted to the
+        // curve on it), so the payment offset is measured the same way.
+        let t_pay =
+            curve_day_count.year_fraction(as_of, payment_date, DayCountContext::default())?;
         payment_extras.push(t_pay - (m as f64 + 1.0) * dt);
         accrual_fractions.push(mbs.day_count.year_fraction(
             period_start,
@@ -429,7 +434,7 @@ pub(crate) fn calculate_mc_oas(
 
     // Per-step accrual periods, day-count fractions, seasonings and
     // payment-delay discounting offsets (actual payment dates).
-    let steps = mc_step_schedule(mbs, as_of, num_steps)?;
+    let steps = mc_step_schedule(mbs, as_of, num_steps, discount_curve.day_count())?;
 
     // Capture pricing errors raised by price_on_path so they propagate
     // through the f64-only Brent objective rather than being silently coerced
@@ -672,7 +677,7 @@ mod tests {
         // And price_on_path itself must run without producing a non-finite PV.
         // Use the MBS issue date so seasoning starts at 0 (fresh pool).
         let as_of = mbs.issue_date;
-        let steps = mc_step_schedule(&mbs, as_of, wam).expect("steps");
+        let steps = mc_step_schedule(&mbs, as_of, wam, DayCount::Act365F).expect("steps");
         let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, &steps).expect("price");
         assert!(
             pv.is_finite() && pv > 0.0,
@@ -699,7 +704,7 @@ mod tests {
         let hw = HullWhiteCalibrationParams::new(config.hw_kappa, config.hw_sigma).expect("hw");
         let hw1f = prepare_hw1f_params(hw, curve.as_ref(), as_of, 30.0).expect("theta prepared");
         let paths = simulate_rate_paths(initial_rate, &hw1f, 64, 360, config.seed);
-        let steps = mc_step_schedule(&mbs, as_of, 360).expect("steps");
+        let steps = mc_step_schedule(&mbs, as_of, 360, curve.day_count()).expect("steps");
         let total: f64 = paths
             .iter()
             .map(|path| {
@@ -753,8 +758,10 @@ mod tests {
         let mut gnma1 = create_test_mbs();
         gnma1.agency = AgencyProgram::GnmaI; // pays 15th of following month
 
-        let fnma_steps = mc_step_schedule(&fnma, as_of, wam).expect("fnma steps");
-        let gnma1_steps = mc_step_schedule(&gnma1, as_of, wam).expect("gnma steps");
+        let fnma_steps =
+            mc_step_schedule(&fnma, as_of, wam, DayCount::Act365F).expect("fnma steps");
+        let gnma1_steps =
+            mc_step_schedule(&gnma1, as_of, wam, DayCount::Act365F).expect("gnma steps");
         assert!(
             fnma_steps.payment_extras[0] > gnma1_steps.payment_extras[0],
             "FNMA delay extra {} must exceed GNMA I extra {}",
@@ -881,8 +888,10 @@ mod tests {
             rates: vec![base_rate; wam + 1],
         };
 
-        let fresh_steps = mc_step_schedule(&fresh_mbs, as_of, wam).expect("fresh steps");
-        let seasoned_steps = mc_step_schedule(&seasoned_mbs, as_of, wam).expect("seasoned steps");
+        let fresh_steps =
+            mc_step_schedule(&fresh_mbs, as_of, wam, DayCount::Act365F).expect("fresh steps");
+        let seasoned_steps =
+            mc_step_schedule(&seasoned_mbs, as_of, wam, DayCount::Act365F).expect("seasoned steps");
         let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps)
             .expect("fresh pv");
         let seasoned_pv = price_on_path(
@@ -974,7 +983,11 @@ mod tests {
         let flat_path = RatePath {
             rates: vec![flat_rate; wam + 1],
         };
-        let steps = mc_step_schedule(&mbs, as_of, wam).expect("steps");
+        let curve_dc = market
+            .get_discount(&mbs.discount_curve_id)
+            .expect("curve")
+            .day_count();
+        let steps = mc_step_schedule(&mbs, as_of, wam, curve_dc).expect("steps");
         let mc_pv = price_on_path(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps).expect("mc pv");
 
         assert!(det_pv > 0.0 && mc_pv > 0.0);
@@ -984,6 +997,25 @@ mod tests {
             "MC model price {mc_pv:.2} must agree with deterministic PV {det_pv:.2} \
              at zero vol / zero OAS / flat curve; relative diff {rel_diff:.5}"
         );
+    }
+
+    /// The MC grid runs on the discount curve's time axis, so a cashflow's
+    /// payment offset must use the curve day count. January 2024 accrual of
+    /// the FNMA test pool pays Monday 26 Feb 2024 (the 25th is a Sunday), 42
+    /// days after the 15 Jan valuation: on an Act/360 curve the offset from
+    /// the first grid point is `42/360 − 1/12`, not `42/365.25 − 1/12`.
+    #[test]
+    fn payment_offset_uses_the_curve_day_count() {
+        let mbs = create_test_mbs();
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        let steps = mc_step_schedule(&mbs, as_of, 1, DayCount::Act360).expect("steps");
+        let expected = 42.0 / 360.0 - 1.0 / 12.0;
+        assert!(
+            (steps.payment_extras[0] - expected).abs() < 1e-15,
+            "{} versus {expected}",
+            steps.payment_extras[0]
+        );
+        assert!((steps.payment_extras[0] - (42.0 / 365.25 - 1.0 / 12.0)).abs() > 1e-3);
     }
 
     #[test]
