@@ -829,6 +829,63 @@ mod oas_tests {
         );
     }
 
+    /// A pool mixing a new row (originated at closing) with a two-year
+    /// seasoned row under PSA prepayment and SDA default curves, defaults
+    /// charged off through a three-bucket delinquency pipeline. The
+    /// deterministic engine reads both curves at each row's own age; with
+    /// neither dimension stochastic the OAS scenario must run the SAME
+    /// rates, so the OAS equals the z-spread of the deterministic flows to
+    /// solver precision.
+    #[test]
+    fn deterministic_oas_matches_z_spread_for_a_dated_psa_pool_with_delinquency() {
+        use finstack_quant_valuations::instruments::fixed_income::structured_credit::DelinquencyModel;
+        let mut sc = deal();
+        sc.pool.assets[0].origination_date = Some(closing());
+        sc.pool.assets.push({
+            let mut b = PoolAsset::fixed_rate_bond(
+                "B1",
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                0.06,
+                maturity(),
+                DayCount::Thirty360,
+            );
+            b.origination_date = Some(Date::from_calendar_date(2022, Month::January, 1).unwrap());
+            b
+        });
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
+        sc.credit_model.default_spec = DefaultModelSpec::sda(2.0);
+        sc.credit_model.delinquency = Some(DelinquencyModel::new(
+            vec![0.5, 0.5, 0.5],
+            vec![0.5, 0.5, 0.5],
+        ));
+        let mkt = market();
+        let as_of = closing();
+        let pv = sc.value_tranche("SR", &mkt, as_of).unwrap();
+        let original = 800_000.0;
+        let market_price = 0.98 * pv.amount() / original * 100.0;
+        let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
+            .expect("valid money fixture");
+
+        let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
+        let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
+        let z = calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap()
+            / 10_000.0;
+
+        let config = OasConfig {
+            stochastic_rates: false,
+            stochastic_credit: false,
+            tolerance: 1e-14,
+            ..Default::default()
+        };
+        let oas = calculate_tranche_oas(&sc, "SR", market_price, &mkt, as_of, &config).unwrap();
+        assert!(
+            (oas.oas - z).abs() < 1e-8,
+            "deterministic OAS {} must equal the z-spread {z} (diff {:e})",
+            oas.oas,
+            oas.oas - z
+        );
+    }
+
     #[test]
     fn stochastic_oas_converges_to_market_price() {
         // Rate + credit coupling both on: the solver should still reprice the

@@ -412,8 +412,12 @@ impl StochasticPricer {
         // required for bit-identical serial/parallel results (the downstream
         // Welford accumulation is order-sensitive).
         let price_factors = |(path_index, factors): (usize, Vec<f64>)| {
-            let shocks =
-                self.path_shocks_from_factors(instrument, &factors, path_index as u64, prepared)?;
+            let shocks = self.path_shocks_from_factors(
+                instrument,
+                &factors,
+                (path_index, antithetic),
+                prepared,
+            )?;
             let per_name_engine = per_name_simulator
                 .as_ref()
                 .map(|sim| self.per_name_engine(sim, path_index, antithetic));
@@ -735,7 +739,7 @@ impl StochasticPricer {
     ) -> Result<Vec<PeriodPoolShock>> {
         let month_count = self.month_count(instrument);
         let factors = self.tree_path_factors(path_index, path_count, branch_count, month_count);
-        self.path_shocks_from_factors(instrument, &factors, path_index as u64, prepared)
+        self.path_shocks_from_factors(instrument, &factors, (path_index, false), prepared)
     }
 
     fn tree_path_factors(
@@ -905,11 +909,73 @@ impl StochasticPricer {
         evolved
     }
 
+    /// Evolved prepayment factor series of one path, correlated with the
+    /// evolved `credit_factors` at the configured level; `None` when the
+    /// factor spec is single-factor (prepayment then shares the credit
+    /// factor).
+    ///
+    /// SC-M23: a SECOND factor for prepayment. Handing ONE scalar to both
+    /// `conditional_smm` and `conditional_mdr` would drive prepayment and
+    /// default off the same realization, forcing their implied correlation to
+    /// +1 (or -1 through a negative loading) regardless of the -0.30
+    /// configured in the shipped RMBS/CLO calibrations. Construction is the
+    /// standard two-factor decomposition
+    ///     Z_prepay = rho * Z_credit + sqrt(1 - rho^2) * Z_indep
+    /// which gives `Z_prepay` a unit-variance standard-normal marginal and
+    /// exactly `rho` correlation with the credit factor.
+    ///
+    /// `Z_indep` comes from a SALTED stream so the credit draws are
+    /// untouched. Antithetic pairs `(2k, 2k+1)` share `substream(k)` and the
+    /// odd member negates its draws, mirroring the credit factors (negated by
+    /// `monte_carlo_factor_sets`) and the per-name streams, so the pair's
+    /// prepayment factors are exact negatives; independent paths use
+    /// `substream(path_index)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `credit_factors` - The path's evolved monthly credit factors.
+    /// * `path_index` - Path number within the run.
+    /// * `antithetic` - Whether paths are drawn as antithetic pairs.
+    /// * `prepared` - Run state carrying the factor correlation and κ.
+    fn prepay_factors(
+        &self,
+        credit_factors: &[f64],
+        (path_index, antithetic): (usize, bool),
+        prepared: &PreparedRun,
+    ) -> Option<Vec<f64>> {
+        let rho = prepared.factor_correlation?;
+        let base = PhiloxRng::new(self.config.seed ^ PREPAY_FACTOR_SEED_SALT);
+        let (mut rng, negate) = if antithetic {
+            (base.substream((path_index / 2) as u64), path_index % 2 == 1)
+        } else {
+            (base.substream(path_index as u64), false)
+        };
+        let independent: Vec<f64> = (0..credit_factors.len())
+            .map(|_| {
+                let draw = rng.next_std_normal();
+                if negate {
+                    -draw
+                } else {
+                    draw
+                }
+            })
+            .collect();
+        let evolved_independent = Self::evolved_factors(&independent, prepared.factor_kappa);
+        let scale = (1.0 - rho * rho).max(0.0).sqrt();
+        Some(
+            credit_factors
+                .iter()
+                .zip(evolved_independent.iter())
+                .map(|(zc, zi)| rho * zc + scale * zi)
+                .collect(),
+        )
+    }
+
     fn path_shocks_from_factors(
         &self,
         instrument: &StructuredCredit,
         factors: &[f64],
-        path_index: u64,
+        path: (usize, bool),
         prepared: &PreparedRun,
     ) -> Result<Vec<PeriodPoolShock>> {
         // AR(1)/OU persistence for MC, tree, and hybrid paths: monthly draws
@@ -917,50 +983,10 @@ impl StochasticPricer {
         // of the factor, not of which channels are simulated.
         let evolved_storage = Self::evolved_factors(factors, prepared.factor_kappa);
         let credit_factors: &[f64] = &evolved_storage;
-
-        // SC-M23: a SECOND factor for prepayment, correlated with the credit
-        // factor at the configured level.
-        //
-        // Handing ONE scalar to both `conditional_smm` and `conditional_mdr`
-        // would drive prepayment and default off the same realization, forcing
-        // their implied correlation to +1 (or -1 through a negative loading)
-        // regardless of the -0.30 configured in the shipped RMBS/CLO
-        // calibrations — a two-factor calibration silently collapsing to a
-        // single-factor model.
-        //
-        // Construction is the standard two-factor decomposition
-        //     Z_prepay = rho * Z_credit + sqrt(1 - rho^2) * Z_indep
-        // which gives `Z_prepay` a unit-variance standard-normal marginal (so
-        // the prepayment model's calibration is untouched) and exactly `rho`
-        // correlation with the credit factor.
-        //
-        // `Z_indep` comes from a SALTED stream keyed by path, so every existing
-        // draw sequence is bit-identical and only the prepayment channel moves.
-        // The transform is linear in both inputs, so antithetic negation still
-        // commutes: negating the raw draws negates `Z_prepay` too, preserving
-        // the pairing.
-        let prepay_storage;
-        let prepay_factors: &[f64] = match prepared.factor_correlation {
-            Some(rho) => {
-                let mut rng = PhiloxRng::new(self.config.seed ^ PREPAY_FACTOR_SEED_SALT)
-                    .substream(path_index);
-                let independent: Vec<f64> = (0..credit_factors.len())
-                    .map(|_| rng.next_std_normal())
-                    .collect();
-                let evolved_independent =
-                    Self::evolved_factors(&independent, prepared.factor_kappa);
-                let scale = (1.0 - rho * rho).max(0.0).sqrt();
-                prepay_storage = credit_factors
-                    .iter()
-                    .zip(evolved_independent.iter())
-                    .map(|(zc, zi)| rho * zc + scale * zi)
-                    .collect::<Vec<f64>>();
-                &prepay_storage
-            }
-            // SingleFactor: prepayment shares the credit factor, i.e. implied
-            // correlation +1.
-            None => credit_factors,
-        };
+        let prepay_storage = self.prepay_factors(credit_factors, path, prepared);
+        // SingleFactor: prepayment shares the credit factor, i.e. implied
+        // correlation +1.
+        let prepay_factors: &[f64] = prepay_storage.as_deref().unwrap_or(credit_factors);
         let factors: &[f64] = credit_factors;
         let months_per_period = instrument.frequency.months().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
@@ -2515,7 +2541,7 @@ mod per_name_copula_tests {
             .prepare_run(&deal, &MarketContext::new())
             .expect("prepared run");
         let shocks = pricer
-            .path_shocks_from_factors(&deal, &factors, 0, &prepared)
+            .path_shocks_from_factors(&deal, &factors, (0, false), &prepared)
             .expect("path shocks");
 
         assert!(!shocks.is_empty(), "must produce at least one period shock");
@@ -2808,7 +2834,7 @@ mod per_name_copula_tests {
                 .expect("prepared run");
             let factors: Vec<f64> = (0..24).map(|m| ((m as f64) * 0.37).sin()).collect();
             pricer
-                .path_shocks_from_factors(&deal, &factors, 0, &prepared)
+                .path_shocks_from_factors(&deal, &factors, (0, false), &prepared)
                 .expect("path shocks")
                 .iter()
                 .map(|s| s.smm)
@@ -2827,6 +2853,44 @@ mod per_name_copula_tests {
              {single_factor}. Equal values mean the engine is still handing one \
              scalar to both channels (SC-M23)."
         );
+    }
+
+    /// Antithetic pairs `(2k, 2k+1)` negate the credit factors, so the
+    /// pair's prepayment factors `rho * Z_credit + sqrt(1 - rho^2) * Z_indep`
+    /// must be exact negatives too: the independent draw has to come from
+    /// the pair's shared substream and be negated on the odd member. Drawing
+    /// it from `substream(path_index)` left the pair's prepayment channel
+    /// independent.
+    #[test]
+    fn antithetic_pair_prepayment_factors_sum_to_zero() {
+        let mut cfg = copula_config(0.06, 0.20, 12, PoolGranularity::PerName, 16);
+        cfg.tree_config.factor_spec = LatentFactorSpec::two_factor(0.20, 0.25, -0.30);
+        let pricer = StochasticPricer::new(cfg);
+        let prepared = pricer
+            .prepare_run(&clo_deal(10), &MarketContext::new())
+            .expect("prepared run");
+        let credit: Vec<f64> = (0..12).map(|m| ((m as f64) * 0.61).cos()).collect();
+        let negated: Vec<f64> = credit.iter().map(|z| -z).collect();
+        for pair in [0usize, 3] {
+            let first = pricer
+                .prepay_factors(&credit, (2 * pair, true), &prepared)
+                .expect("two-factor spec");
+            let second = pricer
+                .prepay_factors(&negated, (2 * pair + 1, true), &prepared)
+                .expect("two-factor spec");
+            for (a, b) in first.iter().zip(&second) {
+                assert!(a.abs() > 0.0);
+                assert!((a + b).abs() < 1e-15, "pair {pair}: {a} + {b} != 0");
+            }
+        }
+        // Without antithetic pairing, neighbouring paths stay independent.
+        let first = pricer
+            .prepay_factors(&credit, (0, false), &prepared)
+            .expect("two-factor spec");
+        let second = pricer
+            .prepay_factors(&negated, (1, false), &prepared)
+            .expect("two-factor spec");
+        assert!(first.iter().zip(&second).any(|(a, b)| (a + b).abs() > 1e-3));
     }
 
     /// SC-M24 — burnout must ACCUMULATE across a path, not sit at 1.0.
@@ -2854,7 +2918,7 @@ mod per_name_copula_tests {
         let factors: Vec<f64> = (0..24).map(|_| 1.5_f64).collect();
         let mut burnout = 1.0_f64;
         let _ = pricer
-            .path_shocks_from_factors(&deal, &factors, 0, &prepared)
+            .path_shocks_from_factors(&deal, &factors, (0, false), &prepared)
             .expect("path shocks");
 
         // Exercise the month loop directly so the state is observable.

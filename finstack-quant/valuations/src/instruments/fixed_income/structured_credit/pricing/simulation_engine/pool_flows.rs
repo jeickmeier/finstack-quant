@@ -74,6 +74,30 @@ pub(super) struct AssetSeasonedRates {
 }
 
 impl AssetSeasonedRates {
+    /// Apply scenario multipliers to every per-asset rate, clamping each
+    /// scaled rate to `[0, cap]`. A `None` multiplier drops that channel's
+    /// per-asset rates so the pool-level rate applies to every row.
+    ///
+    /// # Arguments
+    ///
+    /// * `smm_mult` - Factor on each asset's monthly prepayment rate.
+    /// * `mdr_mult` - Factor on each asset's monthly default rate.
+    /// * `cap` - Upper bound on a scaled monthly rate (decimal, below 1).
+    pub(super) fn scaled(mut self, smm_mult: Option<f64>, mdr_mult: Option<f64>, cap: f64) -> Self {
+        fn scale(rates: &mut Vec<Option<f64>>, mult: Option<f64>, cap: f64) {
+            match mult {
+                Some(mult) => rates
+                    .iter_mut()
+                    .flatten()
+                    .for_each(|rate| *rate = (*rate * mult).clamp(0.0, cap)),
+                None => rates.clear(),
+            }
+        }
+        scale(&mut self.smm, smm_mult, cap);
+        scale(&mut self.mdr, mdr_mult, cap);
+        self
+    }
+
     fn smm(&self, i: usize) -> Option<f64> {
         self.smm.get(i).copied().flatten()
     }
