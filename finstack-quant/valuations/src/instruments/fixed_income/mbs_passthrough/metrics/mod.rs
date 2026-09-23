@@ -56,8 +56,34 @@ impl MetricCalculator for EffectiveConvexityCalculator {
 /// Calculator for option-adjusted spread (OAS).
 ///
 /// Reports the Monte Carlo OAS from [`calculate_mc_oas`], using stochastic
-/// Hull-White rate paths and rate-dependent prepayment.
+/// Hull-White rate paths and rate-dependent prepayment. The Hull-White mean
+/// reversion κ and short-rate volatility σ come from
+/// `instrument_pricing_overrides.model_config.hw1f_mean_reversion` and
+/// `hw1f_sigma`, supplied together; without them the engine uses κ = 5% and
+/// σ = 1%. These are user inputs: the metric does not calibrate them to
+/// swaptions.
 pub(crate) struct OasCalculator;
+
+/// Resolve the MC-OAS configuration from the pool's model overrides.
+fn mc_oas_config(mbs: &AgencyMbsPassthrough) -> finstack_quant_core::Result<McOasConfig> {
+    let model = &mbs.instrument_pricing_overrides.model_config;
+    if model.hw1f_sigma_schedule.is_some() {
+        return Err(finstack_quant_core::Error::Validation(
+            "MBS MC-OAS takes a scalar hw1f_sigma; hw1f_sigma_schedule is not supported".into(),
+        ));
+    }
+    match (model.hw1f_mean_reversion, model.hw1f_sigma) {
+        (None, None) => Ok(McOasConfig::default()),
+        (Some(hw_kappa), Some(hw_sigma)) => Ok(McOasConfig {
+            hw_kappa,
+            hw_sigma,
+            ..McOasConfig::default()
+        }),
+        _ => Err(finstack_quant_core::Error::Validation(
+            "MBS MC-OAS requires hw1f_mean_reversion and hw1f_sigma together".into(),
+        )),
+    }
+}
 
 impl MetricCalculator for OasCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -77,7 +103,7 @@ impl MetricCalculator for OasCalculator {
             market_price,
             context.curves.as_ref(),
             context.as_of,
-            &McOasConfig::default(),
+            &mc_oas_config(mbs)?,
         )
     }
 }
@@ -208,5 +234,61 @@ mod tests {
             (mc_oas - static_zspread).abs() > 1e-4,
             "MC-OAS {mc_oas} should differ from static Z-spread {static_zspread}"
         );
+    }
+
+    /// The Oas metric reads κ and σ from the pool's model overrides; a
+    /// partial pair is rejected rather than silently defaulted.
+    #[test]
+    fn oas_metric_reads_hull_white_parameters_from_model_config() {
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (30.0, 0.30)])
+                .interp(InterpStyle::LogLinear)
+                .build()
+                .expect("valid curve"),
+        );
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        mbs.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(95.0);
+        let metric = |mbs: &AgencyMbsPassthrough| {
+            let mut ctx = MetricContext::new(
+                Arc::new(mbs.clone()),
+                Arc::new(market.clone()),
+                as_of,
+                Money::from((0_i64, Currency::USD)),
+                MetricContext::default_config(),
+            );
+            OasCalculator.calculate(&mut ctx)
+        };
+        let default_oas = metric(&mbs).expect("default oas");
+
+        mbs.instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.10);
+        mbs.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.015);
+        let configured = metric(&mbs).expect("configured oas");
+        let direct = calculate_mc_oas(
+            &mbs,
+            95.0,
+            &market,
+            as_of,
+            &McOasConfig {
+                hw_kappa: 0.10,
+                hw_sigma: 0.015,
+                ..McOasConfig::default()
+            },
+        )
+        .expect("direct");
+        assert!(
+            (configured - direct).abs() < 1e-12,
+            "{configured} vs {direct}"
+        );
+        assert!((configured - default_oas).abs() > 1e-6);
+
+        mbs.instrument_pricing_overrides.model_config.hw1f_sigma = None;
+        assert!(metric(&mbs).is_err(), "partial κ/σ pair must be rejected");
     }
 }
