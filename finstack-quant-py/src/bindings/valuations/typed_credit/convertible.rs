@@ -85,7 +85,8 @@ impl PyConversionSpec {
     ///     Dividend protection; default ``"none"``.
     /// dilution_events : list[dict] | None
     ///     Dilution events (``date``, ``new_issue_price``, ``new_shares_issued``,
-    ///     ``shares_outstanding_before``); default empty.
+    ///     ``shares_outstanding_before``) in chronological order; pricing raises
+    ///     ``ValueError`` for out-of-order events. Default empty.
     ///
     /// Returns
     /// -------
