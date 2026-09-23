@@ -180,6 +180,55 @@ fn single_path_stochastic_pv_matches_deterministic_tranche_pv() {
     }
 }
 
+/// A pool mixing a row originated at closing with a two-year seasoned row
+/// under PSA prepayment and SDA default curves. The deterministic engine
+/// reads each curve at the row's own age; the single deterministic-spec
+/// stochastic path must run the same per-row rates (its pool-level shock
+/// only scales them), so its tranche PVs match the deterministic ones.
+#[test]
+fn single_path_stochastic_pv_matches_deterministic_for_a_dated_psa_sda_pool() {
+    let mut sc = structured_credit(false);
+    sc.pool.assets[0].origination_date = Some(closing_date());
+    let mut seasoned = PoolAsset::fixed_rate_bond(
+        "A2",
+        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        0.06,
+        legal_maturity(),
+        DayCount::Thirty360,
+    );
+    seasoned.origination_date = Some(Date::from_calendar_date(2022, Month::January, 1).unwrap());
+    sc.pool.assets.push(seasoned);
+    sc.tranches.tranches[0].original_balance =
+        Money::new(1_600_000.0, Currency::USD).expect("valid money fixture");
+    sc.tranches.tranches[0].current_balance = sc.tranches.tranches[0].original_balance;
+    sc.tranches.tranches[1].original_balance =
+        Money::new(400_000.0, Currency::USD).expect("valid money fixture");
+    sc.tranches.tranches[1].current_balance = sc.tranches.tranches[1].original_balance;
+    sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
+    sc.credit_model.default_spec = DefaultModelSpec::sda(2.0);
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+        sc.credit_model.prepayment_spec.clone(),
+    ));
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
+        sc.credit_model.default_spec.clone(),
+    ));
+    let market = fixed_market();
+
+    let details = stochastic_details(&stochastic_single_path(&sc, &market));
+    for tranche in &details.tranche_results {
+        let deterministic = sc
+            .value_tranche(&tranche.tranche_id, &market, as_of())
+            .expect("deterministic tranche pv");
+        assert!(
+            (tranche.npv.amount() - deterministic.amount()).abs() < 1.0,
+            "{} stochastic PV {} should match deterministic PV {}",
+            tranche.tranche_id,
+            tranche.npv.amount(),
+            deterministic.amount()
+        );
+    }
+}
+
 #[test]
 fn stochastic_json_result_contains_full_tranche_details() {
     let sc = structured_credit(false);

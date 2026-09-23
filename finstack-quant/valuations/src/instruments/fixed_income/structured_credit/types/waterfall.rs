@@ -14,7 +14,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::explain::ExplanationTrace;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::HashMap;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -267,8 +266,8 @@ impl EquityHistory {
 /// waterfall.
 ///
 /// Each sub-spec is optional; when none are present the resolved waterfall is
-/// identical to the base waterfall. Applied by
-/// [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].
+/// identical to the base waterfall. The simulation engine applies them to
+/// each period's copy of the waterfall.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -324,8 +323,8 @@ impl WaterfallRules {
     ///   non-negative (a ratio, so it may exceed 1).
     /// - `excess_spread.target_balance` is non-negative.
     /// - The shifting-interest schedule is non-empty and strictly ascending in
-    ///   `months_from_closing` (so [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`]'s
-    ///   step lookup is unambiguous).
+    ///   `months_from_closing` (so the per-period shifting-interest step lookup
+    ///   is unambiguous).
     /// - `controlled_accumulation.start_date <= bullet_date`.
     ///
     /// # Errors
@@ -1667,58 +1666,6 @@ impl CoverageTestType {
     }
 }
 
-// WATERFALL WORKSPACE (Pre-allocated Buffers)
-
-/// Pre-allocated workspace for waterfall execution to avoid hot-path allocations.
-///
-/// This struct holds reusable buffers that are cleared between periods rather than
-/// reallocated. For Monte Carlo simulations with thousands of paths and hundreds
-/// of periods, this significantly reduces allocation overhead.
-#[derive(Debug, Clone)]
-pub struct WaterfallWorkspace {
-    /// Pre-allocated tier allocations buffer
-    pub tier_allocations: Vec<(String, Money)>,
-    /// Pre-allocated distributions map
-    pub distributions: HashMap<RecipientType, Money>,
-    /// Pre-allocated payment records buffer
-    pub payment_records: Vec<PaymentRecord>,
-    /// Pre-allocated coverage test results buffer
-    pub coverage_tests: Vec<(String, f64, bool)>,
-    /// Pre-allocated tranche index (built once per deal, reused across periods)
-    pub tranche_index: HashMap<String, usize>,
-}
-
-impl WaterfallWorkspace {
-    /// Create a new workspace with pre-allocated capacity.
-    pub fn new(num_tiers: usize, num_recipients: usize, num_tranches: usize) -> Self {
-        let mut distributions = HashMap::default();
-        distributions.reserve(num_recipients);
-        let mut tranche_index = HashMap::default();
-        tranche_index.reserve(num_tranches);
-        Self {
-            tier_allocations: Vec::with_capacity(num_tiers),
-            distributions,
-            payment_records: Vec::with_capacity(num_recipients),
-            coverage_tests: Vec::with_capacity(num_tranches * 2),
-            tranche_index,
-        }
-    }
-
-    /// Clear all buffers for reuse in the next period.
-    pub fn clear(&mut self) {
-        self.tier_allocations.clear();
-        self.distributions.clear();
-        self.payment_records.clear();
-        self.coverage_tests.clear();
-    }
-}
-
-impl Default for WaterfallWorkspace {
-    fn default() -> Self {
-        Self::new(8, 32, 8)
-    }
-}
-
 /// Main waterfall engine with tier-based distribution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1785,7 +1732,9 @@ impl Waterfall {
     /// Insert `test` as a coverage-test position immediately after the tier
     /// that pays `spec.placement_tranche()`'s interest (or after the last
     /// interest tier when that tranche has no interest recipient), joining an
-    /// existing test tier at that position when one is already there.
+    /// existing test tier at that position whose tests share the test's
+    /// `action` and `divert_pct`, else adding a new test tier after those
+    /// already there.
     /// Priorities are renumbered `1..=n` in order.
     ///
     /// # Arguments
@@ -1830,21 +1779,31 @@ impl Waterfall {
                 .iter()
                 .rposition(|tier| tier.payment_type == PaymentType::Interest)
         });
-        let insert_at = anchor.map_or(0, |i| i + 1);
-        match self.tiers.get_mut(insert_at) {
-            Some(existing)
-                if existing.payment_type == PaymentType::CoverageTest
-                    && existing
-                        .tests
-                        .first()
-                        .is_none_or(|first| first.action == test.action) =>
-            {
-                existing.tests.push(test);
-            }
-            _ => {
-                let tier =
-                    WaterfallTier::coverage_tests(format!("{placement}_coverage"), 0, vec![test]);
-                self.tiers.insert(insert_at, tier);
+        // The run of test tiers already at this position: join the one whose
+        // tests share this test's action and diversion cap (a tier diverts
+        // once, under one action and one cap), else append a new tier after
+        // the run so tests keep their insertion order.
+        let run_start = anchor.map_or(0, |i| i + 1);
+        let run_end = run_start
+            + self.tiers[run_start..]
+                .iter()
+                .take_while(|tier| tier.payment_type == PaymentType::CoverageTest)
+                .count();
+        let joinable = self.tiers[run_start..run_end].iter_mut().find(|tier| {
+            tier.tests.first().is_none_or(|first| {
+                first.action == test.action && first.divert_pct == test.divert_pct
+            })
+        });
+        match joinable {
+            Some(existing) => existing.tests.push(test),
+            None => {
+                let id = if run_end == run_start {
+                    format!("{placement}_coverage")
+                } else {
+                    format!("{placement}_coverage_{}", run_end - run_start + 1)
+                };
+                let tier = WaterfallTier::coverage_tests(id, 0, vec![test]);
+                self.tiers.insert(run_end, tier);
             }
         }
         for (index, tier) in self.tiers.iter_mut().enumerate() {

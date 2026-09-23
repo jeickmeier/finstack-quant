@@ -27,7 +27,7 @@ impl MetricCalculator for WamCalculator {
         let deal = context
             .instrument_as::<StructuredCredit>()?
             .resolved_for_pricing()?;
-        Ok(deal.pool.weighted_avg_maturity(context.as_of))
+        deal.pool.weighted_avg_maturity(context.as_of)
     }
 }
 

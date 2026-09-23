@@ -16,7 +16,6 @@ pub use simulation_engine::{
 pub(crate) mod stochastic;
 pub(crate) mod waterfall;
 
-pub use resolve::resolve_waterfall;
 pub use waterfall::execute_waterfall;
 
 use crate::cashflow::traits::DatedFlows;

@@ -49,7 +49,7 @@ pub use types::{
     TrancheAccrualPeriod, TrancheBehaviorType, TrancheBuilder, TrancheCashflows, TrancheCoupon,
     TrancheDraw, TrancheReadvance, TrancheSeniority, TrancheStructure, TrancheValuation,
     TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
-    WaterfallTier, WaterfallWorkspace,
+    WaterfallTier,
 };
 
 pub use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};
@@ -64,8 +64,7 @@ pub use utils::{
 };
 
 pub use pricing::{
-    execute_waterfall, generate_cashflows, generate_tranche_cashflows, resolve_waterfall,
-    run_simulation,
+    execute_waterfall, generate_cashflows, generate_tranche_cashflows, run_simulation,
 };
 
 pub use pricing::coverage_tests::{CoverageTest, TestContext, TestResult};

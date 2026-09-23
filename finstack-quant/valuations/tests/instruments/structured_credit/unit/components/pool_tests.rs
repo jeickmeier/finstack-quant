@@ -437,10 +437,62 @@ fn test_pool_weighted_avg_maturity() {
     ));
 
     // Act
-    let wam = pool.weighted_avg_maturity(test_date());
+    let wam = pool.weighted_avg_maturity(test_date()).expect("wam");
 
     // Assert: (10M * 3 + 10M * 7) / 20M = 5 years
     assert!((wam - 5.0).abs() < 0.1);
+}
+
+/// Every row's remaining term counts, in Act/365F years, whatever its
+/// accrual day count. A row under ACT/ACT ICMA (a materialized bond) cannot
+/// be measured by its own convention without a coupon schedule; the old code
+/// dropped it from the numerator while keeping its balance in the
+/// denominator, reporting (10M x 3y + 0) / 20M = 1.5y for 3y and 7y loans.
+#[test]
+fn test_pool_weighted_avg_maturity_counts_every_row() {
+    let first = Date::from_calendar_date(2028, Month::January, 1).unwrap();
+    let second = Date::from_calendar_date(2032, Month::January, 1).unwrap();
+    let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "B1",
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        0.06,
+        first,
+        finstack_quant_core::dates::DayCount::Thirty360,
+    ));
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "B2",
+        Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        0.06,
+        second,
+        finstack_quant_core::dates::DayCount::ActActIsma,
+    ));
+    // 2025-01-01 -> 2028-01-01 is 1095 days; -> 2032-01-01 is 2556 days.
+    assert_eq!((first - test_date()).whole_days(), 1095);
+    assert_eq!((second - test_date()).whole_days(), 2556);
+    let expected = (1095.0 / 365.0 + 2556.0 / 365.0) / 2.0;
+    let wam = pool.weighted_avg_maturity(test_date()).expect("wam");
+    assert!((wam - expected).abs() < 1e-12, "{wam} vs {expected}");
+    assert!((wam - 1.5).abs() > 1.0, "the ICMA row must not be dropped");
+    let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
+    assert!((stats.weighted_avg_maturity - expected).abs() < 1e-12);
+}
+
+/// A row in a currency other than the pool's base currency makes the pool
+/// balance unsummable: the WAM (and the pool stats) must fail rather than
+/// report 0.
+#[test]
+fn test_pool_weighted_avg_maturity_propagates_balance_errors() {
+    let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "B1",
+        Money::new(10_000_000.0, Currency::EUR).expect("valid money fixture"),
+        0.06,
+        Date::from_calendar_date(2028, Month::January, 1).unwrap(),
+        finstack_quant_core::dates::DayCount::Thirty360,
+    ));
+    assert!(pool.weighted_avg_maturity(test_date()).is_err());
+    assert!(calculate_pool_stats(&pool, test_date()).is_err());
 }
 
 // AssetPool Diversity Score Tests
@@ -646,7 +698,7 @@ fn test_calculate_pool_stats_comprehensive() {
     );
 
     // Act
-    let stats = calculate_pool_stats(&pool, test_date());
+    let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
 
     // Assert
     assert!(stats.weighted_avg_coupon > 0.0);
@@ -688,7 +740,7 @@ fn test_calculate_pool_stats_with_defaults() {
     pool.assets.push(defaulted);
 
     // Act
-    let stats = calculate_pool_stats(&pool, test_date());
+    let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
 
     // Assert: 1M / 10M = 10% default rate
     assert!((stats.cumulative_default_rate - 10.0).abs() < 0.01);

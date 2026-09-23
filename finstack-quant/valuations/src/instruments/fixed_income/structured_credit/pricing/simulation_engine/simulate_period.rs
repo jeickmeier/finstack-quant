@@ -66,7 +66,7 @@ pub(super) fn simulate_period(
     // uncapped recipient owes the full coupon, a capped recipient owes the
     // capped coupon (the capped-off portion never defers), and a debt tranche
     // with no interest recipient owes nothing. Extracted from the base
-    // waterfall with the live AFC cap applied exactly as `resolve_waterfall`
+    // waterfall with the live AFC cap applied exactly as the AFC rule
     // does, so these claims match what the period waterfall allocates. Shared
     // by the excess-spread/reserve sizing below and the Step-5 recording.
     let claim_caps =
@@ -396,22 +396,10 @@ pub(super) fn simulate_period(
     // The tests are evaluated on what the executor will see: the waterfall
     // with this period's hedge payments ranked as fees, and interest proceeds
     // including call premia, reserve interest and hedge receipts.
-    let trigger_waterfall = if hedge_flows.payments.is_empty() {
-        std::borrow::Cow::Borrowed(waterfall)
-    } else {
-        let mut resolved = waterfall.clone();
-        for (id, amount, priority) in &hedge_flows.payments {
-            resolved.insert_hedge_payment(
-                crate::instruments::fixed_income::structured_credit::types::Recipient::fixed_fee(
-                    id.clone(),
-                    "SwapCounterparty",
-                    *amount,
-                ),
-                *priority,
-            );
-        }
-        std::borrow::Cow::Owned(resolved)
-    };
+    let mut trigger_waterfall = std::borrow::Cow::Borrowed(waterfall);
+    if !hedge_flows.payments.is_empty() {
+        insert_hedge_payments(trigger_waterfall.to_mut(), &hedge_flows.payments);
+    }
     let trigger_actions = super::triggers::advance(
         state,
         &trigger_waterfall,
@@ -621,7 +609,7 @@ pub(super) fn simulate_period(
             tranche_index.insert(tr.id.as_str(), i);
         }
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::senior_fee_accrual(
-            // The BASE waterfall: `resolve_waterfall` only rewrites AFC caps
+            // The BASE waterfall: the period rules only rewrite AFC caps
             // on tranche interest, step-down/shifting weights on principal
             // tiers, and accumulation lockout targets — it never touches fee
             // tiers, so the fee accrual is identical either way.
@@ -827,18 +815,21 @@ pub(super) fn simulate_period(
     }
 
     // ── Step 4: Execute Waterfall on post-loss balances ──────────────
-    // Per-period step-down: switch principal to pro-rata once the deal has
-    // seasoned past the step-down date with cumulative losses below the trigger.
-    // Borrowed (zero-cost) when no step-down rule applies.
-    let rules = instrument.waterfall_rules.as_ref();
+    // The period's waterfall: the base waterfall, copied once by the first
+    // rule that edits it (no copy when no rule applies this period).
+    //
     // Controlled accumulation locks out investor principal (held flat) and takes
     // precedence; otherwise shifting interest and step-down govern principal
     // allocation, with shifting interest winning when both are configured.
-    let period_waterfall = if is_accumulating {
+    // Step-down switches principal to pro-rata once the deal has seasoned past
+    // the step-down date with every trigger passing.
+    let rules = instrument.waterfall_rules.as_ref();
+    let mut period_waterfall = std::borrow::Cow::Borrowed(waterfall);
+    if is_accumulating {
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_accumulation_lockout(
-            waterfall,
+            period_waterfall.to_mut(),
             &state.tranche_balances,
-        )
+        );
     } else if let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) {
         let months_from_closing = state.closing_date.months_until(pay_date);
         // Senior's pro-rata share (by current balance) governs scheduled
@@ -875,88 +866,70 @@ pub(super) fn simulate_period(
         };
         let metrics = step_down_metrics(state);
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_shifting_interest(
-            waterfall,
-            rules,
+            period_waterfall.to_mut(),
+            si,
             months_from_closing,
             senior_prorata_share,
             unscheduled_fraction,
             &state.tranche_balances,
             &metrics,
-        )
+        );
     } else {
         let metrics = step_down_metrics(state);
-        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_step_down(
-            waterfall,
-            rules,
-            pay_date,
-            &metrics,
-            &state.tranche_balances,
-        )
-    };
+        if crate::instruments::fixed_income::structured_credit::pricing::resolve::step_down_in_effect(rules, pay_date, &metrics) {
+            crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_step_down(
+                period_waterfall.to_mut(),
+                &state.tranche_balances,
+            );
+        }
+    }
 
     // Layer the available-funds cap onto the per-period waterfall using the live
     // cap rate, so the cash *routed* to capped tranches' interest matches the
-    // interest *recorded* in Step 5 (both keyed on `live_afc_cap`). Identity (no
-    // clone) when no AFC rule is configured.
-    let period_waterfall = if rules.and_then(|r| r.afc.as_ref()).is_some() {
-        std::borrow::Cow::Owned(
-            crate::instruments::fixed_income::structured_credit::pricing::resolve::resolve_waterfall(
-                &period_waterfall,
-                rules,
-                live_afc_cap,
-            ),
-        )
-    } else {
-        period_waterfall
-    };
+    // interest *recorded* in Step 5 (both keyed on `live_afc_cap`).
+    let afc = rules.and_then(|r| r.afc.as_ref());
+    let afc_carryover = afc.is_some_and(|afc| afc.carryover);
+    if let Some(afc) = afc {
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_afc_cap(
+            period_waterfall.to_mut(),
+            afc,
+            live_afc_cap,
+        );
+    }
 
     // Targeted OC amortization caps the notes' principal at the amount that
     // holds overcollateralization at the target on the post-collection pool.
-    let period_waterfall = match rules.and_then(|r| r.target_oc.as_ref()) {
-        Some(spec) if !is_accumulating => std::borrow::Cow::Owned(
+    if let Some(spec) = rules.and_then(|r| r.target_oc.as_ref()) {
+        if !is_accumulating {
             crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_target_oc(
-                &period_waterfall,
+                period_waterfall.to_mut(),
                 spec,
                 state.pool_state.balances.iter().sum::<f64>()
                     + state.principal_funding_account.amount(),
                 state.original_pool_balance.amount(),
                 &state.tranche_balances,
-            )
-            .into_owned(),
-        ),
-        _ => period_waterfall,
-    };
+            );
+        }
+    }
 
     // Net-WAC carryover: each capped tranche's recipient asks for the
     // balance brought into the period.
-    let afc_carryover = rules
-        .and_then(|r| r.afc.as_ref())
-        .is_some_and(|afc| afc.carryover);
-    let period_waterfall = if afc_carryover {
-        std::borrow::Cow::Owned(
-            crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_net_wac_carryover(
-                &period_waterfall,
-                &state.carryover_balance,
-            )
-            .into_owned(),
-        )
-    } else {
-        period_waterfall
-    };
+    if afc_carryover {
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_net_wac_carryover(
+            period_waterfall.to_mut(),
+            &state.carryover_balance,
+        );
+    }
 
-    let period_waterfall = match reserve_target {
-        Some(target) => std::borrow::Cow::Owned(
-            crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_reserve_target(
-                &period_waterfall,
-                Money::new(target, state.base_currency)?,
-            )
-            .into_owned(),
-        ),
-        None => period_waterfall,
-    };
+    if let Some(target) = reserve_target {
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_reserve_target(
+            period_waterfall.to_mut(),
+            Money::new(target, state.base_currency)?,
+        );
+    }
 
-    let period_waterfall = if is_reinvestment_active {
-        let mut resolved = period_waterfall.into_owned();
+    if is_reinvestment_active {
+        let resolved = period_waterfall.to_mut();
         let amortizing: &[String] = state
             .pool
             .reinvestment_period
@@ -991,48 +964,27 @@ pub(super) fn simulate_period(
                 }
             }
         }
-        std::borrow::Cow::Owned(resolved)
-    } else {
-        period_waterfall
-    };
+    }
 
-    let period_waterfall = if state.tranche_triggers.is_empty() {
-        period_waterfall
-    } else {
-        let mut resolved = period_waterfall.into_owned();
-        trigger_actions.apply(&mut resolved);
-        std::borrow::Cow::Owned(resolved)
-    };
+    if !state.tranche_triggers.is_empty() {
+        trigger_actions.apply(period_waterfall.to_mut());
+    }
 
     // On a redemption date the equity residual is withheld: it carries as
     // undistributed interest into the redemption proceeds, which the
     // orchestration distributes after the notes are redeemed.
-    let period_waterfall = if period.redemption {
-        let mut resolved = period_waterfall.into_owned();
-        resolved
+    if period.redemption {
+        period_waterfall
+            .to_mut()
             .tiers
             .retain(|tier| tier.payment_type != PaymentType::Residual);
-        std::borrow::Cow::Owned(resolved)
-    } else {
-        period_waterfall
-    };
+    }
 
-    let period_waterfall = if hedge_flows.payments.is_empty() {
-        period_waterfall
-    } else {
-        let mut resolved = period_waterfall.into_owned();
-        for (id, amount, priority) in &hedge_flows.payments {
-            resolved.insert_hedge_payment(
-                crate::instruments::fixed_income::structured_credit::types::Recipient::fixed_fee(
-                    id.clone(),
-                    "SwapCounterparty",
-                    *amount,
-                ),
-                *priority,
-            );
-        }
-        std::borrow::Cow::Owned(resolved)
-    };
+    // Hedge payments rank last: their junior-fee position is placed after
+    // the tiers the rules above insert or remove.
+    if !hedge_flows.payments.is_empty() {
+        insert_hedge_payments(period_waterfall.to_mut(), &hedge_flows.payments);
+    }
 
     // Canonical asset balances already reflect amortization, defaults, and
     // any par purchased with reinvested cash. Restricted cash is passed once.
@@ -1531,4 +1483,26 @@ fn apply_tranche_draws(
         state.tranche_draws.push((tranche_id, pay_date, amount));
     }
     Ok(())
+}
+
+/// Rank this period's hedge payments in `waterfall` as fixed fees to the swap
+/// counterparty at each payment's configured priority.
+fn insert_hedge_payments(
+    waterfall: &mut crate::instruments::fixed_income::structured_credit::types::Waterfall,
+    payments: &[(
+        String,
+        Money,
+        crate::instruments::fixed_income::structured_credit::types::SwapPriority,
+    )],
+) {
+    for (id, amount, priority) in payments {
+        waterfall.insert_hedge_payment(
+            crate::instruments::fixed_income::structured_credit::types::Recipient::fixed_fee(
+                id.clone(),
+                "SwapCounterparty",
+                *amount,
+            ),
+            *priority,
+        );
+    }
 }

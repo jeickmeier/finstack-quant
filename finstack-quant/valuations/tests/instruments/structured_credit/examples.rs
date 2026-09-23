@@ -303,8 +303,9 @@ mod tests {
         // Would be calculated from all-in rates after index fixing
 
         // WAM (not WAL)
-        let _wam =
-            pool.weighted_avg_maturity(Date::from_calendar_date(2025, Month::January, 1).unwrap());
+        let _wam = pool
+            .weighted_avg_maturity(Date::from_calendar_date(2025, Month::January, 1).unwrap())
+            .expect("wam");
     }
 
     #[test]

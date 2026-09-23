@@ -2,75 +2,51 @@
 //!
 //! This is the seam through which declarative [`WaterfallRules`] are layered
 //! onto the base waterfall produced by `StructuredCredit::create_waterfall`.
-//! When no rules are present the resolved waterfall is identical to the base
-//! (the identity), so deals that configure no rules are bit-for-bit unaffected.
-//!
-//! Today the only rule is the available-funds cap, whose cap rate (the
-//! collateral weighted-average coupon) is effectively constant over the deal's
-//! life, so resolution runs once. Future per-period rules (step-down triggers,
-//! revolving phases) will call this per period with the evolving deal state.
+//! Each rule edits the period's waterfall in place; the simulation clones the
+//! base waterfall at most once per period, on the first rule that applies, so
+//! deals that configure no rules run the base waterfall unchanged.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, FundingSource, PaymentCalculation, PaymentType, Recipient, ShiftMode,
-    ShiftingInterestStep, StepDownSpec, StepDownTrigger, Waterfall, WaterfallRules,
+    AfcSpec, AllocationMode, FundingSource, PaymentCalculation, PaymentType, Recipient, ShiftMode,
+    ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec, StepDownTrigger, Waterfall,
+    WaterfallRules,
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use std::borrow::Cow;
 use std::collections::HashMap;
 
-/// Resolve `base` into the concrete waterfall for a deal, applying any rules.
+/// Rewrite the interest recipients of available-funds-capped tranches to
+/// capped interest at `cap_rate`.
 ///
 /// # Arguments
 ///
-/// * `base` - The deal's base waterfall (from `create_waterfall`).
-/// * `rules` - Optional declarative rules to layer on.
-/// * `collateral_wac` - The collateral weighted-average coupon (decimal), used
-///   as the available-funds cap rate.
-///
-/// # Returns
-///
-/// A waterfall identical to `base` when `rules` is `None` or carries no
-/// applicable rule; otherwise a rewritten copy (e.g. capped-interest recipients
-/// for available-funds-capped tranches).
-pub fn resolve_waterfall(
-    base: &Waterfall,
-    rules: Option<&WaterfallRules>,
-    collateral_wac: f64,
-) -> Waterfall {
-    let mut waterfall = base.clone();
-
-    let Some(rules) = rules else {
-        return waterfall;
-    };
-
-    if let Some(afc) = rules.afc.as_ref() {
-        for tier in &mut waterfall.tiers {
-            for recipient in &mut tier.recipients {
-                // Rewrite TrancheInterest -> CappedTrancheInterest for capped
-                // tranches. Compute the replacement first so the immutable
-                // borrow from the match ends before the reassignment.
-                let replacement = match &recipient.calculation {
-                    PaymentCalculation::TrancheInterest {
-                        tranche_id,
-                        rounding,
-                    } if afc.capped_tranches.iter().any(|t| t == tranche_id) => {
-                        Some(PaymentCalculation::CappedTrancheInterest {
-                            tranche_id: tranche_id.clone(),
-                            cap_rate: collateral_wac,
-                            rounding: *rounding,
-                        })
-                    }
-                    _ => None,
-                };
-                if let Some(new_calc) = replacement {
-                    recipient.calculation = new_calc;
+/// * `waterfall` - Period waterfall edited in place.
+/// * `afc` - Available-funds-cap rule naming the capped tranches.
+/// * `cap_rate` - Cap rate (decimal), the live collateral net WAC.
+pub(crate) fn apply_afc_cap(waterfall: &mut Waterfall, afc: &AfcSpec, cap_rate: f64) {
+    for tier in &mut waterfall.tiers {
+        for recipient in &mut tier.recipients {
+            // Rewrite TrancheInterest -> CappedTrancheInterest for capped
+            // tranches. Compute the replacement first so the immutable borrow
+            // from the match ends before the reassignment.
+            let replacement = match &recipient.calculation {
+                PaymentCalculation::TrancheInterest {
+                    tranche_id,
+                    rounding,
+                } if afc.capped_tranches.iter().any(|t| t == tranche_id) => {
+                    Some(PaymentCalculation::CappedTrancheInterest {
+                        tranche_id: tranche_id.clone(),
+                        cap_rate,
+                        rounding: *rounding,
+                    })
                 }
+                _ => None,
+            };
+            if let Some(new_calc) = replacement {
+                recipient.calculation = new_calc;
             }
         }
     }
-
-    waterfall
 }
 
 /// Per-period deal-health metrics evaluated against [`StepDownTrigger`]s.
@@ -112,28 +88,38 @@ fn step_down_active(spec: &StepDownSpec, date: Date, metrics: &StepDownMetrics) 
 
 /// Apply per-period step-down to the waterfall's principal allocation.
 ///
-/// Returns `base` unchanged (borrowed) unless a `StepDownSpec` is configured
-/// and the step-down condition holds this period — on or after the step-down
-/// date with every [`StepDownTrigger`] passing for the given `metrics` — in
-/// which case it returns a copy with every principal tier switched to pro-rata
-/// allocation, releasing subordination to the junior tranches. While any
-/// trigger is breached the deal reverts to sequential (re-evaluated each period).
-pub(crate) fn apply_step_down<'w, S: std::hash::BuildHasher>(
-    base: &'w Waterfall,
+/// Whether the deal's step-down is in effect this period: a `StepDownSpec`
+/// is configured, `date` is on or after the step-down date and every
+/// [`StepDownTrigger`] passes on `metrics`. While any trigger is breached the
+/// deal reverts to sequential (re-evaluated each period).
+///
+/// # Arguments
+///
+/// * `rules` - The deal's waterfall rules, if any.
+/// * `date` - Payment date of the period.
+/// * `metrics` - The period's deal-health metrics.
+pub(crate) fn step_down_in_effect(
     rules: Option<&WaterfallRules>,
     date: Date,
     metrics: &StepDownMetrics,
+) -> bool {
+    rules
+        .and_then(|r| r.step_down.as_ref())
+        .is_some_and(|sd| step_down_active(sd, date, metrics))
+}
+
+/// Switch every principal tier to pro-rata allocation weighted by current
+/// balance, releasing subordination to the junior tranches. Call only while
+/// [`step_down_in_effect`] holds.
+///
+/// # Arguments
+///
+/// * `waterfall` - Period waterfall edited in place.
+/// * `tranche_balances` - Live note balances used as pro-rata weights.
+pub(crate) fn apply_step_down<S: std::hash::BuildHasher>(
+    waterfall: &mut Waterfall,
     tranche_balances: &HashMap<String, Money, S>,
-) -> Cow<'w, Waterfall> {
-    let Some(sd) = rules.and_then(|r| r.step_down.as_ref()) else {
-        return Cow::Borrowed(base);
-    };
-
-    if !step_down_active(sd, date, metrics) {
-        return Cow::Borrowed(base);
-    }
-
-    let mut waterfall = base.clone();
+) {
     for tier in &mut waterfall.tiers {
         if tier.payment_type != PaymentType::Principal {
             continue;
@@ -162,7 +148,6 @@ pub(crate) fn apply_step_down<'w, S: std::hash::BuildHasher>(
             }
         }
     }
-    Cow::Owned(waterfall)
 }
 
 #[derive(Clone, Copy)]
@@ -186,9 +171,7 @@ fn tranche_id_of(recipient: &Recipient, scope: TrancheRecipientScope) -> Option<
 
 /// Apply per-period shifting-interest weights to the principal tiers.
 ///
-/// Returns `base` unchanged (borrowed) unless a shifting-interest spec is
-/// configured, in which case it returns a copy whose principal tiers are
-/// pro-rata with the senior tranche weighted by an *effective* share, and the
+/// Rewrites the principal tiers to pro-rata with the senior tranche weighted by an *effective* share, and the
 /// remainder split across the other debt tranches **pro-rata by current
 /// balance** (`tranche_balances`).
 ///
@@ -217,19 +200,25 @@ fn tranche_id_of(recipient: &Recipient, scope: TrancheRecipientScope) -> Option<
 /// `schedule_senior_pct = senior_prorata_share + s · (1 − senior_prorata_share)`;
 /// under `SeniorShare` it is `s` itself. While any of the spec's triggers
 /// fails on `metrics`, `s` is `1.0` (full lockout).
-pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
-    base: &'w Waterfall,
-    rules: Option<&WaterfallRules>,
+///
+/// # Arguments
+///
+/// * `waterfall` - Period waterfall edited in place.
+/// * `si` - Shifting-interest rule (senior class, schedule, triggers, mode).
+/// * `months_from_closing` - Deal age selecting the schedule step.
+/// * `senior_prorata_share` - Senior's share of the debt by current balance.
+/// * `unscheduled_fraction` - Unscheduled share `u` of the period's principal.
+/// * `tranche_balances` - Live note balances splitting the junior remainder.
+/// * `metrics` - Deal-health metrics tested against the lockout triggers.
+pub(crate) fn apply_shifting_interest<S: std::hash::BuildHasher>(
+    waterfall: &mut Waterfall,
+    si: &ShiftingInterestSpec,
     months_from_closing: u32,
     senior_prorata_share: f64,
     unscheduled_fraction: f64,
     tranche_balances: &HashMap<String, Money, S>,
     metrics: &StepDownMetrics,
-) -> Cow<'w, Waterfall> {
-    let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) else {
-        return Cow::Borrowed(base);
-    };
-
+) {
     let locked_out = si
         .triggers
         .iter()
@@ -247,7 +236,6 @@ pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
     let u = unscheduled_fraction.clamp(0.0, 1.0);
     let senior_pct = (senior_prorata_share * (1.0 - u) + schedule_senior_pct * u).clamp(0.0, 1.0);
 
-    let mut waterfall = base.clone();
     for tier in &mut waterfall.tiers {
         if tier.payment_type != PaymentType::Principal {
             continue;
@@ -299,7 +287,6 @@ pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
             }
         }
     }
-    Cow::Owned(waterfall)
 }
 
 /// Apply targeted-overcollateralization amortization to the principal tiers.
@@ -315,21 +302,20 @@ pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
 ///
 /// # Arguments
 ///
-/// * `base` - Period waterfall (already carrying any step-down or
-///   shifting-interest weights).
+/// * `waterfall` - Period waterfall (already carrying any step-down or
+///   shifting-interest weights), edited in place.
 /// * `spec` - Target rule.
 /// * `current_pool` - Pool balance after this period's collections.
 /// * `original_pool` - Original (cut-off) pool balance.
 /// * `tranche_balances` - Live note balances.
-pub(crate) fn apply_target_oc<'w, S: std::hash::BuildHasher>(
-    base: &'w Waterfall,
+pub(crate) fn apply_target_oc<S: std::hash::BuildHasher>(
+    waterfall: &mut Waterfall,
     spec: &super::super::types::TargetOcSpec,
     current_pool: f64,
     original_pool: f64,
     tranche_balances: &HashMap<String, Money, S>,
-) -> Cow<'w, Waterfall> {
+) {
     let target_oc = spec.target(current_pool, original_pool);
-    let mut waterfall = base.clone();
     let notes: f64 = waterfall
         .tiers
         .iter()
@@ -371,16 +357,19 @@ pub(crate) fn apply_target_oc<'w, S: std::hash::BuildHasher>(
             _ => {}
         }
     }
-    Cow::Owned(waterfall)
 }
 
 /// Point every `NetWacCarryover` recipient at its tranche's carryover
 /// balance brought into the period.
-pub(crate) fn apply_net_wac_carryover<'w, S: std::hash::BuildHasher>(
-    base: &'w Waterfall,
+///
+/// # Arguments
+///
+/// * `waterfall` - Period waterfall edited in place.
+/// * `carryover` - Net-WAC carryover balance per tranche id.
+pub(crate) fn apply_net_wac_carryover<S: std::hash::BuildHasher>(
+    waterfall: &mut Waterfall,
     carryover: &HashMap<String, Money, S>,
-) -> Cow<'w, Waterfall> {
-    let mut waterfall = base.clone();
+) {
     for tier in &mut waterfall.tiers {
         for recipient in &mut tier.recipients {
             if let PaymentCalculation::NetWacCarryover { tranche_id, amount } =
@@ -392,13 +381,16 @@ pub(crate) fn apply_net_wac_carryover<'w, S: std::hash::BuildHasher>(
             }
         }
     }
-    Cow::Owned(waterfall)
 }
 
 /// Point every `ReserveReplenishment` recipient at this period's reserve
 /// target (the template inserts the recipient with a placeholder target).
-pub(crate) fn apply_reserve_target(base: &Waterfall, target: Money) -> Cow<'_, Waterfall> {
-    let mut waterfall = base.clone();
+///
+/// # Arguments
+///
+/// * `waterfall` - Period waterfall edited in place.
+/// * `target` - Reserve target balance for the period.
+pub(crate) fn apply_reserve_target(waterfall: &mut Waterfall, target: Money) {
     for tier in &mut waterfall.tiers {
         for recipient in &mut tier.recipients {
             if let PaymentCalculation::ReserveReplenishment { target_balance } =
@@ -408,7 +400,6 @@ pub(crate) fn apply_reserve_target(base: &Waterfall, target: Money) -> Cow<'_, W
             }
         }
     }
-    Cow::Owned(waterfall)
 }
 
 /// Lock out investor principal during a controlled-accumulation period.
@@ -419,12 +410,16 @@ pub(crate) fn apply_reserve_target(base: &Waterfall, target: Money) -> Cow<'_, W
 /// otherwise sweep into senior principal) flows on to the equity/residual tier.
 /// Pool principal itself is withheld from the waterfall separately (held in the
 /// accumulation funding account) and released as a bullet at the accumulation
-/// end. Always returns an owned waterfall (only called while accumulating).
-pub(crate) fn apply_accumulation_lockout<'w, S: std::hash::BuildHasher>(
-    base: &'w Waterfall,
+/// end. Only called while accumulating.
+///
+/// # Arguments
+///
+/// * `waterfall` - Period waterfall edited in place.
+/// * `tranche_balances` - Live note balances held flat this period.
+pub(crate) fn apply_accumulation_lockout<S: std::hash::BuildHasher>(
+    waterfall: &mut Waterfall,
     tranche_balances: &HashMap<String, Money, S>,
-) -> Cow<'w, Waterfall> {
-    let mut waterfall = base.clone();
+) {
     for tier in &mut waterfall.tiers {
         if tier.payment_type != PaymentType::Principal {
             continue;
@@ -442,7 +437,6 @@ pub(crate) fn apply_accumulation_lockout<'w, S: std::hash::BuildHasher>(
             }
         }
     }
-    Cow::Owned(waterfall)
 }
 
 /// Senior share in effect at `months`: the `senior_pct` of the schedule step
@@ -518,7 +512,9 @@ mod step_down_weight_tests {
         let rules = stepped_down_rules(date);
         let metrics = healthy_metrics();
 
-        let resolved = apply_step_down(&base, Some(&rules), date, &metrics, &balances(500.0, 50.0));
+        assert!(step_down_in_effect(Some(&rules), date, &metrics));
+        let mut resolved = base;
+        apply_step_down(&mut resolved, &balances(500.0, 50.0));
 
         let tier = resolved
             .tiers
@@ -558,13 +554,9 @@ mod step_down_weight_tests {
         let base = Waterfall::new(Currency::USD).add_tier(principal_tier());
         let rules = stepped_down_rules(date);
 
-        let resolved = apply_step_down(
-            &base,
-            Some(&rules),
-            date,
-            &healthy_metrics(),
-            &balances(0.0, 0.0),
-        );
+        assert!(step_down_in_effect(Some(&rules), date, &healthy_metrics()));
+        let mut resolved = base;
+        apply_step_down(&mut resolved, &balances(0.0, 0.0));
 
         let tier = resolved
             .tiers
@@ -577,24 +569,13 @@ mod step_down_weight_tests {
         );
     }
 
-    /// An inactive step-down must be exact identity — no clone, no weights.
+    /// A step-down before its date is not in effect.
     #[test]
-    fn inactive_step_down_is_identity() {
+    fn step_down_is_not_in_effect_before_its_date() {
         let future = Date::from_calendar_date(2030, Month::January, 1).expect("date");
         let now = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let base = Waterfall::new(Currency::USD).add_tier(principal_tier());
         let rules = stepped_down_rules(future);
-
-        let resolved = apply_step_down(
-            &base,
-            Some(&rules),
-            now,
-            &healthy_metrics(),
-            &balances(500.0, 50.0),
-        );
-        assert!(
-            matches!(resolved, Cow::Borrowed(_)),
-            "an inactive step-down must borrow the base waterfall unchanged"
-        );
+        assert!(!step_down_in_effect(Some(&rules), now, &healthy_metrics()));
+        assert!(!step_down_in_effect(None, now, &healthy_metrics()));
     }
 }

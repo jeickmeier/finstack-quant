@@ -865,8 +865,37 @@ impl AssetPool {
             instruments.validate(self.base_currency)?;
             pool.assets = instruments.materialize(closing_date)?;
         }
-        for asset in &pool.assets {
-            pool.validate_asset_currency(asset)?;
+        pool.validate_rows()?;
+        Ok(pool)
+    }
+
+    /// [`Self::normalized`] without copying a pool that already holds its
+    /// rows as `assets`: borrowed after the same validation, owned when
+    /// representative lines or instrument collateral must be expanded.
+    ///
+    /// # Arguments
+    ///
+    /// * `closing_date` - Deal closing date, as for [`Self::normalized`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::normalized`].
+    pub(crate) fn normalized_view(
+        &self,
+        closing_date: Date,
+    ) -> finstack_quant_core::Result<std::borrow::Cow<'_, Self>> {
+        if self.rep_lines.is_none() && self.instruments.is_none() {
+            self.validate_representation()?;
+            self.validate_rows()?;
+            return Ok(std::borrow::Cow::Borrowed(self));
+        }
+        self.normalized(closing_date).map(std::borrow::Cow::Owned)
+    }
+
+    /// Currency and override-range checks on every asset row.
+    fn validate_rows(&self) -> finstack_quant_core::Result<()> {
+        for asset in &self.assets {
+            self.validate_asset_currency(asset)?;
             for (name, value) in [
                 ("SMM", asset.smm_override),
                 ("MDR", asset.mdr_override),
@@ -877,7 +906,7 @@ impl AssetPool {
                 }
             }
         }
-        Ok(pool)
+        Ok(())
     }
 
     fn validate_representation(&self) -> finstack_quant_core::Result<()> {
@@ -1106,40 +1135,46 @@ impl AssetPool {
 
     /// Calculate weighted average maturity (WAM)
     ///
-    /// This calculates the balance-weighted average time to maturity.
+    /// This calculates the balance-weighted average time to maturity, in
+    /// Act/365F years (the time basis shared by every structured-credit
+    /// metric, so WAM and WAL are on one clock); rows past maturity count 0.
+    /// A row's accrual day count does not apply: ACT/ACT ICMA, for one, cannot
+    /// measure a span without the coupon schedule a pool row does not carry.
     /// Note: This is NOT the same as Weighted Average Life (WAL).
     /// WAL requires cashflow schedules and is calculated from principal payments.
-    pub fn weighted_avg_maturity(&self, as_of: Date) -> f64 {
-        let total_balance = match self.total_balance() {
-            Ok(b) => b.amount(),
-            Err(_) => return 0.0,
-        };
-
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Date from which each row's remaining term is measured.
+    ///
+    /// # Returns
+    ///
+    /// Balance-weighted remaining term in Act/365F years; `0.0` for an empty
+    /// pool.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the pool balance cannot be summed (a row in a
+    /// currency other than the pool's base currency).
+    pub fn weighted_avg_maturity(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        let total_balance = self.total_balance()?.amount();
         if total_balance == 0.0 {
-            return 0.0;
+            return Ok(0.0);
         }
-
-        let weighted_sum = self
-            .assets
-            .iter()
-            .filter_map(|a| {
-                a.remaining_term(as_of, a.day_count)
-                    .ok()
-                    .map(|term| term * a.balance.amount())
-            })
-            .chain(self.rep_lines.iter().flatten().filter_map(|line| {
-                line.day_count
-                    .year_fraction(
-                        as_of.min(line.maturity),
-                        line.maturity,
-                        finstack_quant_core::dates::DayCountContext::default(),
-                    )
-                    .ok()
-                    .map(|term| term * line.balance.amount())
-            }))
-            .sum::<f64>();
-
-        weighted_sum / total_balance
+        let basis = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
+        let mut weighted_sum = 0.0;
+        for asset in &self.assets {
+            weighted_sum += asset.remaining_term(as_of, basis)? * asset.balance.amount();
+        }
+        for line in self.rep_lines.iter().flatten() {
+            let term = basis.year_fraction(
+                as_of.min(line.maturity),
+                line.maturity,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
+            weighted_sum += term * line.balance.amount();
+        }
+        Ok(weighted_sum / total_balance)
     }
 
     /// Calculate true weighted average life from cashflow schedule
@@ -1296,7 +1331,16 @@ impl AssetPool {
 ///   coupons, and collateral attributes are summarized.
 /// * `as_of` - Reporting date used to classify asset state and calculate
 ///   date-dependent pool measures.
-pub fn calculate_pool_stats(pool: &AssetPool, as_of: Date) -> PoolStats {
+///
+/// # Errors
+///
+/// Returns an error when the pool balance cannot be summed or the weighted
+/// average maturity cannot be measured (see
+/// [`AssetPool::weighted_avg_maturity`]).
+pub fn calculate_pool_stats(
+    pool: &AssetPool,
+    as_of: Date,
+) -> finstack_quant_core::Result<PoolStats> {
     // Count unique obligors and industries
     let mut obligors = finstack_quant_core::HashSet::default();
     let mut industries = finstack_quant_core::HashSet::default();
@@ -1310,7 +1354,7 @@ pub fn calculate_pool_stats(pool: &AssetPool, as_of: Date) -> PoolStats {
         }
     }
 
-    let total_balance = pool.total_balance().map(|b| b.amount()).unwrap_or(0.0);
+    let total_balance = pool.total_balance()?.amount();
     let defaulted_balance: f64 = pool
         .assets
         .iter()
@@ -1324,11 +1368,11 @@ pub fn calculate_pool_stats(pool: &AssetPool, as_of: Date) -> PoolStats {
         0.0
     };
 
-    PoolStats {
+    Ok(PoolStats {
         weighted_avg_coupon: pool.weighted_avg_coupon(),
         weighted_avg_spread: pool.weighted_avg_spread(),
         // Maintain historical behavior: WAL field carries WAM proxy unless cashflows provided externally
-        weighted_avg_maturity: pool.weighted_avg_maturity(as_of),
+        weighted_avg_maturity: pool.weighted_avg_maturity(as_of)?,
         weighted_avg_rating_factor: 0.0, // Computed separately if needed
         diversity_score: pool.diversity_score(),
         num_obligors: obligors.len(),
@@ -1345,7 +1389,7 @@ pub fn calculate_pool_stats(pool: &AssetPool, as_of: Date) -> PoolStats {
                     .map(|c| (c.amount() - a.balance.amount()).max(0.0))
             })
             .sum(),
-    }
+    })
 }
 
 /// Result of concentration limit checking
@@ -1415,7 +1459,7 @@ mod market_standards_tests {
         pool.assets.push(asset_a);
         pool.assets.push(asset_b);
 
-        let wam = pool.weighted_avg_maturity(as_of);
+        let wam = pool.weighted_avg_maturity(as_of).expect("wam");
 
         // Both should be exactly 1.0
         assert!((wam - 1.0).abs() < 1e-10);

@@ -9,7 +9,6 @@ use crate::instruments::fixed_income::structured_credit::types::{
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
     PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention, Tranche,
     TrancheCoupon, TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
-    WaterfallWorkspace,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -174,18 +173,22 @@ pub fn execute_waterfall(
     execute_waterfall_with_explanation(waterfall, tranches, pool, context, ExplainOpts::disabled())
 }
 
-/// Core waterfall execution logic with optional workspace for zero-allocation hot paths.
+/// Execute waterfall with optional explanation trace.
 ///
-/// This is the unified implementation that handles both regular and workspace-based execution.
-/// When `workspace` is `Some`, it uses pre-allocated buffers for zero-allocation execution.
-/// When `workspace` is `None`, it allocates local state as needed.
-fn execute_waterfall_core(
+/// # Arguments
+///
+/// * `waterfall` - Ordered payment rules, base currency, and diversion logic.
+/// * `tranches` - Tranche structure receiving the calculated distributions.
+/// * `pool` - Asset pool supplying collateral and coverage-test data.
+/// * `context` - Period cash, dates, market data, and dynamic balance state.
+/// * `explain` - Trace configuration; disabled tracing leaves the economic
+///   allocations unchanged while avoiding explanation records.
+pub fn execute_waterfall_with_explanation(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
     pool: &AssetPool,
     context: WaterfallContext,
     explain: ExplainOpts,
-    mut workspace: Option<&mut WaterfallWorkspace>,
 ) -> Result<WaterfallDistribution> {
     let mut tiers: Vec<_> = waterfall.tiers.iter().collect();
     tiers.sort_by_key(|tier| tier.priority);
@@ -308,38 +311,14 @@ fn execute_waterfall_core(
         context.deferred_interest,
     )?;
 
-    let mut allocation_output = if let Some(ref mut ws) = workspace {
-        // Clear workspace buffers and reuse them
-        ws.distributions.clear();
-        ws.payment_records.clear();
-        ws.tier_allocations.clear();
-        ws.coverage_tests.clear();
-        ws.coverage_tests.extend(
-            coverage_test_results
-                .iter()
-                .map(|r| (r.test_id.clone(), r.current_ratio, r.is_passing)),
-        );
+    let estimated_recipients = waterfall
+        .tiers
+        .iter()
+        .map(|t| t.recipients.len())
+        .sum::<usize>();
+    let mut allocation_output = AllocationOutput::with_capacity(estimated_recipients, &explain);
 
-        AllocationOutput {
-            distributions: std::mem::take(&mut ws.distributions),
-            principal_distributions: HashMap::default(),
-            payment_records: std::mem::take(&mut ws.payment_records),
-            trace: if explain.enabled {
-                Some(ExplanationTrace::new("waterfall"))
-            } else {
-                None
-            },
-        }
-    } else {
-        let estimated_recipients = waterfall
-            .tiers
-            .iter()
-            .map(|t| t.recipients.len())
-            .sum::<usize>();
-        AllocationOutput::with_capacity(estimated_recipients, &explain)
-    };
-
-    // Storage for tier allocations (will be moved to workspace or returned directly)
+    // Cash allocated per tier, in execution order.
     let mut tier_allocations = Vec::with_capacity(waterfall.tiers.len());
 
     // Net all principal paid during the period against the period-start balance
@@ -531,22 +510,17 @@ fn execute_waterfall_core(
         .collect();
     diverted_amounts.extend(reinvestment_diversions);
 
-    let distribution = WaterfallDistribution {
+    Ok(WaterfallDistribution {
         payment_date: context.payment_date,
         total_available: context.available_cash,
-        tier_allocations: tier_allocations.clone(),
-        distributions: allocation_output
-            .distributions
-            .iter()
-            .map(|(recipient, amount)| (recipient.clone(), *amount))
-            .collect(),
+        tier_allocations,
+        distributions: allocation_output.distributions.into_iter().collect(),
         principal_distributions: allocation_output
             .principal_distributions
-            .iter()
-            .map(|(recipient, amount)| (recipient.clone(), *amount))
+            .into_iter()
             .collect(),
-        payment_records: allocation_output.payment_records.clone(),
-        coverage_tests: coverage_tests_public.clone(),
+        payment_records: allocation_output.payment_records,
+        coverage_tests: coverage_tests_public,
         diverted_cash: total_diverted,
         remaining_cash: interest_remaining.checked_add(principal_remaining)?,
         remaining_interest: interest_remaining,
@@ -557,37 +531,7 @@ fn execute_waterfall_core(
         diverted_amounts,
         recovery_proceeds: context.recovery_proceeds,
         explanation: allocation_output.trace,
-    };
-
-    // If using workspace, restore buffers for future reuse
-    if let Some(ws) = workspace {
-        ws.distributions = allocation_output.distributions;
-        ws.payment_records = allocation_output.payment_records;
-        ws.tier_allocations = tier_allocations;
-        ws.coverage_tests = coverage_tests_public;
-    }
-
-    Ok(distribution)
-}
-
-/// Execute waterfall with optional explanation trace.
-///
-/// # Arguments
-///
-/// * `waterfall` - Ordered payment rules, base currency, and diversion logic.
-/// * `tranches` - Tranche structure receiving the calculated distributions.
-/// * `pool` - Asset pool supplying collateral and coverage-test data.
-/// * `context` - Period cash, dates, market data, and dynamic balance state.
-/// * `explain` - Trace configuration; disabled tracing leaves the economic
-///   allocations unchanged while avoiding explanation records.
-pub fn execute_waterfall_with_explanation(
-    waterfall: &Waterfall,
-    tranches: &TrancheStructure,
-    pool: &AssetPool,
-    context: WaterfallContext,
-    explain: ExplainOpts,
-) -> Result<WaterfallDistribution> {
-    execute_waterfall_core(waterfall, tranches, pool, context, explain, None)
+    })
 }
 
 /// Immutable context for waterfall allocation operations.
@@ -1152,7 +1096,7 @@ fn shifted_tranche_rate(
 ///   (e.g. a principal-only class): nothing accrues, nothing defers.
 ///
 /// When `afc` names a tranche whose recipient is still the uncapped variant,
-/// `live_afc_cap` is applied — exactly the rewrite `resolve_waterfall` performs
+/// `live_afc_cap` is applied — exactly the rewrite `resolve::apply_afc_cap` performs
 /// on the period waterfall, so claims extracted from the base waterfall agree
 /// with the allocation the resolved waterfall executes.
 ///
@@ -1311,7 +1255,7 @@ pub(super) fn evaluate_coverage_tests(
     // The waterfall spec defines each tranche's interest CLAIM (uncapped,
     // capped, or absent); the IC test must measure coverage of those claims,
     // not of raw coupons the structure never owes. Caps in this waterfall are
-    // already resolved (the live AFC cap is baked in by `resolve_waterfall`),
+    // already resolved (the live AFC cap is baked in by `resolve::apply_afc_cap`),
     // so no AFC override applies here.
     let claim_caps = interest_claim_caps(waterfall, None, 0.0);
 

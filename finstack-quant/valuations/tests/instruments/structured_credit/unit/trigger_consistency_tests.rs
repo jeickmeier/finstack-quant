@@ -15,8 +15,8 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation_with_diagnostics, AssetPool, CoverageTestDiagnostic,
     CoverageTestSpec, DealType, HedgeSwap, PaymentCalculation, PaymentType, PeriodDiagnostics,
     PoolAsset, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallBuilder,
-    WaterfallContext, WaterfallTier,
+    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, Waterfall,
+    WaterfallBuilder, WaterfallContext, WaterfallTier,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
@@ -160,12 +160,9 @@ fn reinvestment_suspends_on_the_executors_test_result() {
     }
 }
 
-/// A test placed after the junior fees with `divert_pct = 50` diverts half
-/// of what would otherwise reach equity, and the other half still does.
-#[test]
-fn a_fifty_percent_diversion_after_the_sub_fee_diverts_half_the_residual() {
-    let deal = clo(Vec::new());
-    let mut waterfall = WaterfallBuilder::new(Currency::USD)
+/// Fees 50k, A coupon, sub-management fee 100k, A principal, equity.
+fn junior_fee_waterfall() -> Waterfall {
+    WaterfallBuilder::new(Currency::USD)
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::fixed_fee(
                 "trustee",
@@ -193,25 +190,12 @@ fn a_fifty_percent_diversion_after_the_sub_fee_diverts_half_the_residual() {
             )),
         )
         .build()
-        .expect("waterfall");
-    waterfall.insert_coverage_test(
-        CoverageTestSpec::ic("A", 5.0)
-            .after_junior_fees()
-            .with_divert_pct(50.0),
-    );
-    let ids: Vec<&str> = waterfall.tiers.iter().map(|t| t.id.as_str()).collect();
-    assert_eq!(
-        ids,
-        vec![
-            "fees",
-            "a_interest",
-            "junior_fees",
-            "junior_fees_coverage",
-            "principal",
-            "equity"
-        ]
-    );
+        .expect("waterfall")
+}
 
+/// Run one quarter of 1.5M interest through `waterfall`; returns
+/// `(diverted, equity)`.
+fn diverted_and_equity(deal: &StructuredCredit, waterfall: &Waterfall) -> (f64, f64) {
     let market = market(0.02);
     let context = WaterfallContext {
         available_cash: usd(1_500_000.0),
@@ -235,12 +219,38 @@ fn a_fifty_percent_diversion_after_the_sub_fee_diverts_half_the_residual() {
         equity_history: None,
     };
     let result =
-        execute_waterfall(&waterfall, &deal.tranches, &deal.pool, context).expect("waterfall");
+        execute_waterfall(waterfall, &deal.tranches, &deal.pool, context).expect("waterfall");
     let equity = result
         .distributions
         .get(&RecipientType::Equity)
         .map_or(0.0, |amount| amount.amount());
-    let diverted = result.diverted_cash.amount();
+    (result.diverted_cash.amount(), equity)
+}
+
+/// A test placed after the junior fees with `divert_pct = 50` diverts half
+/// of what would otherwise reach equity, and the other half still does.
+#[test]
+fn a_fifty_percent_diversion_after_the_sub_fee_diverts_half_the_residual() {
+    let deal = clo(Vec::new());
+    let mut waterfall = junior_fee_waterfall();
+    waterfall.insert_coverage_test(
+        CoverageTestSpec::ic("A", 5.0)
+            .after_junior_fees()
+            .with_divert_pct(50.0),
+    );
+    let ids: Vec<&str> = waterfall.tiers.iter().map(|t| t.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        vec![
+            "fees",
+            "a_interest",
+            "junior_fees",
+            "junior_fees_coverage",
+            "principal",
+            "equity"
+        ]
+    );
+    let (diverted, equity) = diverted_and_equity(&deal, &waterfall);
     assert!(
         diverted > 100_000.0,
         "the failing 5x IC test diverts: {diverted}"
@@ -249,4 +259,75 @@ fn a_fifty_percent_diversion_after_the_sub_fee_diverts_half_the_residual() {
         (diverted - equity).abs() < 1e-6,
         "half of the residual is diverted ({diverted}) and half reaches equity ({equity})"
     );
+}
+
+/// Two failing tests at the same position with different caps each bind:
+/// the 50% IC test diverts half of the residual R, then the 25% OC test
+/// diverts a quarter of the R/2 left, so 0.625 R is diverted and 0.375 R
+/// reaches equity (diverted / equity = 5/3). Merging both into one tier
+/// under the first cap would split R 50/50.
+#[test]
+fn tests_with_different_caps_at_one_position_each_bind() {
+    let deal = clo(Vec::new());
+    let mut waterfall = junior_fee_waterfall();
+    waterfall.insert_coverage_test(
+        CoverageTestSpec::ic("A", 5.0)
+            .after_junior_fees()
+            .with_divert_pct(50.0),
+    );
+    // OC = 100M / 60M = 1.67x against a 3x trigger: the cure (pay A down
+    // to 33.3M) far exceeds the residual, so only the cap binds.
+    waterfall.insert_coverage_test(
+        CoverageTestSpec::oc("A", 3.0)
+            .after_junior_fees()
+            .with_divert_pct(25.0),
+    );
+    let test_tiers: Vec<Vec<&str>> = waterfall
+        .tiers
+        .iter()
+        .filter(|tier| tier.payment_type == PaymentType::CoverageTest)
+        .map(|tier| tier.tests.iter().map(|test| test.id.as_str()).collect())
+        .collect();
+    assert_eq!(test_tiers, vec![vec!["IC_A"], vec!["OC_A"]]);
+
+    let (diverted, equity) = diverted_and_equity(&deal, &waterfall);
+    let residual = diverted + equity;
+    assert!(residual > 100_000.0, "residual {residual}");
+    assert!(
+        (diverted - 0.625 * residual).abs() < 1e-6,
+        "diverted {diverted} of residual {residual}"
+    );
+    assert!(
+        (equity - 0.375 * residual).abs() < 1e-6,
+        "equity {equity} of residual {residual}"
+    );
+    assert!(
+        (diverted - equity).abs() > 1.0,
+        "the second cap must not be dropped (the old 50/50 split)"
+    );
+}
+
+/// A tier whose tests disagree on `divert_pct` diverts once, so one of the
+/// caps could not apply: validation rejects it.
+#[test]
+fn a_tier_mixing_diversion_caps_is_rejected() {
+    let mut waterfall = junior_fee_waterfall();
+    waterfall.tiers.insert(
+        3,
+        WaterfallTier::coverage_tests(
+            "mixed_caps",
+            0,
+            vec![
+                CoverageTestSpec::ic("A", 5.0).with_divert_pct(50.0),
+                CoverageTestSpec::oc("A", 3.0).with_divert_pct(25.0),
+            ],
+        ),
+    );
+    for (index, tier) in waterfall.tiers.iter_mut().enumerate() {
+        tier.priority = index + 1;
+    }
+    let err = clo(Vec::new())
+        .with_waterfall(waterfall)
+        .expect_err("mixed caps in one tier must be rejected");
+    assert!(err.to_string().contains("divert_pct"), "{err}");
 }

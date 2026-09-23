@@ -60,6 +60,33 @@ impl StructuredCredit {
     /// Copy the deal with effective assumptions made explicit for scenario/risk
     /// mutations. Clearing resolved rate overrides prevents them masking shocks.
     pub(crate) fn resolved_for_pricing(&self) -> Result<Self> {
+        self.validate_dates()?;
+        let credit_model = self.resolved_credit_model()?;
+        let pool = self.pool.normalized(self.closing_date)?;
+        self.validate_resolved_pool(&pool)?;
+        let mut deal = self.clone();
+        deal.credit_model = credit_model;
+        deal.pool = pool;
+        deal.behavior_overrides.cpr_annual = None;
+        deal.behavior_overrides.psa_speed_multiplier = None;
+        deal.behavior_overrides.cdr_annual = None;
+        deal.behavior_overrides.sda_speed_multiplier = None;
+        deal.behavior_overrides.recovery_rate = None;
+        deal.behavior_overrides.recovery_lag_months = None;
+        Ok(deal)
+    }
+
+    /// Run every check [`Self::resolved_for_pricing`] runs without copying
+    /// the deal (the pool is borrowed unless it must be normalized from
+    /// representative lines or instrument collateral).
+    pub(crate) fn validate_resolvable(&self) -> Result<()> {
+        self.validate_dates()?;
+        self.resolved_credit_model()?;
+        let pool = self.pool.normalized_view(self.closing_date)?;
+        self.validate_resolved_pool(&pool)
+    }
+
+    fn validate_dates(&self) -> Result<()> {
         if self.closing_date >= self.maturity
             || self.first_payment_date <= self.closing_date
             || self.first_payment_date > self.maturity
@@ -68,11 +95,14 @@ impl StructuredCredit {
                 "structured-credit dates require closing < first payment <= maturity".into(),
             ));
         }
-        let mut deal = self.clone();
-        deal.credit_model = self.resolved_credit_model()?;
-        deal.pool = self.pool.normalized(self.closing_date)?;
-        deal.pool.validate_reserve_config(&deal.tranches)?;
-        for asset in &deal.pool.assets {
+        Ok(())
+    }
+
+    /// Checks on the normalized pool: reserve configuration, default claims,
+    /// and the reinvestment period and its assumptions.
+    fn validate_resolved_pool(&self, pool: &super::AssetPool) -> Result<()> {
+        pool.validate_reserve_config(&self.tranches)?;
+        for asset in &pool.assets {
             if asset.is_defaulted {
                 if asset.default_date.is_none() || asset.recovery_amount.is_none() {
                     return Err(finstack_quant_core::Error::Validation(format!(
@@ -97,16 +127,16 @@ impl StructuredCredit {
                 )));
             }
         }
-        if let Some(price) = deal.behavior_overrides.reinvestment_price {
+        if let Some(price) = self.behavior_overrides.reinvestment_price {
             if !price.is_finite() || price <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(
                     "reinvestment price must be finite and positive percent of par".into(),
                 ));
             }
         }
-        if let Some(period) = &deal.pool.reinvestment_period {
-            if period.end_date < deal.closing_date
-                || period.end_date > deal.maturity
+        if let Some(period) = &pool.reinvestment_period {
+            if period.end_date < self.closing_date
+                || period.end_date > self.maturity
                 || !period.criteria.max_price.is_finite()
                 || period.criteria.max_price <= 0.0
                 || !period.criteria.min_yield.is_finite()
@@ -116,7 +146,7 @@ impl StructuredCredit {
                 ));
             }
             for id in &period.amortizing_tranches {
-                match deal.tranches.tranches.iter().find(|t| t.id.as_str() == id) {
+                match self.tranches.tranches.iter().find(|t| t.id.as_str() == id) {
                     None => {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "amortizing tranche {id} is not a tranche of the deal"
@@ -148,12 +178,6 @@ impl StructuredCredit {
                 }
             }
         }
-        deal.behavior_overrides.cpr_annual = None;
-        deal.behavior_overrides.psa_speed_multiplier = None;
-        deal.behavior_overrides.cdr_annual = None;
-        deal.behavior_overrides.sda_speed_multiplier = None;
-        deal.behavior_overrides.recovery_rate = None;
-        deal.behavior_overrides.recovery_lag_months = None;
-        Ok(deal)
+        Ok(())
     }
 }

@@ -126,99 +126,131 @@ fn asset_seasoned_rates(request: &PoolFlowRequest<'_, '_>) -> Result<AssetSeason
     Ok(rates)
 }
 
+/// The deal credit model's rates for one payment period: the pool-level
+/// monthly-equivalent SMM and MDR at the pool's seasoning plus each dated
+/// asset's own seasoned rates.
+///
+/// Every pool-flow source starts from these rates. The deterministic source
+/// uses them as they are; the OAS and Monte Carlo sources scale them by their
+/// scenario multipliers, so a scenario with no shock runs exactly the
+/// deterministic engine's rates.
+pub(super) struct BasePeriodRates {
+    /// Pool-level monthly-equivalent prepayment rate.
+    pub(super) smm: f64,
+    /// Pool-level monthly-equivalent default rate.
+    pub(super) mdr: f64,
+    /// Per-asset seasoned rates overriding the pool level for dated rows.
+    pub(super) asset: AssetSeasonedRates,
+}
+
+/// Resolve [`BasePeriodRates`] for `request` from the deal's credit model.
+///
+/// # Arguments
+///
+/// * `request` - Period being projected: its pay date, pool seasoning in
+///   months, period length and simulation state (performing and delinquent
+///   balances) that the default curves are stated against.
+pub(super) fn base_period_rates(request: &PoolFlowRequest<'_, '_>) -> Result<BasePeriodRates> {
+    let smm = period_averaged_monthly_rate(
+        request.pay_date,
+        request.seasoning_months,
+        request.months_per_period,
+        |_, seasoning| {
+            request
+                .instrument
+                .credit_model
+                .prepayment_spec
+                .smm(seasoning)
+        },
+    )?;
+    let survival = surviving_balance_fraction(request.state);
+    // A cumulative-loss or timing curve states the CHARGE-OFFS by month
+    // of the pool's life. With a delinquency model the default rate is
+    // the entry into the first bucket, which charges off only after
+    // rolling through every bucket, so the entry is sized from the
+    // curve `k` months ahead (`k` = buckets) grossed up by the roll
+    // probabilities, on the performing balance the entry applies to.
+    // Exact when each bucket fully rolls or cures every month; a `stay`
+    // share delays part of the charge-off past the curve's month.
+    let curve_lookahead = request
+        .instrument
+        .credit_model
+        .delinquency
+        .as_ref()
+        .filter(|_| {
+            matches!(
+                request.instrument.credit_model.default_spec.curve,
+                Some(crate::cashflow::builder::DefaultCurve::CumulativeLoss { .. })
+                    | Some(crate::cashflow::builder::DefaultCurve::Timing { .. })
+            )
+        })
+        .map(|model| {
+            let delinquent: f64 = request
+                .state
+                .pool_state
+                .delinquent
+                .iter()
+                .map(|buckets| super::delinquency::delinquent_balance(buckets))
+                .sum();
+            let outstanding = request.state.pool_outstanding.amount();
+            let performing_gross_up = if outstanding - delinquent > 0.0 {
+                outstanding / (outstanding - delinquent)
+            } else {
+                1.0
+            };
+            let roll_through: f64 = model.roll_rates.iter().product();
+            let months_to_charge_off = u32::try_from(model.buckets()).unwrap_or(u32::MAX);
+            (
+                months_to_charge_off,
+                performing_gross_up / roll_through.max(f64::MIN_POSITIVE),
+            )
+        });
+    // The curve's charge-offs in the first `k` months of the projection
+    // can only come from loans already in the pipeline at the start; a
+    // pool without seeded buckets has none, so the first entry also
+    // carries those months and the lifetime loss is preserved (the
+    // charge-offs land `k` months later than the curve states them).
+    let first_month_seasoning = request
+        .seasoning_months
+        .saturating_sub(request.months_per_period.round().max(1.0) as u32 - 1);
+    let catch_up = request.state.period_diagnostics.is_empty();
+    let mdr = period_averaged_monthly_rate(
+        request.pay_date,
+        request.seasoning_months,
+        request.months_per_period,
+        |_, seasoning| {
+            let spec = &request.instrument.credit_model.default_spec;
+            match curve_lookahead {
+                Some((ahead, gross_up)) => {
+                    let target = seasoning.saturating_add(ahead);
+                    let from = if catch_up && seasoning == first_month_seasoning {
+                        seasoning
+                    } else {
+                        target
+                    };
+                    let mut rate = 0.0;
+                    for month in from..=target {
+                        rate += spec.mdr_with_survival(month, survival)?;
+                    }
+                    Ok((rate * gross_up).min(1.0))
+                }
+                None => spec.mdr_with_survival(seasoning, survival),
+            }
+        },
+    )?;
+    Ok(BasePeriodRates {
+        smm,
+        mdr,
+        asset: asset_seasoned_rates(request)?,
+    })
+}
+
 /// Deterministic pool-flow source using the instrument's base credit model.
 pub(crate) struct DeterministicPoolFlowSource;
 
 impl PoolFlowSource for DeterministicPoolFlowSource {
     fn calculate_pool_flows(&mut self, request: PoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
-        let smm = period_averaged_monthly_rate(
-            request.pay_date,
-            request.seasoning_months,
-            request.months_per_period,
-            |_, seasoning| {
-                request
-                    .instrument
-                    .credit_model
-                    .prepayment_spec
-                    .smm(seasoning)
-            },
-        )?;
-        let survival = surviving_balance_fraction(request.state);
-        // A cumulative-loss or timing curve states the CHARGE-OFFS by month
-        // of the pool's life. With a delinquency model the default rate is
-        // the entry into the first bucket, which charges off only after
-        // rolling through every bucket, so the entry is sized from the
-        // curve `k` months ahead (`k` = buckets) grossed up by the roll
-        // probabilities, on the performing balance the entry applies to.
-        // Exact when each bucket fully rolls or cures every month; a `stay`
-        // share delays part of the charge-off past the curve's month.
-        let curve_lookahead = request
-            .instrument
-            .credit_model
-            .delinquency
-            .as_ref()
-            .filter(|_| {
-                matches!(
-                    request.instrument.credit_model.default_spec.curve,
-                    Some(crate::cashflow::builder::DefaultCurve::CumulativeLoss { .. })
-                        | Some(crate::cashflow::builder::DefaultCurve::Timing { .. })
-                )
-            })
-            .map(|model| {
-                let delinquent: f64 = request
-                    .state
-                    .pool_state
-                    .delinquent
-                    .iter()
-                    .map(|buckets| super::delinquency::delinquent_balance(buckets))
-                    .sum();
-                let outstanding = request.state.pool_outstanding.amount();
-                let performing_gross_up = if outstanding - delinquent > 0.0 {
-                    outstanding / (outstanding - delinquent)
-                } else {
-                    1.0
-                };
-                let roll_through: f64 = model.roll_rates.iter().product();
-                let months_to_charge_off = u32::try_from(model.buckets()).unwrap_or(u32::MAX);
-                (
-                    months_to_charge_off,
-                    performing_gross_up / roll_through.max(f64::MIN_POSITIVE),
-                )
-            });
-        // The curve's charge-offs in the first `k` months of the projection
-        // can only come from loans already in the pipeline at the start; a
-        // pool without seeded buckets has none, so the first entry also
-        // carries those months and the lifetime loss is preserved (the
-        // charge-offs land `k` months later than the curve states them).
-        let first_month_seasoning = request
-            .seasoning_months
-            .saturating_sub(request.months_per_period.round().max(1.0) as u32 - 1);
-        let catch_up = request.state.period_diagnostics.is_empty();
-        let mdr = period_averaged_monthly_rate(
-            request.pay_date,
-            request.seasoning_months,
-            request.months_per_period,
-            |_, seasoning| {
-                let spec = &request.instrument.credit_model.default_spec;
-                match curve_lookahead {
-                    Some((ahead, gross_up)) => {
-                        let target = seasoning.saturating_add(ahead);
-                        let from = if catch_up && seasoning == first_month_seasoning {
-                            seasoning
-                        } else {
-                            target
-                        };
-                        let mut rate = 0.0;
-                        for month in from..=target {
-                            rate += spec.mdr_with_survival(month, survival)?;
-                        }
-                        Ok((rate * gross_up).min(1.0))
-                    }
-                    None => spec.mdr_with_survival(seasoning, survival),
-                }
-            },
-        )?;
-        let asset_rates = asset_seasoned_rates(&request)?;
+        let base = base_period_rates(&request)?;
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
@@ -226,15 +258,15 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
             months_per_period: request.months_per_period,
             context: request.context,
             rates: PoolFlowRates {
-                smm,
-                mdr,
+                smm: base.smm,
+                mdr: base.mdr,
                 recovery_rate: request
                     .instrument
                     .credit_model
                     .recovery_spec
                     .recovery_rate(request.seasoning_months),
             },
-            asset_rates,
+            asset_rates: base.asset,
             copula_outcome: None,
             delinquency: request.instrument.credit_model.delinquency.as_ref(),
             special_servicing: SpecialServicingFees::from_deal(request.instrument.fees.as_ref()),
@@ -296,10 +328,18 @@ impl OasPathFlowSource {
     }
 }
 
-impl PeriodShockSource for OasPathFlowSource {
-    fn period_shock(&mut self, request: &PoolFlowRequest<'_, '_>) -> Result<PeriodShock> {
-        const RATE_CLAMP: f64 = 0.9999;
+/// Cap on a scenario-scaled monthly prepayment or default rate.
+const SCENARIO_RATE_CLAMP: f64 = 0.9999;
 
+impl OasPathFlowSource {
+    /// This scenario's period rates: the deal's [`BasePeriodRates`] (pool
+    /// level and per dated asset) scaled by the rate-path prepayment
+    /// response and the systematic credit stress, plus the rate-path shift
+    /// applied to floating coupons.
+    fn scenario_rates(
+        &self,
+        request: &PoolFlowRequest<'_, '_>,
+    ) -> Result<(PeriodShock, AssetSeasonedRates)> {
         // SC-M13: this period's rate shift, so FLOATING coupons — both pool
         // assets and tranches — follow the simulated path.
         //
@@ -316,58 +356,27 @@ impl PeriodShockSource for OasPathFlowSource {
             .as_ref()
             .and_then(|p| p.get(month).copied())
             .unwrap_or(0.0);
-        let base_smm = period_averaged_monthly_rate(
-            request.pay_date,
-            request.seasoning_months,
-            request.months_per_period,
-            |_, seasoning| {
-                request
-                    .instrument
-                    .credit_model
-                    .prepayment_spec
-                    .smm(seasoning)
-            },
-        )?;
-        let survival = surviving_balance_fraction(request.state);
-        let base_mdr = period_averaged_monthly_rate(
-            request.pay_date,
-            request.seasoning_months,
-            request.months_per_period,
-            |_, seasoning| {
-                request
-                    .instrument
-                    .credit_model
-                    .default_spec
-                    .mdr_with_survival(seasoning, survival)
-            },
-        )?;
-
-        let mut smm = base_smm;
-        let mut mdr = base_mdr;
+        let base = base_period_rates(request)?;
 
         // Rate-dependent prepayment: higher rates slow prepayment.
-        if let Some(rate_path) = &self.rate_path {
-            let month = self.as_of.months_until(request.pay_date) as usize;
+        let mut smm_mult = self.rate_path.as_ref().map_or(1.0, |rate_path| {
             let r = rate_path.get(month).copied().unwrap_or(self.base_rate);
-            let mult = (-self.prepay_beta * (r - self.base_rate)).exp();
-            smm = (smm * mult).clamp(0.0, RATE_CLAMP);
-        }
-
+            (-self.prepay_beta * (r - self.base_rate)).exp()
+        });
+        let mut mdr_mult = 1.0;
         // Systematic credit stress (canonical convention: low `z` is the stress
         // state). Mean-corrected lognormal multipliers keep `E[shock] ≈ 1`, so
         // the stochastic credit dimension adds dispersion without biasing the
         // mean cashflows (and hence the OAS).
         if let Some(z) = self.credit_z {
             let l = self.credit_loading;
-            let mdr_mult = (-l * z - 0.5 * l * l).exp();
-            let smm_mult = (l * z - 0.5 * l * l).exp();
-            mdr = (mdr * mdr_mult).clamp(0.0, RATE_CLAMP);
-            smm = (smm * smm_mult).clamp(0.0, RATE_CLAMP);
+            mdr_mult = (-l * z - 0.5 * l * l).exp();
+            smm_mult *= (l * z - 0.5 * l * l).exp();
         }
 
         let mut shock = PeriodPoolShock::pool_wide(
-            smm,
-            mdr,
+            (base.smm * smm_mult).clamp(0.0, SCENARIO_RATE_CLAMP),
+            (base.mdr * mdr_mult).clamp(0.0, SCENARIO_RATE_CLAMP),
             request
                 .instrument
                 .credit_model
@@ -375,13 +384,22 @@ impl PeriodShockSource for OasPathFlowSource {
                 .recovery_rate(request.seasoning_months),
         );
         shock.systematic_z = self.credit_z.unwrap_or(0.0);
-        Ok(PeriodShock { shock, rate_shift })
+        let asset = base
+            .asset
+            .scaled(Some(smm_mult), Some(mdr_mult), SCENARIO_RATE_CLAMP);
+        Ok((PeriodShock { shock, rate_shift }, asset))
+    }
+}
+
+impl PeriodShockSource for OasPathFlowSource {
+    fn period_shock(&mut self, request: &PoolFlowRequest<'_, '_>) -> Result<PeriodShock> {
+        Ok(self.scenario_rates(request)?.0)
     }
 }
 
 impl PoolFlowSource for OasPathFlowSource {
     fn calculate_pool_flows(&mut self, request: PoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
-        let period = self.period_shock(&request)?;
+        let (period, asset_rates) = self.scenario_rates(&request)?;
         request.state.floating_rate_shift = period.rate_shift;
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
@@ -394,7 +412,7 @@ impl PoolFlowSource for OasPathFlowSource {
                 mdr: period.shock.mdr,
                 recovery_rate: period.shock.recovery_rate,
             },
-            asset_rates: AssetSeasonedRates::default(),
+            asset_rates,
             copula_outcome: None,
             delinquency: request.instrument.credit_model.delinquency.as_ref(),
             special_servicing: SpecialServicingFees::from_deal(request.instrument.fees.as_ref()),
@@ -791,6 +809,18 @@ impl PoolFlowSource for StochasticPathFlowSource {
             _ => None,
         };
 
+        // The path's pool-level shock is the scenario model's rate at the
+        // pool's average age; dated rows keep their own seasoning on the
+        // deal's curves, scaled by the path's ratio to the deal's pool-level
+        // rate, so a path with no shock runs the deterministic rates.
+        let base = base_period_rates(&request)?;
+        let ratio = |shocked: f64, base: f64| (base > 0.0).then(|| shocked / base);
+        let asset_rates = base.asset.scaled(
+            ratio(shock.smm, base.smm),
+            ratio(shock.mdr, base.mdr),
+            SCENARIO_RATE_CLAMP,
+        );
+
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
@@ -802,7 +832,7 @@ impl PoolFlowSource for StochasticPathFlowSource {
                 mdr: shock.mdr,
                 recovery_rate: shock.recovery_rate,
             },
-            asset_rates: AssetSeasonedRates::default(),
+            asset_rates,
             copula_outcome,
             delinquency: request.instrument.credit_model.delinquency.as_ref(),
             special_servicing: SpecialServicingFees::from_deal(request.instrument.fees.as_ref()),
