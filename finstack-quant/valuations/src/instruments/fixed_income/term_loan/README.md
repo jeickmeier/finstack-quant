@@ -109,7 +109,7 @@ Notes that bite:
   `fixing_calendar_id` (the loan calendar when unset) drives the reset lag and
   overnight observations. Overnight index floors and caps apply to each daily
   fixing unless `overnight_index_constraints` is `period`.
-- `settlement_days` defaults to **2** as a pricing-date anchor, not the LSTA
+- `settlement_days` defaults to **2** as the quote anchor, not the LSTA
   par-trade convention (T+7, with delayed compensation beyond T+7). Set
   `settlement_days: 7` when marking to the LSTA par target:
 
@@ -127,9 +127,13 @@ Both pricers are registered in [`src/pricer/fixed_income.rs`](../../../pricer/fi
 | `TermLoanTreePricer` | `Tree` | Callable structures — values the borrower's prepayment option and backs `Oas` / `EmbeddedOptionValue`. |
 
 The discounting path generates the full internal schedule (DDTL draws,
-interest, amortization, PIK capitalization, fees), filters to cash flows, then
-discounts from the settlement date on the loan's discount curve. The
-callable tree uses the same settlement-date origin.
+interest, amortization, PIK capitalization, fees), filters to cash flows, and
+values them on the settlement date on the loan's discount curve; the callable
+tree uses the same settlement-date origin. The instrument PV is then carried to
+`as_of`, like the bond and the revolver: `DF(as_of, settlement) × settlement
+value` plus the flows paid between `as_of` and settlement. Quote-space measures
+(discount margin, yields, OAS, the quoted CS01 target) stay on the settlement
+date, where a quoted price applies.
 
 **Call settlement**: hard/soft calls redeem dirty — clean strike times
 pre-exercise outstanding plus cash accrued at the exercise step. Coupon-date

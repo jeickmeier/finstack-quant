@@ -41,6 +41,7 @@ macro_rules! define_ytn {
                     let target_price = target_price_from_quote_or_model(
                         loan,
                         &schedule,
+                        &context.curves,
                         as_of,
                         context.base_value,
                     )?;

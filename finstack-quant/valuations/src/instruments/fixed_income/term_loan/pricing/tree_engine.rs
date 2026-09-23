@@ -923,6 +923,8 @@ impl TermLoanTreePricer {
     /// Price a callable term loan using tree-based backward induction.
     ///
     /// Uses `quoted_oas` (decimal) when present; otherwise prices at a zero OAS.
+    /// The tree values the loan on its settlement date; the result is carried
+    /// to the PV on `as_of` like the discounting engine's.
     ///
     /// # Arguments
     ///
@@ -935,7 +937,13 @@ impl TermLoanTreePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        self.price_at_oas(loan, market, as_of, Self::quoted_oas_bp(loan))
+        let settlement_value = self.price_at_oas(loan, market, as_of, Self::quoted_oas_bp(loan))?;
+        super::discounting::TermLoanDiscountingPricer::value_at_as_of(
+            loan,
+            market,
+            as_of,
+            settlement_value,
+        )
     }
 
     /// Price the loan on the prepared tree at a fixed OAS in basis points.

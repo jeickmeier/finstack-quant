@@ -181,11 +181,19 @@ fn oas_round_trip_near_zero_at_model_price() {
     let pricer =
         finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new();
 
+    let settlement = loan.settlement_date(as_of).expect("settlement");
+    // The PV is anchored at `as_of`; the quote is a settlement-date price, so
+    // carry the PV forward over the (flow-free) settlement lag.
+    let df_settlement = market
+        .get_discount("USD-OIS")
+        .expect("discount curve")
+        .df_between_dates(as_of, settlement)
+        .expect("df");
     let pv = pricer
         .price_callable(&loan, &market, as_of)
         .unwrap()
-        .amount();
-    let settlement = loan.settlement_date(as_of).expect("settlement");
+        .amount()
+        / df_settlement;
     let schedule = loan
         .cashflow_schedule(&market, as_of)
         .expect("cashflow schedule");
@@ -537,7 +545,11 @@ fn quoted_oas_discounts_off_grid_cashflows_at_event_time() {
             let df = discount.df_between_dates(settlement, flow.date)?;
             Ok::<_, finstack_quant_core::Error>(pv + flow.amount.amount() * df * (-0.02 * t).exp())
         })
-        .expect("analytical OAS PV");
+        .expect("analytical OAS PV")
+        // PV on `as_of`: the settlement-date value discounted over the lag.
+        * discount
+            .df_between_dates(as_of, settlement)
+            .expect("settlement df");
     let actual =
         finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanTreePricer::new()
             .price_callable(&loan, &market, as_of)

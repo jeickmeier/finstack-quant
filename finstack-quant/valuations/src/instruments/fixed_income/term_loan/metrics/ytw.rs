@@ -36,7 +36,13 @@ impl MetricCalculator for YtwCalculator {
         };
         let dirty_now = {
             let loan: &TermLoan = context.instrument_as()?;
-            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value)?
+            target_price_from_quote_or_model(
+                loan,
+                &schedule,
+                &context.curves,
+                as_of,
+                context.base_value,
+            )?
         };
         let out_path = schedule.outstanding_by_date()?;
 

@@ -22,9 +22,9 @@ impl ZSpreadCs01 for TermLoan {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<ZSpreadCs01Inputs> {
-        // Reuse the pricer's holder-view flow builder so PV_z(0) reproduces the
-        // base PV exactly (same settlement anchor, same PIK/past-flow filter,
-        // same seasoned-fixing handling).
+        // Quote-space flows: a settlement-date buyer's flows, matching the
+        // settlement-date dirty quote the spread is solved against (same
+        // PIK filter and seasoned-fixing handling as the pricer).
         let (settlement, flows) = TermLoanDiscountingPricer::pricing_flows(self, curves, as_of)?;
 
         // Compounding frequency for the z-spread shift = coupon payments/year,

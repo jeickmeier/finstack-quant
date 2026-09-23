@@ -41,12 +41,12 @@ impl DiscountMarginCalculator {
     /// PV of the loan's **unchanged** contractual cashflows with `dm` (decimal)
     /// added to the discount rate.
     ///
-    /// Uses the same holder-view flows the base discounting pricer values
-    /// (PIK capitalization and pre-settlement flows excluded), anchored at the
-    /// loan's settlement date. Each flow is discounted with the DM applied on
+    /// Uses the settlement-date buyer's flows (PIK capitalization and
+    /// pre-settlement flows excluded), anchored at the loan's settlement date
+    /// like the quote it is solved against. Each flow is discounted with the DM applied on
     /// the periodically-compounded zero rate implied by the base discount
     /// factor at the loan's coupon frequency (Z-spread mechanics), so
-    /// `pv_given_dm(loan, m, 0.0)` reproduces the base model PV exactly.
+    /// `pv_given_dm(loan, m, 0.0)` is the settlement-date model value.
     ///
     /// # Errors
     ///
@@ -113,7 +113,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         }
 
         // Target price: quoted clean price converted to a dirty settlement
-        // amount (% of outstanding at settlement + accrued) if set, else base PV
+        // amount (% of outstanding at settlement + accrued) if set.
         let quoted_px = loan
             .instrument_pricing_overrides
             .market_quotes
@@ -124,7 +124,9 @@ impl MetricCalculator for DiscountMarginCalculator {
             let loan: &TermLoan = context.instrument_as()?;
             super::irr_helpers::quoted_dirty_from_clean_px(loan, &schedule, as_of, px)?.amount()
         } else {
-            context.base_value.amount()
+            // No quote: the settlement-date model value, so the DM is the
+            // spread over the loan's own curve (zero by construction).
+            Self::pv_given_dm(loan, &context.curves, context.as_of, 0.0)?
         };
         let loan: &TermLoan = context.instrument_as()?;
 
