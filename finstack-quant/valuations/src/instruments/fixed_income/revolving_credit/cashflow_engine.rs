@@ -544,14 +544,14 @@ impl<'a> CashflowEngine<'a> {
                 let commitment_fee_bp = self
                     .facility
                     .fees
-                    .commitment_fee_bp_at(utilization, sub_start);
+                    .commitment_fee_bp_at(utilization, sub_start)?;
                 if commitment_fee_bp > 0.0 {
                     let commitment_fee = current_undrawn * (commitment_fee_bp * 1e-4 * dt);
                     total_commitment_fee = total_commitment_fee.checked_add(commitment_fee)?;
                     weighted_commitment_fee_rate += (commitment_fee_bp * 1e-4) * dt;
                 }
 
-                let usage_fee_bp = self.facility.fees.usage_fee_bp_at(utilization, sub_start);
+                let usage_fee_bp = self.facility.fees.usage_fee_bp_at(utilization, sub_start)?;
                 if usage_fee_bp > 0.0 {
                     let usage_fee = current_balance * (usage_fee_bp * 1e-4 * dt);
                     total_usage_fee = total_usage_fee.checked_add(usage_fee)?;
@@ -1046,7 +1046,7 @@ impl<'a> CashflowEngine<'a> {
                 let commitment_bp = self
                     .facility
                     .fees
-                    .commitment_fee_bp_at(tier_utilization, sub_start);
+                    .commitment_fee_bp_at(tier_utilization, sub_start)?;
                 if commitment_bp > 0.0 {
                     commitment_fee = commitment_fee
                         .checked_add(undrawn_balance * (commitment_bp * 1e-4 * sub_dt))?;
@@ -1055,7 +1055,7 @@ impl<'a> CashflowEngine<'a> {
                 let usage_bp = self
                     .facility
                     .fees
-                    .usage_fee_bp_at(tier_utilization, sub_start);
+                    .usage_fee_bp_at(tier_utilization, sub_start)?;
                 if usage_bp > 0.0 {
                     usage_fee =
                         usage_fee.checked_add(drawn_balance * (usage_bp * 1e-4 * sub_dt))?;

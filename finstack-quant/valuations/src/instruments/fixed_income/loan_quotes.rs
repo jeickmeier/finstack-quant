@@ -101,8 +101,8 @@ pub fn pv_with_discount_margin(
 ///
 /// Brent on the decimal spread axis with tolerance `1e-10` (about 0.001 bp)
 /// and a ±500 bp starting bracket around `guess`; PV is strictly decreasing
-/// in the margin, so the root is unique. Pricing errors inside the objective
-/// surface as `NaN` so the solver cannot converge on an artificial value.
+/// in the margin, so the root is unique. The first pricing error inside the
+/// objective is returned instead of a margin.
 ///
 /// # Arguments
 ///
@@ -114,23 +114,37 @@ pub fn pv_with_discount_margin(
 ///
 /// # Errors
 ///
-/// Returns an error when the solver fails or the solution leaves
-/// [`DISCOUNT_MARGIN_BOUND`].
+/// Returns the first error `pv` raised, an error when the solver fails, or an
+/// error when the solution leaves [`DISCOUNT_MARGIN_BOUND`].
 pub fn solve_discount_margin(
     pv: impl Fn(f64) -> Result<f64>,
     target: f64,
     guess: f64,
 ) -> Result<f64> {
+    // Keep the first repricing error and report it instead of a solver
+    // failure or a root found around it, as the bond YTM solver does. PV is
+    // decreasing in the margin and fails only where it diverges upward (a
+    // non-positive compounding base), so the residual there is large and
+    // positive.
+    let pricing_error: std::cell::RefCell<Option<finstack_quant_core::Error>> =
+        std::cell::RefCell::new(None);
     let objective = |dm: f64| -> f64 {
         match pv(dm) {
             Ok(value) => value - target,
-            Err(_) => f64::NAN,
+            Err(err) => {
+                pricing_error.borrow_mut().get_or_insert(err);
+                1e12
+            }
         }
     };
     let solver = BrentSolver::new()
         .tolerance(1e-10)
         .initial_bracket_size(Some(0.05));
-    let dm = solver.solve(objective, guess)?;
+    let solved = solver.solve(objective, guess);
+    if let Some(err) = pricing_error.into_inner() {
+        return Err(err);
+    }
+    let dm = solved?;
     if dm.abs() > DISCOUNT_MARGIN_BOUND {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Discount margin {} bp exceeds sanity bounds (±{} bp)",
@@ -361,6 +375,26 @@ mod tests {
     use super::*;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use time::macros::date;
+
+    /// A repricing failure surfaces as that error, not as a solver failure.
+    #[test]
+    fn discount_margin_solve_propagates_the_pricing_error() {
+        let err = solve_discount_margin(
+            |_| {
+                Err(finstack_quant_core::Error::Validation(
+                    "discount curve 'USD-OIS' not found".to_string(),
+                ))
+            },
+            100.0,
+            0.02,
+        )
+        .expect_err("pricing always fails");
+        assert!(
+            err.to_string()
+                .contains("discount curve 'USD-OIS' not found"),
+            "{err}"
+        );
+    }
 
     #[test]
     fn zero_margin_reproduces_curve_discounting_and_solve_recovers_it() {
