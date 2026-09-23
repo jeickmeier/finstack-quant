@@ -2,7 +2,7 @@
 import { beforeAll, afterAll, afterEach, it, expect, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
-import { FxSurfaceChart } from "@/components/finstack/core/components/fx-surface-chart/fx-surface-chart";
+import { FxSurfaceChart } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { unwrap } from "@/workers/finstack-contract";
 import { fxQuotes } from "./surfaces/fixtures";

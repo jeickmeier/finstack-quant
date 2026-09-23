@@ -775,7 +775,7 @@ before_digest=$(uv run --no-sync python scripts/generation_digest.py)
 mise run core-check-data
 mise run rust-check-schemas
 mise run wasm-check-bindings
-npm --prefix finstack-quant-ui run check:generated
+npm --prefix finstack-quant-ui run generate -- --check
 uv run --no-sync python scripts/check_generated_instrument_fixtures.py \
   || (echo 'Generated instrument fixtures do not match the registry manifest'; exit 1)
 uv run --no-sync python scripts/sync_generated_ts_index.py --check \
@@ -1026,7 +1026,7 @@ run = "npm --prefix finstack-quant-ui run generate"
 
 [tasks.ui-fmt]
 description = "Format + auto-fix UI/TS code (prettier --write, mutating)"
-run = "npm --prefix finstack-quant-ui run format:fix"
+run = "npm --prefix finstack-quant-ui run format"
 
 [tasks.ui-typecheck]
 description = "Type-check the UI package with tsc"
@@ -1042,7 +1042,7 @@ run = "npm --prefix finstack-quant-ui run check"
 
 [tasks.ui-size]
 description = "Enforce the UI raw-byte budget on the optimized WASM package"
-run = "npm --prefix finstack-quant-ui run test:size"
+run = "npm --prefix finstack-quant-ui run size"
 
 [tasks.ui-build]
 description = "Build component-registry distribution with the pinned shadcn CLI"
@@ -1078,7 +1078,7 @@ run = "node finstack-quant-ui/tests/browser/install-smoke.mjs"
 
 [tasks.ui-e2e]
 description = "Verify served registry gallery screenshots, accessibility and keyboard interactions"
-run = "npm --prefix finstack-quant-ui run test:e2e --"
+run = "npm --prefix finstack-quant-ui run e2e --"
 
 [tasks.ui-install]
 description = "Install every registry item in isolation, then verify composed production consumers"

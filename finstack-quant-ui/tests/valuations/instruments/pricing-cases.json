@@ -2,8 +2,8 @@
   "description": "UI form-to-worker routing cases. Captured native values are regression anchors, not independent economic benchmarks. All market numbers are test inputs, not live quotes.",
   "marketProvenance": [
     {
-      "path": "finstack-quant-ui/src/fixtures/curves/market.json",
-      "sha256": "1852996417b4f9614dff5eafed87b0b4333de8d339738f6cce0d85ec3cea9c5e"
+      "path": "finstack-quant-ui/registry/core/components/curve-link-example/market.json",
+      "sha256": "fe40cc7d09b1d42b0ba0f19b9d6b238593182fcc4b82ce9cd8114cf4e79a288d"
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_equity.json",

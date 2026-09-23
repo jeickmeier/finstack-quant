@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import prettier from "prettier";
-import { schemaAt } from "../src/schema.mjs";
+import { linkSchema, schemaAt, sharedDefsId } from "../src/schema.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = async (name) =>
   JSON.parse(await readFile(path.join(root, name), "utf8"));
@@ -17,8 +17,10 @@ function resolve(root, node) {
   return { ...found, ...rest };
 }
 const records = [];
+let sharedSchema;
+let sharedMetadata;
 for (const entry of roots) {
-  const schema = await read(`src/generated/${entry.schema}`);
+  let schema = await read(`src/generated/${entry.schema}`);
   const example = await read(
     `src/generated/examples/${path.basename(entry.schema)}`,
   );
@@ -30,6 +32,23 @@ for (const entry of roots) {
     ),
     "utf8",
   );
+  const linked = JSON.stringify(schema).includes(sharedDefsId);
+  if (linked) {
+    sharedSchema ??= await read("src/generated/defs/shared.json");
+    if (!sharedMetadata) {
+      const sharedText = await readFile(
+        path.join(root, "src/generated/meta/shared.ts"),
+        "utf8",
+      );
+      sharedMetadata = JSON.parse(
+        sharedText
+          .slice(sharedText.indexOf("export default ") + 15)
+          .trim()
+          .replace(/;$/, ""),
+      );
+    }
+    schema = linkSchema(schema, sharedSchema);
+  }
   const metadata = new Map(
     JSON.parse(
       metaText
@@ -38,6 +57,10 @@ for (const entry of roots) {
         .replace(/;$/, ""),
     ).map((meta) => [meta.path, meta]),
   );
+  if (linked)
+    for (const meta of sharedMetadata ?? [])
+      if (meta.path.startsWith("#/$defs/") && !metadata.has(meta.path))
+        metadata.set(meta.path, meta);
   const constructs = [],
     visited = new Set();
   function visit(raw, pointer, ancestors = []) {

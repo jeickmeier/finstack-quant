@@ -18,6 +18,7 @@ import {
   FieldFrame,
   type FieldInfo,
 } from "@/components/finstack/shared/primitives/field-frame/field-frame";
+import { useSurfaceAttributes } from "@/components/finstack/shared/primitives/surface/surface";
 /** Supplied ISO text and a stock calendar; native validation owns financial date rules. */
 export function DateInput({
   value,
@@ -36,6 +37,7 @@ export function DateInput({
   businessDays?: readonly string[];
 }) {
   const [open, setOpen] = useState(false);
+  const surface = useSurfaceAttributes();
   const parse = (text: string | undefined) => {
     if (!text) return undefined;
     const date = new Date(`${text}T12:00:00Z`);
@@ -75,7 +77,7 @@ export function DateInput({
               </PopoverTrigger>
             </InputGroupAddon>
           </InputGroup>
-          <PopoverContent align="end" className="w-auto p-0">
+          <PopoverContent {...surface} align="end" className="w-auto p-0">
             <PopoverTitle className="sr-only">{field.label}</PopoverTitle>
             <Calendar
               mode="single"

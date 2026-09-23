@@ -28,7 +28,7 @@ try {
     secondary_axis: "strike",
     quote_type: "black_lognormal",
     interpolation_mode: "total_variance",
-    vols_row_major: [0.21, 0.2, 0.23, 0.22, 0.24, 0.26, 0.25, 0.27, 0.28],
+    vols_row_major: [0.3, 0.25, 0.27, 0.29, 0.24, 0.26, 0.28, 0.23, 0.25],
   };
   const normal = {
     ...stored,
@@ -98,7 +98,7 @@ try {
   });
   await page.goto(server.url, { waitUntil: "networkidle" });
   await page.waitForFunction(
-    () => document.querySelectorAll("svg.ts-chart").length === 3,
+    () => document.querySelectorAll("svg.ts-chart").length >= 3,
   );
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
@@ -130,7 +130,7 @@ try {
   );
   assert.equal(
     await surface
-      .getByRole("gridcell", { name: "0.21", exact: true })
+      .getByRole("gridcell", { name: "0.3", exact: true })
       .getAttribute("aria-selected"),
     "true",
   );
@@ -187,7 +187,12 @@ try {
   );
   await page.getByText("Select middle externally", { exact: true }).click();
   await page.getByText("Remove selected expiry", { exact: true }).click();
-  assert.equal(await surface.getByLabel("Stored coordinate").inputValue(), "");
+  assert.match(
+    await surface
+      .getByRole("combobox", { name: "Stored coordinate" })
+      .textContent(),
+    /Choose a node/,
+  );
   assert.equal(
     await page
       .locator('[aria-label="Supplied surface row slice"][tabindex]')

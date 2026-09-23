@@ -25,7 +25,10 @@ const item = (name, files, registryDependencies = [], dependencies = []) => ({
   registryDependencies: registryDependencies.map((name) => `@finstack/${name}`),
   dependencies,
 });
-const contracts = roots.map(({ schema }) => {
+const sharedMarker =
+  "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json";
+const contracts = [];
+for (const { schema } of roots) {
   const name = basename(schema, ".json");
   const files = [
     `generated/${schema}`,
@@ -38,42 +41,30 @@ const contracts = roots.map(({ schema }) => {
       `generated/instrument/${name}.ts`,
       `generated/examples/${name}.json`,
     );
-  return item(
-    `contract-${name.replaceAll("_", "-")}`,
-    files,
-    instrument ? ["finstack-codec"] : [],
+  const text = await readFile(`${root}src/generated/${schema}`, "utf8");
+  const dependencies = [];
+  if (instrument) dependencies.push("finstack-codec");
+  if (text.includes(sharedMarker)) dependencies.push("shared-schema-defs");
+  contracts.push(
+    item(`contract-${name.replaceAll("_", "-")}`, files, dependencies),
   );
-});
+}
 const items = [
-  {
-    name: "curve-link-example",
-    type: "registry:component",
-    docs: "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
-    files: [
-      {
-        path: "registry/core/components/curve-link-example/curve-link-example.tsx",
-        type: "registry:component",
-        target:
-          "components/finstack/core/components/curve-link-example/curve-link-example.tsx",
-      },
-      file("fixtures/curves/market.json"),
-    ],
-    registryDependencies: [
-      "@finstack/finstack-table",
-      "@finstack/curve-chart",
-      "@finstack/use-linked-selection",
-      "@finstack/finstack-codec",
-      "@finstack/contract-market-context-state",
-    ],
-    dependencies: ["@tanstack/charts@0.18.0", "@tanstack/react-table@9.2.4"],
-  },
-
   item(
     "finstack-fixtures",
     ["fixtures/results/bond.json"],
     ["contract-bond", "contract-market-context-state"],
   ),
   item("primitive-contracts", ["generated/primitive-contracts.json"]),
+  item(
+    "shared-schema-defs",
+    [
+      "generated/defs/shared.json",
+      "generated/types/shared.ts",
+      "generated/meta/shared.ts",
+    ],
+    ["finstack-codec"],
+  ),
   item(
     "finstack-format",
     ["format/format.ts", "format/columns.ts"],

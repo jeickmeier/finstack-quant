@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { FinstackQueryProvider } from "./hooks/shared/use-finstack/use-finstack";
 import { useMarketValidator } from "./hooks/core/use-market-validator/use-market-validator";
 import { useLinkedSelection } from "./hooks/shared/use-linked-selection/use-linked-selection";
-import { FxSurfaceChart } from "./components/finstack/core/components/fx-surface-chart/fx-surface-chart";
+import { FxSurfaceChart } from "./components/finstack/models/components/fx-surface-chart/fx-surface-chart";
 import { MarketContextForm } from "./components/finstack/core/components/market-context-form/market-context-form";
 import type { FigureHandle } from "./components/finstack/shared/chart/finstack-chart/finstack-chart";
 import fixture from "./fixture.json";

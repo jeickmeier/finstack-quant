@@ -16,6 +16,7 @@ import { InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { instruments } from "@/lib/finstack/generated/instruments";
+import { useSurfaceAttributes } from "@/components/finstack/shared/primitives/surface/surface";
 type Entry = (typeof instruments)[number];
 const storageKey = "finstack.recent-instruments";
 /** Canonical choices only; storage contains at most six known type identifiers. */
@@ -30,12 +31,16 @@ export function InstrumentSelector({
   allowedTypes?: readonly string[];
 }) {
   const id = useId();
+  const surface = useSurfaceAttributes();
   const [recent, setRecent] = useState<string[]>([]);
   const available = allowedTypes
     ? instruments.filter((entry) => allowedTypes.includes(entry.type))
     : instruments;
   const groups = [...Map.groupBy(available, (entry) => entry.group)].map(
     ([value, items]) => ({ value, items }),
+  );
+  const visibleRecent = recent.filter((type) =>
+    available.some((entry) => entry.type === type),
   );
   useEffect(() => {
     try {
@@ -98,7 +103,7 @@ export function InstrumentSelector({
           </InputGroupAddon>
         </ComboboxInput>
 
-        <ComboboxContent>
+        <ComboboxContent {...surface}>
           <ComboboxEmpty>No matching instrument</ComboboxEmpty>
           <ComboboxList>
             {(group: { value: string; items: Entry[] }) => (
@@ -121,10 +126,10 @@ export function InstrumentSelector({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
-      {recent.length > 0 && (
+      {visibleRecent.length > 0 && (
         <nav aria-label="Recently used instruments">
           <span>Recent</span>
-          {recent.filter((type) => available.some((entry) => entry.type === type)).map((type) => (
+          {visibleRecent.map((type) => (
             <Button
               variant="ghost"
               size="sm"

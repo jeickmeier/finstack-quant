@@ -137,6 +137,22 @@ it.each([12, 13])("prints values only up to 12 rows and columns (%i)", (n) => {
     ),
   ).toHaveLength(n === 12 ? 144 : 0);
 });
+it("labels cells with the complete supplied value", () => {
+  const priced = [{ id: "price", x: 1, y: "A", v: 100.0625 }];
+  const result = render(
+    heatmap({
+      ...options,
+      data: priced,
+      palette: "sequential",
+      domain: [100, 101],
+    }),
+    "light",
+  );
+  const labels = result.nodes.filter(
+    (n) => n.kind === "label" && n.key?.includes("heatmap-values"),
+  );
+  expect(labels.map((n) => n.kind === "label" && n.text)).toEqual(["100.0625"]);
+});
 it("rejects ambiguous cell identities and misleading color extents", () => {
   expect(() =>
     heatmap({

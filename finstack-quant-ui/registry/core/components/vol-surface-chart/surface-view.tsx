@@ -31,6 +31,7 @@ import {
   useLinkedSelection,
   type LinkedSelection,
 } from "@/hooks/shared/use-linked-selection/use-linked-selection";
+import { useSurfaceAttributes } from "@/components/finstack/shared/primitives/surface/surface";
 import { surfaceSlices, type SurfacePoint } from "./stored";
 export interface SurfaceViewProps<T extends SurfacePoint>
   extends FigureText, FigureInteractions<T, ChartKey, ChartKey> {
@@ -87,6 +88,7 @@ export function SurfaceView<T extends SurfacePoint>(
     defaultSelectedKey: props.nodes[0]?.key ?? null,
   });
   const link = props.link ?? owned;
+  const surface = useSurfaceAttributes();
   const { nodes, labels } = props;
   const slices = surfaceSlices(nodes, link.selectedKey);
   // Removed coordinates have no active representation. The external owner retains its state.
@@ -177,7 +179,7 @@ export function SurfaceView<T extends SurfacePoint>(
                 >
                   <SelectValue placeholder="Choose a node" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent {...surface}>
                   {nodes.map((node) => (
                     <SelectItem key={node.key} value={node.key}>
                       {labels.expiry} {node.expiry} · {labels.secondary}{" "}

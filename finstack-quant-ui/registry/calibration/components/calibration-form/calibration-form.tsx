@@ -3,7 +3,7 @@ import { useState } from "react";
 import {
   SchemaForm,
   type SchemaFormProps,
-} from "@/components/finstack/shared/components/schema-form/schema-form";
+} from "@/components/finstack/core/components/schema-form/schema-form";
 import { calibrationModule } from "./calibration";
 /** Edit the complete generated envelope. Remount to load a different initial document. */
 export function CalibrationForm({

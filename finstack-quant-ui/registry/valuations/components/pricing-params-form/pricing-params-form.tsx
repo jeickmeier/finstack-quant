@@ -7,11 +7,11 @@ import bondSchema from "@/lib/finstack/generated/schemas/bond.json";
 import { createWireCodec } from "@/lib/finstack/codec.mjs";
 import { DateInput } from "@/components/finstack/core/primitives/date-input/date-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import type {
   InstrumentModule,
   Schema,
-} from "@/components/finstack/shared/components/schema-form/schema";
+} from "@/components/finstack/core/components/schema-form/schema";
 import { MetricPicker } from "../../primitives/metric-picker/metric-picker";
 import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";

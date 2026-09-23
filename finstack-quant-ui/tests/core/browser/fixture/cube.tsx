@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { FinstackQueryProvider } from "./hooks/shared/use-finstack/use-finstack";
 import { useMarketValidator } from "./hooks/core/use-market-validator/use-market-validator";
-import { VolCubeExplorer } from "./components/finstack/core/components/vol-cube-explorer/vol-cube-explorer";
+import { VolCubeExplorer } from "./components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
 import { MarketContextForm } from "./components/finstack/core/components/market-context-form/market-context-form";
 import type { FigureHandle } from "./components/finstack/shared/chart/finstack-chart/finstack-chart";
 import fixture from "./fixture.json";

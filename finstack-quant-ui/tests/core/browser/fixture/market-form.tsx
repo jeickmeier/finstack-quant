@@ -10,7 +10,7 @@ import {
   type CurveState,
 } from "./components/finstack/core/components/curve-chart/curve-chart";
 import { JsonViewer } from "./components/finstack/shared/primitives/json-viewer/json-viewer";
-import { serializeHost } from "../../../../src/codec.mjs";
+import { serializeHost } from "./lib/finstack/codec.mjs";
 import fixture from "./fixture.json";
 function App() {
   const [marketJson, setMarketJson] = useState(fixture.request.marketJson);

@@ -7,11 +7,9 @@ import {
   PopoverTitle,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import {
-  initialValue,
-  type InstrumentModule,
-  type SchemaLocation,
-} from "./schema";
+import { useSurfaceAttributes } from "@/components/finstack/shared/primitives/surface/surface";
+import type { InstrumentModule, SchemaLocation } from "./schema";
+import { initialValue } from "./schema-walk";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
 
 /** Embedded editors can omit an explicit null, which is the same as leaving the field off the wire. */
@@ -40,6 +38,7 @@ function TermActions({
   content: ReactNode;
   children: ReactNode;
 }) {
+  const surface = useSurfaceAttributes();
   return (
     <div className="finstack-editable-term">
       <div className="min-w-0">{content}</div>
@@ -50,7 +49,7 @@ function TermActions({
         >
           ⋯
         </PopoverTrigger>
-        <PopoverContent>
+        <PopoverContent {...surface}>
           <PopoverTitle>{label}</PopoverTitle>
           {children}
         </PopoverContent>

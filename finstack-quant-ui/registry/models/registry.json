@@ -65,6 +65,63 @@
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
       }
+    },
+    {
+      "name": "fx-surface-chart",
+      "type": "registry:component",
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
+      "files": [
+        {
+          "path": "components/fx-surface-chart/fx-surface-chart.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/fx-surface-chart/fx-surface-chart.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/vol-surface-chart",
+        "@finstack/fx-delta-quotes",
+        "@finstack/use-fx-delta-samples"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "vol-cube-explorer",
+      "type": "registry:component",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
+      "files": [
+        {
+          "path": "components/vol-cube-explorer/vol-cube-explorer.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/models/components/vol-cube-explorer/vol-cube-explorer.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/use-cube-samples",
+        "@finstack/vol-surface-chart",
+        "@finstack/json-viewer",
+        "@finstack/finstack-codec",
+        "@finstack/decimal-input",
+        "@finstack/enum-field"
+      ],
+      "dependencies": ["react@19.2.8"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
     }
   ]
 }

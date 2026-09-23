@@ -19,6 +19,7 @@ import {
   type CalibrationFitChartProps,
 } from "@/components/finstack/calibration/components/calibration-fit-chart/calibration-fit-chart";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
+import { useSurfaceAttributes } from "@/components/finstack/shared/primitives/surface/surface";
 import {
   useCalibrate,
   useCalibrationDryRun,
@@ -41,6 +42,7 @@ export function CalibrationPanel({
     "stepId" | "report" | "marketData" | "link"
   >;
 }) {
+  const surface = useSurfaceAttributes();
   const [draft, setDraft] = useState(defaultJson ?? ""),
     [document, setDocument] = useState(defaultJson),
     [revision, setRevision] = useState(0);
@@ -188,7 +190,7 @@ export function CalibrationPanel({
               <SelectTrigger aria-label="Calibration report">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent {...surface}>
                 <SelectItem value="plan">Plan</SelectItem>
                 {Object.keys(result.step_reports).map((id) => (
                   <SelectItem key={id} value={`step/${id}`}>

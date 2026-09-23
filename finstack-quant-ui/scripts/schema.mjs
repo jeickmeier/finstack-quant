@@ -10,6 +10,7 @@ import {
   singles,
   annotations,
   schemaAt,
+  sharedDefsId,
 } from "../src/schema.mjs";
 
 export const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
@@ -69,9 +70,15 @@ export async function readContracts(repo) {
   return contracts;
 }
 
-/** Resolve with Ref Parser, then project only reachable schema nodes into local $defs. */
-export async function bundleRoot(uri, contracts) {
-  if (!contracts.has(uri)) throw new Error(`Unknown root: ${uri}`);
+/**
+ * Resolve with Ref Parser, then project only reachable schema nodes into local $defs.
+ * `schema` replaces the indexed root document. `stableDefinitionNames` keeps
+ * `#/$defs/<name>` keys for definitions owned by `sharedDefsId`. References to
+ * that document stay external instead of being copied into the root.
+ */
+export async function bundleRoot(uri, contracts, options = {}) {
+  const sourceSchema = options.schema ?? contracts.get(uri)?.schema;
+  if (!sourceSchema) throw new Error(`Unknown root: ${uri}`);
   const parser = new $RefParser();
   await parser.resolve(uri, {
     resolve: {
@@ -81,7 +88,11 @@ export async function bundleRoot(uri, contracts) {
         order: 1,
         canRead: () => true,
         read: ({ url }) => {
-          const contract = contracts.get(url);
+          const document = String(url).split("#")[0];
+          if (url === uri || document === uri)
+            return json(resolutionSchema(sourceSchema));
+          if (document === sharedDefsId) return "{}";
+          const contract = contracts.get(url) ?? contracts.get(document);
           if (!contract) throw new Error(`Unresolved canonical schema: ${url}`);
           return json(resolutionSchema(contract.schema));
         },
@@ -93,9 +104,17 @@ export async function bundleRoot(uri, contracts) {
   const metadata = [];
   const rootIdentity = `${uri}#`;
 
+  function definitionKey(identity) {
+    const prefix = `${sharedDefsId}#/$defs/`;
+    if (options.stableDefinitionNames && identity.startsWith(prefix)) {
+      const name = identity.slice(prefix.length);
+      if (!name.includes("/")) return name;
+    }
+    return `d_${createHash("sha256").update(identity).digest("hex").slice(0, 20)}`;
+  }
   function localRef(identity) {
     if (identity === rootIdentity) return "#";
-    const key = `d_${createHash("sha256").update(identity).digest("hex").slice(0, 20)}`;
+    const key = definitionKey(identity);
     if (identities.has(key) && identities.get(key) !== identity)
       throw new Error(`Definition hash collision: ${identity}`);
     if (!identities.has(key)) {
@@ -103,8 +122,12 @@ export async function bundleRoot(uri, contracts) {
       definitions[key] = null; // Reserve before visiting recursive targets.
       parser.$refs.get(identity); // Verify resolution through the maintained resolver.
       const [document, fragment] = identity.split("#");
+      const documentSchema =
+        document === uri ? sourceSchema : contracts.get(document)?.schema;
+      if (!documentSchema)
+        throw new Error(`Unresolved canonical schema: ${document}`);
       const original = schemaAt(
-        contracts.get(document).schema,
+        documentSchema,
         fragment ? `#${decodeURIComponent(fragment)}` : "#",
       );
       definitions[key] = visit(original, identity, `#/$defs/${key}`);
@@ -143,7 +166,12 @@ export async function bundleRoot(uri, contracts) {
       meta.ref = schema.$ref;
       const absolute = new URL(schema.$ref, identity.split("#")[0]).href;
       meta.resolvedRef = absolute.includes("#") ? absolute : `${absolute}#`;
-      body.$ref = localRef(meta.resolvedRef);
+      const externalShared =
+        uri !== sharedDefsId &&
+        meta.resolvedRef.startsWith(`${sharedDefsId}#/$defs/`);
+      body.$ref = externalShared
+        ? meta.resolvedRef
+        : localRef(meta.resolvedRef);
     }
     metadata.push(meta);
     return mapChildren(body, (child, suffix) =>
@@ -151,7 +179,7 @@ export async function bundleRoot(uri, contracts) {
     );
   }
 
-  const schema = visit(contracts.get(uri).schema, rootIdentity, "#");
+  const schema = visit(sourceSchema, rootIdentity, "#");
   schema.$id = uri;
   schema.$defs = Object.fromEntries(
     Object.entries(definitions).sort(([a], [b]) => a.localeCompare(b)),

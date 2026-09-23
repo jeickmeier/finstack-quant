@@ -1,5 +1,44 @@
 const pointer = (key) => key.replaceAll("~", "~0").replaceAll("/", "~1");
 
+/** Canonical id of the shared definition document emitted for wide instrument roots. */
+export const sharedDefsId =
+  "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json";
+
+/**
+ * Inline a shared definition document so validators and forms see local `#/$defs` refs.
+ * Root-owned definitions win when a key is present in both documents.
+ * @param schema - Bundled root whose shared references use `sharedDefsId`.
+ * @param shared - Bundled shared document; its `$defs` are copied, not mutated.
+ * @returns A closed schema. Shared reference targets must exist.
+ */
+export function linkSchema(schema, shared) {
+  const linked = structuredClone(schema);
+  const defs = structuredClone(shared?.$defs ?? {});
+  for (const [key, value] of Object.entries(linked.$defs ?? {}))
+    defs[key] = value;
+  linked.$defs = defs;
+  const prefix = `${sharedDefsId}#/$defs/`;
+  const seen = new WeakSet();
+  const rewrite = (node) => {
+    if (typeof node !== "object" || node === null || seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      node.forEach(rewrite);
+      return;
+    }
+    if (typeof node.$ref === "string" && node.$ref.startsWith(prefix)) {
+      const rest = node.$ref.slice(prefix.length);
+      const name = rest.split("/")[0];
+      if (!Object.hasOwn(linked.$defs, name))
+        throw new Error(`Missing shared definition: ${name}`);
+      node.$ref = `#/$defs/${name}${rest.slice(name.length)}`;
+    }
+    for (const value of Object.values(node)) rewrite(value);
+  };
+  rewrite(linked);
+  return linked;
+}
+
 /**
  * Look up a local JSON Pointer against a schema root.
  * Decodes `~1` before `~0`, returns the raw target with no sibling merge and

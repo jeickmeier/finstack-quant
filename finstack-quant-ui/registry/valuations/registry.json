@@ -131,6 +131,28 @@
       }
     },
     {
+      "name": "dimensional-measures",
+      "type": "registry:component",
+      "docs": "Displays native per-coordinate valuation measures as bucket lists, two-axis matrices, and selectable three-axis slices. Uses Rust-supplied metric metadata for coordinates and units; exact values and canonical keys remain available.",
+      "files": [
+        {
+          "path": "components/dimensional-measures/dimensional-measures.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/valuations/components/dimensional-measures/dimensional-measures.tsx"
+        }
+      ],
+      "registryDependencies": ["@finstack/measure-value"],
+      "dependencies": ["finstack-quant-wasm@0.8.0"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "instrument-form",
       "type": "registry:component",
       "docs": "Standalone all-instrument generated form with grouped search, explicit examples and guarded recent selections. Lazy schema modules are reused by native module caching. Native validation is supplied by the consumer.",
@@ -427,12 +449,18 @@
           "path": "blocks/pricing-workbench/use-print-report.ts",
           "type": "registry:block",
           "target": "components/finstack/valuations/blocks/pricing-workbench/use-print-report.ts"
+        },
+        {
+          "path": "blocks/pricing-workbench/use-workbench-session.tsx",
+          "type": "registry:block",
+          "target": "components/finstack/valuations/blocks/pricing-workbench/use-workbench-session.tsx"
         }
       ],
       "registryDependencies": [
         "@finstack/instrument-form",
         "@finstack/pricing-params-form",
         "@finstack/measures-grid",
+        "@finstack/dimensional-measures",
         "@finstack/json-viewer",
         "@finstack/use-instrument-validator",
         "@finstack/use-price-instrument",

@@ -86,10 +86,8 @@ export async function verifyPublishing(page, evidence, repo) {
       .getByRole("tab", { name: "3 Cashflows", exact: true })
       .click();
     await workbench.getByRole("tab", { name: "2 Market", exact: true }).click();
-    await workbench.getByLabel("Search market fields").fill("/curves/0");
-    await workbench
-      .getByRole("button", { name: "Inspect /curves/0", exact: true })
-      .click();
+    await workbench.getByLabel("Search market data").fill("/curves/0");
+    await workbench.getByRole("button", { name: "/curves/0" }).click();
     for (const format of ["A4", "Letter"]) {
       await page.evaluate(() => {
         window.readPrintFigureGeometry = () =>

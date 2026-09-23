@@ -1,12 +1,10 @@
+import { propertiesOf, type Schema, type SchemaLocation } from "./schema";
 import {
-  resolve,
-  propertiesOf,
-  matchesBranch,
   initialValue,
+  matchesBranch,
   objectValue,
-  type Schema,
-  type SchemaLocation,
-} from "./schema";
+  resolve,
+} from "./schema-walk";
 /** Structural tag information from the generated canonical schema and its resolved metadata paths. */
 export function discriminator(root: Schema, location: SchemaLocation) {
   const { schema, pointer } = resolve(root, location);

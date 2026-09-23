@@ -10,19 +10,19 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRequire } from "node:module";
-import { termDisclosure } from "@/components/finstack/shared/components/schema-form/disclosure";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
+import { termDisclosure } from "@/components/finstack/core/components/schema-form/disclosure";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import * as bond from "../../src/generated/instrument/bond";
 import * as equityOption from "../../src/generated/instrument/equity_option";
 import { createWireCodec } from "../../src/codec.mjs";
-import { discriminator } from "@/components/finstack/shared/components/schema-form/discriminator";
+import { discriminator } from "@/components/finstack/core/components/schema-form/discriminator";
+import type { Schema } from "@/components/finstack/core/components/schema-form/schema";
 import {
   initialValue,
   resolve,
   structuralValidator,
   workingValue,
-  type Schema,
-} from "@/components/finstack/shared/components/schema-form/schema";
+} from "@/components/finstack/core/components/schema-form/schema-walk";
 import calibrationSchema from "../../src/generated/schemas/calibration.json";
 afterEach(cleanup);
 const native = createRequire(import.meta.url)(

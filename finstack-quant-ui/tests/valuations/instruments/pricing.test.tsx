@@ -8,8 +8,8 @@ import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import Big from "big.js";
 import init, { valuations } from "../../../../finstack-quant-wasm/index.js";
 import { instruments } from "../../../src/generated/instruments";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
-import type { InstrumentModule } from "@/components/finstack/shared/components/schema-form/schema";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
+import type { InstrumentModule } from "@/components/finstack/core/components/schema-form/schema";
 import {
   unwrap,
   errorValue,

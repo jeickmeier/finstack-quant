@@ -10,11 +10,11 @@ import {
   EvaluatedSurfaceStatus,
   evaluatedSurfaceNodes,
   type SurfaceViewProps,
-} from "../vol-surface-chart/surface-view";
-import type { SurfacePoint } from "../vol-surface-chart/stored";
+} from "@/components/finstack/core/components/vol-surface-chart/surface-view";
+import type { SurfacePoint } from "@/components/finstack/core/components/vol-surface-chart/stored";
 import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/json-viewer";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
-import { DecimalInput } from "../../primitives/decimal-input/decimal-input";
+import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
 import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
 export interface CubePoint extends SurfacePoint {
   coordinate: CubeSampleRequest["coordinates"][number];

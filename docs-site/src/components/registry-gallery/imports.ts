@@ -5,6 +5,13 @@ export const importHarnesses = {
       name: "finstack-base",
       modules: modules.length,
     })),
+  "finstack-surface": () =>
+    Promise.all([
+      import("@/components/finstack/shared/primitives/surface/surface"),
+    ]).then((modules) => ({
+      name: "finstack-surface",
+      modules: modules.length,
+    })),
   "use-finstack": () =>
     Promise.all([
       import("@/hooks/shared/use-finstack/use-finstack"),
@@ -88,6 +95,15 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/primitive-contracts.json"),
     ]).then((modules) => ({
       name: "primitive-contracts",
+      modules: modules.length,
+    })),
+  "shared-schema-defs": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/defs/shared.json"),
+      import("@/lib/finstack/generated/types/shared"),
+      import("@/lib/finstack/generated/meta/shared"),
+    ]).then((modules) => ({
+      name: "shared-schema-defs",
       modules: modules.length,
     })),
   "finstack-format": () =>

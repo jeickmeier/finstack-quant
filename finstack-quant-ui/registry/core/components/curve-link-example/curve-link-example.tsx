@@ -8,7 +8,7 @@ import { decorative } from "@tanstack/charts/mark/decorative";
 import type { ColumnDef } from "@tanstack/react-table";
 import { createWireCodec } from "@/lib/finstack/codec.mjs";
 import marketSchema from "@/lib/finstack/generated/schemas/market_context_state.json";
-import fixture from "@/lib/finstack/fixtures/curves/market.json";
+import fixture from "./market.json";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import { useLinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";

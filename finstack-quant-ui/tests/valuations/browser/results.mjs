@@ -10,6 +10,9 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-results-"));
+const bond = JSON.parse(
+  await readFile(path.join(root, "src/fixtures/results/bond.json"), "utf8"),
+);
 let browser, server, page;
 try {
   const installed = await installBuilt(root, consumer, ["measures-grid"]);
@@ -135,12 +138,12 @@ try {
         mode.rowToken === (mode.density === "comfortable" ? "36px" : "28px"),
     ),
   );
-  assert(
-    (
-      await page
-        .getByRole("region", { name: "Valuation", exact: true })
-        .textContent()
-    ).includes("USD 1,042,500"),
+  assert.equal(
+    await page
+      .getByRole("region", { name: "Valuation", exact: true })
+      .getByTitle(bond.result.value.amount)
+      .count(),
+    1,
   );
   assert(
     (
@@ -263,8 +266,20 @@ try {
     })
     .locator("td")
     .allTextContents();
-  assert(thirtyYearCells[1].includes("-103.45856181590352"));
+  assert(thirtyYearCells[1].startsWith("0"));
   assert(thirtyYearCells[2].startsWith("2"));
+  const oneYearCells = await dv01Table
+    .locator("tbody tr")
+    .filter({
+      has: page.getByText("bucketed_dv01::USD-OIS::1y", { exact: true }),
+    })
+    .locator("td")
+    .allTextContents();
+  assert(
+    oneYearCells[1].startsWith(
+      String(bond.result.measures["bucketed_dv01::USD-OIS::1y"]),
+    ),
+  );
   await page.getByRole("button", { name: "Exact keys" }).click();
   await page.getByRole("button", { name: "Exact values" }).click();
   await dv01Toggle.click();
@@ -293,16 +308,19 @@ try {
     await printSection.isVisible(),
     `Collapsed buckets remain visible in print: ${JSON.stringify(printSectionStyle)}`,
   );
-  const printedThirtyYear = printSection.locator("tbody tr").filter({
-    has: page.locator('[title="bucketed_dv01::USD-OIS::30y"]'),
+  const printedOneYear = printSection.locator("tbody tr").filter({
+    has: page.locator('[title="bucketed_dv01::USD-OIS::1y"]'),
   });
-  const printValue = printedThirtyYear.locator(
+  const printValue = printedOneYear.locator(
     'td:nth-child(2) span[aria-hidden="true"]',
   );
-  assert.equal(await printValue.textContent(), "-103.45856181590352");
+  assert.equal(
+    await printValue.textContent(),
+    String(bond.result.measures["bucketed_dv01::USD-OIS::1y"]),
+  );
   assert(await printValue.isVisible(), "Exact raw value is visible in print");
   assert.equal(
-    await printedThirtyYear
+    await printedOneYear
       .locator('td:nth-child(2) span[class~="print:hidden"]')
       .isVisible(),
     false,

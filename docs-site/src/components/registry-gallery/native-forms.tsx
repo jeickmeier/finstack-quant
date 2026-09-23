@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import { InstrumentForm } from "@/components/finstack/valuations/components/instrument-form/instrument-form";
 import { MarketContextForm } from "@/components/finstack/core/components/market-context-form/market-context-form";
 import { CalibrationForm } from "@/components/finstack/calibration/components/calibration-form/calibration-form";

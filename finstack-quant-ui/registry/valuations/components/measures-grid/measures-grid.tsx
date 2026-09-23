@@ -9,6 +9,10 @@ import {
 import type { ColumnDef } from "@tanstack/react-table";
 import type { MetricMetadata } from "finstack-quant-wasm";
 export interface MeasuresGridProps extends ValuationSummaryProps {
+  /** Choose a compact valuation summary, detailed measures, or both. */
+  content?: "all" | "summary" | "measures";
+  /** Requested metrics to show above the full table in a compact pricing workbench. */
+  featuredMetrics?: readonly string[];
   /** Rust-supplied per-key metadata for the primary result; absent records keep keys raw. */
   metadata?: readonly MetricMetadata[];
   /** Rust-supplied per-key metadata for the comparison result, independent of the primary sidecar. */
@@ -16,6 +20,8 @@ export interface MeasuresGridProps extends ValuationSummaryProps {
   /** Optional source-backed units by complete metric key. Exact values remain available. */
   units?: Readonly<Record<string, { label: string; source: string }>>;
   comparisonUnits?: Readonly<Record<string, { label: string; source: string }>>;
+  /** Leave coordinate measures to a separate dimensional results view. */
+  excludeDimensional?: boolean;
 }
 type MeasureRow = {
   key: string;
@@ -34,6 +40,16 @@ const metricLabels: Readonly<Record<string, string>> = {
   dv01: "DV01",
   bucketed_dv01: "Bucketed DV01",
   bucketed_cs01: "Bucketed CS01",
+  fx01: "FX01",
+  delta: "Delta",
+  gamma: "Gamma",
+  vega: "Vega",
+  theta: "Theta",
+  par_spread: "Par spread",
+  risky_pv01: "Risky PV01",
+  jump_to_default: "Jump to default",
+  expected_loss: "Expected loss",
+  wal: "Weighted average life",
 };
 function descriptorFor(key: string, props: MeasuresGridProps) {
   return (
@@ -134,7 +150,11 @@ function measureUnit(
 export function groupMeasures(
   props: Pick<
     MeasuresGridProps,
-    "result" | "compareTo" | "metadata" | "comparisonMetadata"
+    | "result"
+    | "compareTo"
+    | "metadata"
+    | "comparisonMetadata"
+    | "excludeDimensional"
   >,
 ) {
   const grouped = new Map<string, MeasureRow[]>();
@@ -143,6 +163,13 @@ export function groupMeasures(
     ...Object.keys(props.compareTo?.measures ?? {}),
   ]);
   for (const key of keys) {
+    if (
+      props.excludeDimensional &&
+      (props.metadata?.find((entry) => entry.key === key)?.components.length ||
+        props.comparisonMetadata?.find((entry) => entry.key === key)?.components
+          .length)
+    )
+      continue;
     const group =
       props.metadata?.find((entry) => entry.key === key)?.group ??
       props.comparisonMetadata?.find((entry) => entry.key === key)?.group ??
@@ -162,6 +189,23 @@ export function groupMeasures(
 /** Supplied measures and independent comparison context, using the unlinked core table. */
 export function MeasuresGrid(props: MeasuresGridProps) {
   const grouped = groupMeasures(props);
+  const measureKeys = Object.keys(props.result?.measures ?? {});
+  const featuredRows = [
+    ...new Set(
+      (props.featuredMetrics ?? []).flatMap((metric) =>
+        measureKeys.filter(
+          (key) => key === metric || key.startsWith(`${metric}::`),
+        ),
+      ),
+    ),
+  ]
+    .filter((key) => {
+      const descriptor = descriptorFor(key, props);
+      return descriptor
+        ? descriptor.components.length === 0
+        : (props.featuredMetrics ?? []).includes(key);
+    })
+    .slice(0, 3);
   const [showKeys, setShowKeys] = useState(false);
   const [showExact, setShowExact] = useState(false);
   const [hideZeroRows, setHideZeroRows] = useState(false);
@@ -258,20 +302,42 @@ export function MeasuresGrid(props: MeasuresGridProps) {
       className="finstack-measures font-sans text-foreground"
       data-density={props.density}
     >
-      <ValuationSummary
-        result={props.result}
-        compareTo={props.compareTo}
-        formattedValue={props.formattedValue}
-        comparisonFormattedValue={props.comparisonFormattedValue}
-        compact
-        model={props.model}
-        comparisonModel={props.comparisonModel}
-        density={props.density}
-        loading={props.loading}
-        error={props.error}
-      />
-      {grouped.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-2 print:hidden">
+      {props.content !== "measures" && (
+        <ValuationSummary
+          result={props.result}
+          compareTo={props.compareTo}
+          formattedValue={props.formattedValue}
+          comparisonFormattedValue={props.comparisonFormattedValue}
+          compact
+          model={props.model}
+          comparisonModel={props.comparisonModel}
+          density={props.density}
+          loading={props.loading}
+          error={props.error}
+        />
+      )}
+      {props.content !== "measures" && featuredRows.length > 0 && (
+        <dl
+          className="finstack-workbench__key-results"
+          aria-label="Key measures"
+        >
+          {featuredRows.map((key) => (
+            <div key={key}>
+              <dt title={key}>{measureLabel(key, props)}</dt>
+              <dd>
+                <MeasureValue
+                  value={props.result?.measures[key]}
+                  unit={measureUnit(key, props.metadata, props.units)}
+                  displayText={shortenedValue(props.result?.measures[key])}
+                  showUnavailableUnit={false}
+                />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {props.content !== "summary" && grouped.length > 0 && (
+        <div className="finstack-measures__toolbar flex flex-wrap items-center justify-between gap-3 border-y border-border py-2 print:hidden">
           <span className="text-xs font-medium text-muted-foreground">
             Measure display
           </span>
@@ -317,7 +383,7 @@ export function MeasuresGrid(props: MeasuresGridProps) {
           </div>
         </div>
       )}
-      {grouped.length > 0 && (
+      {props.content !== "summary" && grouped.length > 0 && (
         <p className="text-xs text-muted-foreground">
           {props.compareTo === undefined ? "" : "— Not supplied · "}
           {noUnits
@@ -326,7 +392,7 @@ export function MeasuresGrid(props: MeasuresGridProps) {
           {showExact ? "" : " · Values shortened to six significant digits"}
         </p>
       )}
-      {grouped.length ? (
+      {props.content === "summary" ? null : grouped.length ? (
         grouped.map(({ group, rows }, groupIndex) => (
           <section
             key={group}
@@ -413,7 +479,11 @@ export function MeasuresGrid(props: MeasuresGridProps) {
         ))
       ) : (
         <p role="status" className="text-sm text-muted-foreground">
-          No measures supplied
+          {props.excludeDimensional &&
+          (Object.keys(props.result?.measures ?? {}).length > 0 ||
+            Object.keys(props.compareTo?.measures ?? {}).length > 0)
+            ? "No scalar measures returned. See Buckets & surfaces for coordinate measures."
+            : "No measures supplied"}
         </p>
       )}
     </div>

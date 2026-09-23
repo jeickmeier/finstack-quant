@@ -6,7 +6,7 @@ export const storedSurface: StoredSurface = {
   secondary_axis: "strike",
   quote_type: "black_lognormal",
   interpolation_mode: "total_variance",
-  vols_row_major: [0.21, 0.2, 0.23, 0.22, 0.24, 0.26, 0.25, 0.27, 0.28],
+  vols_row_major: [0.3, 0.25, 0.27, 0.29, 0.24, 0.26, 0.28, 0.23, 0.25],
 };
 export const tenorSurface: StoredSurface = {
   ...storedSurface,

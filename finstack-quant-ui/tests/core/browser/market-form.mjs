@@ -56,7 +56,10 @@ try {
   });
   await resultView.waitFor();
   const before = JSON.parse(await resultView.locator("pre").textContent());
-  await page.getByLabel("Stored value 1", { exact: true }).first().fill("0.96");
+  await page
+    .getByLabel("Stored value 1", { exact: true })
+    .first()
+    .fill("0.985");
   await page.getByRole("button", { name: "Apply market", exact: true }).click();
   await page.waitForFunction(() => {
     const text = document.querySelector(
@@ -65,7 +68,7 @@ try {
     return (
       text &&
       JSON.parse(text).curves.find((c) => c.id === "USD-OIS")
-        .knot_points[1][1] === 0.96
+        .knot_points[1][1] === 0.985
     );
   });
   await marketView
@@ -113,7 +116,7 @@ try {
     browser: browser.version(),
     installed,
     fullMarketCanonical: true,
-    editedKnot: [40, 0.96],
+    editedKnot: [0.25, 0.985],
     directPricingMatch: true,
     exactCopy: true,
     violations: audit.violations,

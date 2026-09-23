@@ -9,7 +9,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { VolCubeExplorer } from "@/components/finstack/core/components/vol-cube-explorer/vol-cube-explorer";
+import { VolCubeExplorer } from "@/components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
 import { startWorker } from "../shared/worker/harness.mjs";
 import { unwrap, type CubeSampleRequest } from "@/workers/finstack-contract";
 import fixtures from "./cubes/cases.json";

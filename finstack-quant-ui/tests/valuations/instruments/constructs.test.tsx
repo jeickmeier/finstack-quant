@@ -10,7 +10,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import * as bond from "../../../src/generated/instrument/bond";
 import * as equity from "../../../src/generated/instrument/equity";
 import * as structuredCredit from "../../../src/generated/instrument/structured_credit";

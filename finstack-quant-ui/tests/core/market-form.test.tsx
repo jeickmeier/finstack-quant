@@ -31,7 +31,7 @@ import { serializeHost } from "../../src/codec.mjs";
 import { startWorker } from "../shared/worker/harness.mjs";
 import bond from "../../src/fixtures/results/bond.json";
 import marketFixture from "../valuations/instruments/pricing-market.json";
-import curves from "../../src/fixtures/curves/market.json";
+import curves from "../../registry/core/components/curve-link-example/market.json";
 const native = createRequire(import.meta.url)(
   "../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
@@ -78,11 +78,11 @@ it("edits a stored knot, redraws that exact coordinate and prices the full edite
     />,
   );
   fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
-    target: { value: "0.96" },
+    target: { value: "0.985" },
   });
   const json = await submit(onSubmit);
   const expected = JSON.parse(bond.request.marketJson);
-  expected.curves[0].knot_points[1][1] = 0.96;
+  expected.curves[0].knot_points[1][1] = 0.985;
   expect(JSON.parse(json)).toEqual(
     JSON.parse(canonical(JSON.stringify(expected))),
   );
@@ -260,7 +260,7 @@ it("rejects malformed imports without discarding edits or exposing readonly data
     />,
   );
   fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
-    target: { value: "0.97" },
+    target: { value: "0.987" },
   });
   fireEvent.change(screen.getByLabelText("Market or calibration result JSON"), {
     target: { value: "{bad" },
@@ -269,12 +269,12 @@ it("rejects malformed imports without discarding edits or exposing readonly data
   expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
   expect(
     (screen.getAllByLabelText("Stored value 1")[0] as HTMLInputElement).value,
-  ).toBe("0.97");
+  ).toBe("0.987");
   expect(
     JSON.parse(await submit(onSubmit)).curves.find(
       (c: { id: string }) => c.id === "USD-OIS",
     ).knot_points[1][1],
-  ).toBe(0.97);
+  ).toBe(0.987);
 });
 
 it("edits stored FX entries and scalar prices while preserving populated unopened surfaces", async () => {

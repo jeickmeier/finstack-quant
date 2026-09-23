@@ -11,6 +11,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { FieldFrame, type FieldInfo } from "../field-frame/field-frame";
+import { useSurfaceAttributes } from "../surface/surface";
 export interface EnumOption {
   value: string;
   label: string;
@@ -35,6 +36,7 @@ export function EnumField({
   ...field
 }: EnumFieldProps) {
   const groups = Map.groupBy(options, (option) => option.group ?? "");
+  const surface = useSurfaceAttributes();
   return (
     <FieldFrame {...field}>
       {(control) =>
@@ -72,7 +74,7 @@ export function EnumField({
             <SelectTrigger {...control} className="w-full">
               <SelectValue placeholder="Select…" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent {...surface}>
               {[...groups].map(([group, items]) => (
                 <SelectGroup key={group}>
                   {group && <SelectLabel>{group}</SelectLabel>}

@@ -7,6 +7,7 @@ import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { compile } from "json-schema-to-typescript";
 import { bundleRoot, readContracts } from "../../scripts/schema.mjs";
+import { externalize, planSharedDefs } from "../../scripts/share-defs.mjs";
 import {
   discoverFixtures,
   repoRoot,
@@ -15,8 +16,10 @@ import {
 import {
   converterSchema,
   integerText,
+  linkSchema,
   numericEdit,
   schemaAt,
+  sharedDefsId,
 } from "../../src/schema.mjs";
 
 const uri = (name) => `https://example.test/${name}.json`;
@@ -294,6 +297,52 @@ describe("offline reachable bundling", () => {
       z
         .fromJSONSchema(converterSchema(first.schema))
         .safeParse({ a: { n: 1, next: { n: 2 } }, b: "x" }).success,
+    ).toBe(true);
+  });
+  it("externalizes repeated wide-root definitions and links them for validation", async () => {
+    const bond = {
+      type: "object",
+      properties: { n: { type: "number" } },
+      additionalProperties: false,
+    };
+    const wide = (extra) => ({
+      type: "object",
+      properties: { instrument: { $ref: "#/$defs/Bond" } },
+      $defs: { Bond: bond, ...extra },
+    });
+    const filler = Object.fromEntries(
+      Array.from({ length: 80 }, (_, index) => [
+        `Extra${index}`,
+        { type: "string", const: `extra-${index}` },
+      ]),
+    );
+    const plan = planSharedDefs([
+      wide(filler),
+      wide(filler),
+      { type: "object", $defs: { Bond: bond, Only: { type: "string" } } },
+    ]);
+    expect(plan.names.has("Bond")).toBe(true);
+    expect(plan.names.has("Only")).toBe(false);
+    expect(plan.names.has("Extra0")).toBe(true);
+    const bundled = await bundleRoot(
+      uri("root"),
+      contracts({ root: wide(filler) }),
+      {
+        schema: externalize(wide(filler), plan.names),
+      },
+    );
+    expect(bundled.schema.properties.instrument.$ref).toBe(
+      `${sharedDefsId}#/$defs/Bond`,
+    );
+    expect(bundled.schema.$defs?.Bond).toBeUndefined();
+    const linked = linkSchema(bundled.schema, {
+      $defs: { Bond: bond },
+    });
+    expect(linked.properties.instrument.$ref).toBe("#/$defs/Bond");
+    expect(
+      z
+        .fromJSONSchema(converterSchema(linked))
+        .safeParse({ instrument: { n: 1 } }).success,
     ).toBe(true);
   });
   it("rejects external refs absent from indexes and dangling internal pointers", async () => {

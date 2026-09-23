@@ -6,6 +6,9 @@ import type {
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
+  StatementResultJson,
+  FormulaExplanationJson,
+  CheckReport,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
 export interface PriceRequest {
@@ -35,6 +38,25 @@ export interface CashflowRequest {
   readonly marketJson: string;
   readonly asOf: string;
   readonly model: string;
+}
+/** Exact statement evaluation identity; market and date are supplied together. */
+export interface StatementRequest {
+  readonly modelJson: string;
+  readonly marketJson?: string;
+  readonly asOf?: string;
+}
+/** Match the model and its already evaluated result for diagnostics. */
+export interface StatementExplanationRequest {
+  readonly modelJson: string;
+  readonly resultsJson: string;
+  readonly nodeId: string;
+  readonly period: string;
+}
+export interface StatementChecksRequest {
+  readonly modelJson: string;
+  readonly resultsJson: string;
+  readonly kind: "suite" | "three-statement" | "credit-underwriting";
+  readonly configJson: string;
 }
 /** Omitted pricing models resolve to the native "default" (see pricing.rs price_instrument). */
 export function resolveModel(model?: string | null): string {
@@ -80,6 +102,13 @@ export interface WorkerApi {
   validateMarket(marketJson: string): Promise<Envelope<string>>;
   /** Full envelope includes prior_market, quote sets, data and every plan setting. */
   validateCalibration(envelopeJson: string): Promise<Envelope<string>>;
+  validateStatementModel(modelJson: string): Promise<Envelope<string>>;
+  statementNodeIds(modelJson: string): Promise<Envelope<string[]>>;
+  validateStatementFormula(formula: string): Promise<Envelope<string>>;
+  evaluateStatement(request: StatementRequest): Promise<Envelope<StatementResultJson>>;
+  explainStatement(request: StatementExplanationRequest): Promise<Envelope<FormulaExplanationJson>>;
+  traceStatement(modelJson: string, nodeId: string): Promise<Envelope<string>>;
+  runStatementChecks(request: StatementChecksRequest): Promise<Envelope<CheckReport>>;
   dryRun(envelopeJson: string): Promise<Envelope<string>>;
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;

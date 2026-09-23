@@ -17,8 +17,9 @@ import {
   PricingParamsForm,
   type PricingParams,
 } from "@/components/finstack/valuations/components/pricing-params-form/pricing-params-form";
+import { useSurfaceAttributes } from "@/components/finstack/shared/primitives/surface/surface";
 
-/** Settings chrome. Theme and density still stamp the document so portaled menus match. */
+/** Settings chrome. Theme and density belong to the workbench; portaled menus read them from its surface. */
 export function WorkbenchSettings({
   params,
   onParamsChange,
@@ -44,12 +45,14 @@ export function WorkbenchSettings({
   theme: "light" | "dark" | undefined;
   onThemeChange(value: "light" | "dark"): void;
 }) {
+  const surface = useSurfaceAttributes();
   return (
     <Popover>
       <PopoverTrigger render={<Button variant="outline" size="sm" />}>
         Settings
       </PopoverTrigger>
       <PopoverContent
+        {...surface}
         align="end"
         className="w-[28rem] max-w-[calc(100vw-2rem)]"
       >
@@ -74,14 +77,13 @@ export function WorkbenchSettings({
               value={density}
               onValueChange={(value) => {
                 if (value !== "compact" && value !== "comfortable") return;
-                document.documentElement.dataset.density = value;
                 onDensityChange(value);
               }}
             >
               <SelectTrigger aria-label="Workbench density">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent {...surface}>
                 <SelectItem value="compact">Compact</SelectItem>
                 <SelectItem value="comfortable">Comfortable</SelectItem>
               </SelectContent>
@@ -97,11 +99,6 @@ export function WorkbenchSettings({
                 ?.getAttribute("data-theme");
               const nextTheme =
                 (theme ?? inherited) === "dark" ? "light" : "dark";
-              document.documentElement.dataset.theme = nextTheme;
-              document.documentElement.classList.toggle(
-                "dark",
-                nextTheme === "dark",
-              );
               onThemeChange(nextTheme);
             }}
           >

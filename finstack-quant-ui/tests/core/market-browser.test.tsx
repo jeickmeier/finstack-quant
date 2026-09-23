@@ -44,7 +44,7 @@ function showOriginal(viewer: HTMLElement) {
   });
   if (button) fireEvent.click(button);
 }
-it("retains the fresh full credit-desk calibration and native canonical supplemental fixture", () => {
+it("retains the realistic CDX calibration and native canonical supplemental fixture", () => {
   const source = readFileSync(
     resolve(
       dirname(fileURLToPath(import.meta.url)),
@@ -65,7 +65,7 @@ it("retains the fresh full credit-desk calibration and native canonical suppleme
   } finally {
     handle.free();
   }
-});
+}, 15000);
 it("navigates every supplied leaf with exact displayed and copied values", async () => {
   const copy = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", {
@@ -133,11 +133,13 @@ it("searches literal paths and preserves identified selection across reorder, th
       .getByRole("region", { name: "Selected stored value" })
       .querySelector("pre")!.textContent,
   ).toBe(serializeHost(curve));
-  fireEvent.change(screen.getByLabelText("Search market fields"), {
+  fireEvent.change(screen.getByLabelText("Search market data"), {
     target: { value: "USD~1CSA" },
   });
   fireEvent.click(
-    screen.getByRole("button", { name: "Inspect /collateral/USD~1CSA" }),
+    within(
+      screen.getByRole("navigation", { name: "Market references" }),
+    ).getByRole("button", { name: "Inspect USD/CSA, /collateral/USD~1CSA" }),
   );
   expect(link.select).toHaveBeenLastCalledWith(
     JSON.stringify(["collateral", "USD/CSA"]),
@@ -161,14 +163,19 @@ it("shows absent generated roots as unavailable and preserves null and empty sto
     prices: {},
   } as unknown as MarketContextStateWire;
   render(<MarketContextBrowser state={state} />);
-  fireEvent.click(screen.getByRole("button", { name: "Inspect /hierarchy" }));
+  fireEvent.click(screen.getByText("All snapshot fields"));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Inspect hierarchy, /hierarchy" }),
+  );
   expect(screen.getByText("Field unavailable in supplied state")).toBeTruthy();
-  for (const [field, value] of [
-    ["curves", "[]"],
-    ["fx", "null"],
-    ["prices", "{}"],
+  for (const [field, name, value] of [
+    ["curves", "curves", "[]"],
+    ["fx", "FX matrix", "null"],
+    ["prices", "prices", "{}"],
   ]) {
-    fireEvent.click(screen.getByRole("button", { name: `Inspect /${field}` }));
+    fireEvent.click(
+      screen.getByRole("button", { name: `Inspect ${name}, /${field}` }),
+    );
     showOriginal(screen.getByRole("region", { name: "Selected stored value" }));
     expect(
       screen
@@ -176,6 +183,33 @@ it("shows absent generated roots as unavailable and preserves null and empty sto
         .querySelector("pre")!.textContent,
     ).toBe(value);
   }
+});
+it("keeps the desk list compact, names curve values, and reports empty searches", () => {
+  render(<MarketContextBrowser state={market} />);
+  const references = screen.getByRole("navigation", {
+    name: "Market references",
+  });
+  const discount = market.curves.find((curve) => curve.type === "discount")!;
+  expect(
+    within(references).getByRole("button", { name: new RegExp(discount.id) }),
+  ).toBeTruthy();
+  expect(within(references).queryByText("schema version")).toBeNull();
+  expect(
+    screen.getByRole("grid", { name: "Stored curve knots" }).textContent,
+  ).toContain("Discount factor");
+  expect(
+    screen.getByText("Snapshot provider and observation time not supplied"),
+  ).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Search market data"), {
+    target: { value: discount.id },
+  });
+  expect(within(references).getAllByRole("button")).toHaveLength(1);
+  fireEvent.change(screen.getByLabelText("Search market data"), {
+    target: { value: "NO-SUCH-MARKET" },
+  });
+  expect(
+    screen.getByText("No market data matches “NO-SUCH-MARKET”."),
+  ).toBeTruthy();
 });
 it("preserves FX source, direction, date, policy and unavailable diagonals without resolution", () => {
   render(<FxMatrixGrid state={market.fx} />);

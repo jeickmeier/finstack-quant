@@ -14,46 +14,6 @@
   ],
   "items": [
     {
-      "name": "curve-link-example",
-      "type": "registry:component",
-      "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
-      "files": [
-        {
-          "path": "registry/core/components/curve-link-example/curve-link-example.tsx",
-          "type": "registry:component",
-          "target": "components/finstack/core/components/curve-link-example/curve-link-example.tsx"
-        },
-        {
-          "path": "src/fixtures/curves/market.json",
-          "type": "registry:file",
-          "target": "lib/finstack/fixtures/curves/market.json"
-        }
-      ],
-      "registryDependencies": [
-        "@finstack/finstack-table",
-        "@finstack/curve-chart",
-        "@finstack/use-linked-selection",
-        "@finstack/finstack-codec",
-        "@finstack/contract-market-context-state",
-        "button",
-        "checkbox",
-        "label"
-      ],
-      "dependencies": [
-        "@tanstack/charts@0.18.0",
-        "@tanstack/react-table@9.2.4"
-      ],
-      "categories": ["Individual Components"],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.8.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
-        ]
-      }
-    },
-    {
       "name": "finstack-fixtures",
       "type": "registry:lib",
       "docs": "Installs finstack-fixtures under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
@@ -91,6 +51,32 @@
         }
       ],
       "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+    },
+    {
+      "name": "shared-schema-defs",
+      "type": "registry:lib",
+      "docs": "Installs shared-schema-defs under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/defs/shared.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/defs/shared.json"
+        },
+        {
+          "path": "src/generated/types/shared.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/shared.ts"
+        },
+        {
+          "path": "src/generated/meta/shared.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/shared.ts"
+        }
+      ],
+      "registryDependencies": ["@finstack/finstack-codec"],
       "dependencies": [],
       "categories": [],
       "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
@@ -557,7 +543,10 @@
           "target": "lib/finstack/generated/examples/composite.json"
         }
       ],
-      "registryDependencies": ["@finstack/finstack-codec"],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/shared-schema-defs"
+      ],
       "dependencies": [],
       "categories": [],
       "meta": {
@@ -1481,7 +1470,10 @@
           "target": "lib/finstack/generated/examples/basket.json"
         }
       ],
-      "registryDependencies": ["@finstack/finstack-codec"],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/shared-schema-defs"
+      ],
       "dependencies": [],
       "categories": [],
       "meta": {
@@ -1859,7 +1851,10 @@
           "target": "lib/finstack/generated/examples/asset_backed_facility.json"
         }
       ],
-      "registryDependencies": ["@finstack/finstack-codec"],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/shared-schema-defs"
+      ],
       "dependencies": [],
       "categories": [],
       "meta": {
@@ -2153,7 +2148,10 @@
           "target": "lib/finstack/generated/examples/structured_credit.json"
         }
       ],
-      "registryDependencies": ["@finstack/finstack-codec"],
+      "registryDependencies": [
+        "@finstack/finstack-codec",
+        "@finstack/shared-schema-defs"
+      ],
       "dependencies": [],
       "categories": [],
       "meta": {

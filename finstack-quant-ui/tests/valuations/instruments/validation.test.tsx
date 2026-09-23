@@ -8,12 +8,10 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
-import { issuePathToFieldPath } from "@/components/finstack/shared/components/schema-form/issue-mapping";
-import {
-  structuralValidator,
-  type InstrumentModule,
-} from "@/components/finstack/shared/components/schema-form/schema";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
+import { issuePathToFieldPath } from "@/components/finstack/core/components/schema-form/issue-mapping";
+import type { InstrumentModule } from "@/components/finstack/core/components/schema-form/schema";
+import { structuralValidator } from "@/components/finstack/core/components/schema-form/schema-walk";
 import * as bond from "../../../src/generated/instrument/bond";
 import * as deposit from "../../../src/generated/instrument/deposit";
 import * as equity from "../../../src/generated/instrument/equity";

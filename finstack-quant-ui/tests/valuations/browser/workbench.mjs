@@ -13,6 +13,9 @@ import {
 } from "../../browser/consumer.mjs";
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const consumer = await mkdtemp(path.join(root, ".consumer-workbench-"));
+const bond = JSON.parse(
+  await readFile(path.join(root, "src/fixtures/results/bond.json"), "utf8"),
+);
 let browser, server, page;
 async function original(viewer) {
   await viewer.locator("pre").waitFor();
@@ -66,7 +69,7 @@ try {
     `${server.url}${process.env.REGISTRY_WORKBENCH_PATH ?? "/"}`,
     { waitUntil: "networkidle" },
   );
-  await page.getByText("USD 1,042,500", { exact: true }).waitFor();
+  await page.getByTitle(bond.result.value.amount).waitFor();
   const results = page.getByRole("region", { name: "Results", exact: true });
   await results.getByRole("tab", { name: "Request", exact: true }).click();
   await original(
@@ -120,10 +123,8 @@ try {
   assert.deepEqual(actual, direct);
   assert.equal(old.marketJson, request.marketJson);
   await page.getByRole("tab", { name: "2 Market" }).click();
-  await page.getByLabel("Search market fields").fill("/curves/0");
-  await page
-    .getByRole("button", { name: "Inspect /curves/0", exact: true })
-    .click();
+  await page.getByLabel("Search market data").fill("/curves/0");
+  await page.getByRole("button", { name: "/curves/0" }).click();
   await page.locator("svg.ts-chart").first().waitFor();
   await page.getByRole("tab", { name: "Snapshot JSON", exact: true }).click();
   assert(
@@ -298,10 +299,8 @@ try {
         : source.includes("fx")
           ? "fx_delta_vol_surfaces"
           : "surfaces";
-      await page.getByLabel("Search market fields").fill(`/${field}/0`);
-      await page
-        .getByRole("button", { name: `Inspect /${field}/0`, exact: true })
-        .click();
+      await page.getByLabel("Search market data").fill(`/${field}/0`);
+      await page.getByRole("button", { name: `/${field}/0` }).click();
       await page
         .getByRole("region", { name: "Selected market field" })
         .locator("svg.ts-chart")
@@ -335,12 +334,11 @@ try {
       .click();
     await page.getByRole("tab", { name: "View market", exact: true }).click();
     await page
-      .getByLabel("Search market fields")
+      .getByLabel("Search market data")
       .fill("/fx_delta_vol_surfaces/0");
     await page
       .getByRole("button", {
-        name: "Inspect /fx_delta_vol_surfaces/0",
-        exact: true,
+        name: "/fx_delta_vol_surfaces/0",
       })
       .click();
     await page

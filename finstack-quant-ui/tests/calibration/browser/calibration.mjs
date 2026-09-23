@@ -176,9 +176,7 @@ try {
   await page.waitForFunction(
     () => !!window.calibrationProbe.result && !window.calibrationProbe.error,
   );
-  await page
-    .getByLabel("Search market fields", { exact: true })
-    .fill("USD-OIS");
+  await page.getByLabel("Search market data", { exact: true }).fill("USD-OIS");
   const firstQuote = Object.keys(
     (await page.evaluate(() => window.calibrationProbe.result)).result
       .step_reports["USD-OIS"].residuals,

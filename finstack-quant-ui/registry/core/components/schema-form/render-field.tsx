@@ -3,20 +3,20 @@ import { useContext, useEffect, useState, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@tanstack/react-form";
 import { Fieldset } from "@/lib/finstack/form";
-import { EnumField } from "../../primitives/enum-field/enum-field";
+import { EnumField } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { ScalarField } from "./field-kind";
 import { DISCLOSURE_ORDER, pinnedTerm, termDisclosure } from "./disclosure";
 import { FieldRendererContext } from "./field-renderer";
 import { discriminator } from "./discriminator";
+import type { InstrumentModule, SchemaLocation } from "./schema";
+import { propertiesOf } from "./schema";
 import {
-  resolve,
-  propertiesOf,
-  nullable,
   initialValue,
-  objectValue,
   labelFor,
-  type InstrumentModule,
-  type SchemaLocation,
-} from "./schema";
+  nullable,
+  objectValue,
+  resolve,
+} from "./schema-walk";
 import type { SchemaFormApi, FieldFilter } from "./schema-form";
 import { nullableFieldChrome, optionalFieldChrome } from "./field-chrome";
 
@@ -24,11 +24,13 @@ function TermDisclosure({
   label,
   count,
   forceOpen,
+  pricingOverrides,
   children,
 }: {
   label: string;
   count: number;
   forceOpen: boolean;
+  pricingOverrides?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,6 +51,7 @@ function TermDisclosure({
     <details
       ref={detailsRef}
       className="finstack-term-disclosure"
+      data-pricing-overrides={pricingOverrides || undefined}
       open={open || forceOpen}
       onBeforeToggle={(event) => {
         if (forceOpen && event.newState === "closed") event.preventDefault();
@@ -403,6 +406,9 @@ export function RenderField({
               label={name}
               count={entries.length}
               forceOpen={entries.some(([key]) => fieldHasError(key))}
+              pricingOverrides={
+                path === "instrument.spec" && name === "Pricing overrides"
+              }
             >
               <div className="finstack-term-fields">{entries.map(render)}</div>
             </TermDisclosure>
@@ -470,34 +476,13 @@ export function RenderField({
       </form.AppField>
     );
   return (
-    <form.AppField name={path}>
-      {(field) => {
-        if (schema.type === "boolean") return <field.BooleanField {...info} />;
-        if (schema.format === "date") return <field.DateField {...info} />;
-        if (
-          schema.type === "string" &&
-          (metadata?.source.includes("/decimal") || schema.title === "Decimal")
-        )
-          return <field.DecimalField {...info} pattern={schema.pattern} />;
-        if (["string", "integer", "number"].includes(String(schema.type)))
-          return (
-            <field.TextField
-              {...info}
-              inputMode={
-                schema.type === "integer"
-                  ? "numeric"
-                  : schema.type === "number"
-                    ? "decimal"
-                    : "text"
-              }
-            />
-          );
-        return (
-          <p className="text-sm text-muted-foreground">
-            {label}: unsupported generated schema construct.
-          </p>
-        );
-      }}
-    </form.AppField>
+    <ScalarField
+      form={form}
+      path={path}
+      schema={schema}
+      metadata={metadata}
+      info={info}
+      label={label}
+    />
   );
 }

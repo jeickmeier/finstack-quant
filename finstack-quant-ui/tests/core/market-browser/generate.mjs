@@ -5,7 +5,7 @@ const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 );
 const source =
-  "finstack-quant/calibration/examples/market_bootstrap/12_full_credit_desk_market.json";
+  "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json";
 const input = await readFile(
   new URL(`../../../../${source}`, import.meta.url),
   "utf8",
@@ -13,7 +13,10 @@ const input = await readFile(
 const calibrated = native.calibrate(input).result.final_market;
 const variants = JSON.parse(
   await readFile(
-    new URL("../../../src/fixtures/curves/market.json", import.meta.url),
+    new URL(
+      "../../../registry/core/components/curve-link-example/market.json",
+      import.meta.url,
+    ),
     "utf8",
   ),
 );

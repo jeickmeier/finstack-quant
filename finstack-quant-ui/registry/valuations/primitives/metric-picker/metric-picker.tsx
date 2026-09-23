@@ -15,6 +15,7 @@ import {
   type FieldInfo,
 } from "@/components/finstack/shared/primitives/field-frame/field-frame";
 import type { EnumOption } from "@/components/finstack/shared/primitives/enum-field/enum-field";
+import { useSurfaceAttributes } from "@/components/finstack/shared/primitives/surface/surface";
 /** Controlled metric selection using stock controls; unavailable selections remain unchanged. */
 export function MetricPicker({
   value,
@@ -29,6 +30,7 @@ export function MetricPicker({
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const surface = useSurfaceAttributes();
   const groups = Map.groupBy(
     options.filter((option) =>
       `${option.label} ${option.group ?? ""}`
@@ -48,7 +50,7 @@ export function MetricPicker({
           >
             {value.length ? `${value.length} selected` : "Select metrics"}
           </PopoverTrigger>
-          <PopoverContent>
+          <PopoverContent {...surface}>
             <PopoverTitle>{field.label}</PopoverTitle>
             <Input
               aria-label="Search metrics"

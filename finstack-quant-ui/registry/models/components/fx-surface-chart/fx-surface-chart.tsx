@@ -4,13 +4,13 @@ import {
   useFxDeltaSamples,
   type FxDeltaSampleRequest,
 } from "@/hooks/models/use-fx-delta-samples/use-fx-delta-samples";
-import { FxDeltaQuotes } from "../fx-delta-quotes/fx-delta-quotes";
+import { FxDeltaQuotes } from "@/components/finstack/core/components/fx-delta-quotes/fx-delta-quotes";
 import {
   EvaluatedSurfaceStatus,
   evaluatedSurfaceNodes,
   type SurfaceViewProps,
-} from "../vol-surface-chart/surface-view";
-import type { SurfacePoint } from "../vol-surface-chart/stored";
+} from "@/components/finstack/core/components/vol-surface-chart/surface-view";
+import type { SurfacePoint } from "@/components/finstack/core/components/vol-surface-chart/stored";
 export interface FxSamplePoint extends SurfacePoint {
   coordinate: FxDeltaSampleRequest["coordinates"][number];
 }

@@ -32,9 +32,9 @@ market.curves.push(
     reset_lag: 2,
     tenor: 0.25,
     knot_points: [
-      [0, 0.03],
-      [1, 0.031],
-      [5, 0.04],
+      [0, 0.044],
+      [1, 0.041],
+      [5, 0.039],
     ],
   },
   {
@@ -46,8 +46,8 @@ market.curves.push(
     extrapolation: "flat_forward",
     knot_points: [
       [0, 300],
-      [1, 306],
-      [5, 330],
+      [1, 307.5],
+      [5, 340],
     ],
   },
   {
@@ -61,28 +61,50 @@ market.curves.push(
     type,
     id: type.toUpperCase(),
     ...(type === "price"
-      ? { spot_price: 10 }
+      ? { spot_price: 100 }
       : type === "vol_index"
-        ? { spot_level: 10 }
+        ? { spot_level: 18 }
         : {}),
-    knot_points: [
-      [0, 10],
-      [1, 12],
-      [5, 15],
-    ],
+    knot_points:
+      type === "basis_spread"
+        ? [
+            [0, -0.001],
+            [1, -0.0012],
+            [5, -0.0015],
+          ]
+        : type === "vol_index"
+          ? [
+              [0, 18],
+              [1, 19],
+              [5, 20],
+            ]
+          : [
+              [0, 100],
+              [1, 102],
+              [5, 110],
+            ],
   })),
   {
     type: "parametric",
     id: "NS",
     base_date: base.base,
     day_count: base.day_count,
-    model: { variant: "ns", beta0: 0.02, beta1: -0.01, beta2: 0.005, tau: 1.5 },
+    model: {
+      variant: "ns",
+      beta0: 0.04,
+      beta1: 0.003,
+      beta2: -0.006,
+      tau: 1.5,
+    },
   },
 );
 const state = new native.Market(JSON.stringify(market));
 try {
   await writeFile(
-    new URL("../../../src/fixtures/curves/market.json", import.meta.url),
+    new URL(
+      "../../../registry/core/components/curve-link-example/market.json",
+      import.meta.url,
+    ),
     JSON.stringify(JSON.parse(state.toJson()), null, 2) + "\n",
   );
 } finally {

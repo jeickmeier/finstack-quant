@@ -26,6 +26,9 @@ const sources = {
   scenarios: "tests/valuations/scenario-table/cases.json",
   cashflows: "tests/valuations/cashflows/cases.json",
   details: "tests/valuations/details/cases.json",
+  irsInstrument:
+    "../finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
+  pricingMarket: "tests/valuations/instruments/pricing-market.json",
 };
 const data = {},
   provenance = [];
@@ -33,10 +36,62 @@ for (const [name, relative] of Object.entries(sources)) {
   const bytes = await readFile(path.join(root, relative));
   data[name] = JSON.parse(bytes);
   provenance.push({
-    path: `finstack-quant-ui/${relative}`,
+    path: path.relative(repo, path.join(root, relative)),
     sha256: createHash("sha256").update(bytes).digest("hex"),
   });
 }
+const pricingCases = JSON.parse(
+  await readFile(
+    path.join(root, "tests/valuations/instruments/pricing-cases.json"),
+    "utf8",
+  ),
+).cases;
+const catalogue = JSON.parse(
+  await readFile(path.join(root, "src/generated/catalogue.json"), "utf8"),
+);
+const workbenchGroups = new Set(["credit", "rates", "fixed_income"]);
+const workbenchTypes = new Set(
+  catalogue
+    .filter((entry) => workbenchGroups.has(entry.group))
+    .map((entry) => entry.type),
+);
+async function readPinnedSource(source) {
+  const bytes = await readFile(path.join(repo, source.path));
+  if (createHash("sha256").update(bytes).digest("hex") !== source.sha256)
+    throw new Error(`Stale pricing source: ${source.path}`);
+  return structuredClone(
+    source.pointer.reduce((value, key) => value[key], JSON.parse(bytes)),
+  );
+}
+function applyPatches(value, patches) {
+  for (const patch of patches) {
+    const parent = patch.path
+      .slice(0, -1)
+      .reduce((node, key) => node[key], value);
+    parent[patch.path.at(-1)] = structuredClone(patch.value);
+  }
+}
+data.pricingExamples = {};
+for (const entry of pricingCases.filter((entry) =>
+  workbenchTypes.has(entry.type),
+)) {
+  const instrument = await readPinnedSource(entry.instrumentSource);
+  applyPatches(instrument, entry.instrumentPatches);
+  const market = await readPinnedSource(entry.marketSource);
+  applyPatches(market, entry.marketPatches);
+  const sharedMarket =
+    entry.marketSource.path ===
+      "finstack-quant-ui/tests/valuations/instruments/pricing-market.json" &&
+    entry.marketPatches.length === 0;
+  data.pricingExamples[entry.type] = {
+    instrument,
+    ...(sharedMarket ? {} : { market }),
+    request: entry.request,
+  };
+  workbenchTypes.delete(entry.type);
+}
+if (workbenchTypes.size)
+  throw new Error(`Missing workbench pricing cases: ${[...workbenchTypes]}`);
 const imports = nonvisual.map((item) => {
   const targets = (item.files ?? [])
     .map((file) => file.target.replace(/^~\//, ""))

@@ -38,6 +38,8 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
       ref?: Ref<FigureHandle>;
       /** Put source links in an on-screen disclosure; exports retain full source text. */
       sourceDisplay?: "inline" | "disclosure";
+      /** Label for a disclosed reference list. */
+      sourceDisclosureLabel?: string;
     },
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -177,7 +179,9 @@ export function FinstackChart<T, X extends ChartValue, Y extends ChartValue>(
       )}
       {props.sourceDisplay === "disclosure" && sources?.length ? (
         <details className="mt-2 text-xs text-muted-foreground">
-          <summary className="cursor-pointer">Sources</summary>
+          <summary className="cursor-pointer">
+            {props.sourceDisclosureLabel ?? "Sources"}
+          </summary>
           <ul className="mt-2 space-y-1">
             {sources.map((source, index) => (
               <li key={index}>

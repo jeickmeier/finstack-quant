@@ -41,6 +41,8 @@ export function FinstackProvider({
     try {
       client = createClient(
         new Worker(
+          // Installed layout: hooks/shared/use-finstack → workers/. The source
+          // tree aliases @/workers, and this relative URL is not rewritten.
           new URL("../../../workers/finstack.worker.ts", import.meta.url),
           { type: "module" },
         ),

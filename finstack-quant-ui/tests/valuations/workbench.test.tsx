@@ -23,7 +23,8 @@ import {
   FinstackError,
   errorValue,
 } from "@/workers/finstack-contract";
-import { formatMoney } from "../../src/format/format";
+import { formatMoney, formatRawMoney } from "../../src/format/format";
+const bondDisplay = formatRawMoney(fixture.result.value);
 const mock = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/hooks/shared/use-finstack/client", () => ({
   createClient: mock.createClient,
@@ -155,7 +156,7 @@ it("embeds the existing components, debounces complete requests and retains edit
   expect(
     (await within(results).findByTitle(fixture.result.value.amount))
       .textContent,
-  ).toBe("USD 1,042,500");
+  ).toBe(bondDisplay);
   const amount = screen.getByRole("textbox", { name: "Amount" });
   fireEvent.change(amount, { target: { value: "1000000.123456789" } });
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
@@ -207,7 +208,7 @@ it("retains the completed context during invalid edits, native pricing failure a
         { timeout: 3000 },
       )
     ).textContent,
-  ).toBe("USD 1,042,500");
+  ).toBe(bondDisplay);
   const amount = screen.getByRole("textbox", { name: "Amount" });
   fireEvent.change(amount, { target: { value: "abc" } });
   const issue = await screen.findByRole("button", {
@@ -217,7 +218,7 @@ it("retains the completed context during invalid edits, native pricing failure a
   expect(document.activeElement).toBe(amount);
   expect(prices()).toHaveLength(1);
   expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-    "USD 1,042,500",
+    bondDisplay,
   );
   fireEvent.change(amount, { target: { value: "1000000" } });
   await userEvent.click(screen.getByRole("button", { name: "Settings" }));
@@ -237,7 +238,7 @@ it("retains the completed context during invalid edits, native pricing failure a
     { timeout: 3000 },
   );
   expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-    "USD 1,042,500",
+    bondDisplay,
   );
   await userEvent.click(
     screen.getByRole("combobox", { name: "Instrument type" }),
@@ -249,7 +250,7 @@ it("retains the completed context during invalid edits, native pricing failure a
   await waitFor(() => expect(prices()).toHaveLength(3), { timeout: 3000 });
   expect(prices()[2].model).toBe(prices()[0].model);
   expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-    "USD 1,042,500",
+    bondDisplay,
   );
 }, 15000);
 it("rejects a calibration envelope as a market snapshot before issuing a price request", async () => {
@@ -283,16 +284,16 @@ it("feeds the complete native-validated market edit to pricing and shares stored
         { timeout: 3000 },
       )
     ).textContent,
-  ).toBe("USD 1,042,500");
+  ).toBe(bondDisplay);
   await userEvent.click(screen.getByRole("tab", { name: "2 Market" }));
   await userEvent.click(screen.getByRole("tab", { name: "Edit market" }));
   fireEvent.change(screen.getAllByLabelText("Stored value 1")[0], {
-    target: { value: "0.96" },
+    target: { value: "0.985" },
   });
   await waitFor(() => expect(prices()).toHaveLength(2), { timeout: 4000 });
   const request = prices()[1];
   const expected = JSON.parse(fixture.request.marketJson);
-  expected.curves[0].knot_points[1][1] = 0.96;
+  expected.curves[0].knot_points[1][1] = 0.985;
   expect(request.marketJson).toBe(canonicalMarket(JSON.stringify(expected)));
   expect({ ...request, marketJson: prices()[0].marketJson }).toEqual(
     prices()[0],
@@ -301,13 +302,15 @@ it("feeds the complete native-validated market edit to pricing and shares stored
   const curveIndex = JSON.parse(request.marketJson).curves.findIndex(
     (curve: any) => curve.id === expected.curves[0].id,
   );
-  fireEvent.change(screen.getByLabelText("Search market fields"), {
+  fireEvent.change(screen.getByLabelText("Search market data"), {
     target: { value: `/curves/${curveIndex}` },
   });
   fireEvent.click(
-    screen.getByRole("button", { name: `Inspect /curves/${curveIndex}` }),
+    screen.getByRole("button", {
+      name: `Inspect ${expected.curves[0].id}, /curves/${curveIndex}`,
+    }),
   );
-  const cell = screen.getByRole("cell", { name: "0.96" });
+  const cell = screen.getByRole("cell", { name: "0.985" });
   await userEvent.click(cell);
   expect(cell.getAttribute("aria-selected")).toBe("true");
   await userEvent.click(screen.getByRole("tab", { name: "4 Diagnostics" }));
@@ -390,14 +393,19 @@ it.each(cashflowFixtures.cases.filter((entry) => entry.type !== "bond"))(
       entry.pricedValue,
     );
     await userEvent.click(tabs.getByRole("tab", { name: "3 Cashflows" }));
-    const viewer = await results.findByRole("region", { name: "Cashflows" });
-    if (entry.error)
-      await waitFor(() =>
-        expect(within(viewer).getByRole("alert").textContent).toBe(
-          `Cashflows unavailable: ${entry.error}`,
+    if (entry.error) {
+      expect(
+        await results.findByText(
+          "Cashflows are exported only for the discounting and hazard_rate models.",
         ),
-      );
-    else {
+      ).toBeTruthy();
+      expect(
+        call.mock.calls.filter(([method]) => method === "cashflows"),
+      ).toHaveLength(0);
+    } else {
+      const viewer = await results.findByRole("region", {
+        name: "Cashflows",
+      });
       await within(viewer).findByRole("table", { name: "Cashflow schedule" });
       fireEvent.click(
         within(viewer).getByText("Original JSON", { exact: true }),
@@ -429,6 +437,44 @@ it("lets the host deep link select another canonical example while preserving ex
   expect(JSON.parse(request.instrumentJson).instrument.type).toBe("equity");
   expect(request.marketJson).toBe(canonicalMarket(fixture.request.marketJson));
   expect(request.model).toBe(fixture.request.model);
+});
+
+it("loads the complete host request when a prepared instrument is selected", async () => {
+  const option = cashflowFixtures.cases.find(
+    (entry) => entry.type === "equity_option",
+  )!.request;
+  render(
+    <FinstackQueryProvider>
+      <PricingWorkbench
+        defaultRequest={fixture.request}
+        exampleRequests={{ bond: fixture.request, equity_option: option }}
+      />
+    </FinstackQueryProvider>,
+  );
+  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 5000 });
+  expect(screen.queryByRole("button", { name: "Load example" })).toBeNull();
+  await userEvent.click(
+    screen.getByRole("combobox", { name: "Instrument type" }),
+  );
+  expect(screen.queryByRole("option", { name: "equity" })).toBeNull();
+  await userEvent.click(screen.getByRole("option", { name: "equity_option" }));
+  await waitFor(() => expect(prices()).toHaveLength(2), { timeout: 5000 });
+  const selected = prices()[1];
+  expect(JSON.parse(selected.instrumentJson).instrument.type).toBe(
+    "equity_option",
+  );
+  expect(selected.marketJson).toBe(canonicalMarket(option.marketJson));
+  expect(selected.asOf).toBe(option.asOf);
+  expect(selected.model).toBe(option.model);
+  expect(selected.metrics).toEqual(option.metrics);
+  expect(
+    (
+      await screen.findByTitle(
+        cashflowFixtures.cases.find((entry) => entry.type === "equity_option")!
+          .pricedValue.amount,
+      )
+    ).textContent,
+  ).toContain("25,748");
 });
 
 it("loads configured scenario prices only on demand from the completed structured-credit context", async () => {
@@ -537,7 +583,7 @@ it("prepares one completed cashflow snapshot before printing and restores the in
       instrumentJson: request.instrumentJson,
       marketJson: request.marketJson,
       asOf: request.asOf,
-      model: request.model ?? "default",
+      model: "discounting",
     });
     showOriginal(
       workbench.querySelector('[aria-label="Priced instrument JSON"]')!,

@@ -4,13 +4,13 @@ import { afterEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { instruments } from "../../../src/generated/instruments";
 import report from "./encoding-report.json";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
+import type { InstrumentModule } from "@/components/finstack/core/components/schema-form/schema";
 import {
-  structuralValidator,
   editValue,
+  structuralValidator,
   workingValue,
-  type InstrumentModule,
-} from "@/components/finstack/shared/components/schema-form/schema";
+} from "@/components/finstack/core/components/schema-form/schema-walk";
 const native = createRequire(import.meta.url)(
   "../../../../finstack-quant-wasm/pkg-node/finstack_quant_wasm.js",
 ) as { validateInstrumentJson(json: string): string };

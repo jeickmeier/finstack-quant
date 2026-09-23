@@ -7,8 +7,8 @@ import { serializeHost } from "@/lib/finstack/codec.mjs";
 import {
   SchemaForm,
   type SchemaFormProps,
-} from "@/components/finstack/shared/components/schema-form/schema-form";
-import type { FieldRenderer } from "@/components/finstack/shared/components/schema-form/field-renderer";
+} from "@/components/finstack/core/components/schema-form/schema-form";
+import type { FieldRenderer } from "@/components/finstack/core/components/schema-form/field-renderer";
 import {
   KnotTable,
   type KnotEdit,

@@ -15,6 +15,11 @@ export function MoneyValue({
   prominent?: boolean;
 }) {
   const text = value ? (displayText ?? formatRawMoney(value)) : "—";
+  const prefix = value ? `${value.currency} ` : "";
+  const amount =
+    prominent && value && text.startsWith(prefix)
+      ? text.slice(prefix.length)
+      : null;
   return (
     <span
       aria-label={label}
@@ -25,12 +30,10 @@ export function MoneyValue({
       }
       title={value?.amount}
     >
-      {prominent && value ? (
+      {value && amount !== null ? (
         <>
           <span className="finstack-money__currency">{value.currency}</span>{" "}
-          <span className="finstack-money__amount">
-            {text.slice(value.currency.length + 1)}
-          </span>
+          <span className="finstack-money__amount">{amount}</span>
         </>
       ) : (
         text

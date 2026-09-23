@@ -7,6 +7,7 @@ import {
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import {
   CurveChart,
+  curveKnotLabels,
   curvePanels,
   type CurveChartProps,
   type CurvePoint,
@@ -34,17 +35,13 @@ export function StoredCurveView({
       ),
     [points],
   );
+  const single = props.curves.length === 1;
+  const labels = curveKnotLabels(single ? props.curves[0]?.type : undefined);
   return (
-    <div className="@container">
-      <div className="finstack-stored-curve__layout grid min-w-0 gap-4 @min-[720px]:grid-cols-2">
-        <div className="min-w-0">
-          <CurveChart
-            {...props}
-            link={{ ...link, getPointKey: storedCurveKey }}
-          />
-        </div>
-        <div className="min-w-0 max-h-[320px] overflow-auto">
-          {points.length > 0 && (
+    <div className="@container min-w-0">
+      {points.length > 0 ? (
+        <div className="finstack-stored-curve__layout grid min-w-0 gap-4 @min-[720px]:grid-cols-2">
+          <div className="min-w-0 max-h-[320px] overflow-auto">
             <FinstackTable
               caption="Stored curve knots"
               data={points}
@@ -56,33 +53,48 @@ export function StoredCurveView({
               }
               getActiveCell={(key) => addresses.get(key) ?? null}
               columns={[
-                {
-                  id: "curve",
-                  header: "Curve",
-                  accessorFn: (point) => point.curve.id,
-                },
-                {
-                  id: "type",
-                  header: "Variant",
-                  accessorFn: (point) => point.curve.type,
-                },
+                ...(!single
+                  ? [
+                      {
+                        id: "curve",
+                        header: "Curve",
+                        accessorFn: (point: CurvePoint) => point.curve.id,
+                      },
+                      {
+                        id: "type",
+                        header: "Variant",
+                        accessorFn: (point: CurvePoint) => point.curve.type,
+                      },
+                    ]
+                  : []),
                 {
                   id: "x",
-                  header: "Stored x",
+                  header: labels.x,
                   meta: { className: "text-right finstack-numeric" },
                   accessorFn: (point) => point.knot[0],
                 },
                 {
                   id: "value",
-                  header: "Stored value",
+                  header: labels.y,
                   meta: { className: "text-right finstack-numeric" },
                   accessorFn: (point) => point.knot[1],
                 },
               ]}
             />
-          )}
+          </div>
+          <div className="min-w-0">
+            <CurveChart
+              {...props}
+              link={{ ...link, getPointKey: storedCurveKey }}
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <CurveChart
+          {...props}
+          link={{ ...link, getPointKey: storedCurveKey }}
+        />
+      )}
     </div>
   );
 }

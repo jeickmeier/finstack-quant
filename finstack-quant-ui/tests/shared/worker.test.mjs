@@ -149,9 +149,9 @@ it("keeps four native handles, refreshes recency, frees evictions until worker t
   try {
     const markets = Array.from({ length: 5 }, (_, i) => {
       const state = JSON.parse(requests.bond.marketJson);
-      state.curves.find(
-        (curve) => curve.type === "discount",
-      ).knot_points[1][1] -= i * 0.01;
+      state.curves
+        .find((curve) => curve.type === "discount")
+        .knot_points.at(-1)[1] -= i * 0.005;
       const handle = new native.Market(JSON.stringify(state));
       try {
         return handle.toJson();

@@ -9,6 +9,7 @@ import {
   PopoverTitle,
   PopoverDescription,
 } from "@/components/ui/popover";
+import { useSurfaceAttributes } from "../surface/surface";
 /** Supplied field text and validation status, shared by controlled primitives. */
 export interface FieldInfo {
   label: string;
@@ -72,6 +73,7 @@ export function FieldFrame({
 }
 /** Supplied schema description in an unmodified stock popover. */
 export function FieldHelp({ label, help }: { label: string; help: string }) {
+  const surface = useSurfaceAttributes();
   return (
     <Popover>
       <PopoverTrigger
@@ -80,7 +82,7 @@ export function FieldHelp({ label, help }: { label: string; help: string }) {
       >
         ?
       </PopoverTrigger>
-      <PopoverContent>
+      <PopoverContent {...surface}>
         <PopoverTitle>{label}</PopoverTitle>
         <PopoverDescription>{help}</PopoverDescription>
       </PopoverContent>

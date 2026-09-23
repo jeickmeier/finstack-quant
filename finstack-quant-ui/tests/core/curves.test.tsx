@@ -5,7 +5,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { createChartRuntime, type SceneNode } from "@tanstack/charts";
 import { createWireCodec } from "../../src/codec.mjs";
 import schema from "../../src/generated/schemas/market_context_state.json";
-import fixture from "../../src/fixtures/curves/market.json";
+import fixture from "../../registry/core/components/curve-link-example/market.json";
 import {
   CurveChart,
   curvePanels,
@@ -90,4 +90,12 @@ it("rejects ambiguous overlay identities and handles empty input", () => {
   expect(() => curvePanels([curves[0], curves[0]])).toThrow(/Duplicate curve/);
   render(<CurveChart curves={[]} />);
   expect(screen.getByText("No curves supplied")).toBeTruthy();
+});
+it("reports unknown curve types instead of throwing during render", () => {
+  const unknown = { ...curves[0], type: "unknown" } as unknown as CurveState;
+  expect(() => curvePanels([unknown])).toThrow(/Unknown curve type: unknown/);
+  render(<CurveChart curves={[unknown]} />);
+  expect(screen.getByRole("alert").textContent).toBe(
+    "Curves unavailable: Unknown curve type: unknown",
+  );
 });

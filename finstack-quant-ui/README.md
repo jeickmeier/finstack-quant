@@ -44,6 +44,11 @@ pointers and refs, including non-`type` discriminator constants. Defaults,
 descriptions and supplied `x-` annotations remain in the committed bundles.
 Numeric type or a decimal reference never assigns a financial unit.
 
+Wide instrument roots (schemas with more than 80 local definitions) reference
+one shared definition document instead of copying those definitions into every
+bundle. Their instrument modules link that document back into a closed schema
+before validation. Narrow roots stay self-contained.
+
 The fixture manifest is rediscovered from the instrument example directory and
 calibration bootstrap directory. Every instrument root requires one example.
 Calibration envelopes validate as inputs; an optional returned `final_market`
@@ -108,7 +113,7 @@ PR-003 retains an isolated Next production-export fixture using the docs site's
 shared configuration and local dependencies. After `mise run wasm-pkg`, install
 the docs dependencies with `npm --prefix docs-site ci --ignore-scripts`, install
 Chromium with `npm --prefix finstack-quant-ui exec -- playwright install chromium`,
-and run `npm --prefix finstack-quant-ui run test:browser`. It checks root and
+and run `node finstack-quant-ui/tests/browser/run.mjs`. It checks root and
 `/finstack-quant` deployments and removes its temporary app afterward.
 `REGISTRY_SMOKE_DIR` selects a directory for JSON evidence.
 
@@ -126,7 +131,7 @@ against the 25,000,000-byte limit. Compression does not waive this raw-byte gate
 Brotli measurements without a UI-specific limit. `mise run ui-size` checks the
 selected artifact hash and enforces the 25,000,000-byte UI budget.
 
-`test:footprint` requires `REGISTRY_WASM_PACKAGE` to select the optimized web
+`REGISTRY_MEASURE_FOOTPRINT=1 node finstack-quant-ui/tests/browser/run.mjs` requires `REGISTRY_WASM_PACKAGE` to select the optimized web
 package and matching generated glue, and runs the size gate before browser
 measurements. `REGISTRY_WASM_PACKAGE` also selects the package for `ui-size`; it
 defaults to the repository web package.
@@ -171,7 +176,7 @@ Tenant CSS loads after the theme and overrides the same variables.
 The single token source includes the Fontsource package versions, selected faces
 and SIL OFL-1.1 licences. `ui-gen` emits CSS and registry metadata; `ui-check`
 checks drift, literal colours/fonts and contrast, including the tenant example.
-`npm run test:theme:browser` builds and statically serves an installed theme
+`node finstack-quant-ui/tests/browser/theme.mjs` builds and statically serves an installed theme
 fixture, checking actual font loading and the theme/density switches.
 
 ## Display formatting
@@ -216,7 +221,7 @@ using pinned `lossless-json`, preserving number tokens without converting them
 to JavaScript numbers. Its Original toggle shows the supplied bytes; Copy and
 Download always use those original bytes. Print uses the compact original text
 with wrapping, independently of the screen toggle. Invalid JSON, including duplicate keys,
-stays in Original view with a formatting notice. `npm run test:primitives:browser` builds an isolated
+stays in Original view with a formatting notice. `node finstack-quant-ui/tests/shared/browser/primitives.mjs` builds an isolated
 consumer from actual registry JSON, checks keyboard/focus/clipboard behavior and
 10,000-option virtualization, and runs axe in both themes and densities.
 
@@ -274,7 +279,7 @@ PNG scale changes pixel density, not data/layout coordinates. For example, a
 The original inputs are unchanged. SVG includes all persistent prose, sources,
 axes, legends and marks, without HTML overlays or rasterized marks.
 
-`npm run test:figures:browser` builds the installed example, exports narrow/wide
+`node finstack-quant-ui/tests/shared/browser/figures.mjs` builds the installed example, exports narrow/wide
 numeric/date/category fixtures, checks text clipping/overlap, vector elements,
 font/style portability, exact raster dimensions, accessibility and no WASM loads.
 Pages 14.5 places the complete SVG at 15.24 × 10.16 cm with IBM Plex Sans
@@ -430,8 +435,8 @@ rejects stale copies. Fixtures preserve their source-file hashes.
 For interactive review, `mise run ui-docs-dev` installs the catalogue and starts
 the docs-site Next.js server. Open
 [http://localhost:3000/registry-gallery/](http://localhost:3000/registry-gallery/)
-once it is ready. If the catalogue is already installed and unchanged, reuse
-`mise run docs-site-dev` and the same gallery URL.
+once it is ready. If the catalogue is already installed and unchanged, `npm run dev`
+in this package starts the same server.
 
 To exercise a running development server, use
 `REGISTRY_GALLERY_URL=http://localhost:3000 mise run ui-e2e -- workbench-controls.spec.ts radio-alignment.spec.ts`.

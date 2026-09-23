@@ -384,6 +384,28 @@ it("shows caller-prepared money display text while the title keeps the raw sourc
   const node = screen.getByTitle("1.245");
   expect(node.textContent).toBe("USD 1.24");
 });
+it("splits prominent money only when the prepared text carries its currency prefix", () => {
+  const view = render(
+    <>
+      <MoneyValue
+        value={{ amount: "1.245", currency: "USD" }}
+        displayText="USD 1.24"
+        prominent
+      />
+      <MoneyValue
+        value={{ amount: "1.245", currency: "USD" }}
+        displayText="$1.24"
+        prominent
+      />
+    </>,
+  );
+  const [split, whole] = view.container.querySelectorAll(".finstack-money");
+  expect(split!.querySelector(".finstack-money__amount")!.textContent).toBe(
+    "1.24",
+  );
+  expect(whole!.querySelector(".finstack-money__amount")).toBeNull();
+  expect(whole!.textContent).toBe("$1.24");
+});
 it("formats JSON without losing numeric tokens and copies or downloads only the original bytes", async () => {
   const user = userEvent.setup();
   const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();

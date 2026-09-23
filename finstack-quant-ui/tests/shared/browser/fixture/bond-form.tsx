@@ -8,7 +8,7 @@ import { useInstrumentValidator } from "./hooks/valuations/use-instrument-valida
 import {
   SchemaForm,
   type InstrumentModule,
-} from "./components/finstack/shared/components/schema-form/schema-form";
+} from "./components/finstack/core/components/schema-form/schema-form";
 function Form() {
   const [module, setModule] = useState<InstrumentModule | null>(null);
   const [output, setOutput] = useState("");

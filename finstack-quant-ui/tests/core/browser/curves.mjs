@@ -19,7 +19,12 @@ try {
   );
   await writeFile(
     path.join(consumer, "fixture.json"),
-    await readFile(path.join(root, "src/fixtures/curves/market.json")),
+    await readFile(
+      path.join(
+        root,
+        "registry/core/components/curve-link-example/market.json",
+      ),
+    ),
   );
 
   const modules = await buildConsumer(consumer, { title: "Stored curves" });
@@ -81,8 +86,8 @@ try {
   for (const label of [
     "Stored market observations",
     "Canonical state supplied by native Market",
-    "Stored coordinate",
-    "Stored value",
+    "Time (years)",
+    "Discount factor",
     "Supplied knot note",
     "Publication note",
     "Retained native fixture",

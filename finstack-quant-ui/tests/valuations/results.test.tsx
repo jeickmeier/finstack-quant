@@ -100,6 +100,16 @@ it("renders Rust-supplied units and groups from native metric metadata", () => {
   ).toBeNull();
   expect(screen.queryByText("Unit unavailable")).toBeNull();
 });
+it("keeps coordinate keys in the separate bucket view when requested", () => {
+  const keys = groupMeasures({
+    result: fixture.result,
+    metadata: fixture.metadata as MetricMetadata[],
+    excludeDimensional: true,
+  }).flatMap((group) => group.rows.map((row) => row.key));
+  expect(keys).toContain("ytm");
+  expect(keys).toContain("bucketed_dv01");
+  expect(keys.some((key) => key.startsWith("bucketed_dv01::"))).toBe(false);
+});
 it("keeps comparison currencies, dates and stamps independent and never calculates missing values", () => {
   const other: SuppliedValuation = {
     instrument_id: "EUR-OTHER",
@@ -131,7 +141,7 @@ it("keeps comparison currencies, dates and stamps independent and never calculat
   const comparison = screen.getByRole("region", {
     name: "Comparison valuation",
   });
-  expect(primary.textContent).toContain("USD 1,042,500");
+  expect(primary.textContent).toContain(formatRawMoney(fixture.result.value));
   for (const value of [
     "EUR 2.000",
     other.instrument_id,

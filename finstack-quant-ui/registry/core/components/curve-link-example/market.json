@@ -7,9 +7,9 @@
       "base": "2025-01-01",
       "day_count": "act_365f",
       "knot_points": [
-        [0, 10],
-        [1, 12],
-        [5, 15]
+        [0, -0.001],
+        [1, -0.0012],
+        [5, -0.0015]
       ],
       "interp_style": "linear",
       "extrapolation": "flat_forward"
@@ -29,8 +29,8 @@
       "indexation_lag_months": 3,
       "knot_points": [
         [0, 300],
-        [1, 306],
-        [5, 330]
+        [1, 307.5],
+        [5, 340]
       ],
       "interp_style": "linear",
       "extrapolation": "flat_forward"
@@ -43,9 +43,9 @@
       "day_count": "act_365f",
       "tenor": 0.25,
       "knot_points": [
-        [0, 0.03],
-        [1, 0.031],
-        [5, 0.04]
+        [0, 0.044],
+        [1, 0.041],
+        [5, 0.039]
       ],
       "projection_grid": null,
       "interp_style": "linear",
@@ -58,8 +58,13 @@
       "id": "HZ",
       "base": "2025-01-01",
       "knot_points": [
-        [0, 0.02],
-        [40, 0.02]
+        [0, 0.012],
+        [1, 0.014],
+        [3, 0.016],
+        [5, 0.018],
+        [10, 0.021],
+        [20, 0.025],
+        [40, 0.028]
       ],
       "recovery_rate": 0.4,
       "issuer": null,
@@ -79,9 +84,9 @@
       "day_count": "act_365f",
       "model": {
         "variant": "ns",
-        "beta0": 0.02,
-        "beta1": -0.01,
-        "beta2": 0.005,
+        "beta0": 0.04,
+        "beta1": 0.003,
+        "beta2": -0.006,
         "tau": 1.5
       }
     },
@@ -109,11 +114,11 @@
       "id": "PRICE",
       "base": "2025-01-01",
       "day_count": "act_365f",
-      "spot_price": 10,
+      "spot_price": 100,
       "knot_points": [
-        [0, 10],
-        [1, 12],
-        [5, 15]
+        [0, 100],
+        [1, 102],
+        [5, 110]
       ],
       "interp_style": "linear",
       "extrapolation": "flat_forward"
@@ -125,7 +130,17 @@
       "day_count": "act_365f",
       "knot_points": [
         [0, 1],
-        [40, 1]
+        [0.25, 0.989307575],
+        [0.5, 0.97897419],
+        [1, 0.959349335],
+        [2, 0.923116346],
+        [3, 0.889051602],
+        [5, 0.824894318],
+        [7, 0.762159064],
+        [10, 0.675704114],
+        [20, 0.449328964],
+        [30, 0.296710014],
+        [40, 0.193980042]
       ],
       "interp_style": "log_linear",
       "extrapolation": "flat_forward",
@@ -141,11 +156,11 @@
       "id": "VOL_INDEX",
       "base": "2025-01-01",
       "day_count": "act_365f",
-      "spot_level": 10,
+      "spot_level": 18,
       "knot_points": [
-        [0, 10],
-        [1, 12],
-        [5, 15]
+        [0, 18],
+        [1, 19],
+        [5, 20]
       ],
       "interp_style": "linear",
       "extrapolation": "flat_forward"

@@ -1,13 +1,5 @@
 "use client";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useMemo, useState, type ReactNode } from "react";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
@@ -31,6 +23,7 @@ import {
   type MarketEntry,
 } from "./tree";
 export { marketTree, flattenMarket, marketPointer } from "./tree";
+
 export interface MarketContextBrowserProps {
   /** Complete canonical validated state. Data remains read-only until a parent accepts native validation. */
   state: MarketContextStateWire;
@@ -42,52 +35,53 @@ export interface MarketContextBrowserProps {
   /** Host-owned evaluated views require explicit strike/forward/convention inputs and a provider. */
   renderObject?(entry: MarketEntry): ReactNode | undefined;
 }
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function entryName(entry: MarketEntry) {
+  const id = record(entry.value)?.id;
+  if (typeof id === "string") return id;
+  if (entry.path.length === 1 && entry.path[0] === "fx") return "FX matrix";
+  return entry.label.replaceAll("_", " ");
+}
+
+function entryKind(entry: MarketEntry) {
+  const type = record(entry.value)?.type;
+  const category = String(entry.path[0]).replaceAll("_", " ");
+  return typeof type === "string"
+    ? `${type.replaceAll("_", " ")} ${category === "curves" ? "curve" : category}`
+    : category;
+}
+
+/** One row per stored reference; the complete schema tree remains available below it. */
+function marketReferences(entries: readonly MarketEntry[]) {
+  return entries.flatMap((root) => {
+    if (root.path[0] === "schema_version" || root.value == null) return [];
+    if (root.path[0] === "fx" || root.path[0] === "hierarchy") return [root];
+    return root.children;
+  });
+}
+
+function entryLabel(entry: MarketEntry) {
+  return `Inspect ${entryName(entry)}, ${marketPointer(entry.path)}`;
+}
+
 function EntryBranch({
   entry,
-  visible,
   selectedKey,
   onSelect,
-  searching,
-  activeCategory,
 }: {
   entry: MarketEntry;
-  visible: Set<string> | null;
   selectedKey: string | null;
   onSelect: (key: string) => void;
-  searching: boolean;
-  activeCategory?: string | number;
 }) {
-  const [open, setOpen] = useState(entry.path.length === 1);
-  if (visible && !visible.has(entry.key)) return null;
-  const button = (
-    <Button
-      variant="ghost"
-      size="sm"
-      type="button"
-      aria-pressed={entry.key === selectedKey}
-      onClick={() => onSelect(entry.key)}
-
-      aria-label={`Inspect ${marketPointer(entry.path)}`}
-    >
-      {entry.path.length === 1
-        ? entry.label.replaceAll("_", " ")
-        : entry.value && typeof entry.value === "object" && "id" in entry.value
-          ? String(entry.value.id)
-          : entry.label}
-      {entry.path.length === 1 && (
-        <span className="ml-2 font-mono text-xs text-muted-foreground">
-          {entry.children.length}
-        </span>
-      )}
-      {entry.path.length > 1 && !entry.children.length
-        ? `: ${entry.value === undefined ? "Unavailable" : serializeHost(entry.value)}`
-        : ""}
-    </Button>
-  );
-  const expanded = searching || open;
+  const [open, setOpen] = useState(false);
   return (
     <li
-      data-active-category={entry.path[0] === activeCategory}
       className={
         entry.path.length === 1 ? "finstack-market__category" : undefined
       }
@@ -98,27 +92,40 @@ function EntryBranch({
             variant="ghost"
             size="icon-sm"
             type="button"
-            aria-expanded={expanded}
-            aria-label={`${expanded ? "Collapse" : "Expand"} ${marketPointer(entry.path)}`}
-            disabled={searching}
+            aria-expanded={open}
+            aria-label={`${open ? "Collapse" : "Expand"} ${entryName(entry)}, ${marketPointer(entry.path)}`}
             onClick={() => setOpen(!open)}
           >
-            {expanded ? "−" : "+"}
+            {open ? "−" : "+"}
           </Button>
         )}
-        {button}
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          aria-pressed={entry.key === selectedKey}
+          aria-label={entryLabel(entry)}
+          onClick={() => onSelect(entry.key)}
+        >
+          {entryName(entry)}
+          {entry.path.length === 1 && (
+            <span className="ml-2 font-mono text-xs text-muted-foreground">
+              {entry.children.length}
+            </span>
+          )}
+          {entry.path.length > 1 && !entry.children.length
+            ? `: ${entry.value === undefined ? "Unavailable" : serializeHost(entry.value)}`
+            : ""}
+        </Button>
       </div>
-      {expanded && entry.children.length > 0 && (
+      {open && entry.children.length > 0 && (
         <ul className="ml-4 space-y-1">
           {entry.children.map((child) => (
             <EntryBranch
               key={child.key}
               entry={child}
-              visible={visible}
               selectedKey={selectedKey}
               onSelect={onSelect}
-              searching={searching}
-              activeCategory={activeCategory}
             />
           ))}
         </ul>
@@ -126,7 +133,40 @@ function EntryBranch({
     </li>
   );
 }
-/** Searchable native disclosure tree over the generated contract and actual state, with exact selected exports. */
+
+function ReferenceButton({
+  entry,
+  selected,
+  onSelect,
+}: {
+  entry: MarketEntry;
+  selected: boolean;
+  onSelect: (key: string) => void;
+}) {
+  const base = record(entry.value)?.base;
+  return (
+    <li>
+      <Button
+        type="button"
+        variant="ghost"
+        aria-pressed={selected}
+        aria-label={entryLabel(entry)}
+        className="finstack-market__reference"
+        onClick={() => onSelect(entry.key)}
+      >
+        <span className="finstack-market__reference-name">
+          {entryName(entry)}
+        </span>
+        <span className="finstack-market__reference-detail">
+          {entryKind(entry)}
+          {typeof base === "string" ? ` · base ${base}` : ""}
+        </span>
+      </Button>
+    </li>
+  );
+}
+
+/** Compact stored-reference list with an optional exact-field explorer and exact JSON values. */
 export function MarketContextBrowser({
   state,
   link: external,
@@ -134,12 +174,14 @@ export function MarketContextBrowser({
   renderObject,
 }: MarketContextBrowserProps) {
   const entries = useMemo(() => marketTree(state), [state]);
-  const owned = useLinkedSelection({
-      defaultSelectedKey:
-        entries.find((entry) => entry.children.length)?.children[0]?.key ??
-        null,
-    }),
-    link = external ?? owned;
+  const references = useMemo(() => marketReferences(entries), [entries]);
+  const first =
+    references.find(
+      (entry) =>
+        entry.path[0] === "curves" && record(entry.value)?.type === "discount",
+    ) ?? references[0];
+  const owned = useLinkedSelection({ defaultSelectedKey: first?.key ?? null });
+  const link = external ?? owned;
   const [search, setSearch] = useState("");
   const all = useMemo(() => flattenMarket(entries), [entries]);
   const index = useMemo(
@@ -153,21 +195,26 @@ export function MarketContextBrowser({
     ? index.keys.get(link.selectedKey)
     : undefined;
   const query = search.toLowerCase().trim();
-  const visible = useMemo(() => {
-    if (!query) return null;
-    const keys = new Set<string>();
-    const walk = (entry: MarketEntry): boolean => {
-      const children = entry.children.map(walk).some(Boolean);
-      const own =
-        `${marketPointer(entry.path)} ${entry.key} ${entry.label} ${entry.children.length ? "" : entry.value === undefined ? "Unavailable" : serializeHost(entry.value)}`
+  const matches = useMemo(() => {
+    if (!query) return references;
+    const exactPath = all.find(
+      (entry) => marketPointer(entry.path).toLowerCase() === query,
+    );
+    if (exactPath) return [exactPath];
+    const referenceMatches = references.filter((entry) =>
+      `${entryName(entry)} ${entryKind(entry)} ${marketPointer(entry.path)}`
+        .toLowerCase()
+        .includes(query),
+    );
+    if (referenceMatches.length) return referenceMatches;
+    return all.filter(
+      (entry) =>
+        !entry.children.length &&
+        `${entryName(entry)} ${marketPointer(entry.path)} ${entry.value === undefined ? "Unavailable" : serializeHost(entry.value)}`
           .toLowerCase()
-          .includes(query);
-      if (own || children) keys.add(entry.key);
-      return own || children;
-    };
-    entries.forEach(walk);
-    return keys;
-  }, [entries, query]);
+          .includes(query),
+    );
+  }, [all, query, references]);
   let view: ReactNode;
   if (selected) {
     const [field, position] = selected.path;
@@ -213,6 +260,13 @@ export function MarketContextBrowser({
         );
     }
   }
+  const stored = selected ? record(selected.value) : null;
+  const conventions = [
+    ["Base", stored?.base ?? stored?.base_date],
+    ["Day count", stored?.day_count],
+    ["Interpolation", stored?.interp_style],
+    ["Extrapolation", stored?.extrapolation],
+  ].filter((item): item is [string, string] => typeof item[1] === "string");
   return (
     <section
       aria-label="Market context browser"
@@ -220,57 +274,53 @@ export function MarketContextBrowser({
     >
       <div className="finstack-market__layout">
         <aside className="finstack-market__rail print:hidden">
-          <Label className="mb-3 grid gap-2">
-            Search market fields
+          <label className="mb-2 grid gap-1">
+            Search market data
             <Input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-          </Label>
-          <Label className="finstack-market__category-picker mb-3">
-            Market category
-            <Select
-              items={entries.map((entry) => ({
-                value: String(entry.path[0]),
-                label: `${entry.label.replaceAll("_", " ")} · ${entry.children.length}`,
-              }))}
-              value={selected ? String(selected.path[0]) : null}
-              onValueChange={(value) => {
-                const category = entries.find(
-                  (entry) => String(entry.path[0]) === value,
-                );
-                if (category)
-                  link.select(category.children[0]?.key ?? category.key);
-              }}
-            >
-              <SelectTrigger className="w-full" aria-label="Market category">
-                <SelectValue placeholder="Choose a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {entries.map((entry) => (
-                  <SelectItem key={entry.key} value={String(entry.path[0])}>
-                    {entry.label.replaceAll("_", " ")} · {entry.children.length}
-                  </SelectItem>
+          </label>
+          <div className="finstack-market__list-heading">
+            <span>Stored references</span>
+            <span role="status">{matches.length} shown</span>
+          </div>
+          <nav aria-label="Market references">
+            {matches.length ? (
+              <ul className="finstack-market__references">
+                {matches.map((entry) => (
+                  <ReferenceButton
+                    key={entry.key}
+                    entry={entry}
+                    selected={entry.key === selected?.key}
+                    onSelect={link.select}
+                  />
                 ))}
-              </SelectContent>
-            </Select>
-          </Label>
-          <nav aria-label="Market fields" data-searching={!!query}>
-            <ul>
-              {entries.map((entry) => (
-                <EntryBranch
-                  key={entry.key}
-                  entry={entry}
-                  visible={visible}
-                  selectedKey={selected?.key ?? null}
-                  onSelect={link.select}
-                  searching={!!query}
-                  activeCategory={selected?.path[0]}
-                />
-              ))}
-            </ul>
+              </ul>
+            ) : (
+              <p role="status" className="py-3 text-muted-foreground">
+                {query
+                  ? `No market data matches “${search.trim()}”.`
+                  : "No stored market references in this snapshot."}
+              </p>
+            )}
           </nav>
+          <details className="finstack-market__all-fields">
+            <summary>All snapshot fields</summary>
+            <nav aria-label="All market fields">
+              <ul>
+                {entries.map((entry) => (
+                  <EntryBranch
+                    key={entry.key}
+                    entry={entry}
+                    selectedKey={selected?.key ?? null}
+                    onSelect={link.select}
+                  />
+                ))}
+              </ul>
+            </nav>
+          </details>
         </aside>
         {selected ? (
           <section
@@ -279,21 +329,28 @@ export function MarketContextBrowser({
           >
             <header>
               <div>
-                <h2>
-                  {typeof selected.value === "object" &&
-                  selected.value !== null &&
-                  "id" in selected.value
-                    ? String(selected.value.id)
-                    : selected.label.replaceAll("_", " ")}
-                </h2>
+                <h2>{entryName(selected)}</h2>
                 <p className="text-xs text-muted-foreground">
-                  {marketPointer(selected.path)}
+                  {entryKind(selected)} · {marketPointer(selected.path)}
                 </p>
               </div>
               <span className="text-xs text-muted-foreground">
-                Stored market data
+                Stored snapshot
               </span>
             </header>
+            {conventions.length > 0 && (
+              <dl className="finstack-market__conventions">
+                {conventions.map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <p className="finstack-market__provenance">
+              Snapshot provider and observation time not supplied
+            </p>
             {view}
             {selected.value === undefined ? (
               <p>Field unavailable in supplied state</p>
@@ -318,7 +375,7 @@ export function MarketContextBrowser({
           <p className="print:hidden">
             {link.selectedKey
               ? "Selected field is no longer available"
-              : "Select a market field"}
+              : "Select a market reference"}
           </p>
         )}
       </div>

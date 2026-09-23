@@ -1,6 +1,6 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { VolCubeExplorer } from "@/components/finstack/core/components/vol-cube-explorer/vol-cube-explorer";
+import { VolCubeExplorer } from "@/components/finstack/models/components/vol-cube-explorer/vol-cube-explorer";
 import type { MarketContextStateWire } from "@/lib/finstack/generated/types/market_context_state";
 import data from "../data.json";
 const cubes = data.cubes.market as unknown as MarketContextStateWire;
@@ -24,7 +24,7 @@ export function Example({
       )!}
       initialStrike={variant === "shifted" ? -0.005 : 0.05}
       initialConvention={variant === "shifted" ? "black_lognormal" : "normal"}
-      colorDomains={{ normal: [0, 0.1], black_lognormal: [0, 2] }}
+      colorDomains={{ normal: [0.003, 0.012], black_lognormal: [0.1, 0.7] }}
       width={width}
       height={460}
     />

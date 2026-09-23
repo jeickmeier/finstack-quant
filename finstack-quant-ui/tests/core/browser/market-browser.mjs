@@ -54,11 +54,9 @@ try {
   const leaves = await page.evaluate(() => window.marketProbe.leaves);
   for (const leaf of leaves) {
     await page
-      .getByLabel("Search market fields", { exact: true })
+      .getByLabel("Search market data", { exact: true })
       .fill(leaf.pointer);
-    await page
-      .getByRole("button", { name: `Inspect ${leaf.pointer}`, exact: true })
-      .click();
+    await page.getByRole("button", { name: leaf.pointer }).click();
     await originalSelected();
     assert.equal(
       await page
@@ -68,12 +66,8 @@ try {
       leaf.json,
     );
   }
-  await page
-    .getByLabel("Search market fields", { exact: true })
-    .fill("USD~1CSA");
-  await page
-    .getByRole("button", { name: "Inspect /collateral/USD~1CSA", exact: true })
-    .click();
+  await page.getByLabel("Search market data", { exact: true }).fill("USD~1CSA");
+  await page.getByRole("button", { name: "/collateral/USD~1CSA" }).click();
   await originalSelected();
   assert.equal(
     await page
@@ -83,10 +77,8 @@ try {
     '"NEG-RATES"',
   );
   const pointer = await page.evaluate(() => window.marketProbe.negativePointer);
-  await page.getByLabel("Search market fields", { exact: true }).fill(pointer);
-  await page
-    .getByRole("button", { name: `Inspect ${pointer}`, exact: true })
-    .click();
+  await page.getByLabel("Search market data", { exact: true }).fill(pointer);
+  await page.getByRole("button", { name: pointer }).click();
   await originalSelected();
   const selected = page
     .getByRole("region", { name: "Selected stored value", exact: true })
@@ -113,11 +105,9 @@ try {
   await input.fill("1.02");
   await page.getByRole("button", { name: "Apply market", exact: true }).click();
   await page
-    .getByLabel("Search market fields", { exact: true })
-    .fill("fx/config");
-  await page
-    .getByRole("button", { name: "Inspect /fx/config", exact: true })
-    .click();
+    .getByLabel("Search market data", { exact: true })
+    .fill("/fx/config");
+  await page.getByRole("button", { name: "/fx/config" }).click();
   const fx = page.getByRole("region", {
     name: "Complete stored FX state",
     exact: true,
@@ -127,7 +117,7 @@ try {
     JSON.parse(await page.evaluate(() => navigator.clipboard.readText())),
     await page.evaluate(() => window.marketProbe.market.fx),
   );
-  await page.getByLabel("Search market fields", { exact: true }).fill("");
+  await page.getByLabel("Search market data", { exact: true }).fill("");
   await page.addScriptTag({
     path: path.join(root, "node_modules/axe-core/axe.min.js"),
   });

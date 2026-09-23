@@ -1,7 +1,7 @@
 {
   "request": {
     "instrumentJson": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":\"HZ\",\"discount_curve_id\":\"USD-OIS\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2025-01-01\",\"maturity\":\"2026-01-01\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1,\"instrument_pricing_overrides\":{\"model_config\":{\"hazard_volatility\":0.01,\"mc_paths\":8,\"tree_steps\":4}}},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
-    "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2025-01-01\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[40,1]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"calibration_ois_cutoff_days\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"HZ\",\"base\":\"2025-01-01\",\"knot_points\":[[0,0.02],[40,0.02]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"collateral\":{},\"hierarchy\":null}",
+    "marketJson": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2025-01-01\",\"day_count\":\"act_365f\",\"knot_points\":[[0,1],[0.25,0.989307575],[0.5,0.97897419],[1,0.959349335],[2,0.923116346],[3,0.889051602],[5,0.824894318],[7,0.762159064],[10,0.675704114],[20,0.449328964],[30,0.296710014],[40,0.193980042]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":null,\"allow_non_monotonic\":false,\"min_forward_tenor\":0.000001,\"rate_calibration\":null,\"calibration_ois_cutoff_days\":null,\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"HZ\",\"base\":\"2025-01-01\",\"knot_points\":[[0,0.012],[1,0.014],[3,0.016],[5,0.018],[10,0.021],[20,0.025],[40,0.028]],\"recovery_rate\":0.4,\"issuer\":null,\"seniority\":null,\"currency\":null,\"day_count\":\"act_365f\",\"par_points\":[],\"par_interp\":\"linear\",\"hazard_calibration\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"collateral\":{},\"hierarchy\":null}",
     "asOf": "2025-01-01",
     "model": "discounting",
     "metrics": ["ytm", "dv01", "duration_mod", "bucketed_dv01"]
@@ -10,22 +10,22 @@
     "schema_version": 1,
     "instrument_id": "US912828XG33",
     "as_of": "2025-01-01",
-    "value": { "amount": "1042500", "currency": "USD" },
+    "value": { "amount": "1000438.964391248", "currency": "USD" },
     "measures": {
-      "ytm": 1.307944151889478e-13,
-      "dv01": -103.45856181590352,
-      "duration_mod": 0.989751844932828,
-      "bucketed_dv01": -103.45856181590352,
+      "ytm": 0.04192805926047216,
+      "dv01": -99.2633986165165,
+      "duration_mod": 0.969221509109137,
+      "bucketed_dv01": -99.26339861378074,
       "bucketed_dv01::USD-OIS::10y": 0,
       "bucketed_dv01::USD-OIS::15y": 0,
-      "bucketed_dv01::USD-OIS::1y": 0,
+      "bucketed_dv01::USD-OIS::1y": -97.69482497143326,
       "bucketed_dv01::USD-OIS::20y": 0,
-      "bucketed_dv01::USD-OIS::2y": 0,
-      "bucketed_dv01::USD-OIS::30y": -103.45856181590352,
-      "bucketed_dv01::USD-OIS::3m": 0,
+      "bucketed_dv01::USD-OIS::2y": -0.5367847516899928,
+      "bucketed_dv01::USD-OIS::30y": 0,
+      "bucketed_dv01::USD-OIS::3m": -0.008550736703909934,
       "bucketed_dv01::USD-OIS::3y": 0,
       "bucketed_dv01::USD-OIS::5y": 0,
-      "bucketed_dv01::USD-OIS::6m": 0,
+      "bucketed_dv01::USD-OIS::6m": -1.0232381539535709,
       "bucketed_dv01::USD-OIS::7y": 0
     },
     "meta": {
@@ -38,7 +38,7 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-09-21T22:24:57.149000000Z",
+      "timestamp": "+002026-09-22T23:46:59.907000000Z",
       "version": "0.8.0"
     },
     "covenants": null
@@ -430,5 +430,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "c337193371d0c1bad964a50b93f1c4cfc5ae55fbfd79012f072873f1e128ad4b"
+  "facadeWasmSha256": "528c4510cb533fc382ca72b9b3a4ff923a4750b75c9000b256dfcc5260b05acc"
 }

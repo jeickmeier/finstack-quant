@@ -12,6 +12,7 @@ import {
 import { InputGroupAddon, InputGroupButton } from "@/components/ui/input-group";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import { FieldFrame, type FieldInfo } from "../field-frame/field-frame";
+import { useSurfaceAttributes } from "../surface/surface";
 type ListVirtualizer = Virtualizer<HTMLDivElement, Element>;
 /** Free-text IDs with virtualized supplied suggestions composed from stock shadcn Combobox. */
 export function IdCombobox({
@@ -27,6 +28,7 @@ export function IdCombobox({
   disabled?: boolean;
 }) {
   const virtualizer = useRef<ListVirtualizer | null>(null);
+  const surface = useSurfaceAttributes();
   const filtered = options.filter((option) =>
     option.toLocaleLowerCase().includes(value.toLocaleLowerCase()),
   );
@@ -68,7 +70,7 @@ export function IdCombobox({
               />
             </InputGroupAddon>
           </ComboboxInput>
-          <ComboboxContent>
+          <ComboboxContent {...surface}>
             <ComboboxEmpty>
               No matching IDs; free text is retained
             </ComboboxEmpty>

@@ -21,6 +21,19 @@ import {
 } from "@/components/finstack/shared/chart/finstack-chart/finstack-chart";
 import type { FigureText } from "@/components/finstack/shared/chart/finstack-chart/presentation";
 export type CurveState = MarketContextStateWire["curves"][number];
+/** Labels backed by each curve's stored knot contract; other variants retain wire-neutral labels. */
+export function curveKnotLabels(type?: CurveState["type"]) {
+  switch (type) {
+    case "discount":
+      return { x: "Time (years)", y: "Discount factor" };
+    case "forward":
+      return { x: "Time (years)", y: "Forward rate (decimal)" };
+    case "hazard":
+      return { x: "Time (years)", y: "Hazard rate (decimal)" };
+    default:
+      return { x: "Stored coordinate", y: "Stored value" };
+  }
+}
 /** Original state and tuple references; no evaluation, conversion or interpolation. */
 export interface CurvePoint {
   curve: CurveState;
@@ -64,7 +77,8 @@ export function curvePanels(curves: readonly CurveState[]) {
     groups.set(curve.type, group);
   }
   return [...groups].map(([type, states]) => {
-    const route = routes.find((route) => route.type === type)!;
+    const route = routes.find((route) => route.type === type);
+    if (!route) throw new TypeError(`Unknown curve type: ${String(type)}`);
     const points: CurvePoint[] = [];
     for (const curve of states) {
       const view = getCurveView(curve);
@@ -80,6 +94,7 @@ export function curveDefinition(
   type: CurveState["type"],
   props: Pick<CurveChartProps, "axes" | "annotations" | "link">,
 ) {
+  const labels = curveKnotLabels(type);
   const selection = props.link
     ? chartSelection<CurvePoint, number, number>(
         props.link,
@@ -116,11 +131,11 @@ export function curveDefinition(
     scales: {
       x: props.axes?.x ?? {
         scale: scaleLinear,
-        axis: { label: "Stored coordinate" },
+        axis: { label: labels.x },
       },
       y: props.axes?.y ?? {
         scale: scaleLinear,
-        axis: { label: "Stored value" },
+        axis: { label: labels.y },
       },
     },
     color: { legend: colorLegend() },
@@ -129,8 +144,8 @@ export function curveDefinition(
       use: tooltip,
       content: (points) => ({
         rows: points.map((point) => ({
-          label: `${point.datum.curve.id} · Stored coordinate ${String(point.datum.knot[0])}`,
-          value: `Stored value ${String(point.datum.knot[1])}`,
+          label: `${point.datum.curve.id} · ${labels.x} ${String(point.datum.knot[0])}`,
+          value: `${labels.y} ${String(point.datum.knot[1])}`,
         })),
       }),
     },
@@ -168,6 +183,9 @@ function KnotPanel({
       caption={props.caption}
       sources={sources}
       sourceDisplay="disclosure"
+      sourceDisclosureLabel={
+        props.sources?.length ? "Sources" : "Schema reference"
+      }
       figureAnnotations={props.figureAnnotations}
       width={props.width}
       height={props.height}
@@ -181,7 +199,23 @@ function KnotPanel({
 }
 /** Present supplied market state without importing or invoking a pricing engine. */
 export function CurveChart(props: CurveChartProps) {
-  const panels = useMemo(() => curvePanels(props.curves), [props.curves]);
+  const result = useMemo(() => {
+    try {
+      return { panels: curvePanels(props.curves) };
+    } catch (error) {
+      return {
+        panels: [],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }, [props.curves]);
+  const { panels, error } = result;
+  if (error)
+    return (
+      <p role="alert" className="font-sans text-sm text-error">
+        Curves unavailable: {error}
+      </p>
+    );
   return (
     <div className="space-y-6 font-sans text-sm text-foreground">
       {panels.length === 0 && <p>No curves supplied</p>}

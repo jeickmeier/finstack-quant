@@ -41,11 +41,6 @@
       "docs": "Standalone supplied-data publication example. Uses the same figure props on screen and in explicit 900x600 vector / 1800x1200 pixel exports (6x4 inches at 300 PPI). The theme includes licensed fonts; install IBM Plex Sans in a desktop editor if it cannot use embedded webfonts."
     },
     {
-      "name": "schema-form",
-      "type": "registry:component",
-      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates."
-    },
-    {
       "name": "finstack-form",
       "type": "registry:ui",
       "docs": "Shared TanStack Form contexts bound to registry fields, array controls, error summary and submit/reset controls. Values remain working edits; canonical validation is a separate boundary."
@@ -96,6 +91,11 @@
       "docs": "Controlled date-input primitive. Import the installed finstack theme. Supply canonical values, labels, constraints and option lists; this item owns presentation only. No worker or workbench is required."
     },
     {
+      "name": "domain-field",
+      "type": "registry:ui",
+      "docs": "Date and decimal fields bound to the shared form context. Supply labels and constraints; canonical validation stays outside these controls."
+    },
+    {
       "name": "curve-chart",
       "type": "registry:component",
       "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine."
@@ -116,16 +116,6 @@
       "docs": "Raw canonical FX ATM delta-neutral straddle, RR and BF quote arrays. Missing optional arrays remain missing. No forward, interpolation, strike grid or conversion is inferred."
     },
     {
-      "name": "fx-surface-chart",
-      "type": "registry:component",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator."
-    },
-    {
-      "name": "vol-cube-explorer",
-      "type": "registry:component",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation."
-    },
-    {
       "name": "fx-matrix-grid",
       "type": "registry:component",
       "docs": "Exact directed stored FX matrices separated by pair-global, provider and date/policy-pinned sources. Missing cells remain unavailable, undated tuples stay undated, and complete config/state exports remain unchanged. No priority resolution, inverse rates or triangulation."
@@ -134,6 +124,16 @@
       "name": "market-context-browser",
       "type": "registry:component",
       "docs": "Searchable disclosure tree over every actual market value and generated root fields. Inspect exact leaf JSON and matching stored curve/FX views. Optional surfaceOptions supplies explicit color extents; without them surface data remains raw. A host renderObject slot can supply evaluated views with explicit strike/forward/convention inputs. No worker is required for stored browsing. Parent accepts canonical market edits through market-context-form/use-market-validator."
+    },
+    {
+      "name": "schema-form",
+      "type": "registry:component",
+      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates."
+    },
+    {
+      "name": "curve-link-example",
+      "type": "registry:component",
+      "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations."
     },
     {
       "name": "metric-picker",
@@ -159,6 +159,11 @@
       "name": "measures-grid",
       "type": "registry:component",
       "docs": "Displays supplied valuation context and measures. Native metric metadata provides readable labels and grouped, maturity-sorted bucket tenors; Exact keys reveals fully qualified keys. Values default to six significant digits, with Exact values and value titles retaining supplied precision. The nonzero view hides zero rows only when both sides are supplied and zero in a comparison; Show all reveals every row, and missing values remain distinct. Comparisons retain independent currencies, dates and stamps; no local differences, aggregates or FX conversion. Pass native metric metadata and explicit source-backed units when available."
+    },
+    {
+      "name": "dimensional-measures",
+      "type": "registry:component",
+      "docs": "Displays native per-coordinate valuation measures as bucket lists, two-axis matrices, and selectable three-axis slices. Uses Rust-supplied metric metadata for coordinates and units; exact values and canonical keys remain available."
     },
     {
       "name": "instrument-form",
@@ -226,15 +231,24 @@
       "docs": "Published MonteCarloValuationDetails only: native counts, flags, standard error, full-width bigint seed and time grid. Includes the native LSMC standard-error caveat."
     },
     {
-      "name": "curve-link-example",
+      "name": "fx-surface-chart",
       "type": "registry:component",
-      "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations."
+      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator."
+    },
+    {
+      "name": "vol-cube-explorer",
+      "type": "registry:component",
+      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation."
     }
   ],
   "nonvisual": [
     {
       "name": "finstack-base",
       "type": "registry:base"
+    },
+    {
+      "name": "finstack-surface",
+      "type": "registry:lib"
     },
     {
       "name": "use-finstack",
@@ -286,6 +300,10 @@
     },
     {
       "name": "primitive-contracts",
+      "type": "registry:lib"
+    },
+    {
+      "name": "shared-schema-defs",
       "type": "registry:lib"
     },
     {
@@ -644,11 +662,11 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "5c6dc15c81fbb218de42ea0dbb32b3575c85928df1aef71063e387abd5a57717"
+      "sha256": "763128511616934fd64e3bb804af9240c504b6c6d5dccbf0878b8271dcad1e9f"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
-      "sha256": "3903e6d951b9c783ccb0677538066e653a40dd925630d87b4d75b5bb831930d7"
+      "sha256": "5d74d8563a9dfc5f6143cab66e5231053b7744d2080375ee3e40b74dd5036b20"
     },
     {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",
@@ -664,11 +682,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "03b0160045810edb85725c712b06a0e52f10e89a62a11f6d5af394e656a8bb22"
+      "sha256": "0e4c865acb125a3933d792dea6373f553af62420c271d50491a1fe55a33db22e"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "166115299bf4722f3ec636fb110d24bdb1275375123433e6b651a7b8c1d98e63"
+      "sha256": "abf0690b10713cc5072a617d64c2e01e1deb0bad406ce116d81db79eeaed8ad3"
+    },
+    {
+      "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
+      "sha256": "bf2e65a50eeb2cfd7ef593360b04bd95ff6f3ddce2f787756fc3d7df4d9f66af"
+    },
+    {
+      "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
+      "sha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474"
     }
   ]
 }

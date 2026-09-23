@@ -1,14 +1,14 @@
 "use client";
 import type { ExampleProps } from "./props";
-import { FxSurfaceChart } from "@/components/finstack/core/components/fx-surface-chart/fx-surface-chart";
+import { FxSurfaceChart } from "@/components/finstack/models/components/fx-surface-chart/fx-surface-chart";
 const fx = {
   id: "EURUSD",
-  expiries: [0.5, 1],
-  atm_vols: [0.08, 0.09],
-  rr_25d: [0.01, 0.012],
-  bf_25d: [0.005, 0.006],
-  rr_10d: null,
-  bf_10d: null,
+  expiries: [0.25, 0.5, 1, 2],
+  atm_vols: [0.092, 0.09, 0.088, 0.09],
+  rr_25d: [0.007, 0.008, 0.009, 0.01],
+  bf_25d: [0.0035, 0.004, 0.0045, 0.005],
+  rr_10d: [0.014, 0.016, 0.018, 0.02],
+  bf_10d: [0.007, 0.008, 0.009, 0.01],
 };
 export function Example({
   width = 880,
@@ -23,10 +23,15 @@ export function Example({
     <FxSurfaceChart
       {...presentation}
       surface={fx}
-      coordinates={[0.5, 1].flatMap((expiry) =>
-        [1, 1.1, 1.2].map((strike) => ({ expiry, strike, forward: 1.12 })),
+      coordinates={[
+        { expiry: 0.25, forward: 1.102 },
+        { expiry: 0.5, forward: 1.104 },
+        { expiry: 1, forward: 1.108 },
+        { expiry: 2, forward: 1.116 },
+      ].flatMap(({ expiry, forward }) =>
+        [1.05, 1.1, 1.15].map((strike) => ({ expiry, strike, forward })),
       )}
-      colorDomain={[0, 1]}
+      colorDomain={[0.07, 0.13]}
       width={width}
       height={460}
     />

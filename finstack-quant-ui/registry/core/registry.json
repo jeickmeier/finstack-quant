@@ -226,6 +226,34 @@
       "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
     },
     {
+      "name": "domain-field",
+      "type": "registry:ui",
+      "docs": "Date and decimal fields bound to the shared form context. Supply labels and constraints; canonical validation stays outside these controls.",
+      "files": [
+        {
+          "path": "primitives/domain-field/domain-field.tsx",
+          "type": "registry:ui",
+          "target": "components/finstack/core/primitives/domain-field/domain-field.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-base",
+        "@finstack/finstack-theme",
+        "@finstack/decimal-input",
+        "@finstack/date-input",
+        "@finstack/finstack-form"
+      ],
+      "dependencies": ["react@19.2.8", "@tanstack/react-form@1.33.5"],
+      "categories": ["Primitive Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "curve-chart",
       "type": "registry:component",
       "docs": "Displays validated CurveState entries with point-only stored coordinates. Variants are faceted, same-variant curves overlay. Base-correlation arrays and parametric fields retain their generated schema view. Native figure axes, annotations, typed callbacks, tooltip and per-variant exports are supported; linking requires a caller key mapping. No sampling or pricing engine.",
@@ -319,6 +347,7 @@
       "registryDependencies": [
         "@finstack/finstack-chart",
         "@finstack/finstack-table",
+        "@finstack/finstack-surface",
         "@finstack/use-linked-selection",
         "@finstack/contract-market-context-state",
         "button",
@@ -352,63 +381,6 @@
         "@finstack/json-viewer",
         "@finstack/contract-market-context-state",
         "@finstack/finstack-codec"
-      ],
-      "dependencies": ["react@19.2.8"],
-      "categories": ["Individual Components"],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.8.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
-        ]
-      }
-    },
-    {
-      "name": "fx-surface-chart",
-      "type": "registry:component",
-      "docs": "Raw FX quotes and native evaluated Black volatility, sharing surface table/slices/selection/exports. Supply original coordinates with explicit quote/base forwards and an explicit color domain. Missing forwards show only raw quotes; no curve choice or local conversion occurs. Requires FinstackQueryProvider. Quote editing uses market-context-form and use-market-validator.",
-      "files": [
-        {
-          "path": "components/fx-surface-chart/fx-surface-chart.tsx",
-          "type": "registry:component",
-          "target": "components/finstack/core/components/fx-surface-chart/fx-surface-chart.tsx"
-        }
-      ],
-      "registryDependencies": [
-        "@finstack/vol-surface-chart",
-        "@finstack/fx-delta-quotes",
-        "@finstack/use-fx-delta-samples"
-      ],
-      "dependencies": ["react@19.2.8"],
-      "categories": ["Individual Components"],
-      "meta": {
-        "version": "0.2.0",
-        "wasmVersion": "0.8.0",
-        "schemaIds": [
-          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
-        ]
-      }
-    },
-    {
-      "name": "vol-cube-explorer",
-      "type": "registry:component",
-      "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation.",
-      "files": [
-        {
-          "path": "components/vol-cube-explorer/vol-cube-explorer.tsx",
-          "type": "registry:component",
-          "target": "components/finstack/core/components/vol-cube-explorer/vol-cube-explorer.tsx"
-        }
-      ],
-      "registryDependencies": [
-        "@finstack/use-cube-samples",
-        "@finstack/vol-surface-chart",
-        "@finstack/json-viewer",
-        "@finstack/finstack-codec",
-        "@finstack/decimal-input",
-        "@finstack/enum-field"
       ],
       "dependencies": ["react@19.2.8"],
       "categories": ["Individual Components"],
@@ -504,6 +476,120 @@
       "registryDependencies": ["@finstack/use-finstack"],
       "dependencies": ["react@19.2.8"],
       "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "schema-form",
+      "type": "registry:component",
+      "docs": "Generated schema form for the complete 78-tag instrument inventory. Supply a lazy generated module and native validation callback; canonical JSON is emitted after valid submission. Maps use editable key/value rows internally and emit exact string keys. Basic mode hides defaulted fields. Edited pricing coverage and catalogue activation are separate gates.",
+      "files": [
+        {
+          "path": "components/schema-form/schema-form.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/schema-form.tsx"
+        },
+        {
+          "path": "components/schema-form/render-field.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/render-field.tsx"
+        },
+        {
+          "path": "components/schema-form/disclosure.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/disclosure.ts"
+        },
+        {
+          "path": "components/schema-form/field-chrome.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/field-chrome.tsx"
+        },
+        {
+          "path": "components/schema-form/schema.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/schema.ts"
+        },
+        {
+          "path": "components/schema-form/discriminator.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/discriminator.ts"
+        },
+        {
+          "path": "components/schema-form/issue-mapping.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/issue-mapping.ts"
+        },
+        {
+          "path": "components/schema-form/field-renderer.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/field-renderer.ts"
+        },
+        {
+          "path": "components/schema-form/schema-walk.ts",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/schema-walk.ts"
+        },
+        {
+          "path": "components/schema-form/field-kind.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/schema-form/field-kind.tsx"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-form",
+        "@finstack/domain-field",
+        "@finstack/finstack-codec",
+        "@finstack/enum-field",
+        "button",
+        "popover"
+      ],
+      "dependencies": ["react@19.2.8", "zod@4.6.5"],
+      "categories": ["Individual Components"],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "curve-link-example",
+      "type": "registry:component",
+      "docs": "Stored discount curve table and chart share accepted semantic selection. Explicit row/cell addresses preserve original data and render identity; caller activation callbacks update detail only. No WASM or financial calculations.",
+      "files": [
+        {
+          "path": "components/curve-link-example/curve-link-example.tsx",
+          "type": "registry:component",
+          "target": "components/finstack/core/components/curve-link-example/curve-link-example.tsx"
+        },
+        {
+          "path": "components/curve-link-example/market.json",
+          "type": "registry:file",
+          "target": "components/finstack/core/components/curve-link-example/market.json"
+        }
+      ],
+      "registryDependencies": [
+        "@finstack/finstack-table",
+        "@finstack/curve-chart",
+        "@finstack/use-linked-selection",
+        "@finstack/finstack-codec",
+        "@finstack/contract-market-context-state",
+        "button",
+        "checkbox",
+        "label"
+      ],
+      "dependencies": [
+        "@tanstack/charts@0.18.0",
+        "@tanstack/react-table@9.2.4"
+      ],
+      "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
         "wasmVersion": "0.8.0",

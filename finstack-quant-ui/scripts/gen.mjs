@@ -4,8 +4,9 @@ import { fileURLToPath } from "node:url";
 import { compile } from "json-schema-to-typescript";
 import { z } from "zod";
 import { bundleRoot, json, readContracts } from "./schema.mjs";
-import { converterSchema } from "../src/schema.mjs";
+import { converterSchema, linkSchema } from "../src/schema.mjs";
 import { generateProvenance } from "./provenance.mjs";
+import { externalize, planSharedDefs, sharedRefNames } from "./share-defs.mjs";
 
 export const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 export const repoRoot = resolve(packageRoot, "..");
@@ -26,6 +27,10 @@ export async function discoverFixtures(repo, contracts) {
       "calibration-input",
       "finstack-quant/calibration/examples/market_bootstrap/*.json",
     ],
+    [
+      "statement-model",
+      "finstack-quant/statements/tests/data/canonical/financial_model.json",
+    ],
   ]) {
     const paths = [];
     for await (const path of glob(pattern, { cwd: repo })) paths.push(path);
@@ -35,7 +40,7 @@ export async function discoverFixtures(repo, contracts) {
       const contract =
         kind === "instrument"
           ? byFile(value.instrument?.type)
-          : byFile("calibration");
+          : byFile(kind === "statement-model" ? "financial_model_spec" : "calibration");
       if (
         !contract ||
         (kind === "instrument" && !contract.$id.includes("/instrument/1/"))
@@ -82,6 +87,8 @@ export async function generate(repo = repoRoot) {
           "market_context_state",
           "valuation_result",
           "instrument_cashflow",
+          "financial_model_spec",
+          "statement_result",
         ].some((name) => entry.$id.endsWith(`/${name}.schema.json`)),
     )
     .sort((a, b) => a.$id.localeCompare(b.$id));
@@ -89,14 +96,60 @@ export async function generate(repo = repoRoot) {
   const catalogue = [];
   const catalogueMetadata = [];
   const names = new Set();
+  const sharedPlan = planSharedDefs(roots.map((root) => root.schema));
+  const wideIds = new Set(
+    roots
+      .filter((root) => Object.keys(root.schema.$defs ?? {}).length > 80)
+      .map((root) => root.$id),
+  );
+  let sharedBundle = null;
+  if (sharedPlan.schema) {
+    sharedBundle = await bundleRoot(sharedPlan.schema.$id, contracts, {
+      schema: sharedPlan.schema,
+      stableDefinitionNames: true,
+    });
+    sharedBundle = {
+      schema: structuredClone(sharedBundle.schema),
+      metadata: structuredClone(sharedBundle.metadata),
+    };
+    files.set("defs/shared.json", json(sharedBundle.schema));
+    files.set(
+      "meta/shared.ts",
+      `${header}export default ${JSON.stringify(sharedBundle.metadata, null, 2)};\n`,
+    );
+    const sharedTypes = converterSchema(
+      structuredClone(sharedBundle.schema),
+      "typescript",
+    );
+    sharedTypes.title = "SharedDefs";
+    files.set(
+      "types/shared.ts",
+      await compile(sharedTypes, "SharedDefs", {
+        bannerComment: `${header}// JSON wire shape only; runtime constraints remain in the schema.`,
+        unreachableDefinitions: true,
+        unknownAny: true,
+        $refOptions: { resolve: { file: false, http: false } },
+      }),
+    );
+  }
   for (const root of roots) {
     const name = root.$id.split("/").at(-1).replace(".schema.json", "");
     if (names.has(name)) throw new Error(`Duplicate output name: ${name}`);
     names.add(name);
-    const { schema, metadata } = await bundleRoot(root.$id, contracts);
+    // Statement definitions reference one another extensively; keep that
+    // published root closed so generated TS follows its complete graph.
+    const wide = wideIds.has(root.$id) && !root.$id.includes("/statements/1/");
+    const { schema, metadata } = await bundleRoot(
+      root.$id,
+      contracts,
+      wide ? { schema: externalize(root.schema, sharedPlan.names) } : {},
+    );
+    const closed = wide ? linkSchema(schema, sharedBundle.schema) : schema;
     // Conversion here makes unsupported constructs a generation failure. Runtime
     // conversion stays lazy and cached by the generated module's ESM identity.
-    const validator = z.fromJSONSchema(converterSchema(schema));
+    const validator = z.fromJSONSchema(
+      converterSchema(structuredClone(closed)),
+    );
     const examples = fixtures.filter((fixture) => fixture.schema === root.$id);
     for (const fixture of examples) {
       const value = JSON.parse(fixture.text);
@@ -116,20 +169,96 @@ export async function generate(repo = repoRoot) {
       `meta/${name}.ts`,
       `${header}export default ${JSON.stringify(metadata, null, 2)};\n`,
     );
-    const typeSchema = converterSchema(schema, "typescript");
+    let typeInput = structuredClone(schema);
+    const localNames = new Map();
+    if (wide && typeInput.$defs) {
+      let index = 0;
+      for (const key of Object.keys(typeInput.$defs))
+        localNames.set(key, `Local${index++}`);
+      const retarget = (node) => {
+        if (Array.isArray(node)) return node.map(retarget);
+        if (!node || typeof node !== "object") return node;
+        const next = {};
+        for (const [key, value] of Object.entries(node)) {
+          if (
+            key === "$ref" &&
+            typeof value === "string" &&
+            value.startsWith("#/$defs/")
+          ) {
+            const id = value.slice("#/$defs/".length).split("/")[0];
+            if (localNames.has(id)) {
+              next[key] =
+                `#/$defs/${localNames.get(id)}${value.slice(`#/$defs/${id}`.length)}`;
+              continue;
+            }
+          }
+          next[key] = retarget(value);
+        }
+        return next;
+      };
+      const defs = Object.fromEntries(
+        [...localNames].map(([key, title]) => [
+          title,
+          retarget(typeInput.$defs[key]),
+        ]),
+      );
+      typeInput = retarget({ ...typeInput, $defs: {} });
+      typeInput.$defs = defs;
+    }
+    const typeSchema = converterSchema(typeInput, "typescript");
     typeSchema.title = `${name
       .split("_")
       .map((word) => word[0].toUpperCase() + word.slice(1))
       .join("")}Wire`;
-    files.set(
-      `types/${name}.ts`,
-      await compile(typeSchema, typeSchema.title, {
-        bannerComment: `${header}// JSON wire shape only; runtime constraints remain in the schema.`,
-        unreachableDefinitions: false,
-        unknownAny: true,
-        $refOptions: { resolve: { file: false, http: false } },
-      }),
-    );
+    const banner = `${header}// JSON wire shape only; runtime constraints remain in the schema.\n`;
+    const sharedTypesResolver = sharedBundle && {
+      resolve: {
+        file: false,
+        http: false,
+        canonical: {
+          order: 1,
+          canRead: (file) =>
+            String(file.url).split("#")[0] === sharedBundle.schema.$id,
+          read: () => structuredClone(sharedBundle.schema),
+        },
+      },
+    };
+    let types = await compile(typeSchema, typeSchema.title, {
+      bannerComment: banner,
+      unreachableDefinitions: false,
+      unknownAny: true,
+      declareExternallyReferenced: !wide,
+      $refOptions: wide
+        ? sharedTypesResolver
+        : { resolve: { file: false, http: false } },
+    });
+    if (wide) {
+      const referenced = new Set(sharedRefNames(schema));
+      for (const [title, def] of Object.entries(typeInput.$defs ?? {})) {
+        const local = converterSchema(
+          structuredClone({ ...def, title }),
+          "typescript",
+        );
+        const part = await compile(local, title, {
+          bannerComment: "",
+          unreachableDefinitions: false,
+          unknownAny: true,
+          declareExternallyReferenced: false,
+          $refOptions: sharedTypesResolver,
+        });
+        types += `\n${part.trim()}\n`;
+        for (const defName of sharedRefNames(def)) referenced.add(defName);
+      }
+      const used = [...referenced]
+        .filter((defName) => new RegExp(`\\b${defName}\\b`).test(types))
+        .sort();
+      if (used.length)
+        types = types.replace(
+          banner,
+          `${banner}import type { ${used.join(", ")} } from "./shared";\n`,
+        );
+    }
+    files.set(`types/${name}.ts`, types);
     if (root.$id.includes("/instrument/1/")) {
       if (examples.length !== 1)
         throw new Error(
@@ -140,7 +269,9 @@ export async function generate(repo = repoRoot) {
       files.set(`examples/${name}.json`, examples[0].text);
       files.set(
         `instrument/${name}.ts`,
-        `${header}import { createWireCodec } from "../../codec.mjs";\nimport schema from "../schemas/${name}.json";\nexport { default as metadata } from "../meta/${name}";\nexport { default as example } from "../examples/${name}.json";\nexport type * from "../types/${name}";\nexport { schema };\nexport const codec = createWireCodec(schema);\nexport const validator = codec.validator;\n`,
+        wide
+          ? `${header}import { createWireCodec } from "../../codec.mjs";\nimport { linkSchema } from "../../schema.mjs";\nimport source from "../schemas/${name}.json";\nimport sharedSchema from "../defs/shared.json";\nimport sharedMetadata from "../meta/shared";\nimport localMetadata from "../meta/${name}";\nexport { default as example } from "../examples/${name}.json";\nexport type * from "../types/${name}";\nexport const schema = linkSchema(source, sharedSchema);\nexport const metadata = [\n  ...localMetadata,\n  ...sharedMetadata.filter((entry) => entry.path.startsWith("#/$defs/")),\n];\nexport const codec = createWireCodec(schema);\nexport const validator = codec.validator;\n`
+          : `${header}import { createWireCodec } from "../../codec.mjs";\nimport schema from "../schemas/${name}.json";\nexport { default as metadata } from "../meta/${name}";\nexport { default as example } from "../examples/${name}.json";\nexport type * from "../types/${name}";\nexport { schema };\nexport const codec = createWireCodec(schema);\nexport const validator = codec.validator;\n`,
       );
       const schemaGroup = root.$id.split("/").at(-2);
       const group = [

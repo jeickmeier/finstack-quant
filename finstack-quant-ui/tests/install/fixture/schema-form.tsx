@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { SchemaForm } from "@/components/finstack/shared/components/schema-form/schema-form";
+import { SchemaForm } from "@/components/finstack/core/components/schema-form/schema-form";
 import schema from "./bond.schema.json";
 import { createWireCodec } from "@/lib/finstack/codec.mjs";
 import data from "./data.json";

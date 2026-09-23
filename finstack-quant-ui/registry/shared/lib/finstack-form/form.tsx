@@ -9,8 +9,6 @@ import {
   FieldHelp,
   type FieldInfo,
 } from "@/components/finstack/shared/primitives/field-frame/field-frame";
-import { DecimalInput } from "@/components/finstack/core/primitives/decimal-input/decimal-input";
-import { DateInput } from "@/components/finstack/core/primitives/date-input/date-input";
 import {
   EnumField,
   type EnumOption,
@@ -61,32 +59,6 @@ function TextField(
         />
       )}
     </FieldFrame>
-  );
-}
-function DecimalField(props: FieldInfo & { pattern?: string }) {
-  const field = useFieldContext<string>();
-  return (
-    <DecimalInput
-      {...props}
-      path={field.name}
-      dirty={field.state.meta.isDirty}
-      value={field.state.value ?? ""}
-      onValueChange={field.handleChange}
-      error={errorText(field.state.meta.errors)}
-    />
-  );
-}
-function DateField(props: FieldInfo) {
-  const field = useFieldContext<string>();
-  return (
-    <DateInput
-      {...props}
-      path={field.name}
-      dirty={field.state.meta.isDirty}
-      value={field.state.value ?? ""}
-      onValueChange={field.handleChange}
-      error={errorText(field.state.meta.errors)}
-    />
   );
 }
 function SelectField(props: FieldInfo & { options: readonly EnumOption[] }) {
@@ -359,8 +331,6 @@ export const { useAppForm } = createFormHook({
   formContext,
   fieldComponents: {
     TextField,
-    DecimalField,
-    DateField,
     SelectField,
     BooleanField,
     ArrayField,
