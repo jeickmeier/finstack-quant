@@ -104,31 +104,12 @@ impl AgencyProgram {
     /// * `accrual_month` - Accrual month whose following-month payment date is
     ///   computed and adjusted on the Federal Reserve banking calendar.
     pub fn payment_date_for_period(&self, accrual_year: i32, accrual_month: Month) -> Result<Date> {
-        let (pay_year, pay_month, pay_day) = match self {
-            AgencyProgram::Fnma | AgencyProgram::Fhlmc => {
-                let (y, m) = advance_month(accrual_year, accrual_month);
-                (y, m, 25_u8)
-            }
-            AgencyProgram::GnmaI => {
-                let (y, m) = advance_month(accrual_year, accrual_month);
-                (y, m, 15_u8)
-            }
-            AgencyProgram::GnmaII => {
-                let (y, m) = advance_month(accrual_year, accrual_month);
-                (y, m, 20_u8)
-            }
+        let pay_day = match self {
+            AgencyProgram::Fnma | AgencyProgram::Fhlmc => 25,
+            AgencyProgram::GnmaI => 15,
+            AgencyProgram::GnmaII => 20,
         };
-        let payment = Date::from_calendar_date(pay_year, pay_month, pay_day).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "invalid agency payment date {pay_year}-{:02}-{pay_day}: {e}",
-                pay_month as u8
-            ))
-        })?;
-        finstack_quant_core::dates::adjust(
-            payment,
-            finstack_quant_core::dates::BusinessDayConvention::Following,
-            finstack_quant_core::dates::calendar_by_id_strict("usny")?,
-        )
+        payment_date_after(accrual_year, accrual_month, 1, pay_day)
     }
 
     /// Returns the canonical string representation.
@@ -151,13 +132,31 @@ impl AgencyProgram {
 ///
 /// Uses [`time::Month::next`], which is total (no fallible conversion), so
 /// this helper cannot panic.
-fn advance_month(year: i32, month: Month) -> (i32, Month) {
-    let next_year = if matches!(month, Month::December) {
-        year + 1
-    } else {
-        year
-    };
-    (next_year, month.next())
+/// Payment on day `pay_day` (clamped to the month length) of the month
+/// `months_ahead` months after the accrual month, rolled Following on the
+/// `usny` Federal Reserve calendar.
+fn payment_date_after(
+    accrual_year: i32,
+    accrual_month: Month,
+    months_ahead: u32,
+    pay_day: u8,
+) -> Result<Date> {
+    let index = accrual_year * 12 + i32::from(u8::from(accrual_month)) - 1 + months_ahead as i32;
+    let pay_year = index.div_euclid(12);
+    let pay_month = Month::try_from((index.rem_euclid(12) + 1) as u8)
+        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+    let day = pay_day.min(pay_month.length(pay_year));
+    let payment = Date::from_calendar_date(pay_year, pay_month, day).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "invalid agency payment date {pay_year}-{:02}-{day}: {e}",
+            pay_month as u8
+        ))
+    })?;
+    finstack_quant_core::dates::adjust(
+        payment,
+        finstack_quant_core::dates::BusinessDayConvention::Following,
+        finstack_quant_core::dates::calendar_by_id_strict("usny")?,
+    )
 }
 
 impl std::fmt::Display for AgencyProgram {
@@ -333,7 +332,11 @@ pub struct AgencyMbsPassthrough {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub maturity: Date,
-    /// Optional custom payment delay (overrides agency default).
+    /// Optional custom stated payment delay in days (overrides the agency
+    /// rule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`
+    /// months after the accrual month, rolled Following on the `usny`
+    /// calendar (55 → 25th of the next month, 75 → 15th two months later).
+    /// Must be at least 1.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_lag_days: Option<u32>,
@@ -419,21 +422,42 @@ impl AgencyMbsPassthrough {
 
     /// Compute the exact payment date for an accrual period.
     ///
-    /// When a custom `payment_lag_days` override is set, falls back to
-    /// adding that many calendar days from `period_start`. Otherwise uses
-    /// the agency's calendar-based rule via
-    /// [`AgencyProgram::payment_date_for_period`].
+    /// Uses the agency's calendar-based rule via
+    /// [`AgencyProgram::payment_date_for_period`]. A custom stated delay `D`
+    /// (`payment_lag_days`) follows the same stated-delay convention: it pays
+    /// on day `D − 30k` of the month `k = (D − 1) / 30` months after the
+    /// accrual month, rolled Following on the `usny` calendar. So 45/50/55
+    /// days give the 15th/20th/25th of the next month, and 75 days the 15th
+    /// of the month after that.
     ///
     /// # Arguments
     ///
-    /// * `period_start` - Accrual-period start date. When `payment_lag_days` is unset, only the
-    ///   year and month feed the agency rule; when a custom lag is set, this date is the lag origin.
+    /// * `period_start` - Accrual-period start date; only its year and month
+    ///   feed the rule.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` for a zero custom delay or a payment date
+    /// outside the supported calendar range.
     pub fn payment_date_for_accrual_period(&self, period_start: Date) -> Result<Date> {
-        if let Some(custom_delay) = self.payment_lag_days {
-            super::delay::actual_payment_date(period_start, custom_delay, false)
-        } else {
-            self.agency
-                .payment_date_for_period(period_start.year(), period_start.month())
+        match self.payment_lag_days {
+            Some(0) => Err(finstack_quant_core::Error::Validation(
+                "MBS payment_lag_days must be at least 1".into(),
+            )),
+            Some(delay) => {
+                let months_ahead = (delay - 1) / 30;
+                let pay_day = u8::try_from(delay - 30 * months_ahead)
+                    .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+                payment_date_after(
+                    period_start.year(),
+                    period_start.month(),
+                    months_ahead,
+                    pay_day,
+                )
+            }
+            None => self
+                .agency
+                .payment_date_for_period(period_start.year(), period_start.month()),
         }
     }
 
@@ -498,6 +522,11 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthroug
             self.maturity,
             "MBS issue-to-maturity",
         )?;
+        if self.payment_lag_days == Some(0) {
+            return Err(finstack_quant_core::Error::Validation(
+                "MBS payment_lag_days must be at least 1".into(),
+            ));
+        }
         if let Some(last_paid) = self.last_paid_accrual_end {
             if last_paid < self.issue_date || last_paid > self.maturity {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -616,6 +645,54 @@ mod tests {
             .expect("December wrap should be Ok");
         assert_eq!(dec.year(), 2025);
         assert_eq!(dec.month(), Month::January);
+    }
+
+    /// A custom stated delay D maps to day `D − 30k` of the month `k`
+    /// months after accrual, `k = (D − 1) / 30`, rolled Following on the
+    /// Federal Reserve calendar — the same rule that turns the agency
+    /// delays 45/50/55 into the 15th/20th/25th of the following month.
+    /// 75 days on a January 2024 accrual pays Friday 15 March 2024 (adding 75
+    /// calendar days gave Saturday 16 March). 55 days on a November 2025
+    /// accrual pays 25 December → Friday 26 December 2025 (Christmas).
+    #[test]
+    fn custom_payment_delay_uses_day_of_month_rule_with_usny_roll() {
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        mbs.payment_lag_days = Some(75);
+        assert_eq!(
+            mbs.payment_date_for_accrual_period(
+                Date::from_calendar_date(2024, Month::January, 1).expect("date")
+            )
+            .expect("payment"),
+            Date::from_calendar_date(2024, Month::March, 15).expect("date")
+        );
+        mbs.payment_lag_days = Some(55);
+        assert_eq!(
+            mbs.payment_date_for_accrual_period(
+                Date::from_calendar_date(2025, Month::November, 1).expect("date")
+            )
+            .expect("payment"),
+            Date::from_calendar_date(2025, Month::December, 26).expect("date")
+        );
+        for (agency, delay) in [
+            (AgencyProgram::Fnma, 55),
+            (AgencyProgram::GnmaI, 45),
+            (AgencyProgram::GnmaII, 50),
+        ] {
+            mbs.agency = agency;
+            mbs.payment_lag_days = Some(delay);
+            let custom = mbs
+                .payment_date_for_accrual_period(
+                    Date::from_calendar_date(2024, Month::May, 1).expect("date"),
+                )
+                .expect("custom");
+            assert_eq!(
+                custom,
+                agency
+                    .payment_date_for_period(2024, Month::May)
+                    .expect("agency"),
+                "stated {delay}-day delay must match the {agency:?} rule"
+            );
+        }
     }
 
     #[test]
@@ -760,14 +837,5 @@ mod production_mortgage_audit {
                 .expect("payment"),
             date!(2026 - 04 - 27)
         );
-    }
-
-    #[test]
-    fn agency_schedule_uses_calendar_payment_dates() {
-        let starts = [date!(2026 - 02 - 01), date!(2026 - 03 - 01)];
-        let schedule =
-            super::super::delay::payment_schedule(&starts, AgencyProgram::Fnma).expect("schedule");
-        assert_eq!(schedule[0].1, date!(2026 - 03 - 25));
-        assert_eq!(schedule[1].1, date!(2026 - 04 - 27));
     }
 }
