@@ -208,7 +208,7 @@ pub(crate) fn register_bond_metrics(
             (EmbeddedOptionValue, EmbeddedOptionValueCalculator),
             (Vega, BondVegaCalculator),
             (ZSpread, ZSpreadCalculator::default()),
-            (ISpread, ISpreadCalculator::default()),
+            (ISpread, ISpreadCalculator),
             (DiscountMargin, DiscountMarginCalculator::default()),
             (ASWPar, AssetSwapParCalculator),
             (ASWMarket, AssetSwapMarketCalculator),

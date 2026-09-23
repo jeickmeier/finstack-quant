@@ -6,7 +6,7 @@ use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_sprea
 use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use crate::pricer::ModelKey;
 use finstack_quant_core::dates::calendar::calendar_by_id;
-use finstack_quant_core::dates::{Date, DayCount, ScheduleBuilder, StubKind, Tenor};
+use finstack_quant_core::dates::{Date, ScheduleBuilder};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -162,69 +162,6 @@ pub fn price_from_dm(
     // Coupons stay at the contractual quoted margin; the DM shifts the
     // discount rate via the shared Z-spread discounting mechanics.
     price_from_z_spread(&b, curves, as_of, dm)
-}
-
-/// Compute the par swap fixed rate used in the I-Spread definition
-/// (`ISpread = YTM - par_swap_rate`) using the same convention as the
-/// `ISpreadCalculator` (annual Act/Act proxy fixed leg by default).
-pub(super) fn par_swap_rate_from_discount(
-    bond: &Bond,
-    curves: &MarketContext,
-    quote_date: Date,
-) -> Result<f64> {
-    let disc = curves.get_discount(&bond.discount_curve_id)?;
-    if let Some(par_swap_rate) =
-        crate::instruments::fixed_income::bond::metrics::price_yield_spread::i_spread::interpolated_swap_quote_rate(
-            disc.as_ref(),
-            quote_date,
-            bond.maturity,
-        )?
-    {
-        return Ok(par_swap_rate);
-    }
-    let ispread_cfg =
-        crate::instruments::fixed_income::bond::metrics::price_yield_spread::i_spread::ISpreadConfig::default();
-
-    // Mirror the fallback logic in `ISpreadCalculator`:
-    // when using the default (annual Act/Act) proxy-leg config, use the bond's
-    // fixed-coupon conventions for the proxy fixed leg.
-    let mut fixed_leg_day_count = ispread_cfg.fixed_leg_day_count;
-    let mut fixed_leg_frequency = ispread_cfg.fixed_leg_frequency;
-    if matches!(ispread_cfg.fixed_leg_day_count, DayCount::ActAct)
-        && ispread_cfg.fixed_leg_frequency == Tenor::annual()
-    {
-        if let CashflowSpec::Fixed(spec) = &bond.cashflow_spec {
-            fixed_leg_day_count = spec.schedule.day_count;
-            fixed_leg_frequency = spec.schedule.frequency;
-        }
-    }
-
-    // Mirror the schedule and fixed-leg conventions used in ISpreadCalculator defaults.
-    let dates: Vec<Date> = ScheduleBuilder::new(quote_date, bond.maturity)?
-        .frequency(fixed_leg_frequency)
-        .stub_rule(StubKind::ShortFront)
-        .build()?
-        .into_iter()
-        .collect();
-
-    if dates.len() < 2 {
-        return Err(finstack_quant_core::Error::Validation(
-            "I-spread proxy par-swap calculation requires at least two schedule dates".to_string(),
-        ));
-    }
-
-    let (par_rate, annuity) = par_rate_and_annuity_from_discount(
-        disc.as_ref(),
-        fixed_leg_day_count,
-        Some(fixed_leg_frequency),
-        &dates,
-    )?;
-    if annuity.abs() < 1e-12 {
-        return Err(finstack_quant_core::Error::Validation(
-            "I-spread proxy par-swap calculation is undefined for near-zero annuity".to_string(),
-        ));
-    }
-    Ok(par_rate)
 }
 
 /// Price from market asset swap spread (decimal) using the same
