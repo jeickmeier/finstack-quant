@@ -477,6 +477,22 @@ it("loads the complete host request when a prepared instrument is selected", asy
   ).toContain("25,748");
 });
 
+it("offers configured scenario prices only while structured credit is selected", async () => {
+  render(
+    <FinstackQueryProvider>
+      <PricingWorkbench
+        defaultRequest={fixture.request}
+        scenario={{
+          trancheId: scenarioCases.trancheId,
+          gridJson: JSON.stringify(scenarioCases.grid),
+          priceDomain: [80, 140],
+        }}
+      />
+    </FinstackQueryProvider>,
+  );
+  await waitFor(() => expect(prices()).toHaveLength(1), { timeout: 10000 });
+  expect(screen.queryByRole("tab", { name: "Scenarios" })).toBeNull();
+});
 it("loads configured scenario prices only on demand from the completed structured-credit context", async () => {
   const request = {
     instrumentJson: JSON.stringify(scenarioCases.cases[0]!.instrument),

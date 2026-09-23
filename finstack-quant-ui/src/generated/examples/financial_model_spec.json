@@ -1,0 +1,1 @@
+{"id":"current-operating-model","meta":{"desk":"corp","source":"golden"},"nodes":{"revenue":{"name":"Revenue","node_id":"revenue","node_type":"value","value_type":{"type":"scalar"},"values":{"2025Q1":100000.0}}},"periods":[{"end":"2025-04-01","id":"2025Q1","is_actual":true,"start":"2025-01-01"}],"schema_version":1}

@@ -345,6 +345,15 @@ describe("offline reachable bundling", () => {
         .safeParse({ instrument: { n: 1 } }).success,
     ).toBe(true);
   });
+  it("rejects a root definition that conflicts with the shared definition of the same name", () => {
+    const shared = { $defs: { Bond: { type: "object" } } };
+    expect(
+      linkSchema({ $defs: { Bond: { type: "object" } } }, shared).$defs.Bond,
+    ).toEqual({ type: "object" });
+    expect(() =>
+      linkSchema({ $defs: { Bond: { type: "string" } } }, shared),
+    ).toThrow("Conflicting shared definition: Bond");
+  });
   it("rejects external refs absent from indexes and dangling internal pointers", async () => {
     await expect(
       bundleRoot(uri("root"), contracts({ root: { $ref: uri("missing") } })),

@@ -96,11 +96,19 @@ export async function generate(repo = repoRoot) {
   const catalogue = [];
   const catalogueMetadata = [];
   const names = new Set();
-  const sharedPlan = planSharedDefs(roots.map((root) => root.schema));
-  const wideIds = new Set(
+  const sharedPlan = planSharedDefs(
     roots
-      .filter((root) => Object.keys(root.schema.$defs ?? {}).length > 80)
-      .map((root) => root.$id),
+      .filter((root) => !root.$id.includes("/statements/1/"))
+      .map((root) => root.schema),
+  );
+  // Wide roots link against the shared document only when one is emitted;
+  // otherwise they stay self-contained like every other root.
+  const wideIds = new Set(
+    sharedPlan.schema
+      ? roots
+          .filter((root) => Object.keys(root.schema.$defs ?? {}).length > 80)
+          .map((root) => root.$id)
+      : [],
   );
   let sharedBundle = null;
   if (sharedPlan.schema) {
@@ -164,6 +172,8 @@ export async function generate(repo = repoRoot) {
           `Fixture failed ${fixture.source}: ${JSON.stringify(result.error.issues).slice(0, 4000)}`,
         );
     }
+    if (root.$id.endsWith("/financial_model_spec.schema.json") && examples.length === 1)
+      files.set("examples/financial_model_spec.json", examples[0].text);
     files.set(`schemas/${name}.json`, json(schema));
     files.set(
       `meta/${name}.ts`,

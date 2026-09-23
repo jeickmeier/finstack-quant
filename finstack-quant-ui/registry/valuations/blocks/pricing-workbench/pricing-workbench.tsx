@@ -64,7 +64,7 @@ export function PricingWorkbench({
   /** Notify the host when a prepared instrument example is selected. */
   onInstrumentTypeChange?: (type: string) => void;
   defaultCalibrationJson?: string;
-  /** Explicit native tranche/grid inputs and display extent; evaluated on the completed structured-credit request only. */
+  /** Explicit native tranche/grid inputs and display extent; offered while structured credit is selected and evaluated on its completed request only. */
   scenario?: {
     trancheId: string;
     gridJson: string;
@@ -468,7 +468,7 @@ export function PricingWorkbench({
                       <span className="finstack-kbd">5</span> Trace
                     </TabsTrigger>
                     <TabsTrigger value="request">Request</TabsTrigger>
-                    {scenario && (
+                    {scenario && type === "structured_credit" && (
                       <TabsTrigger value="scenarios">Scenarios</TabsTrigger>
                     )}
                   </TabsList>

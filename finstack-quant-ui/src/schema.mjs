@@ -6,7 +6,7 @@ export const sharedDefsId =
 
 /**
  * Inline a shared definition document so validators and forms see local `#/$defs` refs.
- * Root-owned definitions win when a key is present in both documents.
+ * A key present in both documents must have an identical body.
  * @param schema - Bundled root whose shared references use `sharedDefsId`.
  * @param shared - Bundled shared document; its `$defs` are copied, not mutated.
  * @returns A closed schema. Shared reference targets must exist.
@@ -14,8 +14,14 @@ export const sharedDefsId =
 export function linkSchema(schema, shared) {
   const linked = structuredClone(schema);
   const defs = structuredClone(shared?.$defs ?? {});
-  for (const [key, value] of Object.entries(linked.$defs ?? {}))
+  for (const [key, value] of Object.entries(linked.$defs ?? {})) {
+    if (
+      Object.hasOwn(defs, key) &&
+      JSON.stringify(defs[key]) !== JSON.stringify(value)
+    )
+      throw new Error(`Conflicting shared definition: ${key}`);
     defs[key] = value;
+  }
   linked.$defs = defs;
   const prefix = `${sharedDefsId}#/$defs/`;
   const seen = new WeakSet();
