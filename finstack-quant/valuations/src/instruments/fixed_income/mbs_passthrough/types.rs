@@ -521,6 +521,16 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthroug
         Some(self.issue_date)
     }
 
+    fn rate_risk_rebuild(
+        &self,
+        base: &finstack_quant_core::market_data::context::MarketContext,
+        bumped: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Box<dyn crate::instruments::Instrument>>> {
+        let pool = super::metrics::duration::rate_risk_pool(self, base, bumped, as_of)?;
+        Ok(Some(Box::new(pool)))
+    }
+
     crate::impl_focused_pricing_overrides!();
 }
 

@@ -869,6 +869,38 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     fn effective_start_date(&self) -> Option<Date> {
         None
     }
+
+    /// Rebuild the instrument for a rate scenario when its projected
+    /// cashflows respond to rates.
+    ///
+    /// Rate-risk metrics (DV01, bucketed DV01) reprice the returned
+    /// instrument in the bumped market instead of `self`. Agency mortgage
+    /// instruments override this to shift their prepayment speed with the
+    /// refinancing incentive implied by the bumped discount curve, so their
+    /// DV01 captures prepayment (negative-convexity) risk. The default returns
+    /// `Ok(None)`: cashflows do not depend on the rate scenario and `self` is
+    /// repriced unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - Unbumped market the instrument is valued in.
+    /// * `bumped` - Market after the rate bump; compared with `base` to derive
+    ///   the rate shift that drives any behavioural change.
+    /// * `as_of` - Valuation date at which the rate shift is measured.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the curves needed to measure the rate shift are
+    /// missing or the rebuilt instrument cannot be constructed.
+    fn rate_risk_rebuild(
+        &self,
+        base: &MarketContext,
+        bumped: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Box<dyn Instrument>>> {
+        let _ = (base, bumped, as_of);
+        Ok(None)
+    }
 }
 
 // Note: Methods formerly on the `Attributable` trait are now default methods on `Instrument`.

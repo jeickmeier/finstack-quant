@@ -4,6 +4,7 @@
 //! pools to be delivered are not known at trade time. Instead, pools must
 //! meet good delivery standards (coupon, term, agency).
 
+use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram};
@@ -186,6 +187,14 @@ pub struct AgencyTba {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assumed_pool: Option<Box<AgencyMbsPassthrough>>,
+    /// Prepayment model of the generic assumed pool.
+    ///
+    /// Applies only when `assumed_pool` is absent (an explicit pool carries its
+    /// own model); `None` uses the embedded generic PSA assumption. Setting it
+    /// together with `assumed_pool` is rejected.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prepayment_model: Option<PrepaymentModelSpec>,
     /// Discount curve identifier.
     pub discount_curve_id: CurveId,
     /// Pricing overrides.
@@ -268,6 +277,15 @@ impl AgencyTba {
                     "{context} assumed-pool currency must match TBA notional currency"
                 )));
             }
+            if self.prepayment_model.is_some() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} prepayment_model applies to the generic pool only; \
+                     set it on the explicit assumed_pool instead"
+                )));
+            }
+        }
+        if let Some(model) = &self.prepayment_model {
+            model.validate()?;
         }
         Ok(())
     }
@@ -432,6 +450,24 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
 
     fn effective_start_date(&self) -> Option<Date> {
         self.trade_date
+    }
+
+    fn rate_risk_rebuild(
+        &self,
+        base: &finstack_quant_core::market_data::context::MarketContext,
+        bumped: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Box<dyn crate::instruments::Instrument>>> {
+        use crate::instruments::fixed_income::mbs_passthrough::metrics::duration::rate_risk_pool;
+        let mut rebuilt = self.clone();
+        if let Some(pool) = &self.assumed_pool {
+            rebuilt.assumed_pool = Some(Box::new(rate_risk_pool(pool, base, bumped, as_of)?));
+        } else {
+            let generic = crate::instruments::fixed_income::tba::pricer::create_assumed_pool(self)?;
+            rebuilt.prepayment_model =
+                Some(rate_risk_pool(&generic, base, bumped, as_of)?.prepayment_model);
+        }
+        Ok(Some(Box::new(rebuilt)))
     }
 
     fn expiry(&self) -> Option<Date> {

@@ -711,6 +711,20 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyCmo {
         Some(self.issue_date)
     }
 
+    fn rate_risk_rebuild(
+        &self,
+        base: &finstack_quant_core::market_data::context::MarketContext,
+        bumped: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Box<dyn crate::instruments::Instrument>>> {
+        use crate::instruments::fixed_income::mbs_passthrough::metrics::duration::rate_risk_pool;
+        let collateral =
+            crate::instruments::fixed_income::cmo::pricer::resolve_collateral(self, as_of)?;
+        let mut rebuilt = self.clone();
+        rebuilt.collateral = Some(Box::new(rate_risk_pool(&collateral, base, bumped, as_of)?));
+        Ok(Some(Box::new(rebuilt)))
+    }
+
     crate::impl_focused_pricing_overrides!();
 }
 

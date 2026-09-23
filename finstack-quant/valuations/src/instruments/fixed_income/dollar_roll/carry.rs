@@ -71,7 +71,7 @@ pub fn implied_financing_rate(roll: &DollarRoll) -> Result<CarryResult> {
     let front_settle = roll.front_settle_date()?;
     let back_settle = roll.back_settle_date()?;
 
-    let pool = create_assumed_pool(&front_leg, front_settle)?;
+    let pool = create_assumed_pool(&front_leg)?;
     let months = (back_settle.year() - front_settle.year()) * 12
         + i32::from(u8::from(back_settle.month()))
         - i32::from(u8::from(front_settle.month()));
@@ -280,7 +280,7 @@ mod tests {
         let roll = DollarRoll::example().expect("DollarRoll example is valid");
         let result = implied_financing_rate(&roll).expect("ok");
         let front = roll.front_settle_date().expect("front");
-        let pool = create_assumed_pool(&roll.front_leg().expect("leg"), front).expect("pool");
+        let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
         let front_accrued = settlement_accrued_interest(&pool, front).expect("accrued") * 100.0
             / pool.current_face.amount();
 
@@ -349,8 +349,7 @@ mod production_mortgage_audit {
         let mut roll = DollarRoll::example().expect("roll");
         roll.front_settlement_date = Some(date!(2026 - 03 - 11));
         roll.back_settlement_date = Some(date!(2026 - 04 - 11));
-        let pool = create_assumed_pool(&roll.front_leg().expect("leg"), date!(2026 - 03 - 11))
-            .expect("pool");
+        let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
         let i = pool.wac / 12.0;
         let paydown = 100.0 * i / ((1.0 + i).powi(360) - 1.0);
         let coupon = 0.04 * (100.0 * 20.0 + (100.0 - paydown) * 10.0) / 360.0;
@@ -379,8 +378,7 @@ mod production_mortgage_audit {
         roll.front_settlement_date = Some(date!(2026 - 03 - 11));
         roll.back_settlement_date = Some(date!(2026 - 04 - 11));
         let carry = implied_financing_rate(&roll).expect("carry");
-        let pool = create_assumed_pool(&roll.front_leg().expect("leg"), date!(2026 - 03 - 11))
-            .expect("pool");
+        let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
         let cf = generate_cashflows(&pool, date!(2026 - 03 - 11), Some(1)).expect("flows");
         let principal =
             (cf[0].scheduled_principal + cf[0].prepayment) / pool.current_face.amount() * 100.0;

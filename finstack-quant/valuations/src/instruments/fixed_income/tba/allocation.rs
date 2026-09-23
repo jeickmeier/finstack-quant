@@ -85,18 +85,8 @@ pub struct AllocationResult {
 ///   conventions determine the assumed generic deliverable pool.
 pub fn allocate_generic_pool(tba: &AgencyTba) -> Result<AllocationResult> {
     use crate::instruments::fixed_income::tba::pricer::create_assumed_pool;
-    use finstack_quant_core::dates::Date;
 
-    // Use a reference date for pool creation
-    let reference_date = Date::from_calendar_date(
-        tba.settlement_year,
-        time::Month::try_from(tba.settlement_month)
-            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?,
-        1,
-    )
-    .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-
-    let pool = create_assumed_pool(tba, reference_date)?;
+    let pool = create_assumed_pool(tba)?;
 
     Ok(AllocationResult {
         pool,

@@ -220,6 +220,17 @@
             "null"
           ]
         },
+        "prepayment_model": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prepayment model of the generic assumed pool.\n\nApplies only when `assumed_pool` is absent (an explicit pool carries its\nown model); `None` uses the embedded generic PSA assumption. Setting it\ntogether with `assumed_pool` is rejected."
+        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
