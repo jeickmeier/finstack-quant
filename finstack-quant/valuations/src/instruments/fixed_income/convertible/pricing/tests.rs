@@ -78,7 +78,9 @@ fn create_test_market_context() -> MarketContext {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
-        .knots([(0.0, 1.0), (10.0, 0.90)])
+        // (5, 0.95) lies on the linear-DF segment, so the curve is unchanged;
+        // three pillars let the market roll one day for theta.
+        .knots([(0.0, 1.0), (5.0, 0.95), (10.0, 0.90)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
         .build()
         .expect("should succeed");
@@ -800,4 +802,29 @@ fn put_at_maturity_floors_terminal_payoff() {
         "maturity put at 105 must lift PV by ~PV(50); got uplift {uplift} \
          (plain {pv_plain}, puttable {pv_puttable})"
     );
+}
+
+/// Theta must not silently reprice on an un-rolled market when the market
+/// cannot roll one day forward. The sparse curve below has its last pillar
+/// at 0.002y (< 1 day), so `roll_forward(1)` fails; theta must surface it.
+#[test]
+fn theta_propagates_market_roll_failure() {
+    let bond = create_test_bond();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let sparse = DiscountCurve::builder("SPARSE")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (0.002, 0.99999)])
+        .build()
+        .expect("sparse curve");
+    let market = create_test_market_context().insert(sparse);
+    assert!(market.roll_forward(1).is_err(), "fixture must fail to roll");
+
+    let result = calculate_convertible_greeks(
+        &bond,
+        &market,
+        ConvertibleTreeType::Binomial(50),
+        Some(0.01),
+        as_of,
+    );
+    assert!(result.is_err(), "theta hid a roll failure: {result:?}");
 }

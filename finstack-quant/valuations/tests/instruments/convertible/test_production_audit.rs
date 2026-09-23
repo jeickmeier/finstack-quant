@@ -19,7 +19,12 @@ fn market(as_of: Date, rate: f64, spot: f64, vol: f64) -> MarketContext {
         .insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
-                .knots([(0.0, 1.0), (10.0, (-rate * 10.0).exp())])
+                // Flat continuous rate; three pillars let theta roll one day.
+                .knots([
+                    (0.0, 1.0),
+                    (5.0, (-rate * 5.0).exp()),
+                    (10.0, (-rate * 10.0).exp()),
+                ])
                 .build()
                 .expect("discount"),
         )

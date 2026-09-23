@@ -609,15 +609,10 @@ pub fn calculate_convertible_greeks(
                 // and roll-down. See module documentation
                 // (realized-forward roll semantics).
                 //
-                // A roll can fail when a curve is too sparse to retain ≥ 2
-                // knots after the shift; in that case we fall back to a
-                // no-roll reprice. Because the pricer discounts relative to
-                // `as_of`, the fallback yields nearly the same discounting
-                // effect, but leaves curve base dates anchored at `t`.
-                let rolled_market = match market_context.roll_forward(1) {
-                    Ok(m) => m,
-                    Err(_) => market_context.clone(),
-                };
+                // A roll fails when a curve is too sparse to retain ≥ 2 knots
+                // after the shift; that error propagates rather than
+                // repricing on a market still anchored at `t`.
+                let rolled_market = market_context.roll_forward(1)?;
                 let fwd_price = price_convertible_bond(bond, &rolled_market, tree_type, next_day)?;
                 // Theta = P(t+1d) - P(t), reported as change per calendar day.
                 greeks.theta = fwd_price.amount() - greeks.price;
