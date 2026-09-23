@@ -27,8 +27,9 @@ pub(super) struct ConvertibleBondValuator {
     put_map: HashMap<usize, f64>,
     /// Conversion policy
     conversion_policy: ConversionPolicy,
-    /// Base date for time calculations
-    base_date: Date,
+    /// Steps (or spot condition) at which conversion is permitted, resolved
+    /// once from the policy so node decisions do no date arithmetic.
+    conversion_window: ConversionWindow,
     /// Conversion price per share (for soft-call trigger evaluation).
     conversion_price: f64,
     /// Optional soft-call trigger condition.
@@ -46,15 +47,23 @@ pub(super) struct ConvertibleBondValuator {
     pub(super) risky_step_dfs: Vec<f64>,
     /// Equity volatility (stored for soft-call trigger adjustment).
     volatility: f64,
-    /// Bond maturity date (for date-to-step mapping in conversion policies).
-    maturity: Date,
-    /// Number of tree steps (for date-to-step mapping in conversion policies).
-    num_steps: usize,
     /// Whether the bond carries dividend protection (`AdjustPrice` or
     /// `AdjustRatio`). When set, the conversion ratio accretes at the
     /// dividend yield: `ratio(t) = ratio_0 * exp(q * t)`; see
     /// [`ConvertibleBondValuator::conversion_value`].
     pub(super) dividend_protected: bool,
+}
+
+/// Where conversion is permitted on the tree, resolved from the policy.
+enum ConversionWindow {
+    /// Every step (voluntary conversion).
+    Always,
+    /// Inclusive step range (mandatory date or conversion window).
+    Steps { start: usize, end: usize },
+    /// Node spot must reach the threshold (price-trigger barrier approximation).
+    SpotAtLeast(f64),
+    /// Not modelable on the tree (IPO / change-of-control events).
+    Never,
 }
 
 impl ConvertibleBondValuator {
@@ -111,6 +120,9 @@ impl ConvertibleBondValuator {
             *coupon_map.entry(bounded_step).or_insert(0.0) += cf.amount.amount();
         }
 
+        // One accrual index serves every call/put exercise date below.
+        let accrual = super::engine::accrual_index(bond, cashflow_schedule)?;
+
         // Map call/put schedules to tree steps, supporting exercise periods.
         let mut call_map: HashMap<usize, f64> = HashMap::default();
         let mut put_map: HashMap<usize, f64> = HashMap::default();
@@ -155,11 +167,7 @@ impl ConvertibleBondValuator {
                         .take(end_step + 1)
                         .skip(start_step)
                     {
-                        let accrued = super::engine::accrued_interest_at(
-                            bond,
-                            cashflow_schedule,
-                            exercise_date,
-                        )?;
+                        let accrued = accrual.accrued_at(exercise_date)?;
                         let call_price = if let Some((curve, spread)) = &reference_curve {
                             let mut pv_remaining = 0.0;
                             for cashflow in cashflow_schedule
@@ -217,12 +225,7 @@ impl ConvertibleBondValuator {
                         .take(end_step + 1)
                         .skip(start_step)
                     {
-                        let dirty_put_price = put_price
-                            + super::engine::accrued_interest_at(
-                                bond,
-                                cashflow_schedule,
-                                exercise_date,
-                            )?;
+                        let dirty_put_price = put_price + accrual.accrued_at(exercise_date)?;
                         put_map
                             .entry(s)
                             .and_modify(|p| *p = p.max(dirty_put_price))
@@ -321,15 +324,18 @@ impl ConvertibleBondValuator {
             coupon_map,
             call_map,
             put_map,
+            conversion_window: Self::conversion_window(
+                &bond.conversion.policy,
+                base_date,
+                bond.maturity,
+                steps,
+            )?,
             conversion_policy: bond.conversion.policy.clone(),
-            base_date,
             conversion_price,
             soft_call_trigger: bond.soft_call_trigger.clone(),
             rf_step_dfs,
             risky_step_dfs,
             volatility,
-            maturity: bond.maturity,
-            num_steps: steps,
             dividend_protected: bond.conversion.dividend_adjustment.is_protected(),
         })
     }
@@ -362,73 +368,67 @@ impl ConvertibleBondValuator {
     /// voluntary conversion before that date (a feature of some mandatory
     /// structures) is not modeled; before the mandatory step the holder simply
     /// carries the continuation value.
-    pub(super) fn conversion_allowed(&self, step: usize, node_spot: f64) -> Result<bool> {
-        let ctx = DayCountContext::default();
-        let allowed = match &self.conversion_policy {
-            ConversionPolicy::Voluntary => true,
+    pub(super) fn conversion_allowed(&self, step: usize, node_spot: f64) -> bool {
+        match self.conversion_window {
+            ConversionWindow::Always => true,
+            ConversionWindow::Steps { start, end } => step >= start && step <= end,
+            ConversionWindow::SpotAtLeast(threshold) => node_spot >= threshold,
+            ConversionWindow::Never => false,
+        }
+    }
+
+    /// Resolve the conversion policy to tree steps once per valuator.
+    ///
+    /// Date-based policies map to the nearest tree step with
+    /// `map_date_to_step` on the ACT/365F model clock. `PriceTrigger` uses
+    /// the instantaneous node spot as a barrier approximation (its lookback is
+    /// path-dependent and not modeled); IPO / change-of-control events need
+    /// external event probabilities and are treated as no conversion.
+    fn conversion_window(
+        policy: &ConversionPolicy,
+        base_date: Date,
+        maturity: Date,
+        steps: usize,
+    ) -> Result<ConversionWindow> {
+        let to_step = |date: Date| {
+            map_date_to_step(
+                base_date,
+                date,
+                maturity,
+                steps,
+                DayCount::Act365F,
+                DayCountContext::default(),
+            )
+        };
+        Ok(match policy {
+            ConversionPolicy::Voluntary => ConversionWindow::Always,
             ConversionPolicy::MandatoryOn(date) => {
-                // Map the mandatory date to its nearest tree step
-                let target_step = map_date_to_step(
-                    self.base_date,
-                    *date,
-                    self.maturity,
-                    self.num_steps,
-                    DayCount::Act365F,
-                    ctx,
-                )?;
-                step == target_step
-            }
-            ConversionPolicy::Window { start, end } => {
-                let start_step = map_date_to_step(
-                    self.base_date,
-                    *start,
-                    self.maturity,
-                    self.num_steps,
-                    DayCount::Act365F,
-                    ctx,
-                )?;
-                let end_step = map_date_to_step(
-                    self.base_date,
-                    *end,
-                    self.maturity,
-                    self.num_steps,
-                    DayCount::Act365F,
-                    ctx,
-                )?;
-                step >= start_step && step <= end_step
-            }
-            ConversionPolicy::UponEvent(event) => {
-                // PriceTrigger uses barrier approximation in the tree.
-                // QualifiedIpo / ChangeOfControl cannot be modeled in a tree
-                // (they require external event probability); treated as no conversion.
-                match event {
-                    ConversionEvent::PriceTrigger {
-                        threshold,
-                        lookback_days: _,
-                    } => {
-                        // Barrier approximation: node spot must exceed threshold.
-                        // The lookback_days would ideally require path-dependent modeling;
-                        // here we use the instantaneous spot as a first-order approximation.
-                        node_spot >= *threshold
-                    }
-                    ConversionEvent::QualifiedIpo | ConversionEvent::ChangeOfControl => false,
+                let step = to_step(*date)?;
+                ConversionWindow::Steps {
+                    start: step,
+                    end: step,
                 }
             }
             ConversionPolicy::MandatoryVariable {
                 conversion_date, ..
             } => {
-                let target_step = map_date_to_step(
-                    self.base_date,
-                    *conversion_date,
-                    self.maturity,
-                    self.num_steps,
-                    DayCount::Act365F,
-                    ctx,
-                )?;
-                step == target_step
+                let step = to_step(*conversion_date)?;
+                ConversionWindow::Steps {
+                    start: step,
+                    end: step,
+                }
             }
-        };
-        Ok(allowed)
+            ConversionPolicy::Window { start, end } => ConversionWindow::Steps {
+                start: to_step(*start)?,
+                end: to_step(*end)?,
+            },
+            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger { threshold, .. }) => {
+                ConversionWindow::SpotAtLeast(*threshold)
+            }
+            ConversionPolicy::UponEvent(
+                ConversionEvent::QualifiedIpo | ConversionEvent::ChangeOfControl,
+            ) => ConversionWindow::Never,
+        })
     }
 
     /// Compute the conversion value at a given node, accounting for variable delivery

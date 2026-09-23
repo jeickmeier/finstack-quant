@@ -767,23 +767,24 @@ pub fn calculate_accrued_interest(
     let settle = settlement_date(bond, as_of)?;
 
     let schedule = build_convertible_schedule(bond, market_context)?;
-    accrued_interest_at(bond, &schedule, settle)
+    accrual_index(bond, &schedule)?.accrued_at(settle)
 }
 
-/// Coupon accrual at the actual exercise date, without applying settlement lag.
-pub(super) fn accrued_interest_at(
+/// Reusable coupon-accrual state for a convertible's schedule.
+///
+/// Accrual is linear, includes PIK, and has no ex-coupon window; queries do
+/// not apply settlement lag.
+pub(super) fn accrual_index(
     bond: &ConvertibleBond,
     schedule: &CashFlowSchedule,
-    date: Date,
-) -> Result<f64> {
+) -> Result<crate::cashflow::accrual::AccrualIndex> {
     let frequency = bond
         .fixed_coupon
         .as_ref()
         .map(|c| c.schedule.frequency)
         .or_else(|| bond.floating_coupon.as_ref().map(|c| c.schedule.frequency));
-    crate::cashflow::accrual::accrued_interest_amount(
+    crate::cashflow::accrual::AccrualIndex::build(
         schedule,
-        date,
         &crate::cashflow::accrual::AccrualConfig {
             method: crate::cashflow::accrual::AccrualMethod::Linear,
             ex_coupon: None,

@@ -828,3 +828,32 @@ fn theta_propagates_market_roll_failure() {
     );
     assert!(result.is_err(), "theta hid a roll failure: {result:?}");
 }
+
+/// The registry's Delta/Gamma/Vega/Rho come from one shared Greek run and
+/// equal the direct `ConvertibleBond::greeks` values exactly.
+#[test]
+fn registry_greeks_match_single_greeks_run() {
+    use crate::instruments::Instrument;
+    use crate::metrics::MetricId;
+
+    let bond = create_test_bond();
+    let market = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let direct = bond.greeks(&market, None, None, as_of).expect("greeks");
+    let result = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta, MetricId::Gamma, MetricId::Vega, MetricId::Rho],
+            crate::instruments::PricingOptions::default(),
+        )
+        .expect("metrics");
+    for (key, expected) in [
+        ("delta", direct.delta),
+        ("gamma", direct.gamma),
+        ("vega", direct.vega),
+        ("rho", direct.rho),
+    ] {
+        assert_eq!(result.measures.get(key).copied(), Some(expected), "{key}");
+    }
+}
