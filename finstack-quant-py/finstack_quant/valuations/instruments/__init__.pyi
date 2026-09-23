@@ -26617,17 +26617,17 @@ class FacilityProjection:
     @property
     def lender_cashflows(self) -> list[tuple[datetime.date, Money]]:
         """
-        Every cashflow to the lender (interest, principal and fees) per date.
+        Every cashflow to the lender per date: interest, principal and fees less draws.
 
         Returns
         -------
         list[tuple[datetime.date, Money]]
-            ``(payment date, amount)`` pairs in date order.
+            ``(payment date, amount)`` pairs in date order; a draw is a negative amount.
 
         Raises
         ------
         ValueError
-            If a date cannot be converted.
+            If a date cannot be converted or two flows on one date differ in currency.
         """
         ...
     @property

@@ -280,7 +280,7 @@ fn unused_fee_accrues_on_the_undrawn_commitment() {
     assert_eq!(projection.unused_fees.len(), revolving_periods);
     assert!(revolving_periods < projection.facility.accrual_periods.len());
 
-    let lender: Vec<_> = projection.lender_cashflows();
+    let lender: Vec<_> = projection.lender_cashflows().expect("lender flows");
     let interest_plus_fee = projection.facility.interest_flows[0].1.amount() + fee.amount();
     assert!((lender[0].1.amount() - interest_plus_fee).abs() < 1e-6);
 
@@ -552,7 +552,7 @@ fn a_scheduled_draw_lifts_the_facility_balance_and_interest() {
     let (draw_date, draw_amount) = projection.draws[0];
     assert!(draw_date >= d(2025, 1, 1) && draw_date < d(2025, 2, 1));
     assert!((draw_amount.amount() - 10_000_000.0).abs() < 1e-6);
-    let lender: Vec<_> = projection.lender_cashflows();
+    let lender: Vec<_> = projection.lender_cashflows().expect("lender flows");
     let on_draw_date = lender
         .iter()
         .find(|(date, _)| *date == draw_date)
@@ -655,4 +655,80 @@ fn readvance_draws_up_to_the_borrowing_base_while_revolving() {
         (total_principal - 60_000_000.0 - total_draws).abs() < 1e-6,
         "every draw is repaid: {total_principal} vs 60M + {total_draws}"
     );
+}
+
+/// The instrument PV is the NPV of every lender flow, draws included: a
+/// scheduled 10M draw is cash the lender pays out, so it reduces the price by
+/// its discounted amount. Discount factors are written out from the flat 5%
+/// continuously compounded ACT/365F curve of [`market`].
+#[test]
+fn price_is_the_npv_of_the_lender_flows_including_draws() {
+    let mut facility = facility(60_000_000.0, 100_000_000.0);
+    facility.draw_schedule = vec![FacilityDraw {
+        date: d(2025, 1, 1),
+        amount: usd(10_000_000.0),
+    }];
+    let as_of = close();
+    let projection = facility.project(&market(), as_of).expect("projection");
+    let df = |date: Date| (-0.05 * f64::from((date - as_of).whole_days() as i32) / 365.0).exp();
+    let lender = projection.lender_cashflows().expect("lender flows");
+    let expected: f64 = lender
+        .iter()
+        .filter(|(date, _)| *date > as_of)
+        .map(|(date, amount)| amount.amount() * df(*date))
+        .sum();
+    let draws_pv: f64 = projection
+        .draws
+        .iter()
+        .map(|(date, amount)| amount.amount() * df(*date))
+        .sum();
+    assert!(draws_pv > 9_000_000.0, "the draw is material: {draws_pv}");
+
+    let price = facility
+        .base_value(&market(), as_of)
+        .expect("price")
+        .amount();
+    assert!(
+        (price - expected).abs() < 1e-6 * expected.abs(),
+        "price {price} vs lender-flow NPV {expected}"
+    );
+    // The old schedule omitted the draw and overstated the price by its PV.
+    assert!(
+        (price - (expected + draws_pv)).abs() > 1_000_000.0,
+        "price must not ignore the draw"
+    );
+}
+
+/// A facility with an index pays floating coupons: its schedule tags the
+/// interest `FloatReset`; a fixed-rate facility keeps `Fixed`.
+#[test]
+fn floating_facility_interest_is_tagged_float_reset() {
+    use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_core::cashflow::CFKind;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+    let fixed = facility(60_000_000.0, 100_000_000.0);
+    let mut floating = fixed.clone();
+    floating.index_id = Some(CurveId::new("USD-SOFR-3M".to_string()));
+    floating.margin_bp = 250.0;
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(close())
+        .knots([(0.0, 0.04), (12.0, 0.04)])
+        .build()
+        .expect("forward curve");
+    let fixing =
+        ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(close(), 0.04)], None).expect("fixing");
+    let market = market().insert(fwd).insert_series(fixing);
+    let kinds = |f: &AssetBackedFacility| -> Vec<CFKind> {
+        f.cashflow_schedule(&market, close())
+            .expect("schedule")
+            .coupons()
+            .map(|cf| cf.kind)
+            .collect()
+    };
+    let floating_kinds = kinds(&floating);
+    assert!(!floating_kinds.is_empty());
+    assert!(floating_kinds.iter().all(|k| *k == CFKind::FloatReset));
+    assert!(kinds(&fixed).iter().all(|k| *k == CFKind::Fixed));
 }
