@@ -1319,6 +1319,18 @@ impl RevolvingCredit {
                         )
                     })?;
                 }
+                // The revolver projects every reset from the forward curve
+                // and has no fallback path; reject fields it would ignore.
+                validation::require_with(spec.index_tenor.is_none(), || {
+                    "RevolvingCredit does not support index_tenor: resets use the \
+                     forward curve's own tenor"
+                        .to_string()
+                })?;
+                validation::require_with(spec.fallback.is_default(), || {
+                    "RevolvingCredit does not support a floating-rate fallback: a missing \
+                     curve or fixing is an error"
+                        .to_string()
+                })?;
                 let _ = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
                 let _ = crate::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
                     spec.index_id.as_str(),

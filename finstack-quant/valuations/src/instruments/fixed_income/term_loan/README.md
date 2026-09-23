@@ -104,10 +104,11 @@ Notes that bite:
 - `AmortizationSpec::PercentPerPeriod { bp }` applies to the **declining**
   outstanding balance, so dollar amortization decays geometrically. It is not a
   flat percentage of original notional.
-- `FloatingRateSpec::calendar_id` is ignored for term loans — the loan-level
-  `calendar_id` drives the payment schedule and business-day adjustment. Only
-  `index_id`, `spread_bp`, `gearing`, `index_floor_bp`, `all_in_cap_bp` and
-  `reset_lag_days` are read from the rate spec.
+- Every `FloatingRateSpec` field is honored. The loan-level `calendar_id`
+  drives the payment schedule and business-day adjustment; the spec's
+  `fixing_calendar_id` (the loan calendar when unset) drives the reset lag and
+  overnight observations. Overnight index floors and caps apply to each daily
+  fixing unless `overnight_index_constraints` is `period`.
 - `settlement_days` defaults to **2** as a pricing-date anchor, not the LSTA
   par-trade convention (T+7, with delayed compensation beyond T+7). Set
   `settlement_days: 7` when marking to the LSTA par target:

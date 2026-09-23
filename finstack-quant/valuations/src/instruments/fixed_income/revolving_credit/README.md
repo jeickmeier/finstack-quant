@@ -388,8 +388,11 @@ are priced in the default leg, not here.
 term forwards for term indices (`USD-SOFR-3M`, EURIBOR) and compound daily
 overnight fixings when the index is a registered overnight RFR (`USD-SOFR-OIS`)
 or `FloatingRateSpec.overnight_compounding` is set. Reset lag is applied on the
-reset grid. Gearing, spread, and floors/caps apply after the index rate in both
-cases.
+reset grid. Gearing, spread, and all-in floors/caps apply after the index rate
+in both cases. On an overnight index the index floor and cap apply to each daily
+fixing before compounding, unless `overnight_index_constraints` is `period`,
+which bounds the compounded rate once. `index_tenor` and a non-default
+`fallback` are rejected: resets always project from the forward curve.
 
 ## Metrics
 
