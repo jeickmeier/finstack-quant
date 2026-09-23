@@ -251,7 +251,6 @@ pub struct TestFIIndexTrsBuilder {
     index_id: String,
     yield_id: Option<String>,
     duration_id: Option<String>,
-    contract_size: f64,
     discount_curve_id: String,
     forward_curve_id: String,
     spread_bp: f64,
@@ -269,7 +268,6 @@ impl Default for TestFIIndexTrsBuilder {
             index_id: "HY-INDEX".into(),
             yield_id: Some("HY-INDEX-YIELD".into()),
             duration_id: Some("HY-INDEX-DURATION".into()),
-            contract_size: 1.0,
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: 100.0,
@@ -325,8 +323,7 @@ impl TestFIIndexTrsBuilder {
 
     pub fn build(self) -> FIIndexTotalReturnSwap {
         let mut underlying =
-            IndexUnderlyingParams::new(self.index_id.clone(), self.notional.currency())
-                .with_contract_size(self.contract_size);
+            IndexUnderlyingParams::new(self.index_id.clone(), self.notional.currency());
 
         if let Some(y_id) = self.yield_id {
             underlying = underlying.with_yield(y_id);

@@ -207,8 +207,7 @@ impl FIIndexTotalReturnSwap {
         use time::macros::date;
         let underlying = IndexUnderlyingParams::new("US-CORP-INDEX", Currency::USD)
             .with_yield("US-CORP-YIELD")
-            .with_duration("US-CORP-DURATION")
-            .with_contract_size(1.0);
+            .with_duration("US-CORP-DURATION");
         let financing = FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",

@@ -196,8 +196,6 @@ pub struct IndexUnderlyingParams {
     /// Market scalar identifier for signed index duration in years. Required when
     /// requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
     pub duration_id: Option<String>,
-    /// Contract size (index units per contract, defaults to 1.0)
-    pub contract_size: f64,
 }
 
 impl IndexUnderlyingParams {
@@ -208,7 +206,6 @@ impl IndexUnderlyingParams {
             base_currency,
             yield_id: None,
             duration_id: None,
-            contract_size: 1.0,
         }
     }
 
@@ -224,13 +221,7 @@ impl IndexUnderlyingParams {
         self
     }
 
-    /// Set contract size
-    pub fn with_contract_size(mut self, size: f64) -> Self {
-        self.contract_size = size;
-        self
-    }
-
-    /// Validate the index identifier, optional market-data identifiers, and scale.
+    /// Validate the index identifier and optional market-data identifiers.
     ///
     /// # Arguments
     ///
@@ -251,11 +242,6 @@ impl IndexUnderlyingParams {
                 )));
             }
         }
-        if !self.contract_size.is_finite() || self.contract_size < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} contract_size must be non-negative and finite"
-            )));
-        }
         Ok(())
     }
 }
@@ -272,9 +258,22 @@ mod tests {
             "yield_id": "US-CORP-YIELD",
             "duration_id": "US-CORP-DURATION",
             "convexity_id": "US-CORP-CONVEXITY",
-            "contract_size": 1.0,
         });
 
+        assert!(serde_json::from_value::<IndexUnderlyingParams>(legacy).is_err());
+    }
+
+    /// `contract_size` scaled only the total-return leg, never financing, so
+    /// it was removed; wire payloads carrying it are rejected.
+    #[test]
+    fn index_underlying_rejects_removed_contract_size() {
+        let legacy = serde_json::json!({
+            "index_id": "US-CORP-INDEX",
+            "base_currency": "USD",
+            "yield_id": "US-CORP-YIELD",
+            "duration_id": "US-CORP-DURATION",
+            "contract_size": 1.0,
+        });
         assert!(serde_json::from_value::<IndexUnderlyingParams>(legacy).is_err());
     }
 }

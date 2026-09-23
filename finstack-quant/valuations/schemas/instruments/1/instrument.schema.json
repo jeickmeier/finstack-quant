@@ -13224,11 +13224,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency of the index"
         },
-        "contract_size": {
-          "description": "Contract size (index units per contract, defaults to 1.0)",
-          "format": "double",
-          "type": "number"
-        },
         "duration_id": {
           "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.",
           "type": [
@@ -13250,8 +13245,7 @@
       },
       "required": [
         "index_id",
-        "base_currency",
-        "contract_size"
+        "base_currency"
       ],
       "type": "object"
     },
@@ -26797,7 +26791,6 @@
           "side": "receive_total_return",
           "underlying": {
             "base_currency": "USD",
-            "contract_size": 1.0,
             "duration_id": "US-CORP-DURATION",
             "index_id": "US-CORP-INDEX",
             "yield_id": "US-CORP-YIELD"
