@@ -26,15 +26,25 @@ impl MetricCalculator for ParSpreadCalculator {
     }
 
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        tracing::warn!(
-            "FIIndexTotalReturnSwap par spread is computed from a carry-only analytic model, \
-             not a full fixed-income index mark-to-market model"
-        );
+        // Warn once per process, not on every metric call (matches the pricer).
+        static CARRY_MODEL_WARNING: std::sync::Once = std::sync::Once::new();
+        CARRY_MODEL_WARNING.call_once(|| {
+            tracing::warn!(
+                "FIIndexTotalReturnSwap par spread is computed from a carry-only analytic \
+                 model, not a full fixed-income index mark-to-market model"
+            );
+        });
+        let annuity = context
+            .computed
+            .get(&MetricId::FinancingAnnuity)
+            .copied()
+            .ok_or_else(|| finstack_quant_core::InputError::NotFound {
+                id: "metric:financing_annuity".into(),
+            })?;
         let trs: &FIIndexTotalReturnSwap = context.instrument_as()?;
         let curves = context.curves.as_ref();
         let as_of = context.as_of;
 
-        let annuity = trs.financing_annuity(curves, as_of)?;
         if annuity.abs() < ANNUITY_EPSILON {
             return Err(Error::Validation(format!(
                 "FI TRS par spread: financing annuity {annuity:.3e} below \
