@@ -651,7 +651,7 @@ impl StructuredCredit {
         // A test tier pays nobody and must sit after the tier that pays its
         // tested tranche's interest: a test evaluated ahead of that coupon
         // would divert the coupon it is meant to protect. Every test in one
-        // tier shares an action, since the tier diverts once.
+        // tier shares an action and a divert_pct, since the tier diverts once.
         let mut ordered: Vec<&super::WaterfallTier> = waterfall.tiers.iter().collect();
         ordered.sort_by_key(|tier| tier.priority);
         for (position, tier) in ordered.iter().enumerate() {
@@ -683,6 +683,19 @@ impl StructuredCredit {
                 return Err(invalid(format!(
                     "coverage-test tier '{}' mixes actions; every test in one tier must \
                      share an action",
+                    tier.id
+                )));
+            }
+            if is_test_tier
+                && tier
+                    .tests
+                    .iter()
+                    .any(|test| test.divert_pct != tier.tests[0].divert_pct)
+            {
+                return Err(invalid(format!(
+                    "coverage-test tier '{}' mixes divert_pct caps; the tier diverts once, \
+                     so every test in one tier must share a divert_pct (put differently \
+                     capped tests in separate tiers)",
                     tier.id
                 )));
             }

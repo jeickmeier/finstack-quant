@@ -1785,7 +1785,9 @@ impl Waterfall {
     /// Insert `test` as a coverage-test position immediately after the tier
     /// that pays `spec.placement_tranche()`'s interest (or after the last
     /// interest tier when that tranche has no interest recipient), joining an
-    /// existing test tier at that position when one is already there.
+    /// existing test tier at that position whose tests share the test's
+    /// `action` and `divert_pct`, else adding a new test tier after those
+    /// already there.
     /// Priorities are renumbered `1..=n` in order.
     ///
     /// # Arguments
@@ -1830,21 +1832,31 @@ impl Waterfall {
                 .iter()
                 .rposition(|tier| tier.payment_type == PaymentType::Interest)
         });
-        let insert_at = anchor.map_or(0, |i| i + 1);
-        match self.tiers.get_mut(insert_at) {
-            Some(existing)
-                if existing.payment_type == PaymentType::CoverageTest
-                    && existing
-                        .tests
-                        .first()
-                        .is_none_or(|first| first.action == test.action) =>
-            {
-                existing.tests.push(test);
-            }
-            _ => {
-                let tier =
-                    WaterfallTier::coverage_tests(format!("{placement}_coverage"), 0, vec![test]);
-                self.tiers.insert(insert_at, tier);
+        // The run of test tiers already at this position: join the one whose
+        // tests share this test's action and diversion cap (a tier diverts
+        // once, under one action and one cap), else append a new tier after
+        // the run so tests keep their insertion order.
+        let run_start = anchor.map_or(0, |i| i + 1);
+        let run_end = run_start
+            + self.tiers[run_start..]
+                .iter()
+                .take_while(|tier| tier.payment_type == PaymentType::CoverageTest)
+                .count();
+        let joinable = self.tiers[run_start..run_end].iter_mut().find(|tier| {
+            tier.tests.first().is_none_or(|first| {
+                first.action == test.action && first.divert_pct == test.divert_pct
+            })
+        });
+        match joinable {
+            Some(existing) => existing.tests.push(test),
+            None => {
+                let id = if run_end == run_start {
+                    format!("{placement}_coverage")
+                } else {
+                    format!("{placement}_coverage_{}", run_end - run_start + 1)
+                };
+                let tier = WaterfallTier::coverage_tests(id, 0, vec![test]);
+                self.tiers.insert(run_end, tier);
             }
         }
         for (index, tier) in self.tiers.iter_mut().enumerate() {
