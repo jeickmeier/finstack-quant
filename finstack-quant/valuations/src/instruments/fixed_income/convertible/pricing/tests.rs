@@ -844,7 +844,12 @@ fn registry_greeks_match_single_greeks_run() {
         .price_with_metrics(
             &market,
             as_of,
-            &[MetricId::Delta, MetricId::Gamma, MetricId::Vega, MetricId::Rho],
+            &[
+                MetricId::Delta,
+                MetricId::Gamma,
+                MetricId::Vega,
+                MetricId::Rho,
+            ],
             crate::instruments::PricingOptions::default(),
         )
         .expect("metrics");

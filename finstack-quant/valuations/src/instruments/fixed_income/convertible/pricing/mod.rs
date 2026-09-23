@@ -10,7 +10,6 @@
 //! - `price_convertible_bond`: Present value using selected tree type
 //! - `calculate_convertible_greeks`: Tree-based Greeks and price (central differences)
 //! - `calculate_parity`: Equity parity ratio
-//! - `calculate_conversion_premium`: Conversion premium versus equity value
 //! - `calculate_accrued_interest`: Accrued coupon interest as of valuation date
 
 mod engine;
@@ -20,8 +19,8 @@ mod valuator;
 
 pub(crate) use engine::{build_convertible_schedule, compute_conversion_value, price_bond_floor};
 pub use engine::{
-    calculate_accrued_interest, calculate_conversion_premium, calculate_convertible_greeks,
-    calculate_parity, price_convertible_bond, settlement_date, ConvertibleTreeType,
+    calculate_accrued_interest, calculate_convertible_greeks, calculate_parity,
+    price_convertible_bond, settlement_date, ConvertibleTreeType,
 };
 pub(crate) use tree_pricer::ConvertibleTreePricer;
 

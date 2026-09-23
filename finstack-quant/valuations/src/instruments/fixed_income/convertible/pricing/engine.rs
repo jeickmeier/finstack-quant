@@ -15,9 +15,9 @@ use crate::instruments::fixed_income::convertible::{
     ConversionEvent, ConversionPolicy, ConvertibleBond,
 };
 use crate::metrics::bump_discount_curve_parallel;
-use finstack_quant_models::{single_factor_equity_state, TreeGreeks};
+use finstack_quant_models::TreeGreeks;
 
-use super::tsiveriotis_zhang::TsiveriotisZhangEngine;
+use super::tsiveriotis_zhang::{TsiveriotisZhangEngine, TzMarketInputs};
 use super::valuator::ConvertibleBondValuator;
 
 /// Compute the conversion value for any conversion policy given the spot price.
@@ -368,20 +368,21 @@ fn price_convertible_bond_with_inputs(
         inputs.volatility,
     )?;
 
-    let initial_vars = single_factor_equity_state(
-        inputs.spot,
-        inputs.risk_free_rate,
-        inputs.dividend_yield,
-        inputs.volatility,
-    );
-
     let engine = TsiveriotisZhangEngine {
         valuator: &valuator,
         steps,
         time_to_maturity: inputs.time_to_maturity,
     };
 
-    let (pv_amount, _) = engine.price(initial_vars, tree_type)?;
+    let (pv_amount, _) = engine.price(
+        TzMarketInputs {
+            spot: inputs.spot,
+            volatility: inputs.volatility,
+            risk_free_rate: inputs.risk_free_rate,
+            dividend_yield: inputs.dividend_yield,
+        },
+        tree_type,
+    )?;
 
     Money::new(pv_amount, bond.notional.currency())
 }
@@ -659,27 +660,6 @@ pub fn calculate_parity(bond: &ConvertibleBond, current_spot: f64) -> Result<f64
         ));
     }
     Ok(compute_conversion_value(bond, current_spot)? / bond.notional.amount())
-}
-
-/// Calculate conversion premium
-///
-/// # Arguments
-///
-/// * `bond_price` - Observed or model convertible price in the same units as
-///   the conversion value.
-/// * `current_spot` - Current conversion-share price in the same quote units.
-/// * `conversion_ratio` - Shares received per bond for conversion.
-pub fn calculate_conversion_premium(
-    bond_price: f64,
-    current_spot: f64,
-    conversion_ratio: f64,
-) -> f64 {
-    let conversion_value = current_spot * conversion_ratio;
-    if conversion_value > 0.0 {
-        (bond_price / conversion_value) - 1.0
-    } else {
-        0.0
-    }
 }
 
 /// Compute the settlement date for a convertible bond.

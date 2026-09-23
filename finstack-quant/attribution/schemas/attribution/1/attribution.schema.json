@@ -8220,7 +8220,7 @@
         },
         "dilution_events": {
           "default": [],
-          "description": "Historical dilution events that affect the conversion ratio.\nEvents are applied in chronological order.",
+          "description": "Historical dilution events that affect the conversion ratio, recorded\nin chronological (non-decreasing date) order and applied in that\norder. Validation rejects out-of-order events.",
           "items": {
             "$ref": "#/$defs/DilutionEvent"
           },

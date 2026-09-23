@@ -1,7 +1,5 @@
 //! Tsiveriotis-Zhang backward-induction engine.
 
-use finstack_quant_core::HashMap;
-use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
 use finstack_quant_models::EvolutionParams;
@@ -37,6 +35,20 @@ use super::valuator::ConvertibleBondValuator;
 /// zero-recovery TZ model. Setting R=0.40 (ISDA standard for senior unsecured)
 /// reflects that bondholders recover 40% of face value on default, reducing
 /// the effective credit spread impact on the cash component.
+/// Equity market state at the valuation date driving the lattice.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct TzMarketInputs {
+    /// Underlying share price in the bond's quote currency.
+    pub(super) spot: f64,
+    /// Annualized equity volatility (decimal).
+    pub(super) volatility: f64,
+    /// Short risk-free rate (continuously compounded, decimal) used only for
+    /// the lattice's constant up/down factors.
+    pub(super) risk_free_rate: f64,
+    /// Continuous dividend yield (decimal).
+    pub(super) dividend_yield: f64,
+}
+
 pub(super) struct TsiveriotisZhangEngine<'a> {
     pub(super) valuator: &'a ConvertibleBondValuator,
     pub(super) steps: usize,
@@ -46,32 +58,15 @@ pub(super) struct TsiveriotisZhangEngine<'a> {
 impl<'a> TsiveriotisZhangEngine<'a> {
     pub(super) fn price(
         &self,
-        initial_vars: HashMap<&'static str, f64>,
+        market: TzMarketInputs,
         tree_type: ConvertibleTreeType,
     ) -> Result<(f64, f64)> {
-        let spot = *initial_vars
-            .get("spot")
-            .ok_or(Error::Input(InputError::NotFound {
-                id: "spot price".to_string(),
-            }))?;
-        let volatility =
-            *initial_vars
-                .get("volatility")
-                .ok_or(Error::Input(InputError::NotFound {
-                    id: "volatility".to_string(),
-                }))?;
-        let risk_free_rate =
-            *initial_vars
-                .get("interest_rate")
-                .ok_or(Error::Input(InputError::NotFound {
-                    id: "interest_rate".to_string(),
-                }))?;
-        let dividend_yield =
-            *initial_vars
-                .get("dividend_yield")
-                .ok_or(Error::Input(InputError::NotFound {
-                    id: "dividend_yield".to_string(),
-                }))?;
+        let TzMarketInputs {
+            spot,
+            volatility,
+            risk_free_rate,
+            dividend_yield,
+        } = market;
 
         let dt = self.time_to_maturity / self.steps as f64;
 

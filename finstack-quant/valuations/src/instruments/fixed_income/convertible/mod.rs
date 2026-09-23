@@ -57,6 +57,6 @@ pub use types::{
 };
 
 pub use pricing::{
-    calculate_accrued_interest, calculate_conversion_premium, calculate_convertible_greeks,
-    calculate_parity, price_convertible_bond, settlement_date, ConvertibleTreeType,
+    calculate_accrued_interest, calculate_convertible_greeks, calculate_parity,
+    price_convertible_bond, settlement_date, ConvertibleTreeType,
 };
