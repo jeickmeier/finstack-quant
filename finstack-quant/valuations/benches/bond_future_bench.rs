@@ -274,6 +274,7 @@ fn bench_invoice_price(c: &mut Criterion) {
         b.iter(|| {
             future.invoice_price(
                 black_box(&ctd_bond),
+                black_box(future.quoted_price),
                 black_box(&market),
                 black_box(settlement),
             )

@@ -274,7 +274,9 @@ impl InflationSource {
                             cpi0 + weight * (cpi1 - cpi0)
                         }
                     }
-                    InflationLag::Months(months) => cpi_on(date.add_months(-(i32::from(months))))?,
+                    InflationLag::Months(months) => cpi_on(
+                        InflationLinkedBond::step_reference_month(date, months.into())?,
+                    )?,
                     InflationLag::Days(days) => cpi_on(date - Duration::days(i64::from(days)))?,
                     _ => cpi_on(date)?,
                 };
@@ -766,7 +768,9 @@ impl InflationLinkedBond {
                 let cpi1 = inflation_curve.cpi_on_date(anchor1)?;
                 cpi0 + weight * (cpi1 - cpi0)
             }
-            InflationLag::Months(m) => inflation_curve.cpi_on_date(date.add_months(-(m as i32)))?,
+            InflationLag::Months(m) => {
+                inflation_curve.cpi_on_date(Self::step_reference_month(date, m.into())?)?
+            }
             InflationLag::Days(d) => {
                 inflation_curve.cpi_on_date(date - Duration::days(d as i64))?
             }
@@ -794,6 +798,17 @@ impl InflationLinkedBond {
         }
     }
 
+    /// Reference month for a step (non-interpolated) months lag: the first of
+    /// the month `lag_months` before the month containing `date`. A monthly
+    /// CPI print applies to its whole month, so a mid-month date must not
+    /// interpolate between prints.
+    fn step_reference_month(date: Date, lag_months: u32) -> Result<Date> {
+        Ok(date
+            .replace_day(1)
+            .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?
+            .add_months(-(lag_months as i32)))
+    }
+
     /// First-of-month anchor dates and interpolation weight for the official
     /// RefCPI formula: `RefCPI(d) = CPI(m−L) + (day−1)/D(m) × [CPI(m−L+1) − CPI(m−L)]`.
     fn ref_cpi_anchors(date: Date, lag_months: u32) -> Result<(Date, Date, f64)> {
@@ -811,6 +826,20 @@ impl InflationLinkedBond {
     pub fn index_ratio_from_market(&self, date: Date, curves: &MarketContext) -> Result<f64> {
         let source = self.inflation_source(curves)?;
         source.ratio(self, date)
+    }
+
+    /// Business-day-adjusted maturity on which principal is paid.
+    ///
+    /// Shared by the projected (PV) schedule and the real-yield schedule so
+    /// both pay principal on the same date as the final coupon.
+    fn principal_payment_date(&self) -> Result<Date> {
+        crate::cashflow::builder::calendar::adjust_date(
+            self.maturity,
+            self.business_day_convention,
+            self.calendar_id
+                .as_deref()
+                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        )
     }
 
     /// Calculate real accrued interest at the given date
@@ -932,11 +961,7 @@ impl InflationLinkedBond {
             ));
         }
 
-        let principal_date = crate::cashflow::builder::calendar::adjust_date(
-            self.maturity,
-            self.business_day_convention,
-            cal_id,
-        )?;
+        let principal_date = self.principal_payment_date()?;
         if principal_date >= as_of {
             flows.push((principal_date, self.notional));
         }
@@ -1253,7 +1278,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             &mut detailed_flows,
         )?;
 
-        let raw_principal_ratio = inflation_source.ratio(self, self.maturity)?;
+        let principal_date = self.principal_payment_date()?;
+        let raw_principal_ratio = inflation_source.ratio(self, principal_date)?;
         let principal_ratio = match self.deflation_protection {
             DeflationProtection::None => raw_principal_ratio,
             DeflationProtection::MaturityOnly | DeflationProtection::AllPayments => {
@@ -1261,7 +1287,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             }
         };
         detailed_flows.push(crate::cashflow::primitives::CashFlow::new(
-            self.maturity,
+            principal_date,
             None,
             self.notional * principal_ratio,
             crate::cashflow::primitives::CFKind::Notional,
@@ -1604,6 +1630,39 @@ mod tests {
         assert!((ratio - expected).abs() < 1e-12);
     }
 
+    /// Principal on a weekend maturity (Sunday 2034-01-15) is paid on the
+    /// Following business day, 2034-01-16,
+    /// in both the PV schedule and the real-yield schedule, together with the
+    /// final coupon.
+    #[test]
+    fn principal_paid_on_adjusted_maturity_in_pv_and_real_schedules() {
+        let as_of = d(2024, Month::January, 15);
+        let mut bond = sample_bond(DeflationProtection::None);
+        bond.issue_date = d(2024, Month::January, 15);
+        bond.maturity = d(2034, Month::January, 15); // Sunday
+        let inflation = InflationCurve::builder("US-CPI")
+            .base_date(as_of)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (12.0, 100.0)])
+            .build()
+            .expect("inflation curve");
+        let market = MarketContext::new().insert(inflation);
+
+        let adjusted = d(2034, Month::January, 16);
+        let schedule = bond.cashflow_schedule(&market, as_of).expect("pv schedule");
+        let principal_dates: Vec<Date> = schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Notional)
+            .map(|cf| cf.date)
+            .collect();
+        assert_eq!(principal_dates, vec![adjusted]);
+        assert_ne!(principal_dates[0], bond.maturity);
+
+        let real = bond.build_real_schedule(as_of).expect("real schedule");
+        assert_eq!(real.last().map(|(date, _)| *date), Some(adjusted));
+    }
+
     #[test]
     fn maturity_only_deflation_floor_applies_only_to_principal() {
         let as_of = d(2024, Month::January, 15);
@@ -1691,6 +1750,54 @@ mod tests {
                 .any(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional),
             "expected principal notional flow at maturity"
         );
+    }
+
+    /// UK legacy 8-month step lag reads the whole-month print: for a date of
+    /// 2025-06-15 the reference month is October 2024, i.e. the curve at
+    /// 2024-10-01 = 100 (a knot), giving ratio 100/100 = 1.0. Reading the
+    /// curve on 2024-10-15 would interpolate toward the November value 110.
+    #[test]
+    fn uk_step_lag_reads_first_of_month_from_curve_and_hybrid() {
+        use finstack_quant_core::market_data::scalars::InflationIndex;
+
+        let mut bond = sample_bond(DeflationProtection::None);
+        bond.indexation_method = IndexationMethod::Uk;
+        bond.lag = InflationLag::Months(8);
+        let curve = InflationCurve::builder("US-CPI")
+            .base_date(d(2024, Month::October, 1))
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (31.0 / 365.0, 110.0)])
+            .build()
+            .expect("curve");
+        let date = d(2025, Month::June, 15);
+
+        let ratio = bond
+            .index_ratio_from_curve(date, &curve)
+            .expect("curve ratio");
+        assert!((ratio - 1.0).abs() < 1e-12, "curve ratio {ratio}");
+        let mid_month = curve
+            .cpi_on_date(d(2024, Month::October, 15))
+            .expect("mid-month cpi");
+        assert!((mid_month - 100.0).abs() > 1.0, "fixture must discriminate");
+
+        // Hybrid: prints published through September 2024, so October comes
+        // from the projection curve on its first-of-month anchor.
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![
+                (d(2024, Month::August, 1), 98.0),
+                (d(2024, Month::September, 1), 99.0),
+            ],
+            Currency::USD,
+        )
+        .expect("published CPI");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_inflation_index("US-CPI", index);
+        let hybrid = bond
+            .index_ratio_from_market(date, &market)
+            .expect("hybrid ratio");
+        assert!((hybrid - 1.0).abs() < 1e-12, "hybrid ratio {hybrid}");
     }
 
     /// Regression test for the UK gilt lag validation that was previously

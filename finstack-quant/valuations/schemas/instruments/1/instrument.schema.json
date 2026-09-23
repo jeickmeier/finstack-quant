@@ -3067,7 +3067,7 @@
         },
         "quoted_price": {
           "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow."
+          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\nUsed only for mark-to-market: `base_value` returns model-minus-contract\nvalue for a long position. Basis, implied-repo and invoice helpers take\nthe current futures price as an explicit argument instead.\nCurrent-settlement variation margin is a separate cash-P&L workflow."
         },
         "repo_curve_id": {
           "anyOf": [
@@ -10397,7 +10397,7 @@
     },
     "FIIndexTotalReturnSwap": {
       "additionalProperties": false,
-      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits realized index price returns,\nroll-down, underlying rate/spread mark-to-market, stochastic credit,\nconstituent decomposition, early termination, and bespoke fees. Pricing\nrejects an in-progress total-return accrual period. Cashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
+      "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -10412,7 +10412,7 @@
           "description": "Unique instrument identifier."
         },
         "initial_level": {
-          "description": "Optional reference level retained with the contract.\n\nThe deterministic carry pricer does not consume or fetch this value.",
+          "description": "Index level at the reset of the return period in progress, in the\nindex's own units.\n\nRequired when the valuation date falls inside a return period; the\nrealized return to date is `index_level / initial_level`. Unused for\nunseasoned trades. Must be positive and finite when set.",
           "format": "double",
           "type": [
             "number",
@@ -13224,11 +13224,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency of the index"
         },
-        "contract_size": {
-          "description": "Contract size (index units per contract, defaults to 1.0)",
-          "format": "double",
-          "type": "number"
-        },
         "duration_id": {
           "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.",
           "type": [
@@ -13250,8 +13245,7 @@
       },
       "required": [
         "index_id",
-        "base_currency",
-        "contract_size"
+        "base_currency"
       ],
       "type": "object"
     },
@@ -26797,7 +26791,6 @@
           "side": "receive_total_return",
           "underlying": {
             "base_currency": "USD",
-            "contract_size": 1.0,
             "duration_id": "US-CORP-DURATION",
             "index_id": "US-CORP-INDEX",
             "yield_id": "US-CORP-YIELD"

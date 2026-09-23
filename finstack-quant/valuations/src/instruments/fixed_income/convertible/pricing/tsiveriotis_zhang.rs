@@ -165,6 +165,13 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
         let mandatory = self.valuator.conversion_is_mandatory();
         let terminal_accretion = ratio_accretion_at(self.steps);
+        let terminal_coupon = self
+            .valuator
+            .coupon_map
+            .get(&self.steps)
+            .copied()
+            .unwrap_or(0.0);
+        let terminal_put = self.valuator.put_price_at_step(self.steps);
 
         for i in 0..num_nodes {
             let node_spot = get_spot(self.steps, i);
@@ -172,15 +179,10 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 .valuator
                 .conversion_value(node_spot, terminal_accretion);
 
-            let coupon = self
-                .valuator
-                .coupon_map
-                .get(&self.steps)
-                .copied()
-                .unwrap_or(0.0);
+            let coupon = terminal_coupon;
             let redemption_val = self.valuator.face_value;
 
-            let can_convert = self.valuator.conversion_allowed(self.steps, node_spot)?;
+            let can_convert = self.valuator.conversion_allowed(self.steps, node_spot);
 
             let (mut ex_coupon_total, mut ex_coupon_cash) = if can_convert && mandatory {
                 // Mandatory conversion: holder must convert regardless of optimality.
@@ -200,7 +202,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
             // at maturity is deliberately ignored: the contractual redemption
             // at face dominates, so a call cannot reduce the maturity payoff.
             if !(can_convert && mandatory) {
-                if let Some(put_price) = self.valuator.put_price_at_step(self.steps) {
+                if let Some(put_price) = terminal_put {
                     if ex_coupon_total < put_price {
                         ex_coupon_total = put_price;
                         ex_coupon_cash = put_price;
@@ -230,6 +232,11 @@ impl<'a> TsiveriotisZhangEngine<'a> {
             let df_risky = self.valuator.risky_step_dfs[step];
             let sp = &step_params[step];
             let step_accretion = ratio_accretion_at(step);
+            // Exercise decisions are ex-coupon; the coupon is added after
+            // conversion/call/put resolution so no branch can overwrite it.
+            let coupon = self.valuator.coupon_map.get(&step).copied().unwrap_or(0.0);
+            let call_price_here = self.valuator.call_price_at_step(step);
+            let put_price_here = self.valuator.put_price_at_step(step);
 
             next_values.clear();
 
@@ -263,17 +270,13 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 let continuation_total = equity_part + cash_part;
                 let continuation_cash = cash_part;
 
-                // Exercise decisions are ex-coupon. The coupon is added after
-                // conversion/call/put resolution so no branch can overwrite it.
-                let coupon = self.valuator.coupon_map.get(&step).copied().unwrap_or(0.0);
-
                 // Node decision logic
                 let node_spot = get_spot(step, i);
 
                 // 1. Conversion (uses variable delivery for MandatoryVariable,
                 //    dividend-protection accretion at this step's time)
                 let conversion_val = self.valuator.conversion_value(node_spot, step_accretion);
-                let can_convert = self.valuator.conversion_allowed(step, node_spot)?;
+                let can_convert = self.valuator.conversion_allowed(step, node_spot);
 
                 let mut final_total = continuation_total;
                 let mut final_cash = continuation_cash;
@@ -309,7 +312,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 let call_allowed = self.valuator.soft_call_triggered(node_spot);
 
                 if call_allowed {
-                    if let Some(call_price) = self.valuator.call_price_at_step(step) {
+                    if let Some(call_price) = call_price_here {
                         // Holder converts in response to a call only if
                         // conversion is genuinely permitted here and is worth
                         // more than the cash call price.
@@ -336,7 +339,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 }
 
                 // 3. Put (Holder maximizes value)
-                if let Some(put_price) = self.valuator.put_price_at_step(step) {
+                if let Some(put_price) = put_price_here {
                     if final_total < put_price {
                         final_total = put_price;
                         final_cash = final_total;

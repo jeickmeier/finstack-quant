@@ -32,10 +32,13 @@ use rust_decimal::Decimal;
 ///
 /// # Model limitations
 ///
-/// This deterministic carry analytic omits realized index price returns,
-/// roll-down, underlying rate/spread mark-to-market, stochastic credit,
-/// constituent decomposition, early termination, and bespoke fees. Pricing
-/// rejects an in-progress total-return accrual period. Cashflow-schedule APIs
+/// This deterministic carry analytic omits roll-down, underlying rate/spread
+/// mark-to-market, stochastic credit, constituent decomposition, early
+/// termination, and bespoke fees. The period in progress on the valuation
+/// date is valued from the live index level (`underlying.index_id`) against
+/// `initial_level`, then carried at the index yield to period end; a period
+/// that has ended but is not yet paid stays in the PV at its projected carry.
+/// Cashflow-schedule APIs
 /// return payment dates with zero amounts; use
 /// [`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected
 /// leg values.
@@ -104,9 +107,12 @@ pub struct FIIndexTotalReturnSwap {
     pub schedule: TrsScheduleSpec,
     /// Trade side (receive/pay total return).
     pub side: TrsSide,
-    /// Optional reference level retained with the contract.
+    /// Index level at the reset of the return period in progress, in the
+    /// index's own units.
     ///
-    /// The deterministic carry pricer does not consume or fetch this value.
+    /// Required when the valuation date falls inside a return period; the
+    /// realized return to date is `index_level / initial_level`. Unused for
+    /// unseasoned trades. Must be positive and finite when set.
     pub initial_level: Option<f64>,
     /// Optional OTC margin specification for VM/IM.
     ///
@@ -201,8 +207,7 @@ impl FIIndexTotalReturnSwap {
         use time::macros::date;
         let underlying = IndexUnderlyingParams::new("US-CORP-INDEX", Currency::USD)
             .with_yield("US-CORP-YIELD")
-            .with_duration("US-CORP-DURATION")
-            .with_contract_size(1.0);
+            .with_duration("US-CORP-DURATION");
         let financing = FinancingLegSpec::new(
             "USD-OIS",
             "USD-SOFR-3M",
@@ -354,6 +359,10 @@ impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnS
         }
         if let Some(duration_id) = &self.underlying.duration_id {
             deps.add_market_scalar_id(duration_id);
+        }
+        if self.initial_level.is_some() {
+            // Seasoned trades read the live index level for the period in progress.
+            deps.add_market_scalar_id(self.underlying.index_id.as_str());
         }
         Ok(deps)
     }

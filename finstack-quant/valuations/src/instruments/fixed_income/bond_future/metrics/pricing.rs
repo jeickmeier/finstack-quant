@@ -17,7 +17,7 @@ impl MetricCalculator for FuturesPriceCalculator {
                 future.id.as_str()
             ))
         })?;
-        let conversion_factor = ctd_conversion_factor(future)?;
+        let conversion_factor = future.ctd_conversion_factor()?;
         BondFuturePricer::calculate_model_price_for_future(
             future,
             ctd,
@@ -34,34 +34,6 @@ pub(crate) struct ConversionFactorCalculator;
 impl MetricCalculator for ConversionFactorCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let future: &BondFuture = context.instrument_as()?;
-        ctd_conversion_factor(future)
+        future.ctd_conversion_factor()
     }
-}
-
-fn ctd_conversion_factor(future: &BondFuture) -> Result<f64> {
-    let ctd_id = if let Some(ctd_id) = &future.ctd_bond_id {
-        ctd_id
-    } else if let Some(ctd_bond) = &future.ctd_bond {
-        &ctd_bond.id
-    } else if future.deliverable_basket.len() == 1 {
-        &future.deliverable_basket[0].bond_id
-    } else {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "BondFuture '{}' requires ctd_bond_id for conversion_factor metric",
-            future.id.as_str()
-        )));
-    };
-
-    future
-        .deliverable_basket
-        .iter()
-        .find(|deliverable| deliverable.bond_id == *ctd_id)
-        .map(|deliverable| deliverable.conversion_factor)
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "BondFuture '{}' CTD '{}' is not in deliverable_basket",
-                future.id.as_str(),
-                ctd_id.as_str()
-            ))
-        })
 }

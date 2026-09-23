@@ -609,15 +609,10 @@ pub fn calculate_convertible_greeks(
                 // and roll-down. See module documentation
                 // (realized-forward roll semantics).
                 //
-                // A roll can fail when a curve is too sparse to retain ≥ 2
-                // knots after the shift; in that case we fall back to a
-                // no-roll reprice. Because the pricer discounts relative to
-                // `as_of`, the fallback yields nearly the same discounting
-                // effect, but leaves curve base dates anchored at `t`.
-                let rolled_market = match market_context.roll_forward(1) {
-                    Ok(m) => m,
-                    Err(_) => market_context.clone(),
-                };
+                // A roll fails when a curve is too sparse to retain ≥ 2 knots
+                // after the shift; that error propagates rather than
+                // repricing on a market still anchored at `t`.
+                let rolled_market = market_context.roll_forward(1)?;
                 let fwd_price = price_convertible_bond(bond, &rolled_market, tree_type, next_day)?;
                 // Theta = P(t+1d) - P(t), reported as change per calendar day.
                 greeks.theta = fwd_price.amount() - greeks.price;
@@ -772,23 +767,24 @@ pub fn calculate_accrued_interest(
     let settle = settlement_date(bond, as_of)?;
 
     let schedule = build_convertible_schedule(bond, market_context)?;
-    accrued_interest_at(bond, &schedule, settle)
+    accrual_index(bond, &schedule)?.accrued_at(settle)
 }
 
-/// Coupon accrual at the actual exercise date, without applying settlement lag.
-pub(super) fn accrued_interest_at(
+/// Reusable coupon-accrual state for a convertible's schedule.
+///
+/// Accrual is linear, includes PIK, and has no ex-coupon window; queries do
+/// not apply settlement lag.
+pub(super) fn accrual_index(
     bond: &ConvertibleBond,
     schedule: &CashFlowSchedule,
-    date: Date,
-) -> Result<f64> {
+) -> Result<crate::cashflow::accrual::AccrualIndex> {
     let frequency = bond
         .fixed_coupon
         .as_ref()
         .map(|c| c.schedule.frequency)
         .or_else(|| bond.floating_coupon.as_ref().map(|c| c.schedule.frequency));
-    crate::cashflow::accrual::accrued_interest_amount(
+    crate::cashflow::accrual::AccrualIndex::build(
         schedule,
-        date,
         &crate::cashflow::accrual::AccrualConfig {
             method: crate::cashflow::accrual::AccrualMethod::Linear,
             ex_coupon: None,

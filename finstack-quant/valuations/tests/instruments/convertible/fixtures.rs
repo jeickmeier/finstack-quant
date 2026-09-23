@@ -474,14 +474,26 @@ pub fn create_market_context_with_credit(credit_spread_bp: f64) -> MarketContext
 
     let rf_curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
-        .knots([(0.0, 1.0), (10.0, (-rf_rate * 10.0).exp())])
+        // The mid pillar lies on the linear-DF segment, so the curve is
+        // unchanged; three pillars let the market roll one day for theta.
+        .knots([
+            (0.0, 1.0),
+            (5.0, 0.5 * (1.0 + (-rf_rate * 10.0).exp())),
+            (10.0, (-rf_rate * 10.0).exp()),
+        ])
         .interp(InterpStyle::Linear)
         .build()
         .unwrap();
 
     let credit_curve = DiscountCurve::builder("USD-CREDIT")
         .base_date(base_date)
-        .knots([(0.0, 1.0), (10.0, (-credit_rate * 10.0).exp())])
+        // The mid pillar lies on the linear-DF segment, so the curve is
+        // unchanged; three pillars let the market roll one day for theta.
+        .knots([
+            (0.0, 1.0),
+            (5.0, 0.5 * (1.0 + (-credit_rate * 10.0).exp())),
+            (10.0, (-credit_rate * 10.0).exp()),
+        ])
         .interp(InterpStyle::Linear)
         .build()
         .unwrap();
