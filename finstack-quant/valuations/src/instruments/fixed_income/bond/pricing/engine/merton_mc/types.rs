@@ -365,13 +365,11 @@ fn validate_recovery_rate(recovery_rate: f64) -> finstack_quant_core::Result<()>
 /// Result from Monte Carlo PIK pricing.
 #[derive(Debug, Clone)]
 pub struct MertonMcResult {
-    /// Clean price as percentage of par.
+    /// Clean price as percentage of par: `dirty_price_pct` minus the accrued
+    /// interest at the valuation date.
     pub clean_price_pct: f64,
-    /// Dirty price as percentage of par.
-    ///
-    /// Equal to `clean_price_pct` because the MC engine works in continuous
-    /// time and does not model accrued interest separately. Use the pricer's
-    /// metrics pipeline for clean/dirty decomposition.
+    /// Dirty price as percentage of par: the mean simulated present value at
+    /// the valuation date, including the full next coupon.
     pub dirty_price_pct: f64,
     /// Expected loss as fraction of PIK-aware risk-free PV.
     ///

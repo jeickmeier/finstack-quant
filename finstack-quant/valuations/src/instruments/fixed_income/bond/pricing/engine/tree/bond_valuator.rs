@@ -647,6 +647,13 @@ impl BondValuator {
                         discount_curve.as_ref(),
                         as_of,
                     )?;
+                    // Several dates can map to one step of a uniform (BDT /
+                    // Ho-Lee) grid; the node keeps the cheapest call among
+                    // them. Measured against pricing each step at its nearest
+                    // date (5y 5% bond, 4y American call at par, BDT 20%):
+                    // 0.045 per 100 at 25 steps, 0.007 at 50, 0.003 at 100,
+                    // 0.002 at 400. Hull-White grids pass through every
+                    // exercise date, so no bucket is shared there.
                     call_vec[step] = Some(
                         call_vec[step].map_or(call_price, |existing| existing.min(call_price)),
                     );

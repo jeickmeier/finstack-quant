@@ -30,6 +30,7 @@ mod types;
 
 pub mod calibration;
 
+pub(crate) use engine::MertonBondTerms;
 pub use engine::MertonMcEngine;
 pub use types::{
     BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, MertonMcResult,

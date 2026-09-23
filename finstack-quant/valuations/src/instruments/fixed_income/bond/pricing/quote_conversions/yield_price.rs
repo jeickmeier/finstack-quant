@@ -521,38 +521,27 @@ pub fn price_from_ytm(
     price_from_ytm_compounded(bond, flows, as_of, ytm, YieldCompounding::Street)
 }
 
-/// Dirty price in currency from a Japanese simple yield (単利).
+/// JSDA inputs of a Japanese simple yield (単利): annual coupon rate and
+/// ACT/365F remaining life from `quote_date` to maturity.
 ///
-/// Closed form for a **bullet fixed-rate** bond, using ACT/365F remaining life
-/// and the contractual annual coupon rate:
-///
-/// ```text
-/// P = 100 * (1 + C * n) / (1 + y * n)
-/// dirty = P / 100 * notional
-/// ```
-///
-/// This is not a discount-factor convention and must not be used as
-/// [`df_from_yield`] compounding.
-///
-/// # Arguments
-///
-/// * `bond` - Bullet fixed-rate bond supplying the annual coupon rate,
-///   notional, and contractual maturity used for remaining life `n`.
-/// * `quote_date` - Settlement/quote date from which ACT/365F remaining life
-///   is measured to `bond.maturity`.
-/// * `simple_yield` - Tokyo simple yield as a decimal (e.g. `0.02` for 2%).
-pub(crate) fn price_from_japanese_simple_yield(
+/// Only bullet fixed-rate bonds carry a Tokyo simple yield; other coupon
+/// shapes are rejected, as is a non-positive remaining life.
+fn japanese_simple_yield_terms(
     bond: &Bond,
     quote_date: Date,
-    simple_yield: f64,
-) -> finstack_quant_core::Result<f64> {
+) -> finstack_quant_core::Result<(f64, f64)> {
     let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) = &bond.cashflow_spec
     else {
         return Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::Invalid,
         ));
     };
-    let coupon = spec.rate.to_f64().unwrap_or(0.0);
+    let coupon = spec.rate.to_f64().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "bond '{}' coupon rate {} is not representable as f64",
+            bond.id, spec.rate
+        ))
+    })?;
     let n = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
         quote_date,
         bond.maturity,
@@ -563,19 +552,74 @@ pub(crate) fn price_from_japanese_simple_yield(
             "Japanese simple yield requires positive ACT/365F remaining life".to_string(),
         ));
     }
+    Ok((coupon, n))
+}
+
+/// Japanese simple yield (単利) from a clean price, JSDA convention.
+///
+/// ```text
+/// y = [C + (100 − P) / N] / P
+/// ```
+///
+/// with `C` the annual coupon (% of par), `P` the CLEAN price (% of par) and
+/// `N` the ACT/365F remaining life in years from `quote_date`. Accrued
+/// interest plays no part in the formula.
+///
+/// # Arguments
+///
+/// * `bond` - Bullet fixed-rate bond supplying the coupon and maturity.
+/// * `quote_date` - Settlement/quote date from which `N` is measured.
+/// * `clean_price_pct` - Clean price as a percentage of par (e.g. `98.5`);
+///   must be positive.
+pub(crate) fn japanese_simple_yield(
+    bond: &Bond,
+    quote_date: Date,
+    clean_price_pct: f64,
+) -> finstack_quant_core::Result<f64> {
+    let (coupon, n) = japanese_simple_yield_terms(bond, quote_date)?;
+    if !clean_price_pct.is_finite() || clean_price_pct <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Japanese simple yield requires a positive clean price (got {clean_price_pct})"
+        )));
+    }
+    Ok((100.0 * coupon + (100.0 - clean_price_pct) / n) / clean_price_pct)
+}
+
+/// Clean price (% of par) from a Japanese simple yield (単利), the exact
+/// inverse of [`japanese_simple_yield`]:
+///
+/// ```text
+/// P = 100 · (1 + C·N) / (1 + y·N)
+/// ```
+///
+/// This is not a discount-factor convention and must not be used as
+/// [`df_from_yield`] compounding.
+///
+/// # Arguments
+///
+/// * `bond` - Bullet fixed-rate bond supplying the coupon and maturity.
+/// * `quote_date` - Settlement/quote date from which ACT/365F remaining life
+///   `N` is measured to `bond.maturity`.
+/// * `simple_yield` - Tokyo simple yield as a decimal (e.g. `0.02` for 2%).
+pub(crate) fn clean_price_from_japanese_simple_yield(
+    bond: &Bond,
+    quote_date: Date,
+    simple_yield: f64,
+) -> finstack_quant_core::Result<f64> {
+    let (coupon, n) = japanese_simple_yield_terms(bond, quote_date)?;
     let denom = 1.0 + simple_yield * n;
     if denom <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Japanese simple yield denominator (1 + y*n) = {denom} is non-positive for y={simple_yield}, n={n}"
         )));
     }
-    let dirty_pct = 100.0 * (1.0 + coupon * n) / denom;
-    if dirty_pct <= 0.0 {
+    let clean_pct = 100.0 * (1.0 + coupon * n) / denom;
+    if clean_pct <= 0.0 {
         return Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::Invalid,
         ));
     }
-    Ok(dirty_pct / 100.0 * bond.notional.amount())
+    Ok(clean_pct)
 }
 
 /// Compute outstanding principal at a given date from the cashflow schedule.
@@ -1009,6 +1053,78 @@ pub fn price_from_ytw(
     best_price.ok_or_else(|| {
         finstack_quant_core::Error::Validation(
             "yield-to-worst inversion produced no workout paths".to_string(),
+        )
+    })
+}
+
+/// Convert an I-spread quote into settlement dirty price.
+///
+/// The inverse of `ISpreadCalculator`: for a bullet the price is the Street
+/// YTM price at `i_spread + par(quote_date → maturity)`. For a bond with
+/// exercise rights every workout path `k` is priced at
+/// `i_spread + par(quote_date → T_k)`; the answer is the lowest such price
+/// whose own yield-to-worst path is `k` (self-consistent), so the metric
+/// recovers `i_spread` at that price. When no path is self-consistent (the
+/// quote falls in the gap where the workout date flips), the lowest path
+/// price is returned.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose schedule, exercise rights and conventions define the
+///   yield paths and the proxy swap leg.
+/// * `curves` - Market context with the bond's discount curve.
+/// * `as_of` - Valuation date; settlement and coupon entitlement follow the
+///   bond's quote convention.
+/// * `i_spread` - I-spread as a decimal (e.g. `0.015` for 150 bp).
+pub(crate) fn price_from_i_spread(
+    bond: &Bond,
+    curves: &MarketContext,
+    as_of: Date,
+    i_spread: f64,
+) -> finstack_quant_core::Result<f64> {
+    use crate::instruments::fixed_income::bond::metrics::price_yield_spread::i_spread::i_spread_par_rate;
+
+    let disc = curves.get_discount(&bond.discount_curve_id)?;
+    let effective_bond = bond.effective_for_pricing(curves, as_of)?;
+    let quote_ctx = QuoteDateContext::new(bond, curves, as_of)?;
+    let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;
+    let quote_date = quote_ctx.quote_date;
+    if !effective_bond
+        .call_put
+        .as_ref()
+        .is_some_and(|cp| cp.has_options())
+    {
+        let par = i_spread_par_rate(bond, disc.as_ref(), quote_date, bond.maturity)?;
+        return price_from_ytm(bond, &flows, quote_date, i_spread + par);
+    }
+
+    let schedule = effective_bond.full_cashflow_schedule(curves)?;
+    let paths = workout_cashflow_paths(&effective_bond, curves, &flows, quote_date, &schedule)?;
+    let mut candidates = Vec::with_capacity(paths.len());
+    for path in paths {
+        let horizon = path.last().map_or(bond.maturity, |(date, _)| *date);
+        let par = i_spread_par_rate(bond, disc.as_ref(), quote_date, horizon)?;
+        let price =
+            price_workout_path_from_yield(&effective_bond, &path, quote_date, i_spread + par)?;
+        candidates.push((price, horizon));
+    }
+    candidates.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for &(price, horizon) in &candidates {
+        let (_, workout) = solve_ytw_from_flows(
+            &effective_bond,
+            curves,
+            &flows,
+            quote_date,
+            Money::new(price, bond.notional.currency())?,
+            &schedule,
+        )?;
+        if workout.last().map(|(date, _)| *date) == Some(horizon) {
+            return Ok(price);
+        }
+    }
+    candidates.first().map(|&(price, _)| price).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "I-spread inversion produced no workout paths".to_string(),
         )
     })
 }

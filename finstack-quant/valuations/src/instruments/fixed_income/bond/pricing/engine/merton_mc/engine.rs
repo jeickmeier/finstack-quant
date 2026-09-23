@@ -6,13 +6,24 @@ use finstack_quant_core::{InputError, Result};
 use finstack_quant_models::credit::{AssetDynamics, BarrierType, CreditState};
 use smallvec::SmallVec;
 
-/// Bond parameters for the PIK-aware risk-free leg (no-default scenario).
-struct RiskFreeLeg {
-    notional: f64,
-    coupon_rate: f64,
-    maturity_years: f64,
-    coupon_frequency: usize,
-    discount_rate: f64,
+/// Contractual terms of the bond leg simulated by [`MertonMcEngine`].
+///
+/// Times are on the bond model clock (years from the valuation date under the
+/// bond coupon day count). Every remaining coupon is paid in full, so the
+/// simulated PV is a DIRTY value; `accrued` converts it to clean.
+#[derive(Debug, Clone)]
+pub(crate) struct MertonBondTerms {
+    /// Initial face amount in currency units.
+    pub(crate) notional: f64,
+    /// Annual coupon rate as a decimal.
+    pub(crate) coupon_rate: f64,
+    /// Horizon (final redemption) time in years; strictly positive.
+    pub(crate) maturity_years: f64,
+    /// Remaining coupons as `(payment time, accrual year fraction)`, ascending,
+    /// with every payment time in `(0, maturity_years]`.
+    pub(crate) coupons: Vec<(f64, f64)>,
+    /// Accrued interest at the valuation date in currency units.
+    pub(crate) accrued: f64,
 }
 
 /// Merton Monte Carlo pricing engine for PIK bonds.
@@ -33,12 +44,20 @@ impl MertonMcEngine {
     /// - `PikMode::Split` → coupon split between cash and PIK
     /// - `PikMode::Toggle` → deferred to `config.toggle_model`
     ///
+    /// Coupons sit on a regular grid anchored backward from maturity. When
+    /// `maturity_years` is not a whole number of periods the valuation date
+    /// falls inside the first period: that coupon is paid in full, so
+    /// `dirty_price_pct` is the simulated PV and `clean_price_pct` subtracts
+    /// the accrued interest for the elapsed part of the period.
+    ///
     /// # Arguments
     ///
     /// * `notional` - Bond face amount in major currency units used as the repayment basis
     /// * `coupon_rate` - Annual coupon rate as a decimal (for example 0.08 for 8%)
-    /// * `maturity_years` - Time to maturity in years under the pricing day-count
-    /// * `coupon_frequency` - Number of coupon periods per year (for example 2 for semi-annual)
+    /// * `maturity_years` - Time to maturity in years under the pricing day-count;
+    ///   must be positive
+    /// * `coupon_frequency` - Number of coupon periods per year (for example 2 for
+    ///   semi-annual); must be at least 1
     /// * `config` - Monte Carlo configuration including path count and PIK schedule
     /// * `discount_rate` - Continuous discount rate for Merton drift and the flat-rate
     ///   fallback when `cashflow_dfs` is not set
@@ -55,6 +74,37 @@ impl MertonMcEngine {
         config: &MertonMcConfig,
         discount_rate: f64,
     ) -> Result<MertonMcResult> {
+        if coupon_frequency == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "Merton MC requires coupon_frequency >= 1".to_string(),
+            ));
+        }
+        let coupons = Self::coupon_schedule(maturity_years, coupon_frequency);
+        let period = 1.0 / coupon_frequency as f64;
+        let elapsed = coupons
+            .first()
+            .map_or(0.0, |&(t_first, _)| (period - t_first).max(0.0));
+        let terms = MertonBondTerms {
+            notional,
+            coupon_rate,
+            maturity_years,
+            coupons,
+            accrued: notional * coupon_rate * elapsed,
+        };
+        Self::price_terms(&terms, config, discount_rate)
+    }
+
+    /// Price explicit bond terms (coupon grid, horizon and accrued).
+    ///
+    /// This is the engine behind [`MertonMcEngine::price`] and
+    /// `Bond::price_merton_mc`; see [`MertonBondTerms`] for the inputs.
+    pub(crate) fn price_terms(
+        terms: &MertonBondTerms,
+        config: &MertonMcConfig,
+        discount_rate: f64,
+    ) -> Result<MertonMcResult> {
+        let (notional, coupon_rate, maturity_years) =
+            (terms.notional, terms.coupon_rate, terms.maturity_years);
         if !matches!(config.merton.dynamics(), AssetDynamics::GeometricBrownian) {
             return Err(InputError::Invalid.into());
         }
@@ -96,14 +146,12 @@ impl MertonMcEngine {
             .max(1.0) as usize;
         let dt = maturity_years / total_steps as f64;
         let sqrt_dt = dt.sqrt();
-        let accrual_factor = coupon_rate / coupon_frequency as f64;
         let sigma = config.merton.asset_vol();
         let r = config.merton.risk_free_rate();
         let mu = r - config.merton.payout_rate() - 0.5 * sigma * sigma;
 
-        // Coupon schedule anchored backward from maturity (floor + stub),
-        // shared with the risk-free leg.
-        let coupon_schedule = Self::coupon_schedule(maturity_years, coupon_frequency);
+        // Remaining coupon grid, shared with the risk-free leg.
+        let coupon_schedule = terms.coupons.as_slice();
         let num_coupons = coupon_schedule.len();
 
         let dfs_ref = config.cashflow_dfs.as_deref();
@@ -315,8 +363,8 @@ impl MertonMcEngine {
                         while coupon_idx < coupon_schedule.len()
                             && t >= coupon_schedule[coupon_idx].0 - dt * 0.5
                         {
-                            let (coupon_t, period_frac) = coupon_schedule[coupon_idx];
-                            let coupon_amount = n_current * accrual_factor * period_frac;
+                            let (coupon_t, accrual) = coupon_schedule[coupon_idx];
+                            let coupon_amount = n_current * coupon_rate * accrual;
                             path_coupon_periods += 1;
                             let df = Self::df_at_time(dfs_ref, coupon_t, discount_rate);
 
@@ -453,18 +501,12 @@ impl MertonMcEngine {
         // Aggregate statistics
         let actual_paths = path_pvs.len() as f64;
         let mean_pv = path_pvs.iter().sum::<f64>() / actual_paths;
-        let clean_price_pct = mean_pv / notional * 100.0;
+        let dirty_price_pct = mean_pv / notional * 100.0;
+        let clean_price_pct = dirty_price_pct - terms.accrued / notional * 100.0;
 
         // PIK-aware risk-free PV for expected loss calculation
-        let risk_free_pv = Self::risk_free_pv_pik_aware(
-            notional,
-            coupon_rate,
-            maturity_years,
-            coupon_frequency,
-            discount_rate,
-            &config.pik_schedule,
-            dfs_ref,
-        );
+        let risk_free_pv =
+            Self::risk_free_pv_spread(terms, discount_rate, &config.pik_schedule, dfs_ref, 0.0);
         let expected_loss = if risk_free_pv > 0.0 {
             1.0 - mean_pv / risk_free_pv
         } else {
@@ -477,13 +519,8 @@ impl MertonMcEngine {
         // mean_pv (term-structure DFs when set) keeps curve shape out of the
         // spread.
         let effective_spread_bp = Self::solve_effective_spread(
-            &RiskFreeLeg {
-                notional,
-                coupon_rate,
-                maturity_years,
-                coupon_frequency,
-                discount_rate,
-            },
+            terms,
+            discount_rate,
             mean_pv,
             &config.pik_schedule,
             dfs_ref,
@@ -560,7 +597,7 @@ impl MertonMcEngine {
 
         Ok(MertonMcResult {
             clean_price_pct,
-            dirty_price_pct: clean_price_pct,
+            dirty_price_pct,
             expected_loss,
             unexpected_loss,
             expected_shortfall_95,
@@ -652,81 +689,44 @@ impl MertonMcEngine {
         (df0.ln() * (1.0 - w) + df1.ln() * w).exp()
     }
 
-    /// Coupon times anchored backward from maturity (standard back-generated
-    /// schedule), with a short front stub when the maturity is not an integer
-    /// number of periods.
+    /// Regular coupon grid anchored backward from maturity for the synthetic
+    /// [`MertonMcEngine::price`] entry point.
     ///
-    /// Returns `(time, period_fraction)` pairs where `period_fraction` is the
-    /// coupon's accrual as a fraction of a full period (1.0 for regular
-    /// coupons, < 1.0 for the stub). Anchoring at maturity keeps every coupon
-    /// inside the simulated horizon and gives seasoned bonds the correct
-    /// remaining-coupon timing; `round(maturity·frequency)` from the valuation
-    /// date (the previous behavior) dropped stub coupons and could place the
-    /// final coupon beyond the simulated horizon.
-    ///
-    /// Shared by the MC pricing loop and the risk-free leg so expected loss
-    /// is a like-for-like difference.
+    /// Returns `(time, accrual)` pairs with `accrual = 1 / coupon_frequency`
+    /// for every coupon. `maturity_years` is read as the remaining life of a
+    /// bond on a regular schedule, so when it is not a whole number of
+    /// periods the valuation date sits inside the first period and that
+    /// coupon is still paid in full (dirty valuation); the elapsed part of
+    /// the period is the accrued interest.
     fn coupon_schedule(maturity_years: f64, coupon_frequency: usize) -> Vec<(f64, f64)> {
         let period = 1.0 / coupon_frequency as f64;
-        // floor + stub, with an FP tolerance so aligned maturities (e.g.
-        // exactly 10 semi-annual periods) do not gain a zero-length stub.
+        // FP tolerance so aligned maturities (e.g. exactly 10 semi-annual
+        // periods) do not gain an extra coupon.
         let n = ((maturity_years / period) - 1e-9).ceil().max(1.0) as usize;
         (1..=n)
-            .map(|k| {
-                let t = maturity_years - (n - k) as f64 * period;
-                let t_prev = (t - period).max(0.0);
-                let frac = ((t - t_prev) / period).clamp(0.0, 1.0);
-                (t, frac)
-            })
+            .map(|k| (maturity_years - (n - k) as f64 * period, period))
             .collect()
     }
 
-    /// PIK-aware risk-free PV (no-default scenario).
+    /// PIK-aware risk-free PV (no-default scenario) with each cashflow's
+    /// discount factor bumped by `e^{-spread·t}` on top of the base discount
+    /// basis (term-structure DFs when set, flat rate otherwise).
     ///
     /// For Toggle periods the risk-free scenario assumes cash payment
     /// (zero hazard implies no PIK trigger).
-    fn risk_free_pv_pik_aware(
-        notional: f64,
-        coupon_rate: f64,
-        maturity_years: f64,
-        coupon_frequency: usize,
+    fn risk_free_pv_spread(
+        terms: &MertonBondTerms,
         discount_rate: f64,
         pik_schedule: &PikSchedule,
         cashflow_dfs: Option<&[(f64, f64)]>,
-    ) -> f64 {
-        let coupon_schedule = Self::coupon_schedule(maturity_years, coupon_frequency);
-        Self::risk_free_pv_spread(
-            &RiskFreeLeg {
-                notional,
-                coupon_rate,
-                maturity_years,
-                coupon_frequency,
-                discount_rate,
-            },
-            pik_schedule,
-            cashflow_dfs,
-            &coupon_schedule,
-            0.0,
-        )
-    }
-
-    /// PIK-aware risk-free PV with each cashflow's discount factor bumped by
-    /// `e^{-spread·t}` on top of the base discount basis (term-structure DFs
-    /// when set, flat rate otherwise).
-    fn risk_free_pv_spread(
-        leg: &RiskFreeLeg,
-        pik_schedule: &PikSchedule,
-        cashflow_dfs: Option<&[(f64, f64)]>,
-        coupon_schedule: &[(f64, f64)],
         spread: f64,
     ) -> f64 {
-        let accrual_factor = leg.coupon_rate / leg.coupon_frequency as f64;
         let mut pv = 0.0;
-        let mut n = leg.notional;
+        let mut n = terms.notional;
 
-        for &(t, period_frac) in coupon_schedule {
-            let df = Self::df_at_time(cashflow_dfs, t, leg.discount_rate) * (-spread * t).exp();
-            let coupon = n * accrual_factor * period_frac;
+        for &(t, accrual) in &terms.coupons {
+            let df = Self::df_at_time(cashflow_dfs, t, discount_rate) * (-spread * t).exp();
+            let coupon = n * terms.coupon_rate * accrual;
 
             match pik_schedule.mode_at(t) {
                 PikMode::Cash | PikMode::Toggle => {
@@ -745,8 +745,8 @@ impl MertonMcEngine {
             }
         }
         pv += n
-            * Self::df_at_time(cashflow_dfs, leg.maturity_years, leg.discount_rate)
-            * (-spread * leg.maturity_years).exp();
+            * Self::df_at_time(cashflow_dfs, terms.maturity_years, discount_rate)
+            * (-spread * terms.maturity_years).exp();
         pv
     }
 
@@ -758,21 +758,18 @@ impl MertonMcEngine {
     /// the SAME one used to compute `target_pv`, so curve shape cancels out
     /// of the spread instead of leaking into it.
     fn solve_effective_spread(
-        leg: &RiskFreeLeg,
+        terms: &MertonBondTerms,
+        discount_rate: f64,
         target_pv: f64,
         pik_schedule: &PikSchedule,
         cashflow_dfs: Option<&[(f64, f64)]>,
     ) -> f64 {
-        let (notional, maturity_years) = (leg.notional, leg.maturity_years);
+        let (notional, maturity_years) = (terms.notional, terms.maturity_years);
         if target_pv <= 0.0 || maturity_years <= 0.0 {
             return 0.0;
         }
-        // Build the coupon schedule once; the Newton iteration below reprices
-        // ~100 times and previously rebuilt it on every call.
-        let coupon_schedule = Self::coupon_schedule(leg.maturity_years, leg.coupon_frequency);
-        let pv_at = |s: f64| {
-            Self::risk_free_pv_spread(leg, pik_schedule, cashflow_dfs, &coupon_schedule, s)
-        };
+        let pv_at =
+            |s: f64| Self::risk_free_pv_spread(terms, discount_rate, pik_schedule, cashflow_dfs, s);
         let rf_pv = pv_at(0.0);
         if target_pv >= rf_pv {
             return 0.0;

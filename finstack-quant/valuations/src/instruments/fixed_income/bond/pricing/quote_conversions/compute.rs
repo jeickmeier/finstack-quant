@@ -1,9 +1,10 @@
 use super::spread_price::{
-    par_swap_rate_from_discount, price_from_asw_market, price_from_dm, price_from_oas,
-    price_from_z_spread,
+    price_from_asw_market, price_from_dm, price_from_oas, price_from_z_spread,
 };
 use super::types::{BondQuoteInput, BondQuoteSet};
-use super::yield_price::{price_from_japanese_simple_yield, price_from_ytm, price_from_ytw};
+use super::yield_price::{
+    clean_price_from_japanese_simple_yield, price_from_i_spread, price_from_ytm, price_from_ytw,
+};
 use crate::constants::numerical::ZERO_TOLERANCE;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
@@ -236,9 +237,12 @@ pub fn compute_quotes(
         (None, CashflowSpec::Fixed(_)) | (Some(_), CashflowSpec::Floating(_))
     );
     for metric_id in &metric_ids {
+        // The Tokyo simple yield is defined only for fixed-coupon bonds.
         if (*metric_id == MetricId::DiscountMargin && !bond_for_metrics.has_floating_coupons())
             || ((*metric_id == MetricId::ASWPar || *metric_id == MetricId::ASWMarket)
                 && !asset_swap_applicable)
+            || (*metric_id == MetricId::JapaneseSimpleYield
+                && !matches!(bond_for_metrics.cashflow_spec, CashflowSpec::Fixed(_)))
         {
             continue;
         }
@@ -329,13 +333,14 @@ pub(crate) fn settlement_dirty_from_quote_overrides(
     } else if let Some(dm) = quotes.quoted_discount_margin {
         price_from_dm(bond, curves, as_of, dm)?
     } else if let Some(i_spread) = quotes.quoted_i_spread {
-        let par_swap_rate = par_swap_rate_from_discount(bond, curves, quote_ctx.quote_date)?;
-        let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;
-        price_from_ytm(bond, &flows, quote_ctx.quote_date, i_spread + par_swap_rate)?
+        price_from_i_spread(bond, curves, as_of, i_spread)?
     } else if let Some(asw) = quotes.quoted_asw_market {
         price_from_asw_market(bond, curves, quote_ctx.quote_date, asw)?
     } else if let Some(simple_yield) = quotes.quoted_japanese_simple_yield {
-        price_from_japanese_simple_yield(bond, quote_ctx.quote_date, simple_yield)?
+        quote_ctx.dirty_from_clean_pct(
+            clean_price_from_japanese_simple_yield(bond, quote_ctx.quote_date, simple_yield)?,
+            bond.notional.amount(),
+        )
     } else {
         return Ok(None);
     };

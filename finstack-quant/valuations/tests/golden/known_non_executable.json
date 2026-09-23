@@ -14,6 +14,11 @@
           "metric": "npv",
           "reason": "The Bloomberg invoice total remains the immutable source-backed target while the proprietary callable-tree inputs are unavailable.",
           "evidence": "The executable callable-tree valuation produces 1039110.941365521983 versus Bloomberg 1039530.560000000056."
+        },
+        {
+          "metric": "i_spread",
+          "reason": "Finstack measures a workout I-spread against the linearly interpolated SOFR swap quote at the workout date, the same benchmark the IBM fixture matches within 1bp at maturity; the BHCCN screen's workout benchmark is not reproduced by that interpolation.",
+          "evidence": "YTW 8.955% minus the interpolated USD SOFR swap rate at the 2030-04-15 call gives 5.2640% versus Bloomberg 5.2990% (3.5bp). The previous 2bp match came from subtracting the continuous zero rate, which is not a swap rate and made the metric disagree with its own quote inverse (fix/fi-bond W2.2)."
         }
       ]
     },

@@ -547,6 +547,62 @@ fn bench_stochastic_hazard_callable_lsmc(c: &mut Criterion) {
     group.finish();
 }
 
+/// A 10Y bond callable at par every day of a 5-year window (2030-2035),
+/// priced on the Hull-White tree and through the production OAS metric.
+fn create_call_window_bond() -> Bond {
+    let mut bond = create_test_bond(10);
+    bond.call_put = Some(CallPutSchedule {
+        calls: vec![CallPut {
+            start_date: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            end_date: Date::from_calendar_date(2035, Month::January, 1).unwrap(),
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        }],
+        puts: Vec::new(),
+    });
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
+        .with_quoted_clean_price(99.0)
+        .with_implied_vol(0.01);
+    bond
+}
+
+fn bench_call_window(c: &mut Criterion) {
+    use finstack_quant_valuations::instruments::PricingOptions;
+
+    let mut group = c.benchmark_group("bond_call_window");
+    let market = create_market();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let quoted = create_call_window_bond();
+    let mut unquoted = quoted.clone();
+    unquoted
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = None;
+
+    group.bench_function("tree_pv_5y_window", |b| {
+        b.iter(|| {
+            let pv = unquoted
+                .value(black_box(&market), black_box(as_of))
+                .unwrap_or_else(|e| panic!("call-window tree pv failed: {e:?}"));
+            black_box(pv)
+        });
+    });
+    group.bench_function("oas_metric_5y_window", |b| {
+        b.iter(|| {
+            let result = quoted
+                .price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    &[MetricId::Oas],
+                    PricingOptions::default(),
+                )
+                .unwrap_or_else(|e| panic!("call-window OAS metric failed: {e:?}"));
+            black_box(result)
+        });
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_bond_pv,
@@ -558,6 +614,7 @@ criterion_group!(
     bench_tree_oas_solver,
     bench_tree_step_scaling,
     bench_spread_metrics,
-    bench_stochastic_hazard_callable_lsmc
+    bench_stochastic_hazard_callable_lsmc,
+    bench_call_window
 );
 criterion_main!(benches);

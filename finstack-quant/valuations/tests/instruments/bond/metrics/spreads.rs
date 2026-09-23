@@ -1643,3 +1643,105 @@ fn test_z_spread_on_curve_model_pv_is_zero_with_settlement_lag() {
         "on-curve model-PV Z-spread must be ~0 with a settlement lag, got {z:.6e}"
     );
 }
+
+/// W2.2: on a callable whose workout is the call, the I-spread is the
+/// yield-to-worst minus the swap PAR rate to the workout date, and the
+/// quote engine inverts it back to the same price.
+///
+/// Hand calculation: 5% 30/360 semi-annual bond, valued on the Jan-15
+/// coupon date (no accrued), callable at 100 on 2027-01-15 only, maturity
+/// 2030-01-15. Clean price = call-path price at a 3% Street yield:
+/// `P = Σ_{k=1..4} 2.5·1.015^-k + 100·1.015^-4`. Flat 4% continuous
+/// ACT/365F curve; proxy leg = the bond's 30/360 semi-annual schedule to the
+/// call date: `par = (1 − DF_4) / Σ 0.5·DF_k`.
+#[test]
+fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
+        compute_quotes, BondQuoteInput,
+    };
+
+    let as_of = date!(2025 - 01 - 15);
+    let r = 0.04;
+    let curve = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .knots([(0.0, 1.0), (30.0, (-r * 30.0_f64).exp())])
+        .build()
+        .expect("curve");
+    let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
+
+    let mut bond = Bond::fixed(
+        "ISPR-CALLABLE",
+        Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+        date!(2024 - 01 - 15),
+        date!(2030 - 01 - 15),
+        finstack_quant_core::dates::StubKind::None,
+        "USD-OIS",
+    )
+    .expect("bond");
+    bond.settlement_convention = None;
+    bond.call_put = Some(CallPutSchedule {
+        calls: vec![CallPut {
+            start_date: date!(2027 - 01 - 15),
+            end_date: date!(2027 - 01 - 15),
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        }],
+        puts: Vec::new(),
+    });
+
+    let clean: f64 =
+        (1..=4).map(|k| 2.5 * 1.015_f64.powi(-k)).sum::<f64>() + 100.0 * 1.015_f64.powi(-4);
+    let pay_dates = [
+        date!(2025 - 07 - 15),
+        date!(2026 - 01 - 15),
+        date!(2026 - 07 - 15),
+        date!(2027 - 01 - 15),
+    ];
+    let df = |d: time::Date| (-r * (d - as_of).whole_days() as f64 / 365.0).exp();
+    let annuity: f64 = pay_dates.iter().map(|&d| 0.5 * df(d)).sum();
+    let par = (1.0 - df(pay_dates[3])) / annuity;
+    let expected = 0.03 - par;
+
+    let mut quoted = bond.clone();
+    quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean);
+    let result = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Ytw, MetricId::ISpread],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("metrics");
+    let ytw = *result.measures.get("ytw").expect("ytw");
+    assert!(
+        (ytw - 0.03).abs() < 1e-9,
+        "workout is the call at 3%: {ytw}"
+    );
+    let i_spread = *result.measures.get("i_spread").expect("i_spread");
+    assert!(
+        (i_spread - expected).abs() < 1e-9,
+        "I-spread {i_spread} must equal YTW − par swap rate to the call {expected}"
+    );
+    // The old metric subtracted the continuous zero rate (4%) instead.
+    assert!((i_spread - (0.03 - r)).abs() > 1e-4);
+
+    let quotes = compute_quotes(
+        &bond,
+        &market,
+        as_of,
+        BondQuoteInput::ISpread(i_spread),
+        finstack_quant_valuations::instruments::PricingOptions::default(),
+    )
+    .expect("quote engine");
+    assert!(
+        (quotes.clean_price_pct - clean).abs() < 1e-8,
+        "I-spread round trip: {} vs {clean}",
+        quotes.clean_price_pct
+    );
+}

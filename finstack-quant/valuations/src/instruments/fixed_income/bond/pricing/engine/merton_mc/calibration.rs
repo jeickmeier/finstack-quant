@@ -3,7 +3,7 @@
 use super::{CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode, PikSchedule};
 use crate::cashflow::builder::specs::CouponType;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-    price_from_japanese_simple_yield, price_from_ytm, price_from_ytw, price_from_z_spread,
+    clean_price_from_japanese_simple_yield, price_from_ytm, price_from_ytw, price_from_z_spread,
     BondQuoteInput,
 };
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
@@ -104,9 +104,10 @@ fn target_pv_from_quote(
             quote_ctx.dirty_from_clean_pct(clean_pct, bond.notional.amount())
         }
         BondQuoteInput::DirtyPriceCurrency(dirty_currency) => dirty_currency,
-        BondQuoteInput::JapaneseSimpleYield(simple_yield) => {
-            price_from_japanese_simple_yield(bond, quote_date, simple_yield)?
-        }
+        BondQuoteInput::JapaneseSimpleYield(simple_yield) => quote_ctx.dirty_from_clean_pct(
+            clean_price_from_japanese_simple_yield(bond, quote_date, simple_yield)?,
+            bond.notional.amount(),
+        ),
         BondQuoteInput::Ytm(ytm) => {
             let flows = bond.pricing_dated_cashflows(market, as_of)?;
             price_from_ytm(bond, &flows, quote_date, ytm)?
@@ -151,7 +152,7 @@ fn mc_cash_pv(
     }
 
     let result = bond_cash.price_merton_mc(&cfg, discount_rate, as_of)?;
-    Ok(result.clean_price_pct / 100.0 * bond_cash.notional.amount())
+    Ok(result.dirty_price_pct / 100.0 * bond_cash.notional.amount())
 }
 
 /// Calibrate a structural parameter to a market quote using the same MC engine.

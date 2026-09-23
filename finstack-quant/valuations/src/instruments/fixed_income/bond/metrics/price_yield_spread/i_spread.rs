@@ -8,47 +8,22 @@ use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, RateCalibrationPillar, RateCalibrationQuote,
 };
 
-/// Configuration for I-Spread fixed-leg conventions.
+/// I-Spread: bond yield minus the interpolated swap par rate at the same horizon.
 ///
-/// Controls the proxy swap fixed leg used to derive the par rate that is
-/// subtracted from the bond's YTM.
-#[derive(Debug, Clone)]
-pub(crate) struct ISpreadConfig {
-    /// Day-count convention for the proxy fixed leg used in the par rate.
-    pub fixed_leg_day_count: DayCount,
-    /// Payment frequency for the proxy fixed leg.
-    pub fixed_leg_frequency: Tenor,
-}
-
-impl Default for ISpreadConfig {
-    fn default() -> Self {
-        Self {
-            // Preserve previous behaviour: annual Act/Act proxy fixed leg.
-            fixed_leg_day_count: DayCount::ActAct,
-            fixed_leg_frequency: Tenor::annual(),
-        }
-    }
-}
-
-/// I-Spread: bond YTM minus interpolated swap par rate at same maturity.
-///
-/// Uses the bond's discount curve to approximate a par swap fixed leg with
-/// configurable day-count and frequency (defaults to annual Act/Act).
-///
-/// The I-spread is computed as:
 /// ```text
-/// I-Spread = YTM - par_swap_rate
+/// I-Spread = yield − par_swap_rate(quote_date → horizon)
 /// ```
-/// where `par_swap_rate` is derived from the discount curve using a proxy
-/// fixed-leg schedule.
+///
+/// For a callable or puttable bond with a quoted price the yield is the
+/// yield-to-worst and the horizon is the workout date; otherwise the yield is
+/// the Street YTM and the horizon is maturity. The par rate comes from
+/// [`i_spread_par_rate`], which the quote engine's inverse also uses.
 ///
 /// # Dependencies
 ///
 /// Requires `Ytm` metric to be computed first.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ISpreadCalculator {
-    config: ISpreadConfig,
-}
+pub(crate) struct ISpreadCalculator;
 
 impl MetricCalculator for ISpreadCalculator {
     fn dependencies(&self) -> &[MetricId] {
@@ -58,7 +33,6 @@ impl MetricCalculator for ISpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = context.instrument_as()?;
 
-        // Bond YTM from dependencies
         let ytm = context
             .computed
             .get(&MetricId::Ytm)
@@ -69,101 +43,80 @@ impl MetricCalculator for ISpreadCalculator {
                 })
             })?;
 
-        // Use the bond's discount curve as proxy for swap discounting (OIS collateral)
         let disc = context.curves.get_discount(&bond.discount_curve_id)?;
-
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
         let flows = quote_ctx.entitled_flows(bond, &context.curves, context.as_of)?;
-        let (yield_rate, spread_maturity, uses_workout_path) =
-            if let Some((workout_yield, workout_flows, _)) =
-                crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
-                    bond,
-                    context.curves.as_ref(),
-                    context.as_of,
-                    &flows,
-                )?
-            {
-                let maturity = workout_flows
-                    .last()
-                    .map(|(date, _)| *date)
-                    .unwrap_or(bond.maturity);
-                (workout_yield, maturity, maturity < bond.maturity)
-            } else {
-                (ytm, bond.maturity, false)
+        let (yield_rate, horizon) =
+            match crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
+                bond,
+                context.curves.as_ref(),
+                context.as_of,
+                &flows,
+            )? {
+                Some((workout_yield, workout_flows, _)) => (
+                    workout_yield,
+                    workout_flows
+                        .last()
+                        .map_or(bond.maturity, |(date, _)| *date),
+                ),
+                None => (ytm, bond.maturity),
             };
+        Ok(yield_rate - i_spread_par_rate(bond, disc.as_ref(), quote_ctx.quote_date, horizon)?)
+    }
+}
 
-        if uses_workout_path {
-            let t = disc.day_count().year_fraction(
-                quote_ctx.quote_date,
-                spread_maturity,
-                DayCountContext::default(),
-            )?;
-            if t > 0.0 {
-                let df = disc.df_between_dates(quote_ctx.quote_date, spread_maturity)?;
-                if df > 0.0 && df.is_finite() {
-                    return Ok(yield_rate - (-df.ln() / t));
-                }
-            }
+/// Swap par rate from `quote_date` to `horizon` used as the I-spread benchmark.
+///
+/// Interpolates the curve's swap calibration quotes when the discount curve
+/// carries them; otherwise builds a proxy fixed leg on the bond's coupon
+/// frequency and day count (annual ACT/ACT for non-fixed coupons) and returns
+/// `(DF(start) − DF(end)) / annuity` on the bond's discount curve.
+///
+/// # Arguments
+///
+/// * `bond` - Bond supplying the proxy fixed-leg conventions.
+/// * `disc` - The bond's discount curve, used as the swap curve proxy.
+/// * `quote_date` - Settlement/quote date where the proxy leg starts.
+/// * `horizon` - Workout or maturity date where the proxy leg ends.
+pub(crate) fn i_spread_par_rate(
+    bond: &Bond,
+    disc: &DiscountCurve,
+    quote_date: Date,
+    horizon: Date,
+) -> finstack_quant_core::Result<f64> {
+    if let Some(par_swap_rate) = interpolated_swap_quote_rate(disc, quote_date, horizon)? {
+        return Ok(par_swap_rate);
+    }
+    let (day_count, frequency) = match &bond.cashflow_spec {
+        crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => {
+            (spec.schedule.day_count, spec.schedule.frequency)
         }
-
-        // Bloomberg-style I-spread is measured against the interpolated market
-        // swap quote. When the curve carries its original calibration quotes,
-        // use those instead of re-deriving a par coupon from fitted DFs.
-        let use_default_proxy = matches!(self.config.fixed_leg_day_count, DayCount::ActAct)
-            && self.config.fixed_leg_frequency == Tenor::annual();
-        if use_default_proxy {
-            if let Some(par_swap_rate) =
-                interpolated_swap_quote_rate(disc.as_ref(), quote_ctx.quote_date, spread_maturity)?
-            {
-                return Ok(yield_rate - par_swap_rate);
-            }
-        }
-
-        // Build proxy fixed-leg schedule using configured frequency and standard
-        // business-day / stub rules when market quote metadata is unavailable.
-        let mut fixed_leg_day_count = self.config.fixed_leg_day_count;
-        let mut fixed_leg_frequency = self.config.fixed_leg_frequency;
-        if matches!(self.config.fixed_leg_day_count, DayCount::ActAct)
-            && self.config.fixed_leg_frequency == Tenor::annual()
-        {
-            if let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) =
-                &bond.cashflow_spec
-            {
-                fixed_leg_day_count = spec.schedule.day_count;
-                fixed_leg_frequency = spec.schedule.frequency;
-            }
-        }
-        let dates: Vec<Date> = finstack_quant_core::dates::ScheduleBuilder::new(
-            quote_ctx.quote_date,
-            spread_maturity,
-        )?
-        .frequency(fixed_leg_frequency)
+        _ => (DayCount::ActAct, Tenor::annual()),
+    };
+    let dates: Vec<Date> = finstack_quant_core::dates::ScheduleBuilder::new(quote_date, horizon)?
+        .frequency(frequency)
         .stub_rule(StubKind::ShortFront)
         .build()?
         .into_iter()
         .collect();
-
-        if dates.len() < 2 {
-            return Err(finstack_quant_core::Error::Validation(
-                "I-spread calculation requires at least two fixed-leg schedule dates".to_string(),
-            ));
-        }
-
-        let (par_swap_rate, annuity) =
-            crate::instruments::fixed_income::bond::pricing::quote_conversions::par_rate_and_annuity_from_discount(
-                disc.as_ref(),
-                fixed_leg_day_count,
-                Some(fixed_leg_frequency),
-                &dates,
-            )?;
-        if annuity.abs() < 1e-12 {
-            return Err(finstack_quant_core::Error::Validation(
-                "I-spread calculation is undefined for near-zero fixed-leg annuity".to_string(),
-            ));
-        }
-
-        Ok(yield_rate - par_swap_rate)
+    if dates.len() < 2 {
+        return Err(finstack_quant_core::Error::Validation(
+            "I-spread calculation requires at least two fixed-leg schedule dates".to_string(),
+        ));
     }
+    let (par_swap_rate, annuity) =
+        crate::instruments::fixed_income::bond::pricing::quote_conversions::par_rate_and_annuity_from_discount(
+            disc,
+            day_count,
+            Some(frequency),
+            &dates,
+        )?;
+    if annuity.abs() < 1e-12 {
+        return Err(finstack_quant_core::Error::Validation(
+            "I-spread calculation is undefined for near-zero fixed-leg annuity".to_string(),
+        ));
+    }
+    Ok(par_swap_rate)
 }
 
 pub(crate) fn interpolated_swap_quote_rate(
