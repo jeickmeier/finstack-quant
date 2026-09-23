@@ -88,6 +88,13 @@ const exampleResultTabs = {
   structured_credit: "measures",
 } as const;
 
+/** Structured-credit scenario inputs; the workbench offers them only while that example is selected. */
+const scenario = {
+  trancheId: data.scenarios.trancheId,
+  gridJson: JSON.stringify(data.scenarios.grid),
+  priceDomain: [80, 140] as const,
+};
+
 export function Example({
   density = "compact",
   variant = "default",
@@ -121,15 +128,7 @@ export function Example({
       }}
       density={density}
       defaultCalibrationJson={JSON.stringify(data.calibration[0]!.input)}
-      scenario={
-        selectedType === "structured_credit"
-          ? {
-              trancheId: data.scenarios.trancheId,
-              gridJson: JSON.stringify(data.scenarios.grid),
-              priceDomain: [80, 140],
-            }
-          : undefined
-      }
+      scenario={scenario}
     />
   );
 }
