@@ -14,7 +14,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::explain::ExplanationTrace;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::HashMap;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -267,8 +266,8 @@ impl EquityHistory {
 /// waterfall.
 ///
 /// Each sub-spec is optional; when none are present the resolved waterfall is
-/// identical to the base waterfall. Applied by
-/// [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].
+/// identical to the base waterfall. The simulation engine applies them to
+/// each period's copy of the waterfall.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -324,8 +323,8 @@ impl WaterfallRules {
     ///   non-negative (a ratio, so it may exceed 1).
     /// - `excess_spread.target_balance` is non-negative.
     /// - The shifting-interest schedule is non-empty and strictly ascending in
-    ///   `months_from_closing` (so [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`]'s
-    ///   step lookup is unambiguous).
+    ///   `months_from_closing` (so the per-period shifting-interest step lookup
+    ///   is unambiguous).
     /// - `controlled_accumulation.start_date <= bullet_date`.
     ///
     /// # Errors
@@ -1664,58 +1663,6 @@ impl CoverageTestType {
             Self::Ic => "IC",
             Self::BorrowingBase => "BB",
         }
-    }
-}
-
-// WATERFALL WORKSPACE (Pre-allocated Buffers)
-
-/// Pre-allocated workspace for waterfall execution to avoid hot-path allocations.
-///
-/// This struct holds reusable buffers that are cleared between periods rather than
-/// reallocated. For Monte Carlo simulations with thousands of paths and hundreds
-/// of periods, this significantly reduces allocation overhead.
-#[derive(Debug, Clone)]
-pub struct WaterfallWorkspace {
-    /// Pre-allocated tier allocations buffer
-    pub tier_allocations: Vec<(String, Money)>,
-    /// Pre-allocated distributions map
-    pub distributions: HashMap<RecipientType, Money>,
-    /// Pre-allocated payment records buffer
-    pub payment_records: Vec<PaymentRecord>,
-    /// Pre-allocated coverage test results buffer
-    pub coverage_tests: Vec<(String, f64, bool)>,
-    /// Pre-allocated tranche index (built once per deal, reused across periods)
-    pub tranche_index: HashMap<String, usize>,
-}
-
-impl WaterfallWorkspace {
-    /// Create a new workspace with pre-allocated capacity.
-    pub fn new(num_tiers: usize, num_recipients: usize, num_tranches: usize) -> Self {
-        let mut distributions = HashMap::default();
-        distributions.reserve(num_recipients);
-        let mut tranche_index = HashMap::default();
-        tranche_index.reserve(num_tranches);
-        Self {
-            tier_allocations: Vec::with_capacity(num_tiers),
-            distributions,
-            payment_records: Vec::with_capacity(num_recipients),
-            coverage_tests: Vec::with_capacity(num_tranches * 2),
-            tranche_index,
-        }
-    }
-
-    /// Clear all buffers for reuse in the next period.
-    pub fn clear(&mut self) {
-        self.tier_allocations.clear();
-        self.distributions.clear();
-        self.payment_records.clear();
-        self.coverage_tests.clear();
-    }
-}
-
-impl Default for WaterfallWorkspace {
-    fn default() -> Self {
-        Self::new(8, 32, 8)
     }
 }
 

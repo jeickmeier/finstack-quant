@@ -280,16 +280,17 @@ impl StochasticPricer {
             ));
         }
 
-        let factor_sets = self.monte_carlo_factor_sets(instrument, num_paths, antithetic);
         // Antithetic pairing is only effective when `num_paths` is even — an
-        // odd trailing path is drawn independently (see `monte_carlo_factor_sets`)
+        // odd trailing path is drawn independently (see `monte_carlo_path_factors`)
         // and cannot be paired. Pair-aware std-error therefore requires an even
         // path count; with an odd count the antithetic flag is dropped so the
         // collector falls back to the plain i.i.d. estimator.
         self.price_factor_sets(
             instrument,
             context,
-            factor_sets,
+            |path_index| {
+                self.monte_carlo_path_factors(instrument, path_index, num_paths, antithetic)
+            },
             num_paths,
             PricingMode::MonteCarlo {
                 num_paths,
@@ -342,37 +343,32 @@ impl StochasticPricer {
         let suffix_months = month_count.saturating_sub(prefix_months);
         let has_stochastic_rates = self.has_stochastic_rates();
 
-        let mut factor_sets = Vec::with_capacity(total_paths);
-        for prefix_index in 0..prefix_count {
+        // Path `prefix_index * mc_paths + suffix_index` continues tree prefix
+        // `prefix_index` with Monte Carlo suffix draws from its own Philox
+        // substream: `Philox(seed).substream(path_id)` is statistically
+        // independent for any pair of distinct path ids, so the hybrid suffix
+        // factors carry no inter-path correlation.
+        let hybrid_factors = |path_index: usize| {
+            let prefix_index = path_index / mc_paths;
             let prefix =
                 self.tree_path_factors(prefix_index, prefix_count, branch_count, prefix_months);
-            for suffix_index in 0..mc_paths {
-                let path_index = prefix_index * mc_paths + suffix_index;
-                // Per-path counter-based substream: Philox(seed).substream(path_id)
-                // is statistically independent for any pair of distinct path_ids,
-                // so the hybrid suffix factors carry no inter-path correlation.
-                let mut rng = PhiloxRng::new(self.config.seed).substream(path_index as u64);
-                // Pre-size to exact total length so neither the prefix copy nor
-                // the suffix push triggers a Vec re-grow. Each path needs its
-                // own owned Vec because `factor_sets` is consumed by a parallel
-                // iterator below.
-                let mut factors = Vec::with_capacity(prefix.len() + suffix_months);
-                factors.extend_from_slice(&prefix);
-                for _ in 0..suffix_months {
-                    factors.push(if has_stochastic_rates {
-                        rng.next_std_normal()
-                    } else {
-                        0.0
-                    });
-                }
-                factor_sets.push(factors);
+            let mut rng = PhiloxRng::new(self.config.seed).substream(path_index as u64);
+            let mut factors = Vec::with_capacity(prefix.len() + suffix_months);
+            factors.extend_from_slice(&prefix);
+            for _ in 0..suffix_months {
+                factors.push(if has_stochastic_rates {
+                    rng.next_std_normal()
+                } else {
+                    0.0
+                });
             }
-        }
+            factors
+        };
 
         self.price_factor_sets(
             instrument,
             context,
-            factor_sets,
+            hybrid_factors,
             total_paths,
             PricingMode::Hybrid {
                 tree_periods,
@@ -382,18 +378,21 @@ impl StochasticPricer {
         )
     }
 
+    /// Price `total_paths` scenario paths, drawing each path's monthly
+    /// factors from `path_factors(path_index)` inside the (parallel) path
+    /// loop so no path's factors outlive its pricing.
     fn price_factor_sets(
         &self,
         instrument: &StructuredCredit,
         context: &MarketContext,
-        factor_sets: Vec<Vec<f64>>,
+        path_factors: impl Fn(usize) -> Vec<f64> + Sync,
         total_paths: usize,
         pricing_mode: PricingMode,
         prepared: &PreparedRun,
     ) -> Result<StochasticPricingResult> {
         // Antithetic pairing is only effective when the path count is even —
         // an odd trailing path is drawn independently (see
-        // `monte_carlo_factor_sets`) and cannot be paired. Pair-aware
+        // `monte_carlo_path_factors`) and cannot be paired. Pair-aware
         // std-error therefore requires an even path count; with an odd count
         // the antithetic flag is dropped so the collector falls back to the
         // plain i.i.d. estimator. Tree and Hybrid modes draw no pairs.
@@ -405,13 +404,14 @@ impl StochasticPricer {
             _ => (total_paths, false),
         };
         let per_name_simulator = self.per_name_simulator()?;
-        // `into_par_iter().enumerate()` on a `Vec` is an order-preserving
+        // `(0..n).into_par_iter()` is an order-preserving
         // `IndexedParallelIterator`: `collect()` returns outputs in path
         // order regardless of rayon scheduling, and each path keeps a stable
-        // index for its idiosyncratic-draw substream. Both properties are
-        // required for bit-identical serial/parallel results (the downstream
-        // Welford accumulation is order-sensitive).
-        let price_factors = |(path_index, factors): (usize, Vec<f64>)| {
+        // index for its factor and idiosyncratic-draw substreams. Both
+        // properties are required for bit-identical serial/parallel results
+        // (the downstream Welford accumulation is order-sensitive).
+        let price_factors = |path_index: usize| {
+            let factors = path_factors(path_index);
             let shocks = self.path_shocks_from_factors(
                 instrument,
                 &factors,
@@ -434,17 +434,14 @@ impl StochasticPricer {
         #[cfg(not(target_arch = "wasm32"))]
         let outputs: Vec<PathScenarioOutput> = {
             use rayon::prelude::*;
-            factor_sets
+            (0..total_paths)
                 .into_par_iter()
-                .enumerate()
                 .map(price_factors)
                 .collect::<Result<Vec<_>>>()?
         };
 
         #[cfg(target_arch = "wasm32")]
-        let outputs: Vec<PathScenarioOutput> = factor_sets
-            .into_iter()
-            .enumerate()
+        let outputs: Vec<PathScenarioOutput> = (0..total_paths)
             .map(price_factors)
             .collect::<Result<Vec<_>>>()?;
 
@@ -461,46 +458,35 @@ impl StochasticPricer {
         collector.finalize(self, pricing_mode)
     }
 
-    fn monte_carlo_factor_sets(
+    /// Monthly systematic factors of Monte Carlo path `path_index`.
+    ///
+    /// One base Philox RNG seeded from `config.seed`; each path draws from a
+    /// counter-based substream, so a path's factors do not depend on which
+    /// other paths run or in what order. With `antithetic`, path `2k + 1` is
+    /// the negation of path `2k`: both members share `substream(k)`, so the
+    /// pair is perfectly correlated while pairs stay independent. A trailing
+    /// unpaired path (odd `num_paths`) and every non-antithetic path draw from
+    /// `substream(path_index)`.
+    fn monte_carlo_path_factors(
         &self,
         instrument: &StructuredCredit,
+        path_index: usize,
         num_paths: usize,
         antithetic: bool,
-    ) -> Vec<Vec<f64>> {
-        // One base Philox RNG seeded from config.seed.  Each (logical) path
-        // index gets its own counter-based substream via `substream(path_id)`.
-        //
-        // For antithetic pairs path 2k+1 is the negation of path 2k.  Both
-        // members of a pair share the same Philox stream (stream_id = k) so
-        // the antithetic pair is perfectly correlated by construction; all
-        // pairs are independent of one another because they have distinct
-        // stream IDs.
+    ) -> Vec<f64> {
         let base_rng = PhiloxRng::new(self.config.seed);
-        let mut factor_sets = Vec::with_capacity(num_paths);
-
-        let mut path_index = 0usize;
-        while path_index < num_paths {
-            if antithetic && path_index + 1 < num_paths {
-                // Stream ID is the pair index (path_index / 2) so each pair
-                // draws from a stream that is independent of all other pairs.
-                let stream_id = (path_index / 2) as u64;
-                let mut rng = base_rng.substream(stream_id);
-                let factors = self.random_factors(instrument, &mut rng);
-                let antithetic_factors = factors.iter().map(|z| -z).collect();
-                factor_sets.push(factors);
-                factor_sets.push(antithetic_factors);
-                path_index += 2;
-            } else {
-                // Non-antithetic path: stream_id equals the path index so
-                // every path is independent regardless of execution order.
-                let mut rng = base_rng.substream(path_index as u64);
-                let factors = self.random_factors(instrument, &mut rng);
-                factor_sets.push(factors);
-                path_index += 1;
+        let paired = antithetic && (path_index % 2 == 1 || path_index + 1 < num_paths);
+        if paired {
+            let mut rng = base_rng.substream((path_index / 2) as u64);
+            let mut factors = self.random_factors(instrument, &mut rng);
+            if path_index % 2 == 1 {
+                factors.iter_mut().for_each(|z| *z = -*z);
             }
+            factors
+        } else {
+            let mut rng = base_rng.substream(path_index as u64);
+            self.random_factors(instrument, &mut rng)
         }
-
-        factor_sets
     }
 
     /// Extract the copula specification and asset correlation when the
@@ -549,7 +535,7 @@ impl StochasticPricer {
     /// # Antithetic pairing (item 5)
     ///
     /// When `antithetic` is `true` the paths were generated as antithetic
-    /// pairs `(2k, 2k+1)` with `monte_carlo_factor_sets` negating the
+    /// pairs `(2k, 2k+1)` with `monte_carlo_path_factors` negating the
     /// systematic factors of `2k+1`. For the variance reduction to actually
     /// work, the per-name idiosyncratic channel must be paired too: both
     /// members of pair `k` draw from the SAME substream `substream(k)`, and
@@ -927,7 +913,7 @@ impl StochasticPricer {
     /// `Z_indep` comes from a SALTED stream so the credit draws are
     /// untouched. Antithetic pairs `(2k, 2k+1)` share `substream(k)` and the
     /// odd member negates its draws, mirroring the credit factors (negated by
-    /// `monte_carlo_factor_sets`) and the per-name streams, so the pair's
+    /// `monte_carlo_path_factors`) and the per-name streams, so the pair's
     /// prepayment factors are exact negatives; independent paths use
     /// `substream(path_index)`.
     ///

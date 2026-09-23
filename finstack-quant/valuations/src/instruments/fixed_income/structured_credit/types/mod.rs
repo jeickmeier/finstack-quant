@@ -76,7 +76,7 @@ pub use waterfall::{
     ManagementFeeType, PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType,
     ReserveAccountSpec, ReserveTarget, RoundingConvention, ShiftMode, ShiftingInterestSpec,
     ShiftingInterestStep, StepDownSpec, StepDownTrigger, TargetOcSpec, TemplateFees, Waterfall,
-    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier, WaterfallWorkspace,
+    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
 
 pub use results::{TrancheAccrualPeriod, TrancheCashflows, TrancheValuation};
@@ -467,7 +467,7 @@ pub struct StructuredCredit {
     pub coverage_rules: Option<CoverageRules>,
 
     /// Declarative waterfall rules (available-funds caps, etc.) layered onto the
-    /// base waterfall by `resolve_waterfall`. `None` reproduces the base
+    /// base waterfall each period by the simulation engine. `None` reproduces the base
     /// waterfall exactly.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]

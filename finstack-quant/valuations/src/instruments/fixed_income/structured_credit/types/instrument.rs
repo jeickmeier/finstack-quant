@@ -81,7 +81,7 @@ impl Instrument for StructuredCredit {
     }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        self.resolved_for_pricing()?;
+        self.validate_resolvable()?;
         if let Some(threshold) = self.cleanup_call_pct {
             if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(

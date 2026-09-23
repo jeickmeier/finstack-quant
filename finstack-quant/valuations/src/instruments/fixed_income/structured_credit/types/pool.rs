@@ -865,8 +865,37 @@ impl AssetPool {
             instruments.validate(self.base_currency)?;
             pool.assets = instruments.materialize(closing_date)?;
         }
-        for asset in &pool.assets {
-            pool.validate_asset_currency(asset)?;
+        pool.validate_rows()?;
+        Ok(pool)
+    }
+
+    /// [`Self::normalized`] without copying a pool that already holds its
+    /// rows as `assets`: borrowed after the same validation, owned when
+    /// representative lines or instrument collateral must be expanded.
+    ///
+    /// # Arguments
+    ///
+    /// * `closing_date` - Deal closing date, as for [`Self::normalized`].
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::normalized`].
+    pub(crate) fn normalized_view(
+        &self,
+        closing_date: Date,
+    ) -> finstack_quant_core::Result<std::borrow::Cow<'_, Self>> {
+        if self.rep_lines.is_none() && self.instruments.is_none() {
+            self.validate_representation()?;
+            self.validate_rows()?;
+            return Ok(std::borrow::Cow::Borrowed(self));
+        }
+        self.normalized(closing_date).map(std::borrow::Cow::Owned)
+    }
+
+    /// Currency and override-range checks on every asset row.
+    fn validate_rows(&self) -> finstack_quant_core::Result<()> {
+        for asset in &self.assets {
+            self.validate_asset_currency(asset)?;
             for (name, value) in [
                 ("SMM", asset.smm_override),
                 ("MDR", asset.mdr_override),
@@ -877,7 +906,7 @@ impl AssetPool {
                 }
             }
         }
-        Ok(pool)
+        Ok(())
     }
 
     fn validate_representation(&self) -> finstack_quant_core::Result<()> {

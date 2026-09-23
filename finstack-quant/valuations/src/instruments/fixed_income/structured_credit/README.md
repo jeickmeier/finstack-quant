@@ -21,7 +21,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats` | Collateral pool and its aggregates. Floating rows (`index_id` + `spread_bp`) may carry `index_floor`, an annual-decimal floor on the index applied before the spread. |
 | `Tranche`, `TrancheBuilder`, `TrancheStructure`, `TrancheCoupon`, `TrancheBehaviorType` | Capital structure. |
 | `Waterfall`, `WaterfallBuilder`, `WaterfallTier`, `Recipient`, `RecipientType`, `PaymentType`, `PaymentCalculation`, `AllocationMode` | Waterfall construction. |
-| `WaterfallRules`, `AfcSpec`, `StepDownSpec`, `StepDownTrigger`, `ShiftingInterestSpec`, `ShiftMode` | Declarative rules layered onto the base waterfall by `resolve_waterfall`. |
+| `WaterfallRules`, `AfcSpec`, `StepDownSpec`, `StepDownTrigger`, `ShiftingInterestSpec`, `ShiftMode` | Declarative rules layered onto the base waterfall per period (`pricing/resolve.rs`). |
 | `CoverageTestSpec`, `CoverageTestAction`, `CoverageTestType`, `CoverageTrigger` (tranche-level), `TriggerConsequence` | OC/IC tests as waterfall positions — see [Coverage tests](#coverage-tests). |
 | `DealFees`, `IncentiveFeeSpec` | Fee schedule the template turns into senior, junior and incentive fee tiers. |
 | `CoverageRules`, `DefaultedValuation`, `CccBucketRule`, `DiscountObligationRule` | Collateral valuation rules for the OC tests (rating haircuts, defaulted-asset value, excess-CCC bucket, discount obligations); `CoverageRules::clo_standard()` from the registry. |
@@ -44,7 +44,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `CallAssumption`, `CallScope` | Deal or tranche call for price-to-call analytics (`TrancheMetrics.wal_to_call`, `z_spread_to_call_bp`, `dm_to_call_bp`) — see [Calls and clean-up calls](#calls-and-clean-up-calls). |
 | `run_simulation_with_diagnostics`, `SimulationRun`, `SimulationDiagnostics`, `PeriodDiagnostics`, `CoverageTestDiagnostic`, `calculate_equity_metrics`, `EquityMetrics` | Period-by-period deal record and equity analytics — see [Deal diagnostics and equity analytics](#deal-diagnostics-and-equity-analytics). |
 | `run_simulation`, `generate_cashflows`, `generate_tranche_cashflows` | Deterministic projection entry points. |
-| `execute_waterfall`, `execute_waterfall_with_explanation`, `WaterfallContext`, `WaterfallDistribution`, `resolve_waterfall` | Waterfall execution. |
+| `execute_waterfall`, `execute_waterfall_with_explanation`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
 | `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | Tranche summary (price, WAL, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters) and scenario grids (one projection per cell, clean settlement price per current face). |
 | `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
@@ -69,7 +69,7 @@ structured_credit/
 ├── pricing/
 │   ├── simulation_engine/ # the deterministic period loop, pool flows, conservation checks
 │   ├── waterfall.rs       # execute_waterfall(_with_explanation), WaterfallContext
-│   ├── resolve.rs         # resolve_waterfall: layer WaterfallRules onto the base waterfall
+│   ├── resolve.rs         # layer WaterfallRules onto the period waterfall in place
 │   ├── coverage_tests.rs  # OC/IC test evaluation
 │   └── stochastic/        # calibration presets, tree and Monte Carlo orchestration
 ├── metrics/
@@ -302,7 +302,7 @@ the senior's share outright. `triggers` (the `StepDownTrigger` tests) gate
 the schedule: while any fails the shift reverts to the full lockout.
 
 Declarative rules (`WaterfallRules`: available-funds cap, step-down triggers,
-shifting interest) are layered onto the base waterfall by `resolve_waterfall`,
+shifting interest) are layered onto the base waterfall each period (`pricing/resolve.rs`),
 which is the identity when no rules are configured.
 
 The available-funds cap (`AfcSpec { capped_tranches, net_wac_fee_bp,
