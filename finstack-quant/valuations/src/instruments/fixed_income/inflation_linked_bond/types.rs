@@ -813,6 +813,20 @@ impl InflationLinkedBond {
         source.ratio(self, date)
     }
 
+    /// Business-day-adjusted maturity on which principal is paid.
+    ///
+    /// Shared by the projected (PV) schedule and the real-yield schedule so
+    /// both pay principal on the same date as the final coupon.
+    fn principal_payment_date(&self) -> Result<Date> {
+        crate::cashflow::builder::calendar::adjust_date(
+            self.maturity,
+            self.business_day_convention,
+            self.calendar_id
+                .as_deref()
+                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        )
+    }
+
     /// Calculate real accrued interest at the given date
     fn accrued_real_interest(&self, as_of: Date) -> Result<f64> {
         if self.issue_date >= self.maturity {
@@ -932,11 +946,7 @@ impl InflationLinkedBond {
             ));
         }
 
-        let principal_date = crate::cashflow::builder::calendar::adjust_date(
-            self.maturity,
-            self.business_day_convention,
-            cal_id,
-        )?;
+        let principal_date = self.principal_payment_date()?;
         if principal_date >= as_of {
             flows.push((principal_date, self.notional));
         }
@@ -1253,7 +1263,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             &mut detailed_flows,
         )?;
 
-        let raw_principal_ratio = inflation_source.ratio(self, self.maturity)?;
+        let principal_date = self.principal_payment_date()?;
+        let raw_principal_ratio = inflation_source.ratio(self, principal_date)?;
         let principal_ratio = match self.deflation_protection {
             DeflationProtection::None => raw_principal_ratio,
             DeflationProtection::MaturityOnly | DeflationProtection::AllPayments => {
@@ -1261,7 +1272,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             }
         };
         detailed_flows.push(crate::cashflow::primitives::CashFlow::new(
-            self.maturity,
+            principal_date,
             None,
             self.notional * principal_ratio,
             crate::cashflow::primitives::CFKind::Notional,
@@ -1602,6 +1613,39 @@ mod tests {
             .expect("hybrid RefCPI");
         let expected = (110.0 + (14.0 / 30.0) * (120.0 - 110.0)) / bond.base_index;
         assert!((ratio - expected).abs() < 1e-12);
+    }
+
+    /// Principal on a weekend maturity (Sunday 2034-01-15) is paid on the
+    /// Following business day, 2034-01-16,
+    /// in both the PV schedule and the real-yield schedule, together with the
+    /// final coupon.
+    #[test]
+    fn principal_paid_on_adjusted_maturity_in_pv_and_real_schedules() {
+        let as_of = d(2024, Month::January, 15);
+        let mut bond = sample_bond(DeflationProtection::None);
+        bond.issue_date = d(2024, Month::January, 15);
+        bond.maturity = d(2034, Month::January, 15); // Sunday
+        let inflation = InflationCurve::builder("US-CPI")
+            .base_date(as_of)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (12.0, 100.0)])
+            .build()
+            .expect("inflation curve");
+        let market = MarketContext::new().insert(inflation);
+
+        let adjusted = d(2034, Month::January, 16);
+        let schedule = bond.cashflow_schedule(&market, as_of).expect("pv schedule");
+        let principal_dates: Vec<Date> = schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Notional)
+            .map(|cf| cf.date)
+            .collect();
+        assert_eq!(principal_dates, vec![adjusted]);
+        assert_ne!(principal_dates[0], bond.maturity);
+
+        let real = bond.build_real_schedule(as_of).expect("real schedule");
+        assert_eq!(real.last().map(|(date, _)| *date), Some(adjusted));
     }
 
     #[test]
