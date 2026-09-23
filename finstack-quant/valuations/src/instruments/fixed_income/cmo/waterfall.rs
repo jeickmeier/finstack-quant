@@ -130,8 +130,9 @@ pub fn execute_waterfall_with_pac(
 
 /// Execute waterfall while preserving scheduled-principal vs prepayment buckets.
 ///
-/// `collateral_factor` is the collateral pool factor (current/original
-/// balance) for this period; IO strip notionals amortize with it.
+/// `collateral_survival` is the fraction of the collateral balance that
+/// survives this period (`ending / beginning`); IO strip notionals amortize
+/// with it.
 ///
 /// # Arguments
 ///
@@ -142,8 +143,9 @@ pub fn execute_waterfall_with_pac(
 /// * `prepayment_principal` - Voluntary/prepaid collateral principal collected
 ///   this period.
 /// * `available_interest` - Total collateral interest available this period.
-/// * `collateral_factor` - Current/original collateral balance ratio used to
-///   amortize IO strip notional.
+/// * `collateral_survival` - Collateral ending/beginning balance ratio for
+///   this period, in `[0, 1]`. An IO strip accrues on its current notional
+///   and its notional is multiplied by this ratio at period end.
 /// * `pac_context` - Optional PAC schedule, period index, and realized PSA;
 ///   `None` applies no PAC collar constraint.
 ///
@@ -173,7 +175,7 @@ pub fn execute_waterfall_with_principal_breakdown(
     scheduled_principal: f64,
     prepayment_principal: f64,
     available_interest: f64,
-    collateral_factor: f64,
+    collateral_survival: f64,
     pac_context: Option<&PacContext>,
 ) -> finstack_quant_core::Result<CmoWaterfallPeriodResult> {
     let mut remaining_principal = scheduled_principal + prepayment_principal;
@@ -211,14 +213,10 @@ pub fn execute_waterfall_with_principal_breakdown(
         if accretion_phase && tranche.tranche_type == CmoTrancheType::Accrual {
             continue;
         }
-        // An IO strip's notional is not a principal balance — it amortizes
-        // with the collateral factor (the IO references a slice of the pool's
-        // interest, which shrinks as the pool pays down).
-        let notional = if tranche.tranche_type == CmoTrancheType::InterestOnly {
-            tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
-        } else {
-            tranche.current_face.amount()
-        };
+        // An IO strip's current notional is not a principal balance: it
+        // references a slice of the pool's interest and amortizes with the
+        // collateral at period end (see the output loop).
+        let notional = tranche.current_face.amount();
         if notional <= 0.0 {
             continue;
         }
@@ -404,7 +402,7 @@ pub fn execute_waterfall_with_principal_breakdown(
         // tranche's balance grows by the funded accrual capitalized this
         // period before any principal paydown.
         let ending = if tranche.tranche_type == CmoTrancheType::InterestOnly {
-            tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
+            beginning * collateral_survival.clamp(0.0, 1.0)
         } else {
             (beginning + accreted_interest - principal).max(0.0)
         };
@@ -556,23 +554,6 @@ fn allocate_principal_to_group(
     }
 
     allocations
-}
-
-/// Allocate IO cashflows.
-///
-/// IO strips receive interest based on their notional and coupon,
-/// but their notional decreases as the underlying pool pays down.
-///
-/// # Arguments
-///
-/// * `io_tranche` - Interest-only CMO tranche whose original face and monthly
-///   coupon determine the period interest allocation.
-/// * `collateral_factor` - Current/original collateral balance ratio applied
-///   to reduce the IO strip's effective notional.
-pub fn allocate_io_cashflow(io_tranche: &CmoTranche, collateral_factor: f64) -> f64 {
-    // IO payment = notional × factor × coupon / 12
-    let adjusted_notional = io_tranche.original_face.amount() * collateral_factor;
-    adjusted_notional * io_tranche.coupon / 12.0
 }
 
 /// Attribute scheduled-vs-prepayment principal to each tranche at source.
@@ -776,20 +757,6 @@ mod tests {
         assert!(a_alloc.interest > 100.0 && a_alloc.interest < 200.0);
     }
 
-    #[test]
-    fn test_io_allocation() {
-        let io = CmoTranche::io_strip("IO", Money::from((100_000_i64, Currency::USD)), 0.04);
-
-        // At 100% factor
-        let payment = allocate_io_cashflow(&io, 1.0);
-        // 100,000 × 0.04 / 12 = 333.33
-        assert!((payment - 333.33).abs() < 1.0);
-
-        // At 50% factor
-        let payment_half = allocate_io_cashflow(&io, 0.5);
-        assert!((payment_half - 166.67).abs() < 1.0);
-    }
-
     /// Finding 17: when collateral interest cannot cover the tranche coupons,
     /// the unmet demand is reported per tranche as `interest_shortfall`
     /// (juniors short first, matching the priority-ordered interest pass).
@@ -829,18 +796,21 @@ mod tests {
         assert!(c.interest_shortfall > 0.0, "junior tranche bears shortfall");
     }
 
-    /// Finding 17: in the waterfall interest pass an IO strip accrues on its
-    /// factor-adjusted notional and its reported balance amortizes with the
-    /// collateral factor, not with (nonexistent) principal payments.
+    /// An IO strip accrues on its *current* notional and its notional
+    /// amortizes by the collateral survival ratio, not with (nonexistent)
+    /// principal payments. The IO here was issued at 100,000 and is now at
+    /// 70,000 (collateral factor 0.7): interest = 70,000 × 4% / 12 = 233.33.
+    /// Half the collateral pays down this period, so the IO ends at 35,000.
     #[test]
-    fn io_interest_and_balance_use_collateral_factor() {
+    fn io_accrues_on_current_notional_and_amortizes_with_collateral() {
+        let mut io = CmoTranche::io_strip("IO", Money::from((100_000_i64, Currency::USD)), 0.04);
+        io.current_face = Money::from((70_000_i64, Currency::USD));
         let tranches = vec![
-            CmoTranche::sequential("A", Money::from((100_000_i64, Currency::USD)), 0.04, 1),
-            CmoTranche::io_strip("IO", Money::from((100_000_i64, Currency::USD)), 0.04),
+            CmoTranche::sequential("A", Money::from((70_000_i64, Currency::USD)), 0.04, 1),
+            io,
         ];
         let mut waterfall = CmoWaterfall::new(tranches);
 
-        // Pool at factor 0.5: IO accrues on 50,000, not 100,000.
         let result = execute_waterfall_with_principal_breakdown(
             &mut waterfall,
             1_000.0,
@@ -856,15 +826,14 @@ mod tests {
             .iter()
             .find(|x| x.tranche_id == "IO")
             .expect("IO allocation");
-        // 100,000 × 0.5 × 0.04 / 12 = 166.67
         assert!(
-            (io.interest - 100_000.0 * 0.5 * 0.04 / 12.0).abs() < 1e-6,
-            "IO interest must accrue on factor-adjusted notional, got {}",
+            (io.interest - 70_000.0 * 0.04 / 12.0).abs() < 1e-9,
+            "IO interest must accrue on its current notional, got {}",
             io.interest
         );
         assert!(
-            (io.ending_balance - 50_000.0).abs() < 1e-9,
-            "IO balance must amortize with the collateral factor, got {}",
+            (io.ending_balance - 35_000.0).abs() < 1e-9,
+            "IO balance must amortize with the collateral, got {}",
             io.ending_balance
         );
         assert!(io.principal.abs() < 1e-12, "IO receives no principal");

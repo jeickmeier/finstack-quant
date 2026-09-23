@@ -448,6 +448,16 @@ impl AgencyCmo {
                     "{context} collateral and tranche currencies must match"
                 )));
             }
+            // The collateral backs exactly the principal tranches; IO
+            // notionals are scaled by collateral balance over this face.
+            let collateral_face = pool.current_face.amount();
+            let principal_face = self.waterfall.total_current_face()?.amount();
+            if (collateral_face - principal_face).abs() > 1e-6 * collateral_face.max(1.0) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} collateral current face {collateral_face:.2} must equal the sum \
+                     of principal-tranche current faces {principal_face:.2}"
+                )));
+            }
         }
         Self::validate_interest_coverage(self)
     }
