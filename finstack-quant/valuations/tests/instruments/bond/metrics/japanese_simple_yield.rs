@@ -258,3 +258,55 @@ fn quote_engine_japanese_simple_yield_rejects_frn() {
         "unexpected error: {err}"
     );
 }
+
+/// W2.1: JSDA simple yield uses the CLEAN price, `y = [C + (100 − P)/N] / P`,
+/// in both the metric and its inverse, so a mid-period quote round-trips.
+///
+/// Hand calculation: 2% coupon, clean 98.0, settlement 2025-04-01,
+/// maturity 2027-01-01 → N = 640/365 years (ACT/365F).
+#[test]
+fn japanese_simple_yield_mid_period_uses_clean_price_and_round_trips() {
+    let as_of = date!(2025 - 04 - 01);
+    let market = flat_jpy_market(as_of);
+    let n = 640.0 / 365.0;
+    let clean = 98.0;
+    let expected = (2.0 + (100.0 - clean) / n) / clean;
+
+    let mut quoted = two_year_jgb_style_bond();
+    quoted.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(clean);
+    let y = japanese_simple_yield(&quoted, &market, as_of);
+    assert!(
+        (y - expected).abs() < 1e-12,
+        "JSDA simple yield on clean {clean}: expected {expected}, got {y}"
+    );
+    // The old metric divided by the DIRTY price (clean + ~0.49 accrued).
+    let accrued = 100.0 * 0.02 * 90.0 / 365.0;
+    let dirty_denominator = (2.0 + (100.0 - clean) / n) / (clean + accrued);
+    assert!((y - dirty_denominator).abs() > 1e-5);
+
+    let target = 0.025;
+    let quotes = compute_quotes(
+        &two_year_jgb_style_bond(),
+        &market,
+        as_of,
+        BondQuoteInput::JapaneseSimpleYield(target),
+        finstack_quant_valuations::instruments::PricingOptions::default()
+            .with_model(ModelKey::Discounting),
+    )
+    .expect("quote engine");
+    let expected_clean = 100.0 * (1.0 + 0.02 * n) / (1.0 + target * n);
+    assert!(
+        (quotes.clean_price_pct - expected_clean).abs() < 1e-10,
+        "clean {} should match JSDA inverse {expected_clean}",
+        quotes.clean_price_pct
+    );
+    let mut priced = two_year_jgb_style_bond();
+    priced.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(quotes.clean_price_pct);
+    let recovered = japanese_simple_yield(&priced, &market, as_of);
+    assert!(
+        (recovered - target).abs() < 1e-12,
+        "mid-period round-trip: expected {target}, got {recovered}"
+    );
+}

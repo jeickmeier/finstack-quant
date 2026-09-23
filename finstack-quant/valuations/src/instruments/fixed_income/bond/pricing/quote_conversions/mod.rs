@@ -29,8 +29,8 @@ pub use yield_price::{
 pub(crate) use annuity::asset_swap_projection_rate;
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
 pub(crate) use yield_price::{
-    enumerate_exit_paths, exercise_redemption_amount, icma_reference_period,
-    price_from_japanese_simple_yield, solve_ytw_from_flows,
+    clean_price_from_japanese_simple_yield, enumerate_exit_paths, exercise_redemption_amount,
+    icma_reference_period, japanese_simple_yield, solve_ytw_from_flows,
 };
 
 /// One candidate early-exit for yield-to-worst enumeration.
