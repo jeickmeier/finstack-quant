@@ -35,11 +35,23 @@ export function createService(native: {
   >;
   statements: Pick<
     typeof statements,
-    "validateFinancialModelJson" | "modelNodeIds" | "validateFormula" | "parseFormulaText" | "evaluateModel" | "evaluateModelWithMarket"
+    | "validateFinancialModelJson"
+    | "modelNodeIds"
+    | "validateCheckSuiteSpecJson"
+    | "validateFormula"
+    | "parseFormulaText"
+    | "evaluateModel"
+    | "evaluateModelWithMarket"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
-    "explainFormula" | "traceDependencies" | "runChecks" | "runThreeStatementChecks" | "runCreditUnderwritingChecks"
+    | "explainFormula"
+    | "explainFormulaText"
+    | "traceDependencies"
+    | "runChecks"
+    | "runThreeStatementChecks"
+    | "runCreditUnderwritingChecks"
+    | "renderCheckReportText"
   >;
   valuations: Pick<
     typeof valuations,
@@ -141,7 +153,9 @@ export function createService(native: {
       return result(() => {
         if (request.marketJson !== undefined || request.asOf !== undefined) {
           if (request.marketJson === undefined || request.asOf === undefined)
-            throw new TypeError("Statement market JSON and as-of date must be supplied together");
+            throw new TypeError(
+              "Statement market JSON and as-of date must be supplied together",
+            );
           return native.statements.evaluateModelWithMarket(
             request.modelJson,
             request.marketJson,
@@ -152,28 +166,59 @@ export function createService(native: {
       });
     },
     explainStatement(request) {
-      return result(() => native.statements_analytics.explainFormula(
-        request.modelJson,
-        request.resultsJson,
-        request.nodeId,
-        request.period,
-      ));
+      return result(() =>
+        native.statements_analytics.explainFormula(
+          request.modelJson,
+          request.resultsJson,
+          request.nodeId,
+          request.period,
+        ),
+      );
+    },
+    explainStatementText(request) {
+      return result(() =>
+        native.statements_analytics.explainFormulaText(
+          request.modelJson,
+          request.resultsJson,
+          request.nodeId,
+          request.period,
+        ),
+      );
     },
     traceStatement(modelJson, nodeId) {
-      return result(() => native.statements_analytics.traceDependencies(modelJson, nodeId));
+      return result(() =>
+        native.statements_analytics.traceDependencies(modelJson, nodeId),
+      );
     },
     runStatementChecks(request) {
       return result(() => {
         const { modelJson, resultsJson, configJson } = request;
         switch (request.kind) {
           case "suite":
-            return native.statements_analytics.runChecks(modelJson, configJson, resultsJson);
+            return native.statements_analytics.runChecks(
+              modelJson,
+              native.statements.validateCheckSuiteSpecJson(configJson),
+              resultsJson,
+            );
           case "three-statement":
-            return native.statements_analytics.runThreeStatementChecks(modelJson, configJson, resultsJson);
+            return native.statements_analytics.runThreeStatementChecks(
+              modelJson,
+              configJson,
+              resultsJson,
+            );
           case "credit-underwriting":
-            return native.statements_analytics.runCreditUnderwritingChecks(modelJson, configJson, resultsJson);
+            return native.statements_analytics.runCreditUnderwritingChecks(
+              modelJson,
+              configJson,
+              resultsJson,
+            );
         }
       });
+    },
+    renderStatementChecks(reportJson) {
+      return result(() =>
+        native.statements_analytics.renderCheckReportText(reportJson),
+      );
     },
     dryRun(json) {
       return result(() => native.calibration.dryRun(json));

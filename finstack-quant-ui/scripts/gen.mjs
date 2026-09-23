@@ -40,7 +40,11 @@ export async function discoverFixtures(repo, contracts) {
       const contract =
         kind === "instrument"
           ? byFile(value.instrument?.type)
-          : byFile(kind === "statement-model" ? "financial_model_spec" : "calibration");
+          : byFile(
+              kind === "statement-model"
+                ? "financial_model_spec"
+                : "calibration",
+            );
       if (
         !contract ||
         (kind === "instrument" && !contract.$id.includes("/instrument/1/"))
@@ -172,7 +176,10 @@ export async function generate(repo = repoRoot) {
           `Fixture failed ${fixture.source}: ${JSON.stringify(result.error.issues).slice(0, 4000)}`,
         );
     }
-    if (root.$id.endsWith("/financial_model_spec.schema.json") && examples.length === 1)
+    if (
+      root.$id.endsWith("/financial_model_spec.schema.json") &&
+      examples.length === 1
+    )
       files.set("examples/financial_model_spec.json", examples[0].text);
     files.set(`schemas/${name}.json`, json(schema));
     files.set(

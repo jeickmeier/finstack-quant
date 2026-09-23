@@ -105,10 +105,20 @@ export interface WorkerApi {
   validateStatementModel(modelJson: string): Promise<Envelope<string>>;
   statementNodeIds(modelJson: string): Promise<Envelope<string[]>>;
   validateStatementFormula(formula: string): Promise<Envelope<string>>;
-  evaluateStatement(request: StatementRequest): Promise<Envelope<StatementResultJson>>;
-  explainStatement(request: StatementExplanationRequest): Promise<Envelope<FormulaExplanationJson>>;
+  evaluateStatement(
+    request: StatementRequest,
+  ): Promise<Envelope<StatementResultJson>>;
+  explainStatement(
+    request: StatementExplanationRequest,
+  ): Promise<Envelope<FormulaExplanationJson>>;
+  explainStatementText(
+    request: StatementExplanationRequest,
+  ): Promise<Envelope<string>>;
   traceStatement(modelJson: string, nodeId: string): Promise<Envelope<string>>;
-  runStatementChecks(request: StatementChecksRequest): Promise<Envelope<CheckReport>>;
+  runStatementChecks(
+    request: StatementChecksRequest,
+  ): Promise<Envelope<CheckReport>>;
+  renderStatementChecks(reportJson: string): Promise<Envelope<string>>;
   dryRun(envelopeJson: string): Promise<Envelope<string>>;
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;

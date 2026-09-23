@@ -1,0 +1,1856 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Versioned financial statement evaluation result.",
+  "examples": [
+    {
+      "meta": {
+        "num_nodes": 0,
+        "num_periods": 0,
+        "numeric_mode": "float64",
+        "parallel": false
+      },
+      "nodes": {},
+      "schema_version": 1
+    }
+  ],
+  "properties": {
+    "check_report": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_f0893f1d89ca5934871f"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Check report from inline validation (None if no checks configured)"
+    },
+    "cs_cashflows": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_f840db5f4c38222f7ca7"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Capital structure cashflows (populated when model has a capital_structure)"
+    },
+    "meta": {
+      "$ref": "#/$defs/d_d812cec4e88e45c1b673",
+      "description": "Metadata about the evaluation"
+    },
+    "monetary_nodes": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c"
+        },
+        "type": "object"
+      },
+      "description": "Map of node_id → (period_id → Money) for monetary nodes",
+      "type": "object"
+    },
+    "node_value_types": {
+      "additionalProperties": {
+        "$ref": "#/$defs/d_8b741636dd21d9f7ad3f"
+      },
+      "description": "Track value types for each node",
+      "type": "object"
+    },
+    "nodes": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "$ref": "#/$defs/d_d2458ef8e558d1360642"
+        },
+        "type": "object"
+      },
+      "description": "Map of node_id → (period_id → value). Native values are f64; JSON uses\nnumbers for finite values and `\"nan\"`, `\"inf\"`, `\"-inf\"` for non-finite cells.",
+      "type": "object"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/d_1123ed7c2c0a8683a461",
+      "description": "Required wire-format schema version. Only numeric `1` is accepted."
+    }
+  },
+  "required": [
+    "schema_version",
+    "nodes",
+    "meta"
+  ],
+  "title": "StatementResult",
+  "type": "object",
+  "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+  "$defs": {
+    "d_033184211bfcc772ee94": {
+      "description": "Aggregate counts for a completed check run.",
+      "properties": {
+        "errors": {
+          "description": "Total number of error-severity findings across all checks.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Number of checks that failed (at least one error-severity finding).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "infos": {
+          "description": "Total number of info-severity findings across all checks.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "passed": {
+          "description": "Number of checks that passed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total_checks": {
+          "description": "Total number of checks executed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "description": "Total number of warning-severity findings across all checks.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_checks",
+        "passed",
+        "failed",
+        "errors",
+        "warnings",
+        "infos"
+      ],
+      "type": "object"
+    },
+    "d_033ef06200a8ef7aaa49": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    },
+    "d_051db3e5118e3d934ba2": {
+      "description": "Cash claim category affected by a capital-structure warning.",
+      "oneOf": [
+        {
+          "const": "fees",
+          "description": "Fee claims such as commitment or facility fees.",
+          "type": "string"
+        },
+        {
+          "const": "interest",
+          "description": "Cash-interest claims.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_07ccd5501efef381b26a": {
+      "const": "float64",
+      "description": "Numeric mode used for evaluation.",
+      "type": "string"
+    },
+    "d_0a5999cddcebb0071355": {
+      "description": "Severity level for a check finding, ordered from least to most severe.",
+      "oneOf": [
+        {
+          "const": "info",
+          "description": "Informational finding — no action required.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Warning — review recommended.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Error — indicates a likely problem that should be addressed.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_1123ed7c2c0a8683a461": {
+      "description": "Numeric schema revision for contracts whose sole supported revision is v1.",
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "d_11c7dbc9fa7cb6ce298a": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "d_1b5716dde9957a614f3c": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/d_a6d5ae6d2d82132c00a1",
+          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
+        },
+        "currency": {
+          "$ref": "#/$defs/d_9e50e1b9698ebe0e1126",
+          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "d_288b30976e4551573cdd": {
+      "description": "Materiality context attached to a finding, describing its quantitative\nsignificance.",
+      "properties": {
+        "absolute": {
+          "description": "Absolute amount of the discrepancy.",
+          "format": "double",
+          "type": "number"
+        },
+        "reference_label": {
+          "description": "Human-readable label for the reference (e.g. \"total_assets\").",
+          "type": "string"
+        },
+        "reference_value": {
+          "description": "The reference (denominator) value used when computing `relative_pct`.",
+          "format": "double",
+          "type": "number"
+        },
+        "relative_pct": {
+          "description": "Discrepancy as a percentage of the reference value.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "absolute",
+        "relative_pct",
+        "reference_value",
+        "reference_label"
+      ],
+      "type": "object"
+    },
+    "d_4f32370227b1985d85e9": {
+      "description": "Outcome of a single check execution.",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/d_6b3a4039b4eb2830fb1a",
+          "description": "Category this check belongs to."
+        },
+        "check_id": {
+          "description": "Identifier of the check.",
+          "type": "string"
+        },
+        "check_name": {
+          "description": "Human-readable name of the check.",
+          "type": "string"
+        },
+        "findings": {
+          "description": "Individual findings produced by the check.",
+          "items": {
+            "$ref": "#/$defs/d_82a7f3795866afe7c96c"
+          },
+          "type": "array"
+        },
+        "passed": {
+          "description": "Whether the check passed (no error-severity findings).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "check_id",
+        "check_name",
+        "category",
+        "passed",
+        "findings"
+      ],
+      "type": "object"
+    },
+    "d_677810bf9653cfb0a467": {
+      "additionalProperties": false,
+      "description": "Breakdown of cashflows by type for a single period.\n\nOutflow-like fields such as interest, fees, and principal payments are\nstored as positive amounts representing debt service paid or accrued during\nthe period.\n\nInterest expense is split into cash and PIK components for visibility\ninto non-cash interest accrual. Use `interest_expense_total()` for the\ncombined value. All monetary fields use the Money type for currency safety.\n\nInterest *expense* and interest *income* are tracked separately rather than\nas one signed field: a two-leg instrument (an interest-rate swap) can net to\na receipt in a period — a pay-fixed hedge is in the money whenever the\nfloating leg exceeds the fixed leg — and a receipt is not debt service. The\nwaterfall allocates cash against expense claims, so folding a receipt into\n`interest_expense_cash` as a negative claim would corrupt pro-rata\nallocation. See [`Self::net_interest_expense_cash`] for the combined view.",
+      "properties": {
+        "accrued_interest": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Accrued interest not yet paid (liability)"
+        },
+        "debt_balance": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Outstanding debt balance at period end"
+        },
+        "fees": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Fees (commitment fees, etc.)"
+        },
+        "interest_expense_cash": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Cash interest payments (coupons, floating resets)"
+        },
+        "interest_expense_pik": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "PIK (payment-in-kind) interest accrued but not paid in cash"
+        },
+        "interest_income_cash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1b5716dde9957a614f3c"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Net cash interest **received** during the period.\n\nNon-zero only for two-leg instruments whose legs net to a receipt (e.g.\nan in-the-money pay-fixed swap). Stored as a positive amount, like the\noutflow-oriented fields, and reported through the `cs.interest_income`\nnamespace.\n\n`None` means that no income leg applies. Read it via\n[`Self::interest_income_cash_or_zero`] when a currency-preserving zero\nis more convenient than an optional value."
+        },
+        "principal_payment": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Principal repayments (amortization, maturity)"
+        }
+      },
+      "required": [
+        "interest_expense_cash",
+        "interest_expense_pik",
+        "principal_payment",
+        "fees",
+        "debt_balance",
+        "accrued_interest"
+      ],
+      "type": "object"
+    },
+    "d_6b3a4039b4eb2830fb1a": {
+      "description": "Category that groups related checks together.",
+      "oneOf": [
+        {
+          "const": "accounting_identity",
+          "description": "Balance sheet balances, retained earnings flow-through, cash ties",
+          "type": "string"
+        },
+        {
+          "const": "cross_statement_reconciliation",
+          "description": "Depreciation ties to PP&E, interest ties to debt schedule, etc.",
+          "type": "string"
+        },
+        {
+          "const": "internal_consistency",
+          "description": "Growth rate plausibility, effective tax rate range, WC consistency",
+          "type": "string"
+        },
+        {
+          "const": "credit_reasonableness",
+          "description": "Leverage ranges, coverage floors, FCF sign, liquidity runway",
+          "type": "string"
+        },
+        {
+          "const": "data_quality",
+          "description": "Missing values, NaN/Inf, sign conventions",
+          "type": "string"
+        }
+      ]
+    },
+    "d_76adf23abc095fd56514": {
+      "description": "Warning emitted during evaluation.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Division by zero encountered",
+          "properties": {
+            "division_by_zero": {
+              "properties": {
+                "node_id": {
+                  "description": "Identifier of the node that triggered the warning.",
+                  "type": "string"
+                },
+                "period": {
+                  "description": "Period in which the warning occurred.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node_id",
+                "period"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "division_by_zero"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "NaN value bubbled up to a node result",
+          "properties": {
+            "nan_propagated": {
+              "properties": {
+                "node_id": {
+                  "description": "Identifier of the node that produced the NaN value.",
+                  "type": "string"
+                },
+                "period": {
+                  "description": "Period in which the warning occurred.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node_id",
+                "period"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "nan_propagated"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Non-finite value (NaN, Inf, -Inf) detected when storing a node result.\n\nThis warning is emitted by the finiteness validation pipeline so that\nconsumers can identify which node/period introduced bad values.",
+          "properties": {
+            "non_finite_value": {
+              "properties": {
+                "node_id": {
+                  "description": "Identifier of the node that produced the non-finite value.",
+                  "type": "string"
+                },
+                "period": {
+                  "description": "Period in which the warning occurred.",
+                  "type": "string"
+                },
+                "value": {
+                  "$ref": "#/$defs/d_d2458ef8e558d1360642",
+                  "description": "The actual non-finite value, encoded as `\"nan\"`, `\"inf\"`, or `\"-inf\"`."
+                }
+              },
+              "required": [
+                "node_id",
+                "period",
+                "value"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "non_finite_value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Capital-structure extraction or waterfall processing required a guarded fallback.",
+          "properties": {
+            "capital_structure": {
+              "properties": {
+                "period": {
+                  "description": "Period in which the warning was raised.",
+                  "type": "string"
+                },
+                "warning": {
+                  "$ref": "#/$defs/d_dcfe22859677d75effd4",
+                  "description": "Typed reason and associated diagnostic values."
+                }
+              },
+              "required": [
+                "period",
+                "warning"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "capital_structure"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One or more non-finite inputs were skipped by a skip-NaN aggregate\n(`sum`, `mean`, ...).\n\nThe aggregate's skip-NaN policy is intentional, but silently dropping a\nbroken line item can mask upstream problems (e.g. a division by zero in\none argument), so the drop is surfaced here.",
+          "properties": {
+            "non_finite_skipped": {
+              "properties": {
+                "count": {
+                  "description": "Number of non-finite inputs dropped.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "function": {
+                  "description": "Name of the aggregate function that dropped values.",
+                  "type": "string"
+                },
+                "node_id": {
+                  "description": "Identifier of the node whose aggregate dropped inputs.",
+                  "type": "string"
+                },
+                "period": {
+                  "description": "Period in which the drop occurred.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "node_id",
+                "period",
+                "function",
+                "count"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "non_finite_skipped"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_82a7f3795866afe7c96c": {
+      "description": "A single finding produced by a check for a specific period or node.",
+      "properties": {
+        "check_id": {
+          "description": "Identifier of the check that produced this finding.",
+          "type": "string"
+        },
+        "materiality": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_288b30976e4551573cdd"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Materiality context, if applicable."
+        },
+        "message": {
+          "description": "Human-readable description of the issue.",
+          "type": "string"
+        },
+        "nodes": {
+          "description": "Node identifiers involved in the finding.",
+          "items": {
+            "$ref": "#/$defs/d_033ef06200a8ef7aaa49"
+          },
+          "type": "array"
+        },
+        "period": {
+          "description": "Period the finding relates to, if applicable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "$ref": "#/$defs/d_0a5999cddcebb0071355",
+          "description": "Severity of the finding."
+        }
+      },
+      "required": [
+        "check_id",
+        "severity",
+        "message"
+      ],
+      "type": "object"
+    },
+    "d_8b741636dd21d9f7ad3f": {
+      "description": "Node value type classification.\n\nDetermines whether a node represents monetary values (with a specific currency)\nor scalar values (ratios, percentages, counts, etc.).",
+      "oneOf": [
+        {
+          "description": "Monetary value with a specific currency (e.g., revenue, costs, balance sheet items)",
+          "properties": {
+            "currency": {
+              "$ref": "#/$defs/d_9e50e1b9698ebe0e1126",
+              "description": "Currency of the monetary value"
+            },
+            "type": {
+              "const": "monetary",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "currency"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Unitless scalar value (e.g., ratios, percentages, counts)",
+          "properties": {
+            "type": {
+              "const": "scalar",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_9e50e1b9698ebe0e1126": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "d_a6d5ae6d2d82132c00a1": {
+      "description": "Exact decimal encoded only as a JSON string.",
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+      "type": "string"
+    },
+    "d_c7156583a7d399a69ae5": {
+      "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.",
+      "oneOf": [
+        {
+          "const": "fixed",
+          "description": "Fixed-rate coupon cash-flow.\n\nPeriodic interest payment calculated as: `notional × rate × accrual_factor`.\nThe `rate` field on [`CashFlow`] stores the coupon rate used.",
+          "type": "string"
+        },
+        {
+          "const": "float_reset",
+          "description": "Floating-rate coupon cash-flow (or index fixing event).\n\nInterest payment based on a reference rate (e.g., SOFR, EURIBOR) plus spread.\nThe `reset_date` field on [`CashFlow`] indicates when the rate was fixed.\nThe `rate` field stores the all-in rate (index + spread) if known.",
+          "type": "string"
+        },
+        {
+          "const": "inflation_coupon",
+          "description": "Inflation-linked coupon cash-flow.\n\nPeriodic coupon payment on an inflation-linked bond or swap leg where the\nreal coupon is multiplied by an index ratio (e.g., CPI / base CPI).\nThe `rate` field stores the real coupon rate when known.",
+          "type": "string"
+        },
+        {
+          "const": "fee",
+          "description": "Up-front fee or cost paid at inception.\n\nOne-time fee paid at trade date or settlement date, such as origination fees,\narrangement fees, or underwriting fees.",
+          "type": "string"
+        },
+        {
+          "const": "commitment_fee",
+          "description": "Commitment fee on undrawn balance.\n\nPeriodic fee charged on the undrawn portion of a revolving facility.\nTypically quoted in basis points per annum on the unused commitment.",
+          "type": "string"
+        },
+        {
+          "const": "usage_fee",
+          "description": "Usage fee on drawn balance.\n\nAdditional fee charged when facility utilization exceeds a threshold,\ncommon in leveraged loan facilities.",
+          "type": "string"
+        },
+        {
+          "const": "facility_fee",
+          "description": "Facility fee on total commitment.\n\nFee charged on the entire committed amount regardless of utilization,\ncovering the lender's cost of keeping the facility available.",
+          "type": "string"
+        },
+        {
+          "const": "lc_fee",
+          "description": "Letter-of-credit fee.\n\nPeriodic fee on the face of letters of credit issued under a revolving\nfacility's LC sublimit, typically at the drawn margin.",
+          "type": "string"
+        },
+        {
+          "const": "fronting_fee",
+          "description": "Fronting fee.\n\nPeriodic fee paid to the issuing bank on the face of letters of credit\noutstanding under a revolving facility.",
+          "type": "string"
+        },
+        {
+          "const": "notional",
+          "description": "Principal exchange or notional flow.\n\nUsed for initial notional payment (at inception), final notional repayment\n(at maturity), or intermediate notional exchanges in cross-currency swaps.\nFor bonds: initial = purchase price, final = par redemption.",
+          "type": "string"
+        },
+        {
+          "const": "pik",
+          "description": "Payment-in-kind interest capitalization.\n\nInterest that is added to the outstanding principal rather than paid in cash.\nCreates a new notional amount: `new_notional = old_notional + PIK_interest`.\nThe amount field represents the interest capitalized.",
+          "type": "string"
+        },
+        {
+          "const": "amortization",
+          "description": "Scheduled amortization (principal repayment).\n\nReduces the outstanding principal per the amortization schedule.\nAmount is positive from holder perspective (principal returned).\nAfter amortization: `remaining_notional = previous_notional - amortization`.",
+          "type": "string"
+        },
+        {
+          "const": "pre_payment",
+          "description": "Prepayment of principal (unscheduled early repayment).\n\nVoluntary or mandatory early return of principal, common in:\n- Mortgage-backed securities (borrower refinancing)\n- CLO/CDO structures (collateral prepayments)\n- Callable bonds (issuer exercise)",
+          "type": "string"
+        },
+        {
+          "const": "revolving_draw",
+          "description": "Revolving facility draw (borrowing).\n\nIncrease in outstanding principal when borrower draws on a revolving facility.\nFrom holder (lender) view: negative (cash out to borrower).\nIncreases the drawn balance used for interest calculations.",
+          "type": "string"
+        },
+        {
+          "const": "revolving_repayment",
+          "description": "Revolving facility repayment.\n\nDecrease in outstanding principal when borrower repays revolving facility.\nFrom holder (lender) view: positive (cash in from borrower).\nRestores availability under the commitment.",
+          "type": "string"
+        },
+        {
+          "const": "defaulted_notional",
+          "description": "Defaulted notional (principal written down due to credit event).\n\nRepresents the portion of principal that has experienced a credit event\n(failure to pay, bankruptcy, restructuring). Amount reflects the\nwrite-down from par.",
+          "type": "string"
+        },
+        {
+          "const": "recovery",
+          "description": "Recovery cashflow from defaulted principal.\n\nAmount recovered through workout, liquidation, or settlement of defaulted\ndebt. Typically expressed as a percentage of defaulted notional\n(recovery rate × defaulted amount).",
+          "type": "string"
+        },
+        {
+          "const": "accrued_on_default",
+          "description": "Accrued-on-default interest (ISDA standard for CDS).\n\nInterest accrued but unpaid at the time of a credit event.\nUnder ISDA standard conventions, the protection buyer pays\nthe accrued premium from the last payment date to the default date.",
+          "type": "string"
+        },
+        {
+          "const": "stub",
+          "description": "Irregular stub period interest.\n\nInterest payment for a non-standard accrual period at the beginning (front stub)\nor end (back stub) of a schedule. May be short stub (< regular period) or\nlong stub (> regular period). Accrual factor reflects actual period length.",
+          "type": "string"
+        },
+        {
+          "const": "initial_margin_post",
+          "description": "Initial margin posting (collateral transfer out to counterparty).\n\nRepresents the posting of initial margin collateral under CSA or clearing\nhouse rules. The amount is typically calculated using SIMM, schedule-based,\nor haircut methodologies.",
+          "type": "string"
+        },
+        {
+          "const": "initial_margin_return",
+          "description": "Initial margin return (collateral returned from counterparty).\n\nRepresents the return of previously posted initial margin when exposure\ndecreases or trade is terminated.",
+          "type": "string"
+        },
+        {
+          "const": "variation_margin_receive",
+          "description": "Variation margin received (positive VM payment to us).\n\nDaily or periodic mark-to-market payment received when exposure moves\nin our favor. Governed by CSA threshold, MTA, and rounding rules.",
+          "type": "string"
+        },
+        {
+          "const": "variation_margin_pay",
+          "description": "Variation margin paid (negative VM payment from us).\n\nDaily or periodic mark-to-market payment made when exposure moves\nagainst us. Governed by CSA threshold, MTA, and rounding rules.",
+          "type": "string"
+        },
+        {
+          "const": "margin_interest",
+          "description": "Interest accrued on posted margin collateral.\n\nRepresents interest paid or received on cash collateral posted as margin.\nRate typically defined in CSA (e.g., Fed Funds, EONIA, SONIA).",
+          "type": "string"
+        },
+        {
+          "const": "collateral_substitution_in",
+          "description": "Collateral substitution inflow (replacement collateral received).\n\nWhen a counterparty substitutes one form of eligible collateral for another,\nthis represents the incoming replacement asset.",
+          "type": "string"
+        },
+        {
+          "const": "collateral_substitution_out",
+          "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_d2458ef8e558d1360642": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "enum": [
+            "nan",
+            "inf",
+            "-inf"
+          ]
+        }
+      ]
+    },
+    "d_d812cec4e88e45c1b673": {
+      "additionalProperties": false,
+      "description": "Execution statistics for a statement-model evaluation.\n\nDistinct from [`finstack_quant_core::config::ResultsMeta`], which is the\nworkspace-wide *audit* stamp (numeric mode, rounding context, FX policy).\nThis type records how the evaluation *ran* — timing, graph size, warnings.",
+      "properties": {
+        "eval_time_ms": {
+          "description": "Evaluation time in milliseconds",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "num_nodes": {
+          "description": "Number of nodes evaluated",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "num_periods": {
+          "description": "Number of periods evaluated",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "numeric_mode": {
+          "$ref": "#/$defs/d_07ccd5501efef381b26a",
+          "default": "float64",
+          "description": "Numeric mode used for evaluation"
+        },
+        "parallel": {
+          "default": false,
+          "description": "Whether parallel evaluation was used",
+          "type": "boolean"
+        },
+        "warnings": {
+          "description": "Warnings encountered during evaluation (division by zero, NaN propagation, etc.)",
+          "items": {
+            "$ref": "#/$defs/d_76adf23abc095fd56514"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "num_nodes",
+        "num_periods"
+      ],
+      "type": "object"
+    },
+    "d_dcfe22859677d75effd4": {
+      "description": "Typed reason for a capital-structure evaluation warning.",
+      "oneOf": [
+        {
+          "description": "A schedule-to-model balance ratio exceeded the safety bound and was clamped.",
+          "properties": {
+            "clamped_ratio": {
+              "description": "Ratio used after applying the safety bound.",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "scale_clamped",
+              "type": "string"
+            },
+            "raw_ratio": {
+              "description": "Unbounded ratio calculated from model and schedule balances.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "raw_ratio",
+            "clamped_ratio"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A contractual cashflow kind is not represented in statement debt service.",
+          "properties": {
+            "cashflow_date": {
+              "$ref": "#/$defs/d_11c7dbc9fa7cb6ce298a",
+              "description": "Original contractual payment date."
+            },
+            "cashflow_kind": {
+              "$ref": "#/$defs/d_c7156583a7d399a69ae5",
+              "description": "Canonical cashflow classification that was excluded."
+            },
+            "kind": {
+              "const": "cashflow_ignored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "cashflow_kind",
+            "cashflow_date"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A negative creditor claim was neutralized instead of reducing other claims.",
+          "properties": {
+            "amount": {
+              "description": "Negative claim amount in the waterfall currency.",
+              "format": "double",
+              "type": "number"
+            },
+            "category": {
+              "$ref": "#/$defs/d_051db3e5118e3d934ba2",
+              "description": "Payment category containing the invalid negative claim."
+            },
+            "instrument_id": {
+              "description": "Instrument whose claim was neutralized.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "negative_claim_neutralized",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "category",
+            "instrument_id",
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A negative available-cash pool was floored to zero before allocation.",
+          "properties": {
+            "amount": {
+              "description": "Negative amount that was floored, in the waterfall currency.",
+              "format": "double",
+              "type": "number"
+            },
+            "kind": {
+              "const": "negative_available_cash_floored",
+              "type": "string"
+            },
+            "node_id": {
+              "description": "Statement node supplying the available-cash amount.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "node_id",
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Available cash was insufficient to pay a cash-interest claim.",
+          "properties": {
+            "amount": {
+              "description": "Unpaid amount in the waterfall currency.",
+              "format": "double",
+              "type": "number"
+            },
+            "instrument_id": {
+              "description": "Instrument carrying the unpaid claim forward.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "interest_shortfall",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instrument_id",
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Available cash was insufficient to pay a fee claim.",
+          "properties": {
+            "amount": {
+              "description": "Unpaid amount in the waterfall currency.",
+              "format": "double",
+              "type": "number"
+            },
+            "instrument_id": {
+              "description": "Instrument carrying the unpaid claim forward.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "fee_shortfall",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instrument_id",
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Available cash was insufficient to pay scheduled principal.",
+          "properties": {
+            "amount": {
+              "description": "Unpaid amount in the waterfall currency.",
+              "format": "double",
+              "type": "number"
+            },
+            "instrument_id": {
+              "description": "Instrument carrying the unpaid claim forward.",
+              "type": "string"
+            },
+            "kind": {
+              "const": "principal_shortfall",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instrument_id",
+            "amount"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_f0893f1d89ca5934871f": {
+      "description": "Full report aggregating all [`CheckResult`]s from a check run.",
+      "properties": {
+        "results": {
+          "description": "Individual results for each check.",
+          "items": {
+            "$ref": "#/$defs/d_4f32370227b1985d85e9"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "$ref": "#/$defs/d_033184211bfcc772ee94",
+          "description": "Aggregate summary."
+        }
+      },
+      "required": [
+        "results",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "d_f840db5f4c38222f7ca7": {
+      "additionalProperties": false,
+      "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\naccessor methods return raw `f64` amounts in the reporting currency for\nconvenience; callers that need full currency fidelity should inspect the\nunderlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n});\n\nassert_eq!(cs.get_total_interest(&period).unwrap(), 12_500.0);\n```",
+      "properties": {
+        "by_instrument": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "$ref": "#/$defs/d_677810bf9653cfb0a467"
+            },
+            "type": "object"
+          },
+          "description": "Map of instrument_id → (period_id → cashflow_type → amount)",
+          "type": "object"
+        },
+        "equity_distribution": {
+          "additionalProperties": {
+            "$ref": "#/$defs/d_1b5716dde9957a614f3c"
+          },
+          "description": "Post-waterfall residual cash distributed to equity per period.\n\nOnly populated by waterfall evaluation when `available_cash_node` is\nconfigured: it is the cash remaining after fees, interest, and\nprincipal allocations. With the per-period allocations this satisfies\n`fees + cash interest + principal + equity == available cash`.",
+          "type": "object"
+        },
+        "reporting_currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9e50e1b9698ebe0e1126"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reporting currency used for `totals` (if populated)"
+        },
+        "totals": {
+          "additionalProperties": {
+            "$ref": "#/$defs/d_677810bf9653cfb0a467"
+          },
+          "description": "Total cashflows across all instruments in the reporting currency (if available)",
+          "type": "object"
+        },
+        "totals_by_currency": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "$ref": "#/$defs/d_677810bf9653cfb0a467"
+            },
+            "type": "object"
+          },
+          "description": "Totals bucketed by native instrument currency",
+          "type": "object"
+        }
+      },
+      "required": [
+        "by_instrument"
+      ],
+      "type": "object"
+    }
+  }
+}

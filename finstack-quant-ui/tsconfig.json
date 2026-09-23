@@ -18,6 +18,7 @@
       "@/hooks/valuations/*": ["registry/valuations/hooks/*"],
       "@/hooks/calibration/*": ["registry/calibration/hooks/*"],
       "@/hooks/models/*": ["registry/models/hooks/*"],
+      "@/hooks/statements/*": ["registry/statements/hooks/*"],
       "@/workers/*": ["registry/shared/file/*"],
       "@/components/finstack/*": ["registry/*"],
       "@/components/ui/*": ["components/ui/*"]
