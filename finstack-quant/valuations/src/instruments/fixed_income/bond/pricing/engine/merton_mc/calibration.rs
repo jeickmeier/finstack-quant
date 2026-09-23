@@ -151,7 +151,7 @@ fn mc_cash_pv(
     }
 
     let result = bond_cash.price_merton_mc(&cfg, discount_rate, as_of)?;
-    Ok(result.clean_price_pct / 100.0 * bond_cash.notional.amount())
+    Ok(result.dirty_price_pct / 100.0 * bond_cash.notional.amount())
 }
 
 /// Calibrate a structural parameter to a market quote using the same MC engine.

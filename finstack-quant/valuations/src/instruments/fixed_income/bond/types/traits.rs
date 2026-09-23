@@ -216,9 +216,12 @@ impl Bond {
     /// This method remains for tests and calibration that need the typed
     /// `MertonMcResult` without the valuation envelope.
     ///
-    /// Extracts coupon rate and frequency from the bond's `CashflowSpec`, then
-    /// delegates to
-    /// [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcEngine::price`].
+    /// Extracts the coupon rate from the bond's `CashflowSpec` and drives the
+    /// simulation from the bond's own remaining coupon dates and accrual
+    /// fractions (on the coupon day-count clock, with the ACT/ACT (ICMA)
+    /// quasi-coupon context where needed). The full next coupon is paid, so
+    /// `dirty_price_pct` is the simulated PV and `clean_price_pct` subtracts
+    /// the accrued interest at `as_of`.
     ///
     /// If the config's `pik_schedule` is `Uniform(Cash)` (the default),
     /// this method overrides it based on the bond's `CouponType`:
@@ -256,7 +259,7 @@ impl Bond {
     > {
         use crate::cashflow::builder::specs::CouponType;
         use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::{
-            MertonMcConfig, MertonMcEngine, PikMode, PikSchedule,
+            MertonBondTerms, MertonMcConfig, MertonMcEngine, PikMode, PikSchedule,
         };
         use rust_decimal::prelude::ToPrimitive;
 
@@ -264,20 +267,14 @@ impl Bond {
 
         let notional = self.notional.amount();
 
-        let (coupon_rate, coupon_type, coupon_frequency) = match &self.cashflow_spec {
-            CashflowSpec::Fixed(spec) => {
-                let rate = spec.rate.to_f64().unwrap_or(0.0);
-                let frequency = (1.0 / spec.schedule.frequency.to_years()).round() as usize;
-                (rate, spec.coupon_type, frequency)
-            }
+        let (coupon_rate, coupon_type) = match &self.cashflow_spec {
+            CashflowSpec::Fixed(spec) => (spec.rate.to_f64().unwrap_or(0.0), spec.coupon_type),
             CashflowSpec::Floating(_) => {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
+            // Step-up bonds are simulated at their initial rate.
             CashflowSpec::StepUp(spec) => {
-                // Use initial_rate for Merton MC calibration
-                let rate = spec.initial_rate.to_f64().unwrap_or(0.0);
-                let frequency = (1.0 / spec.schedule.frequency.to_years()).round() as usize;
-                (rate, spec.coupon_type, frequency)
+                (spec.initial_rate.to_f64().unwrap_or(0.0), spec.coupon_type)
             }
             // The Merton MC engine simulates a constant notional with full
             // bullet redemption at maturity; silently extracting the base
@@ -292,11 +289,21 @@ impl Bond {
             }
         };
 
-        let maturity_years = self.cashflow_spec.day_count().year_fraction(
-            as_of,
-            self.maturity,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
+        let schedule =
+            crate::instruments::fixed_income::bond::pricing::time_basis::bond_model_schedule(
+                self, as_of,
+            )?;
+        let terms = MertonBondTerms {
+            notional,
+            coupon_rate,
+            maturity_years: schedule.maturity_years,
+            coupons: schedule
+                .coupons
+                .iter()
+                .map(|&(t, accrual, _)| (t, accrual))
+                .collect(),
+            accrued: schedule.accrued,
+        };
 
         // If the config uses the default schedule, derive from bond's CouponType
         let effective_config;
@@ -322,14 +329,7 @@ impl Bond {
             config
         };
 
-        MertonMcEngine::price(
-            notional,
-            coupon_rate,
-            maturity_years,
-            coupon_frequency,
-            config_ref,
-            discount_rate,
-        )
+        MertonMcEngine::price_terms(&terms, config_ref, discount_rate)
     }
 }
 

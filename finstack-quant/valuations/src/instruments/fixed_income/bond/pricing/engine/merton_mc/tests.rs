@@ -147,35 +147,50 @@ fn toggle_price_between_cash_and_pik() {
     );
 }
 
-/// M2.12: the coupon schedule is anchored backward from maturity with a
-/// floor + stub count, so stub maturities keep every coupon inside the
-/// simulated horizon and aligned maturities stay regular.
+/// The synthetic coupon schedule is anchored backward from maturity; the
+/// valuation date sits inside the first period, whose coupon is still paid
+/// in full (dirty valuation), and aligned maturities stay regular.
 #[test]
 fn coupon_schedule_handles_stub_and_aligned_maturities() {
-    // 4.6y semi-annual: 10 coupons, first is a 0.1y stub (fraction 0.2),
-    // last lands exactly at maturity.
+    // 4.6y semi-annual: 10 coupons, the first 0.1y away and paying a full
+    // half-year coupon; the last lands exactly at maturity.
     let sched = MertonMcEngine::coupon_schedule(4.6, 2);
     assert_eq!(sched.len(), 10);
-    let (t_first, frac_first) = sched[0];
-    assert!((t_first - 0.1).abs() < 1e-9, "stub time: {t_first}");
+    let (t_first, accrual_first) = sched[0];
+    assert!((t_first - 0.1).abs() < 1e-9, "first coupon time: {t_first}");
     assert!(
-        (frac_first - 0.2).abs() < 1e-9,
-        "stub fraction: {frac_first}"
+        (accrual_first - 0.5).abs() < 1e-12,
+        "first coupon accrual: {accrual_first}"
     );
-    let (t_last, frac_last) = sched[sched.len() - 1];
+    let (t_last, accrual_last) = sched[sched.len() - 1];
     assert!(
         (t_last - 4.6).abs() < 1e-12,
         "final coupon at maturity: {t_last}"
     );
-    assert!((frac_last - 1.0).abs() < 1e-9);
+    assert!((accrual_last - 0.5).abs() < 1e-12);
 
     // Aligned 5.0y semi-annual: 10 full coupons at 0.5, 1.0, …, 5.0.
     let aligned = MertonMcEngine::coupon_schedule(5.0, 2);
     assert_eq!(aligned.len(), 10);
-    for (i, &(t, frac)) in aligned.iter().enumerate() {
+    for (i, &(t, accrual)) in aligned.iter().enumerate() {
         assert!((t - 0.5 * (i + 1) as f64).abs() < 1e-9);
-        assert!((frac - 1.0).abs() < 1e-9);
+        assert!((accrual - 0.5).abs() < 1e-12);
     }
+}
+
+/// Dirty minus clean equals the accrued interest of the elapsed part of the
+/// current period: 4.6y semi-annual 8% on 100 has 0.4y elapsed, so accrued
+/// = 100 × 0.08 × 0.4 = 3.2 per 100.
+#[test]
+fn synthetic_schedule_clean_price_subtracts_accrued() {
+    let config = MertonMcConfig::new(test_merton(), 0.40)
+        .expect("valid config")
+        .num_paths(200)
+        .seed(3);
+    let stub = MertonMcEngine::price(100.0, 0.08, 4.6, 2, &config, 0.04).expect("price");
+    assert!((stub.dirty_price_pct - stub.clean_price_pct - 3.2).abs() < 1e-9);
+    let aligned = MertonMcEngine::price(100.0, 0.08, 5.0, 2, &config, 0.04).expect("price");
+    assert!((aligned.dirty_price_pct - aligned.clean_price_pct).abs() < 1e-12);
 }
 
 /// M2.12: with default risk switched off (asset value far above the
