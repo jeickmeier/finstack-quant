@@ -274,7 +274,9 @@ impl InflationSource {
                             cpi0 + weight * (cpi1 - cpi0)
                         }
                     }
-                    InflationLag::Months(months) => cpi_on(date.add_months(-(i32::from(months))))?,
+                    InflationLag::Months(months) => cpi_on(
+                        InflationLinkedBond::step_reference_month(date, months.into())?,
+                    )?,
                     InflationLag::Days(days) => cpi_on(date - Duration::days(i64::from(days)))?,
                     _ => cpi_on(date)?,
                 };
@@ -766,7 +768,9 @@ impl InflationLinkedBond {
                 let cpi1 = inflation_curve.cpi_on_date(anchor1)?;
                 cpi0 + weight * (cpi1 - cpi0)
             }
-            InflationLag::Months(m) => inflation_curve.cpi_on_date(date.add_months(-(m as i32)))?,
+            InflationLag::Months(m) => {
+                inflation_curve.cpi_on_date(Self::step_reference_month(date, m.into())?)?
+            }
             InflationLag::Days(d) => {
                 inflation_curve.cpi_on_date(date - Duration::days(d as i64))?
             }
@@ -792,6 +796,17 @@ impl InflationLinkedBond {
             | IndexationMethod::Japanese => true,
             IndexationMethod::Uk => matches!(self.lag, InflationLag::Months(m) if m <= 3),
         }
+    }
+
+    /// Reference month for a step (non-interpolated) months lag: the first of
+    /// the month `lag_months` before the month containing `date`. A monthly
+    /// CPI print applies to its whole month, so a mid-month date must not
+    /// interpolate between prints.
+    fn step_reference_month(date: Date, lag_months: u32) -> Result<Date> {
+        Ok(date
+            .replace_day(1)
+            .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?
+            .add_months(-(lag_months as i32)))
     }
 
     /// First-of-month anchor dates and interpolation weight for the official
@@ -1735,6 +1750,54 @@ mod tests {
                 .any(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional),
             "expected principal notional flow at maturity"
         );
+    }
+
+    /// UK legacy 8-month step lag reads the whole-month print: for a date of
+    /// 2025-06-15 the reference month is October 2024, i.e. the curve at
+    /// 2024-10-01 = 100 (a knot), giving ratio 100/100 = 1.0. Reading the
+    /// curve on 2024-10-15 would interpolate toward the November value 110.
+    #[test]
+    fn uk_step_lag_reads_first_of_month_from_curve_and_hybrid() {
+        use finstack_quant_core::market_data::scalars::InflationIndex;
+
+        let mut bond = sample_bond(DeflationProtection::None);
+        bond.indexation_method = IndexationMethod::Uk;
+        bond.lag = InflationLag::Months(8);
+        let curve = InflationCurve::builder("US-CPI")
+            .base_date(d(2024, Month::October, 1))
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (31.0 / 365.0, 110.0)])
+            .build()
+            .expect("curve");
+        let date = d(2025, Month::June, 15);
+
+        let ratio = bond
+            .index_ratio_from_curve(date, &curve)
+            .expect("curve ratio");
+        assert!((ratio - 1.0).abs() < 1e-12, "curve ratio {ratio}");
+        let mid_month = curve
+            .cpi_on_date(d(2024, Month::October, 15))
+            .expect("mid-month cpi");
+        assert!((mid_month - 100.0).abs() > 1.0, "fixture must discriminate");
+
+        // Hybrid: prints published through September 2024, so October comes
+        // from the projection curve on its first-of-month anchor.
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![
+                (d(2024, Month::August, 1), 98.0),
+                (d(2024, Month::September, 1), 99.0),
+            ],
+            Currency::USD,
+        )
+        .expect("published CPI");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_inflation_index("US-CPI", index);
+        let hybrid = bond
+            .index_ratio_from_market(date, &market)
+            .expect("hybrid ratio");
+        assert!((hybrid - 1.0).abs() < 1e-12, "hybrid ratio {hybrid}");
     }
 
     /// Regression test for the UK gilt lag validation that was previously
