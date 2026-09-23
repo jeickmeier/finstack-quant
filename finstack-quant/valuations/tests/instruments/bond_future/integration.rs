@@ -1197,7 +1197,7 @@ fn test_invoice_price() {
     let ctd_bond = &bonds[0]; // First bond is the CTD
 
     let invoice = future
-        .invoice_price(ctd_bond, &market, settlement_date)
+        .invoice_price(ctd_bond, quoted_price, &market, settlement_date)
         .expect("Failed to calculate invoice price");
 
     println!("Futures quoted price: {:.2}", quoted_price);
@@ -1320,7 +1320,7 @@ fn test_determine_ctd_picks_lowest_gross_basis() {
         (InstrumentId::new("BOND-B"), 100.0),
     ];
     let (ctd_id, gross_basis) = future
-        .determine_ctd(&prices)
+        .determine_ctd(110.0, &prices)
         .expect("CTD determination should succeed");
 
     assert_eq!(
@@ -1341,7 +1341,7 @@ fn test_determine_ctd_errors_without_valid_prices() {
     let future = ctd_test_future(110.0);
 
     assert!(
-        future.determine_ctd(&[]).is_err(),
+        future.determine_ctd(110.0, &[]).is_err(),
         "empty price set should yield an error"
     );
     let non_positive = vec![
@@ -1349,7 +1349,7 @@ fn test_determine_ctd_errors_without_valid_prices() {
         (InstrumentId::new("BOND-B"), -1.0),
     ];
     assert!(
-        future.determine_ctd(&non_positive).is_err(),
+        future.determine_ctd(110.0, &non_positive).is_err(),
         "all non-positive prices should yield an error"
     );
 }

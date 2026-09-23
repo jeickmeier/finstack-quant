@@ -372,7 +372,7 @@
         },
         "quoted_price": {
           "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow."
+          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\nUsed only for mark-to-market: `base_value` returns model-minus-contract\nvalue for a long position. Basis, implied-repo and invoice helpers take\nthe current futures price as an explicit argument instead.\nCurrent-settlement variation margin is a separate cash-P&L workflow."
         },
         "repo_curve_id": {
           "anyOf": [

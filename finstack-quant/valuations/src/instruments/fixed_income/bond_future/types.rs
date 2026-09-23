@@ -123,6 +123,23 @@ pub struct DeliverableBond {
     pub conversion_factor: f64,
 }
 
+/// Cash-market inputs for one deliverable, used by implied-repo analysis.
+///
+/// All amounts are per 100 face of the deliverable bond.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeliverableQuote {
+    /// Identifier of the deliverable bond (must be in the future's basket).
+    pub bond_id: InstrumentId,
+    /// Clean price today, per 100 face.
+    pub clean_price: f64,
+    /// Accrued interest today, per 100 face.
+    pub accrued_today: f64,
+    /// Projected accrued interest at delivery, per 100 face.
+    pub accrued_at_delivery: f64,
+    /// Coupon income received between today and delivery, per 100 face.
+    pub coupon_income: f64,
+}
+
 /// Contract specifications for bond futures.
 ///
 /// Defines the standard parameters for a bond future contract including
@@ -184,6 +201,16 @@ fn repo_annualization_denominator(day_count: DayCount) -> finstack_quant_core::R
         unsupported => Err(finstack_quant_core::Error::Validation(format!(
             "bond-future repo_day_count must be act_360 or act_365f, got {unsupported:?}"
         ))),
+    }
+}
+
+fn validate_futures_price(futures_price: f64) -> finstack_quant_core::Result<()> {
+    if futures_price.is_finite() && futures_price > 0.0 {
+        Ok(())
+    } else {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "bond-future futures_price must be finite and positive, got {futures_price}"
+        )))
     }
 }
 
@@ -476,7 +503,9 @@ pub struct BondFuture {
 
     /// Contract/entry futures price (e.g., 125.50 for 125-16/32).
     ///
-    /// `base_value` returns model-minus-contract value for a long position.
+    /// Used only for mark-to-market: `base_value` returns model-minus-contract
+    /// value for a long position. Basis, implied-repo and invoice helpers take
+    /// the current futures price as an explicit argument instead.
     /// Current-settlement variation margin is a separate cash-P&L workflow.
     #[serde(
         serialize_with = "finstack_quant_core::wire::serialize_non_negative_f64",
@@ -622,6 +651,34 @@ impl BondFuture {
         ))
     }
 
+    /// Conversion factor of a basket member, looked up by bond identifier.
+    fn conversion_factor_for(&self, bond_id: &InstrumentId) -> finstack_quant_core::Result<f64> {
+        self.deliverable_basket
+            .iter()
+            .find(|deliverable| deliverable.bond_id == *bond_id)
+            .map(|deliverable| deliverable.conversion_factor)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "BondFuture '{}': bond {} is not in deliverable_basket",
+                    self.id.as_str(),
+                    bond_id.as_str()
+                ))
+            })
+    }
+
+    /// Conversion factor of the resolved cheapest-to-deliver bond.
+    ///
+    /// Resolves the CTD as documented on [`Self::ctd_bond_id`] and returns its
+    /// basket conversion factor.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the CTD cannot be resolved or is not a
+    /// member of `deliverable_basket`.
+    pub(crate) fn ctd_conversion_factor(&self) -> finstack_quant_core::Result<f64> {
+        self.conversion_factor_for(&self.resolve_ctd_bond_id()?)
+    }
+
     /// Validate the BondFuture parameters.
     ///
     /// This method checks the following invariants:
@@ -716,13 +773,16 @@ impl BondFuture {
     ///
     /// Formula: `Invoice = (Futures_Price × Conversion_Factor) + Accrued_Interest`
     ///
-    /// Note: this model helper uses the contract entry price stored in
-    /// `quoted_price` as the futures price; exchange invoicing uses the
-    /// delivery-day settlement price.
+    /// The futures price is supplied by the caller (the delivery-day
+    /// settlement price for exchange invoicing); `quoted_price` is the
+    /// contract entry price and is used only for mark-to-market.
     ///
     /// # Arguments
     ///
-    /// * `ctd_bond` - The cheapest-to-deliver bond reference
+    /// * `ctd_bond` - The bond being delivered. Its conversion factor is looked
+    ///   up in `deliverable_basket` by `ctd_bond.id`.
+    /// * `futures_price` - Current futures settlement price per 100 face
+    ///   (e.g. `125.50` for 125-16/32); must be finite and positive.
     /// * `market` - Market context containing curves for accrued interest calculation
     /// * `settlement_date` - Settlement date (typically T+2 after expiry)
     ///
@@ -733,28 +793,20 @@ impl BondFuture {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - CTD bond is not found in the deliverable basket
+    /// - `ctd_bond.id` is not in the deliverable basket
+    /// - `futures_price` is not finite and positive
     /// - Cashflow schedule building fails
     /// - Accrued interest calculation fails
     ///
     pub fn invoice_price(
         &self,
         ctd_bond: &crate::instruments::fixed_income::bond::Bond,
+        futures_price: f64,
         market: &finstack_quant_core::market_data::context::MarketContext,
         settlement_date: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let ctd_bond_id = self.resolve_ctd_bond_id()?;
-        let conversion_factor = self
-            .deliverable_basket
-            .iter()
-            .find(|db| db.bond_id == ctd_bond_id)
-            .ok_or_else(|| finstack_quant_core::InputError::NotFound {
-                id: format!(
-                    "CTD bond {} not found in deliverable basket",
-                    ctd_bond_id.as_str()
-                ),
-            })?
-            .conversion_factor;
+        validate_futures_price(futures_price)?;
+        let conversion_factor = self.conversion_factor_for(&ctd_bond.id)?;
 
         let schedule = ctd_bond.full_cashflow_schedule(market)?;
 
@@ -773,8 +825,7 @@ impl BondFuture {
         // Calculate invoice price per contract
         // Invoice = (Futures_Price × CF) + Accrued
         // Note: Futures price is quoted per $100 face value, so we scale appropriately
-        let futures_price_pct = self.quoted_price; // e.g., 125.50 for 125-16/32
-        let invoice_pct = (futures_price_pct * conversion_factor) + accrued_pct;
+        let invoice_pct = (futures_price * conversion_factor) + accrued_pct;
 
         // Convert from percentage to actual money amount for contract size
         // Contract size is typically $100,000, so invoice_pct is per $100 face
@@ -812,6 +863,9 @@ impl BondFuture {
     ///
     /// # Arguments
     ///
+    /// * `futures_price` - Current futures price per 100 face used in the
+    ///   basis; must be finite and positive. This is the live market price,
+    ///   not the contract entry price in `quoted_price`.
     /// * `bond_clean_prices` - A slice of `(InstrumentId, f64)` tuples containing
     ///   the clean price (per 100 face) for each bond in the deliverable basket.
     ///   Bonds not included in this slice are skipped in the CTD calculation.
@@ -823,13 +877,16 @@ impl BondFuture {
     /// # Errors
     ///
     /// Returns an error if:
+    /// - `futures_price` is not finite and positive
     /// - No valid bond prices are provided for any bond in the basket
     /// - All provided prices are non-positive
     ///
     pub fn determine_ctd(
         &self,
+        futures_price: f64,
         bond_clean_prices: &[(InstrumentId, f64)],
     ) -> finstack_quant_core::Result<(InstrumentId, f64)> {
+        validate_futures_price(futures_price)?;
         let mut best_ctd: Option<(InstrumentId, f64)> = None;
 
         for deliverable in &self.deliverable_basket {
@@ -842,7 +899,7 @@ impl BondFuture {
                 }
 
                 // Calculate gross basis: Clean Price - (Futures Price × CF)
-                let gross_basis = clean_price - (self.quoted_price * deliverable.conversion_factor);
+                let gross_basis = clean_price - (futures_price * deliverable.conversion_factor);
 
                 match &best_ctd {
                     None => {
@@ -874,12 +931,12 @@ impl BondFuture {
     ///
     /// # Arguments
     ///
-    /// * `bond_data` - A slice of `(InstrumentId, f64, f64, f64, f64)` tuples:
-    ///   - `InstrumentId`: bond identifier
-    ///   - `f64` (position 1): clean price per 100 face
-    ///   - `f64` (position 2): accrued interest per 100 face as of today
-    ///   - `f64` (position 3): projected accrued interest per 100 face at delivery
-    ///   - `f64` (position 4): coupon income per 100 face received before delivery
+    /// * `futures_price` - Current futures price per 100 face used for each
+    ///   bond's invoice; must be finite and positive. This is the live market
+    ///   price, not the contract entry price in `quoted_price`.
+    /// * `quotes` - Cash-market inputs per deliverable (see
+    ///   [`DeliverableQuote`]). Basket members without a quote, or with a
+    ///   non-positive clean price, are skipped.
     /// * `days_to_delivery` - Number of days until delivery (must be positive)
     ///
     /// # Returns
@@ -889,11 +946,13 @@ impl BondFuture {
     ///
     /// # Errors
     ///
-    /// Returns an error if `days_to_delivery` is non-positive or if no valid
-    /// bond data is provided for any bond in the deliverable basket.
+    /// Returns an error if `futures_price` is not finite and positive,
+    /// `days_to_delivery` is non-positive, or no valid bond data is provided
+    /// for any bond in the deliverable basket.
     pub fn determine_ctd_by_implied_repo(
         &self,
-        bond_data: &[(InstrumentId, f64, f64, f64, f64)],
+        futures_price: f64,
+        quotes: &[DeliverableQuote],
         days_to_delivery: i32,
     ) -> finstack_quant_core::Result<(InstrumentId, f64)> {
         if days_to_delivery <= 0 {
@@ -905,21 +964,12 @@ impl BondFuture {
         let mut best_ctd: Option<(InstrumentId, f64)> = None;
 
         for deliverable in &self.deliverable_basket {
-            if let Some((id, clean_price, accrued_today, accrued_at_delivery, coupon_income)) =
-                bond_data.iter().find(|(id, ..)| *id == deliverable.bond_id)
-            {
-                if *clean_price <= 0.0 {
+            if let Some(quote) = quotes.iter().find(|q| q.bond_id == deliverable.bond_id) {
+                if quote.clean_price <= 0.0 {
                     continue;
                 }
 
-                let repo = self.implied_repo_rate(
-                    id,
-                    *clean_price,
-                    *accrued_today,
-                    *accrued_at_delivery,
-                    *coupon_income,
-                    days_to_delivery,
-                )?;
+                let repo = self.implied_repo_rate(futures_price, quote, days_to_delivery)?;
 
                 match &best_ctd {
                     None => best_ctd = Some((deliverable.bond_id.clone(), repo)),
@@ -962,11 +1012,12 @@ impl BondFuture {
     ///
     /// # Arguments
     ///
-    /// * `bond_id` - The identifier of the deliverable bond
-    /// * `clean_price` - Current clean price per 100 face
-    /// * `accrued_today` - Accrued interest per 100 face as of today
-    /// * `accrued_at_delivery` - Accrued interest per 100 face at delivery date
-    /// * `coupon_income` - Total coupon payments received between today and delivery (per 100 face)
+    /// * `futures_price` - Current futures price per 100 face used for the
+    ///   invoice at delivery; must be finite and positive. This is the live
+    ///   market price, not the contract entry price in `quoted_price`.
+    /// * `quote` - Cash-market inputs for the deliverable (see
+    ///   [`DeliverableQuote`]); its conversion factor is looked up in
+    ///   `deliverable_basket` by `quote.bond_id`.
     /// * `days_to_delivery` - Number of days until delivery
     ///
     /// # Returns
@@ -977,29 +1028,18 @@ impl BondFuture {
     ///
     /// Returns an error if:
     /// - The specified bond is not in the deliverable basket
+    /// - `futures_price` is not finite and positive
     /// - The purchase price is non-positive
     /// - Days to delivery is zero or negative
     ///
     pub fn implied_repo_rate(
         &self,
-        bond_id: &InstrumentId,
-        clean_price: f64,
-        accrued_today: f64,
-        accrued_at_delivery: f64,
-        coupon_income: f64,
+        futures_price: f64,
+        quote: &DeliverableQuote,
         days_to_delivery: i32,
     ) -> finstack_quant_core::Result<f64> {
-        let cf = self
-            .deliverable_basket
-            .iter()
-            .find(|db| db.bond_id == *bond_id)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Bond {} not found in deliverable basket",
-                    bond_id.as_str()
-                ))
-            })?
-            .conversion_factor;
+        validate_futures_price(futures_price)?;
+        let cf = self.conversion_factor_for(&quote.bond_id)?;
 
         if days_to_delivery <= 0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -1008,7 +1048,7 @@ impl BondFuture {
         }
 
         // Purchase price (dirty price today)
-        let purchase_price = clean_price + accrued_today;
+        let purchase_price = quote.clean_price + quote.accrued_today;
         if purchase_price <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "Purchase price must be positive".to_string(),
@@ -1016,10 +1056,10 @@ impl BondFuture {
         }
 
         // Invoice price at delivery
-        let invoice_price = (self.quoted_price * cf) + accrued_at_delivery;
+        let invoice_price = (futures_price * cf) + quote.accrued_at_delivery;
 
         // Total proceeds include any coupon payments received during the holding period
-        let total_proceeds = invoice_price + coupon_income;
+        let total_proceeds = invoice_price + quote.coupon_income;
 
         // Implied repo rate annualization uses contract-specific day-count basis.
         let annualization_basis =
@@ -1171,6 +1211,168 @@ mod tests {
         assert_eq!(future.deliverable_basket.len(), 1);
     }
 
+    fn quote(
+        bond_id: &InstrumentId,
+        clean_price: f64,
+        accrued_today: f64,
+        accrued_at_delivery: f64,
+        coupon_income: f64,
+    ) -> DeliverableQuote {
+        DeliverableQuote {
+            bond_id: bond_id.clone(),
+            clean_price,
+            accrued_today,
+            accrued_at_delivery,
+            coupon_income,
+        }
+    }
+
+    /// Two-bond basket used by the current-futures-price regression tests.
+    /// BOND-A: CF 0.80; BOND-B: CF 0.90. Entry (`quoted_price`) is 90.0.
+    fn flip_basket_future() -> BondFuture {
+        BondFuture::builder()
+            .id(InstrumentId::new("TY-FLIP"))
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
+            .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
+            .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
+            .quoted_price(90.0)
+            .position(Position::Long)
+            .contract_specs(BondFutureSpecs::default())
+            .deliverable_basket(vec![
+                DeliverableBond {
+                    bond_id: InstrumentId::new("BOND-A"),
+                    conversion_factor: 0.80,
+                },
+                DeliverableBond {
+                    bond_id: InstrumentId::new("BOND-B"),
+                    conversion_factor: 0.90,
+                },
+            ])
+            .ctd_bond_id(InstrumentId::new("BOND-A"))
+            .discount_curve_id(CurveId::new("USD-TREASURY"))
+            .attributes(Attributes::new())
+            .build()
+            .expect("Valid bond future")
+    }
+
+    /// Gross-basis CTD ranks on the CURRENT futures price, not the entry price.
+    ///
+    /// Clean prices A = 100, B = 110. Basis_A − Basis_B = −10 + 0.10·F, so A is
+    /// cheapest below F = 100 and B above it. At the entry price 90 the CTD
+    /// would be A (basis 100 − 72 = 28 vs 110 − 81 = 29); at the current price
+    /// 110 it is B: basis_B = 110 − 110·0.90 = 11.0 vs basis_A = 100 − 88 = 12.0.
+    #[test]
+    fn determine_ctd_uses_current_futures_price() {
+        let future = flip_basket_future();
+        let prices = vec![
+            (InstrumentId::new("BOND-A"), 100.0),
+            (InstrumentId::new("BOND-B"), 110.0),
+        ];
+
+        let (at_entry, basis_entry) = future.determine_ctd(90.0, &prices).expect("ctd at entry");
+        assert_eq!(at_entry.as_str(), "BOND-A");
+        assert!((basis_entry - 28.0).abs() < 1e-12);
+
+        let (current, basis) = future
+            .determine_ctd(110.0, &prices)
+            .expect("ctd at current");
+        assert_eq!(current.as_str(), "BOND-B");
+        assert!((basis - 11.0).abs() < 1e-12, "basis {basis}");
+        assert_ne!(
+            current, at_entry,
+            "ranking must flip with the futures price"
+        );
+
+        assert!(future.determine_ctd(0.0, &prices).is_err());
+        assert!(future.determine_ctd(f64::NAN, &prices).is_err());
+    }
+
+    /// Implied repo uses the current futures price and the bond's own CF.
+    ///
+    /// BOND-B at F = 110: invoice = 110·0.90 + 1.0 = 100.0; purchase =
+    /// 98.0 + 0.5 = 98.5; repo = (100.0/98.5 − 1)·360/30.
+    /// With the entry price 90 it would be (81 + 1)/98.5 − 1 < 0.
+    #[test]
+    fn implied_repo_uses_current_futures_price() {
+        let future = flip_basket_future();
+        let bond_b = InstrumentId::new("BOND-B");
+        let repo = future
+            .implied_repo_rate(110.0, &quote(&bond_b, 98.0, 0.5, 1.0, 0.0), 30)
+            .expect("repo");
+        let expected = (100.0 / 98.5 - 1.0) * 360.0 / 30.0;
+        assert!((repo - expected).abs() < 1e-12, "repo {repo} vs {expected}");
+        let entry_repo = (82.0 / 98.5 - 1.0) * 360.0 / 30.0;
+        assert!((repo - entry_repo).abs() > 1.0);
+
+        // Ranking by implied repo also flips with the futures price.
+        // A: clean 100, coupon income 1.8, CF 0.80 → proceeds 0.80F + 1.8 per 100.
+        // B: clean 110, no income, CF 0.90 → proceeds 0.90F per 110.
+        // F = 90:  A = 73.8/100 = 0.7380 > B = 81/110 = 0.7364 → A.
+        // F = 110: A = 89.8/100 = 0.8980 < B = 99/110 = 0.9000 → B.
+        let data = vec![
+            quote(&InstrumentId::new("BOND-A"), 100.0, 0.0, 0.0, 1.8),
+            quote(&InstrumentId::new("BOND-B"), 110.0, 0.0, 0.0, 0.0),
+        ];
+        let (at_entry, _) = future
+            .determine_ctd_by_implied_repo(90.0, &data, 30)
+            .expect("ctd by repo at entry");
+        assert_eq!(at_entry.as_str(), "BOND-A");
+        let (ctd, best) = future
+            .determine_ctd_by_implied_repo(110.0, &data, 30)
+            .expect("ctd by repo");
+        assert_eq!(ctd.as_str(), "BOND-B");
+        let expected_best = (99.0 / 110.0 - 1.0) * 12.0;
+        assert!((best - expected_best).abs() < 1e-12);
+    }
+
+    /// Invoice uses the delivered bond's own CF (looked up by `ctd_bond.id`)
+    /// and the supplied futures price.
+    ///
+    /// Delivered BOND-B (CF 0.90), 6% semi-annual 30/360 bond, settlement
+    /// 2025-03-15 with the last coupon on 2025-01-15: accrued = 3.0·60/180 =
+    /// 1.0 per 100. Invoice = (110·0.90 + 1.0)/100 × 1,000,000 = 1,000,000.
+    /// The old code used the resolved CTD's CF (BOND-A, 0.80) and the entry
+    /// price 90: (72 + 1)/100 × 1,000,000 = 730,000.
+    #[test]
+    fn invoice_price_uses_delivered_bond_cf_and_current_price() {
+        let future = flip_basket_future();
+        let bond_b = Bond::fixed(
+            "BOND-B",
+            Money::new(1_000_000.0, Currency::USD).expect("money"),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("rate"),
+            Date::from_calendar_date(2020, Month::January, 15).expect("date"),
+            Date::from_calendar_date(2030, Month::January, 15).expect("date"),
+            finstack_quant_core::dates::StubKind::None,
+            "USD-TREASURY",
+        )
+        .expect("bond");
+        let settle = Date::from_calendar_date(2025, Month::March, 15).expect("date");
+        let invoice = future
+            .invoice_price(&bond_b, 110.0, &MarketContext::new(), settle)
+            .expect("invoice");
+        assert!(
+            (invoice.amount() - 1_000_000.0).abs() < 1e-6,
+            "invoice {}",
+            invoice.amount()
+        );
+        assert!((invoice.amount() - 730_000.0).abs() > 1.0);
+
+        let not_in_basket = Bond::fixed(
+            "BOND-X",
+            Money::new(1_000_000.0, Currency::USD).expect("money"),
+            finstack_quant_core::types::Rate::from_decimal(0.06).expect("rate"),
+            Date::from_calendar_date(2020, Month::January, 15).expect("date"),
+            Date::from_calendar_date(2030, Month::January, 15).expect("date"),
+            finstack_quant_core::dates::StubKind::None,
+            "USD-TREASURY",
+        )
+        .expect("bond");
+        assert!(future
+            .invoice_price(&not_in_basket, 110.0, &MarketContext::new(), settle)
+            .is_err());
+    }
+
     #[test]
     fn test_determine_ctd_by_implied_repo_ranks_highest_repo() {
         let bond1 = InstrumentId::new("BOND-1");
@@ -1204,28 +1406,30 @@ mod tests {
         // Bond 2 is cheap relative to its invoice (high implied repo);
         // bond 1 is expensive (low / negative implied repo).
         let bond_data = vec![
-            (bond1.clone(), 104.50, 1.25, 1.75, 0.0),
-            (bond2.clone(), 106.50, 1.50, 2.00, 0.0),
+            quote(&bond1, 104.50, 1.25, 1.75, 0.0),
+            quote(&bond2, 106.50, 1.50, 2.00, 0.0),
         ];
 
         let (ctd_id, repo) = future
-            .determine_ctd_by_implied_repo(&bond_data, 30)
+            .determine_ctd_by_implied_repo(125.50, &bond_data, 30)
             .expect("CTD by implied repo");
         assert_eq!(ctd_id, bond2);
 
         // The winner's repo must equal the single-bond calculation and
         // dominate the alternative.
         let repo1 = future
-            .implied_repo_rate(&bond1, 104.50, 1.25, 1.75, 0.0, 30)
+            .implied_repo_rate(125.50, &bond_data[0], 30)
             .expect("repo bond1");
         let repo2 = future
-            .implied_repo_rate(&bond2, 106.50, 1.50, 2.00, 0.0, 30)
+            .implied_repo_rate(125.50, &bond_data[1], 30)
             .expect("repo bond2");
         assert!((repo - repo2).abs() < 1e-12);
         assert!(repo2 > repo1);
 
         // Non-positive horizon is rejected.
-        assert!(future.determine_ctd_by_implied_repo(&bond_data, 0).is_err());
+        assert!(future
+            .determine_ctd_by_implied_repo(125.50, &bond_data, 0)
+            .is_err());
     }
 
     #[test]
@@ -1769,20 +1973,7 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
             ))
         })?;
 
-        // Use the exchange-provided conversion factor from the deliverable basket.
-        let conversion_factor = self
-            .deliverable_basket
-            .iter()
-            .find(|bond| bond.bond_id == ctd_bond_id)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: format!(
-                        "CTD bond {} not found in deliverable basket",
-                        ctd_bond_id.as_str()
-                    ),
-                })
-            })?
-            .conversion_factor;
+        let conversion_factor = self.conversion_factor_for(&ctd_bond_id)?;
 
         super::pricer::BondFuturePricer::calculate_npv(
             self,
