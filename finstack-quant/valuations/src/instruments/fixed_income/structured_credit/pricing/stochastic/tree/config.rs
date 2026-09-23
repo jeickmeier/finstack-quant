@@ -29,9 +29,6 @@ pub(crate) struct ScenarioTreeConfig {
     /// Random seed for reproducibility.
     pub seed: u64,
 
-    /// Initial pool balance.
-    pub initial_balance: f64,
-
     /// Initial pool seasoning in months.
     pub initial_seasoning: u32,
 
@@ -58,7 +55,6 @@ impl ScenarioTreeConfig {
             default_spec: StochasticDefaultSpec::default(),
             recovery_spec: RecoverySpec::default(),
             seed: 42,
-            initial_balance: 1_000_000.0,
             initial_seasoning: 0,
             market_refi_rate: 0.045,
             asset_correlation_override: None,

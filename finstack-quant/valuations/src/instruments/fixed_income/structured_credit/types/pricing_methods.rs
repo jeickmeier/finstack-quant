@@ -243,7 +243,6 @@ impl StructuredCredit {
             ));
         }
         tree_config.market_refi_rate = self.market_conditions.refi_rate;
-        tree_config.initial_balance = self.pool.total_balance()?.amount().max(1.0);
         tree_config.initial_seasoning = self
             .pool
             .weighted_average_seasoning(as_of, self.closing_date);

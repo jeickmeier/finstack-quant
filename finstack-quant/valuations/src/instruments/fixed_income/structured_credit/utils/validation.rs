@@ -7,10 +7,9 @@
 //! - Empty/impossible tier configurations
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, PaymentCalculation, PaymentType, Waterfall, WaterfallTier,
+    AllocationMode, PaymentCalculation, PaymentType, WaterfallTier,
 };
 use finstack_quant_core::HashSet;
-use finstack_quant_core::Result;
 
 /// Validation error details.
 #[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
@@ -68,72 +67,18 @@ pub enum ValidationError {
     },
 }
 
-/// Trait for validating waterfall specifications.
-pub(crate) trait WaterfallValidator {
-    /// Validate the waterfall specification.
-    ///
-    /// Returns Ok(()) if valid, or Err with validation errors.
-    fn validate(&self) -> Result<()>;
-}
-
-/// Waterfall specification for validation.
+/// Structural validation of waterfall tiers: duplicate tier or recipient
+/// ids, empty tiers, non-finite or negative weights and payment parameters,
+/// and pro-rata tiers without positive total weight.
 ///
-/// This is a simplified representation that includes just the fields needed
-/// for validation (tiers, coverage tests).
-pub(crate) struct WaterfallSpec {
-    /// Tiers.
-    pub(crate) tiers: Vec<WaterfallTier>,
-}
-
-impl WaterfallSpec {
-    /// Create a new waterfall spec.
-    pub(crate) fn new(tiers: Vec<WaterfallTier>) -> Self {
-        Self { tiers }
-    }
-}
-
-impl WaterfallValidator for WaterfallSpec {
-    fn validate(&self) -> Result<()> {
-        let mut errors = Vec::new();
-
-        errors.extend(validate_tiers(&self.tiers));
-
-        if !errors.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Waterfall validation failed with {} error(s): {}",
-                errors.len(),
-                errors
-                    .iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            )));
-        }
-
-        Ok(())
-    }
-}
-
-impl WaterfallValidator for Waterfall {
-    fn validate(&self) -> Result<()> {
-        let errors = validate_tiers(&self.tiers);
-        if !errors.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Waterfall validation failed with {} error(s): {}",
-                errors.len(),
-                errors
-                    .iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            )));
-        }
-        Ok(())
-    }
-}
-
-/// Validate tier specifications.
-fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
+/// # Arguments
+///
+/// * `tiers` - Waterfall tiers in any order.
+///
+/// # Returns
+///
+/// Every violation found; empty when the tiers are valid.
+pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
     let mut seen_tier_ids = HashSet::default();
@@ -242,43 +187,6 @@ fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
     errors
 }
 
-/// Quick validation helper that returns true if spec is valid.
-///
-/// # Arguments
-///
-/// * `tiers` - Ordered waterfall allocation tiers to validate for references,
-///   ordering, and allocation invariants.
-///
-/// SC-m20: this previously also took `diversion_rules` and `coverage_test_ids`.
-/// Both existed only to validate the `DiversionEngine` rule graph, a
-/// declarative diversion mechanism that was never wired to waterfall
-/// execution — the live path evaluates coverage-test positions inside the waterfall.
-/// The engine and its validation are removed; what remains validates the tiers
-/// that actually govern allocation.
-pub fn is_valid_waterfall_spec(tiers: &[WaterfallTier]) -> bool {
-    let spec = WaterfallSpec::new(tiers.to_vec());
-    spec.validate().is_ok()
-}
-
-/// Get validation errors as a list.
-///
-/// # Arguments
-///
-/// * `tiers` - Ordered waterfall allocation tiers to validate for references,
-///   ordering, and allocation invariants.
-///
-/// SC-m20: this previously also took `diversion_rules` and `coverage_test_ids`.
-/// Both existed only to validate the `DiversionEngine` rule graph, a
-/// declarative diversion mechanism that was never wired to waterfall
-/// execution — the live path evaluates coverage-test positions inside the waterfall.
-/// The engine and its validation are removed; what remains validates the tiers
-/// that actually govern allocation.
-pub fn get_validation_errors(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
-    let mut errors = Vec::new();
-    errors.extend(validate_tiers(tiers));
-    errors
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,8 +211,7 @@ mod tests {
     fn test_valid_waterfall_spec() {
         let tiers = vec![create_valid_tier("tier1", 1), create_valid_tier("tier2", 2)];
 
-        let spec = WaterfallSpec::new(tiers);
-        assert!(spec.validate().is_ok());
+        assert!(validate_tiers(&tiers).is_empty());
     }
 
     #[test]

@@ -352,7 +352,7 @@ impl StochasticPricer {
             let prefix_index = path_index / mc_paths;
             let prefix =
                 self.tree_path_factors(prefix_index, prefix_count, branch_count, prefix_months);
-            let mut rng = PhiloxRng::new(self.config.seed).substream(path_index as u64);
+            let mut rng = PhiloxRng::new(self.config.tree_config.seed).substream(path_index as u64);
             let mut factors = Vec::with_capacity(prefix.len() + suffix_months);
             factors.extend_from_slice(&prefix);
             for _ in 0..suffix_months {
@@ -474,7 +474,7 @@ impl StochasticPricer {
         num_paths: usize,
         antithetic: bool,
     ) -> Vec<f64> {
-        let base_rng = PhiloxRng::new(self.config.seed);
+        let base_rng = PhiloxRng::new(self.config.tree_config.seed);
         let paired = antithetic && (path_index % 2 == 1 || path_index + 1 < num_paths);
         if paired {
             let mut rng = base_rng.substream((path_index / 2) as u64);
@@ -550,7 +550,7 @@ impl StochasticPricer {
         path_index: usize,
         antithetic: bool,
     ) -> PerNameDefaultEngine {
-        let base = PhiloxRng::new(self.config.seed ^ PER_NAME_SEED_SALT);
+        let base = PhiloxRng::new(self.config.tree_config.seed ^ PER_NAME_SEED_SALT);
         let idio_recovery_vol = self.idiosyncratic_recovery_vol();
         if antithetic {
             // Both members of pair k share substream(k); the odd member is
@@ -597,7 +597,7 @@ impl StochasticPricer {
     /// `substream(k)` and the odd member negates its draws; independent
     /// paths use `substream(path_index)`.
     fn instrument_path_rng(&self, path_index: usize, antithetic: bool) -> (PhiloxRng, bool) {
-        let base = PhiloxRng::new(self.config.seed ^ INSTRUMENT_PATH_SEED_SALT);
+        let base = PhiloxRng::new(self.config.tree_config.seed ^ INSTRUMENT_PATH_SEED_SALT);
         if antithetic {
             (base.substream((path_index / 2) as u64), path_index % 2 == 1)
         } else {
@@ -757,7 +757,7 @@ impl StochasticPricer {
         }
         let mut tail_rng =
             (resolved_months < month_count && self.has_stochastic_rates()).then(|| {
-                PhiloxRng::new(self.config.seed ^ TREE_TAIL_SEED_SALT)
+                PhiloxRng::new(self.config.tree_config.seed ^ TREE_TAIL_SEED_SALT)
                     .substream(original_path_index as u64)
             });
 
@@ -930,7 +930,7 @@ impl StochasticPricer {
         prepared: &PreparedRun,
     ) -> Option<Vec<f64>> {
         let rho = prepared.factor_correlation?;
-        let base = PhiloxRng::new(self.config.seed ^ PREPAY_FACTOR_SEED_SALT);
+        let base = PhiloxRng::new(self.config.tree_config.seed ^ PREPAY_FACTOR_SEED_SALT);
         let (mut rng, negate) = if antithetic {
             (base.substream((path_index / 2) as u64), path_index % 2 == 1)
         } else {
@@ -2304,7 +2304,6 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
         tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
-        tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(PricingMode::MonteCarlo {
                 num_paths,
@@ -2339,7 +2338,6 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
         tree_config.default_spec = default_spec;
-        tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(PricingMode::MonteCarlo {
                 num_paths,
@@ -2767,11 +2765,12 @@ mod per_name_copula_tests {
         let (mut sum_c, mut sum_p, mut sum_cc, mut sum_pp, mut sum_cp) =
             (0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64);
         for path in 0..PATHS as u64 {
-            let mut credit_rng = PhiloxRng::new(pricer.config.seed).substream(path);
+            let mut credit_rng = PhiloxRng::new(pricer.config.tree_config.seed).substream(path);
             let credit = credit_rng.next_std_normal();
 
             let mut indep_rng =
-                PhiloxRng::new(pricer.config.seed ^ PREPAY_FACTOR_SEED_SALT).substream(path);
+                PhiloxRng::new(pricer.config.tree_config.seed ^ PREPAY_FACTOR_SEED_SALT)
+                    .substream(path);
             let indep = indep_rng.next_std_normal();
 
             let prepay = rho * credit + scale * indep;

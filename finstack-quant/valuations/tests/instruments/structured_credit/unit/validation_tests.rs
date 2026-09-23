@@ -3,7 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    get_validation_errors, is_valid_waterfall_spec, ValidationError,
+    validate_tiers, ValidationError,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AllocationMode, PaymentCalculation, PaymentType, Recipient, RecipientType, WaterfallTier,
@@ -28,7 +28,7 @@ fn fee_tier(id: &str, priority: usize) -> WaterfallTier {
 fn test_duplicate_tier_ids() {
     let tiers = vec![fee_tier("tier-a", 1), fee_tier("tier-a", 2)];
 
-    let errors = get_validation_errors(&tiers);
+    let errors = validate_tiers(&tiers);
     assert_eq!(errors.len(), 1);
     assert!(matches!(errors[0], ValidationError::DuplicateTierId { .. }));
 }
@@ -39,7 +39,7 @@ fn test_duplicate_recipient_ids_within_tier() {
         .add_recipient(fixed_fee_recipient("dup"))
         .add_recipient(fixed_fee_recipient("dup"));
 
-    let errors = get_validation_errors(&[tier]);
+    let errors = validate_tiers(&[tier]);
     assert_eq!(errors.len(), 1);
     assert!(matches!(
         errors[0],
@@ -50,12 +50,12 @@ fn test_duplicate_recipient_ids_within_tier() {
 #[test]
 fn test_empty_tier_is_invalid_except_residual() {
     let empty_fee = WaterfallTier::new("tier-a", 1, PaymentType::Fee);
-    let errors = get_validation_errors(&[empty_fee]);
+    let errors = validate_tiers(&[empty_fee]);
     assert_eq!(errors.len(), 1);
     assert!(matches!(errors[0], ValidationError::EmptyTier { .. }));
 
     let empty_residual = WaterfallTier::new("tier-b", 1, PaymentType::Residual);
-    let residual_errors = get_validation_errors(&[empty_residual]);
+    let residual_errors = validate_tiers(&[empty_residual]);
     assert!(residual_errors.is_empty());
 }
 
@@ -64,7 +64,7 @@ fn test_negative_recipient_weight_is_invalid() {
     let tier = WaterfallTier::new("tier-a", 1, PaymentType::Fee)
         .add_recipient(fixed_fee_recipient("r1").with_weight(-0.25));
 
-    let errors = get_validation_errors(&[tier]);
+    let errors = validate_tiers(&[tier]);
     assert_eq!(errors.len(), 1);
     assert!(matches!(errors[0], ValidationError::InvalidWeight { .. }));
 }
@@ -76,7 +76,7 @@ fn test_pro_rata_requires_positive_total_weight() {
         .add_recipient(fixed_fee_recipient("r1").with_weight(0.0))
         .add_recipient(fixed_fee_recipient("r2").with_weight(0.0));
 
-    let errors = get_validation_errors(&[tier]);
+    let errors = validate_tiers(&[tier]);
     assert_eq!(errors.len(), 1);
     assert!(matches!(
         errors[0],
@@ -87,5 +87,5 @@ fn test_pro_rata_requires_positive_total_weight() {
 #[test]
 fn test_valid_spec_shortcut() {
     let tiers = vec![fee_tier("tier-a", 1), fee_tier("tier-b", 2)];
-    assert!(is_valid_waterfall_spec(&tiers));
+    assert!(validate_tiers(&tiers).is_empty());
 }

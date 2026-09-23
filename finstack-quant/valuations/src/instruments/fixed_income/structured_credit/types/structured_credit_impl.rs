@@ -548,7 +548,7 @@ impl StructuredCredit {
         // Structural tier validation (duplicate ids, empty tiers, weights,
         // non-finite payment parameters) — shared with the executor.
         let tier_errors =
-            crate::instruments::fixed_income::structured_credit::utils::get_validation_errors(
+            crate::instruments::fixed_income::structured_credit::utils::validate_tiers(
                 &waterfall.tiers,
             );
         if let Some(first) = tier_errors.first() {

@@ -49,7 +49,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | Tranche summary (price, WAL, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters) and scenario grids (one projection per cell, clean settlement price per current face). |
 | `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
 | `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
-| `is_valid_waterfall_spec`, `get_validation_errors`, `ValidationError` | Waterfall validation. |
+| `validate_tiers`, `ValidationError` | Waterfall validation. |
 | Deal-type constants | Standard speeds, fees and concentration limits, re-exported at the module root: `clo_standard_cdr`, `rmbs_standard_psa`, `sda_peak_cdr`, … (the `types` submodule itself is `pub(crate)`). |
 
 ## Module layout
