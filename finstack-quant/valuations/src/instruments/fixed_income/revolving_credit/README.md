@@ -30,7 +30,7 @@ Import path:
 | `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture; `expected_cashflows(..)` for the path-averaged schedule of a stochastic facility. |
 | `EnhancedMonteCarloResult`, `PathResult` | MC statistics plus per-path PV, cashflows and factor trajectories. |
 | `PathAwareCashflowSchedule`, `ThreeFactorPathData` | Cashflow schedule carrying the simulated factor path. |
-| `ZERO_TOLERANCE`, `UTILIZATION_CHANGE_THRESHOLD`, `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
+| `ZERO_TOLERANCE`, `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
 
 Note that `pricer` and `types` are `pub(crate)` submodules — import the names
 above from the module root, not from `revolving_credit::types::…`.
