@@ -120,23 +120,39 @@ fn build_pac_context(
     })
 }
 
-/// Generate cashflows for the reference tranche.
+/// Generate the holder's cashflows for the reference tranche.
 ///
-/// Projects collateral cashflows and runs them through the waterfall
-/// to determine the reference tranche's cashflows.
+/// Projects collateral cashflows (including a prior-month payment still in
+/// flight at `as_of`) and runs them through the waterfall to determine the
+/// reference tranche's cashflows.
 pub(crate) fn generate_tranche_cashflows(
     cmo: &AgencyCmo,
     as_of: Date,
     max_periods: Option<u32>,
 ) -> Result<Vec<TrancheCashflow>> {
     let collateral = resolve_collateral(cmo, as_of)?;
+    tranche_cashflows_on(cmo, &collateral, as_of, max_periods)
+}
 
-    // Generate collateral cashflows
-    let collateral_cfs = generate_cashflows(&collateral, as_of, max_periods)?;
+/// Run `collateral`'s projected cashflows through the waterfall and return
+/// the reference tranche's share.
+///
+/// Quote-based spreads pass the `quote_basis_pool` of the collateral so the
+/// first projected period is the settlement month. The PAC schedule is
+/// generated from the collateral balance at `as_of` with its first entry for
+/// that month, so on the quote basis the PAC schedule index lines up with the
+/// collateral period index.
+pub(crate) fn tranche_cashflows_on(
+    cmo: &AgencyCmo,
+    collateral: &AgencyMbsPassthrough,
+    as_of: Date,
+    max_periods: Option<u32>,
+) -> Result<Vec<TrancheCashflow>> {
+    let collateral_cfs = generate_cashflows(collateral, as_of, max_periods)?;
 
     // Build the PAC context once (None for non-PAC deals). The schedule is
     // collateral-derived; only `period_index` advances per period below.
-    let mut pac_context = build_pac_context(cmo, &collateral, as_of);
+    let mut pac_context = build_pac_context(cmo, collateral, as_of);
 
     let mut waterfall = cmo.waterfall.clone();
 

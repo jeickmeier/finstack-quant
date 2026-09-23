@@ -324,6 +324,48 @@ pub(crate) fn settlement_accrued_interest(
             .year_fraction(start, settlement, DayCountContext::default())?)
 }
 
+/// The pool as bought by a new purchaser settling on `settlement`.
+///
+/// A clean quote plus settlement-month accrued interest buys the
+/// settlement-month accrual period onward. The prior month's P&I, still in
+/// flight until the agency payment date, belongs to the seller (the holder of
+/// record at month end). This helper marks every accrual period before the
+/// settlement month as paid, so quote-based spreads (MC-OAS, CMO Z-spread) and
+/// the TBA delivered pool project exactly the cashflows the quote buys. The
+/// holder NPV path (`price_mbs`) keeps the in-flight receivable and does not
+/// use this helper.
+///
+/// # Arguments
+///
+/// * `mbs` - Pool whose `current_face` is the balance at the start of the
+///   settlement month.
+/// * `settlement` - Trade settlement date; its calendar month is the first
+///   accrual period the buyer receives.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `last_paid_accrual_end` already falls in
+/// or after the settlement month, which would mean the buyer's first accrual
+/// period had been paid before it accrued.
+pub(crate) fn quote_basis_pool(
+    mbs: &AgencyMbsPassthrough,
+    settlement: Date,
+) -> Result<AgencyMbsPassthrough> {
+    let accrual_start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+        .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+    if mbs
+        .last_paid_accrual_end
+        .is_some_and(|date| date >= accrual_start)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "MBS last_paid_accrual_end must precede the settlement month starting {accrual_start}"
+        )));
+    }
+    let mut pool = mbs.clone();
+    pool.last_paid_accrual_end = Some(accrual_start - time::Duration::days(1));
+    Ok(pool)
+}
+
 fn previous_month_start(date: Date) -> Result<Date> {
     use time::Duration;
     let current_start = Date::from_calendar_date(date.year(), date.month(), 1)

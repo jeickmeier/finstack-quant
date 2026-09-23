@@ -35,7 +35,9 @@
 //! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit
 //!   Derivatives*. John Wiley & Sons. `docs/REFERENCES.md#o-kane-2008`
 
-use crate::instruments::fixed_income::mbs_passthrough::pricer::first_unpaid_accrual_start;
+use crate::instruments::fixed_income::mbs_passthrough::pricer::{
+    first_unpaid_accrual_start, quote_basis_pool, settlement_accrued_interest,
+};
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use crate::instruments::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 use finstack_quant_core::dates::Date;
@@ -366,6 +368,8 @@ fn price_on_path(
 /// * `mbs` - Agency MBS passthrough instrument
 /// * `market_price_pct` - Clean price as a percentage of current face (e.g., 98.5);
 ///   calendar-month accrued interest at `as_of` is added to the solver target.
+///   The target buys the settlement-month accrual onward, so the projection
+///   excludes the prior month's in-flight payment (see `quote_basis_pool`).
 /// * `market` - Market context with discount curves
 /// * `as_of` - Valuation date
 /// * `config` - Monte Carlo configuration (paths, HW params, seed)
@@ -394,10 +398,13 @@ pub(crate) fn calculate_mc_oas(
     as_of: Date,
     config: &McOasConfig,
 ) -> Result<f64> {
+    // The clean quote plus settlement-month accrued buys the settlement-month
+    // accrual onward, so project the pool the buyer receives: the prior
+    // month's in-flight P&I belongs to the seller.
+    let quote_pool = quote_basis_pool(mbs, as_of)?;
+    let mbs = &quote_pool;
     let market_price = market_price_pct / 100.0 * mbs.current_face.amount()
-        + crate::instruments::fixed_income::mbs_passthrough::pricer::settlement_accrued_interest(
-            mbs, as_of,
-        )?;
+        + settlement_accrued_interest(mbs, as_of)?;
 
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
     let num_steps = config.num_steps.unwrap_or(mbs.wam as usize);
@@ -1037,5 +1044,53 @@ mod production_mortgage_audit {
         };
         let oas = calculate_mc_oas(&mbs, clean, &market, as_of, &config).expect("oas");
         assert!(oas.abs() < 1e-8, "oas {oas}");
+    }
+
+    /// A clean quote buys the settlement-month accrual onward: the prior
+    /// month's P&I, still in flight until the agency payment date, belongs to
+    /// the seller. The same pool quoted at the same clean price before
+    /// (Feb 10) and after (Feb 27) the Feb 26 payment of the January accrual
+    /// must solve to the same OAS.
+    ///
+    /// Hand check of the tolerance: with a flat 4% curve and a 4% pass-through
+    /// the dirty target and the projected PV both carry at ~4%/yr over the 17
+    /// days, so the residual carry mismatch is below 0.01 price points on a
+    /// ~6-year duration pool, i.e. well under 0.1 bp. Before the fix the
+    /// Feb 10 solve priced the in-flight January flow against a target that
+    /// excludes it: 6.80 bp on Feb 10 versus 2.41 bp on Feb 27.
+    #[test]
+    fn mc_oas_is_stable_across_the_in_flight_payment_date() {
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        mbs.issue_date = date!(2023 - 01 - 01);
+        mbs.maturity = date!(2053 - 01 - 01);
+        mbs.wam = 347;
+        let flat = 0.04_f64;
+        let quote = 99.5;
+        let config = McOasConfig {
+            num_paths: 2,
+            hw_sigma: 1e-10,
+            ..McOasConfig::default()
+        };
+        let oas_at = |as_of: Date| {
+            let market = MarketContext::new().insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .build()
+                    .expect("curve"),
+            );
+            calculate_mc_oas(&mbs, quote, &market, as_of, &config).expect("oas")
+        };
+        let before = oas_at(date!(2024 - 02 - 10));
+        let after = oas_at(date!(2024 - 02 - 27));
+        assert!(
+            (before - after).abs() < 1e-5,
+            "OAS must not jump across the payment date: before={before} after={after}"
+        );
+        assert!(
+            (before - 6.804e-4).abs() > 1e-5,
+            "Feb 10 OAS must no longer price the seller's in-flight January flow"
+        );
     }
 }

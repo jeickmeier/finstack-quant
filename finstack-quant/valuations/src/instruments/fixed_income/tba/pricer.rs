@@ -6,7 +6,8 @@
 use super::AgencyTba;
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::{
-    pricer::price_mbs, AgencyMbsPassthrough, PoolType,
+    pricer::{price_mbs, quote_basis_pool},
+    AgencyMbsPassthrough, PoolType,
 };
 use crate::instruments::fixed_income::tba::allocation::assumed_pool_assumptions;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
@@ -85,23 +86,15 @@ pub(crate) fn resolve_assumed_pool(tba: &AgencyTba, as_of: Date) -> Result<Agenc
                 "TBA pool_factor must agree with the explicitly supplied pool".into(),
             ));
         }
-        let mut resolved = pool.as_ref().clone();
         let settlement = tba.get_settlement_date()?;
-        let accrual_start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
-            .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
-        if resolved.issue_date > settlement
-            || resolved
-                .last_paid_accrual_end
-                .is_some_and(|date| date >= accrual_start)
-        {
+        if pool.issue_date > settlement {
             return Err(finstack_quant_core::Error::Validation(
-                "TBA delivered pool state must precede the settlement month's accrual period"
-                    .into(),
+                "TBA delivered pool must be issued on or before settlement".into(),
             ));
         }
         // Delivery transfers the settlement-month accrual onward. Prior-month
         // P&I belongs to the seller even when its agency payment is still due.
-        resolved.last_paid_accrual_end = Some(accrual_start - time::Duration::days(1));
+        let mut resolved = quote_basis_pool(pool, settlement)?;
         let scale = tba.notional.amount() / resolved.current_face.amount();
         if !scale.is_finite()
             || scale <= 0.0
