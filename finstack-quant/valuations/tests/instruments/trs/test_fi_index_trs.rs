@@ -848,3 +848,110 @@ fn test_fi_index_trs_errors_on_price_scalar_for_duration() {
         err_msg
     );
 }
+
+// Seasoned (mid-period) pricing
+
+/// Single-period FI TRS (2025-01-02 → 2025-04-02, ACT/360), valued mid-period
+/// on 2025-02-15 against a zero-rate discount curve so PV = N × R.
+fn seasoned_fi_trs(
+    initial_level: Option<f64>,
+) -> (
+    finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap,
+    MarketContext,
+) {
+    use finstack_quant_cashflows::builder::ScheduleParams;
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
+        FIIndexTotalReturnSwap, TrsScheduleSpec,
+    };
+    use finstack_quant_valuations::instruments::{
+        Attributes, FinancingLegSpec, IndexUnderlyingParams,
+    };
+
+    let trs = FIIndexTotalReturnSwap::builder()
+        .id("SEASONED-FI-TRS".into())
+        .notional(Money::new(10_000_000.0, USD).expect("money"))
+        .underlying(IndexUnderlyingParams::new("HY-INDEX", USD).with_yield("HY-INDEX-YIELD"))
+        .financing(FinancingLegSpec::new(
+            "USD-FLAT",
+            "USD-SOFR-3M",
+            Decimal::ZERO,
+            DayCount::Act360,
+        ))
+        .schedule(TrsScheduleSpec::from_params(
+            d(2025, 1, 2),
+            d(2025, 4, 2),
+            ScheduleParams::quarterly_act360(),
+        ))
+        .side(TrsSide::ReceiveTotalReturn)
+        .initial_level_opt(initial_level)
+        .attributes(Attributes::new())
+        .build()
+        .expect("trs");
+    let disc = DiscountCurve::builder("USD-FLAT")
+        .base_date(d(2025, 1, 2))
+        .knots([(0.0, 1.0), (5.0, 1.0)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new()
+        .insert(disc)
+        .insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(0.05))
+        .insert_price("HY-INDEX", MarketScalar::Unitless(101.0));
+    (trs, market)
+}
+
+/// Mid-period value = N × [S·e^{y·τ}/L − 1] with τ = ACT/360(as_of, end).
+/// as_of 2025-02-15 → end 2025-04-02 is 46 days; S = 101, L = 100, y = 5%.
+#[test]
+fn fi_trs_prices_period_in_progress_from_reset_level() {
+    let (trs, market) = seasoned_fi_trs(Some(100.0));
+    let as_of = d(2025, 2, 15);
+    let pv = trs
+        .pv_total_return_leg(&market, as_of)
+        .expect("seasoned pv");
+    let expected = 10_000_000.0 * (101.0 * (0.05_f64 * 46.0 / 360.0).exp() / 100.0 - 1.0);
+    assert!(
+        (pv.amount() - expected).abs() < 1e-6,
+        "pv {} vs {expected}",
+        pv.amount()
+    );
+
+    // If the index followed carry exactly since the reset (44 days),
+    // the seasoned value equals the full-period carry e^{y·90/360} − 1.
+    let on_carry = 100.0 * (0.05_f64 * 44.0 / 360.0).exp();
+    let market = market.insert_price("HY-INDEX", MarketScalar::Unitless(on_carry));
+    let pv = trs
+        .pv_total_return_leg(&market, as_of)
+        .expect("seasoned pv");
+    let full_carry = 10_000_000.0 * ((0.05_f64 * 90.0 / 360.0).exp() - 1.0);
+    assert!((pv.amount() - full_carry).abs() < 1e-6);
+}
+
+/// Without the reset level, a seasoned period cannot be valued.
+#[test]
+fn fi_trs_period_in_progress_requires_initial_level() {
+    let (trs, market) = seasoned_fi_trs(None);
+    let err = trs
+        .pv_total_return_leg(&market, d(2025, 2, 15))
+        .expect_err("missing reset level");
+    assert!(err.to_string().contains("initial_level"), "{err}");
+}
+
+/// A period that has ended but is still awaiting its lagged payment stays in
+/// the PV at its carry accrual N × (e^{y·90/360} − 1).
+#[test]
+fn fi_trs_keeps_completed_unpaid_period_in_pv() {
+    use finstack_quant_cashflows::builder::ScheduleParams;
+    use finstack_quant_valuations::instruments::fixed_income::fi_trs::TrsScheduleSpec;
+
+    let (mut trs, market) = seasoned_fi_trs(Some(100.0));
+    let mut params = ScheduleParams::quarterly_act360();
+    params.payment_lag_days = 2;
+    trs.schedule = TrsScheduleSpec::from_params(d(2025, 1, 2), d(2025, 4, 2), params);
+    let pv = trs
+        .pv_total_return_leg(&market, d(2025, 4, 3))
+        .expect("completed-unpaid pv");
+    let expected = 10_000_000.0 * ((0.05_f64 * 90.0 / 360.0).exp() - 1.0);
+    assert!((pv.amount() - expected).abs() < 1e-6, "pv {}", pv.amount());
+}

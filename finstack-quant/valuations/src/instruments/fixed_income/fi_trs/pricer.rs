@@ -84,6 +84,40 @@ fn require_unitless_scalar(scalar: &MarketScalar, kind: &str, id: &str) -> Resul
     }
 }
 
+/// Reads the live index level used to value the period in progress.
+///
+/// The scalar keyed by `underlying.index_id` is a price level in the index's
+/// own units (unitless, or a price in the base currency).
+///
+/// # Errors
+///
+/// Returns an error if the level is missing, has the wrong currency, or is
+/// not positive and finite.
+fn extract_index_level(trs: &FIIndexTotalReturnSwap, context: &MarketContext) -> Result<f64> {
+    let id = trs.underlying.index_id.as_str();
+    let scalar = context.get_price(id).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!(
+            "FIIndexTotalReturnSwap '{}': index level '{}' is required to value the \
+             period in progress but is not in the market context",
+            trs.id.as_str(),
+            id
+        ))
+    })?;
+    let level = crate::instruments::common_impl::helpers::scalar_price_amount(
+        scalar,
+        trs.underlying.base_currency,
+    )?;
+    if !level.is_finite() || level <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "FIIndexTotalReturnSwap '{}': index level '{}' must be positive and finite, got {}",
+            trs.id.as_str(),
+            id,
+            level
+        )));
+    }
+    Ok(level)
+}
+
 /// Fixed income index return model using the carry/yield approach.
 ///
 /// Models the total return per period as:
@@ -93,6 +127,11 @@ fn require_unitless_scalar(scalar: &MarketScalar, kind: &str, id: &str) -> Resul
 /// ```
 ///
 /// where `y` is the continuous index yield and `dt` is the accrual period year fraction.
+///
+/// For the period in progress on the valuation date the return is
+/// `S · e^{y·τ} / L − 1`, where `S` is the live index level
+/// (`underlying.index_id`), `L` is the reset level (`initial_level`) and `τ`
+/// is the schedule year fraction from `as_of` to the period end.
 ///
 /// This is the exponential (multiplicative) form of the income-based return model.
 /// For typical quarterly periods and HY yields (5-6%), the difference between
@@ -109,26 +148,34 @@ struct FiIndexReturnModel<'a> {
 }
 
 impl TrsReturnModel for FiIndexReturnModel<'_> {
-    fn period_return(&self, inputs: &PeriodReturnInputs, _context: &MarketContext) -> Result<f64> {
+    fn period_return(&self, inputs: &PeriodReturnInputs, context: &MarketContext) -> Result<f64> {
         let PeriodReturnInputs {
             period_start,
             period_end,
             t_start,
+            t_end,
             ..
         } = *inputs;
-        // Seasoned (in-progress) periods are not supported by the carry
-        // model: the realized index move since the period start would be
-        // silently replaced by projected carry. Fail loud (this preserves
-        // the engine's previous behavior, which rejected past period starts).
-        if t_start < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FIIndexTotalReturnSwap '{}': period starting {} is already in progress; \
-                 seasoned FI index TRS pricing is not supported",
-                self.trs.id.as_str(),
-                period_start
-            )));
+        // Period in progress (including one ending exactly on `as_of`): the
+        // realized index move since the reset enters through the live index
+        // level, and only the remaining accrual to period end is projected
+        // at the carry yield.
+        if t_start < 0.0 && t_end >= 0.0 {
+            let reset_level = self.trs.initial_level.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "FIIndexTotalReturnSwap '{}': the return period starting {} is in \
+                     progress; set initial_level to the index level at that reset",
+                    self.trs.id.as_str(),
+                    period_start
+                ))
+            })?;
+            let index_level = extract_index_level(self.trs, context)?;
+            return Ok(index_level * (self.index_yield * t_end).exp() / reset_level - 1.0);
         }
-        // Carry model: the index earns its yield as total return.
+        // Carry model: the index earns its yield as total return. A period
+        // that ended before `as_of` but is still awaiting payment has no
+        // recorded end fixing in this model, so its accrual stays at the
+        // projected carry and remains in the PV until the payment date.
         //
         // Year fraction computed using the schedule's day count convention
         // (same convention used for the financing leg accrual).
@@ -164,6 +211,7 @@ impl TrsReturnModel for FiIndexReturnModel<'_> {
 /// Returns an error if:
 /// - The TRS has already matured (`end <= as_of`)
 /// - The yield_id is configured but missing from the market context
+/// - A period is in progress and `initial_level` or the index level is missing
 /// - The discount curve is not found
 pub(crate) fn pv_total_return_leg(
     trs: &FIIndexTotalReturnSwap,
