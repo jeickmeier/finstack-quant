@@ -11,13 +11,13 @@ use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 /// expected coupon income, and principal paydown between settlement dates.
 /// Uses the MBS cashflow engine for carry inputs.
 ///
-/// Uses 0.5% monthly SMM as the prepayment assumption.
+/// Prepayment follows the generic TBA pool's prepayment model.
 pub(crate) struct ImpliedFinancingRateCalculator;
 
 impl MetricCalculator for ImpliedFinancingRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let roll: &crate::instruments::DollarRoll = context.instrument_as()?;
-        let result = super::carry::implied_financing_rate(roll, 0.005)?;
+        let result = super::carry::implied_financing_rate(roll)?;
         Ok(result.implied_rate)
     }
 }
@@ -27,7 +27,8 @@ impl MetricCalculator for ImpliedFinancingRateCalculator {
 /// Returns specialness in basis points (repo rate - implied financing rate).
 /// Positive means rolling is cheaper than repo financing.
 ///
-/// Uses 0.5% monthly SMM and resolves financing over the actual roll interval.
+/// Uses the generic TBA pool's prepayment model and resolves repo financing
+/// over the actual roll interval.
 pub(crate) struct RollSpecialnessCalculator;
 
 impl MetricCalculator for RollSpecialnessCalculator {
@@ -57,7 +58,7 @@ impl MetricCalculator for RollSpecialnessCalculator {
             let curve = context.curves.get_discount(&roll.discount_curve_id)?;
             (1.0 / curve.df_between_dates(front, back)? - 1.0) / accrual
         };
-        super::carry::roll_specialness(roll, 0.005, repo_rate)
+        super::carry::roll_specialness(roll, repo_rate)
     }
 }
 
@@ -104,10 +105,9 @@ mod production_mortgage_audit {
         roll.front_settlement_date = Some(date!(2026 - 03 - 11));
         roll.back_settlement_date = Some(date!(2026 - 04 - 11));
         roll.repo_curve_id = Some("REPO".into());
-        let carry = crate::instruments::fixed_income::dollar_roll::carry::implied_financing_rate(
-            &roll, 0.005,
-        )
-        .expect("carry");
+        let carry =
+            crate::instruments::fixed_income::dollar_roll::carry::implied_financing_rate(&roll)
+                .expect("carry");
         let market = MarketContext::new()
             .insert(
                 DiscountCurve::builder("USD-OIS")
