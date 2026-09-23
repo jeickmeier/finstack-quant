@@ -527,3 +527,42 @@ fn leq_prices_the_draw_at_default() {
         .to_string()
         .contains("leq"));
 }
+
+/// Draws smaller than the old booking threshold are still funded: a
+/// utilization mean-reverting (speed 1, volatility 1e-8) from 30% toward
+/// 30.0002% moves the balance by at most 10M × 2e-6 × (1 − e^-0.25) ≈ 4.4
+/// dollars per quarter (below 1e-6 of the commitment, which used to be
+/// dropped) and about 17 dollars over two years, yet the principal leg must still
+/// net to the 3M drawn at the valuation date (lender view: funding outflows
+/// plus the terminal repayment).
+#[test]
+fn stochastic_funding_leg_conserves_cash_for_small_draws() {
+    let market = MarketContext::new().insert(flat_discount_curve(0.03, COMMITMENT, "USD-OIS"));
+    let drawn = 3_000_000.0;
+    let f = facility(
+        "RC-SMALL-DRAWS",
+        drawn,
+        BaseRateSpec::Fixed { rate: 0.05 },
+        stochastic(0.300_002, 1e-8, 2, Some(no_credit_config())),
+        0.4,
+    );
+    let result = RevolvingCreditPricer::price_with_paths(&f, &market, COMMITMENT).expect("price");
+    for (i, path) in result.path_results.iter().enumerate() {
+        let terminal: f64 = path
+            .cashflows
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Notional && cf.date >= MATURITY)
+            .map(|cf| cf.amount.amount())
+            .sum();
+        assert!(
+            terminal > drawn + 10.0,
+            "the balance drifted up: {terminal}"
+        );
+        let sum = notional_sum(&path.cashflows);
+        assert!(
+            (sum - drawn).abs() < 1e-6,
+            "path {i}: notional flows sum to {sum}, drawn = {drawn}"
+        );
+    }
+}

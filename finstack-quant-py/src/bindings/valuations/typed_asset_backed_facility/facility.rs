@@ -786,6 +786,7 @@ impl PyFacilityProjection {
     ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
             .lender_cashflows()
+            .map_err(core_to_py)?
             .into_iter()
             .map(|(date, amount)| Ok((date_to_py(py, date)?, money_to_py(amount))))
             .collect()

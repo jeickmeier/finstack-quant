@@ -50,9 +50,15 @@ pub struct FacilityProjection {
 }
 
 impl FacilityProjection {
-    /// Every cashflow to the lender (interest, principal and unused fees)
-    /// in date order, summed per date.
-    pub fn lender_cashflows(&self) -> Vec<(Date, Money)> {
+    /// Every cashflow to the lender in date order, summed per date:
+    /// interest, principal and unused fees as inflows, draws (scheduled draws
+    /// and re-advances) as outflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::CurrencyMismatch` when two flows on one date carry
+    /// different currencies.
+    pub fn lender_cashflows(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let mut by_date: std::collections::BTreeMap<Date, Money> =
             std::collections::BTreeMap::new();
         let draws = self
@@ -67,16 +73,17 @@ impl FacilityProjection {
             .map(|(date, amount)| (*date, *amount))
             .chain(draws)
         {
-            by_date
-                .entry(date)
-                .and_modify(|total| {
-                    if let Ok(sum) = total.checked_add(amount) {
-                        *total = sum;
-                    }
-                })
-                .or_insert(amount);
+            match by_date.entry(date) {
+                std::collections::btree_map::Entry::Occupied(mut total) => {
+                    let sum = total.get().checked_add(amount)?;
+                    *total.get_mut() = sum;
+                }
+                std::collections::btree_map::Entry::Vacant(slot) => {
+                    slot.insert(amount);
+                }
+            }
         }
-        by_date.into_iter().collect()
+        Ok(by_date.into_iter().collect())
     }
 }
 
@@ -378,7 +385,7 @@ impl AssetBackedFacility {
         let mut flows: Vec<(Date, f64)> = vec![(as_of, -self.drawn.amount())];
         flows.extend(
             projection
-                .lender_cashflows()
+                .lender_cashflows()?
                 .into_iter()
                 .map(|(date, amount)| (date, amount.amount())),
         );
@@ -398,13 +405,18 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let projection = self.project(context, as_of)?;
         let mut flows: Vec<CashFlow> = Vec::new();
+        let interest_kind = if self.index_id.is_some() {
+            CFKind::FloatReset
+        } else {
+            CFKind::Fixed
+        };
         for (date, amount) in &projection.facility.interest_flows {
             if amount.amount() > 0.0 {
                 flows.push(CashFlow::new(
                     *date,
                     None,
                     *amount,
-                    CFKind::Fixed,
+                    interest_kind,
                     0.0,
                     None,
                 ));
@@ -436,6 +448,19 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
         }
         for (date, amount) in &projection.unused_fees {
             flows.push(CashFlow::new(*date, None, *amount, CFKind::Fee, 0.0, None));
+        }
+        // Draws (scheduled and re-advances) are cash the lender pays out.
+        for (date, amount) in &projection.draws {
+            if amount.amount() > 0.0 {
+                flows.push(CashFlow::new(
+                    *date,
+                    None,
+                    amount.checked_neg(),
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ));
+            }
         }
         Ok(schedule_from_classified_flows(
             flows,

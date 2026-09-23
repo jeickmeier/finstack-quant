@@ -30,7 +30,7 @@ Import path:
 | `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture; `expected_cashflows(..)` for the path-averaged schedule of a stochastic facility. |
 | `EnhancedMonteCarloResult`, `PathResult` | MC statistics plus per-path PV, cashflows and factor trajectories. |
 | `PathAwareCashflowSchedule`, `ThreeFactorPathData` | Cashflow schedule carrying the simulated factor path. |
-| `ZERO_TOLERANCE`, `UTILIZATION_CHANGE_THRESHOLD`, `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
+| `ZERO_TOLERANCE`, `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
 
 Note that `pricer` and `types` are `pub(crate)` submodules — import the names
 above from the module root, not from `revolving_credit::types::…`.
@@ -388,8 +388,11 @@ are priced in the default leg, not here.
 term forwards for term indices (`USD-SOFR-3M`, EURIBOR) and compound daily
 overnight fixings when the index is a registered overnight RFR (`USD-SOFR-OIS`)
 or `FloatingRateSpec.overnight_compounding` is set. Reset lag is applied on the
-reset grid. Gearing, spread, and floors/caps apply after the index rate in both
-cases.
+reset grid. Gearing, spread, and all-in floors/caps apply after the index rate
+in both cases. On an overnight index the index floor and cap apply to each daily
+fixing before compounding, unless `overnight_index_constraints` is `period`,
+which bounds the compounded rate once. `index_tenor` and a non-default
+`fallback` are rejected: resets always project from the forward curve.
 
 ## Metrics
 

@@ -57,7 +57,6 @@
 //!
 //! This module uses centralized numerical tolerances for consistency:
 //! - `ZERO_TOLERANCE`: General zero comparison threshold (1e-8)
-//! - `UTILIZATION_CHANGE_THRESHOLD`: Threshold for detecting utilization changes (1e-6)
 //! - `INTERPOLATION_TOLERANCE`: Tolerance for interpolation equality checks (1e-10)
 //!
 //! # See Also
@@ -80,10 +79,6 @@ mod utils;
 /// General zero comparison threshold for numerical stability.
 /// Used for comparing floating-point values to zero.
 pub const ZERO_TOLERANCE: f64 = 1e-8;
-
-/// Threshold for detecting significant utilization changes.
-/// Changes smaller than this are treated as noise and ignored.
-pub const UTILIZATION_CHANGE_THRESHOLD: f64 = 1e-6;
 
 /// Tolerance for interpolation equality checks.
 /// Used when comparing time points or interpolation boundaries.

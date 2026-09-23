@@ -552,8 +552,16 @@ impl RevolvingCreditFees {
     /// * `utilization` - Drawn plus LC usage over the commitment in force, as a
     ///   decimal in `[0, 1]`, used to select the tier.
     /// * `date` - Accrual date the steps are evaluated on.
-    pub fn commitment_fee_bp_at(&self, utilization: f64, date: Date) -> f64 {
-        (self.commitment_fee_bp(utilization) + self.deltas_at(date).commitment_bp).max(0.0)
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::commitment_fee_bp`].
+    pub fn commitment_fee_bp_at(
+        &self,
+        utilization: f64,
+        date: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        Ok((self.commitment_fee_bp(utilization)? + self.deltas_at(date).commitment_bp).max(0.0))
     }
 
     /// Usage fee in force on `date` for the given utilization (tier rate plus
@@ -564,8 +572,16 @@ impl RevolvingCreditFees {
     /// * `utilization` - Drawn plus LC usage over the commitment in force, as a
     ///   decimal in `[0, 1]`, used to select the tier.
     /// * `date` - Accrual date the steps are evaluated on.
-    pub fn usage_fee_bp_at(&self, utilization: f64, date: Date) -> f64 {
-        (self.usage_fee_bp(utilization) + self.deltas_at(date).usage_bp).max(0.0)
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::usage_fee_bp`].
+    pub fn usage_fee_bp_at(
+        &self,
+        utilization: f64,
+        date: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        Ok((self.usage_fee_bp(utilization)? + self.deltas_at(date).usage_bp).max(0.0))
     }
 
     /// Facility fee in force on `date` (flat rate plus cumulative step delta,
@@ -600,47 +616,56 @@ impl RevolvingCreditFees {
         }
     }
 
-    /// Get commitment fee bp for given utilization (evaluates tiers).
+    /// Commitment fee in basis points for a utilization: the rate of the
+    /// highest tier whose threshold the utilization reaches, or `0.0` when no
+    /// tier applies. Tiers must be sorted by threshold ascending.
     ///
-    /// Returns the fee rate from the highest tier where utilization >= threshold.
-    /// Tiers should be sorted by threshold ascending.
-    /// If no tiers match or tiers are empty, returns 0.0.
+    /// # Arguments
     ///
-    /// # Panics (debug builds only)
+    /// * `utilization` - Drawn plus LC usage over the commitment, as a
+    ///   decimal (`0.4` = 40% used).
     ///
-    /// Asserts that `utilization` is finite.
-    pub fn commitment_fee_bp(&self, utilization: f64) -> f64 {
-        debug_assert!(
-            utilization.is_finite(),
-            "commitment_fee_bp: utilization is not finite ({utilization})"
-        );
-        let util = Decimal::try_from(utilization).unwrap_or(Decimal::ZERO);
-        evaluate_fee_tiers(&self.commitment_fee_tiers, util)
-            .ok()
-            .and_then(|bp| bp.to_f64())
-            .unwrap_or(0.0)
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `utilization` is not finite or the
+    /// tiers are not strictly ascending.
+    pub fn commitment_fee_bp(&self, utilization: f64) -> finstack_quant_core::Result<f64> {
+        tier_bp(&self.commitment_fee_tiers, utilization, "commitment")
     }
 
-    /// Get usage fee bp for given utilization (evaluates tiers).
+    /// Usage fee in basis points for a utilization: the rate of the highest
+    /// tier whose threshold the utilization reaches, or `0.0` when no tier
+    /// applies. Tiers must be sorted by threshold ascending.
     ///
-    /// Returns the fee rate from the highest tier where utilization >= threshold.
-    /// Tiers should be sorted by threshold ascending.
-    /// If no tiers match or tiers are empty, returns 0.0.
+    /// # Arguments
     ///
-    /// # Panics (debug builds only)
+    /// * `utilization` - Drawn plus LC usage over the commitment, as a
+    ///   decimal (`0.4` = 40% used).
     ///
-    /// Asserts that `utilization` is finite.
-    pub fn usage_fee_bp(&self, utilization: f64) -> f64 {
-        debug_assert!(
-            utilization.is_finite(),
-            "usage_fee_bp: utilization is not finite ({utilization})"
-        );
-        let util = Decimal::try_from(utilization).unwrap_or(Decimal::ZERO);
-        evaluate_fee_tiers(&self.usage_fee_tiers, util)
-            .ok()
-            .and_then(|bp| bp.to_f64())
-            .unwrap_or(0.0)
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `utilization` is not finite or the
+    /// tiers are not strictly ascending.
+    pub fn usage_fee_bp(&self, utilization: f64) -> finstack_quant_core::Result<f64> {
+        tier_bp(&self.usage_fee_tiers, utilization, "usage")
     }
+}
+
+/// Tier rate in basis points for a finite utilization.
+fn tier_bp(tiers: &[FeeTier], utilization: f64, label: &str) -> finstack_quant_core::Result<f64> {
+    let util = Decimal::try_from(utilization)
+        .ok()
+        .filter(|_| utilization.is_finite())
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "RevolvingCredit {label} fee: utilization must be finite, got {utilization}"
+            ))
+        })?;
+    evaluate_fee_tiers(tiers, util)?.to_f64().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "RevolvingCredit {label} fee tier rate is not representable as f64"
+        ))
+    })
 }
 
 /// Draw and repayment specification.
@@ -989,6 +1014,8 @@ impl RevolvingCredit {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         use super::MAX_RECOVERY_RATE;
 
+        self.pricing_model_override()?;
+
         // Commitment amount must be positive
         validation::validate_money_gt(
             self.commitment_amount,
@@ -1319,6 +1346,18 @@ impl RevolvingCredit {
                         )
                     })?;
                 }
+                // The revolver projects every reset from the forward curve
+                // and has no fallback path; reject fields it would ignore.
+                validation::require_with(spec.index_tenor.is_none(), || {
+                    "RevolvingCredit does not support index_tenor: resets use the \
+                     forward curve's own tenor"
+                        .to_string()
+                })?;
+                validation::require_with(spec.fallback.is_default(), || {
+                    "RevolvingCredit does not support a floating-rate fallback: a missing \
+                     curve or fixing is an error"
+                        .to_string()
+                })?;
                 let _ = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
                 let _ = crate::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
                     spec.index_id.as_str(),
@@ -1640,6 +1679,28 @@ impl RevolvingCredit {
         .max(0.0)
     }
 
+    /// Model named by `attributes.meta["pricing_model"]`, when set.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when the value is not a `ModelKey` string,
+    /// instead of silently pricing with the default model.
+    pub(crate) fn pricing_model_override(
+        &self,
+    ) -> finstack_quant_core::Result<Option<crate::pricer::ModelKey>> {
+        self.attributes
+            .get_meta("pricing_model")
+            .map(|model| {
+                <crate::pricer::ModelKey as ::std::str::FromStr>::from_str(model).map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "RevolvingCredit '{}': unknown pricing_model '{model}'",
+                        self.id
+                    ))
+                })
+            })
+            .transpose()
+    }
+
     /// Fronting fee in force, in basis points per annum (zero without an LC
     /// sub-facility).
     pub fn fronting_fee_bp(&self) -> f64 {
@@ -1757,11 +1818,11 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
     }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
-        self.attributes()
-            .get_meta("pricing_model")
-            .and_then(|model_str| {
-                <crate::pricer::ModelKey as ::std::str::FromStr>::from_str(model_str).ok()
-            })
+        // `validate` rejects an unknown `pricing_model`, so only a valid
+        // override or none reaches here.
+        self.pricing_model_override()
+            .ok()
+            .flatten()
             .unwrap_or(crate::pricer::ModelKey::Discounting)
     }
 
@@ -1771,15 +1832,12 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         // Optional model override via attributes metadata (e.g., meta["pricing_model"] = "monte_carlo_gbm")
-        if let Some(model_str) = self.attributes().get_meta("pricing_model") {
-            if let Ok(model) = <crate::pricer::ModelKey as ::std::str::FromStr>::from_str(model_str)
-            {
-                let registry = crate::pricer::standard_pricer_registry();
-                let result = registry
-                    .price_with_metrics(self, model, curves, as_of, &[], Default::default())
-                    .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-                return Ok(result.value);
-            }
+        if let Some(model) = self.pricing_model_override()? {
+            let registry = crate::pricer::standard_pricer_registry();
+            let result = registry
+                .price_with_metrics(self, model, curves, as_of, &[], Default::default())
+                .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+            return Ok(result.value);
         }
 
         // Use the same automatic deterministic/Monte Carlo dispatch as the

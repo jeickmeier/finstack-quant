@@ -46,9 +46,14 @@ impl MetricCalculator for YtmCalculator {
             Vec::with_capacity(holder_flows.len() + 1);
 
         // Add initial price leg at settlement_date (negative = outflow for purchase).
-        // Model PV and quoted dirty prices already share the settlement origin.
-        let target_price =
-            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value)?;
+        // Quoted dirty prices and the carried model PV share the settlement origin.
+        let target_price = target_price_from_quote_or_model(
+            loan,
+            &schedule,
+            &context.curves,
+            as_of,
+            context.base_value,
+        )?;
         flows.push((
             settlement_date,
             Money::new(-target_price.amount(), target_price.currency())?,

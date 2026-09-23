@@ -194,14 +194,32 @@ impl TermLoanDiscountingPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
+        let settlement_value = Self::settlement_value(loan, market, as_of)?;
+        Self::value_at_as_of(loan, market, as_of, settlement_value)
+    }
+
+    /// Model value on the settlement date of the flows a buyer settling
+    /// today receives: [`Self::pricing_flows`] discounted to settlement (at
+    /// the `quoted_z_spread` when set). This is the price quote-space
+    /// measures compare with a settlement-date dirty quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `loan` - Term loan to value.
+    /// * `market` - Discount curve and any forward curves and fixings.
+    /// * `as_of` - Trade date; settlement is `loan.settlement_date(as_of)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns cashflow-generation, curve-lookup or discounting errors.
+    pub(crate) fn settlement_value(
+        loan: &TermLoan,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<Money> {
         if loan.settlement_date(as_of)? >= loan.maturity {
             return Ok(Money::from((0_i64, loan.currency)));
         }
-
-        // Retrieve discount curve and discount the holder-view flows to the
-        // settlement date using date-based DF mapping. This anchors valuation on
-        // the settlement date rather than the trade date, consistent with
-        // leveraged loan market conventions.
         let (settlement_date, flows) = Self::pricing_flows(loan, market, as_of)?;
         let disc = market.get_discount(loan.discount_curve_id.as_str())?;
 
@@ -228,15 +246,99 @@ impl TermLoanDiscountingPricer {
         }
     }
 
-    /// Build the holder-view cashflows the discounting pricer values, anchored
-    /// to the loan's settlement date.
+    /// Carry between the valuation date and settlement: the discount factor
+    /// `DF(as_of, settlement)` and the `as_of` value of the cash flows paid in
+    /// `(as_of, settlement]`, which the holder on `as_of` still receives.
+    fn settlement_carry(
+        loan: &TermLoan,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<(f64, Money)> {
+        use finstack_quant_core::cashflow::CFKind;
+
+        let settlement = loan.settlement_date(as_of)?;
+        let disc = market.get_discount(loan.discount_curve_id.as_str())?;
+        let df_settlement = disc.df_between_dates(as_of, settlement)?;
+        let mut pre_settlement = Money::from((0_i64, loan.currency));
+        if settlement > as_of {
+            for cf in Self::pricing_schedule(loan, market, as_of)?.get_flows() {
+                if cf.kind != CFKind::Pik && cf.date > as_of && cf.date <= settlement {
+                    pre_settlement = pre_settlement
+                        .checked_add(cf.amount * disc.df_between_dates(as_of, cf.date)?)?;
+                }
+            }
+        }
+        Ok((df_settlement, pre_settlement))
+    }
+
+    /// Instrument PV on `as_of` from a settlement-date model value.
     ///
-    /// Returns `(settlement_date, flows)` where `flows` are the same `(date,
-    /// amount)` pairs [`price`](Self::price) discounts: PIK capitalization and
-    /// pre-settlement flows are excluded, and seasoned floating coupons reflect
-    /// historical fixings where available. Sharing this builder keeps the
-    /// z-spread CS01 fallback (which reprices these flows under a spread bump)
-    /// consistent with the base PV.
+    /// The PV is the holder's value on `as_of`, as for the bond and the
+    /// revolver: `DF(as_of, settlement) × settlement_value` plus the flows
+    /// paid between `as_of` and settlement, discounted to `as_of`.
+    ///
+    /// # Arguments
+    ///
+    /// * `loan` - Term loan whose settlement lag and schedule apply.
+    /// * `market` - Market holding the loan's discount curve.
+    /// * `as_of` - Valuation date the PV is anchored at.
+    /// * `settlement_value` - Model value on the settlement date, in the loan
+    ///   currency (from the discounting or tree engine).
+    ///
+    /// # Errors
+    ///
+    /// Returns curve-lookup, schedule or currency errors.
+    pub(crate) fn value_at_as_of(
+        loan: &TermLoan,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        settlement_value: Money,
+    ) -> finstack_quant_core::Result<Money> {
+        if as_of >= loan.maturity {
+            return Ok(Money::from((0_i64, loan.currency)));
+        }
+        let (df_settlement, pre_settlement) = Self::settlement_carry(loan, market, as_of)?;
+        (settlement_value * df_settlement).checked_add(pre_settlement)
+    }
+
+    /// Settlement-date value from an instrument PV on `as_of`: the inverse of
+    /// [`Self::value_at_as_of`], used by model-derived yield targets.
+    ///
+    /// # Arguments
+    ///
+    /// * `loan` - Term loan whose settlement lag and schedule apply.
+    /// * `market` - Market holding the loan's discount curve.
+    /// * `as_of` - Valuation date `value` is anchored at.
+    /// * `value` - Instrument PV on `as_of`, in the loan currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns curve-lookup, schedule or currency errors, or
+    /// `Error::Validation` when the settlement discount factor is not positive.
+    pub(crate) fn value_at_settlement(
+        loan: &TermLoan,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        value: Money,
+    ) -> finstack_quant_core::Result<Money> {
+        let (df_settlement, pre_settlement) = Self::settlement_carry(loan, market, as_of)?;
+        if !(df_settlement.is_finite() && df_settlement > 0.0) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "TermLoan '{}' settlement discount factor must be positive, got {df_settlement}",
+                loan.id
+            )));
+        }
+        Ok(value.checked_sub(pre_settlement)? * (1.0 / df_settlement))
+    }
+
+    /// Build the holder-view cashflows a buyer settling today receives, for
+    /// quote-space measures anchored at the loan's settlement date.
+    ///
+    /// Returns `(settlement_date, flows)`: PIK capitalization and flows on or
+    /// before settlement are excluded, and seasoned floating coupons reflect
+    /// historical fixings where available. The discount margin and the
+    /// z-spread CS01 solve against a settlement-date quote with these flows;
+    /// the instrument PV ([`price`](Self::price)) is anchored at `as_of`.
     pub(crate) fn pricing_flows(
         loan: &TermLoan,
         market: &MarketContext,

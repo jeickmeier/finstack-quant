@@ -368,6 +368,12 @@ pub(super) fn project_revolver_floating_rate(
         return Ok(crate::cashflow::builder::rate_helpers::calculate_floating_rate(0.0, &params));
     }
 
+    // Index bounds applied per daily fixing (the default for floored SOFR
+    // loans) act on each observation before compounding, as in the cashflows
+    // builder's overnight replay; `Period` bounds act on the compounded rate.
+    let daily_constraints = input.spec.overnight_index_constraints
+        == crate::cashflow::builder::OvernightIndexConstraintApplication::Daily
+        && (params.index_floor_bp.is_some() || params.index_cap_bp.is_some());
     let projection = project_overnight_coupon(OvernightCouponProjectionInput {
         curve: OvernightProjectionCurve::Forward(input.fwd),
         fixings: input.fixings,
@@ -380,7 +386,7 @@ pub(super) fn project_revolver_floating_rate(
         compounding: &compounding,
         fixing_calendar: calendar,
         compounded_spread: 0.0,
-        need_observation_exposures: projected_fixings.is_some(),
+        need_observation_exposures: projected_fixings.is_some() || daily_constraints,
     })?;
     if let Some(out) = projected_fixings {
         out.extend(projection.observation_exposures.iter().map(|observation| {
@@ -391,7 +397,31 @@ pub(super) fn project_revolver_floating_rate(
             }
         }));
     }
-    Ok(crate::cashflow::builder::rate_helpers::calculate_floating_rate(projection.rate, &params))
+    let index_rate = if daily_constraints {
+        let bound = |rate: f64| {
+            let floored = params
+                .index_floor_bp
+                .map_or(rate, |floor| rate.max(floor * 1e-4));
+            params
+                .index_cap_bp
+                .map_or(floored, |cap| floored.min(cap * 1e-4))
+        };
+        let factor = projection
+            .observation_exposures
+            .iter()
+            .fold(1.0, |product, observation| {
+                product
+                    * (1.0
+                        + bound(observation.projected_rate)
+                            * observation.factor_accrual_year_fraction)
+            });
+        params.index_floor_bp = None;
+        params.index_cap_bp = None;
+        (factor - 1.0) / projection.accrual_year_fraction
+    } else {
+        projection.rate
+    };
+    Ok(crate::cashflow::builder::rate_helpers::calculate_floating_rate(index_rate, &params))
 }
 
 /// Apply a draw/repay event to current balance with commitment limit validation.
@@ -763,6 +793,110 @@ mod tests {
             (revolver_rate - expected.rate).abs() < 1e-12,
             "revolver overnight rate {revolver_rate} != shared engine {}",
             expected.rate
+        );
+    }
+
+    /// A 0% SOFR index floor applied daily floors every negative fixing
+    /// before compounding; applied per period it floors only the compounded
+    /// rate. Fixings are -1% before 2025-02-14 and +2% from it, all realized.
+    /// The expected rates are compounded by hand over the usny business days.
+    #[test]
+    fn overnight_index_floor_applies_daily_or_per_period() {
+        use crate::cashflow::builder::{
+            OvernightCompoundingMethod, OvernightIndexConstraintApplication,
+        };
+        use finstack_quant_core::dates::{calendar_by_id, DateExt};
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use rust_decimal::Decimal;
+
+        let start = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+        let end = Date::from_calendar_date(2025, Month::April, 2).expect("date");
+        let switch = Date::from_calendar_date(2025, Month::February, 14).expect("date");
+        let fixing = |date: Date| if date < switch { -0.01 } else { 0.02 };
+        let calendar = calendar_by_id("usny").expect("usny");
+        let mut observations = Vec::new();
+        let mut date = start;
+        while date < end {
+            observations.push((date, fixing(date)));
+            date = date
+                .add_business_days(1, calendar)
+                .expect("next business day");
+        }
+        let series = ScalarTimeSeries::new("FIXING:USD-SOFR-OIS", observations.clone(), None)
+            .expect("fixings");
+
+        // Hand calculation: ∏(1 + r_i · d_i / 360) over each business day,
+        // d_i the calendar days to the next business day.
+        let compound = |floor: bool| -> f64 {
+            let mut product = 1.0;
+            for (i, (date, rate)) in observations.iter().enumerate() {
+                let next = observations.get(i + 1).map_or(end, |(next, _)| *next);
+                let days = f64::from(i32::try_from((next - *date).whole_days()).expect("days"));
+                let rate = if floor { rate.max(0.0) } else { *rate };
+                product *= 1.0 + rate * days / 360.0;
+            }
+            let period_days = f64::from(i32::try_from((end - start).whole_days()).expect("days"));
+            (product - 1.0) * 360.0 / period_days
+        };
+        let daily_expected = compound(true);
+        let period_expected = compound(false).max(0.0);
+        assert!(
+            daily_expected > period_expected + 1e-4,
+            "fixings straddle zero"
+        );
+
+        let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
+            .base_date(start)
+            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
+            .build()
+            .expect("forward curve");
+        let rate = |application: OvernightIndexConstraintApplication| -> f64 {
+            let spec = crate::cashflow::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-OIS".into(),
+                spread_bp: Decimal::ZERO,
+                gearing: Decimal::ONE,
+                gearing_includes_spread: true,
+                index_floor_bp: Some(Decimal::ZERO),
+                index_cap_bp: None,
+                all_in_floor_bp: None,
+                all_in_cap_bp: None,
+                overnight_index_constraints: application,
+                reset_frequency: Tenor::quarterly(),
+                index_tenor: None,
+                reset_lag_days: 0,
+                fixing_calendar_id: Some("usny".into()),
+                overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+                overnight_basis: Some(DayCount::Act360),
+                fallback: Default::default(),
+            };
+            project_revolver_floating_rate(
+                RevolverFloatingProjection {
+                    accrual_start: start,
+                    accrual_end: end,
+                    as_of: end,
+                    spec: &spec,
+                    fwd: &forward,
+                    day_count: DayCount::Act360,
+                    coupon_frequency: Tenor::quarterly(),
+                    currency: Currency::USD,
+                    calendar_id: None,
+                    margin_delta_bp: 0.0,
+                    fixings: Some(&series),
+                },
+                None,
+            )
+            .expect("overnight coupon")
+        };
+        let daily = rate(OvernightIndexConstraintApplication::Daily);
+        let period = rate(OvernightIndexConstraintApplication::Period);
+        assert!(
+            (daily - daily_expected).abs() < 1e-12,
+            "daily floor {daily} vs hand {daily_expected}"
+        );
+        assert!(
+            (period - period_expected).abs() < 1e-12,
+            "period floor {period} vs hand {period_expected}"
         );
     }
 

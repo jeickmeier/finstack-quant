@@ -29,7 +29,7 @@ impl ZSpreadCs01 for AssetBackedFacility {
         };
         let flows = self
             .project(curves, as_of)?
-            .lender_cashflows()
+            .lender_cashflows()?
             .into_iter()
             .filter(|(date, _)| *date >= as_of)
             .collect();

@@ -122,11 +122,13 @@ pub enum RateSpec {
     /// Uses the standard floating rate specification with full support
     /// for floors, caps, gearing, and reset conventions.
     ///
-    /// **Note on calendars**: The `FloatingRateSpec.calendar_id` field is ignored
-    /// for term loans. The loan-level `TermLoan::calendar_id` drives the payment
-    /// schedule and business-day adjustments. Only `index_id`, `spread_bp`,
-    /// `gearing`, `index_floor_bp`, `all_in_cap_bp`, and `reset_lag_days` are used from this
-    /// specification.
+    /// Every field of the spec is honored. The loan-level
+    /// `TermLoan::calendar_id` drives the payment schedule and business-day
+    /// adjustments; `fixing_calendar_id` (the loan calendar when unset) drives
+    /// the reset lag and overnight observations. Covenant and override margin
+    /// step-ups add to `spread_bp` from the next accrual period. Overnight
+    /// indices compound per `overnight_compounding` and apply index floors and
+    /// caps per `overnight_index_constraints` (each daily fixing by default).
     Floating(FloatingRateSpec),
 }
 

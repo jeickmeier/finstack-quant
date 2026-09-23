@@ -156,11 +156,17 @@ fn apply_baseline_regime(
 /// The pinned value uses the deterministic instrument-derived seed and the
 /// test-only 128-estimator budget set by [`apply_baseline_regime`].
 const BASELINE_BOND_PV: f64 = 986_735.637_112_065;
-/// PV of the callable credit-risky term loan under the same regime after
-/// dirty-call settlement and survival-on-continuation rollback. Accrued
-/// coupons remain payable through adjusted payment dates, including calls
-/// between an unadjusted coupon end and its delayed settlement.
-const BASELINE_LOAN_PV: f64 = 9_862_676.817_499_82;
+/// Settlement-date tree value of the callable credit-risky term loan under
+/// the same regime after dirty-call settlement and survival-on-continuation
+/// rollback. Accrued coupons remain payable through adjusted payment dates,
+/// including calls between an unadjusted coupon end and its delayed
+/// settlement.
+///
+/// The instrument PV is anchored at `as_of` (like the bond and the
+/// revolver), so the test pins `PV = BASELINE × DF(as_of, settlement)`: the
+/// tree itself did not move, only the anchor (formerly the PV was reported
+/// at settlement, 9,862,676.82; now 9,860,515.37 on `as_of`).
+const BASELINE_LOAN_SETTLEMENT_PV: f64 = 9_862_676.817_499_82;
 /// OAS (bp) recovered by re-solving at the term loan's own model price.
 /// Non-zero only by the clean/dirty accrued conversion inside the solve.
 const BASELINE_LOAN_OAS_BP: f64 = -1.191_277_146_1;
@@ -192,11 +198,19 @@ fn callable_credit_term_loan_pv_and_oas_baseline() {
         .price_callable(&loan, &market, as_of())
         .unwrap()
         .amount();
+    let df_settlement = market
+        .get_discount(loan.discount_curve_id.as_str())
+        .unwrap()
+        .df_between_dates(as_of(), loan.settlement_date(as_of()).unwrap())
+        .unwrap();
+    let expected = BASELINE_LOAN_SETTLEMENT_PV * df_settlement;
     assert!(
-        (pv - BASELINE_LOAN_PV).abs() < 1e-6,
+        (pv - expected).abs() < 1e-6,
         "callable credit-risky term-loan PV moved: actual={pv:.10}, \
-         baseline={BASELINE_LOAN_PV:.10}"
+         baseline={expected:.10}"
     );
+    assert!((pv - BASELINE_LOAN_SETTLEMENT_PV).abs() > 1_000.0);
+    let pv = pv / df_settlement;
 
     // OAS re-solved at the instrument's own model price: the round trip must
     // land on the same point it did before the refactor, which also pins that

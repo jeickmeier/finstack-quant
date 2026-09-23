@@ -119,12 +119,13 @@ pub(crate) fn quoted_dirty_from_clean_px(
 /// Resolve the target purchase price for quote-derived term-loan yield metrics.
 ///
 /// Uses the quoted clean price when present, converted to a dirty settlement
-/// amount via [`quoted_dirty_from_clean_px`]. Both term-loan pricing engines
-/// already return settlement-date model values, so model-derived yield metrics
-/// use `base_value` directly without a second carry adjustment.
+/// amount via [`quoted_dirty_from_clean_px`]. Otherwise the instrument PV on
+/// `as_of` (`base_value`, from either pricing engine) is carried to the
+/// settlement date the yield is measured from.
 pub(super) fn target_price_from_quote_or_model(
     loan: &TermLoan,
     schedule: &CashFlowSchedule,
+    market: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
     base_value: Money,
 ) -> finstack_quant_core::Result<Money> {
@@ -135,7 +136,9 @@ pub(super) fn target_price_from_quote_or_model(
     {
         quoted_dirty_from_clean_px(loan, schedule, as_of, px)
     } else {
-        Ok(base_value)
+        crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer::value_at_settlement(
+            loan, market, as_of, base_value,
+        )
     }
 }
 

@@ -11,6 +11,7 @@ mod basic;
 mod cashflows;
 mod construction;
 pub mod draw_option_cost;
+mod error_propagation;
 mod fixings;
 pub mod metrics;
 mod pricing;

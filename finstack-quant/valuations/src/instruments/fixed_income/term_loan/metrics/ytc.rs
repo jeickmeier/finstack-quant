@@ -43,7 +43,13 @@ impl MetricCalculator for YtcCalculator {
 
         let target_price = {
             let loan: &TermLoan = context.instrument_as()?;
-            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value)?
+            target_price_from_quote_or_model(
+                loan,
+                &schedule,
+                &context.curves,
+                as_of,
+                context.base_value,
+            )?
         };
 
         // Use pre-exercise outstanding (< call_date) for redemption calculation.

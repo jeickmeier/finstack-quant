@@ -442,9 +442,9 @@ pub(crate) fn generate_cashflows(
                     all_in_cap_bp: spec.all_in_cap_bp,
                     all_in_floor_bp: spec.all_in_floor_bp,
                     index_cap_bp: spec.index_cap_bp,
-                    overnight_index_constraints: Default::default(),
-                    reset_frequency: loan.frequency,
-                    index_tenor: None,
+                    overnight_index_constraints: spec.overnight_index_constraints,
+                    reset_frequency: spec.reset_frequency,
+                    index_tenor: spec.index_tenor,
                     reset_lag_days: spec.reset_lag_days,
                     fixing_calendar_id: spec.fixing_calendar_id.clone(),
                     overnight_compounding: spec.overnight_compounding,
@@ -586,16 +586,22 @@ fn build_commitment_fee_flows(
 
     use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
+    // Fees accrue on the loan's own period grid and are paid once per period
+    // on its payment date; the availability window may start and end off it.
     let schedule_params = loan_schedule_params(loan);
     let periods = build_periods(BuildPeriodsParams::from_schedule(
         &schedule_params,
-        fee_start,
-        fee_end,
+        loan.issue_date,
+        loan.maturity,
         None,
     ))?;
-    let mut dates: Vec<Date> = std::iter::once(fee_start)
-        .chain(periods.into_iter().map(|period| period.accrual_end))
-        .collect();
+    let mut dates: Vec<Date> = vec![fee_start, fee_end];
+    dates.extend(
+        periods
+            .iter()
+            .map(|period| period.accrual_end)
+            .filter(|end| *end > fee_start && *end < fee_end),
+    );
     for sd in &ddtl.commitment_step_downs {
         if sd.date > fee_start && sd.date < fee_end {
             dates.push(sd.date);
@@ -629,7 +635,8 @@ fn build_commitment_fee_flows(
         last
     };
 
-    let mut flows = Vec::new();
+    let fee_rate = f64::from(ddtl.commitment_fee_bp) * 1e-4;
+    let mut by_payment_date = std::collections::BTreeMap::<Date, f64>::new();
     let mut prev = dates[0];
     for &d in dates.iter().skip(1) {
         let yf = loan
@@ -653,24 +660,37 @@ fn build_commitment_fee_flows(
                 (limit.amount() - outstanding_at(prev).amount()).max(0.0)
             }
         };
-        if base > 0.0 {
-            let fee_rate = f64::from(ddtl.commitment_fee_bp) * 1e-4;
-            let fee_amt = base * fee_rate * yf;
-            if fee_amt > 0.0 {
-                flows.push(CashFlow::new(
-                    d,
-                    None,
-                    Money::new(fee_amt, loan.currency)?,
-                    CFKind::CommitmentFee,
-                    0.0,
-                    Some(fee_rate),
-                ));
-            }
+        let fee_amt = base * fee_rate * yf;
+        if fee_amt > 0.0 {
+            let payment_date = periods
+                .iter()
+                .find(|period| period.accrual_start <= prev && prev < period.accrual_end)
+                .map(|period| period.payment_date)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "TermLoan '{}' commitment-fee accrual from {prev} lies outside the \
+                         loan's periods [{}, {})",
+                        loan.id, loan.issue_date, loan.maturity
+                    ))
+                })?;
+            *by_payment_date.entry(payment_date).or_default() += fee_amt;
         }
         prev = d;
     }
 
-    Ok(flows)
+    by_payment_date
+        .into_iter()
+        .map(|(date, amount)| {
+            Ok(CashFlow::new(
+                date,
+                None,
+                Money::new(amount, loan.currency)?,
+                CFKind::CommitmentFee,
+                0.0,
+                Some(fee_rate),
+            ))
+        })
+        .collect()
 }
 
 fn commitment_limit_at(ddtl: &super::spec::DdtlSpec, date: Date) -> Money {
