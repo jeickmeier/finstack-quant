@@ -70,7 +70,7 @@ fn test_pool_stats_weighted_spread_and_coupon() {
         DayCount::Thirty360,
     ));
 
-    let stats = calculate_pool_stats(&pool, maturity_date());
+    let stats = calculate_pool_stats(&pool, maturity_date()).expect("stats");
 
     // Fixed-rate B1 has no explicit spread component, so it is excluded
     // from WAS (no rate × 10⁴ fallback): only L1's 400bps contributes.
@@ -107,7 +107,7 @@ fn test_pool_stats_default_rate() {
         DayCount::Thirty360,
     ));
 
-    let stats = calculate_pool_stats(&pool, maturity_date());
+    let stats = calculate_pool_stats(&pool, maturity_date()).expect("stats");
     assert!(
         (stats.cumulative_default_rate - 33.333333).abs() < 1e-3,
         "Default rate should reflect defaulted balance share"

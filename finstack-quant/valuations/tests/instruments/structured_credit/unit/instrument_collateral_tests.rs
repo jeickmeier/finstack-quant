@@ -168,7 +168,7 @@ fn instrument_collateral_round_trips_and_materializes() {
     assert!((raw_total - materialized_total).abs() < 1e-6);
 
     // Undrawn commitment: revolver 40M + DDTL 5M.
-    let stats = calculate_pool_stats(&normalized, CLOSING);
+    let stats = calculate_pool_stats(&normalized, CLOSING).expect("stats");
     assert!((stats.undrawn_commitment - 45_000_000.0).abs() < 1e-6);
 }
 
