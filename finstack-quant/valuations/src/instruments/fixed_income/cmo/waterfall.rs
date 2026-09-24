@@ -83,51 +83,6 @@ pub struct PacContext {
     pub actual_psa: f64,
 }
 
-/// Execute waterfall for a single period (convenience entry point).
-///
-/// # Arguments
-///
-/// * `waterfall` - Mutable CMO waterfall; tranche balances and payment history
-///   are updated in place.
-/// * `available_principal` - Total collateral principal available for this
-///   distribution period in waterfall base-currency amount units.
-/// * `available_interest` - Total collateral interest available for this
-///   distribution period in the same currency units.
-pub fn execute_waterfall(
-    waterfall: &mut CmoWaterfall,
-    available_principal: f64,
-    available_interest: f64,
-) -> finstack_quant_core::Result<CmoWaterfallPeriodResult> {
-    execute_waterfall_with_pac(waterfall, available_principal, available_interest, None)
-}
-
-/// Execute waterfall with optional PAC schedule context.
-///
-/// # Arguments
-///
-/// * `waterfall` - Mutable CMO waterfall; tranche balances and payment history
-///   are updated in place.
-/// * `available_principal` - Total collateral principal available this period.
-/// * `available_interest` - Total collateral interest available this period.
-/// * `pac_context` - Optional PAC schedule, period index, and realized PSA;
-///   `None` applies no PAC collar constraint.
-pub fn execute_waterfall_with_pac(
-    waterfall: &mut CmoWaterfall,
-    available_principal: f64,
-    available_interest: f64,
-    pac_context: Option<&PacContext>,
-) -> finstack_quant_core::Result<CmoWaterfallPeriodResult> {
-    execute_waterfall_with_principal_breakdown(
-        waterfall,
-        available_principal,
-        0.0,
-        available_interest,
-        1.0,
-        1.0 / 12.0,
-        pac_context,
-    )
-}
-
 /// Execute waterfall while preserving scheduled-principal vs prepayment buckets.
 ///
 /// `collateral_survival` is the fraction of the collateral balance that
@@ -648,8 +603,16 @@ mod tests {
         let mut waterfall = create_test_waterfall();
 
         // Distribute 10,000 principal, enough interest
-        let result = execute_waterfall(&mut waterfall, 10_000.0, 500.0)
-            .expect("valid execute_waterfall fixture");
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            10_000.0,
+            0.0,
+            500.0,
+            1.0,
+            1.0 / 12.0,
+            None,
+        )
+        .expect("valid waterfall fixture");
 
         // A should get all principal (it's first priority)
         let a_alloc = result
@@ -673,8 +636,16 @@ mod tests {
         let mut waterfall = create_test_waterfall();
 
         // Distribute enough to pay off A completely plus some to B
-        let result = execute_waterfall(&mut waterfall, 50_000.0, 500.0)
-            .expect("valid execute_waterfall fixture");
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            50_000.0,
+            0.0,
+            500.0,
+            1.0,
+            1.0 / 12.0,
+            None,
+        )
+        .expect("valid waterfall fixture");
 
         // A should be paid off
         let a_alloc = result
@@ -699,8 +670,16 @@ mod tests {
         let mut waterfall = create_test_waterfall();
 
         // Run waterfall with interest
-        let result = execute_waterfall(&mut waterfall, 1_000.0, 500.0)
-            .expect("valid execute_waterfall fixture");
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            1_000.0,
+            0.0,
+            500.0,
+            1.0,
+            1.0 / 12.0,
+            None,
+        )
+        .expect("valid waterfall fixture");
 
         // Each tranche should get monthly interest based on balance × coupon / 12
         let a_alloc = result
@@ -722,8 +701,16 @@ mod tests {
 
         // Coupon demand: A 40,000×4% + B 30,000×5% + C 30,000×6% = 4,900/yr
         // ≈ 408.33/mo. Deliver only 200 of interest.
-        let result =
-            execute_waterfall(&mut waterfall, 0.0, 200.0).expect("valid execute_waterfall fixture");
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            0.0,
+            0.0,
+            200.0,
+            1.0,
+            1.0 / 12.0,
+            None,
+        )
+        .expect("valid waterfall fixture");
 
         let total_shortfall: f64 = result
             .allocations
@@ -818,8 +805,16 @@ mod tests {
         ];
         let mut waterfall = CmoWaterfall::new(tranches);
 
-        let result = execute_waterfall(&mut waterfall, 10_000.0, 5_000.0)
-            .expect("valid execute_waterfall fixture");
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            10_000.0,
+            0.0,
+            5_000.0,
+            1.0,
+            1.0 / 12.0,
+            None,
+        )
+        .expect("valid waterfall fixture");
 
         let a = result
             .allocations
