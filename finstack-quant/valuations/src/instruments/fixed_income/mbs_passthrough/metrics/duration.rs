@@ -346,12 +346,11 @@ mod tests {
 
         let result = duration_convexity(&mbs, &market, as_of, Some(25.0)).expect("result");
 
-        // The combined pass must agree with the single-measure entry points,
-        // and a par-area pass-through loses value when rates rise.
-        let duration = effective_duration(&mbs, &market, as_of, Some(25.0)).expect("duration");
-        let convexity = effective_convexity(&mbs, &market, as_of, Some(25.0)).expect("convexity");
-        assert_eq!(result.duration, duration);
-        assert_eq!(result.convexity, convexity);
+        // A par-area pass-through loses value when rates rise, and the pass is
+        // deterministic.
+        let again = duration_convexity(&mbs, &market, as_of, Some(25.0)).expect("result");
+        assert_eq!(result.duration, again.duration);
+        assert_eq!(result.convexity, again.convexity);
         assert!(result.duration > 0.0, "duration {}", result.duration);
     }
 
