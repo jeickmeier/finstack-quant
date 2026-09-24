@@ -5844,7 +5844,7 @@
     },
     "CommitmentStep": {
       "additionalProperties": false,
-      "description": "A scheduled change of a revolving facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic facility books the\nimplied principal change at the step.",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
       "properties": {
         "amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -5864,25 +5864,6 @@
       "required": [
         "date",
         "amount"
-      ],
-      "type": "object"
-    },
-    "CommitmentStepDown": {
-      "additionalProperties": false,
-      "description": "Commitment step-down event for DDTL facilities.\n\nReduces the total commitment limit at a specified date, typically used\nto match construction completion or covenant requirements.",
-      "properties": {
-        "date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Effective date of the step-down"
-        },
-        "new_limit": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "New (lower) commitment limit after step-down"
-        }
-      },
-      "required": [
-        "date",
-        "new_limit"
       ],
       "type": "object"
     },
@@ -8321,7 +8302,7 @@
     },
     "DdtlSpec": {
       "additionalProperties": false,
-      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50,        // 50 bp usage fee\n    commitment_fee_bp: 25,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
+      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
       "properties": {
         "availability_end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -8332,18 +8313,18 @@
           "description": "First date draws are permitted"
         },
         "commitment_fee_bp": {
-          "description": "Commitment fee in basis points (on undrawn amounts)",
-          "format": "int32",
-          "type": "integer"
+          "description": "Commitment fee on the undrawn commitment, in basis points per annum\n(non-negative, finite; `50.0` = 0.50%).",
+          "format": "double",
+          "type": "number"
         },
         "commitment_limit": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Total commitment limit available for draws"
         },
         "commitment_step_downs": {
-          "description": "Commitment step-down schedule",
+          "description": "Commitment step-down schedule: strictly increasing dates inside the\navailability window, non-increasing `amount`s in the loan currency,\nand `fee_bp == 0.0` (term loans carry no reduction fee).",
           "items": {
-            "$ref": "#/$defs/CommitmentStepDown"
+            "$ref": "#/$defs/CommitmentStep"
           },
           "type": "array"
         },
@@ -8370,9 +8351,9 @@
           "description": "Original issue discount policy, if applicable"
         },
         "usage_fee_bp": {
-          "description": "Usage fee in basis points (on drawn amounts)",
-          "format": "int32",
-          "type": "integer"
+          "description": "Usage fee on drawn amounts, in basis points per annum (non-negative,\nfinite; `25.0` = 0.25%).",
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [

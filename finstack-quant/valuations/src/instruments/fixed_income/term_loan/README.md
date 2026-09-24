@@ -19,7 +19,7 @@ Import path:
 | `TermLoan` | The runtime instrument. Build with `TermLoan::builder()`; examples: `example`, `example_floating_with_ddtl`, `example_callable`. |
 | `RateSpec` | `Fixed { rate_bp }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `AmortizationSpec` | `None` (bullet), `Linear { start, end }`, `PercentPerPeriod { bp }`, `PercentOfOriginalNotional { .. }`, `Custom(..)`. |
-| `DdtlSpec`, `DrawEvent`, `CommitmentStepDown`, `CommitmentFeeBase` | Delayed-draw commitment, draw calendar, step-downs, commitment/usage fee bases. |
+| `DdtlSpec`, `DrawEvent`, `CommitmentStep`, `CommitmentFeeBase` | Delayed-draw commitment, draw calendar, step-downs (the `loan_terms::CommitmentStep` shared with the revolver; no reduction fee), commitment/usage fee bases. |
 | `TermLoanCovenantEvents`, `MarginStepUp`, `PikToggle`, `CashSweepEvent` | Covenant-driven margin step-ups, PIK toggles, cash sweeps, draw-stop dates. |
 | `OidPolicy`, `OidEirSpec` | OID withheld from proceeds vs tracked separately, plus EIR amortization settings. |
 | `LoanCallSchedule`, `LoanCall`, `LoanCallType` | Borrower prepayment options: `Hard`, `Soft`, `MakeWhole { treasury_spread_bp }`. |
@@ -87,9 +87,10 @@ Notes that bite:
 - Every `Option<T>` field has two setters: `.ddtl(spec)` for the inner value,
   `.ddtl_opt(Some(spec))` for the `Option` — the builder rejects a build that
   leaves a required field unset.
-- Rate and fee inputs on the spec types are **integer basis points** (`rate_bp`,
-  `usage_fee_bp`, `commitment_fee_bp`, `treasury_spread_bp`,
-  `AmortizationSpec::PercentPerPeriod { bp }`).
+- Rate inputs on the spec types are **integer basis points** (`rate_bp`,
+  `treasury_spread_bp`, `AmortizationSpec::PercentPerPeriod { bp }`); the DDTL
+  running fees `usage_fee_bp` and `commitment_fee_bp` are `f64` basis points,
+  matching the revolver's fee units.
 - `notional_limit` is the *commitment*, not the funded balance. Without a
   `DdtlSpec` the loan funds the full commitment at issue.
 - `AmortizationSpec::PercentPerPeriod { bp }` applies to the **declining**

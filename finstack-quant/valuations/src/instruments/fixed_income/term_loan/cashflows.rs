@@ -504,10 +504,15 @@ pub(crate) fn generate_cashflows(
         let _ = builder.fee(fee);
     }
     if let Some(ddtl) = &loan.ddtl {
-        if ddtl.usage_fee_bp != 0 {
+        if ddtl.usage_fee_bp != 0.0 {
             let _ = builder.fee(FeeSpec::PeriodicBp {
                 base: FeeBase::Drawn,
-                bp: Decimal::from(ddtl.usage_fee_bp),
+                bp: Decimal::try_from(ddtl.usage_fee_bp).map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "TermLoan '{}' DDTL usage_fee_bp {} is not representable",
+                        loan.id, ddtl.usage_fee_bp
+                    ))
+                })?,
                 frequency: loan.frequency,
                 day_count: loan.day_count,
                 business_day_convention: loan.business_day_convention,
@@ -524,7 +529,7 @@ pub(crate) fn generate_cashflows(
     let mut schedule = builder.build(Some(market))?;
 
     if let Some(ddtl) = &loan.ddtl {
-        if ddtl.commitment_fee_bp != 0 {
+        if ddtl.commitment_fee_bp != 0.0 {
             let commitment_fees = build_commitment_fee_flows(loan, ddtl, draw_stop, &schedule)?;
             if !commitment_fees.is_empty() {
                 let notional = schedule.get_notional().clone();
@@ -635,7 +640,7 @@ fn build_commitment_fee_flows(
         last
     };
 
-    let fee_rate = f64::from(ddtl.commitment_fee_bp) * 1e-4;
+    let fee_rate = ddtl.commitment_fee_bp * 1e-4;
     let mut by_payment_date = std::collections::BTreeMap::<Date, f64>::new();
     let mut prev = dates[0];
     for &d in dates.iter().skip(1) {
@@ -697,7 +702,7 @@ fn commitment_limit_at(ddtl: &super::spec::DdtlSpec, date: Date) -> Money {
     let mut limit = ddtl.commitment_limit;
     for sd in &ddtl.commitment_step_downs {
         if sd.date <= date {
-            limit = sd.new_limit;
+            limit = sd.amount;
         }
     }
     limit

@@ -30,25 +30,6 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
-/// Commitment step-down event for DDTL facilities.
-///
-/// Reduces the total commitment limit at a specified date, typically used
-/// to match construction completion or covenant requirements.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct CommitmentStepDown {
-    /// Effective date of the step-down
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub date: Date,
-    /// New (lower) commitment limit after step-down
-    pub new_limit: Money,
-}
-
 /// Margin step-up event (covenant penalty or scheduled increase).
 ///
 /// Increases the interest margin by a fixed amount at a specified date,
@@ -91,13 +72,17 @@ impl Default for OidEirSpec {
     }
 }
 
-/// A scheduled change of a revolving facility's commitment.
+/// A scheduled change of a facility's commitment.
 ///
 /// The commitment equals `amount` from `date` forward until the next step.
 /// Steps down are amortizing commitments, availability expiries and voluntary
 /// reductions; steps up are accordion exercises. Utilization is always drawn
-/// balance over the commitment in force, so a stochastic facility books the
-/// implied principal change at the step.
+/// balance over the commitment in force, so a stochastic revolving facility
+/// books the implied principal change at the step.
+///
+/// A delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only
+/// non-increasing steps inside its availability window and no reduction fee
+/// (`fee_bp` must be `0.0`).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]

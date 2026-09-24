@@ -42,7 +42,7 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
-pub use super::super::loan_terms::{CommitmentStepDown, MarginStepUp, OidEirSpec};
+pub use super::super::loan_terms::{CommitmentStep, MarginStepUp, OidEirSpec};
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///
@@ -182,8 +182,8 @@ pub enum CommitmentFeeBase {
 ///     availability_end: create_date(2026, Month::January, 1)?,
 ///     draws: vec![],
 ///     commitment_step_downs: vec![],
-///     usage_fee_bp: 50,        // 50 bp usage fee
-///     commitment_fee_bp: 25,   // 25 bp commitment fee
+///     usage_fee_bp: 50.0,        // 50 bp usage fee
+///     commitment_fee_bp: 25.0,   // 25 bp commitment fee
 ///     fee_base: CommitmentFeeBase::Undrawn,
 ///     oid_policy: None,
 /// };
@@ -212,12 +212,16 @@ pub struct DdtlSpec {
     pub availability_end: Date,
     /// Scheduled or actual draw events
     pub draws: Vec<DrawEvent>,
-    /// Commitment step-down schedule
-    pub commitment_step_downs: Vec<CommitmentStepDown>,
-    /// Usage fee in basis points (on drawn amounts)
-    pub usage_fee_bp: i32,
-    /// Commitment fee in basis points (on undrawn amounts)
-    pub commitment_fee_bp: i32,
+    /// Commitment step-down schedule: strictly increasing dates inside the
+    /// availability window, non-increasing `amount`s in the loan currency,
+    /// and `fee_bp == 0.0` (term loans carry no reduction fee).
+    pub commitment_step_downs: Vec<CommitmentStep>,
+    /// Usage fee on drawn amounts, in basis points per annum (non-negative,
+    /// finite; `25.0` = 0.25%).
+    pub usage_fee_bp: f64,
+    /// Commitment fee on the undrawn commitment, in basis points per annum
+    /// (non-negative, finite; `50.0` = 0.50%).
+    pub commitment_fee_bp: f64,
     /// Basis for commitment fee calculation
     pub fee_base: CommitmentFeeBase,
     /// Original issue discount policy, if applicable

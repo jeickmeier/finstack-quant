@@ -7,7 +7,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, RateSpec, TermLoan,
+    AmortizationSpec, CommitmentFeeBase, CommitmentStep, DdtlSpec, DrawEvent, OidPolicy, RateSpec,
+    TermLoan,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -206,8 +207,8 @@ fn test_ddtl_draws_exceeding_commitment_rejected() {
             },
         ],
         commitment_step_downs: vec![],
-        usage_fee_bp: 0,
-        commitment_fee_bp: 0,
+        usage_fee_bp: 0.0,
+        commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
@@ -237,8 +238,8 @@ fn test_ddtl_draws_within_commitment_accepted() {
             },
         ],
         commitment_step_downs: vec![],
-        usage_fee_bp: 0,
-        commitment_fee_bp: 0,
+        usage_fee_bp: 0.0,
+        commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
@@ -255,8 +256,8 @@ fn test_negative_oid_pct_rejected() {
         availability_end: date!(2027 - 01 - 01),
         draws: vec![],
         commitment_step_downs: vec![],
-        usage_fee_bp: 0,
-        commitment_fee_bp: 0,
+        usage_fee_bp: 0.0,
+        commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: Some(OidPolicy::WithheldPct(-100)),
     });
@@ -275,10 +276,51 @@ fn test_zero_oid_pct_accepted() {
         availability_end: date!(2027 - 01 - 01),
         draws: vec![],
         commitment_step_downs: vec![],
-        usage_fee_bp: 0,
-        commitment_fee_bp: 0,
+        usage_fee_bp: 0.0,
+        commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: Some(OidPolicy::WithheldPct(0)),
     });
     assert!(result.is_ok(), "zero OID percentage should be valid");
+}
+
+#[test]
+fn test_ddtl_commitment_step_fee_rejected() {
+    // Term-loan DDTL steps carry no reduction fee; a non-zero fee_bp would be inert.
+    let result = build_ddtl_loan(DdtlSpec {
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        availability_start: date!(2025 - 01 - 01),
+        availability_end: date!(2027 - 01 - 01),
+        draws: vec![],
+        commitment_step_downs: vec![CommitmentStep {
+            date: date!(2026 - 01 - 01),
+            amount: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+            fee_bp: 25.0,
+        }],
+        usage_fee_bp: 0.0,
+        commitment_fee_bp: 0.0,
+        fee_base: CommitmentFeeBase::Undrawn,
+        oid_policy: None,
+    });
+    let err = result.expect_err("a DDTL step reduction fee must be rejected");
+    assert!(
+        err.to_string().contains("fee_bp must be 0"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn test_ddtl_non_finite_fee_rejected() {
+    let result = build_ddtl_loan(DdtlSpec {
+        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        availability_start: date!(2025 - 01 - 01),
+        availability_end: date!(2027 - 01 - 01),
+        draws: vec![],
+        commitment_step_downs: vec![],
+        usage_fee_bp: f64::NAN,
+        commitment_fee_bp: 0.0,
+        fee_base: CommitmentFeeBase::Undrawn,
+        oid_policy: None,
+    });
+    assert!(result.is_err(), "a NaN usage fee must be rejected");
 }

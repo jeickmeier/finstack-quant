@@ -506,8 +506,8 @@ impl TermLoan {
         if ddtl.availability_start < self.issue_date
             || ddtl.availability_start > ddtl.availability_end
             || ddtl.availability_end > self.maturity
-            || ddtl.usage_fee_bp < 0
-            || ddtl.commitment_fee_bp < 0
+            || !(ddtl.usage_fee_bp.is_finite() && ddtl.usage_fee_bp >= 0.0)
+            || !(ddtl.commitment_fee_bp.is_finite() && ddtl.commitment_fee_bp >= 0.0)
         {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} DDTL availability must lie inside the loan life and fees cannot be negative"
@@ -526,7 +526,7 @@ impl TermLoan {
                 .commitment_step_downs
                 .iter()
                 .filter(|step| step.date <= draw.date)
-                .map(|step| step.new_limit.amount())
+                .map(|step| step.amount.amount())
                 .next_back()
                 .unwrap_or(ddtl.commitment_limit.amount());
             if cumulative_draws > effective_limit + 1e-6 {
@@ -551,13 +551,18 @@ impl TermLoan {
                     "{context} DDTL step-down dates must lie inside the availability window"
                 )));
             }
-            self.validate_money(step.new_limit, "DDTL step-down", false)?;
-            if step.new_limit.amount() > prior_limit {
+            self.validate_money(step.amount, "DDTL step-down", false)?;
+            if step.amount.amount() > prior_limit {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} DDTL step-down limits cannot increase"
                 )));
             }
-            prior_limit = step.new_limit.amount();
+            if step.fee_bp != 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} DDTL commitment steps carry no reduction fee; fee_bp must be 0"
+                )));
+            }
+            prior_limit = step.amount.amount();
         }
         if ddtl
             .commitment_step_downs
@@ -748,12 +753,13 @@ impl TermLoan {
                     amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
             ],
-            commitment_step_downs: vec![super::super::loan_terms::CommitmentStepDown {
+            commitment_step_downs: vec![super::super::loan_terms::CommitmentStep {
                 date: date!(2024 - 10 - 15),
-                new_limit: Money::from((15_000_000_i64, Currency::USD)),
+                amount: Money::from((15_000_000_i64, Currency::USD)),
+                fee_bp: 0.0,
             }],
-            usage_fee_bp: 25,
-            commitment_fee_bp: 50,
+            usage_fee_bp: 25.0,
+            commitment_fee_bp: 50.0,
             fee_base: super::spec::CommitmentFeeBase::Undrawn,
             oid_policy: None,
         };
