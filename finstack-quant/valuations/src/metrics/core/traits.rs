@@ -521,12 +521,6 @@ impl MetricContext {
         self.inputs.metric_overrides = overrides;
     }
 
-    /// Temporarily replace the immutable market snapshot during a scoped risk calculation.
-    pub(crate) fn set_market(&mut self, market: Arc<MarketContext>) {
-        self.inputs.curves = market;
-        self.market_scratch = None;
-    }
-
     /// Temporarily replace the instrument view during a scoped metric calculation.
     pub(crate) fn set_instrument(&mut self, instrument: Arc<dyn Instrument>) {
         self.inputs.instrument = instrument;
