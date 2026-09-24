@@ -36,7 +36,7 @@
 //!   Derivatives*. John Wiley & Sons. `docs/REFERENCES.md#o-kane-2008`
 
 use crate::instruments::fixed_income::mbs_passthrough::pricer::{
-    first_unpaid_accrual_start, quote_basis_pool, settlement_accrued_interest,
+    first_unpaid_accrual_start, pool_month_step, quote_basis_pool, settlement_accrued_interest,
 };
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use crate::instruments::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
@@ -281,7 +281,6 @@ fn price_on_path(
     prepay_sensitivity: f64,
     steps: &McStepSchedule,
 ) -> f64 {
-    let monthly_mortgage_rate = mbs.wac / 12.0;
     let dt = 1.0 / 12.0;
 
     let mut balance = mbs.current_face.amount();
@@ -312,35 +311,19 @@ fn price_on_path(
         // Rate-adjusted SMM
         let smm = rate_adjusted_smm(base_smm, current_rate, base_rate, prepay_sensitivity);
 
-        // Scheduled amortization: `wam` is the remaining WAM at `as_of`, so at
-        // projection step `month` (0-based) there are `wam − month` level
-        // payments left, including the current one (same convention as the
-        // deterministic pricer).
-        let remaining = wam.saturating_sub(month).max(1);
-        let scheduled_principal = if remaining <= 1 {
-            balance
-        } else if monthly_mortgage_rate > 1e-12 {
-            let factor = (1.0 + monthly_mortgage_rate).powi(remaining as i32);
-            let payment = balance * monthly_mortgage_rate * factor / (factor - 1.0);
-            let interest_part = balance * monthly_mortgage_rate;
-            (payment - interest_part).max(0.0).min(balance)
-        } else {
-            balance / remaining as f64
-        };
-
-        // Prepayment is the SMM-driven fraction of the balance that remains
-        // *after* scheduled amortization, not of the gross beginning balance.
-        // SMM (single monthly mortality) is defined on the post-amortization
-        // balance; applying it to the gross balance double-counts the
-        // scheduled principal inside the prepayment bucket and can drive the
-        // ending balance negative under high SMM.
-        let prepayment = (balance - scheduled_principal).max(0.0) * smm;
-
-        // Investor interest accrues at the pass-through rate over the pool
-        // day-count fraction of the actual accrual month (identical to the
-        // deterministic pricer; exactly 1/12 for 30/360, month-length
-        // dependent for Act/360 and Act/365F).
-        let interest = balance * mbs.pass_through_rate * steps.accrual_fractions[month];
+        // `wam` is the remaining WAM at `as_of`, so at projection step `month`
+        // (0-based) there are `wam − month` level payments left, including
+        // the current one (same convention as the deterministic pricer).
+        let step = pool_month_step(
+            balance,
+            wam.saturating_sub(month) as u32,
+            mbs.wac,
+            smm,
+            mbs.pass_through_rate,
+            steps.accrual_fractions[month],
+        );
+        let (scheduled_principal, prepayment, interest) =
+            (step.scheduled_principal, step.prepayment, step.interest);
 
         // Total cashflow
         let total_cf = scheduled_principal + prepayment + interest;
@@ -354,7 +337,7 @@ fn price_on_path(
         let delay_df = (-(current_rate + oas) * extra).exp();
         pv += total_cf * cumulative_df * delay_df;
 
-        balance = (balance - scheduled_principal - prepayment).max(0.0);
+        balance = step.ending_balance;
     }
 
     pv

@@ -93,10 +93,6 @@ pub fn generate_cashflows(
     }
 
     let max_periods = max_periods.unwrap_or(mbs.wam);
-    // Level-pay mortgage amortization is, by construction, computed on the
-    // monthly mortgage rate (WAC / 12) — that is the contractual amortization
-    // convention and is intentionally not day-counted.
-    let monthly_mortgage_rate = mbs.wac / 12.0;
 
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("usny")?;
     let mut projected_count: u32 = 0;
@@ -131,23 +127,6 @@ pub fn generate_cashflows(
         // the pool's seasoning, which would double-count the age already
         // netted out of a remaining WAM (matching the MC-OAS pricer).
         let remaining_months = mbs.wam.saturating_sub(projected_count - 1);
-        let remaining_months = if remaining_months == 0 {
-            1
-        } else {
-            remaining_months
-        };
-        let scheduled_principal = if remaining_months == 1 {
-            balance
-        } else if monthly_mortgage_rate > 1e-12 {
-            let factor = (1.0 + monthly_mortgage_rate).powi(remaining_months as i32);
-            let payment = balance * monthly_mortgage_rate * factor / (factor - 1.0);
-            let interest_component = balance * monthly_mortgage_rate;
-            (payment - interest_component).max(0.0).min(balance)
-        } else {
-            balance / remaining_months as f64
-        };
-
-        let prepayment = (balance - scheduled_principal).max(0.0) * smm;
         // Investor interest accrues at the pass-through rate over the actual
         // accrual-period day-count fraction, not a flat 1/12. The accrual
         // period is the full calendar month `[period_start, next_month_start)`.
@@ -160,9 +139,21 @@ pub fn generate_cashflows(
             accrual_period_end,
             DayCountContext::default(),
         )?;
-        let interest = balance * mbs.pass_through_rate * period_yf;
+        let step = pool_month_step(
+            balance,
+            remaining_months,
+            mbs.wac,
+            smm,
+            mbs.pass_through_rate,
+            period_yf,
+        );
+        let (scheduled_principal, prepayment, interest, ending_balance) = (
+            step.scheduled_principal,
+            step.prepayment,
+            step.interest,
+            step.ending_balance,
+        );
         let total_principal = scheduled_principal + prepayment;
-        let ending_balance = (balance - total_principal).max(0.0);
 
         cashflows.push(MbsCashflow {
             period_start,
@@ -187,6 +178,64 @@ pub fn generate_cashflows(
     }
 
     Ok(cashflows)
+}
+
+/// One month of a level-pay mortgage pool.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PoolMonth {
+    /// Level-pay scheduled principal.
+    pub(crate) scheduled_principal: f64,
+    /// Voluntary prepayment: SMM × the post-amortization balance.
+    pub(crate) prepayment: f64,
+    /// Investor interest: balance × pass-through × accrual fraction.
+    pub(crate) interest: f64,
+    /// Balance after scheduled principal and prepayment, floored at 0.
+    pub(crate) ending_balance: f64,
+}
+
+/// Advance a level-pay mortgage pool by one month.
+///
+/// Shared by the deterministic projection, the MC-OAS paths and the CMO PAC
+/// band so the three amortize identically. Scheduled principal is the
+/// level-pay annuity on the monthly mortgage rate `wac / 12` (the contractual
+/// amortization convention, intentionally not day-counted); SMM applies to
+/// the balance left after scheduled principal.
+///
+/// # Arguments
+///
+/// * `balance` - Pool balance at the start of the month.
+/// * `remaining_months` - Level payments left including this one; `0` or `1`
+///   retires the whole balance.
+/// * `wac` - Gross weighted-average mortgage coupon, annual decimal.
+/// * `smm` - Single monthly mortality for the month, decimal in `[0, 1]`.
+/// * `pass_through_rate` - Net investor coupon, annual decimal.
+/// * `accrual_fraction` - Year fraction of the accrual month on the pool day
+///   count (1/12 on 30/360).
+pub(crate) fn pool_month_step(
+    balance: f64,
+    remaining_months: u32,
+    wac: f64,
+    smm: f64,
+    pass_through_rate: f64,
+    accrual_fraction: f64,
+) -> PoolMonth {
+    let monthly_rate = wac / 12.0;
+    let scheduled_principal = if remaining_months <= 1 {
+        balance
+    } else if monthly_rate > 1e-12 {
+        let factor = (1.0 + monthly_rate).powi(remaining_months as i32);
+        let payment = balance * monthly_rate * factor / (factor - 1.0);
+        (payment - balance * monthly_rate).max(0.0).min(balance)
+    } else {
+        balance / remaining_months as f64
+    };
+    let prepayment = (balance - scheduled_principal).max(0.0) * smm;
+    PoolMonth {
+        scheduled_principal,
+        prepayment,
+        interest: balance * pass_through_rate * accrual_fraction,
+        ending_balance: (balance - (scheduled_principal + prepayment)).max(0.0),
+    }
 }
 
 /// Build the canonical projected collateral schedule for an agency MBS.

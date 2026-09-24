@@ -6,6 +6,7 @@
 //! the PAC.
 
 use crate::instruments::fixed_income::cmo::types::PacCollar;
+use crate::instruments::fixed_income::mbs_passthrough::pricer::pool_month_step;
 use crate::instruments::fixed_income::structured_credit::{clamped_cpr_to_smm, psa_to_cpr};
 
 /// PAC amortization schedule.
@@ -112,10 +113,10 @@ impl PacSchedule {
 
 /// Project total principal (scheduled + prepaid) at a given PSA speed.
 ///
-/// Uses standard level-pay mortgage math:
-/// - Monthly payment = P * r * (1+r)^n / ((1+r)^n - 1)
-/// - Scheduled principal = Monthly payment - Interest
-/// - Prepayment = (Balance - Scheduled principal) * SMM
+/// Uses the shared level-pay pool step
+/// ([`pool_month_step`](crate::instruments::fixed_income::mbs_passthrough::pricer::pool_month_step)):
+/// scheduled principal from the level-pay annuity, prepayment = SMM × the
+/// post-scheduled balance.
 ///
 /// `age_months` anchors the PSA seasoning ramp: projection month `m` of a
 /// pool aged `a` months uses the PSA CPR at loan age `a + m`, so seasoned
@@ -127,7 +128,6 @@ fn project_principal_stream(
     age_months: u32,
     psa_speed: f64,
 ) -> Vec<f64> {
-    let monthly_rate = wac / 12.0;
     let mut remaining = initial_balance;
     let mut principals = Vec::with_capacity(wam as usize);
 
@@ -136,33 +136,11 @@ fn project_principal_stream(
             principals.push(0.0);
             continue;
         }
-
-        let remaining_months = wam.saturating_sub(month - 1);
-
-        // Scheduled principal from level-pay amortization
-        let scheduled_principal = if monthly_rate > 1e-12 && remaining_months > 0 {
-            let factor = (1.0 + monthly_rate).powi(remaining_months as i32);
-            let monthly_payment = remaining * monthly_rate * factor / (factor - 1.0);
-            let interest = remaining * monthly_rate;
-            (monthly_payment - interest).max(0.0)
-        } else if remaining_months > 0 {
-            // Zero rate: simple linear amortization
-            remaining / remaining_months as f64
-        } else {
-            remaining
-        };
-
-        let scheduled_principal = scheduled_principal.min(remaining);
-
         // Prepayment on post-scheduled balance, at the pool's actual loan age.
         let smm = psa_to_smm(psa_speed, age_months.saturating_add(month));
-        let balance_after_scheduled = remaining - scheduled_principal;
-        let prepayment = balance_after_scheduled * smm;
-
-        let total_principal = scheduled_principal + prepayment;
-        principals.push(total_principal);
-
-        remaining -= total_principal;
+        let step = pool_month_step(remaining, wam - (month - 1), wac, smm, 0.0, 0.0);
+        principals.push(step.scheduled_principal + step.prepayment);
+        remaining = step.ending_balance;
     }
 
     principals

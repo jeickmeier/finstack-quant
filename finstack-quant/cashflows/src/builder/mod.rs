@@ -81,4 +81,7 @@ pub use specs::{
     RecoveryModelSpec, RollRule, ScheduleParams, StepUpCouponSpec,
 };
 
-pub use credit_rates::{abs_to_smm, cdr_to_mdr, cpr_to_smm, mdr_to_cdr, smm_to_cpr};
+pub use credit_rates::{
+    abs_to_smm, cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_cpr, smm_to_cpr, PSA_RAMP_MONTHS,
+    PSA_TERMINAL_CPR,
+};

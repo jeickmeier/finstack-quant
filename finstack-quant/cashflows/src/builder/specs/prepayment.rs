@@ -114,16 +114,7 @@ impl PrepaymentModelSpec {
                         "PSA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
                     )));
                 }
-                // PSA: ramp to 6% CPR over 30 months, then flat
-                const RAMP_MONTHS: u32 = 30;
-                const TERMINAL_CPR: f64 = 0.06;
-
-                let base = if seasoning_months <= RAMP_MONTHS {
-                    (seasoning_months as f64 / RAMP_MONTHS as f64) * TERMINAL_CPR
-                } else {
-                    TERMINAL_CPR
-                };
-                base * speed_multiplier
+                super::super::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)
             }
             Some(PrepaymentCurve::CmbsLockout { lockout_months }) => {
                 // Zero prepayment during lockout, then constant CPR

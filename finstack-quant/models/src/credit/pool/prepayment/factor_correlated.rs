@@ -79,13 +79,7 @@ impl FactorCorrelatedPrepay {
                 .and_then(|smm| smm_to_cpr(smm).ok())
                 .unwrap_or(0.0),
             Some(PrepaymentCurve::Psa { speed_multiplier }) => {
-                // PSA ramp: 0.2% CPR per month up to month 30, then flat at 6% × speed
-                let base_cpr = if seasoning < 30 {
-                    0.002 * seasoning as f64
-                } else {
-                    0.06
-                };
-                base_cpr * speed_multiplier
+                finstack_quant_cashflows::builder::psa_cpr(*speed_multiplier, seasoning)
             }
             Some(PrepaymentCurve::CmbsLockout { lockout_months }) => {
                 // Zero prepayment during lockout, then constant CPR
