@@ -35,10 +35,12 @@
 //! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit
 //!   Derivatives*. John Wiley & Sons. `docs/REFERENCES.md#o-kane-2008`
 
-use crate::instruments::fixed_income::mbs_passthrough::pricer::first_unpaid_accrual_start;
+use crate::instruments::fixed_income::mbs_passthrough::pricer::{
+    first_unpaid_accrual_start, pool_month_step, quote_basis_pool, settlement_accrued_interest,
+};
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use crate::instruments::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::{Error as CoreError, Result};
@@ -162,8 +164,9 @@ fn simulate_rate_paths(
 /// accrues on the pool's day-count fraction over the actual calendar month,
 /// and prepayment seasoning is measured at each accrual period end.
 struct McStepSchedule {
-    /// Extra discounting time (years) from each step's grid endpoint
-    /// `(m+1)/12` to the pool's actual payment date. May be negative:
+    /// Extra discounting time (years, on the discount curve's day count) from
+    /// each step's grid endpoint `(m+1)/12` to the pool's actual payment date.
+    /// May be negative:
     /// Walked-back in-flight
     /// periods pay before their grid endpoint. Combined with the cumulative
     /// grid discount factor this discounts each cashflow to its actual
@@ -171,9 +174,10 @@ struct McStepSchedule {
     payment_extras: Vec<f64>,
     /// Pool day-count year fraction of each accrual month.
     accrual_fractions: Vec<f64>,
-    /// Pool seasoning (months) at each accrual period end, driving the
-    /// PSA/CPR ramp exactly as in the deterministic pricer.
-    seasonings: Vec<u32>,
+    /// Base (rate-unadjusted) SMM of each step from the pool's prepayment
+    /// model at the pool seasoning of the accrual period end, exactly as in
+    /// the deterministic pricer. Validated finite and in `[0, 1]`.
+    base_smms: Vec<f64>,
 }
 
 impl McStepSchedule {
@@ -187,6 +191,7 @@ fn mc_step_schedule(
     mbs: &AgencyMbsPassthrough,
     as_of: Date,
     num_steps: usize,
+    curve_day_count: DayCount,
 ) -> Result<McStepSchedule> {
     use finstack_quant_core::dates::{DateExt, DayCountContext};
 
@@ -195,12 +200,15 @@ fn mc_step_schedule(
 
     let mut payment_extras = Vec::with_capacity(num_steps);
     let mut accrual_fractions = Vec::with_capacity(num_steps);
-    let mut seasonings = Vec::with_capacity(num_steps);
+    let mut base_smms = Vec::with_capacity(num_steps);
     for m in 0..num_steps {
         let period_start = start_month.add_months(m as i32);
         let accrual_end = period_start.add_months(1);
         let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
-        let t_pay = (payment_date - as_of).whole_days() as f64 / 365.25;
+        // Grid time is the curve's time axis (the HW1F θ(t) is fitted to the
+        // curve on it), so the payment offset is measured the same way.
+        let t_pay =
+            curve_day_count.year_fraction(as_of, payment_date, DayCountContext::default())?;
         payment_extras.push(t_pay - (m as f64 + 1.0) * dt);
         accrual_fractions.push(mbs.day_count.year_fraction(
             period_start,
@@ -208,12 +216,19 @@ fn mc_step_schedule(
             DayCountContext::default(),
         )?);
         let period_end = accrual_end - time::Duration::days(1);
-        seasonings.push(mbs.seasoning_months(period_end));
+        let seasoning = mbs.seasoning_months(period_end);
+        let base_smm = mbs.prepayment_model.smm(seasoning)?;
+        if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
+            return Err(CoreError::Validation(format!(
+                "MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]"
+            )));
+        }
+        base_smms.push(base_smm);
     }
     Ok(McStepSchedule {
         payment_extras,
         accrual_fractions,
-        seasonings,
+        base_smms,
     })
 }
 
@@ -258,10 +273,6 @@ fn rate_adjusted_smm(base_smm: f64, current_rate: f64, base_rate: f64, sensitivi
 /// in-flight receivable), interest accrues on the pool day-count over the
 /// actual calendar month, and the PSA/CPR ramp reflects the true pool age.
 ///
-/// # Errors
-///
-/// Returns `Error::Validation` when the prepayment model returns an
-/// out-of-range or non-finite SMM.
 fn price_on_path(
     mbs: &AgencyMbsPassthrough,
     path: &RatePath,
@@ -269,8 +280,7 @@ fn price_on_path(
     oas: f64,
     prepay_sensitivity: f64,
     steps: &McStepSchedule,
-) -> Result<f64> {
-    let monthly_mortgage_rate = mbs.wac / 12.0;
+) -> f64 {
     let dt = 1.0 / 12.0;
 
     let mut balance = mbs.current_face.amount();
@@ -296,46 +306,24 @@ fn price_on_path(
         let step_df = (-(current_rate + oas) * dt).exp();
         cumulative_df *= step_df;
 
-        let seasoning = steps.seasonings[month];
-        let base_smm = mbs.prepayment_model.smm(seasoning)?;
-        if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
-            return Err(CoreError::Validation(format!(
-                "MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]"
-            )));
-        }
+        let base_smm = steps.base_smms[month];
 
         // Rate-adjusted SMM
         let smm = rate_adjusted_smm(base_smm, current_rate, base_rate, prepay_sensitivity);
 
-        // Scheduled amortization: `wam` is the remaining WAM at `as_of`, so at
-        // projection step `month` (0-based) there are `wam − month` level
-        // payments left, including the current one (same convention as the
-        // deterministic pricer).
-        let remaining = wam.saturating_sub(month).max(1);
-        let scheduled_principal = if remaining <= 1 {
-            balance
-        } else if monthly_mortgage_rate > 1e-12 {
-            let factor = (1.0 + monthly_mortgage_rate).powi(remaining as i32);
-            let payment = balance * monthly_mortgage_rate * factor / (factor - 1.0);
-            let interest_part = balance * monthly_mortgage_rate;
-            (payment - interest_part).max(0.0).min(balance)
-        } else {
-            balance / remaining as f64
-        };
-
-        // Prepayment is the SMM-driven fraction of the balance that remains
-        // *after* scheduled amortization, not of the gross beginning balance.
-        // SMM (single monthly mortality) is defined on the post-amortization
-        // balance; applying it to the gross balance double-counts the
-        // scheduled principal inside the prepayment bucket and can drive the
-        // ending balance negative under high SMM.
-        let prepayment = (balance - scheduled_principal).max(0.0) * smm;
-
-        // Investor interest accrues at the pass-through rate over the pool
-        // day-count fraction of the actual accrual month (identical to the
-        // deterministic pricer; exactly 1/12 for 30/360, month-length
-        // dependent for Act/360 and Act/365F).
-        let interest = balance * mbs.pass_through_rate * steps.accrual_fractions[month];
+        // `wam` is the remaining WAM at `as_of`, so at projection step `month`
+        // (0-based) there are `wam − month` level payments left, including
+        // the current one (same convention as the deterministic pricer).
+        let step = pool_month_step(
+            balance,
+            wam.saturating_sub(month) as u32,
+            mbs.wac,
+            smm,
+            mbs.pass_through_rate,
+            steps.accrual_fractions[month],
+        );
+        let (scheduled_principal, prepayment, interest) =
+            (step.scheduled_principal, step.prepayment, step.interest);
 
         // Total cashflow
         let total_cf = scheduled_principal + prepayment + interest;
@@ -349,10 +337,10 @@ fn price_on_path(
         let delay_df = (-(current_rate + oas) * extra).exp();
         pv += total_cf * cumulative_df * delay_df;
 
-        balance = (balance - scheduled_principal - prepayment).max(0.0);
+        balance = step.ending_balance;
     }
 
-    Ok(pv)
+    pv
 }
 
 /// Calculate Monte Carlo OAS for an agency MBS.
@@ -366,6 +354,8 @@ fn price_on_path(
 /// * `mbs` - Agency MBS passthrough instrument
 /// * `market_price_pct` - Clean price as a percentage of current face (e.g., 98.5);
 ///   calendar-month accrued interest at `as_of` is added to the solver target.
+///   The target buys the settlement-month accrual onward, so the projection
+///   excludes the prior month's in-flight payment (see `quote_basis_pool`).
 /// * `market` - Market context with discount curves
 /// * `as_of` - Valuation date
 /// * `config` - Monte Carlo configuration (paths, HW params, seed)
@@ -394,10 +384,13 @@ pub(crate) fn calculate_mc_oas(
     as_of: Date,
     config: &McOasConfig,
 ) -> Result<f64> {
+    // The clean quote plus settlement-month accrued buys the settlement-month
+    // accrual onward, so project the pool the buyer receives: the prior
+    // month's in-flight P&I belongs to the seller.
+    let quote_pool = quote_basis_pool(mbs, as_of)?;
+    let mbs = &quote_pool;
     let market_price = market_price_pct / 100.0 * mbs.current_face.amount()
-        + crate::instruments::fixed_income::mbs_passthrough::pricer::settlement_accrued_interest(
-            mbs, as_of,
-        )?;
+        + settlement_accrued_interest(mbs, as_of)?;
 
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
     let num_steps = config.num_steps.unwrap_or(mbs.wam as usize);
@@ -422,12 +415,7 @@ pub(crate) fn calculate_mc_oas(
 
     // Per-step accrual periods, day-count fractions, seasonings and
     // payment-delay discounting offsets (actual payment dates).
-    let steps = mc_step_schedule(mbs, as_of, num_steps)?;
-
-    // Capture pricing errors raised by price_on_path so they propagate
-    // through the f64-only Brent objective rather than being silently coerced
-    // to NaN. The first non-zero error is preserved across iterations.
-    let pricing_error: std::cell::RefCell<Option<CoreError>> = std::cell::RefCell::new(None);
+    let steps = mc_step_schedule(mbs, as_of, num_steps, discount_curve.day_count())?;
 
     // Objective: average price across paths minus market price.
     //
@@ -448,28 +436,16 @@ pub(crate) fn calculate_mc_oas(
         };
 
         #[cfg(not(target_arch = "wasm32"))]
-        let path_pvs: Vec<Result<f64>> = {
+        let path_pvs: Vec<f64> = {
             use rayon::prelude::*;
             paths.par_iter().map(price_one).collect()
         };
 
         #[cfg(target_arch = "wasm32")]
-        let path_pvs: Vec<Result<f64>> = paths.iter().map(price_one).collect();
+        let path_pvs: Vec<f64> = paths.iter().map(price_one).collect();
 
-        let mut total = 0.0_f64;
-        for pv in path_pvs {
-            match pv {
-                Ok(pv) => total += pv,
-                Err(e) => {
-                    if pricing_error.borrow().is_none() {
-                        *pricing_error.borrow_mut() = Some(e);
-                    }
-                    return f64::NAN;
-                }
-            }
-        }
-        let avg_price = total / config.num_paths as f64;
-        avg_price - market_price
+        let total: f64 = path_pvs.iter().sum();
+        total / config.num_paths as f64 - market_price
     };
 
     // Solve for OAS using Brent's method
@@ -480,11 +456,6 @@ pub(crate) fn calculate_mc_oas(
         .initial_bracket_size(Some(0.05));
 
     let result = solver.solve(objective, 0.0);
-
-    // Surface a captured pricing error before reporting the solver outcome.
-    if let Some(err) = pricing_error.borrow_mut().take() {
-        return Err(err);
-    }
 
     // Solver failure is now informative: the underlying pricing succeeded but
     // no OAS bracketed the target market price (likely far-from-feasible
@@ -665,8 +636,8 @@ mod tests {
         // And price_on_path itself must run without producing a non-finite PV.
         // Use the MBS issue date so seasoning starts at 0 (fresh pool).
         let as_of = mbs.issue_date;
-        let steps = mc_step_schedule(&mbs, as_of, wam).expect("steps");
-        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, &steps).expect("price");
+        let steps = mc_step_schedule(&mbs, as_of, wam, DayCount::Act365F).expect("steps");
+        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, &steps);
         assert!(
             pv.is_finite() && pv > 0.0,
             "path PV must be finite/positive"
@@ -692,7 +663,7 @@ mod tests {
         let hw = HullWhiteCalibrationParams::new(config.hw_kappa, config.hw_sigma).expect("hw");
         let hw1f = prepare_hw1f_params(hw, curve.as_ref(), as_of, 30.0).expect("theta prepared");
         let paths = simulate_rate_paths(initial_rate, &hw1f, 64, 360, config.seed);
-        let steps = mc_step_schedule(&mbs, as_of, 360).expect("steps");
+        let steps = mc_step_schedule(&mbs, as_of, 360, curve.day_count()).expect("steps");
         let total: f64 = paths
             .iter()
             .map(|path| {
@@ -704,7 +675,6 @@ mod tests {
                     config.prepay_rate_sensitivity,
                     &steps,
                 )
-                .expect("test fixture is well-formed")
             })
             .sum();
         let avg_price: f64 = total / 64.0;
@@ -746,8 +716,10 @@ mod tests {
         let mut gnma1 = create_test_mbs();
         gnma1.agency = AgencyProgram::GnmaI; // pays 15th of following month
 
-        let fnma_steps = mc_step_schedule(&fnma, as_of, wam).expect("fnma steps");
-        let gnma1_steps = mc_step_schedule(&gnma1, as_of, wam).expect("gnma steps");
+        let fnma_steps =
+            mc_step_schedule(&fnma, as_of, wam, DayCount::Act365F).expect("fnma steps");
+        let gnma1_steps =
+            mc_step_schedule(&gnma1, as_of, wam, DayCount::Act365F).expect("gnma steps");
         assert!(
             fnma_steps.payment_extras[0] > gnma1_steps.payment_extras[0],
             "FNMA delay extra {} must exceed GNMA I extra {}",
@@ -755,10 +727,8 @@ mod tests {
             gnma1_steps.payment_extras[0]
         );
 
-        let pv_fnma =
-            price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, &fnma_steps).expect("fnma pv");
-        let pv_gnma1 =
-            price_on_path(&gnma1, &flat_path, base_rate, 0.0, 7.0, &gnma1_steps).expect("gnma pv");
+        let pv_fnma = price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, &fnma_steps);
+        let pv_gnma1 = price_on_path(&gnma1, &flat_path, base_rate, 0.0, 7.0, &gnma1_steps);
 
         assert!(
             pv_fnma < pv_gnma1,
@@ -874,10 +844,11 @@ mod tests {
             rates: vec![base_rate; wam + 1],
         };
 
-        let fresh_steps = mc_step_schedule(&fresh_mbs, as_of, wam).expect("fresh steps");
-        let seasoned_steps = mc_step_schedule(&seasoned_mbs, as_of, wam).expect("seasoned steps");
-        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps)
-            .expect("fresh pv");
+        let fresh_steps =
+            mc_step_schedule(&fresh_mbs, as_of, wam, DayCount::Act365F).expect("fresh steps");
+        let seasoned_steps =
+            mc_step_schedule(&seasoned_mbs, as_of, wam, DayCount::Act365F).expect("seasoned steps");
+        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps);
         let seasoned_pv = price_on_path(
             &seasoned_mbs,
             &flat_path,
@@ -885,8 +856,7 @@ mod tests {
             0.0,
             7.0,
             &seasoned_steps,
-        )
-        .expect("seasoned pv");
+        );
 
         // The seasoned pool (60+ months, PSA plateau at 100 PSA ≈ 6% CPR) must
         // price differently from the fresh pool (still on the ramp, CPR < 6%).
@@ -967,8 +937,12 @@ mod tests {
         let flat_path = RatePath {
             rates: vec![flat_rate; wam + 1],
         };
-        let steps = mc_step_schedule(&mbs, as_of, wam).expect("steps");
-        let mc_pv = price_on_path(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps).expect("mc pv");
+        let curve_dc = market
+            .get_discount(&mbs.discount_curve_id)
+            .expect("curve")
+            .day_count();
+        let steps = mc_step_schedule(&mbs, as_of, wam, curve_dc).expect("steps");
+        let mc_pv = price_on_path(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps);
 
         assert!(det_pv > 0.0 && mc_pv > 0.0);
         let rel_diff = (mc_pv - det_pv).abs() / det_pv;
@@ -977,6 +951,25 @@ mod tests {
             "MC model price {mc_pv:.2} must agree with deterministic PV {det_pv:.2} \
              at zero vol / zero OAS / flat curve; relative diff {rel_diff:.5}"
         );
+    }
+
+    /// The MC grid runs on the discount curve's time axis, so a cashflow's
+    /// payment offset must use the curve day count. January 2024 accrual of
+    /// the FNMA test pool pays Monday 26 Feb 2024 (the 25th is a Sunday), 42
+    /// days after the 15 Jan valuation: on an Act/360 curve the offset from
+    /// the first grid point is `42/360 − 1/12`, not `42/365.25 − 1/12`.
+    #[test]
+    fn payment_offset_uses_the_curve_day_count() {
+        let mbs = create_test_mbs();
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        let steps = mc_step_schedule(&mbs, as_of, 1, DayCount::Act360).expect("steps");
+        let expected = 42.0 / 360.0 - 1.0 / 12.0;
+        assert!(
+            (steps.payment_extras[0] - expected).abs() < 1e-15,
+            "{} versus {expected}",
+            steps.payment_extras[0]
+        );
+        assert!((steps.payment_extras[0] - (42.0 / 365.25 - 1.0 / 12.0)).abs() > 1e-3);
     }
 
     #[test]
@@ -1037,5 +1030,53 @@ mod production_mortgage_audit {
         };
         let oas = calculate_mc_oas(&mbs, clean, &market, as_of, &config).expect("oas");
         assert!(oas.abs() < 1e-8, "oas {oas}");
+    }
+
+    /// A clean quote buys the settlement-month accrual onward: the prior
+    /// month's P&I, still in flight until the agency payment date, belongs to
+    /// the seller. The same pool quoted at the same clean price before
+    /// (Feb 10) and after (Feb 27) the Feb 26 payment of the January accrual
+    /// must solve to the same OAS.
+    ///
+    /// Hand check of the tolerance: with a flat 4% curve and a 4% pass-through
+    /// the dirty target and the projected PV both carry at ~4%/yr over the 17
+    /// days, so the residual carry mismatch is below 0.01 price points on a
+    /// ~6-year duration pool, i.e. well under 0.1 bp. Before the fix the
+    /// Feb 10 solve priced the in-flight January flow against a target that
+    /// excludes it: 6.80 bp on Feb 10 versus 2.41 bp on Feb 27.
+    #[test]
+    fn mc_oas_is_stable_across_the_in_flight_payment_date() {
+        let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
+        mbs.issue_date = date!(2023 - 01 - 01);
+        mbs.maturity = date!(2053 - 01 - 01);
+        mbs.wam = 347;
+        let flat = 0.04_f64;
+        let quote = 99.5;
+        let config = McOasConfig {
+            num_paths: 2,
+            hw_sigma: 1e-10,
+            ..McOasConfig::default()
+        };
+        let oas_at = |as_of: Date| {
+            let market = MarketContext::new().insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .build()
+                    .expect("curve"),
+            );
+            calculate_mc_oas(&mbs, quote, &market, as_of, &config).expect("oas")
+        };
+        let before = oas_at(date!(2024 - 02 - 10));
+        let after = oas_at(date!(2024 - 02 - 27));
+        assert!(
+            (before - after).abs() < 1e-5,
+            "OAS must not jump across the payment date: before={before} after={after}"
+        );
+        assert!(
+            (before - 6.804e-4).abs() > 1e-5,
+            "Feb 10 OAS must no longer price the seller's in-flight January flow"
+        );
     }
 }

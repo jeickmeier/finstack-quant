@@ -8,7 +8,9 @@
 //! consistency with the TBA pricer.
 
 use super::DollarRoll;
-use crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows;
+use crate::instruments::fixed_income::mbs_passthrough::pricer::{
+    generate_cashflows, settlement_accrued_interest,
+};
 use crate::instruments::fixed_income::tba::pricer::create_assumed_pool;
 use finstack_quant_core::Result;
 
@@ -30,20 +32,23 @@ pub struct CarryResult {
 /// Calculate implied financing rate from dollar roll drop.
 ///
 /// Carry inputs (coupon income and principal paydown between settlement
-/// dates) are computed from the MBS cashflow engine using the same
-/// assumed pool that the TBA pricer uses.
+/// dates) are computed from the MBS cashflow engine using the same generic
+/// assumed pool, including its prepayment model, that the TBA pricer uses.
 ///
 /// # Formula
 ///
-/// The roll seller (drops the bond, invests proceeds) forgoes the coupon
-/// income and the paydown's pull-to-par gain over the roll, but buys back
-/// cheaper by the drop. Break-even financing therefore satisfies:
+/// The roll seller delivers the pool at the front settlement for the dirty
+/// front price and forgoes the coupon income and the paydown's pull-to-par
+/// gain over the roll, but buys back cheaper by the drop. Break-even
+/// financing on the dirty proceeds therefore satisfies:
 ///
 /// ```text
 /// implied_rate = (coupon_income + paydown × (100 − back_price)/100 − drop)
-///                / front_price × (360 / days)
+///                / (front_price + front_accrued) × (360 / days)
 /// ```
 ///
+/// `front_accrued` is the pass-through coupon accrued from the first of the
+/// front settlement month to the front settlement date, per 100 of face.
 /// A larger drop *lowers* the implied financing rate (the roll is special /
 /// cheap to finance). Principal paid down at par is not a full-par cost: the
 /// seller only forgoes the pull-to-par component `(100 − back_price)` per 100
@@ -51,11 +56,14 @@ pub struct CarryResult {
 ///
 /// # Arguments
 ///
-/// * `roll` - Dollar roll instrument
-/// * `prepay_rate` - Expected monthly prepayment rate (SMM). When set to
-///   `0.0`, only scheduled amortization is included. This replaces the generic
-///   pool's PSA assumption and must be finite and in `[0, 1]`.
-pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<CarryResult> {
+/// * `roll` - Dollar roll whose prices, settlement dates, coupon and generic
+///   TBA pool assumptions determine the carry.
+///
+/// # Errors
+///
+/// Returns an error when the settlement dates or the assumed pool cannot be
+/// resolved, or when the pool projection fails.
+pub fn implied_financing_rate(roll: &DollarRoll) -> Result<CarryResult> {
     let days = roll.settlement_days()?;
     let drop = roll.drop();
 
@@ -63,15 +71,7 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
     let front_settle = roll.front_settle_date()?;
     let back_settle = roll.back_settle_date()?;
 
-    if !prepay_rate.is_finite() || !(0.0..=1.0).contains(&prepay_rate) {
-        return Err(finstack_quant_core::Error::Validation(
-            "Dollar-roll prepayment SMM must be finite and in [0, 1]".into(),
-        ));
-    }
-    let mut pool = create_assumed_pool(&front_leg, front_settle)?;
-    pool.prepayment_model = crate::cashflow::builder::specs::PrepaymentModelSpec::constant_cpr(
-        1.0 - (1.0 - prepay_rate).powi(12),
-    );
+    let pool = create_assumed_pool(&front_leg)?;
     let months = (back_settle.year() - front_settle.year()) * 12
         + i32::from(u8::from(back_settle.month()))
         - i32::from(u8::from(front_settle.month()));
@@ -103,9 +103,9 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
     // paydown's pull-to-par gain, less the drop captured by buying back cheaper.
     let net_benefit = coupon_income + principal_paydown * (100.0 - roll.back_price) / 100.0 - drop;
 
-    let price = roll.front_price;
+    let dirty_front = roll.front_price + settlement_accrued_interest(&pool, front_settle)? * scale;
     let implied_rate = if days > 0 {
-        (net_benefit / price) * (360.0 / days as f64)
+        (net_benefit / dirty_front) * (360.0 / days as f64)
     } else {
         0.0
     };
@@ -125,8 +125,6 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
 ///
 /// * `roll` - Dollar-roll contract whose front and back prices, settlement
 ///   dates, coupon, and TBA pool assumptions determine implied financing.
-/// * `prepay_rate` - Monthly single-month mortality (SMM) assumption as a
-///   decimal in `[0, 1]`, replacing the generic pool's PSA assumption.
 /// * `repo_rate` - Comparable annualized repo financing rate as a decimal on
 ///   the same ACT/360 basis used for the roll's implied financing rate.
 ///
@@ -134,8 +132,12 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
 ///
 /// Roll specialness in basis points (positive = roll is special, i.e.
 /// rolling is cheaper than repo financing).
-pub fn roll_specialness(roll: &DollarRoll, prepay_rate: f64, repo_rate: f64) -> Result<f64> {
-    let carry = implied_financing_rate(roll, prepay_rate)?;
+///
+/// # Errors
+///
+/// Propagates any error from [`implied_financing_rate`].
+pub fn roll_specialness(roll: &DollarRoll, repo_rate: f64) -> Result<f64> {
+    let carry = implied_financing_rate(roll)?;
     let specialness = repo_rate - carry.implied_rate;
     Ok(specialness * 10_000.0)
 }
@@ -146,14 +148,15 @@ pub fn roll_specialness(roll: &DollarRoll, prepay_rate: f64, repo_rate: f64) -> 
 ///
 /// ```text
 /// drop = coupon_income + paydown × (100 − back_price)/100
-///        − target_rate × front_price × days/360
+///        − target_rate × dirty_front_price × days/360
 /// ```
 ///
 /// # Arguments
 ///
 /// * `target_rate` - Desired annualized financing rate as a decimal on the
 ///   ACT/360 convention used by dollar-roll carry.
-/// * `front_price` - Front-month TBA price in points per 100 of face.
+/// * `dirty_front_price` - Front-month TBA price plus accrued interest at
+///   front settlement, in points per 100 of face.
 /// * `back_price` - Back-month TBA price in points per 100 of face.
 /// * `coupon_income` - Expected accrued coupon income over the roll period in
 ///   points per 100 of face.
@@ -167,13 +170,13 @@ pub fn roll_specialness(roll: &DollarRoll, prepay_rate: f64, repo_rate: f64) -> 
 /// Break-even drop (in price points)
 pub fn break_even_drop(
     target_rate: f64,
-    front_price: f64,
+    dirty_front_price: f64,
     back_price: f64,
     coupon_income: f64,
     principal_paydown: f64,
     days: i64,
 ) -> f64 {
-    let required_net = target_rate * front_price * (days as f64 / 360.0);
+    let required_net = target_rate * dirty_front_price * (days as f64 / 360.0);
     coupon_income + principal_paydown * (100.0 - back_price) / 100.0 - required_net
 }
 
@@ -184,9 +187,8 @@ mod tests {
     #[test]
     fn test_implied_financing_rate() {
         let roll = DollarRoll::example().expect("DollarRoll example is valid");
-        let prepay_rate = 0.005;
 
-        let result = implied_financing_rate(&roll, prepay_rate).expect("should calculate");
+        let result = implied_financing_rate(&roll).expect("should calculate");
 
         assert!(result.implied_rate > -0.20);
         assert!(result.implied_rate < 0.20);
@@ -196,15 +198,6 @@ mod tests {
             result.principal_paydown >= 0.0,
             "paydown should be non-negative"
         );
-    }
-
-    #[test]
-    fn test_implied_financing_zero_prepay() {
-        let roll = DollarRoll::example().expect("DollarRoll example is valid");
-
-        let result = implied_financing_rate(&roll, 0.0).expect("should calculate");
-        assert!(result.implied_rate > -0.20);
-        assert!(result.implied_rate < 0.20);
     }
 
     /// Item 13 regression: coupon income must accrue on the *declining* MBS
@@ -217,7 +210,7 @@ mod tests {
     #[test]
     fn coupon_income_accrues_on_declining_balance() {
         let roll = DollarRoll::example().expect("DollarRoll example is valid");
-        let result = implied_financing_rate(&roll, 0.005).expect("ok");
+        let result = implied_financing_rate(&roll).expect("ok");
 
         // There must be some paydown for the test to be meaningful.
         assert!(
@@ -244,14 +237,12 @@ mod tests {
     #[test]
     fn test_roll_specialness() {
         let roll = DollarRoll::example().expect("DollarRoll example is valid");
-        let prepay_rate = 0.005;
         let repo_rate = 0.05;
 
-        let specialness =
-            roll_specialness(&roll, prepay_rate, repo_rate).expect("should calculate");
+        let specialness = roll_specialness(&roll, repo_rate).expect("should calculate");
 
         // Definition: specialness = (repo − implied) in bp.
-        let carry = implied_financing_rate(&roll, prepay_rate).expect("carry");
+        let carry = implied_financing_rate(&roll).expect("carry");
         let expected = (repo_rate - carry.implied_rate) * 10_000.0;
         assert!(
             (specialness - expected).abs() < 1e-9,
@@ -287,18 +278,22 @@ mod tests {
     #[test]
     fn test_carry_round_trip_consistency() {
         let roll = DollarRoll::example().expect("DollarRoll example is valid");
-        let result = implied_financing_rate(&roll, 0.005).expect("ok");
+        let result = implied_financing_rate(&roll).expect("ok");
+        let front = roll.front_settle_date().expect("front");
+        let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
+        let front_accrued = settlement_accrued_interest(&pool, front).expect("accrued") * 100.0
+            / pool.current_face.amount();
 
         let be = break_even_drop(
             result.implied_rate,
-            roll.front_price,
+            roll.front_price + front_accrued,
             roll.back_price,
             result.coupon_income,
             result.principal_paydown,
             result.settlement_days,
         );
         assert!(
-            (be - roll.drop()).abs() < 0.01,
+            (be - roll.drop()).abs() < 1e-10,
             "break-even at implied rate should ≈ actual drop, got {be} vs {}",
             roll.drop()
         );
@@ -316,9 +311,8 @@ mod tests {
         wide.back_price = base.back_price - 0.25;
         assert!(wide.drop() > base.drop());
 
-        let prepay = 0.005;
-        let r_base = implied_financing_rate(&base, prepay).expect("base carry");
-        let r_wide = implied_financing_rate(&wide, prepay).expect("wide carry");
+        let r_base = implied_financing_rate(&base).expect("base carry");
+        let r_wide = implied_financing_rate(&wide).expect("wide carry");
         assert!(
             r_wide.implied_rate < r_base.implied_rate,
             "larger drop must lower implied financing rate: base={}, wide={}",
@@ -327,8 +321,8 @@ mod tests {
         );
 
         let repo = 0.05;
-        let s_base = roll_specialness(&base, prepay, repo).expect("base specialness");
-        let s_wide = roll_specialness(&wide, prepay, repo).expect("wide specialness");
+        let s_base = roll_specialness(&base, repo).expect("base specialness");
+        let s_wide = roll_specialness(&wide, repo).expect("wide specialness");
         assert!(
             s_wide > s_base,
             "larger drop must raise specialness: base={s_base}bp, wide={s_wide}bp"
@@ -341,15 +335,50 @@ mod production_mortgage_audit {
     use super::*;
     use time::macros::date;
 
+    /// Hand calculation for a Mar 11 -> Apr 11 2026 roll (31 days) on the
+    /// generic 30-year 4% pool, which is issued Mar 1 and therefore has PSA
+    /// seasoning 0 in March (0% CPR). March's principal is level-pay
+    /// scheduled principal only, paid down at the Apr 1 boundary:
+    /// `S/B = i/((1+i)^360 - 1)` with `i = WAC/12`.
+    /// Coupon: 20 days (30/360) on 100, then 10 days on `100 - paydown`.
+    /// Front accrued: Mar 1 -> Mar 11 = 10/360 of the 4% coupon.
+    /// `implied = (coupon + paydown x (100 - 98)/100 - 0.5) / (98.5 + AI) x 360/31`.
+    /// The old metric assumed a flat 0.5% SMM and divided by the clean price.
+    #[test]
+    fn implied_financing_uses_pool_prepayment_and_dirty_front_price() {
+        let mut roll = DollarRoll::example().expect("roll");
+        roll.front_settlement_date = Some(date!(2026 - 03 - 11));
+        roll.back_settlement_date = Some(date!(2026 - 04 - 11));
+        let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
+        let i = pool.wac / 12.0;
+        let paydown = 100.0 * i / ((1.0 + i).powi(360) - 1.0);
+        let coupon = 0.04 * (100.0 * 20.0 + (100.0 - paydown) * 10.0) / 360.0;
+        let accrued = 100.0 * 0.04 * 10.0 / 360.0;
+        let expected =
+            (coupon + paydown * (100.0 - 98.0) / 100.0 - 0.5) / (98.5 + accrued) * 360.0 / 31.0;
+
+        let carry = implied_financing_rate(&roll).expect("carry");
+        assert!(
+            (carry.principal_paydown - paydown).abs() < 1e-10,
+            "paydown {} versus {paydown}",
+            carry.principal_paydown
+        );
+        assert!(
+            (carry.implied_rate - expected).abs() < 1e-12,
+            "implied {} versus {expected}",
+            carry.implied_rate
+        );
+        let clean_basis = (coupon + paydown * 0.02 - 0.5) / 98.5 * 360.0 / 31.0;
+        assert!((carry.implied_rate - clean_basis).abs() > 1e-6);
+    }
+
     #[test]
     fn carry_counts_one_paydown_and_coupon_on_30_360() {
         let mut roll = DollarRoll::example().expect("roll");
         roll.front_settlement_date = Some(date!(2026 - 03 - 11));
         roll.back_settlement_date = Some(date!(2026 - 04 - 11));
-        let carry = implied_financing_rate(&roll, 0.0).expect("carry");
-        let mut pool = create_assumed_pool(&roll.front_leg().expect("leg"), date!(2026 - 03 - 11))
-            .expect("pool");
-        pool.prepayment_model = crate::cashflow::builder::specs::PrepaymentModelSpec::psa(0.0);
+        let carry = implied_financing_rate(&roll).expect("carry");
+        let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
         let cf = generate_cashflows(&pool, date!(2026 - 03 - 11), Some(1)).expect("flows");
         let principal =
             (cf[0].scheduled_principal + cf[0].prepayment) / pool.current_face.amount() * 100.0;

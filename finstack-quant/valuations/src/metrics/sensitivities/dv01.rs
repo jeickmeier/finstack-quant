@@ -39,28 +39,21 @@ use finstack_quant_core::types::CurveId;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-/// Rate scenarios also change mortgage refinancing incentives. Keep the
-/// generic bucket/parallel machinery and active pricing dispatch identical.
+/// Reprice for a rate scenario. Instruments whose projected cashflows respond
+/// to rates (agency mortgages) rebuild themselves through
+/// [`Instrument::rate_risk_rebuild`]; the generic bucket/parallel machinery
+/// and active pricing dispatch stay identical.
 fn reprice_rate_risk(
     context: &MetricContext,
     market: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> finstack_quant_core::Result<f64> {
-    if let Some(mbs) = context
+    match context
         .instrument
-        .as_any()
-        .downcast_ref::<crate::instruments::AgencyMbsPassthrough>()
+        .rate_risk_rebuild(context.curves.as_ref(), market, as_of)?
     {
-        let bumped =
-            crate::instruments::fixed_income::mbs_passthrough::metrics::duration::rate_risk_pool(
-                mbs,
-                context.curves.as_ref(),
-                market,
-                as_of,
-            )?;
-        context.reprice_instrument_raw(&bumped, market, as_of)
-    } else {
-        context.reprice_raw(market, as_of)
+        Some(rebuilt) => context.reprice_instrument_raw(rebuilt.as_ref(), market, as_of),
+        None => context.reprice_raw(market, as_of),
     }
 }
 

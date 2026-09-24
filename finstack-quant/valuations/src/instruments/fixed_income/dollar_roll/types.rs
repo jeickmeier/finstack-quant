@@ -3,6 +3,7 @@
 //! A dollar roll is a simultaneous sale and purchase of agency MBS TBAs
 //! for different settlement months, used for financing and carry trades.
 
+use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::impl_instrument_base;
@@ -126,6 +127,12 @@ pub struct DollarRoll {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub trade_date: Option<Date>,
+    /// Prepayment model of the generic pool both legs deliver.
+    ///
+    /// `None` uses the embedded generic PSA assumption of the TBA legs.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prepayment_model: Option<PrepaymentModelSpec>,
     /// Discount curve identifier.
     pub discount_curve_id: CurveId,
     /// Optional repo/financing curve identifier (carry-only).
@@ -234,6 +241,9 @@ impl DollarRoll {
                 )));
             }
         }
+        if let Some(model) = &self.prepayment_model {
+            model.validate()?;
+        }
         Ok(())
     }
 
@@ -313,6 +323,7 @@ impl DollarRoll {
             .settlement_date_opt(self.front_settlement_date)
             .notional(self.notional)
             .trade_price(self.front_price)
+            .prepayment_model_opt(self.prepayment_model.clone())
             .discount_curve_id(self.discount_curve_id.clone())
             .build()
     }
@@ -334,6 +345,7 @@ impl DollarRoll {
             .settlement_date_opt(self.back_settlement_date)
             .notional(self.notional)
             .trade_price(self.back_price)
+            .prepayment_model_opt(self.prepayment_model.clone())
             .discount_curve_id(self.discount_curve_id.clone())
             .build()
     }
@@ -395,6 +407,23 @@ impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
 
     fn effective_start_date(&self) -> Option<Date> {
         self.trade_date
+    }
+
+    fn rate_risk_rebuild(
+        &self,
+        base: &finstack_quant_core::market_data::context::MarketContext,
+        bumped: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Box<dyn crate::instruments::Instrument>>> {
+        use crate::instruments::fixed_income::mbs_passthrough::metrics::duration::rate_risk_pool;
+        // Both legs deliver the same generic pool; its refinancing-driven speed
+        // shift is measured once on the front leg.
+        let generic =
+            crate::instruments::fixed_income::tba::pricer::create_assumed_pool(&self.front_leg()?)?;
+        let mut rebuilt = self.clone();
+        rebuilt.prepayment_model =
+            Some(rate_risk_pool(&generic, base, bumped, as_of)?.prepayment_model);
+        Ok(Some(Box::new(rebuilt)))
     }
 
     crate::impl_focused_pricing_overrides!();

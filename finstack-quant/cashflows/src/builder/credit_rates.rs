@@ -55,6 +55,53 @@ pub fn cpr_to_smm(cpr: f64) -> finstack_quant_core::Result<f64> {
     Ok(-((1.0 - cpr).ln() / 12.0).exp_m1())
 }
 
+/// Length of the PSA benchmark seasoning ramp, in months.
+pub const PSA_RAMP_MONTHS: u32 = 30;
+
+/// Terminal annual CPR of the 100% PSA benchmark (6%).
+pub const PSA_TERMINAL_CPR: f64 = 0.06;
+
+/// Annual CPR of the PSA benchmark curve at a loan age, scaled by speed.
+///
+/// 100% PSA ramps linearly from 0.2% CPR at month 1 to 6% at month 30 and
+/// stays flat afterwards: `CPR = speed × 6% × min(age, 30) / 30`. This is
+/// the single PSA implementation of the workspace; mortgage, structured
+/// credit and stochastic-prepayment code call it.
+///
+/// # Arguments
+///
+/// * `speed_multiplier` - PSA speed as a multiple of the benchmark (`1.0` =
+///   100% PSA, `1.5` = 150% PSA). Not validated here; callers that accept
+///   user input check it is finite and non-negative.
+/// * `seasoning_months` - Loan age in months; month 0 gives 0% CPR.
+///
+/// # Returns
+///
+/// Annual CPR as a decimal. It exceeds 1.0 for speeds above ~16.7× at the
+/// plateau; callers decide whether to reject or clamp.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_cashflows::builder::psa_cpr;
+///
+/// assert!((psa_cpr(1.0, 15) - 0.03).abs() < 1e-15);
+/// assert!((psa_cpr(1.5, 60) - 0.09).abs() < 1e-15);
+/// ```
+///
+/// # References
+///
+/// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
+#[must_use]
+pub fn psa_cpr(speed_multiplier: f64, seasoning_months: u32) -> f64 {
+    let base = if seasoning_months <= PSA_RAMP_MONTHS {
+        (seasoning_months as f64 / PSA_RAMP_MONTHS as f64) * PSA_TERMINAL_CPR
+    } else {
+        PSA_TERMINAL_CPR
+    };
+    base * speed_multiplier
+}
+
 /// Convert monthly SMM to annual CPR.
 ///
 /// # Formula
@@ -203,6 +250,19 @@ pub fn abs_to_smm(speed: f64, month: u32) -> finstack_quant_core::Result<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 100% PSA: 0.2% CPR per month of age up to 6% at month 30, flat after;
+    /// speeds scale linearly (150% PSA at month 20 = 1.5 × 4% = 6%).
+    #[test]
+    fn psa_cpr_matches_the_benchmark_ramp() {
+        for month in 0..=30_u32 {
+            assert!((psa_cpr(1.0, month) - 0.002 * f64::from(month)).abs() < 1e-15);
+        }
+        assert_eq!(psa_cpr(1.0, 31), 0.06);
+        assert_eq!(psa_cpr(1.0, 360), 0.06);
+        assert!((psa_cpr(1.5, 20) - 0.06).abs() < 1e-15);
+        assert_eq!(psa_cpr(0.0, 45), 0.0);
+    }
 
     #[test]
     fn default_rate_names_share_the_checked_kernel() {

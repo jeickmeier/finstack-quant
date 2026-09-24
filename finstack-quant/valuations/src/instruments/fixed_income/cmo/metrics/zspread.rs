@@ -6,8 +6,9 @@
 //! this is a static Z-spread — **not** an option-adjusted spread (a true
 //! MC-OAS over stochastic rate/prepayment paths is deferred).
 
-use crate::instruments::fixed_income::cmo::pricer::generate_tranche_cashflows;
+use crate::instruments::fixed_income::cmo::pricer::{resolve_collateral, tranche_cashflows_on};
 use crate::instruments::fixed_income::cmo::AgencyCmo;
+use crate::instruments::fixed_income::mbs_passthrough::pricer::quote_basis_pool;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
@@ -35,12 +36,17 @@ pub(crate) fn calculate_tranche_zspread(
         ))
     })?;
 
+    // The clean quote plus accrued buys the settlement-month accrual onward;
+    // the collateral's prior-month in-flight P&I belongs to the seller.
+    let collateral = quote_basis_pool(&resolve_collateral(cmo, as_of)?, as_of)?;
+
+    // Tranche interest accrues on the collateral's day count.
     let month_start = Date::from_calendar_date(as_of.year(), as_of.month(), 1)
         .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
     let accrual_start = month_start.max(cmo.issue_date);
     let accrued = tranche.current_face.amount()
         * tranche.coupon
-        * DayCount::Thirty360.year_fraction(
+        * collateral.day_count.year_fraction(
             accrual_start.min(as_of),
             as_of,
             DayCountContext::default(),
@@ -48,7 +54,7 @@ pub(crate) fn calculate_tranche_zspread(
     let market_price = market_price_pct / 100.0 * tranche.current_face.amount() + accrued;
 
     // Cache cashflows outside the solver loop — they don't depend on spread.
-    let tranche_cfs = generate_tranche_cashflows(cmo, as_of, None)?;
+    let tranche_cfs = tranche_cashflows_on(cmo, &collateral, as_of, None)?;
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
     let day_count = DayCount::Thirty360;
 
@@ -111,6 +117,7 @@ pub(crate) fn calculate_tranche_zspread(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::cmo::pricer::generate_tranche_cashflows;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use time::Month;
@@ -206,5 +213,43 @@ mod production_mortgage_audit {
         let clean = (dirty - accrued) / tranche.current_face.amount() * 100.0;
         let spread = calculate_tranche_zspread(&cmo, clean, &market, as_of).expect("spread");
         assert!(spread.abs() < 1e-9, "spread {spread}");
+    }
+
+    /// Same pool, same clean quote, before (Feb 10) and after (Feb 27) the
+    /// Feb 26 payment of the January collateral accrual: the Z-spread must
+    /// not jump. Over the 17 days the dirty target grows by the tranche
+    /// accrual `c × 17/360` and the projected PV by `(r + s) × 17/365`. The
+    /// flat curve rate is set to `c × 365/360` so the two carries match when
+    /// the spread is near zero; the residual mismatch is then far below the
+    /// 0.1 bp tolerance on a ~3-year-duration tranche. Before the fix the
+    /// Feb 10 solve fed the seller's in-flight January collateral flow into
+    /// tranche A: 4.60 bp on Feb 10 versus −5.05 bp on Feb 27.
+    #[test]
+    fn cmo_zspread_is_stable_across_the_in_flight_payment_date() {
+        let mut cmo = AgencyCmo::example().expect("cmo");
+        cmo.issue_date = date!(2023 - 01 - 01);
+        let flat = 0.035_f64 * 365.0 / 360.0;
+        let quote = 99.6;
+        let spread_at = |as_of: Date| {
+            let market = MarketContext::new().insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .build()
+                    .expect("curve"),
+            );
+            calculate_tranche_zspread(&cmo, quote, &market, as_of).expect("spread")
+        };
+        let before = spread_at(date!(2024 - 02 - 10));
+        let after = spread_at(date!(2024 - 02 - 27));
+        assert!(
+            (before - after).abs() < 1e-5,
+            "Z-spread must not jump across the payment date: before={before} after={after}"
+        );
+        assert!(
+            before < after + 5e-4,
+            "Feb 10 Z-spread must no longer include the seller's in-flight collateral flow"
+        );
     }
 }

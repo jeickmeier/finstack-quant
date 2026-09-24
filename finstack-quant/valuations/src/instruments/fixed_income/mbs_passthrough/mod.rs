@@ -64,7 +64,6 @@
 //! let example_mbs = AgencyMbsPassthrough::example().unwrap();
 //! ```
 
-pub mod delay;
 pub(crate) mod metrics;
 pub mod prepayment;
 pub(crate) mod pricer;

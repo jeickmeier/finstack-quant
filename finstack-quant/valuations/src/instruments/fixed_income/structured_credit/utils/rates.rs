@@ -35,7 +35,6 @@
 //!
 //! PSA speeds are multiples of this curve (e.g., 150% PSA = 1.5x the standard curve).
 
-use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
 use finstack_quant_cashflows::builder::{cdr_to_mdr, cpr_to_smm, mdr_to_cdr, smm_to_cpr};
 
 fn convert_clamped(rate: f64, convert: fn(f64) -> finstack_quant_core::Result<f64>) -> f64 {
@@ -144,20 +143,9 @@ pub fn clamped_mdr_to_cdr(mdr: f64) -> f64 {
 /// - Month 31+: CPR = 6.0%
 ///
 /// PSA speeds scale this curve linearly. For example, 150% PSA at month 30 = 9% CPR.
+/// The curve is the canonical [`finstack_quant_cashflows::builder::psa_cpr`].
 pub fn psa_to_cpr(psa_speed: f64, month: u32) -> f64 {
-    let psa_speed = psa_speed.max(0.0);
-    if month == 0 || psa_speed == 0.0 {
-        return 0.0;
-    }
-
-    let psa_curve = embedded_registry_or_panic().psa_curve();
-    let base_cpr = if month <= psa_curve.ramp_months {
-        (month as f64 / psa_curve.ramp_months as f64) * psa_curve.terminal_cpr
-    } else {
-        psa_curve.terminal_cpr
-    };
-
-    (psa_speed * base_cpr).min(1.0)
+    finstack_quant_cashflows::builder::psa_cpr(psa_speed.max(0.0), month).min(1.0)
 }
 
 /// Calculate periods per year from a payment frequency.

@@ -2,14 +2,6 @@
 //!
 //! This module provides discounting-based pricing for agency MBS passthroughs,
 //! generating projected cashflows with prepayment and payment delay adjustments.
-//!
-//! # SIFMA Settlement
-//!
-//! TBA-eligible agency MBS settle on published SIFMA Good Delivery dates. The
-//! [`sifma_settlement_for_period`] helper uses an exact embedded date when
-//! available and an explicitly approximate nth-weekday date for long-dated
-//! projected cash flows. Operational trade settlement must use the published
-//! calendar, not the projection estimate.
 
 use super::AgencyMbsPassthrough;
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
@@ -29,8 +21,6 @@ pub struct MbsCashflow {
     pub period_end: Date,
     /// Actual payment date (after delay)
     pub payment_date: Date,
-    /// SIFMA Good Delivery date, estimated outside published calendar coverage.
-    pub sifma_date: Date,
     /// Scheduled principal payment
     pub scheduled_principal: f64,
     /// Prepayment (unscheduled principal)
@@ -45,6 +35,10 @@ pub struct MbsCashflow {
     pub ending_balance: f64,
     /// SMM used for this period
     pub smm: f64,
+    /// Year fraction of the accrual month on the pool day count (1/12 on
+    /// 30/360); investor interest is `beginning_balance × pass-through ×
+    /// accrual_fraction`.
+    pub accrual_fraction: f64,
 }
 
 /// One MBS projection with its canonical schedule and row diagnostics.
@@ -53,23 +47,6 @@ pub(crate) struct MbsProjection {
     pub(crate) schedule: CashFlowSchedule,
     /// Pool-state diagnostics aligned by payment date with schedule rows.
     pub(crate) diagnostics: Vec<MbsCashflow>,
-}
-
-/// Derive the SIFMA Good Delivery settlement date for a given accrual period.
-pub(crate) fn sifma_settlement_for_period(period_end: Date) -> Result<Date> {
-    use finstack_quant_core::dates::{
-        estimated_sifma_settlement_date_for_class, sifma_settlement_date, SifmaSettlementClass,
-    };
-
-    Ok(
-        sifma_settlement_date(period_end.month(), period_end.year()).unwrap_or_else(|| {
-            estimated_sifma_settlement_date_for_class(
-                period_end.month(),
-                period_end.year(),
-                SifmaSettlementClass::A,
-            )
-        }),
-    )
 }
 
 /// Generate projected cashflows for an agency MBS.
@@ -116,11 +93,8 @@ pub fn generate_cashflows(
     }
 
     let max_periods = max_periods.unwrap_or(mbs.wam);
-    // Level-pay mortgage amortization is, by construction, computed on the
-    // monthly mortgage rate (WAC / 12) — that is the contractual amortization
-    // convention and is intentionally not day-counted.
-    let monthly_mortgage_rate = mbs.wac / 12.0;
 
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict("usny")?;
     let mut projected_count: u32 = 0;
     loop {
         if balance < 0.01 || projected_count >= max_periods {
@@ -128,7 +102,7 @@ pub fn generate_cashflows(
         }
 
         let period_end = end_of_month(period_start)?;
-        let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
+        let payment_date = mbs.payment_date_on(period_start, calendar)?;
 
         if payment_date < as_of {
             period_start = next_month_start(period_start)?;
@@ -153,23 +127,6 @@ pub fn generate_cashflows(
         // the pool's seasoning, which would double-count the age already
         // netted out of a remaining WAM (matching the MC-OAS pricer).
         let remaining_months = mbs.wam.saturating_sub(projected_count - 1);
-        let remaining_months = if remaining_months == 0 {
-            1
-        } else {
-            remaining_months
-        };
-        let scheduled_principal = if remaining_months == 1 {
-            balance
-        } else if monthly_mortgage_rate > 1e-12 {
-            let factor = (1.0 + monthly_mortgage_rate).powi(remaining_months as i32);
-            let payment = balance * monthly_mortgage_rate * factor / (factor - 1.0);
-            let interest_component = balance * monthly_mortgage_rate;
-            (payment - interest_component).max(0.0).min(balance)
-        } else {
-            balance / remaining_months as f64
-        };
-
-        let prepayment = (balance - scheduled_principal).max(0.0) * smm;
         // Investor interest accrues at the pass-through rate over the actual
         // accrual-period day-count fraction, not a flat 1/12. The accrual
         // period is the full calendar month `[period_start, next_month_start)`.
@@ -182,17 +139,26 @@ pub fn generate_cashflows(
             accrual_period_end,
             DayCountContext::default(),
         )?;
-        let interest = balance * mbs.pass_through_rate * period_yf;
+        let step = pool_month_step(
+            balance,
+            remaining_months,
+            mbs.wac,
+            smm,
+            mbs.pass_through_rate,
+            period_yf,
+        );
+        let (scheduled_principal, prepayment, interest, ending_balance) = (
+            step.scheduled_principal,
+            step.prepayment,
+            step.interest,
+            step.ending_balance,
+        );
         let total_principal = scheduled_principal + prepayment;
-        let ending_balance = (balance - total_principal).max(0.0);
-
-        let sifma_date = sifma_settlement_for_period(period_end)?;
 
         cashflows.push(MbsCashflow {
             period_start,
             period_end,
             payment_date,
-            sifma_date,
             scheduled_principal,
             prepayment,
             interest,
@@ -200,6 +166,7 @@ pub fn generate_cashflows(
             beginning_balance: balance,
             ending_balance,
             smm,
+            accrual_fraction: period_yf,
         });
 
         balance = ending_balance;
@@ -211,6 +178,64 @@ pub fn generate_cashflows(
     }
 
     Ok(cashflows)
+}
+
+/// One month of a level-pay mortgage pool.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PoolMonth {
+    /// Level-pay scheduled principal.
+    pub(crate) scheduled_principal: f64,
+    /// Voluntary prepayment: SMM × the post-amortization balance.
+    pub(crate) prepayment: f64,
+    /// Investor interest: balance × pass-through × accrual fraction.
+    pub(crate) interest: f64,
+    /// Balance after scheduled principal and prepayment, floored at 0.
+    pub(crate) ending_balance: f64,
+}
+
+/// Advance a level-pay mortgage pool by one month.
+///
+/// Shared by the deterministic projection, the MC-OAS paths and the CMO PAC
+/// band so the three amortize identically. Scheduled principal is the
+/// level-pay annuity on the monthly mortgage rate `wac / 12` (the contractual
+/// amortization convention, intentionally not day-counted); SMM applies to
+/// the balance left after scheduled principal.
+///
+/// # Arguments
+///
+/// * `balance` - Pool balance at the start of the month.
+/// * `remaining_months` - Level payments left including this one; `0` or `1`
+///   retires the whole balance.
+/// * `wac` - Gross weighted-average mortgage coupon, annual decimal.
+/// * `smm` - Single monthly mortality for the month, decimal in `[0, 1]`.
+/// * `pass_through_rate` - Net investor coupon, annual decimal.
+/// * `accrual_fraction` - Year fraction of the accrual month on the pool day
+///   count (1/12 on 30/360).
+pub(crate) fn pool_month_step(
+    balance: f64,
+    remaining_months: u32,
+    wac: f64,
+    smm: f64,
+    pass_through_rate: f64,
+    accrual_fraction: f64,
+) -> PoolMonth {
+    let monthly_rate = wac / 12.0;
+    let scheduled_principal = if remaining_months <= 1 {
+        balance
+    } else if monthly_rate > 1e-12 {
+        let factor = (1.0 + monthly_rate).powi(remaining_months as i32);
+        let payment = balance * monthly_rate * factor / (factor - 1.0);
+        (payment - balance * monthly_rate).max(0.0).min(balance)
+    } else {
+        balance / remaining_months as f64
+    };
+    let prepayment = (balance - scheduled_principal).max(0.0) * smm;
+    PoolMonth {
+        scheduled_principal,
+        prepayment,
+        interest: balance * pass_through_rate * accrual_fraction,
+        ending_balance: (balance - (scheduled_principal + prepayment)).max(0.0),
+    }
 }
 
 /// Build the canonical projected collateral schedule for an agency MBS.
@@ -322,6 +347,48 @@ pub(crate) fn settlement_accrued_interest(
         * mbs
             .day_count
             .year_fraction(start, settlement, DayCountContext::default())?)
+}
+
+/// The pool as bought by a new purchaser settling on `settlement`.
+///
+/// A clean quote plus settlement-month accrued interest buys the
+/// settlement-month accrual period onward. The prior month's P&I, still in
+/// flight until the agency payment date, belongs to the seller (the holder of
+/// record at month end). This helper marks every accrual period before the
+/// settlement month as paid, so quote-based spreads (MC-OAS, CMO Z-spread) and
+/// the TBA delivered pool project exactly the cashflows the quote buys. The
+/// holder NPV path (`price_mbs`) keeps the in-flight receivable and does not
+/// use this helper.
+///
+/// # Arguments
+///
+/// * `mbs` - Pool whose `current_face` is the balance at the start of the
+///   settlement month.
+/// * `settlement` - Trade settlement date; its calendar month is the first
+///   accrual period the buyer receives.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `last_paid_accrual_end` already falls in
+/// or after the settlement month, which would mean the buyer's first accrual
+/// period had been paid before it accrued.
+pub(crate) fn quote_basis_pool(
+    mbs: &AgencyMbsPassthrough,
+    settlement: Date,
+) -> Result<AgencyMbsPassthrough> {
+    let accrual_start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
+        .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
+    if mbs
+        .last_paid_accrual_end
+        .is_some_and(|date| date >= accrual_start)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "MBS last_paid_accrual_end must precede the settlement month starting {accrual_start}"
+        )));
+    }
+    let mut pool = mbs.clone();
+    pool.last_paid_accrual_end = Some(accrual_start - time::Duration::days(1));
+    Ok(pool)
 }
 
 fn previous_month_start(date: Date) -> Result<Date> {

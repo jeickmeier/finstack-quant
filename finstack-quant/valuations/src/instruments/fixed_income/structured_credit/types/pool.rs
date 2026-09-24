@@ -844,8 +844,14 @@ impl AssetPool {
                     acquisition_date: None,
                     origination_date: Some(origination),
                     day_count: line.day_count,
-                    smm_override: line.cpr.map(|cpr| 1.0 - (1.0 - cpr).powf(1.0 / 12.0)),
-                    mdr_override: line.cdr.map(|cdr| 1.0 - (1.0 - cdr).powf(1.0 / 12.0)),
+                    smm_override: line
+                        .cpr
+                        .map(finstack_quant_cashflows::builder::cpr_to_smm)
+                        .transpose()?,
+                    mdr_override: line
+                        .cdr
+                        .map(finstack_quant_cashflows::builder::cdr_to_mdr)
+                        .transpose()?,
                     recovery_rate: line.recovery_rate,
                     commitment: None,
                     contractual_payment: line.contractual_payment,

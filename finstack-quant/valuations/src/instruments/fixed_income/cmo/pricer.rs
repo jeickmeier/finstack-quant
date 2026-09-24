@@ -5,9 +5,7 @@
 
 use super::tranches::pac_support::PacSchedule;
 use super::types::{AgencyCmo, CmoTranche, CmoTrancheType, PacCollar};
-use super::waterfall::{
-    allocate_io_cashflow, execute_waterfall_with_principal_breakdown, PacContext,
-};
+use super::waterfall::{execute_waterfall_with_principal_breakdown, PacContext};
 use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};
@@ -120,23 +118,39 @@ fn build_pac_context(
     })
 }
 
-/// Generate cashflows for the reference tranche.
+/// Generate the holder's cashflows for the reference tranche.
 ///
-/// Projects collateral cashflows and runs them through the waterfall
-/// to determine the reference tranche's cashflows.
+/// Projects collateral cashflows (including a prior-month payment still in
+/// flight at `as_of`) and runs them through the waterfall to determine the
+/// reference tranche's cashflows.
 pub(crate) fn generate_tranche_cashflows(
     cmo: &AgencyCmo,
     as_of: Date,
     max_periods: Option<u32>,
 ) -> Result<Vec<TrancheCashflow>> {
     let collateral = resolve_collateral(cmo, as_of)?;
+    tranche_cashflows_on(cmo, &collateral, as_of, max_periods)
+}
 
-    // Generate collateral cashflows
-    let collateral_cfs = generate_cashflows(&collateral, as_of, max_periods)?;
+/// Run `collateral`'s projected cashflows through the waterfall and return
+/// the reference tranche's share.
+///
+/// Quote-based spreads pass the `quote_basis_pool` of the collateral so the
+/// first projected period is the settlement month. The PAC schedule is
+/// generated from the collateral balance at `as_of` with its first entry for
+/// that month, so on the quote basis the PAC schedule index lines up with the
+/// collateral period index.
+pub(crate) fn tranche_cashflows_on(
+    cmo: &AgencyCmo,
+    collateral: &AgencyMbsPassthrough,
+    as_of: Date,
+    max_periods: Option<u32>,
+) -> Result<Vec<TrancheCashflow>> {
+    let collateral_cfs = generate_cashflows(collateral, as_of, max_periods)?;
 
     // Build the PAC context once (None for non-PAC deals). The schedule is
     // collateral-derived; only `period_index` advances per period below.
-    let mut pac_context = build_pac_context(cmo, &collateral, as_of);
+    let mut pac_context = build_pac_context(cmo, collateral, as_of);
 
     let mut waterfall = cmo.waterfall.clone();
 
@@ -150,8 +164,10 @@ pub(crate) fn generate_tranche_cashflows(
     let is_io = ref_tranche.tranche_type == CmoTrancheType::InterestOnly;
     let io_tranche = is_io.then(|| ref_tranche.clone());
 
-    // Track collateral factor for IO strips
-    let original_collateral = collateral.original_face.amount();
+    // IO notionals reference the collateral balance: an IO with current
+    // notional N on collateral of current face F accrues on
+    // `N × beginning_balance / F` each period.
+    let collateral_face = collateral.current_face.amount();
 
     for (period_idx, cf) in collateral_cfs.iter().enumerate() {
         // Run waterfall for this period
@@ -164,14 +180,15 @@ pub(crate) fn generate_tranche_cashflows(
         }
 
         if let Some(io_tranche) = io_tranche.as_ref() {
-            // IO gets interest based on collateral factor.
-            // Use beginning_balance (not ending_balance) because interest accrues
-            // on the balance at the start of the period, before principal payments.
-            let factor = cf.beginning_balance / original_collateral;
+            // Interest accrues on the balance at the start of the period,
+            // before principal payments.
+            let io_notional =
+                io_tranche.current_face.amount() * cf.beginning_balance / collateral_face;
             // Interest conservation: the IO can never receive more than
             // the collateral interest delivered this period, so
             // IO + PO PV stays bounded by collateral PV.
-            let io_payment = allocate_io_cashflow(io_tranche, factor).min(cf.interest);
+            let io_payment =
+                (io_notional * io_tranche.coupon * cf.accrual_fraction).min(cf.interest);
 
             tranche_cfs.push(TrancheCashflow {
                 payment_date: cf.payment_date,
@@ -180,20 +197,22 @@ pub(crate) fn generate_tranche_cashflows(
                 prepayment_principal: 0.0,
                 interest: io_payment,
                 total: io_payment,
-                ending_balance: io_tranche.original_face.amount() * factor,
+                ending_balance: io_tranche.current_face.amount() * cf.ending_balance
+                    / collateral_face,
             });
         } else {
             // Regular waterfall execution. For PAC deals `pac_context` is
             // `Some`, so PAC tranches amortize on their collateral-derived
             // schedule/collar via `allocate_pac_support` instead of falling
             // through to balance-limited sequential allocation.
-            let collateral_factor = cf.beginning_balance / original_collateral;
+            let collateral_survival = collateral_survival(cf.beginning_balance, cf.ending_balance);
             let result = execute_waterfall_with_principal_breakdown(
                 &mut waterfall,
                 cf.scheduled_principal,
                 cf.prepayment,
                 total_interest,
-                collateral_factor,
+                collateral_survival,
+                cf.accrual_fraction,
                 pac_context.as_ref(),
             )?;
 
@@ -212,6 +231,16 @@ pub(crate) fn generate_tranche_cashflows(
     }
 
     Ok(tranche_cfs)
+}
+
+/// Fraction of the collateral balance that survives a period
+/// (`ending / beginning`), which IO notionals amortize by.
+pub(crate) fn collateral_survival(beginning_balance: f64, ending_balance: f64) -> f64 {
+    if beginning_balance > 0.0 {
+        ending_balance / beginning_balance
+    } else {
+        0.0
+    }
 }
 
 /// Build the canonical reference-tranche schedule used by pricing and providers.
@@ -584,9 +613,9 @@ mod tests {
         );
     }
 
-    /// The IO strip's notional must amortize with the collateral factor: its
-    /// reported ending balance tracks `original_face × factor` and declines
-    /// as the pool pays down.
+    /// The IO strip's notional must amortize with the collateral: its
+    /// reported ending balance tracks `current_face × collateral balance /
+    /// collateral current face` and declines as the pool pays down.
     #[test]
     fn io_notional_amortizes_with_collateral_factor() {
         let cmo = AgencyCmo::example_io_po().expect("AgencyCmo IO/PO example is valid");
@@ -663,19 +692,18 @@ mod tests {
         let collateral = resolve_collateral(&cmo, as_of).expect("collateral resolves");
         let collateral_cfs =
             generate_cashflows(&collateral, as_of, None).expect("collateral cashflows");
-        let original_collateral = collateral.current_face.amount();
 
         let mut waterfall = cmo.waterfall;
         let mut total_in = 0.0;
         let mut total_out = 0.0;
         for cf in &collateral_cfs {
-            let collateral_factor = cf.beginning_balance / original_collateral;
             let result = execute_waterfall_with_principal_breakdown(
                 &mut waterfall,
                 cf.scheduled_principal,
                 cf.prepayment,
                 cf.interest,
-                collateral_factor,
+                collateral_survival(cf.beginning_balance, cf.ending_balance),
+                cf.accrual_fraction,
                 None,
             )
             .expect("valid execute_waterfall_with_principal_breakdown fixture");
@@ -791,5 +819,77 @@ mod production_mortgage_audit {
             "{} versus {expected}",
             flows[0].interest
         );
+    }
+    /// Deal issued on seasoned collateral: the pool has original face 100mm
+    /// and factor 0.7, so it enters the deal with 70mm current face. The IO
+    /// references that 70mm (original = current = 70mm) and the PO carries the
+    /// 70mm of principal. The IO's first coupon is `70mm × 3.5% / 12 =
+    /// 204_166.67`. Scaling the IO's original face by the pool's *original*
+    /// factor (the old rule) gave `70mm × 0.7 × 3.5% / 12 = 142_916.67`.
+    #[test]
+    fn io_on_seasoned_collateral_accrues_on_its_current_notional() {
+        let as_of = date!(2024 - 01 - 15);
+        let mut pool = AgencyMbsPassthrough::example().expect("pool");
+        pool.original_face = Money::new(100_000_000.0, Currency::USD).expect("money");
+        pool.current_face = Money::new(70_000_000.0, Currency::USD).expect("money");
+        pool.current_factor = 0.7;
+        pool.issue_date = date!(2024 - 01 - 01);
+        pool.maturity = date!(2054 - 01 - 01);
+        pool.wam = 360;
+        let notional = Money::new(70_000_000.0, Currency::USD).expect("money");
+        let mut cmo = AgencyCmo::example_io_po().expect("cmo");
+        cmo.waterfall.tranches = vec![
+            CmoTranche::io_strip("IO", notional, 0.035),
+            CmoTranche::po_strip("PO", notional),
+        ];
+        cmo.collateral = Some(Box::new(pool));
+        cmo.validate().expect("deal is consistent");
+
+        let flows = generate_tranche_cashflows(&cmo, as_of, Some(2)).expect("flows");
+        let expected = 70_000_000.0 * 0.035 / 12.0;
+        assert!(
+            (flows[0].interest - expected).abs() < 1e-6,
+            "IO first coupon {} versus {expected}",
+            flows[0].interest
+        );
+        assert!((flows[0].interest - 142_916.666_666_67).abs() > 1.0);
+    }
+
+    /// Tranche coupons accrue on the collateral's day count. An Act/360 pool
+    /// valued 15 Jan 2024 (issued 1 Jan) accrues January over 31 days, so
+    /// class A (40mm, 3.5%) receives `40mm × 3.5% × 31/360 = 120_555.56`
+    /// rather than the flat `40mm × 3.5% / 12 = 116_666.67`.
+    #[test]
+    fn tranche_interest_uses_collateral_day_count() {
+        let as_of = date!(2024 - 01 - 15);
+        let mut cmo = AgencyCmo::example().expect("cmo");
+        let mut pool = resolve_collateral(&cmo, as_of).expect("collateral");
+        pool.day_count = DayCount::Act360;
+        cmo.collateral = Some(Box::new(pool));
+        let flows = generate_tranche_cashflows(&cmo, as_of, Some(1)).expect("flows");
+        let expected = 40_000_000.0 * 0.035 * 31.0 / 360.0;
+        assert!(
+            (flows[0].interest - expected).abs() < 1e-6,
+            "{} versus {expected}",
+            flows[0].interest
+        );
+        assert!((flows[0].interest - 116_666.666_666_67).abs() > 1.0);
+    }
+
+    /// The collateral backs exactly the principal tranches: a pool whose
+    /// current face disagrees with the sum of principal-tranche current faces
+    /// is an inconsistent deal.
+    #[test]
+    fn collateral_face_must_match_principal_tranches() {
+        let mut pool = AgencyMbsPassthrough::example().expect("pool");
+        pool.original_face = Money::new(100_000_000.0, Currency::USD).expect("money");
+        pool.current_face = Money::new(90_000_000.0, Currency::USD).expect("money");
+        pool.current_factor = 0.9;
+        let mut cmo = AgencyCmo::example_io_po().expect("cmo");
+        cmo.collateral = Some(Box::new(pool));
+        let err = cmo
+            .validate()
+            .expect_err("90mm pool cannot back a 100mm PO");
+        assert!(err.to_string().contains("collateral current face"), "{err}");
     }
 }

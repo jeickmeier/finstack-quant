@@ -95,69 +95,6 @@ pub(crate) struct DurationResult {
     pub shock_bp: f64,
 }
 
-/// Calculate effective duration using parallel curve bumps.
-///
-/// Effective duration accounts for the change in prepayment behavior
-/// as rates change, unlike modified duration which assumes fixed cashflows.
-///
-/// # Formula
-///
-/// ```text
-/// Duration = (P_down - P_up) / (2 × P_base × Δy)
-/// ```
-///
-/// # Arguments
-///
-/// * `mbs` - Agency MBS passthrough instrument
-/// * `market` - Market context with discount curves
-/// * `as_of` - Valuation date
-/// * `shock_bp` - Shock size in basis points (default: 25)
-///
-/// # Returns
-///
-/// Effective duration in years
-pub(crate) fn effective_duration(
-    mbs: &AgencyMbsPassthrough,
-    market: &MarketContext,
-    as_of: Date,
-    shock_bp: Option<f64>,
-) -> Result<f64> {
-    let result = duration_convexity(mbs, market, as_of, shock_bp)?;
-    Ok(result.duration)
-}
-
-/// Calculate effective convexity using parallel curve bumps.
-///
-/// Effective convexity measures the rate of change of duration as rates change.
-/// For MBS, this is typically negative (negative convexity) due to the
-/// embedded prepayment option.
-///
-/// # Formula
-///
-/// ```text
-/// Convexity = (P_up + P_down - 2 × P_base) / (P_base × Δy²)
-/// ```
-///
-/// # Arguments
-///
-/// * `mbs` - Agency MBS passthrough instrument
-/// * `market` - Market context with discount curves
-/// * `as_of` - Valuation date
-/// * `shock_bp` - Shock size in basis points (default: 25)
-///
-/// # Returns
-///
-/// Effective convexity in years²
-pub(crate) fn effective_convexity(
-    mbs: &AgencyMbsPassthrough,
-    market: &MarketContext,
-    as_of: Date,
-    shock_bp: Option<f64>,
-) -> Result<f64> {
-    let result = duration_convexity(mbs, market, as_of, shock_bp)?;
-    Ok(result.convexity)
-}
-
 /// Calculate both effective duration and convexity in one pass.
 ///
 /// This is more efficient than calculating them separately as it
@@ -307,7 +244,9 @@ mod tests {
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
         let market = create_test_market(as_of);
 
-        let duration = effective_duration(&mbs, &market, as_of, Some(25.0)).expect("duration");
+        let duration = duration_convexity(&mbs, &market, as_of, Some(25.0))
+            .expect("duration")
+            .duration;
 
         // MBS duration can be positive or negative depending on rate environment
         // Just check it's a reasonable value
@@ -320,7 +259,9 @@ mod tests {
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
         let market = create_test_market(as_of);
 
-        let convexity = effective_convexity(&mbs, &market, as_of, Some(25.0)).expect("convexity");
+        let convexity = duration_convexity(&mbs, &market, as_of, Some(25.0))
+            .expect("convexity")
+            .convexity;
 
         // MBS typically has negative convexity due to prepayment option
         // However, the sign depends on rate level and prepayment model
@@ -525,6 +466,11 @@ mod production_mortgage_audit {
                 .build()
                 .expect("curve"),
         );
-        assert!(effective_duration(&mbs, &market, as_of, None).expect("duration") > 0.0);
+        assert!(
+            duration_convexity(&mbs, &market, as_of, None)
+                .expect("duration")
+                .duration
+                > 0.0
+        );
     }
 }

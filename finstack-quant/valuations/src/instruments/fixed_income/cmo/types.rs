@@ -448,6 +448,16 @@ impl AgencyCmo {
                     "{context} collateral and tranche currencies must match"
                 )));
             }
+            // The collateral backs exactly the principal tranches; IO
+            // notionals are scaled by collateral balance over this face.
+            let collateral_face = pool.current_face.amount();
+            let principal_face = self.waterfall.total_current_face()?.amount();
+            if (collateral_face - principal_face).abs() > 1e-6 * collateral_face.max(1.0) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} collateral current face {collateral_face:.2} must equal the sum \
+                     of principal-tranche current faces {principal_face:.2}"
+                )));
+            }
         }
         Self::validate_interest_coverage(self)
     }
@@ -699,6 +709,20 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyCmo {
 
     fn effective_start_date(&self) -> Option<Date> {
         Some(self.issue_date)
+    }
+
+    fn rate_risk_rebuild(
+        &self,
+        base: &finstack_quant_core::market_data::context::MarketContext,
+        bumped: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Box<dyn crate::instruments::Instrument>>> {
+        use crate::instruments::fixed_income::mbs_passthrough::metrics::duration::rate_risk_pool;
+        let collateral =
+            crate::instruments::fixed_income::cmo::pricer::resolve_collateral(self, as_of)?;
+        let mut rebuilt = self.clone();
+        rebuilt.collateral = Some(Box::new(rate_risk_pool(&collateral, base, bumped, as_of)?));
+        Ok(Some(Box::new(rebuilt)))
     }
 
     crate::impl_focused_pricing_overrides!();

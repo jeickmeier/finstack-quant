@@ -469,6 +469,17 @@
             "null"
           ]
         },
+        "prepayment_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrepaymentModelSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prepayment model of the generic assumed pool.\n\nApplies only when `assumed_pool` is absent (an explicit pool carries its\nown model); `None` uses the embedded generic PSA assumption. Setting it\ntogether with `assumed_pool` is rejected."
+        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "description": "Scenario-only pricing adjustments."
@@ -12181,6 +12192,17 @@
         "notional": {
           "$ref": "#/$defs/Money",
           "description": "Trade notional (par amount)."
+        },
+        "prepayment_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrepaymentModelSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prepayment model of the generic pool both legs deliver.\n\n`None` uses the embedded generic PSA assumption of the TBA legs."
         },
         "repo_curve_id": {
           "anyOf": [
