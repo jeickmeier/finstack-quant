@@ -59,8 +59,9 @@ fn bond(id: &str, coupon: f64, maturity: Date) -> Bond {
         "USD-OIS",
     )
     .expect("bond");
-    bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_implied_vol(0.01);
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
     bond
 }
 
@@ -116,7 +117,8 @@ fn fixtures() -> Vec<(&'static str, Bond)> {
     });
     let model = &mut rates_credit.instrument_pricing_overrides.model_config;
     model.hw1f_sigma = Some(0.01);
-    model.hazard_volatility = Some(0.02);
+    model.hw1f_mean_reversion = None;
+    model.hazard_sigma = Some(0.02);
     model.rate_credit_correlation = Some(0.25);
     model.mc_paths = Some(64);
     model.mc_antithetic = Some(true);

@@ -1,6 +1,8 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
-use crate::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config;
+use crate::instruments::fixed_income::bond::pricing::engine::tree::{
+    bond_tree_config, TreeModelChoice,
+};
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::instruments::Bond;
 use crate::metrics::sensitivities::config as sens_config;
@@ -21,36 +23,41 @@ fn resolve_oas_decimal(bond: &Bond, context: &MetricContext) -> finstack_quant_c
     Ok(super::oas::oas_decimal_from_quote_overrides(bond, context)?.unwrap_or(0.0))
 }
 
-/// Whether the selected model reads two-factor short-rate volatility.
-///
-/// That path reads its short-rate volatility from `model_config.hw1f_sigma`
-/// and ignores (in fact rejects) `market_quotes.implied_volatility`, so a vega
-/// bump has to move the field the model actually consumes. Bumping the wrong
-/// channel would report a silently zero vega on every credit-risky callable.
-fn uses_hw_sigma(bond: &Bond, model: ModelKey) -> bool {
-    model == ModelKey::RatesCredit
-        || (model == ModelKey::Tree
-            && !matches!(
-                bond.instrument_pricing_overrides.model_config.vol_model,
-                Some(crate::instruments::common_impl::parameters::VolatilityModel::Black)
-            )
-            && bond
-                .instrument_pricing_overrides
-                .model_config
-                .hw1f_sigma
-                .is_some())
+/// The short-rate volatility input the selected bond model reads.
+#[derive(Debug, Clone, Copy)]
+enum ShortRateSigma {
+    /// Rates-credit lattice: `model_config.hw1f_sigma` (unset means 0).
+    RatesCredit,
+    /// Rates-only Hull-White tree with the resolved mean reversion, pinned on
+    /// every bumped clone so the bump moves σ alone.
+    HullWhite { kappa: f64 },
+    /// Rates-only Black-Derman-Toy tree: `model_config.bdt_sigma`.
+    BlackDermanToy,
 }
 
-/// Base short-rate volatility read by the selected model.
-fn base_rate_volatility(bond: &Bond, model: ModelKey) -> finstack_quant_core::Result<f64> {
-    if uses_hw_sigma(bond, model) {
-        Ok(bond
+/// Resolve which volatility input the model reads, and its base value.
+fn short_rate_sigma(
+    bond: &Bond,
+    context: &MetricContext,
+    model: ModelKey,
+) -> finstack_quant_core::Result<(ShortRateSigma, f64)> {
+    if model == ModelKey::RatesCredit {
+        let sigma = bond
             .instrument_pricing_overrides
             .model_config
             .hw1f_sigma
-            .unwrap_or(0.0))
-    } else {
-        Ok(bond_tree_config(bond)?.volatility)
+            .unwrap_or(0.0);
+        return Ok((ShortRateSigma::RatesCredit, sigma));
+    }
+    match bond_tree_config(bond, context.curves.as_ref())?.tree_model {
+        TreeModelChoice::HullWhite { kappa, sigma } => {
+            Ok((ShortRateSigma::HullWhite { kappa }, sigma))
+        }
+        TreeModelChoice::BlackDermanToy { sigma } => Ok((ShortRateSigma::BlackDermanToy, sigma)),
+        TreeModelChoice::HoLee => Err(finstack_quant_core::Error::Validation(format!(
+            "bond '{}' vega: the tree selected no short-rate volatility input",
+            bond.id
+        ))),
     }
 }
 
@@ -58,17 +65,19 @@ fn holder_option_value_at_vol(
     bond: &Bond,
     context: &MetricContext,
     model: ModelKey,
+    channel: ShortRateSigma,
     oas_decimal: f64,
     volatility: f64,
 ) -> finstack_quant_core::Result<f64> {
     let mut bumped = bond.clone();
-    if uses_hw_sigma(bond, model) {
-        bumped.instrument_pricing_overrides.model_config.hw1f_sigma = Some(volatility);
-    } else {
-        bumped
-            .instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility = Some(volatility);
+    let model_config = &mut bumped.instrument_pricing_overrides.model_config;
+    match channel {
+        ShortRateSigma::RatesCredit => model_config.hw1f_sigma = Some(volatility),
+        ShortRateSigma::HullWhite { kappa } => {
+            model_config.hw1f_mean_reversion = Some(kappa);
+            model_config.hw1f_sigma = Some(volatility);
+        }
+        ShortRateSigma::BlackDermanToy => model_config.bdt_sigma = Some(volatility),
     }
     clear_price_driving_overrides(&mut bumped);
     bumped.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_decimal);
@@ -79,9 +88,7 @@ fn holder_option_value_at_vol(
     };
     // Remove only the exercise rights. Keep the bumped rate volatility and
     // every credit-model input so this is the straight-bond value under the
-    // same stochastic rates-credit process. In particular, stamping the
-    // legacy `implied_volatility` field here makes the rates-credit path reject
-    // an otherwise valid `hw1f_sigma` configuration.
+    // same stochastic rates-credit process.
     bumped.call_put = None;
     bumped.return_floor = None;
     let price_straight = if context.pricing_model().is_some() {
@@ -114,43 +121,22 @@ impl MetricCalculator for BondVegaCalculator {
             context.get_metric_overrides(),
         )?;
         let bump = defaults.vol_bump_pct;
-        let base_vol = base_rate_volatility(bond, model)?;
-        // On the rates-credit path the canonical field is itself the source
-        // quote, so there is no quote-to-model conversion to undo.
-        let source_vol = if uses_hw_sigma(bond, model) {
-            None
-        } else {
-            bond.instrument_pricing_overrides
-                .market_quotes
-                .implied_volatility
-                .filter(|source_vol| source_vol.is_finite() && *source_vol > 0.0)
-        };
-        let model_bump = source_vol.map_or(bump, |source_vol| bump * base_vol / source_vol);
-        let down_vol = (base_vol - model_bump).max(1e-8);
-        let up_vol = base_vol + model_bump;
+        let (channel, base_vol) = short_rate_sigma(bond, context, model)?;
+        let down_vol = (base_vol - bump).max(1e-8);
+        let up_vol = base_vol + bump;
         let oas_decimal = resolve_oas_decimal(bond, context)?;
 
-        let up = holder_option_value_at_vol(bond, context, model, oas_decimal, up_vol)?;
-        let down = holder_option_value_at_vol(bond, context, model, oas_decimal, down_vol)?;
-        let effective_model_bump = up_vol - down_vol;
-        if effective_model_bump.abs() < f64::EPSILON {
+        let up = holder_option_value_at_vol(bond, context, model, channel, oas_decimal, up_vol)?;
+        let down =
+            holder_option_value_at_vol(bond, context, model, channel, oas_decimal, down_vol)?;
+        let width = up_vol - down_vol;
+        if width.abs() < f64::EPSILON {
             return Ok(0.0);
         }
 
-        // Bloomberg OAS screens display bond vega in price points for a 1 vol point
-        // move in the source volatility quote. When a source implied vol is
-        // provided alongside a converted tree vol, `model_bump` maps that quote
-        // bump into the tree's volatility units.
-        let source_width = source_vol
-            .filter(|_| base_vol.is_finite() && base_vol.abs() > f64::EPSILON)
-            .map_or(effective_model_bump, |source_vol| {
-                effective_model_bump * source_vol / base_vol
-            });
-        if source_width.abs() < f64::EPSILON {
-            return Ok(0.0);
-        }
-
-        Ok((up - down) / bond.notional.amount() * 100.0 / source_width * 0.01)
+        // Bloomberg OAS screens display bond vega in price points for a 1 vol
+        // point move in the model's short-rate volatility.
+        Ok((up - down) / bond.notional.amount() * 100.0 / width * 0.01)
     }
 }
 
@@ -196,7 +182,7 @@ mod tests {
         bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
             .with_quoted_oas(0.0)
             .with_hw1f_sigma(0.01)
-            .with_hazard_volatility(0.005)
+            .with_hazard_sigma(0.005)
             .with_tree_steps(16)
             .with_mc_paths(128);
 
@@ -274,8 +260,12 @@ mod tests {
         });
         clean_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
             .with_quoted_clean_price(100.0)
-            .with_implied_vol(0.01)
+            .with_hw1f_sigma(0.01)
             .with_tree_steps(16);
+        clean_bond
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.03);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)

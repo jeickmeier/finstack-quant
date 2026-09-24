@@ -619,8 +619,8 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                         correlation_matrix: None,
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.01),
                         interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {
-                            kappa: 0.03,
-                            sigma,
+                            hw1f_mean_reversion: 0.03,
+                            hw1f_sigma: sigma,
                             initial: 0.04,
                             theta: 0.04,
                         }),

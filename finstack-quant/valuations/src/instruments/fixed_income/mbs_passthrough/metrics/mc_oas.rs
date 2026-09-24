@@ -58,9 +58,9 @@ pub(crate) struct McOasConfig {
     /// If None, uses the MBS WAM.
     pub num_steps: Option<usize>,
     /// Hull-White mean reversion speed κ (default: 0.05).
-    pub hw_kappa: f64,
+    pub hw1f_mean_reversion: f64,
     /// Hull-White short-rate volatility σ (default: 0.01).
-    pub hw_sigma: f64,
+    pub hw1f_sigma: f64,
     /// Prepayment rate sensitivity to interest rates β
     /// (default: [`super::PREPAY_RATE_SENSITIVITY`] ≈ 69.3, the same
     /// refi-incentive doubling per 100 bp used by the effective
@@ -78,8 +78,8 @@ impl Default for McOasConfig {
         Self {
             num_paths: 512,
             num_steps: None,
-            hw_kappa: 0.05,
-            hw_sigma: 0.01,
+            hw1f_mean_reversion: 0.05,
+            hw1f_sigma: 0.01,
             prepay_rate_sensitivity: super::PREPAY_RATE_SENSITIVITY,
             seed: 42,
             tolerance: 1e-7,
@@ -400,7 +400,7 @@ pub(crate) fn calculate_mc_oas(
     // simulated short rate reprices the curve (a constant θ from a single 5Y
     // zero leaves the model arbitrageable against the input curve).
     let initial_rate = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
-    let hw_params = HullWhiteCalibrationParams::new(config.hw_kappa, config.hw_sigma)?;
+    let hw_params = HullWhiteCalibrationParams::new(config.hw1f_mean_reversion, config.hw1f_sigma)?;
     let horizon = num_steps as f64 / 12.0;
     let hw1f = prepare_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
 
@@ -660,7 +660,8 @@ mod tests {
 
         let curve = market.get_discount(&mbs.discount_curve_id).expect("curve");
         let initial_rate = initial_short_rate_from_curve(curve.as_ref(), as_of).expect("r0");
-        let hw = HullWhiteCalibrationParams::new(config.hw_kappa, config.hw_sigma).expect("hw");
+        let hw = HullWhiteCalibrationParams::new(config.hw1f_mean_reversion, config.hw1f_sigma)
+            .expect("hw");
         let hw1f = prepare_hw1f_params(hw, curve.as_ref(), as_of, 30.0).expect("theta prepared");
         let paths = simulate_rate_paths(initial_rate, &hw1f, 64, 360, config.seed);
         let steps = mc_step_schedule(&mbs, as_of, 360, curve.day_count()).expect("steps");
@@ -1025,7 +1026,7 @@ mod production_mortgage_audit {
         let clean = (dirty - accrued) / mbs.current_face.amount() * 100.0;
         let config = McOasConfig {
             num_paths: 2,
-            hw_sigma: 1e-10,
+            hw1f_sigma: 1e-10,
             ..McOasConfig::default()
         };
         let oas = calculate_mc_oas(&mbs, clean, &market, as_of, &config).expect("oas");
@@ -1054,7 +1055,7 @@ mod production_mortgage_audit {
         let quote = 99.5;
         let config = McOasConfig {
             num_paths: 2,
-            hw_sigma: 1e-10,
+            hw1f_sigma: 1e-10,
             ..McOasConfig::default()
         };
         let oas_at = |as_of: Date| {

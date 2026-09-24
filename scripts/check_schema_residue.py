@@ -173,6 +173,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"(?:freq|dc|bdc|asof_spreads|surface_ids|initial_market|rate_calibration_recipe|num_skipped|"
             r"spot_ids|equity_instruments|dual_values|cache_budget_mb|deprecated_ids|bilateral_cva|"
             r"rho_bump_decimal|vega_bump_decimal|ytm_bump_decimal|credit_bump_bp|"
+            r"hw_kappa|hw_sigma|hazard_volatility|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

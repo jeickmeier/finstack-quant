@@ -1544,13 +1544,12 @@
         "forward_curve_id": "USD-SOFRRATE",
         "instrument_pricing_overrides": {
           "market_quotes": {
-            "quoted_clean_price": 103.3975,
-            "implied_volatility": 0.2223
+            "quoted_clean_price": 103.3975
           },
           "model_config": {
             "tree_steps": 200,
             "vol_model": "black",
-            "mean_reversion": 0.0,
+            "bdt_sigma": 0.2223,
             "tree_discount_curve_id": "USD-OAS-S23",
             "oas_quote_compounding": "semi_annual",
             "oas_price_basis": "forward_accrued_clean"

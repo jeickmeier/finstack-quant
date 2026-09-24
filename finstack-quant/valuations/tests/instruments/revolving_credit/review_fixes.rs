@@ -396,8 +396,8 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
         correlation_matrix: None,
         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
         interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {
-            kappa: 0.05,
-            sigma: 1e-6,
+            hw1f_mean_reversion: 0.05,
+            hw1f_sigma: 1e-6,
             initial: 0.05,
             theta: 0.05,
         }),

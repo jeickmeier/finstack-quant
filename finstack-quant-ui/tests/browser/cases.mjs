@@ -15,7 +15,7 @@ export async function pricingCases() {
     issue_date: "2025-01-01",
     maturity: "2026-01-01",
     instrument_pricing_overrides: {
-      model_config: { hazard_volatility: 0.01, mc_paths: 8, tree_steps: 4 },
+      model_config: { hazard_sigma: 0.01, mc_paths: 8, tree_steps: 4 },
     },
   });
   const market = (await read("fixtures/production_cds_option.json")).market;

@@ -34,7 +34,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         return Ok(None);
     };
     let config =
-        crate::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config(bond)?;
+        crate::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_settings(bond);
     let quote_context =
         crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext::new(
             bond,
@@ -79,9 +79,14 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             .scenario_spread_shock_bp
             .is_none()
     {
-        use crate::instruments::fixed_income::bond::pricing::engine::tree::TreePricer;
+        use crate::instruments::fixed_income::bond::pricing::engine::tree::{
+            bond_tree_config, TreePricer,
+        };
         match model {
-            crate::pricer::ModelKey::Tree => Some(TreePricer::with_config(config.clone())),
+            crate::pricer::ModelKey::Tree => Some(TreePricer::with_config(bond_tree_config(
+                bond,
+                context.curves.as_ref(),
+            )?)),
             crate::pricer::ModelKey::RatesCredit => Some(TreePricer::rates_credit(config.clone())),
             _ => None,
         }
@@ -286,7 +291,8 @@ mod tests {
             }),
         );
         bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-            .with_implied_vol(0.01)
+            .with_hw1f_sigma(0.01)
+            .with_hw1f_mean_reversion(0.03)
             .with_tree_steps(16);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("USD-OIS")

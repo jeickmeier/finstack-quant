@@ -1391,6 +1391,18 @@ export interface D_572Ad1Befb7D94914652 {
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
+   * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
+   * decimal proportion of the short rate (`0.20` = 20%).
+   *
+   * Read only by the rates-only bond tree when `vol_model = black` selects
+   * BDT for a bond with embedded exercise rights, where it is required.
+   * It is a relative (lognormal) volatility, unlike the absolute
+   * [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
+   * no mean reversion. Must be finite and non-negative; `0.0` prices on the
+   * deterministic curve.
+   */
+  bdt_sigma?: number | null;
+  /**
    * Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.
    *
    * This models the real-world costs of refinancing / reissue (fees, OID, documentation),
@@ -1462,7 +1474,7 @@ export interface D_572Ad1Befb7D94914652 {
    * instrument; setting it without one is a validation error rather than a
    * silent no-op.
    */
-  hazard_volatility?: number | null;
+  hazard_sigma?: number | null;
   /**
    * Hull-White 1F mean-reversion speed override (κ), in annualised units.
    *
@@ -1484,14 +1496,19 @@ export interface D_572Ad1Befb7D94914652 {
    *
    * This override is valid only with [`Self::hw1f_mean_reversion`]. Pricing
    * requires a complete, positive, finite parameter pair (or a complete
-   * pre-fitted pair/schedule in the market context); partial inputs are
+   * pre-fitted pair/schedule in the market context), except for the
+   * explicit zero the bond lattices accept (below); partial inputs are
    * rejected and no volatility surface is queried.
    *
-   * This is the canonical short-rate volatility field for the
-   * **rates-credit** callable path (`credit_curve_id` set): that path reads
-   * only `hw1f_sigma`/`hw1f_mean_reversion` and rejects the legacy
-   * `implied_volatility`/`mean_reversion` channel rather than silently
-   * reinterpreting it. Its mean reversion is additionally capped by
+   * This is the only short-rate volatility input of both bond lattices:
+   * the rates-only Hull-White tree (callable bond without
+   * `credit_curve_id`) and the **rates-credit** callable path. Neither
+   * reads `implied_volatility`, which is an option quote; the rates-credit
+   * path rejects it outright. On both bond lattices an explicit `0.0`
+   * selects deterministic rates (the rates-only tree still requires a
+   * positive `hw1f_mean_reversion`); it is the only rates-only setting
+   * that prices floating coupons. The rates-credit mean reversion is
+   * additionally capped by
    * [`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX);
    * Hull-White trees on other paths keep their own wider range.
    */
@@ -1539,17 +1556,6 @@ export interface D_572Ad1Befb7D94914652 {
    * and validates this target against the final 95% confidence interval.
    */
   mc_target_ci_half_width?: number | null;
-  /**
-   * Mean reversion speed for Hull-White tree model (annualized).
-   *
-   * When set with Ho-Lee model, transforms the tree into Hull-White 1F:
-   * `dr = [theta(t) - a*r] dt + sigma dW`
-   *
-   * Typical values: 0.01-0.10 (1-10% per year). Higher values produce
-   * tighter rate dispersion at long maturities.
-   * When `None` or zero, the tree uses pure Ho-Lee dynamics (no mean reversion).
-   */
-  mean_reversion?: number | null;
   /**
    * Merton Monte Carlo configuration for structural credit PIK pricing.
    *

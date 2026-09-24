@@ -454,30 +454,30 @@
       "properties": {
         "hull_white_1f": {
           "properties": {
+            "hw1f_mean_reversion": {
+              "description": "Hull-White 1F mean reversion speed κ, per year.",
+              "format": "double",
+              "type": "number"
+            },
+            "hw1f_sigma": {
+              "description": "Hull-White 1F short-rate volatility σ, absolute annual decimal\n(`0.01` = 100 bp).",
+              "format": "double",
+              "type": "number"
+            },
             "initial": {
-              "description": "Initial short rate used only when `sigma == 0`. For a stochastic\nprocess, the pricer derives the initial rate from the facility's\ndiscount curve at the valuation anchor.",
-              "format": "double",
-              "type": "number"
-            },
-            "kappa": {
-              "description": "Mean reversion speed (κ)",
-              "format": "double",
-              "type": "number"
-            },
-            "sigma": {
-              "description": "Volatility (σ)",
+              "description": "Initial short rate used only when `hw1f_sigma == 0`. For a stochastic\nprocess, the pricer derives the initial rate from the facility's\ndiscount curve at the valuation anchor.",
               "format": "double",
               "type": "number"
             },
             "theta": {
-              "description": "Constant mean reversion level used only when `sigma == 0`. For a\nstochastic process, the pricer fits a time-dependent θ(t) to the\nfacility's discount curve.",
+              "description": "Constant mean reversion level used only when `hw1f_sigma == 0`. For a\nstochastic process, the pricer fits a time-dependent θ(t) to the\nfacility's discount curve.",
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "kappa",
-            "sigma",
+            "hw1f_mean_reversion",
+            "hw1f_sigma",
             "initial",
             "theta"
           ],

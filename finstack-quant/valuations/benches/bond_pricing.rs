@@ -254,8 +254,10 @@ fn create_callable_bond(maturity_years: i32) -> Bond {
         }
     }
 
-    bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
+        .with_quoted_clean_price(99.0)
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
     bond
 }
 
@@ -356,9 +358,10 @@ fn bench_tree_step_scaling(c: &mut Criterion) {
 
     let mut bond = create_callable_bond(10);
     bond.instrument_pricing_overrides.model_config.tree_steps = Some(100);
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
 
     let steps = 100;
     group.bench_with_input(
@@ -482,7 +485,7 @@ fn create_stochastic_hazard_callable(
     });
     let model = &mut bond.instrument_pricing_overrides.model_config;
     model.hw1f_sigma = Some(0.01);
-    model.hazard_volatility = Some(0.02);
+    model.hazard_sigma = Some(0.02);
     model.rate_credit_correlation = Some(0.25);
     model.mc_paths = Some(paths);
     model.mc_antithetic = Some(true);
@@ -534,7 +537,8 @@ fn create_call_window_bond() -> Bond {
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(99.0)
-        .with_implied_vol(0.01);
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
     bond
 }
 

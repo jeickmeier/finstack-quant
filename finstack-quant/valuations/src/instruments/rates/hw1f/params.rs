@@ -87,18 +87,24 @@ pub fn resolve_hw1f_params(
 ) -> Result<HullWhiteCalibrationParams> {
     if config.hw1f_sigma_schedule.is_some() {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "{context}: this Hull-White pricing path requires scalar volatility; hw1f_sigma_schedule requires a schedule-capable engine"
+            "{context}: this Hull-White pricing path requires scalar volatility; instrument_pricing_overrides.model_config.hw1f_sigma_schedule requires a schedule-capable engine"
         )));
     }
-    let override_kappa = override_positive_f64(config.hw1f_mean_reversion, "hw1f_kappa")?;
-    let override_sigma = override_positive_f64(config.hw1f_sigma, "hw1f_sigma")?;
+    let override_kappa = override_positive_f64(
+        config.hw1f_mean_reversion,
+        "instrument_pricing_overrides.model_config.hw1f_mean_reversion",
+    )?;
+    let override_sigma = override_positive_f64(
+        config.hw1f_sigma,
+        "instrument_pricing_overrides.model_config.hw1f_sigma",
+    )?;
     match (override_kappa, override_sigma) {
         (Some(kappa), Some(sigma)) => return HullWhiteCalibrationParams::new(kappa, sigma),
         (None, None) => {}
         (kappa, sigma) => {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context}: partial HW1F override (hw1f_kappa={kappa:?}, hw1f_sigma={sigma:?}); \
-                 supply both positive finite parameters"
+                "{context}: partial HW1F override (instrument_pricing_overrides.model_config.hw1f_mean_reversion={kappa:?}, \
+                 instrument_pricing_overrides.model_config.hw1f_sigma={sigma:?}); supply both positive finite parameters"
             )));
         }
     }
@@ -118,8 +124,8 @@ pub fn resolve_hw1f_params(
     match (kappa, sigma) {
         (Some(kappa), Some(sigma)) => HullWhiteCalibrationParams::new(kappa, sigma),
         (None, None) => Err(finstack_quant_core::Error::Validation(format!(
-            "{context}: missing HW1F parameters for curve '{curve_id}'; provide both hw1f_kappa and \
-             hw1f_sigma overrides or pre-calibrate market scalars '{kappa_key}' and '{sigma_key}'"
+            "{context}: missing HW1F parameters for curve '{curve_id}'; provide both \
+             instrument_pricing_overrides.model_config.hw1f_mean_reversion and instrument_pricing_overrides.model_config.hw1f_sigma or pre-calibrate market scalars '{kappa_key}' and '{sigma_key}'"
         ))),
         (kappa, sigma) => Err(finstack_quant_core::Error::Validation(format!(
             "{context}: partial calibrated HW1F scalars for curve '{curve_id}' \

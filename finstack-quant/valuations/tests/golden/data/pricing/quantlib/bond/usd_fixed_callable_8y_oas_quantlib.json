@@ -44,11 +44,11 @@
         "id": "USD-FIXED-CALLABLE-8Y-OAS-QUANTLIB",
         "instrument_pricing_overrides": {
           "market_quotes": {
-            "implied_volatility": 0.01,
             "quoted_clean_price": 98.72972501905866
           },
           "model_config": {
-            "mean_reversion": 0.03,
+            "hw1f_mean_reversion": 0.03,
+            "hw1f_sigma": 0.01,
             "oas_quote_compounding": "continuous",
             "tree_discount_curve_id": "USD-OIS",
             "tree_steps": 200

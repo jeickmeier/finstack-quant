@@ -955,6 +955,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_forward_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
+    "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `vol_model = black` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/call_friction_cents",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/call_friction_cents",
     "default": null,
@@ -980,8 +986,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/hazard_volatility",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/hazard_volatility",
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/hazard_sigma",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/hazard_sigma",
     "description": "Credit hazard-rate volatility for the two-factor rates-credit callable\nlattice (σ_λ), annualised, in **absolute** decimal hazard-rate points\nper √year.\n\nThis is an additive-normal hazard volatility on the same scale as the\nhazard rate itself: `0.02` means the instantaneous hazard diffuses by\nabout 2 percentage points of hazard per √year. It is **not** a relative\nor lognormal credit-spread volatility — inserting a CDS-option quote\nsuch as `0.35` here would be roughly an order of magnitude too large.\nConvert a fractional spread vol first (see\n[`models::credit::market_anchored`](finstack_quant_models::credit::market_anchored)):\n`σ_λ = σ_fractional · λ_ref`.\n\n`None` and `0.0` are equivalent and both mean a **deterministic** credit\nfactor: the lattice still reprices the survival curve exactly, it just\ncarries no hazard diffusion. Requires `credit_curve_id` on the\ninstrument; setting it without one is a validation error rather than a\nsilent no-op.",
     "format": "double"
   },
@@ -994,7 +1000,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/hw1f_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/hw1f_sigma",
-    "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nThis override is valid only with [`Self::hw1f_mean_reversion`]. Pricing\nrequires a complete, positive, finite parameter pair (or a complete\npre-fitted pair/schedule in the market context); partial inputs are\nrejected and no volatility surface is queried.\n\nThis is the canonical short-rate volatility field for the\n**rates-credit** callable path (`credit_curve_id` set): that path reads\nonly `hw1f_sigma`/`hw1f_mean_reversion` and rejects the legacy\n`implied_volatility`/`mean_reversion` channel rather than silently\nreinterpreting it. Its mean reversion is additionally capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX);\nHull-White trees on other paths keep their own wider range.",
+    "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nThis override is valid only with [`Self::hw1f_mean_reversion`]. Pricing\nrequires a complete, positive, finite parameter pair (or a complete\npre-fitted pair/schedule in the market context), except for the\nexplicit zero the bond lattices accept (below); partial inputs are\nrejected and no volatility surface is queried.\n\nThis is the only short-rate volatility input of both bond lattices:\nthe rates-only Hull-White tree (callable bond without\n`credit_curve_id`) and the **rates-credit** callable path. Neither\nreads `implied_volatility`, which is an option quote; the rates-credit\npath rejects it outright. On both bond lattices an explicit `0.0`\nselects deterministic rates (the rates-only tree still requires a\npositive `hw1f_mean_reversion`); it is the only rates-only setting\nthat prices floating coupons. The rates-credit mean reversion is\nadditionally capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX);\nHull-White trees on other paths keep their own wider range.",
     "format": "double"
   },
   {
@@ -1034,13 +1040,6 @@ export default [
     "path": "#/$defs/d_572ad1befb7d94914652/properties/mc_target_ci_half_width",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/mc_target_ci_half_width",
     "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/mean_reversion",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/mean_reversion",
-    "default": null,
-    "description": "Mean reversion speed for Hull-White tree model (annualized).\n\nWhen set with Ho-Lee model, transforms the tree into Hull-White 1F:\n`dr = [theta(t) - a*r] dt + sigma dW`\n\nTypical values: 0.01-0.10 (1-10% per year). Higher values produce\ntighter rate dispersion at long maturities.\nWhen `None` or zero, the tree uses pure Ho-Lee dynamics (no mean reversion).",
     "format": "double"
   },
   {

@@ -39,9 +39,10 @@ fn test_callable_bond_basic() {
         price_pct_of_par: 102.0,
         make_whole: None,
     });
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(schedule);
 
     let market = create_curve(as_of);
@@ -72,9 +73,10 @@ fn test_putable_bond_basic() {
         price_pct_of_par: 98.0,
         make_whole: None,
     });
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(schedule);
 
     let market = create_curve(as_of);

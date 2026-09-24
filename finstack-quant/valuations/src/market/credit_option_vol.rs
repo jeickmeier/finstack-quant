@@ -96,7 +96,7 @@ pub struct HazardVolatilityQuote {
     /// Reference par spread implied by the credit triangle.
     pub reference_spread: f64,
     /// Additive hazard volatility for the callable lattice's
-    /// `hazard_volatility` input.
+    /// `model_config.hazard_sigma` input.
     pub hazard_volatility: f64,
     /// Full conversion diagnostics.
     pub conversion: CreditVolatilityConversion,

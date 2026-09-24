@@ -793,7 +793,11 @@ mod tests {
             "plain bond price should be positive"
         );
 
-        let floored = fixed_10pct_bullet().min_moic(1.25);
+        let mut floored = fixed_10pct_bullet().min_moic(1.25);
+        floored.instrument_pricing_overrides =
+            crate::instruments::InstrumentPricingOverrides::default()
+                .with_hw1f_sigma(0.01)
+                .with_hw1f_mean_reversion(0.03);
         let price_floored = floored.base_value(&market, as_of).unwrap();
         assert!(
             price_floored.amount() > 0.0,

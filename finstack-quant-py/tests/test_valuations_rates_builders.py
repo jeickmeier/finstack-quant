@@ -445,7 +445,12 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
     callable_result = callable_bond.price(market, AS_OF, model="rates_credit")
     puttable_result = puttable_bond.price(market, AS_OF, model="rates_credit")
     hazard_result = bullet.price(market, AS_OF, model="hazard_rate")
-    tree_result = callable_bond.price(market, AS_OF, model="tree")
+    # The rates-only tree needs an explicit Hull-White pair.
+    tree_document = json.loads(callable_bond.to_json())
+    tree_document["instrument"]["spec"]["instrument_pricing_overrides"] = {
+        "model_config": {"hw1f_mean_reversion": 0.03, "hw1f_sigma": 0.01}
+    }
+    tree_result = price_instrument(json.dumps(tree_document), market, AS_OF, model="tree")
     assert bullet_result.currency == "USD"
     assert 0.0 < callable_result.price < bullet_result.price < puttable_result.price < 1_500_000.0
     assert 0.0 < hazard_result.price < 1_500_000.0
@@ -463,7 +468,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
     stochastic_spec = stochastic_document["instrument"]["spec"]
     stochastic_spec["maturity"] = "2026-01-15"
     stochastic_spec["instrument_pricing_overrides"] = {
-        "model_config": {"hazard_volatility": 0.01, "mc_paths": 2, "tree_steps": 4}
+        "model_config": {"hazard_sigma": 0.01, "mc_paths": 2, "tree_steps": 4}
     }
     stochastic_result = price_instrument(json.dumps(stochastic_document), market, AS_OF, model="rates_credit")
     assert stochastic_result.details is not None

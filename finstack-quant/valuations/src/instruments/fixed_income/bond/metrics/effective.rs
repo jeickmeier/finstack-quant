@@ -232,9 +232,10 @@ mod tests {
             price_pct_of_par: 100.0,
             make_whole: None,
         });
+        bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
         bond.instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility = Some(0.01);
+            .model_config
+            .hw1f_mean_reversion = Some(0.03);
         bond.call_put = Some(schedule);
         bond
     }
@@ -360,9 +361,10 @@ mod tests {
             price_pct_of_par: 100.0,
             make_whole: None,
         });
+        bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
         bond.instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility = Some(0.01);
+            .model_config
+            .hw1f_mean_reversion = Some(0.03);
         bond.call_put = Some(schedule);
 
         let shock_bp = 25.0;
@@ -454,9 +456,10 @@ mod tests {
             price_pct_of_par: 100.0,
             make_whole: None,
         });
+        bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
         bond.instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility = Some(0.01);
+            .model_config
+            .hw1f_mean_reversion = Some(0.03);
         bond.call_put = Some(schedule);
 
         let shock_bp = 25.0;
@@ -505,7 +508,7 @@ mod tests {
             .with_tree_steps(1)
             .with_mc_paths(8);
         overrides.model_config.hw1f_sigma = Some(0.01);
-        overrides.model_config.hazard_volatility = Some(0.01);
+        overrides.model_config.hazard_sigma = Some(0.01);
         let mut bond = Bond::builder()
             .id("CALLABLE-OAS-AFTER-FINAL-CASH".into())
             .notional(Money::from((1_000_i64, Currency::USD)))

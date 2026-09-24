@@ -97,6 +97,10 @@ function bondInstrumentJson(returnFloor = null) {
     discount_curve_id: 'USD-OIS',
     settlement_days: 0,
     ex_coupon_days: 0,
+    // The tree model prices on an explicit Hull-White short rate.
+    instrument_pricing_overrides: {
+      model_config: { hw1f_mean_reversion: 0.03, hw1f_sigma: 0.01 },
+    },
     attributes: {},
   };
   if (returnFloor !== null) {

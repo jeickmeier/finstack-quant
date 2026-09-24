@@ -34,9 +34,10 @@ fn build_callable_credit_bond(as_of: time::Date) -> Bond {
     .expect("callable credit bond should build");
     bond.settlement_convention = None;
     bond.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2026 - 01 - 01),
@@ -190,7 +191,12 @@ fn test_unquoted_callable_explicit_models_skip_quote_spread_dependencies() {
         .iter()
         .any(|(key, value)| { key.as_str().starts_with("bucketed_dv01::") && value.abs() > 1e-6 }));
 
-    let tree = bond
+    // The rates-only tree requires a positive Hull-White pair.
+    let mut tree_bond = bond;
+    tree_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
+    let tree = tree_bond
         .price_with_metrics(
             &market,
             as_of,

@@ -141,9 +141,7 @@ fn price_estimate(
 ) -> (f64, f64) {
     let mut bond = bond.clone();
     bond.instrument_pricing_overrides.model_config.hw1f_sigma = sigma;
-    bond.instrument_pricing_overrides
-        .model_config
-        .hazard_volatility = hazard_vol;
+    bond.instrument_pricing_overrides.model_config.hazard_sigma = hazard_vol;
     bond.instrument_pricing_overrides
         .model_config
         .rate_credit_correlation = rho;

@@ -265,7 +265,7 @@ mod tests {
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::bond::pricing::engine::discount::BondEngine;
     use crate::instruments::fixed_income::bond::pricing::engine::tree::{
-        bond_tree_config, TreePricer,
+        bond_tree_settings, TreePricer,
     };
     use crate::instruments::fixed_income::bond::{
         BondSettlementConvention, CallPut, CallPutSchedule, CashflowSpec,
@@ -481,7 +481,20 @@ mod tests {
             puts: Vec::new(),
         });
 
-        let discount_only = MarketContext::new().insert(build_flat_discount(issue));
+        // The rates-only tree reads its Hull-White pair from the pre-fitted
+        // market scalars, leaving the joint model's overrides deterministic.
+        let (kappa_key, sigma_key) =
+            finstack_quant_models::rates::hull_white::hw1f_scalar_keys("USD-OIS");
+        let discount_only = MarketContext::new()
+            .insert(build_flat_discount(issue))
+            .insert_price(
+                kappa_key.as_str(),
+                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.03),
+            )
+            .insert_price(
+                sigma_key.as_str(),
+                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.01),
+            );
         let credit_market = MarketContext::new()
             .insert(build_flat_discount(issue))
             .insert(build_flat_hazard("USD-CREDIT", issue, 0.02, 0.4));
@@ -660,9 +673,7 @@ mod tests {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
         let mut bond = build_test_bond(issue, maturity);
-        bond.instrument_pricing_overrides
-            .model_config
-            .hazard_volatility = Some(0.01);
+        bond.instrument_pricing_overrides.model_config.hazard_sigma = Some(0.01);
         bond.instrument_pricing_overrides.model_config.mc_paths = Some(8);
         bond.instrument_pricing_overrides.model_config.tree_steps = Some(4);
         let market = MarketContext::new()
@@ -715,9 +726,7 @@ mod tests {
             settlement_days: 2,
             ..Default::default()
         });
-        bond.instrument_pricing_overrides
-            .model_config
-            .hazard_volatility = Some(0.01);
+        bond.instrument_pricing_overrides.model_config.hazard_sigma = Some(0.01);
         bond.instrument_pricing_overrides.model_config.mc_paths = Some(32);
         bond.instrument_pricing_overrides.model_config.tree_steps = Some(4);
         bond.instrument_pricing_overrides.market_quotes.quoted_oas = Some(0.0025);
@@ -737,11 +746,9 @@ mod tests {
             .expect("stochastic quoted-OAS hazard price");
 
         assert!(result.value.amount().is_finite());
-        let expected_direct = TreePricer::rates_credit(
-            bond_tree_config(&bond).expect("quoted-OAS tree configuration"),
-        )
-        .price_at_oas(&bond, &market, issue, 25.0)
-        .expect("direct as-of quoted-OAS value");
+        let expected_direct = TreePricer::rates_credit(bond_tree_settings(&bond))
+            .price_at_oas(&bond, &market, issue, 25.0)
+            .expect("direct as-of quoted-OAS value");
         assert!(
             (result.value.amount() - expected_direct).abs() < 1.0e-10,
             "quoted OAS must price on the as-of tree kernel rather than a settlement-date carry"

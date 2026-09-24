@@ -87,9 +87,9 @@ fn mc_oas_config(mbs: &AgencyMbsPassthrough) -> finstack_quant_core::Result<McOa
     }
     match (model.hw1f_mean_reversion, model.hw1f_sigma) {
         (None, None) => Ok(McOasConfig::default()),
-        (Some(hw_kappa), Some(hw_sigma)) => Ok(McOasConfig {
-            hw_kappa,
-            hw_sigma,
+        (Some(hw1f_mean_reversion), Some(hw1f_sigma)) => Ok(McOasConfig {
+            hw1f_mean_reversion,
+            hw1f_sigma,
             ..McOasConfig::default()
         }),
         _ => Err(finstack_quant_core::Error::Validation(
@@ -289,8 +289,8 @@ mod tests {
             &market,
             as_of,
             &McOasConfig {
-                hw_kappa: 0.10,
-                hw_sigma: 0.015,
+                hw1f_mean_reversion: 0.10,
+                hw1f_sigma: 0.015,
                 ..McOasConfig::default()
             },
         )

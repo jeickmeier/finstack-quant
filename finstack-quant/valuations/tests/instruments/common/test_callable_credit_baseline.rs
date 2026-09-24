@@ -3,7 +3,7 @@
 //!
 //! These pin the PV/OAS numbers produced by the two-factor rates-credit
 //! model for a callable bond and a callable term loan. They exist so the
-//! public `hazard_volatility` / `rate_credit_correlation` inputs, the shared
+//! public `hazard_sigma` / `rate_credit_correlation` inputs, the shared
 //! resolver, and the deterministic seed remain wired consistently.
 //!
 //! The pinned regime is the one the engines used implicitly before the
@@ -141,7 +141,7 @@ fn apply_baseline_regime(
     overrides: &mut finstack_quant_valuations::instruments::InstrumentPricingOverrides,
 ) {
     overrides.model_config.hw1f_sigma = Some(BASELINE_RATE_VOL);
-    overrides.model_config.hazard_volatility = Some(BASELINE_HAZARD_VOL);
+    overrides.model_config.hazard_sigma = Some(BASELINE_HAZARD_VOL);
     // These tests pin routing and qualitative model behavior. A small,
     // deterministic sample keeps the integration suite fast; production uses
     // the full default budget unless callers override `mc_paths`.
@@ -242,9 +242,7 @@ fn all_four_regimes_are_selected_by_model_config_alone() {
     let price_in = |sigma: Option<f64>, hazard_vol: Option<f64>, rho: Option<f64>| -> f64 {
         let mut bond = callable_credit_bond();
         bond.instrument_pricing_overrides.model_config.hw1f_sigma = sigma;
-        bond.instrument_pricing_overrides
-            .model_config
-            .hazard_volatility = hazard_vol;
+        bond.instrument_pricing_overrides.model_config.hazard_sigma = hazard_vol;
         bond.instrument_pricing_overrides
             .model_config
             .rate_credit_correlation = rho;
@@ -298,11 +296,9 @@ fn hazard_inputs_without_a_credit_curve_fail_validation() {
     let market = market();
     for (label, apply) in [
         (
-            "hazard_volatility",
+            "hazard_sigma",
             Box::new(|b: &mut Bond| {
-                b.instrument_pricing_overrides
-                    .model_config
-                    .hazard_volatility = Some(0.02);
+                b.instrument_pricing_overrides.model_config.hazard_sigma = Some(0.02);
             }) as Box<dyn Fn(&mut Bond)>,
         ),
         (
@@ -336,6 +332,11 @@ fn hazard_inputs_without_a_credit_curve_fail_validation() {
             "default registry error must name the inert field and missing curve: {default_registry_message}"
         );
 
+        // The rates-only tree needs the complete Hull-White pair.
+        bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+        bond.instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.03);
         let explicit_tree = bond
             .price_with_metrics(
                 &market,

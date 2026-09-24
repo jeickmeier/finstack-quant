@@ -415,6 +415,9 @@ fn quote_engine_ytw_input_uses_callable_workout_inverse() {
     )
     .expect("bond");
     bond.settlement_convention = None;
+    bond.instrument_pricing_overrides = crate::instruments::InstrumentPricingOverrides::default()
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2027 - 01 - 15),

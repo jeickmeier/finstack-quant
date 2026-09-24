@@ -477,11 +477,11 @@ def build_fixed_callable_oas_bond() -> dict[str, Any]:
     spec["instrument_pricing_overrides"] = {
         "market_quotes": {
             "quoted_clean_price": clean_price,
-            "implied_volatility": volatility,
         },
         "model_config": {
             "tree_steps": 200,
-            "mean_reversion": mean_reversion,
+            "hw1f_mean_reversion": mean_reversion,
+            "hw1f_sigma": volatility,
             "tree_discount_curve_id": "USD-OIS",
             "oas_quote_compounding": "continuous",
         },

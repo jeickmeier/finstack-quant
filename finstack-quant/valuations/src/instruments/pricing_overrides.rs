@@ -430,15 +430,6 @@ pub struct ModelConfig {
     /// The friction affects the **exercise decision threshold**, but redemption still occurs
     /// at the contractual call price.
     pub call_friction_cents: Option<f64>,
-    /// Mean reversion speed for Hull-White tree model (annualized).
-    ///
-    /// When set with Ho-Lee model, transforms the tree into Hull-White 1F:
-    /// `dr = [theta(t) - a*r] dt + sigma dW`
-    ///
-    /// Typical values: 0.01-0.10 (1-10% per year). Higher values produce
-    /// tighter rate dispersion at long maturities.
-    /// When `None` or zero, the tree uses pure Ho-Lee dynamics (no mean reversion).
-    pub mean_reversion: Option<f64>,
     /// Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.
     ///
     /// This is the **short-rate** σ used directly in the HW1F stochastic differential
@@ -451,14 +442,19 @@ pub struct ModelConfig {
     ///
     /// This override is valid only with [`Self::hw1f_mean_reversion`]. Pricing
     /// requires a complete, positive, finite parameter pair (or a complete
-    /// pre-fitted pair/schedule in the market context); partial inputs are
+    /// pre-fitted pair/schedule in the market context), except for the
+    /// explicit zero the bond lattices accept (below); partial inputs are
     /// rejected and no volatility surface is queried.
     ///
-    /// This is the canonical short-rate volatility field for the
-    /// **rates-credit** callable path (`credit_curve_id` set): that path reads
-    /// only `hw1f_sigma`/`hw1f_mean_reversion` and rejects the legacy
-    /// `implied_volatility`/`mean_reversion` channel rather than silently
-    /// reinterpreting it. Its mean reversion is additionally capped by
+    /// This is the only short-rate volatility input of both bond lattices:
+    /// the rates-only Hull-White tree (callable bond without
+    /// `credit_curve_id`) and the **rates-credit** callable path. Neither
+    /// reads `implied_volatility`, which is an option quote; the rates-credit
+    /// path rejects it outright. On both bond lattices an explicit `0.0`
+    /// selects deterministic rates (the rates-only tree still requires a
+    /// positive `hw1f_mean_reversion`); it is the only rates-only setting
+    /// that prices floating coupons. The rates-credit mean reversion is
+    /// additionally capped by
     /// [`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX);
     /// Hull-White trees on other paths keep their own wider range.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -477,6 +473,17 @@ pub struct ModelConfig {
     /// scalar pair or volatility schedule. Typical values: 0.01–0.10.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hw1f_mean_reversion: Option<f64>,
+    /// Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
+    /// decimal proportion of the short rate (`0.20` = 20%).
+    ///
+    /// Read only by the rates-only bond tree when `vol_model = black` selects
+    /// BDT for a bond with embedded exercise rights, where it is required.
+    /// It is a relative (lognormal) volatility, unlike the absolute
+    /// [`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has
+    /// no mean reversion. Must be finite and non-negative; `0.0` prices on the
+    /// deterministic curve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bdt_sigma: Option<f64>,
     /// Pre-calibrated flat LMM forward-rate volatility loading scale.
     ///
     /// This is the positive annualized decimal scale applied to the Bermudan
@@ -503,7 +510,7 @@ pub struct ModelConfig {
     /// instrument; setting it without one is a validation error rather than a
     /// silent no-op.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hazard_volatility: Option<f64>,
+    pub hazard_sigma: Option<f64>,
     /// Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
     /// lattice, annualised.
     ///
@@ -636,10 +643,10 @@ impl ModelConfig {
         // separately.
         check_finite_fields(&[
             (self.call_friction_cents, true),
-            (self.mean_reversion, true),
             (self.hw1f_sigma, true),
             (self.hw1f_mean_reversion, true),
-            (self.hazard_volatility, true),
+            (self.bdt_sigma, true),
+            (self.hazard_sigma, true),
             (self.hazard_mean_reversion, true),
         ])?;
         if let Some(base_vol) = self.lmm_base_vol {
@@ -758,8 +765,8 @@ impl InstrumentPricingOverrides {
     /// # Arguments
     ///
     /// * `vol` - option-implied volatility as a decimal (e.g. `0.35`); this
-    ///   is an option-quote channel, not a short-rate σ — the rates-credit
-    ///   callable path rejects it in favour of [`Self::with_hw1f_sigma`]
+    ///   is an option-quote channel, not a short-rate σ — the bond lattices
+    ///   read [`Self::with_hw1f_sigma`] or [`Self::with_bdt_sigma`] instead
     pub fn with_implied_vol(mut self, vol: f64) -> Self {
         self.market_quotes.implied_volatility = Some(vol);
         self
@@ -767,10 +774,9 @@ impl InstrumentPricingOverrides {
 
     /// Set the Hull-White short-rate volatility σ (annualised, absolute).
     ///
-    /// This is the canonical short-rate volatility channel, and the only one
-    /// the rates-credit callable path accepts. Prefer it over
-    /// [`Self::with_implied_vol`] whenever the intent is a short-rate σ rather
-    /// than an option implied volatility.
+    /// This is the Hull-White short-rate volatility read by the bond
+    /// lattices; [`Self::with_implied_vol`] sets an option implied
+    /// volatility, which no short-rate model reads.
     ///
     /// # Arguments
     ///
@@ -781,6 +787,32 @@ impl InstrumentPricingOverrides {
         self
     }
 
+    /// Set the Hull-White mean-reversion speed κ (annualised).
+    ///
+    /// Companion to [`Self::with_hw1f_sigma`]: the rates-only bond tree and
+    /// the other Hull-White pricers require the complete pair.
+    ///
+    /// # Arguments
+    ///
+    /// * `kappa` - mean-reversion speed per year (e.g. `0.03` is 3%/yr)
+    pub fn with_hw1f_mean_reversion(mut self, kappa: f64) -> Self {
+        self.model_config.hw1f_mean_reversion = Some(kappa);
+        self
+    }
+
+    /// Set the Black-Derman-Toy lognormal short-rate volatility σ.
+    ///
+    /// Read only by the rates-only bond tree when `vol_model = black`.
+    ///
+    /// # Arguments
+    ///
+    /// * `sigma` - lognormal short-rate volatility as a decimal proportion
+    ///   (e.g. `0.20` is 20%)
+    pub fn with_bdt_sigma(mut self, sigma: f64) -> Self {
+        self.model_config.bdt_sigma = Some(sigma);
+        self
+    }
+
     /// Set the hazard-rate volatility σ_λ for the rates-credit callable
     /// lattice (annualised, absolute decimal hazard points per √year).
     ///
@@ -788,8 +820,8 @@ impl InstrumentPricingOverrides {
     ///
     /// * `sigma` - annualised absolute hazard volatility (e.g. `0.0105` for
     ///   a 35% fractional vol on a 3% hazard)
-    pub fn with_hazard_volatility(mut self, sigma: f64) -> Self {
-        self.model_config.hazard_volatility = Some(sigma);
+    pub fn with_hazard_sigma(mut self, sigma: f64) -> Self {
+        self.model_config.hazard_sigma = Some(sigma);
         self
     }
 
@@ -920,28 +952,29 @@ pub(crate) fn resolve_rates_credit_config(
     if model.hw1f_sigma.is_none() && quotes.implied_volatility.is_some() {
         return Err(finstack_quant_core::Error::Validation(
             "the rates-credit callable path reads short-rate volatility from \
-             model_config.hw1f_sigma, not market_quotes.implied_volatility"
+             instrument_pricing_overrides.model_config.hw1f_sigma, not \
+             instrument_pricing_overrides.market_quotes.implied_volatility"
                 .to_string(),
         ));
     }
-    if model.hw1f_mean_reversion.is_none() && model.mean_reversion.is_some_and(|value| value != 0.0)
-    {
+    if model.bdt_sigma.is_some() {
         return Err(finstack_quant_core::Error::Validation(
-            "the rates-credit callable path reads mean reversion from \
-             model_config.hw1f_mean_reversion, not model_config.mean_reversion"
+            "instrument_pricing_overrides.model_config.bdt_sigma is a Black-Derman-Toy input; \
+             the rates-credit callable path is a Hull-White lattice and reads \
+             instrument_pricing_overrides.model_config.hw1f_sigma"
                 .to_string(),
         ));
     }
 
     let rate_vol = model.hw1f_sigma.unwrap_or(0.0);
-    let hazard_vol = model.hazard_volatility.unwrap_or(0.0);
+    let hazard_vol = model.hazard_sigma.unwrap_or(0.0);
     let rate_mean_reversion = model.hw1f_mean_reversion.unwrap_or(0.0);
     let hazard_mean_reversion = model.hazard_mean_reversion.unwrap_or(0.0);
     let correlation = model.rate_credit_correlation.unwrap_or(0.0);
 
     for (label, value) in [
         ("hw1f_sigma", rate_vol),
-        ("hazard_volatility", hazard_vol),
+        ("hazard_sigma", hazard_vol),
         ("hw1f_mean_reversion", rate_mean_reversion),
         ("hazard_mean_reversion", hazard_mean_reversion),
     ] {
@@ -970,7 +1003,7 @@ pub(crate) fn resolve_rates_credit_config(
     if correlation != 0.0 && (rate_vol <= 0.0 || hazard_vol <= 0.0) {
         return Err(finstack_quant_core::Error::Validation(format!(
             "rate_credit_correlation = {correlation} is inert because hw1f_sigma = \
-             {rate_vol} and hazard_volatility = {hazard_vol}; set both volatilities \
+             {rate_vol} and hazard_sigma = {hazard_vol}; set both volatilities \
              positive or leave correlation unset"
         )));
     }
@@ -1226,7 +1259,7 @@ mod tests {
     ) -> InstrumentPricingOverrides {
         let mut overrides = InstrumentPricingOverrides::default();
         overrides.model_config.hw1f_sigma = rate_vol;
-        overrides.model_config.hazard_volatility = hazard_vol;
+        overrides.model_config.hazard_sigma = hazard_vol;
         overrides.model_config.rate_credit_correlation = correlation;
         overrides
     }
@@ -1257,7 +1290,7 @@ mod tests {
             ),
             (
                 rates_credit_overrides(Some(0.01), Some(f64::NAN), None),
-                "hazard_volatility",
+                "hazard_sigma",
             ),
             (
                 rates_credit_overrides(Some(0.01), Some(0.02), Some(1.5)),
@@ -1293,19 +1326,38 @@ mod tests {
             .to_string()
             .contains("implied_volatility"));
 
-        let mut legacy_reversion = InstrumentPricingOverrides::default();
-        legacy_reversion.model_config.mean_reversion = Some(0.03);
-        assert!(resolve_rates_credit_config(&legacy_reversion, 32)
-            .expect_err("legacy reversion must fail")
+        let mut bdt = InstrumentPricingOverrides::default();
+        bdt.model_config.bdt_sigma = Some(0.20);
+        assert!(resolve_rates_credit_config(&bdt, 32)
+            .expect_err("a BDT volatility is not a rates-credit input")
             .to_string()
-            .contains("hw1f_mean_reversion"));
+            .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+    }
+
+    #[test]
+    fn model_config_rejects_retired_short_rate_keys() {
+        // schema-rejection-test
+        for (retired, replacement) in [
+            ("mean_reversion", "hw1f_mean_reversion"),
+            ("hazard_volatility", "hazard_sigma"),
+        ] {
+            let json = format!(r#"{{"{retired}": 0.03}}"#);
+            let err = serde_json::from_str::<ModelConfig>(&json)
+                .expect_err("retired model_config key must be rejected");
+            assert!(
+                err.to_string().contains("unknown field"),
+                "{retired}: unexpected error {err}"
+            );
+            let json = format!(r#"{{"{replacement}": 0.03}}"#);
+            serde_json::from_str::<ModelConfig>(&json)
+                .unwrap_or_else(|err| panic!("{replacement} must parse: {err}"));
+        }
     }
 
     #[test]
     fn canonical_fields_win_when_both_channels_are_set() {
         let mut overrides = InstrumentPricingOverrides::default();
         overrides.market_quotes.implied_volatility = Some(0.35);
-        overrides.model_config.mean_reversion = Some(0.09);
         overrides.model_config.hw1f_sigma = Some(0.011);
         overrides.model_config.hw1f_mean_reversion = Some(0.05);
         let config = resolve_rates_credit_config(&overrides, 48)

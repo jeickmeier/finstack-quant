@@ -802,7 +802,7 @@ mod oas_tests {
             num_paths: 4,
             stochastic_rates: true,
             stochastic_credit: false,
-            hw_sigma: 0.0,
+            hw1f_sigma: 0.0,
             prepay_beta: 0.0,
             ..Default::default()
         };

@@ -138,7 +138,7 @@ mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::bond::pricing::engine::tree::{
-        bond_tree_config, TreePricer,
+        bond_tree_settings, TreePricer,
     };
     use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_oas;
     use crate::instruments::fixed_income::bond::BondSettlementConvention;
@@ -198,8 +198,9 @@ mod tests {
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
-                market_quotes: crate::instruments::MarketQuoteOverrides {
-                    implied_volatility: Some(0.01),
+                model_config: crate::instruments::pricing_overrides::ModelConfig {
+                    hw1f_sigma: Some(0.01),
+                    hw1f_mean_reversion: Some(0.03),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -247,8 +248,9 @@ mod tests {
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
-                market_quotes: crate::instruments::MarketQuoteOverrides {
-                    implied_volatility: Some(0.01),
+                model_config: crate::instruments::pricing_overrides::ModelConfig {
+                    hw1f_sigma: Some(0.01),
+                    hw1f_mean_reversion: Some(0.03),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -287,8 +289,9 @@ mod tests {
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
-                market_quotes: crate::instruments::MarketQuoteOverrides {
-                    implied_volatility: Some(0.01),
+                model_config: crate::instruments::pricing_overrides::ModelConfig {
+                    hw1f_sigma: Some(0.01),
+                    hw1f_mean_reversion: Some(0.03),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -351,6 +354,49 @@ mod tests {
             option_value < 0.0,
             "Callable bond holder option value should be negative, got {}",
             option_value
+        );
+    }
+
+    #[test]
+    fn straight_leg_uses_the_optioned_bond_short_rate_model() {
+        use crate::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config;
+
+        let bond = create_callable_bond();
+        let market = create_test_market();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
+        let base_value = bond.value(&market, as_of).expect("Should price");
+        let mut context = MetricContext::new(
+            Arc::new(bond.clone()),
+            Arc::new(market.clone()),
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+        let option_value = EmbeddedOptionValueCalculator
+            .calculate(&mut context)
+            .expect("Should calculate");
+
+        // Reference: the same Hull-White lattice values the callable and the
+        // same bond with an unexercisable call (strike 10,000% of par), which
+        // is the straight bond on that lattice. Identical lattices and
+        // cashflows leave only floating-point noise.
+        let pricer = TreePricer::with_config(bond_tree_config(&bond, &market).expect("config"));
+        let callable = pricer
+            .price_at_oas(&bond, &market, as_of, 0.0)
+            .expect("callable");
+        let mut never_called = bond.clone();
+        if let Some(schedule) = never_called.call_put.as_mut() {
+            for call in &mut schedule.calls {
+                call.price_pct_of_par = 10_000.0;
+            }
+        }
+        let straight = pricer
+            .price_at_oas(&never_called, &market, as_of, 0.0)
+            .expect("straight on the same lattice");
+        assert!(
+            (option_value - (callable - straight)).abs() < 1e-9 * bond.notional.amount(),
+            "option value {option_value} must equal the same-lattice decomposition {}",
+            callable - straight
         );
     }
 
@@ -487,7 +533,7 @@ mod tests {
         bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
             .with_quoted_oas(0.0025)
             .with_hw1f_sigma(0.0)
-            .with_hazard_volatility(0.0)
+            .with_hazard_sigma(0.0)
             .with_tree_steps(16);
         let market = create_test_market().insert(
             HazardCurve::builder("USD-CREDIT")
@@ -497,7 +543,7 @@ mod tests {
                 .build()
                 .expect("valid hazard curve"),
         );
-        let pricer = TreePricer::rates_credit(bond_tree_config(&bond).expect("tree config"));
+        let pricer = TreePricer::rates_credit(bond_tree_settings(&bond));
         let optioned = pricer
             .price_at_oas(&bond, &market, as_of, 25.0)
             .expect("optioned rates-credit price");

@@ -2,6 +2,78 @@
 
 ## [Unreleased]
 
+### Short-rate and hazard model parameters (2026-09-24)
+
+Numbers change. The rates-only bond tree now reads only explicit short-rate
+model inputs, and the same lattice values both legs of an option
+decomposition:
+
+- A bond priced on the `tree` model needs a complete Hull-White pair
+  (`model_config.hw1f_mean_reversion` and `hw1f_sigma`, or the pre-fitted
+  `{curve}_HW1F_KAPPA`/`_SIGMA` market scalars on the tree discount curve),
+  or `vol_model = black` with `model_config.bdt_sigma`. The hard-coded
+  κ = 0.03 default, the `market_quotes.implied_volatility` fallback and the
+  σ = 0 deterministic default are gone; a callable or return-floor bond
+  without them is a validation error naming the missing wire path.
+- Deterministic rates on the rates-only tree are now an explicit choice:
+  `hw1f_sigma = 0` with a positive `hw1f_mean_reversion` (other Hull-White
+  paths still require σ > 0). This is the only rates-only setting that prices
+  a floating coupon, since that tree preprojects coupons; a risk-free callable
+  or return-floor FRN that used to price on the implicit σ = 0 default must
+  now set it, and gets the same price as before. The stochastic floating
+  rejection now names `hw1f_sigma = 0`, or `credit_curve_id` with
+  `rates_credit`, as the remedy.
+- `embedded_option_value` and bond `vega` value the straight leg on the same
+  BDT/Hull-White lattice as the optioned bond. The straight leg used to be a
+  Ho-Lee tree driven by the lognormal `implied_volatility` quote read as a
+  normal volatility. Reference: Bloomberg OAS screens. IBM EUR 2034 option
+  value is now -685.60 against Bloomberg -700.00 (tolerance 50, unchanged);
+  BHCCN 10 2032 is -18312.68 against -19800.00 (still listed as an expected
+  proprietary-tree gap, evidence refreshed). Vega stays within its Bloomberg
+  tolerance for both (-0.0053 vs -0.01, -0.0547 vs -0.06). The QuantLib
+  `usd_fixed_callable_8y_oas` fixture only renames its keys; its expected
+  OAS and DV01 did not move.
+- Every other output is unchanged; the bond tests that relied on the old
+  channels now set the equivalent `hw1f_*` or `bdt_sigma` values
+  (σ = old `implied_volatility`, κ = 0.03).
+
+#### Changed (BREAKING)
+
+- `ModelConfig.hazard_volatility` (now `hazard_sigma`) and
+  `InstrumentPricingOverrides::with_hazard_volatility` (now
+  `with_hazard_sigma`); Rust and the `instrument_pricing_overrides.model_config`
+  JSON wire (Python/WASM/UI payloads). The old key is rejected.
+- Structured-credit `OasConfig.hw_kappa`/`hw_sigma` (now
+  `hw1f_mean_reversion`/`hw1f_sigma`); Rust and the JSON `config` accepted by
+  the Python and WASM tranche OAS entry points. The old keys are rejected.
+- RevolvingCredit `InterestRateProcessSpec::HullWhite1F { kappa, sigma, .. }`
+  (now `{ hw1f_mean_reversion, hw1f_sigma, .. }`); Rust and the
+  `mc_config.interest_rate_process.hull_white_1f` JSON wire. The old keys are
+  rejected.
+- Agency MBS `McOasConfig.hw_kappa`/`hw_sigma` (now
+  `hw1f_mean_reversion`/`hw1f_sigma`; crate-internal).
+- `bond_tree_config(bond)` (now `bond_tree_config(bond, market)`, which
+  resolves the Hull-White pair through `resolve_hw1f_params`) and
+  `TreeModelChoice::BlackDermanToy { mean_reversion, sigma }` (now
+  `{ sigma }`: the BDT lattice has no mean reversion); Rust.
+- HW1F validation errors name the full wire paths
+  (`instrument_pricing_overrides.model_config.hw1f_mean_reversion` /
+  `hw1f_sigma`) instead of the non-existent `hw1f_kappa`.
+
+#### Added
+
+- `ModelConfig.bdt_sigma`: the Black-Derman-Toy lognormal short-rate
+  volatility for bonds with `vol_model = black` (Rust, JSON wire), with
+  `InstrumentPricingOverrides::with_bdt_sigma` and
+  `with_hw1f_mean_reversion` setters (Rust). The rates-credit path rejects it.
+
+#### Removed
+
+- `ModelConfig.mean_reversion`; use `hw1f_mean_reversion` (Rust, JSON wire).
+  The old key is rejected.
+- The bond tree's reading of `market_quotes.implied_volatility` as a
+  Hull-White, BDT or Ho-Lee short-rate volatility. It stays an option quote.
+
 ### Factor-model bumps (2026-09-24)
 
 Numbers change: volatility factors now produce sensitivities. The portfolio

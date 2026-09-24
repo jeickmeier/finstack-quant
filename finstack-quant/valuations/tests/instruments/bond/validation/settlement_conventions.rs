@@ -105,13 +105,9 @@ fn test_callable_exercise_coupon_always_paid() {
         )
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides {
-                market_quotes: finstack_quant_valuations::instruments::MarketQuoteOverrides {
-                    implied_volatility: Some(0.01),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_hw1f_sigma(0.01)
+                .with_hw1f_mean_reversion(0.03),
         )
         .call_put_opt(Some(call_schedule))
         .attributes(Default::default())
@@ -181,13 +177,9 @@ fn test_putable_bond_worth_more() {
         )
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
-            finstack_quant_valuations::instruments::InstrumentPricingOverrides {
-                market_quotes: finstack_quant_valuations::instruments::MarketQuoteOverrides {
-                    implied_volatility: Some(0.01),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_hw1f_sigma(0.01)
+                .with_hw1f_mean_reversion(0.03),
         )
         .call_put_opt(Some(put_schedule))
         .attributes(Default::default())

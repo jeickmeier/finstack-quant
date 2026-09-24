@@ -260,7 +260,13 @@ fn rates_credit_values_bond_call_and_put_rights() {
     let callable = price(&callable_json, &market, "rates_credit");
     let puttable = price(&puttable_json, &market, "rates_credit");
     let hazard = price(&bullet_json, &market, "hazard_rate");
-    let tree = price(&callable_json, &market, "tree");
+    // The rates-only tree needs an explicit Hull-White pair.
+    let mut tree_document: serde_json::Value =
+        serde_json::from_str(&callable_json).expect("callable bond JSON");
+    tree_document["instrument"]["spec"]["instrument_pricing_overrides"] = serde_json::json!({
+        "model_config": {"hw1f_mean_reversion": 0.03, "hw1f_sigma": 0.01}
+    });
+    let tree = price(&tree_document.to_string(), &market, "tree");
 
     assert!(
         0.0 < callable && callable < bullet && bullet < puttable,
@@ -299,7 +305,7 @@ fn stochastic_rates_credit_result_exports_full_width_seed_as_bigint() {
         serde_json::from_str(&explicit_credit_bond_json(id, None, None)).unwrap();
     instrument["instrument"]["spec"]["instrument_pricing_overrides"] = serde_json::json!({
         "model_config": {
-            "hazard_volatility": 0.01,
+            "hazard_sigma": 0.01,
             "mc_paths": 2,
             "tree_steps": 4
         }

@@ -31,12 +31,11 @@ use std::borrow::Cow;
 ///
 /// On the rates-credit path all model inputs come from
 /// `resolve_rates_credit_config`, so the four volatility regimes are
-/// selected purely by `ModelConfig` (`hw1f_sigma`, `hazard_volatility`, the
+/// selected purely by `ModelConfig` (`hw1f_sigma`, `hazard_sigma`, the
 /// two mean reversions, and `rate_credit_correlation`), and an unset
 /// volatility means a deterministic factor rather than an engine default.
-/// The joint path reads only the canonical `hw1f_*` fields: the legacy
-/// `implied_volatility` / `mean_reversion` channels are rejected there rather
-/// than reinterpreted.
+/// Neither family reads the option quote `implied_volatility` as a
+/// short-rate volatility; the joint path rejects it outright.
 ///
 /// Direct PV and the OAS objective share one calibrated tree, so the zero-OAS
 /// point and a direct valuation cannot disagree about the model.
@@ -87,8 +86,7 @@ impl TreePricer {
     ) -> Result<Cow<'a, Bond>> {
         let model = &bond.instrument_pricing_overrides.model_config;
         let stochastic_rates_credit = self.model == BondTreeModel::RatesCredit
-            && (model.hw1f_sigma.unwrap_or(0.0) > 0.0
-                || model.hazard_volatility.unwrap_or(0.0) > 0.0);
+            && (model.hw1f_sigma.unwrap_or(0.0) > 0.0 || model.hazard_sigma.unwrap_or(0.0) > 0.0);
         if bond.return_floor.is_some() && !stochastic_rates_credit {
             Ok(Cow::Owned(
                 bond.effective_for_pricing(market_context, as_of)?,
@@ -197,7 +195,7 @@ impl TreePricer {
             && is_floating(&bond.cashflow_spec)
         {
             return Err(Error::Validation(format!(
-                "Bond '{}' selects stochastic rates-only tree pricing for a floating coupon, but that legacy tree preprojects coupons. Use 'rates_credit' for pathwise term and overnight reset replay, or set the rates-only volatility to zero.",
+                "Bond '{}' selects stochastic rates-only tree pricing for a floating coupon, but that tree preprojects coupons. Set instrument_pricing_overrides.model_config.hw1f_sigma = 0 (with hw1f_mean_reversion) for deterministic rates, or set credit_curve_id to a hazard curve and price with 'rates_credit' for pathwise term and overnight reset replay.",
                 bond.id.as_str()
             )));
         }
@@ -547,17 +545,14 @@ impl TreePricer {
                 )?;
                 PreparedTree::HullWhite(tree, valuator)
             }
-            model @ TreeModelChoice::BlackDermanToy {
-                mean_reversion,
-                sigma,
-            } => {
+            model @ TreeModelChoice::BlackDermanToy { sigma } => {
                 let tree_steps = self.effective_steps_for_model(
                     &tree_bond,
                     as_of,
                     discount_curve.day_count(),
                     &model,
                 );
-                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma, mean_reversion)
+                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma, 0.0)
                     .with_compounding(self.config.tree_compounding);
                 let mut tree = ShortRateTree::new(tree_config);
                 tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
@@ -747,7 +742,11 @@ mod tests {
                     .expect("finite coupon"),
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .instrument_pricing_overrides(Default::default())
+            .instrument_pricing_overrides(
+                crate::instruments::InstrumentPricingOverrides::default()
+                    .with_hw1f_sigma(0.01)
+                    .with_hw1f_mean_reversion(0.03),
+            )
             .attributes(Attributes::new())
             .build()
             .expect("rolled-maturity test bond");

@@ -2,6 +2,8 @@
 //!
 use super::super::super::super::types::Bond;
 use crate::instruments::pricing_overrides::{OasPriceBasis, OasQuoteCompounding};
+use crate::instruments::rates::hw1f::{resolve_hw1f_params, Hw1fParamFamily};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::trees::TreeCompounding;
 
@@ -27,13 +29,9 @@ pub enum TreeModelChoice {
         sigma: f64,
     },
     /// Black-Derman-Toy lognormal short-rate model.
+    ///
+    /// The BDT calibration is binomial and has no mean reversion.
     BlackDermanToy {
-        /// Mean reversion speed.
-        ///
-        /// The current BDT calibration is binomial and non-mean-reverting; use
-        /// `0.0` here. Nonzero mean reversion is rejected to avoid silently
-        /// ignoring a model input.
-        mean_reversion: f64,
         /// Lognormal short-rate volatility (e.g., 0.20 for 20%)
         sigma: f64,
     },
@@ -215,135 +213,173 @@ impl Default for TreePricerConfig {
     }
 }
 
-/// Get the tree pricer configuration for a bond.
+/// Tree settings shared by both bond lattices, with no short-rate model.
 ///
-/// This centralized function sources tree config from `bond.pricing_overrides`
-/// when present, otherwise returns defaults. Use this instead of constructing
-/// `TreePricerConfig::default()` directly to ensure consistent configuration
-/// across all tree-based pricing paths (OAS metric, price_from_oas, embedded
-/// option value, etc.).
+/// Carries the step count, OAS conventions and tree discount curve from
+/// `bond.instrument_pricing_overrides.model_config`. The model is left at
+/// [`TreeModelChoice::HoLee`] with zero volatility: the joint rates-credit
+/// lattice takes its factor dynamics from `resolve_rates_credit_config`, and
+/// the rates-only tree resolves its model in [`bond_tree_config`].
+pub(crate) fn bond_tree_settings(bond: &Bond) -> TreePricerConfig {
+    tree_config_with_model(bond, TreeModelChoice::HoLee)
+}
+
+/// Get the rates-only tree pricer configuration for a bond.
+///
+/// Sources every setting from `bond.instrument_pricing_overrides` so that all
+/// tree-based pricing paths (PV, the OAS metric, embedded option value, vega)
+/// agree on the model. The short-rate model is explicitly parameterized and
+/// does not depend on whether the bond carries exercise rights, so the
+/// straight leg of an option decomposition is valued on the same lattice as
+/// the optioned bond:
+///
+/// - `model_config.vol_model = black` selects Black-Derman-Toy with the
+///   lognormal volatility `model_config.bdt_sigma`.
+/// - Otherwise the Hull-White tree takes `(κ, σ)` from
+///   [`resolve_hw1f_params`]: a complete `model_config.hw1f_mean_reversion` /
+///   `model_config.hw1f_sigma` pair, or else the complete pre-fitted
+///   swaption-family market scalar pair keyed by the tree discount curve.
+/// - An explicit `model_config.hw1f_sigma = 0` (with a positive
+///   `hw1f_mean_reversion`) selects deterministic rates. This is the only
+///   rates-only setting that prices floating coupons.
+///
+/// `market_quotes.implied_volatility` is an option quote and is never read as
+/// a short-rate volatility.
 ///
 /// # Arguments
 ///
-/// * `bond` - The bond to get tree config for
+/// * `bond` - Bond whose `instrument_pricing_overrides` supply the model
+///   inputs and tree settings.
+/// * `market` - Market context searched for pre-fitted Hull-White scalars
+///   when the bond carries neither `hw1f_*` override.
 ///
 /// # Returns
 ///
-/// A `TreePricerConfig` with values from pricing_overrides or defaults.
+/// A `TreePricerConfig` for the rates-only tree.
 ///
 /// # Errors
 ///
-/// Returns a validation error when the bond selects the Black-Derman-Toy
-/// model (`vol_model = Black` with embedded options) but provides no
-/// `implied_volatility`: BDT calibrates to a *lognormal* short-rate vol, and
-/// silently defaulting it (the old behavior used 1%) materially misprices the
-/// embedded option.
+/// Returns a validation error when:
+/// - BDT is selected but `model_config.bdt_sigma` is missing;
+/// - `model_config.bdt_sigma` is set but the Hull-White tree is selected;
+/// - the Hull-White parameters are missing, partial, non-positive (other than
+///   an explicit zero `hw1f_sigma`) or given as a `hw1f_sigma_schedule`.
 ///
 /// # Examples
 ///
 /// ```
+/// use finstack_quant_core::market_data::context::MarketContext;
 /// use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 /// use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
-/// let bond = Bond::example()?;
-/// let config = bond_tree_config(&bond)?;
+/// let mut bond = Bond::example()?;
+/// bond.instrument_pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
+/// bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+/// let config = bond_tree_config(&bond, &MarketContext::new())?;
 /// # Ok(())
 /// # }
 /// ```
-pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerConfig> {
-    let implied_volatility = bond
-        .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility;
-    // Optionality-bearing models below require an explicit vol; a bullet bond on
-    // Ho-Lee has no optionality, so the stamped value is inert.
-    let volatility = implied_volatility.unwrap_or(0.0);
-
+pub fn bond_tree_config(
+    bond: &Bond,
+    market: &MarketContext,
+) -> finstack_quant_core::Result<TreePricerConfig> {
+    let model = &bond.instrument_pricing_overrides.model_config;
     let uses_black_lognormal = matches!(
-        bond.instrument_pricing_overrides.model_config.vol_model,
+        model.vol_model,
         Some(crate::instruments::common_impl::parameters::VolatilityModel::Black)
     );
 
-    // Embedded exercise rights, including a return floor that will be lowered
-    // to an issuer call schedule on deterministic paths, select only
-    // explicitly parameterized models.
-    let tree_model = if bond.call_put.is_some() || bond.return_floor.is_some() {
-        if uses_black_lognormal {
-            let Some(sigma) = implied_volatility else {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Bond '{}' selects the Black-Derman-Toy tree (vol_model = Black) but \
-                     provides no implied_volatility in pricing_overrides.market_quotes. BDT \
-                     requires an explicit lognormal short-rate volatility (e.g. 0.20 for 20%).",
-                    bond.id.as_str()
-                )));
-            };
-            let mean_reversion = bond
-                .instrument_pricing_overrides
-                .model_config
-                .mean_reversion
-                .unwrap_or(0.0);
-            TreeModelChoice::BlackDermanToy {
-                mean_reversion,
-                sigma,
-            }
+    let tree_model = if uses_black_lognormal {
+        let Some(sigma) = model.bdt_sigma else {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Bond '{}' selects the Black-Derman-Toy tree \
+                 (instrument_pricing_overrides.model_config.vol_model = black) but provides \
+                 no instrument_pricing_overrides.model_config.bdt_sigma. BDT requires an \
+                 explicit lognormal short-rate volatility (e.g. 0.20 for 20%).",
+                bond.id.as_str()
+            )));
+        };
+        TreeModelChoice::BlackDermanToy { sigma }
+    } else {
+        if model.bdt_sigma.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Bond '{}' sets instrument_pricing_overrides.model_config.bdt_sigma but \
+                 selects the Hull-White tree; set \
+                 instrument_pricing_overrides.model_config.vol_model = black for BDT or \
+                 remove bdt_sigma",
+                bond.id.as_str()
+            )));
+        }
+        if model.hw1f_sigma == Some(0.0) && model.hw1f_sigma_schedule.is_none() {
+            deterministic_hull_white(bond)?
         } else {
-            // `hw1f_sigma` is the calibrated-parameter channel for this lattice
-            // and takes precedence; `implied_volatility` is the quote channel.
-            // Absent both, rates are deterministic (sigma = 0) rather than the
-            // invented 100 bp this used to supply, which produced a confident
-            // option value out of nothing.
-            let sigma = bond
-                .instrument_pricing_overrides
-                .model_config
-                .hw1f_sigma
-                .or(implied_volatility)
-                .unwrap_or(0.0);
-            let mean_reversion = bond
-                .instrument_pricing_overrides
-                .model_config
-                .mean_reversion
-                .unwrap_or(0.03);
+            let curve_id = model
+                .tree_discount_curve_id
+                .as_ref()
+                .unwrap_or(&bond.discount_curve_id);
+            let params = resolve_hw1f_params(
+                Hw1fParamFamily::Swaption,
+                curve_id.as_str(),
+                model,
+                None,
+                &format!("Bond '{}' Hull-White tree", bond.id.as_str()),
+                market,
+            )?;
             TreeModelChoice::HullWhite {
-                kappa: mean_reversion,
-                sigma,
+                kappa: params.kappa,
+                sigma: params.sigma,
             }
         }
-    } else {
-        TreeModelChoice::HoLee
     };
+    Ok(tree_config_with_model(bond, tree_model))
+}
+
+/// Hull-White tree with an explicit zero short-rate volatility.
+///
+/// `model_config.hw1f_sigma = 0` is the deterministic-rates choice on the
+/// rates-only tree (the only rates-only setting that supports floating
+/// coupons, which that tree preprojects). [`resolve_hw1f_params`] accepts
+/// only a positive σ, so this pair is resolved here; the mean reversion is
+/// still required, positive and finite, so both Hull-White inputs are always
+/// supplied explicitly.
+fn deterministic_hull_white(bond: &Bond) -> finstack_quant_core::Result<TreeModelChoice> {
+    match bond
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion
+    {
+        Some(kappa) if kappa.is_finite() && kappa > 0.0 => {
+            Ok(TreeModelChoice::HullWhite { kappa, sigma: 0.0 })
+        }
+        kappa => Err(finstack_quant_core::Error::Validation(format!(
+            "Bond '{}' Hull-White tree: instrument_pricing_overrides.model_config.hw1f_sigma = 0 \
+             selects deterministic rates but instrument_pricing_overrides.model_config.\
+             hw1f_mean_reversion is {kappa:?}; supply a positive finite mean reversion",
+            bond.id.as_str()
+        ))),
+    }
+}
+
+fn tree_config_with_model(bond: &Bond, tree_model: TreeModelChoice) -> TreePricerConfig {
+    let model = &bond.instrument_pricing_overrides.model_config;
     let tree_compounding = if matches!(&tree_model, TreeModelChoice::BlackDermanToy { .. }) {
         TreeCompounding::Simple
     } else {
         TreeCompounding::default()
     };
-
-    Ok(TreePricerConfig {
-        tree_steps: bond
-            .instrument_pricing_overrides
-            .model_config
-            .tree_steps
-            .unwrap_or(100),
-        volatility,
+    TreePricerConfig {
+        tree_steps: model.tree_steps.unwrap_or(100),
+        volatility: 0.0,
         tolerance: 1e-6,
         max_iterations: 50,
         initial_bracket_size_bp: Some(1000.0),
         tree_model,
-        tree_discount_curve_id: bond
-            .instrument_pricing_overrides
-            .model_config
-            .tree_discount_curve_id
-            .clone(),
-        oas_quote_compounding: bond
-            .instrument_pricing_overrides
-            .model_config
-            .oas_quote_compounding,
-        oas_price_basis: bond
-            .instrument_pricing_overrides
-            .model_config
-            .oas_price_basis,
+        tree_discount_curve_id: model.tree_discount_curve_id.clone(),
+        oas_quote_compounding: model.oas_quote_compounding,
+        oas_price_basis: model.oas_price_basis,
         tree_compounding,
-    })
+    }
 }
 
 #[cfg(test)]
@@ -377,11 +413,10 @@ mod tests {
             puts: vec![],
         });
         bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
-        bond.instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility = Some(0.20);
+        bond.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
 
-        let config = bond_tree_config(&bond).expect("explicit vol should produce a config");
+        let config = bond_tree_config(&bond, &MarketContext::new())
+            .expect("explicit vol should produce a config");
 
         assert_eq!(config.tree_compounding, TreeCompounding::Simple);
         assert!(matches!(
@@ -391,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    fn black_lognormal_callable_config_errors_without_implied_vol() {
+    fn black_lognormal_callable_config_errors_without_bdt_sigma() {
         let mut bond = Bond::fixed(
             "BDT-CALLABLE-NO-VOL",
             Money::from((1_000_i64, Currency::USD)),
@@ -413,12 +448,15 @@ mod tests {
         });
         bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
 
-        let err = bond_tree_config(&bond).expect_err("missing BDT vol must error");
-        assert!(err.to_string().contains("implied_volatility"));
+        let err =
+            bond_tree_config(&bond, &MarketContext::new()).expect_err("missing BDT vol must error");
+        assert!(err
+            .to_string()
+            .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
     }
 
     #[test]
-    fn black_lognormal_return_floor_config_requires_and_uses_implied_vol() {
+    fn black_lognormal_return_floor_config_requires_and_uses_bdt_sigma() {
         let mut bond = Bond::fixed(
             "BDT-RETURN-FLOOR",
             Money::from((1_000_i64, Currency::USD)),
@@ -432,13 +470,15 @@ mod tests {
         bond.return_floor = Some(ReturnFloorSpec::moic(1.0));
         bond.instrument_pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
 
-        let err = bond_tree_config(&bond).expect_err("floor-only BDT bond needs a volatility");
-        assert!(err.to_string().contains("implied_volatility"));
+        let err = bond_tree_config(&bond, &MarketContext::new())
+            .expect_err("floor-only BDT bond needs a volatility");
+        assert!(err
+            .to_string()
+            .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
 
-        bond.instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility = Some(0.20);
-        let config = bond_tree_config(&bond).expect("floor-only option config");
+        bond.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
+        let config =
+            bond_tree_config(&bond, &MarketContext::new()).expect("floor-only option config");
         assert!(matches!(
             config.tree_model,
             TreeModelChoice::BlackDermanToy { sigma, .. } if (sigma - 0.20).abs() < 1e-12

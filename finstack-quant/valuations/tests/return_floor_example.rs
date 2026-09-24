@@ -17,6 +17,9 @@
 //! - 5-year private-credit loan, $1,000,000 notional, 10% annual coupon.
 //! - 1.25× MOIC floor, active from year 2 onward (2-year no-call period).
 //! - Priced flat at a 6% discount rate.
+//! - The floor is an exercise right, so the loan prices on the rates-only
+//!   Hull-White tree, which needs an explicit short-rate model: κ = 3%/yr and
+//!   σ = 100 bp/yr through `model_config.hw1f_mean_reversion` / `hw1f_sigma`.
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -46,6 +49,15 @@ fn flat_curve(id: &str, rate: f64, as_of: finstack_quant_core::dates::Date) -> D
         .unwrap()
 }
 
+/// Attach the Hull-White short-rate model the tree prices the floor with.
+fn with_short_rate_model(mut loan: Bond) -> Bond {
+    loan.instrument_pricing_overrides =
+        finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+            .with_hw1f_mean_reversion(0.03)
+            .with_hw1f_sigma(0.01);
+    loan
+}
+
 /// Construct a $1M 5-year 10% fixed loan with a 1.25× MOIC floor after year 2.
 ///
 /// The floor is active from 2027-01-01 to maturity (2030-01-01), encoding a
@@ -58,17 +70,19 @@ fn build_floored_loan() -> Bond {
     let maturity = date!(2030 - 01 - 01);
     let nc2_end = date!(2027 - 01 - 01);
 
-    Bond::fixed(
-        "LOAN-FLOOR-001",
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        finstack_quant_core::types::Rate::from_decimal(0.10).expect("valid rate fixture"), // 10% coupon
-        issue,
-        maturity,
-        finstack_quant_core::dates::StubKind::ShortFront,
-        "USD-OIS",
+    with_short_rate_model(
+        Bond::fixed(
+            "LOAN-FLOOR-001",
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_core::types::Rate::from_decimal(0.10).expect("valid rate fixture"), // 10% coupon
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("loan construction should succeed")
+        .with_return_floor(ReturnFloorSpec::moic(1.25).window(ProtectionWindow::From(nc2_end))),
     )
-    .expect("loan construction should succeed")
-    .with_return_floor(ReturnFloorSpec::moic(1.25).window(ProtectionWindow::From(nc2_end)))
 }
 
 // Test: construction is valid and produces a positive PV
@@ -218,8 +232,12 @@ fn min_moic_shortcut_equivalent_to_explicit_full_window_spec() {
     .unwrap()
     .with_return_floor(ReturnFloorSpec::moic(1.25));
 
-    let pv_shortcut = loan_shortcut.value(&market, as_of).unwrap();
-    let pv_explicit = loan_explicit.value(&market, as_of).unwrap();
+    let pv_shortcut = with_short_rate_model(loan_shortcut)
+        .value(&market, as_of)
+        .unwrap();
+    let pv_explicit = with_short_rate_model(loan_explicit)
+        .value(&market, as_of)
+        .unwrap();
 
     println!(
         "[return_floor_example] min_moic shortcut PV = {:.2}",

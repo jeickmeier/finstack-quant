@@ -352,7 +352,7 @@ fn oas_solves_on_instrument_collateral() {
             num_paths: 8,
             stochastic_rates: true,
             stochastic_credit: false,
-            hw_sigma: 0.01,
+            hw1f_sigma: 0.01,
             ..OasConfig::default()
         },
     )

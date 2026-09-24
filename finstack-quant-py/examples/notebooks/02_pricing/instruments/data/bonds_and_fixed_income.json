@@ -94,8 +94,11 @@
       },
       "instrument_pricing_overrides": {
         "market_quotes": {
-          "quoted_clean_price": 99.0,
-          "implied_volatility": 0.01
+          "quoted_clean_price": 99.0
+        },
+        "model_config": {
+          "hw1f_mean_reversion": 0.03,
+          "hw1f_sigma": 0.01
         }
       },
       "settlement_days": 1

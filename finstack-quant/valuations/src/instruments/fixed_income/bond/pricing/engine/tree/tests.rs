@@ -61,9 +61,10 @@ fn create_callable_bond() -> Bond {
         price_pct_of_par: 102.0,
         make_whole: None,
     });
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(call_put);
     bond
 }
@@ -80,9 +81,10 @@ fn create_make_whole_callable_bond() -> Bond {
             spread_bp: 25.0,
         }),
     });
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(call_put);
     bond
 }
@@ -129,7 +131,8 @@ fn oas_metric_round_trip_bp(bond: &Bond, oas_bp: f64) -> f64 {
         bond, &market, as_of,
     )
     .expect("quote context");
-    let pricer = TreePricer::with_config(super::bond_tree_config(bond).expect("tree config"));
+    let pricer =
+        TreePricer::with_config(super::bond_tree_config(bond, &market).expect("tree config"));
     let dirty = pricer
         .price_at_oas(bond, &market, quote.quote_date, oas_bp)
         .expect("price at OAS");
@@ -151,7 +154,13 @@ fn oas_metric_round_trip_bp(bond: &Bond, oas_bp: f64) -> f64 {
 }
 #[test]
 fn oas_metric_round_trips_a_tree_price_for_plain_and_callable_bonds() {
-    for bond in [create_test_bond(), create_callable_bond()] {
+    let mut plain = create_test_bond();
+    plain.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+    plain
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
+    for bond in [plain, create_callable_bond()] {
         let implied = oas_metric_round_trip_bp(&bond, 150.0);
         assert!(
             (implied - 150.0).abs() < 1.0e-4,
@@ -222,10 +231,6 @@ fn test_windowed_call_lowers_pv_vs_endpoint_only_exercise() {
         price_pct_of_par: 100.0,
         make_whole: None,
     });
-    single
-        .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
     single.call_put = Some(call_put);
 
     let mut windowed = create_test_bond();
@@ -236,10 +241,6 @@ fn test_windowed_call_lowers_pv_vs_endpoint_only_exercise() {
         price_pct_of_par: 100.0,
         make_whole: None,
     });
-    windowed
-        .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
     windowed.call_put = Some(call_put);
 
     let pv_single = pricer
@@ -292,9 +293,10 @@ fn test_bond_valuator_street_call_redemption_includes_accrued_interest() {
         price_pct_of_par: 100.0,
         make_whole: None,
     });
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(call_put);
 
     let market_context = create_test_market_context();
@@ -484,12 +486,10 @@ fn bdt_tree_accepts_more_than_one_thousand_steps() {
         puts: Vec::new(),
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
-    bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.20);
+    bond.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
     bond.instrument_pricing_overrides.model_config.vol_model =
         Some(crate::instruments::common_impl::parameters::VolatilityModel::Black);
-    let mut config = super::bond_tree_config(&bond).expect("config");
+    let mut config = super::bond_tree_config(&bond, &create_test_market_context()).expect("config");
     config.tree_steps = 1200;
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
@@ -497,4 +497,295 @@ fn bdt_tree_accepts_more_than_one_thousand_steps() {
         .price_at_oas(&bond, &market, as_of, 0.0)
         .expect("1,200-step BDT price");
     assert!(price.is_finite() && price > 0.0);
+}
+
+/// Callable bond with every pricing override cleared, so the tests below
+/// control exactly which model inputs the tree sees.
+fn bare_callable_bond() -> Bond {
+    let mut bond = create_callable_bond();
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
+    bond
+}
+
+/// Reference price from a Hull-White tree configured directly, bypassing the
+/// bond's override resolution. The step count and compounding match what the
+/// bond path uses (100 steps, default compounding), so the two must agree to
+/// floating-point noise: the same calibrated lattice values the same bond.
+fn direct_tree_price(bond: &Bond, tree_model: super::TreeModelChoice) -> f64 {
+    let market = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    super::TreePricer::with_config(super::TreePricerConfig {
+        tree_steps: 100,
+        tree_model,
+        ..super::TreePricerConfig::default()
+    })
+    .price_at_oas(bond, &market, as_of, 0.0)
+    .expect("direct tree price")
+}
+
+fn bond_tree_price(bond: &Bond) -> finstack_quant_core::Result<f64> {
+    let market = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    bond.price_for_model_raw(crate::pricer::ModelKey::Tree, &market, as_of)
+}
+
+#[test]
+fn bond_tree_ignores_implied_volatility() {
+    let mut hw_only = bare_callable_bond();
+    hw_only
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.05);
+    hw_only.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+    let mut with_option_vol = hw_only.clone();
+    with_option_vol
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.20);
+
+    // Independent reference: the same lattice built from (κ, σ) directly.
+    let reference = direct_tree_price(
+        &hw_only,
+        super::TreeModelChoice::HullWhite {
+            kappa: 0.05,
+            sigma: 0.01,
+        },
+    );
+    for (label, bond) in [("hw1f only", hw_only), ("with option vol", with_option_vol)] {
+        let pv = bond_tree_price(&bond).expect("Hull-White tree price");
+        // Same kernel and inputs: agreement to 1e-9 of notional is floating
+        // point noise, while a wrong κ (the old 0.03 default) or σ (the 0.20
+        // option vol) moves this callable by whole price points.
+        assert!(
+            (pv - reference).abs() < 1e-9 * bond.notional.amount(),
+            "{label}: tree PV {pv} must equal the direct (κ=0.05, σ=0.01) tree {reference}"
+        );
+    }
+}
+
+#[test]
+fn bond_tree_requires_short_rate_sigma() {
+    let option_vol_only = {
+        let mut bond = bare_callable_bond();
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.01);
+        bond
+    };
+    let sigma_only = {
+        let mut bond = bare_callable_bond();
+        bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+        bond
+    };
+    for (label, bond, expected) in [
+        (
+            "no volatility",
+            bare_callable_bond(),
+            "instrument_pricing_overrides.model_config.hw1f_sigma",
+        ),
+        (
+            "option vol only",
+            option_vol_only,
+            "instrument_pricing_overrides.model_config.hw1f_sigma",
+        ),
+        (
+            "sigma without mean reversion",
+            sigma_only,
+            "instrument_pricing_overrides.model_config.hw1f_mean_reversion",
+        ),
+    ] {
+        let error = bond_tree_price(&bond).expect_err(label);
+        assert!(error.to_string().contains(expected), "{label}: {error}");
+    }
+}
+
+#[test]
+fn bond_tree_reads_hw1f_parameters_from_market_scalars() {
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+
+    let bond = bare_callable_bond();
+    let (kappa_key, sigma_key) =
+        finstack_quant_models::rates::hull_white::hw1f_scalar_keys("USD-OIS");
+    let market = create_test_market_context()
+        .insert_price(kappa_key.as_str(), MarketScalar::Unitless(0.05))
+        .insert_price(sigma_key.as_str(), MarketScalar::Unitless(0.01));
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let pv = bond
+        .price_for_model_raw(crate::pricer::ModelKey::Tree, &market, as_of)
+        .expect("tree price from pre-fitted market scalars");
+    let reference = direct_tree_price(
+        &bond,
+        super::TreeModelChoice::HullWhite {
+            kappa: 0.05,
+            sigma: 0.01,
+        },
+    );
+    assert!((pv - reference).abs() < 1e-9 * bond.notional.amount());
+}
+
+#[test]
+fn bond_bdt_tree_reads_bdt_sigma() {
+    let mut bond = bare_callable_bond();
+    bond.instrument_pricing_overrides.model_config = serde_json::from_value(serde_json::json!({
+        "vol_model": "black",
+        "bdt_sigma": 0.20
+    }))
+    .expect("bdt_sigma is a model_config field");
+    let pv = bond_tree_price(&bond).expect("BDT tree price");
+    let market = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let reference = super::TreePricer::with_config(super::TreePricerConfig {
+        tree_steps: 100,
+        tree_model: super::TreeModelChoice::BlackDermanToy { sigma: 0.20 },
+        tree_compounding: finstack_quant_models::trees::TreeCompounding::Simple,
+        ..super::TreePricerConfig::default()
+    })
+    .price_at_oas(&bond, &market, as_of, 0.0)
+    .expect("direct BDT price");
+    assert!((pv - reference).abs() < 1e-9 * bond.notional.amount());
+
+    // The option-vol quote is not a BDT input.
+    let mut option_vol_only = bare_callable_bond();
+    option_vol_only
+        .instrument_pricing_overrides
+        .model_config
+        .vol_model = Some(crate::instruments::common_impl::parameters::VolatilityModel::Black);
+    option_vol_only
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.20);
+    let error = bond_tree_price(&option_vol_only).expect_err("BDT needs bdt_sigma");
+    assert!(error
+        .to_string()
+        .contains("instrument_pricing_overrides.model_config.bdt_sigma"));
+}
+
+/// Risk-free (no `credit_curve_id`) callable floating-rate note on the
+/// rates-only tree, with a par call on a coupon date.
+fn risk_free_callable_frn(maturity: Date) -> Bond {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
+    let call_date = Date::from_calendar_date(2027, Month::January, 15).expect("Valid test date");
+    let mut bond = Bond::floating(
+        "RISK_FREE_CALLABLE_FRN",
+        Money::from((1000_i64, finstack_quant_core::currency::Currency::USD)),
+        "USD-SOFR-3M",
+        200,
+        issue,
+        maturity,
+        finstack_quant_core::dates::Tenor::quarterly(),
+        finstack_quant_core::dates::DayCount::Act360,
+        "USD-OIS",
+    )
+    .expect("floating bond builds");
+    bond.call_put = Some(CallPutSchedule {
+        calls: vec![CallPut {
+            start_date: call_date,
+            end_date: call_date,
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        }],
+        puts: Vec::new(),
+    });
+    bond
+}
+
+fn frn_market() -> MarketContext {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let forward = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+        "USD-SOFR-3M",
+        0.25,
+    )
+    .base_date(base_date)
+    .knots([(0.0, 0.04), (10.0, 0.04)])
+    .interp(InterpStyle::Linear)
+    .build()
+    .expect("forward curve");
+    create_test_market_context().insert(forward)
+}
+
+#[test]
+fn risk_free_floating_callable_prices_on_deterministic_hull_white_tree() {
+    let market = frn_market();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("Valid test date");
+    let price = |bond: &Bond, model: crate::pricer::ModelKey| {
+        bond.price_for_model_raw(model, &market, as_of)
+    };
+
+    // Every remedy the rates-only tree's errors name must be one it accepts.
+    let bare = risk_free_callable_frn(maturity);
+    let error = price(&bare, crate::pricer::ModelKey::Tree).expect_err("no HW1F inputs");
+    assert!(
+        error
+            .to_string()
+            .contains("instrument_pricing_overrides.model_config.hw1f_sigma"),
+        "{error}"
+    );
+    let mut stochastic = bare.clone();
+    stochastic
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
+    stochastic
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.01);
+    let error = price(&stochastic, crate::pricer::ModelKey::Tree)
+        .expect_err("stochastic rates-only tree preprojects floating coupons");
+    assert!(
+        error
+            .to_string()
+            .contains("instrument_pricing_overrides.model_config.hw1f_sigma = 0"),
+        "{error}"
+    );
+
+    let mut deterministic = stochastic;
+    deterministic
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.0);
+    let pv = price(&deterministic, crate::pricer::ModelKey::Tree)
+        .expect("hw1f_sigma = 0 prices a floating callable on the rates-only tree");
+
+    // Independent reference: with deterministic rates the issuer exercises a
+    // single par call on a coupon date iff the bond is worth more than par
+    // there, so the callable is the cheaper of the straight FRN and the FRN
+    // redeemed at par on the call date, both discounted off the curves.
+    let mut straight = risk_free_callable_frn(maturity);
+    straight.call_put = None;
+    let mut to_call = risk_free_callable_frn(
+        Date::from_calendar_date(2027, Month::January, 15).expect("Valid test date"),
+    );
+    to_call.call_put = None;
+    let straight_pv = price(&straight, crate::pricer::ModelKey::Discounting).expect("straight");
+    let to_call_pv = price(&to_call, crate::pricer::ModelKey::Discounting).expect("to call");
+    let reference = straight_pv.min(to_call_pv);
+    // SOFR + 200 bp over a ~3-4% discount curve trades above par, so the
+    // call binds: the callable must sit strictly below the straight bond.
+    assert!(
+        to_call_pv < straight_pv,
+        "call must bind: {to_call_pv} vs {straight_pv}"
+    );
+    // Both sides project the same coupons off the same curves; 1e-9 of
+    // notional is floating-point noise, while ignoring the call would miss
+    // by the (several-point) call value.
+    assert!(
+        (pv - reference).abs() < 1e-9 * deterministic.notional.amount(),
+        "deterministic HW tree {pv} must equal min(straight, to-call) {reference}"
+    );
+
+    // Zero volatility still requires the mean reversion.
+    let mut sigma_zero_only = bare;
+    sigma_zero_only
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.0);
+    let error = price(&sigma_zero_only, crate::pricer::ModelKey::Tree)
+        .expect_err("hw1f_sigma = 0 without mean reversion");
+    assert!(
+        error
+            .to_string()
+            .contains("instrument_pricing_overrides.model_config.hw1f_mean_reversion"),
+        "{error}"
+    );
 }

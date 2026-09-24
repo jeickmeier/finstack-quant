@@ -57,10 +57,11 @@ pub struct OasConfig {
     pub stochastic_rates: bool,
     /// Couple a systematic stochastic-credit factor (correlated default/prepay stress).
     pub stochastic_credit: bool,
-    /// Hull-White mean reversion `κ`.
-    pub hw_kappa: f64,
-    /// Hull-White short-rate volatility `σ`.
-    pub hw_sigma: f64,
+    /// Hull-White 1F mean reversion `κ`, per year.
+    pub hw1f_mean_reversion: f64,
+    /// Hull-White 1F short-rate volatility `σ`, absolute annual decimal
+    /// (`0.01` = 100 bp).
+    pub hw1f_sigma: f64,
     /// Rate-dependent prepayment sensitivity `β`.
     pub prepay_beta: f64,
     /// Credit factor loading for the lognormal default/prepayment shocks.
@@ -77,8 +78,8 @@ impl Default for OasConfig {
             num_paths: 256,
             stochastic_rates: false,
             stochastic_credit: true,
-            hw_kappa: 0.05,
-            hw_sigma: 0.01,
+            hw1f_mean_reversion: 0.05,
+            hw1f_sigma: 0.01,
             prepay_beta: 7.0,
             credit_loading: 0.3,
             seed: 42,
@@ -208,8 +209,8 @@ pub fn calculate_tranche_oas(
     // `E[stochastic DF] = curve DF`. The correction is path-independent.
     let rate_convexity_adj = if config.stochastic_rates {
         Some(ou_integral_convexity_adjustments(
-            config.hw_kappa,
-            config.hw_sigma,
+            config.hw1f_mean_reversion,
+            config.hw1f_sigma,
             num_months,
         ))
     } else {
@@ -242,8 +243,8 @@ pub fn calculate_tranche_oas(
         let deviation = if config.stochastic_rates {
             let mut sub = rng.substream(2 * path as u64);
             Some(simulate_ou_deviation(
-                config.hw_kappa,
-                config.hw_sigma,
+                config.hw1f_mean_reversion,
+                config.hw1f_sigma,
                 num_months,
                 &mut sub,
             ))
@@ -254,8 +255,8 @@ pub fn calculate_tranche_oas(
             (Some(fwd), Some(dev)) => Some(absolute_rate_path(
                 fwd,
                 dev,
-                config.hw_kappa,
-                config.hw_sigma,
+                config.hw1f_mean_reversion,
+                config.hw1f_sigma,
             )),
             _ => None,
         };
@@ -655,8 +656,8 @@ mod tests {
             "num_path": 128,
             "stochastic_rates": false,
             "stochastic_credit": true,
-            "hw_kappa": 0.05,
-            "hw_sigma": 0.01,
+            "hw1f_mean_reversion": 0.05,
+            "hw1f_sigma": 0.01,
             "prepay_beta": 7.0,
             "credit_loading": 0.3,
             "seed": 42,
@@ -669,6 +670,20 @@ mod tests {
             msg.contains("num_path"),
             "the error must name the key the caller typed, not the one they meant; got: {msg}"
         );
+    }
+
+    #[test]
+    fn oas_config_rejects_retired_hull_white_keys() {
+        let mut value = serde_json::to_value(OasConfig::default()).expect("serializable");
+        let object = value.as_object_mut().expect("object");
+        object.remove("hw1f_mean_reversion");
+        object.remove("hw1f_sigma");
+        // schema-rejection-test
+        object.insert("hw_kappa".into(), serde_json::json!(0.05));
+        object.insert("hw_sigma".into(), serde_json::json!(0.01));
+        let err = serde_json::from_value::<OasConfig>(value)
+            .expect_err("retired Hull-White keys must be rejected");
+        assert!(err.to_string().contains("hw_"), "{err}");
     }
 
     /// The fully specified config must still parse, so strictness has not made

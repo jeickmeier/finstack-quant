@@ -9,17 +9,18 @@ use super::CashflowSpec;
 
 impl Bond {
     /// Whether instrument-owned inputs request the joint rates-credit family
-    /// on the native default path, including legacy fields that the joint
-    /// resolver must reject rather than silently ignore.
+    /// on the native default path, including short-rate inputs of other
+    /// models (`implied_volatility`, `bdt_sigma`) that the joint resolver must
+    /// reject rather than silently ignore.
     fn has_rates_credit_factor_inputs(&self) -> bool {
         let model = &self.instrument_pricing_overrides.model_config;
         model.hw1f_sigma.is_some()
             || model.hw1f_sigma_schedule.is_some()
             || model.hw1f_mean_reversion.is_some()
-            || model.hazard_volatility.is_some()
+            || model.hazard_sigma.is_some()
             || model.hazard_mean_reversion.is_some()
             || model.rate_credit_correlation.is_some()
-            || model.mean_reversion.is_some()
+            || model.bdt_sigma.is_some()
             || self
                 .instrument_pricing_overrides
                 .market_quotes
@@ -32,7 +33,7 @@ impl Bond {
     fn configured_credit_factor_input(&self) -> Option<&'static str> {
         let model = &self.instrument_pricing_overrides.model_config;
         [
-            ("hazard_volatility", model.hazard_volatility.is_some()),
+            ("hazard_sigma", model.hazard_sigma.is_some()),
             (
                 "hazard_mean_reversion",
                 model.hazard_mean_reversion.is_some(),
@@ -127,7 +128,7 @@ impl Bond {
         use crate::instruments::fixed_income::bond::pricing::engine::{
             discount::BondEngine,
             hazard::HazardBondEngine,
-            tree::{bond_tree_config, TreePriceOutcome, TreePricer},
+            tree::{bond_tree_config, bond_tree_settings, TreePriceOutcome, TreePricer},
         };
         use crate::pricer::ModelKey;
 
@@ -146,9 +147,9 @@ impl Bond {
                 )?,
                 lsmc: None,
             }),
-            ModelKey::Tree => TreePricer::with_config(bond_tree_config(self)?)
+            ModelKey::Tree => TreePricer::with_config(bond_tree_config(self, curves)?)
                 .price_at_oas_outcome(self, curves, as_of, oas_quote_decimal * 10_000.0),
-            ModelKey::RatesCredit => TreePricer::rates_credit(bond_tree_config(self)?)
+            ModelKey::RatesCredit => TreePricer::rates_credit(bond_tree_settings(self))
                 .price_at_oas_outcome(self, curves, as_of, oas_quote_decimal * 10_000.0),
             _ => Err(finstack_quant_core::Error::Validation(format!(
                 "Bond '{}' does not support pricing model '{}'",
@@ -739,15 +740,12 @@ mod tests {
             .expect_err("native joint-model inference must validate legacy implied volatility");
         assert!(error.to_string().contains("implied_volatility"), "{error}");
 
-        let mut legacy_reversion = bond.clone();
-        legacy_reversion
-            .instrument_pricing_overrides
-            .model_config
-            .mean_reversion = Some(0.03);
-        let error = legacy_reversion
+        let mut bdt = bond.clone();
+        bdt.instrument_pricing_overrides.model_config.bdt_sigma = Some(0.20);
+        let error = bdt
             .value(&market, as_of)
-            .expect_err("native joint-model inference must validate legacy mean reversion");
-        assert!(error.to_string().contains("hw1f_mean_reversion"), "{error}");
+            .expect_err("native joint-model inference must reject a BDT volatility");
+        assert!(error.to_string().contains("bdt_sigma"), "{error}");
 
         let mut scheduled = bond;
         scheduled
@@ -792,9 +790,7 @@ mod tests {
 
         let (mut bond, market, as_of) = deterministic_credit_bond_and_market();
         bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
-        bond.instrument_pricing_overrides
-            .model_config
-            .hazard_volatility = Some(0.005);
+        bond.instrument_pricing_overrides.model_config.hazard_sigma = Some(0.005);
         bond.instrument_pricing_overrides
             .model_config
             .hw1f_mean_reversion = Some(KAPPA_MAX.min(0.05));

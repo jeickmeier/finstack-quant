@@ -8,7 +8,7 @@
         {
           "metric": "embedded_option_value",
           "reason": "The Bloomberg proprietary callable-tree option value cannot be reconciled by widening the source-backed tolerance.",
-          "evidence": "The corrected straight-bond decomposition leaves Finstack option value at -18155.735406 versus Bloomberg -19800.00, an 8.3% proprietary-tree model gap, while OAS remains within the established 3bp convention tolerance."
+          "evidence": "With the straight leg valued on the same BDT lattice as the callable (model_config.bdt_sigma), Finstack option value is -18312.684639 versus Bloomberg -19800.00, a 7.5% proprietary-tree model gap, while OAS remains within the established 3bp convention tolerance."
         },
         {
           "metric": "npv",

@@ -488,8 +488,8 @@ impl CapFloorHullWhitePricer {
 
 /// Build the HW1F override JSON blob from a cap/floor's typed pricing overrides.
 ///
-/// Reads `model_config.hw1f_mean_reversion` → `hw1f_kappa` and
-/// `model_config.hw1f_sigma` → `hw1f_sigma` (the Hull-White short-rate absolute
+/// Reads `model_config.hw1f_mean_reversion` → κ and
+/// `model_config.hw1f_sigma` → σ (the Hull-White short-rate absolute
 /// volatility). Partial overrides are retained so [`resolve_hw1f_params`] can
 /// identify the fitted parameter pair independently of option implied volatility.
 /// A σ-only override is retained as well and rejected by the shared resolver.

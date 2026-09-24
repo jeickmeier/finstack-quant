@@ -30,7 +30,7 @@ fn empty_factor_model_config() -> FactorModelConfig {
         matching: MatchingConfig::MappingTable(vec![]),
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: Default::default(),
-        bump_size: None,
+        bump_config: None,
         unmatched_policy: None,
     }
 }

@@ -735,8 +735,11 @@ impl McConfig {
         }
 
         // Validate interest rate process if provided
-        if let Some(InterestRateProcessSpec::HullWhite1F { kappa, sigma, .. }) =
-            &self.interest_rate_process
+        if let Some(InterestRateProcessSpec::HullWhite1F {
+            hw1f_mean_reversion: kappa,
+            hw1f_sigma: sigma,
+            ..
+        }) = &self.interest_rate_process
         {
             validation::require_or(*kappa > 0.0 && *sigma >= 0.0, InputError::Invalid)?;
         }
@@ -811,11 +814,11 @@ pub enum InterestRateProcessSpec {
     ///
     /// Models short rate as: dr_t = κ[θ(t) - r_t]dt + σ dW_t
     ///
-    /// Two calibration modes, selected by `sigma`:
-    /// - `sigma > 0` (stochastic): the pricer fits a time-dependent θ(t) to
-    ///   the facility's discount curve and reads the initial short rate from
-    ///   that curve; the supplied `initial`/`theta` are ignored.
-    /// - `sigma == 0` (deterministic parity mode): the supplied constant
+    /// Two calibration modes, selected by `hw1f_sigma`:
+    /// - `hw1f_sigma > 0` (stochastic): the pricer fits a time-dependent θ(t)
+    ///   to the facility's discount curve and reads the initial short rate
+    ///   from that curve; the supplied `initial`/`theta` are ignored.
+    /// - `hw1f_sigma == 0` (deterministic parity mode): the supplied constant
     ///   `initial` and `theta` are used verbatim, with no curve fitting.
     ///
     /// Consequently the σ → 0 limit of the stochastic mode does **not**
@@ -824,15 +827,16 @@ pub enum InterestRateProcessSpec {
     /// down to zero, keep σ strictly positive for curve-fitted dynamics.
     #[serde(rename = "hull_white_1f")]
     HullWhite1F {
-        /// Mean reversion speed (κ)
-        kappa: f64,
-        /// Volatility (σ)
-        sigma: f64,
-        /// Initial short rate used only when `sigma == 0`. For a stochastic
+        /// Hull-White 1F mean reversion speed κ, per year.
+        hw1f_mean_reversion: f64,
+        /// Hull-White 1F short-rate volatility σ, absolute annual decimal
+        /// (`0.01` = 100 bp).
+        hw1f_sigma: f64,
+        /// Initial short rate used only when `hw1f_sigma == 0`. For a stochastic
         /// process, the pricer derives the initial rate from the facility's
         /// discount curve at the valuation anchor.
         initial: f64,
-        /// Constant mean reversion level used only when `sigma == 0`. For a
+        /// Constant mean reversion level used only when `hw1f_sigma == 0`. For a
         /// stochastic process, the pricer fits a time-dependent θ(t) to the
         /// facility's discount curve.
         theta: f64,
@@ -1308,13 +1312,27 @@ mod dependency_tests {
     #[test]
     fn hull_white_process_uses_canonical_acronym_spelling() {
         let process = InterestRateProcessSpec::HullWhite1F {
-            kappa: 0.1,
-            sigma: 0.01,
+            hw1f_mean_reversion: 0.1,
+            hw1f_sigma: 0.01,
             initial: 0.03,
             theta: 0.03,
         };
         let value = serde_json::to_value(process).expect("serialize Hull-White process");
         assert!(value.get("hull_white_1f").is_some());
+
+        assert!(
+            serde_json::from_value::<InterestRateProcessSpec>(serde_json::json!({
+                "hull_white_1f": {
+                    // schema-rejection-test
+                    "kappa": 0.1,
+                    "sigma": 0.01,
+                    "initial": 0.03,
+                    "theta": 0.03
+                }
+            }))
+            .is_err(),
+            "retired kappa/sigma keys must not parse"
+        );
 
         // schema-rejection-test
         assert!(

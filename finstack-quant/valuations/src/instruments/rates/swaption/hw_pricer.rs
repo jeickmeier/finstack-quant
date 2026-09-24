@@ -225,8 +225,8 @@ impl SwaptionHullWhitePricer {
 
 /// Build the HW1F override JSON blob from a swaption's typed pricing overrides.
 ///
-/// Reads `model_config.hw1f_mean_reversion` → `hw1f_kappa` and
-/// `model_config.hw1f_sigma` → `hw1f_sigma` (the Hull-White short-rate absolute
+/// Reads `model_config.hw1f_mean_reversion` → κ and
+/// `model_config.hw1f_sigma` → σ (the Hull-White short-rate absolute
 /// volatility). Partial overrides are preserved so [`resolve_hw1f_params`] can
 /// reject them explicitly instead of combining sources.
 ///

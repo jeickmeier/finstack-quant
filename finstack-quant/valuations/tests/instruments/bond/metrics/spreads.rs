@@ -379,8 +379,12 @@ fn test_oas_metric_uses_bond_tree_pricing_overrides() {
     .unwrap();
     base_bond
         .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_sigma = Some(0.01);
+    base_bond
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     base_bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -401,12 +405,14 @@ fn test_oas_metric_uses_bond_tree_pricing_overrides() {
     let mut low_vol_bond = base_bond.clone();
     low_vol_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(99.0)
-        .with_implied_vol(0.001);
+        .with_hw1f_sigma(0.001)
+        .with_hw1f_mean_reversion(0.03);
 
     let mut high_vol_bond = base_bond;
     high_vol_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(99.0)
-        .with_implied_vol(0.05);
+        .with_hw1f_sigma(0.05)
+        .with_hw1f_mean_reversion(0.03);
 
     let low = low_vol_bond
         .price_with_metrics(
@@ -450,9 +456,10 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
     )
     .unwrap();
     bond.settlement_convention = None;
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 04 - 01),
@@ -464,7 +471,8 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(99.0)
-        .with_implied_vol(0.01)
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03)
         .with_tree_discount_curve_id("USD-TREE");
 
     let pricing_curve = DiscountCurve::builder("USD-OIS")
@@ -526,9 +534,10 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
     )
     .unwrap();
     bond.settlement_convention = None;
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -540,7 +549,8 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(103.0)
-        .with_implied_vol(0.02);
+        .with_hw1f_sigma(0.02)
+        .with_hw1f_mean_reversion(0.03);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -599,9 +609,10 @@ fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
         ex_coupon_days: 0,
         ex_coupon_calendar_id: None,
     });
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 02),
@@ -613,13 +624,12 @@ fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
     });
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "market_quotes": {
-            "quoted_oas": quoted_oas,
-            "implied_volatility": 0.20
+            "quoted_oas": quoted_oas
         },
         "model_config": {
             "tree_steps": 80,
             "vol_model": "black",
-            "mean_reversion": 0.0
+            "bdt_sigma": 0.20
         }
     }))
     .expect("BDT pricing overrides should deserialize");
@@ -655,7 +665,7 @@ fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
 }
 
 #[test]
-fn test_callable_bond_vega_is_registered_and_bumps_implied_volatility() {
+fn test_callable_bond_vega_is_registered_and_bumps_hw1f_sigma() {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
 
     let as_of = date!(2025 - 01 - 01);
@@ -669,9 +679,10 @@ fn test_callable_bond_vega_is_registered_and_bumps_implied_volatility() {
         "USD-OIS",
     )
     .unwrap();
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -683,7 +694,8 @@ fn test_callable_bond_vega_is_registered_and_bumps_implied_volatility() {
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(103.0)
-        .with_implied_vol(0.02);
+        .with_hw1f_sigma(0.02)
+        .with_hw1f_mean_reversion(0.03);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -727,9 +739,10 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
         "USD-OIS",
     )
     .unwrap();
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -741,13 +754,12 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
     });
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "market_quotes": {
-            "quoted_clean_price": 103.0,
-            "implied_volatility": 0.20
+            "quoted_clean_price": 103.0
         },
         "model_config": {
             "tree_steps": 40,
             "vol_model": "black",
-            "mean_reversion": 0.0
+            "bdt_sigma": 0.20
         }
     }))
     .expect("BDT pricing overrides should deserialize");
@@ -811,9 +823,10 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
         "USD-OIS",
     )
     .unwrap();
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -825,13 +838,12 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
     });
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "market_quotes": {
-            "quoted_clean_price": 103.0,
-            "implied_volatility": 0.20
+            "quoted_clean_price": 103.0
         },
         "model_config": {
             "tree_steps": 40,
             "vol_model": "black",
-            "mean_reversion": 0.0
+            "bdt_sigma": 0.20
         }
     }))
     .expect("BDT pricing overrides should deserialize");
@@ -876,9 +888,10 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         ex_coupon_days: 0,
         ex_coupon_calendar_id: None,
     });
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 02),
@@ -889,13 +902,10 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         puts: vec![],
     });
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
-        "market_quotes": {
-            "implied_volatility": 0.20
-        },
         "model_config": {
             "tree_steps": 80,
             "vol_model": "black",
-            "mean_reversion": 0.0
+            "bdt_sigma": 0.20
         }
     }))
     .expect("BDT pricing overrides should deserialize");
@@ -953,9 +963,10 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
         "USD-OIS",
     )
     .unwrap();
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -966,13 +977,10 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
         puts: vec![],
     });
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
-        "market_quotes": {
-            "implied_volatility": 0.20
-        },
         "model_config": {
             "tree_steps": 40,
             "vol_model": "black",
-            "mean_reversion": 0.0
+            "bdt_sigma": 0.20
         }
     }))
     .expect("BDT pricing overrides should deserialize");
@@ -1684,6 +1692,10 @@ fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
     )
     .expect("bond");
     bond.settlement_convention = None;
+    // The quote bundle includes the OAS, which needs the tree's short-rate model.
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2027 - 01 - 15),

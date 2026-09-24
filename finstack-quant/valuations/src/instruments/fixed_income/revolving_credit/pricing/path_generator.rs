@@ -131,7 +131,7 @@ pub fn generate_three_factor_paths(
             if overnight.is_some()
                 && matches!(
                     &mc_config.interest_rate_process,
-                    Some(InterestRateProcessSpec::HullWhite1F { sigma, .. }) if *sigma > 0.0
+                    Some(InterestRateProcessSpec::HullWhite1F { hw1f_sigma: sigma, .. }) if *sigma > 0.0
                 )
             {
                 return Err(finstack_quant_core::Error::Validation(
@@ -139,15 +139,15 @@ pub fn generate_three_factor_paths(
                      stochastic Hull-White rates: the path generator records short \
                      rates only on payment dates, not the daily fixing path required \
                      to compound an overnight coupon. Use a term index, set \
-                     Hull-White sigma to 0, or price overnight facilities on the \
+                     hull_white_1f.hw1f_sigma to 0, or price overnight facilities on the \
                      static forward curve."
                         .to_string(),
                 ));
             }
             match &mc_config.interest_rate_process {
                 Some(InterestRateProcessSpec::HullWhite1F {
-                    kappa,
-                    sigma,
+                    hw1f_mean_reversion: kappa,
+                    hw1f_sigma: sigma,
                     initial,
                     theta,
                 }) => {
@@ -857,8 +857,8 @@ mod tests {
         let config = McConfig {
             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
             interest_rate_process: Some(InterestRateProcessSpec::HullWhite1F {
-                kappa: 0.1,
-                sigma: 0.01,
+                hw1f_mean_reversion: 0.1,
+                hw1f_sigma: 0.01,
                 initial: 0.99,
                 theta: 0.99,
             }),

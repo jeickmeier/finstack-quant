@@ -12,7 +12,7 @@
 //! On the rates-credit path every model input comes from
 //! [`resolve_rates_credit_config`], so the four volatility regimes
 //! (deterministic/stochastic rates × deterministic/stochastic credit) are
-//! selected purely by `ModelConfig` — `hw1f_sigma`, `hazard_volatility`, the
+//! selected purely by `ModelConfig` — `hw1f_sigma`, `hazard_sigma`, the
 //! two mean reversions, and `rate_credit_correlation`. There are no
 //! engine-side volatility defaults: an unset volatility means a deterministic
 //! factor, not a hidden regime. Hazard inputs on a loan with no credit curve
@@ -24,7 +24,7 @@
 //! Set `hw1f_sigma` to zero for a frozen projection, or supply
 //! `credit_curve_id` so the rates-credit lattice can replay future resets.
 //!
-//! `hazard_volatility` is an **absolute** hazard-rate volatility, not a
+//! `hazard_sigma` is an **absolute** hazard-rate volatility, not a
 //! relative credit-spread volatility; see
 //! [`models::credit::market_anchored`](finstack_quant_models::credit::market_anchored)
 //! for the conversion from a market-quoted fractional spread vol.
@@ -68,7 +68,7 @@ use finstack_quant_models::{
 fn reject_inert_hazard_inputs(loan: &TermLoan) -> Result<()> {
     let model = &loan.instrument_pricing_overrides.model_config;
     let configured = [
-        ("hazard_volatility", model.hazard_volatility),
+        ("hazard_sigma", model.hazard_sigma),
         ("hazard_mean_reversion", model.hazard_mean_reversion),
         ("rate_credit_correlation", model.rate_credit_correlation),
     ]

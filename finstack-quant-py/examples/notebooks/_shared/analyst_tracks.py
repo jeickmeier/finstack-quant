@@ -119,8 +119,9 @@ def complex_bond() -> dict[str, Any]:
         25 percent PIK. Total coupon increases 25 bp after year four, retaining
         that split. Amortization pays 1 percent of original face each quarter
         after year five. Calls start at 103 after year three and decline to par.
-        Short-rate volatility is 1 percent; quoted prices are added explicitly
-        in the yield/OAS exercise, so the fixture retains a model valuation.
+        Hull-White mean reversion is 3 percent and short-rate volatility 1
+        percent; quoted prices are added explicitly in the yield/OAS exercise,
+        so the fixture retains a model valuation.
 
     Raises:
         ValueError: If canonical fixture inputs fail downstream validation.
@@ -166,7 +167,7 @@ def complex_bond() -> dict[str, Any]:
                 for year, price in ((2028, 103.0), (2029, 102.0), (2030, 101.0), (2031, 100.0), (2032, 100.0))
             ],
         },
-        "instrument_pricing_overrides": {"market_quotes": {"implied_volatility": 0.01}},
+        "instrument_pricing_overrides": {"model_config": {"hw1f_mean_reversion": 0.03, "hw1f_sigma": 0.01}},
     })
     return instrument_envelope(bond)
 

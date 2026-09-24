@@ -222,9 +222,10 @@ fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
         "USD-OIS",
     )
     .unwrap();
+    bond.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     bond.instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -236,7 +237,8 @@ fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(105.0)
-        .with_implied_vol(0.01);
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
     bond
 }
 
@@ -453,8 +455,12 @@ fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
     .unwrap();
     callable
         .instrument_pricing_overrides
-        .market_quotes
-        .implied_volatility = Some(0.01);
+        .model_config
+        .hw1f_sigma = Some(0.01);
+    callable
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
     callable.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
             start_date: date!(2028 - 01 - 01),
@@ -497,7 +503,8 @@ fn test_callable_workout_duration_uses_workout_yield_denominator() {
     let mut callable = callable_risk_bond(as_of);
     callable.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price(115.0)
-        .with_implied_vol(0.01);
+        .with_hw1f_sigma(0.01)
+        .with_hw1f_mean_reversion(0.03);
     let market = callable_risk_market(as_of);
 
     let result = callable
