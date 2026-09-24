@@ -649,7 +649,7 @@ fn build_commitment_fee_flows(
             .year_fraction(prev, d, DayCountContext::default())?;
         // The sub-period is [prev, d), so a step-down effective on `d` must not
         // reduce the commitment base for the interval that ends on `d`.
-        let limit = commitment_limit_at(ddtl, prev);
+        let limit = ddtl.limit_in_force_at(prev);
         if limit.currency() != loan.currency {
             return Err(finstack_quant_core::InputError::Invalid.into());
         }
@@ -696,16 +696,6 @@ fn build_commitment_fee_flows(
             ))
         })
         .collect()
-}
-
-fn commitment_limit_at(ddtl: &super::spec::DdtlSpec, date: Date) -> Money {
-    let mut limit = ddtl.commitment_limit;
-    for sd in &ddtl.commitment_step_downs {
-        if sd.date <= date {
-            limit = sd.amount;
-        }
-    }
-    limit
 }
 
 fn cumulative_drawn_at(ddtl: &super::spec::DdtlSpec, draw_stop: Option<Date>, date: Date) -> f64 {

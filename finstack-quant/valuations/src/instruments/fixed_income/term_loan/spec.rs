@@ -228,7 +228,22 @@ pub struct DdtlSpec {
     pub oid_policy: Option<OidPolicy>,
 }
 
-impl DdtlSpec {}
+impl DdtlSpec {
+    /// Commitment limit in force on `date`: the last step-down dated on or
+    /// before `date`, else `commitment_limit`.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date the limit is wanted for; a step dated on it applies.
+    pub(crate) fn limit_in_force_at(&self, date: Date) -> Money {
+        self.commitment_step_downs
+            .iter()
+            .filter(|step| step.date <= date)
+            .map(|step| step.amount)
+            .next_back()
+            .unwrap_or(self.commitment_limit)
+    }
+}
 
 /// Payment-in-kind (PIK) toggle event.
 ///

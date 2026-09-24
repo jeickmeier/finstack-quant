@@ -522,13 +522,7 @@ impl TermLoan {
             }
             self.validate_money(draw.amount, "DDTL draw", true)?;
             cumulative_draws += draw.amount.amount();
-            let effective_limit = ddtl
-                .commitment_step_downs
-                .iter()
-                .filter(|step| step.date <= draw.date)
-                .map(|step| step.amount.amount())
-                .next_back()
-                .unwrap_or(ddtl.commitment_limit.amount());
+            let effective_limit = ddtl.limit_in_force_at(draw.date).amount();
             if cumulative_draws > effective_limit + 1e-6 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} cumulative DDTL draws exceed the effective commitment"
