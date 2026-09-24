@@ -5,10 +5,9 @@
 
 use super::DealFees;
 use crate::instruments::fixed_income::structured_credit::assumptions::{
-    embedded_registry_or_panic, StandardRates,
+    embedded_registry_or_panic, required_assumption, StandardRates,
 };
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::Result;
 
 /// Average days per year for structured credit day count calculations (ACT/365.25).
 ///
@@ -91,18 +90,12 @@ pub fn abs_servicing_fee_bp() -> f64 {
 
 /// Standard CMBS master servicer fee (bp).
 pub fn cmbs_master_servicer_fee_bp() -> f64 {
-    required_optional(
-        cmbs_fees().master_servicer_fee_bp,
-        "standard CMBS master servicer fee",
-    )
+    required_optional(cmbs_fees().master_servicer_fee_bp)
 }
 
 /// Standard CMBS special servicer fee (bp).
 pub fn cmbs_special_servicer_fee_bp() -> f64 {
-    required_optional(
-        cmbs_fees().special_servicer_fee_bp,
-        "standard CMBS special servicer fee",
-    )
+    required_optional(cmbs_fees().special_servicer_fee_bp)
 }
 
 /// Standard RMBS servicing fee (bp).
@@ -280,12 +273,7 @@ pub fn cmbs_standard_cpr() -> f64 {
 }
 
 #[allow(clippy::expect_used)]
-fn required_assumption<T>(result: Result<T>) -> T {
-    result.expect("embedded structured-credit assumptions registry value should exist")
-}
-
-#[allow(clippy::expect_used)]
-fn required_optional<T>(value: Option<T>, _label: &str) -> T {
+fn required_optional<T>(value: Option<T>) -> T {
     value.expect("embedded structured-credit assumptions registry optional value should exist")
 }
 

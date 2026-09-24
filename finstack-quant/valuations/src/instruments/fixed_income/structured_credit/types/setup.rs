@@ -5,9 +5,10 @@
 //! [`super::WaterfallRules`]; this module only holds the fee schedule the
 //! template waterfall turns into fee tiers.
 
-use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
+use crate::instruments::fixed_income::structured_credit::assumptions::{
+    embedded_registry_or_panic, required_assumption,
+};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Result;
 
 use serde::{Deserialize, Serialize};
 
@@ -65,40 +66,25 @@ pub struct IncentiveFeeSpec {
 impl DealFees {
     /// Create CLO-style fee structure
     pub fn clo_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(
-            embedded_registry_or_panic().deal_fees("clo_standard", base_currency),
-            "standard CLO fees",
-        )
+        required_assumption(embedded_registry_or_panic().deal_fees("clo_standard", base_currency))
     }
 
     /// Create ABS-style fee structure
     pub fn abs_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
         required_assumption(
             embedded_registry_or_panic().deal_fees("abs_auto_standard", base_currency),
-            "standard ABS fees",
         )
     }
 
     /// Create CMBS-style fee structure
     pub fn cmbs_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(
-            embedded_registry_or_panic().deal_fees("cmbs_standard", base_currency),
-            "standard CMBS fees",
-        )
+        required_assumption(embedded_registry_or_panic().deal_fees("cmbs_standard", base_currency))
     }
 
     /// Create RMBS-style fee structure
     pub fn rmbs_standard(base_currency: finstack_quant_core::currency::Currency) -> Self {
-        required_assumption(
-            embedded_registry_or_panic().deal_fees("rmbs_standard", base_currency),
-            "standard RMBS fees",
-        )
+        required_assumption(embedded_registry_or_panic().deal_fees("rmbs_standard", base_currency))
     }
-}
-
-#[allow(clippy::expect_used)]
-fn required_assumption<T>(result: Result<T>, _label: &str) -> T {
-    result.expect("embedded structured-credit assumptions registry value should exist")
 }
 
 #[cfg(test)]

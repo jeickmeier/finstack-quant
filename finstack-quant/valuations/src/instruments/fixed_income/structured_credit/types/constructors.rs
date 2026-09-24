@@ -8,11 +8,12 @@ use super::{
     Metadata, Overrides, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, StructuredCredit,
     Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
-use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
+use crate::instruments::fixed_income::structured_credit::assumptions::{
+    embedded_registry_or_panic, required_assumption,
+};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_core::Result;
 
 use crate::instruments::common_impl::traits::Attributes;
 
@@ -373,10 +374,8 @@ impl StructuredCredit {
 
 #[allow(clippy::expect_used)]
 fn deal_config_from_registry(profile_id: &str, closing_date: Date) -> DealConfig {
-    let defaults = required_assumption(
-        embedded_registry_or_panic().constructor_defaults(profile_id),
-        "constructor defaults",
-    );
+    let defaults =
+        required_assumption(embedded_registry_or_panic().constructor_defaults(profile_id));
     DealConfig {
         first_payment_date: closing_date.add_months(
             defaults
@@ -392,9 +391,4 @@ fn deal_config_from_registry(profile_id: &str, closing_date: Date) -> DealConfig
         deal_metadata: Metadata::default(),
         behavior_overrides: Overrides::default(),
     }
-}
-
-#[allow(clippy::expect_used)]
-fn required_assumption<T>(result: Result<T>, _label: &str) -> T {
-    result.expect("embedded structured-credit assumptions registry value should exist")
 }

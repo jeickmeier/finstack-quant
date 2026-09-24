@@ -16,7 +16,9 @@
 //! - PSA Standard Prepayment Model assumptions `docs/REFERENCES.md#richard-roll-1989`
 //! - Basel IRB correlation formulas `docs/REFERENCES.md#basel-ii-2006`
 
-use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
+use crate::instruments::fixed_income::structured_credit::assumptions::{
+    embedded_registry_or_panic, required_assumption,
+};
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_core::Result;
 use finstack_quant_models::credit::pool::{
@@ -58,10 +60,7 @@ pub(crate) struct RmbsCalibration {
 /// - Moderate prepayment (6% CPR base)
 /// - Standard PSA-style seasoning
 pub(crate) fn rmbs_standard() -> RmbsCalibration {
-    required_assumption(
-        embedded_registry_or_panic().rmbs_stochastic_calibration("rmbs_standard"),
-        "standard RMBS stochastic calibration",
-    )
+    required_assumption(embedded_registry_or_panic().rmbs_stochastic_calibration("rmbs_standard"))
 }
 
 /// CLO standard calibration parameters.
@@ -94,10 +93,7 @@ pub(crate) struct CloCalibration {
 /// - Higher correlation (20-25%) for corporate exposures
 /// - Higher prepayment (20% CPR, the CLO registry base case) due to refinancing
 pub(crate) fn clo_standard() -> CloCalibration {
-    required_assumption(
-        embedded_registry_or_panic().clo_stochastic_calibration("clo_standard"),
-        "standard CLO stochastic calibration",
-    )
+    required_assumption(embedded_registry_or_panic().clo_stochastic_calibration("clo_standard"))
 }
 
 /// CMBS standard calibration parameters.
@@ -124,10 +120,7 @@ pub(crate) struct CmbsCalibration {
 /// - Moderate correlation (15%)
 /// - Low prepayment due to lockouts/defeasance (3% CPR)
 pub(crate) fn cmbs_standard() -> CmbsCalibration {
-    required_assumption(
-        embedded_registry_or_panic().cmbs_stochastic_calibration("cmbs_standard"),
-        "standard CMBS stochastic calibration",
-    )
+    required_assumption(embedded_registry_or_panic().cmbs_stochastic_calibration("cmbs_standard"))
 }
 
 pub(crate) fn rmbs_default_spec() -> StochasticDefaultSpec {
@@ -178,11 +171,6 @@ pub(crate) fn cmbs_correlation_structure() -> Result<CorrelationStructure> {
 
 pub(crate) fn abs_auto_correlation_structure() -> Result<CorrelationStructure> {
     CorrelationStructure::flat(0.08, -0.10)
-}
-
-#[allow(clippy::expect_used)]
-fn required_assumption<T>(result: Result<T>, _label: &str) -> T {
-    result.expect("embedded structured-credit assumptions registry value should exist")
 }
 
 #[cfg(test)]
