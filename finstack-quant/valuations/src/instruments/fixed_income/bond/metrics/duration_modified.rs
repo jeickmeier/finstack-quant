@@ -52,6 +52,12 @@ impl MetricCalculator for ModifiedDurationCalculator {
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             return super::effective::effective_duration(bond, context, None);
         }
+        let workout = if has_options {
+            super::context_workout_path(context)?
+        } else {
+            None
+        };
+        let bond: &Bond = context.instrument_as()?;
 
         let ytm = context
             .computed
@@ -74,17 +80,7 @@ impl MetricCalculator for ModifiedDurationCalculator {
             })?;
 
         let denominator_yield = if has_options {
-            if let Some(flows) = context.cashflows.as_ref() {
-                if let Some((workout_yield, _, _)) =
-                    super::quoted_workout_path(bond, context.curves.as_ref(), context.as_of, flows)?
-                {
-                    workout_yield
-                } else {
-                    ytm
-                }
-            } else {
-                ytm
-            }
+            workout.map_or(ytm, |(workout_yield, _, _)| workout_yield)
         } else {
             ytm
         };

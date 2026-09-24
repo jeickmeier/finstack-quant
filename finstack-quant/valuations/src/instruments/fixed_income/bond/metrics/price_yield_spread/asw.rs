@@ -612,6 +612,8 @@ impl MetricCalculator for AssetSwapMarketCalculator {
     }
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let workout =
+            crate::instruments::fixed_income::bond::metrics::context_workout_path(context)?;
         let (
             discount_curve_id,
             maturity,
@@ -762,15 +764,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
         };
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
         if let Some(clean_px) = quoted_clean {
-            let flows = quote_ctx.entitled_flows(bond, &context.curves, context.as_of)?;
-            if let Some((_, workout_flows, workout_quote_date)) =
-                crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
-                    bond,
-                    context.curves.as_ref(),
-                    context.as_of,
-                    &flows,
-                )?
-            {
+            if let Some((_, workout_flows, workout_quote_date)) = workout {
                 let workout_maturity = workout_flows
                     .last()
                     .map(|(date, _)| *date)

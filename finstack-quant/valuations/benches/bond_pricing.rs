@@ -559,6 +559,28 @@ fn bench_call_window(c: &mut Criterion) {
             black_box(pv)
         });
     });
+    group.bench_function("workout_metrics_5y_window", |b| {
+        b.iter(|| {
+            let result = quoted
+                .price_with_metrics(
+                    black_box(&market),
+                    black_box(as_of),
+                    &[
+                        MetricId::Ytw,
+                        MetricId::ISpread,
+                        MetricId::ZSpread,
+                        MetricId::DurationMac,
+                        MetricId::DurationMod,
+                        MetricId::Convexity,
+                        MetricId::YieldDv01,
+                        MetricId::ASWMarket,
+                    ],
+                    PricingOptions::default(),
+                )
+                .unwrap_or_else(|e| panic!("call-window workout metrics failed: {e:?}"));
+            black_box(result)
+        });
+    });
     group.bench_function("oas_metric_5y_window", |b| {
         b.iter(|| {
             let result = quoted

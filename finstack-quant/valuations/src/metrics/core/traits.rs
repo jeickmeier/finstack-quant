@@ -221,6 +221,12 @@ pub struct MetricContext {
     /// Tranche-level detailed cashflow results (for structured credit)
     pub detailed_tranche_cashflows: Option<TrancheCashflows>,
 
+    /// Bond yield-to-worst path at the quoted price, shared by the workout
+    /// metrics (YTW, durations, convexity, yield DV01, I-spread, ASW).
+    /// `Some(None)` records that the bond has no quoted workout path.
+    pub(crate) bond_workout_path:
+        Option<Option<crate::instruments::fixed_income::bond::metrics::QuotedWorkoutPath>>,
+
     /// Deal-level contractual accrual records from the projected waterfall.
     pub(crate) structured_credit_accruals:
         Option<Vec<crate::instruments::fixed_income::structured_credit::TrancheAccrualPeriod>>,
@@ -292,6 +298,7 @@ impl MetricContext {
             tagged_cashflows: None,
             internal_schedule: None,
             detailed_tranche_cashflows: None,
+            bond_workout_path: None,
             structured_credit_accruals: None,
             discount_curve_id: None,
             day_count: None,
@@ -525,11 +532,13 @@ impl MetricContext {
     pub(crate) fn set_market(&mut self, market: Arc<MarketContext>) {
         self.inputs.curves = market;
         self.market_scratch = None;
+        self.bond_workout_path = None;
     }
 
     /// Temporarily replace the instrument view during a scoped metric calculation.
     pub(crate) fn set_instrument(&mut self, instrument: Arc<dyn Instrument>) {
         self.inputs.instrument = instrument;
+        self.bond_workout_path = None;
     }
 
     /// Replace the request's base value during test or nested metric setup.

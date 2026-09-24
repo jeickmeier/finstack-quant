@@ -83,7 +83,7 @@ impl MetricCalculator for BondDv01Calculator {
                 .get(&MetricId::Ytm)
                 .copied()
                 .ok_or_else(|| crate::metrics::metric_not_found(MetricId::Ytm))?;
-            return super::yield_dv01::yield_basis_dv01(bond, context, duration_mod, ytm);
+            return super::yield_dv01::yield_basis_dv01(context, duration_mod, ytm);
         }
 
         let has_price_driver = bond

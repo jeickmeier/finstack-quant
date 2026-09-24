@@ -31,6 +31,8 @@ impl MetricCalculator for ISpreadCalculator {
     }
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let workout =
+            crate::instruments::fixed_income::bond::metrics::context_workout_path(context)?;
         let bond: &Bond = context.instrument_as()?;
 
         let ytm = context
@@ -45,22 +47,15 @@ impl MetricCalculator for ISpreadCalculator {
 
         let disc = context.curves.get_discount(&bond.discount_curve_id)?;
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        let flows = quote_ctx.entitled_flows(bond, &context.curves, context.as_of)?;
-        let (yield_rate, horizon) =
-            match crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
-                bond,
-                context.curves.as_ref(),
-                context.as_of,
-                &flows,
-            )? {
-                Some((workout_yield, workout_flows, _)) => (
-                    workout_yield,
-                    workout_flows
-                        .last()
-                        .map_or(bond.maturity, |(date, _)| *date),
-                ),
-                None => (ytm, bond.maturity),
-            };
+        let (yield_rate, horizon) = match workout {
+            Some((workout_yield, workout_flows, _)) => (
+                workout_yield,
+                workout_flows
+                    .last()
+                    .map_or(bond.maturity, |(date, _)| *date),
+            ),
+            None => (ytm, bond.maturity),
+        };
         Ok(yield_rate - i_spread_par_rate(bond, disc.as_ref(), quote_ctx.quote_date, horizon)?)
     }
 }

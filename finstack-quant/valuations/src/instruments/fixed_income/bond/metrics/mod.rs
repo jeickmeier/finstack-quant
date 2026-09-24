@@ -95,7 +95,8 @@ pub(crate) use wal::BondWalCalculator;
 pub(crate) use yield_dv01::YieldDv01Calculator;
 
 type BondCashflowPath = Vec<(Date, Money)>;
-type QuotedWorkoutPath = (f64, BondCashflowPath, Date);
+/// Yield-to-worst at the quoted price, its cashflow path and the quote date.
+pub(crate) type QuotedWorkoutPath = (f64, BondCashflowPath, Date);
 
 pub(crate) fn bond_risk_basis(
     context: &crate::metrics::MetricContext,
@@ -105,6 +106,41 @@ pub(crate) fn bond_risk_basis(
         .map_or_else(crate::instruments::BondRiskBasis::default, |overrides| {
             overrides.bond_risk_basis_or_default()
         })
+}
+
+/// [`quoted_workout_path`] for the context's bond on its entitled flows at
+/// the quote date, computed once per metric request and cached on the
+/// context.
+pub(crate) fn context_workout_path(
+    context: &mut crate::metrics::MetricContext,
+) -> finstack_quant_core::Result<Option<QuotedWorkoutPath>> {
+    if let Some(cached) = &context.bond_workout_path {
+        return Ok(cached.clone());
+    }
+    let path = {
+        let bond: &crate::instruments::Bond = context.instrument_as()?;
+        let may_have_workout = (bond.return_floor.is_some()
+            || bond.call_put.as_ref().is_some_and(|cp| cp.has_options()))
+            && bond
+                .instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price
+                .is_some();
+        if !may_have_workout {
+            context.bond_workout_path = Some(None);
+            return Ok(None);
+        }
+        let quote_ctx =
+            crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext::new(
+                bond,
+                &context.curves,
+                context.as_of,
+            )?;
+        let flows = quote_ctx.entitled_flows(bond, &context.curves, context.as_of)?;
+        quoted_workout_path(bond, context.curves.as_ref(), context.as_of, &flows)?
+    };
+    context.bond_workout_path = Some(path.clone());
+    Ok(path)
 }
 
 pub(crate) fn quoted_workout_path(
