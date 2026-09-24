@@ -5,13 +5,10 @@ use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
+    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationInterpolation, InflationLag,
-};
-use finstack_quant_core::market_data::term_structures::InflationCurve;
+use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CalendarId;
 use finstack_quant_core::types::CurveId;
@@ -19,8 +16,6 @@ use finstack_quant_core::types::InstrumentId;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
-use std::sync::Arc;
-use time::Duration;
 
 use super::parameters::InflationLinkedBondParams;
 use crate::impl_instrument_base;
@@ -75,9 +70,9 @@ impl IndexationMethod {
     /// # UK Gilt Convention Notes
     ///
     /// For `IndexationMethod::Uk`, this returns the **legacy 8-month lag** which applies to
-    /// UK Index-Linked Gilts issued **before September 2005**. For modern Gilts issued
-    /// **on or after September 2005**, use [`IndexationMethod::standard_lag_modern`] which
-    /// returns the 3-month lag consistent with international standards.
+    /// UK Index-Linked Gilts issued **before September 2005**. Modern Gilts issued
+    /// **on or after September 2005** use a 3-month lag with daily interpolation,
+    /// consistent with international standards; set `lag` explicitly for those.
     ///
     /// | Issue Date | Indexation Lag | Interpolation |
     /// |------------|----------------|---------------|
@@ -97,59 +92,6 @@ impl IndexationMethod {
             | IndexationMethod::French
             | IndexationMethod::Japanese => InflationLag::Months(3),
         }
-    }
-
-    /// Get the modern indexation lag for markets that have transitioned.
-    ///
-    /// # UK Gilt Modern Convention
-    ///
-    /// UK Index-Linked Gilts issued **on or after September 2005** use a 3-month lag
-    /// with daily linear interpolation, aligning with TIPS and other international linkers.
-    ///
-    /// For legacy UK Gilts (pre-September 2005), use [`standard_lag`](Self::standard_lag).
-    pub fn standard_lag_modern(&self) -> InflationLag {
-        match self {
-            IndexationMethod::Uk => InflationLag::Months(3), // Modern UK Gilts (Sep 2005+)
-            _ => self.standard_lag(),
-        }
-    }
-
-    /// Whether this method uses daily interpolation.
-    ///
-    /// # UK Gilt Note
-    ///
-    /// For UK Gilts, this returns `false` (step interpolation) which applies to legacy bonds.
-    /// Modern UK Index-Linked Gilts (post-Sep 2005) use daily linear interpolation;
-    /// use [`uses_daily_interpolation_modern`](Self::uses_daily_interpolation_modern) for those.
-    ///
-    /// # JGBi Note
-    ///
-    /// Japanese JGBi (issued from March 2004 onward) use a daily-interpolated
-    /// reference CPI with a 3-month lag, the same convention as US TIPS
-    /// (Japan Ministry of Finance, "Inflation-Indexed Bonds" issuance terms).
-    pub fn uses_daily_interpolation(&self) -> bool {
-        matches!(
-            self,
-            IndexationMethod::Canadian
-                | IndexationMethod::Tips
-                | IndexationMethod::French
-                | IndexationMethod::Japanese
-        )
-    }
-
-    /// Whether modern issuances of this method use daily interpolation.
-    ///
-    /// Modern UK Index-Linked Gilts (September 2005 onwards) switched to daily linear
-    /// interpolation, matching TIPS and other international linkers.
-    pub fn uses_daily_interpolation_modern(&self) -> bool {
-        matches!(
-            self,
-            IndexationMethod::Canadian
-                | IndexationMethod::Tips
-                | IndexationMethod::Uk
-                | IndexationMethod::French
-                | IndexationMethod::Japanese
-        )
     }
 }
 
@@ -185,106 +127,6 @@ impl std::str::FromStr for DeflationProtection {
             "maturity_only" => Ok(DeflationProtection::MaturityOnly),
             "all_payments" => Ok(DeflationProtection::AllPayments),
             _ => Err(format!("Unknown deflation protection: {s}")),
-        }
-    }
-}
-
-#[derive(Clone)]
-enum InflationSource {
-    Index(Arc<InflationIndex>),
-    Curve(Arc<InflationCurve>),
-    Hybrid {
-        index: Arc<InflationIndex>,
-        curve: Arc<InflationCurve>,
-    },
-}
-
-impl InflationSource {
-    fn from_market(curves: &MarketContext, id: &CurveId) -> Result<Self> {
-        let index = curves.get_inflation_index(id.as_str()).ok();
-        let curve = curves.get_inflation_curve(id.as_str()).ok();
-        match (index, curve) {
-            (Some(index), Some(curve)) => Ok(Self::Hybrid { index, curve }),
-            (Some(index), None) => Ok(Self::Index(index)),
-            (None, Some(curve)) => Ok(Self::Curve(curve)),
-            (None, None) => Err(finstack_quant_core::InputError::NotFound {
-                id: id.as_str().to_string(),
-            }
-            .into()),
-        }
-    }
-
-    fn ratio(&self, bond: &InflationLinkedBond, date: Date) -> Result<f64> {
-        match self {
-            Self::Index(index) => bond.index_ratio(date, index.as_ref()),
-            Self::Curve(curve) => bond.index_ratio_from_curve(date, curve.as_ref()),
-            Self::Hybrid { index, curve } => {
-                let expected_interp = bond.validate_index_conventions(index.as_ref())?;
-                let (first_published, last_published) = index.date_range()?;
-                let cpi_on = |reference_date: Date| -> Result<f64> {
-                    let monthly = matches!(bond.lag, InflationLag::Months(_));
-                    let before_first = if monthly {
-                        (reference_date.year(), reference_date.month())
-                            < (first_published.year(), first_published.month())
-                    } else {
-                        reference_date < first_published
-                    };
-                    let published = if monthly {
-                        (reference_date.year(), reference_date.month())
-                            <= (last_published.year(), last_published.month())
-                    } else {
-                        reference_date <= last_published
-                    };
-                    if before_first {
-                        return Err(finstack_quant_core::InputError::NotFound {
-                            id: format!(
-                                "inflation index '{}' observation on or before {}",
-                                index.id, reference_date
-                            ),
-                        }
-                        .into());
-                    }
-                    if published {
-                        if monthly {
-                            index.ref_cpi_months_lag(
-                                reference_date.replace_day(1).map_err(|_| {
-                                    finstack_quant_core::InputError::InvalidDateRange
-                                })?,
-                                0,
-                            )
-                        } else {
-                            index.value_on(reference_date)
-                        }
-                    } else {
-                        curve.cpi_on_date(reference_date)
-                    }
-                };
-
-                let current_index = match bond.lag {
-                    InflationLag::Months(months)
-                        if expected_interp == InflationInterpolation::Linear =>
-                    {
-                        let (anchor0, anchor1, weight) =
-                            InflationLinkedBond::ref_cpi_anchors(date, months.into())?;
-                        let cpi0 = cpi_on(anchor0)?;
-                        if weight == 0.0 {
-                            cpi0
-                        } else {
-                            let cpi1 = cpi_on(anchor1)?;
-                            cpi0 + weight * (cpi1 - cpi0)
-                        }
-                    }
-                    InflationLag::Months(months) => cpi_on(
-                        InflationLinkedBond::step_reference_month(date, months.into())?,
-                    )?,
-                    InflationLag::Days(days) => cpi_on(date - Duration::days(i64::from(days)))?,
-                    _ => cpi_on(date)?,
-                };
-                if bond.base_index <= 0.0 {
-                    return Err(finstack_quant_core::InputError::NonPositiveValue.into());
-                }
-                Ok(current_index / bond.base_index)
-            }
         }
     }
 }
@@ -445,29 +287,8 @@ impl InflationLinkedBond {
                 "{context} UK linkers require a 3-month modern or 8-month legacy lag"
             )));
         }
-        let calendar_id = self
-            .calendar_id
-            .as_ref()
-            .map_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID, |id| {
-                id.as_str()
-            });
-        crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: self.issue_date,
-                end: self.maturity,
-                frequency: self.frequency,
-                stub: self.stub,
-                business_day_convention: self.business_day_convention,
-                calendar_id,
-                end_of_month: false,
-                day_count: self.day_count,
-                payment_lag_days: 0,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )?;
+        crate::cashflow::builder::calendar::resolve_calendar_strict(self.schedule_calendar_id())?;
+        let periods = self.periods()?;
         if periods.is_empty() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} must generate at least one coupon period"
@@ -644,188 +465,44 @@ impl InflationLinkedBond {
         }
     }
 
-    fn inflation_source(&self, curves: &MarketContext) -> Result<InflationSource> {
-        InflationSource::from_market(curves, &self.inflation_index_id)
+    /// Holiday calendar for schedule adjustment; weekends-only when unset.
+    fn schedule_calendar_id(&self) -> &str {
+        self.calendar_id
+            .as_deref()
+            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
     }
 
-    /// Calculate the raw index ratio for a given date (CPI(date) / CPI(base)).
+    /// Coupon periods from issue to maturity under the bond's schedule
+    /// conventions (unadjusted accrual dates, business-day adjusted payment
+    /// dates, no payment lag).
     ///
-    /// Returns the **unfloored** ratio. Deflation protection is applied when
-    /// building the canonical cashflow schedule so that the
-    /// TIPS-style principal-only floor does not leak into coupon indexation.
-    ///
-    /// | Method | Lag | Interpolation |
-    /// |--------|-----|---------------|
-    /// | TIPS/Canadian | 3 months | Linear (daily) |
-    /// | UK Gilt (legacy) | 8 months | Step (monthly) |
-    /// | UK Gilt (modern) | 3 months | Linear (daily) |
-    /// | French OAT€i | 3 months | Linear (daily) |
-    /// | Japanese JGBi | 3 months | Linear (daily) |
-    ///
-    /// # Lag Ownership
-    ///
-    /// The bond owns the lag: it shifts the lookup date before calling
-    /// `InflationIndex::value_on`. The provided index **must** have
-    /// `lag == InflationLag::None` to avoid double-lagging.
-    pub fn index_ratio(&self, date: Date, inflation_index: &InflationIndex) -> Result<f64> {
-        let expected_interp = self.validate_index_conventions(inflation_index)?;
-
-        let current_index = match self.lag {
-            // Months-lag with daily interpolation follows the official RefCPI
-            // formula: anchor on first-of-month CPI(m−L)/CPI(m−L+1) and weight
-            // by (day−1)/D(settlement month). A generic calendar shift +
-            // interpolation mis-weights month-end settlements (day clamping).
-            InflationLag::Months(m) if expected_interp == InflationInterpolation::Linear => {
-                inflation_index.ref_cpi_months_lag(date, m.into())?
-            }
-            InflationLag::Months(m) => inflation_index.ref_cpi_months_lag(
-                date.replace_day(1)
-                    .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?,
-                m.into(),
-            )?,
-            InflationLag::Days(d) => inflation_index.value_on(date - Duration::days(d as i64))?,
-            _ => inflation_index.value_on(date)?,
-        };
-
-        if self.base_index <= 0.0 {
-            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
-        }
-        Ok(current_index / self.base_index)
+    /// Shared by validation, the real schedule and the projected schedule so
+    /// every view sees the same periods.
+    fn periods(&self) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+        crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: self.issue_date,
+                end: self.maturity,
+                frequency: self.frequency,
+                stub: self.stub,
+                business_day_convention: self.business_day_convention,
+                calendar_id: self.schedule_calendar_id(),
+                end_of_month: false,
+                day_count: self.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            },
+        )
     }
 
-    fn validate_index_conventions(
-        &self,
-        inflation_index: &InflationIndex,
-    ) -> Result<InflationInterpolation> {
-        if !matches!(inflation_index.lag(), InflationLag::None) {
-            return Err(finstack_quant_core::Error::Validation(
-                "InflationIndex must have lag=None when used with InflationLinkedBond \
-                 (the bond applies its own lag to avoid double-lagging)"
-                    .to_string(),
-            ));
-        }
-
-        let is_modern_uk = matches!(self.indexation_method, IndexationMethod::Uk)
-            && matches!(self.lag, InflationLag::Months(m) if m <= 3);
-
-        if matches!(self.indexation_method, IndexationMethod::Uk) {
-            let valid_uk_lag =
-                matches!(self.lag, InflationLag::Months(3) | InflationLag::Months(8));
-            if !valid_uk_lag {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Non-standard UK gilt lag {:?}: expected Months(3) for modern or \
-                     Months(8) for legacy. Index ratio cannot be reliably computed for \
-                     non-standard lags.",
-                    self.lag
-                )));
-            }
-        }
-
-        let expected_interp = match self.indexation_method {
-            IndexationMethod::Tips
-            | IndexationMethod::Canadian
-            | IndexationMethod::French
-            | IndexationMethod::Japanese => InflationInterpolation::Linear,
-            IndexationMethod::Uk => {
-                if is_modern_uk {
-                    InflationInterpolation::Linear
-                } else {
-                    InflationInterpolation::Step
-                }
-            }
-        };
-        if inflation_index.interpolation() != expected_interp {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Inflation index interpolation mismatch for {:?}: expected {:?}, got {:?}",
-                self.indexation_method,
-                expected_interp,
-                inflation_index.interpolation()
-            )));
-        }
-
-        Ok(expected_interp)
-    }
-
-    /// Calculate the raw index ratio using an inflation term structure.
-    ///
-    /// Uses the curve's own base date and day count for time conversion
-    /// (via [`InflationCurve::cpi_on_date`]), avoiding day-count basis
-    /// mismatches between the bond and the curve.
-    ///
-    /// Returns the **unfloored** ratio. Deflation protection is applied when
-    /// building the canonical cashflow schedule.
-    pub fn index_ratio_from_curve(
-        &self,
-        date: Date,
-        inflation_curve: &InflationCurve,
-    ) -> Result<f64> {
-        let current_index = match self.lag {
-            // Same official RefCPI weighting as `index_ratio`: anchor on
-            // first-of-month CPI(m−L)/CPI(m−L+1), weight by (day−1)/D(m).
-            InflationLag::Months(m) if self.daily_interpolated_indexation() => {
-                let (anchor0, anchor1, weight) = Self::ref_cpi_anchors(date, m.into())?;
-                let cpi0 = inflation_curve.cpi_on_date(anchor0)?;
-                let cpi1 = inflation_curve.cpi_on_date(anchor1)?;
-                cpi0 + weight * (cpi1 - cpi0)
-            }
-            InflationLag::Months(m) => {
-                inflation_curve.cpi_on_date(Self::step_reference_month(date, m.into())?)?
-            }
-            InflationLag::Days(d) => {
-                inflation_curve.cpi_on_date(date - Duration::days(d as i64))?
-            }
-            _ => inflation_curve.cpi_on_date(date)?,
-        };
-
-        if self.base_index <= 0.0 {
-            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
-        }
-        Ok(current_index / self.base_index)
-    }
-
-    /// Whether the indexation method uses daily-interpolated reference CPI
-    /// (the official months-lag RefCPI formula) rather than a step lookup.
-    ///
-    /// Japanese JGBi (issued from March 2004 onward) use the same
-    /// daily-interpolated 3-month-lag reference CPI as US TIPS.
-    fn daily_interpolated_indexation(&self) -> bool {
-        match self.indexation_method {
-            IndexationMethod::Tips
-            | IndexationMethod::Canadian
-            | IndexationMethod::French
-            | IndexationMethod::Japanese => true,
-            IndexationMethod::Uk => matches!(self.lag, InflationLag::Months(m) if m <= 3),
-        }
-    }
-
-    /// Reference month for a step (non-interpolated) months lag: the first of
-    /// the month `lag_months` before the month containing `date`. A monthly
-    /// CPI print applies to its whole month, so a mid-month date must not
-    /// interpolate between prints.
-    fn step_reference_month(date: Date, lag_months: u32) -> Result<Date> {
-        Ok(date
-            .replace_day(1)
-            .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?
-            .add_months(-(lag_months as i32)))
-    }
-
-    /// First-of-month anchor dates and interpolation weight for the official
-    /// RefCPI formula: `RefCPI(d) = CPI(m−L) + (day−1)/D(m) × [CPI(m−L+1) − CPI(m−L)]`.
-    fn ref_cpi_anchors(date: Date, lag_months: u32) -> Result<(Date, Date, f64)> {
-        let first_of_month =
-            Date::from_calendar_date(date.year(), date.month(), 1).map_err(|_| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::InvalidDateRange)
-            })?;
-        let anchor0 = first_of_month.add_months(-(lag_months as i32));
-        let anchor1 = anchor0.add_months(1);
-        let weight = (f64::from(date.day()) - 1.0) / f64::from(date.month().length(date.year()));
-        Ok((anchor0, anchor1, weight))
-    }
-
-    /// Calculate index ratio sourcing inflation data from the market context
-    pub fn index_ratio_from_market(&self, date: Date, curves: &MarketContext) -> Result<f64> {
-        let source = self.inflation_source(curves)?;
-        source.ratio(self, date)
+    /// Real coupon rate as a decimal (0.02 = 2%).
+    fn real_coupon_rate(&self) -> Result<f64> {
+        Ok(self
+            .real_coupon
+            .to_f64()
+            .ok_or(finstack_quant_core::InputError::ConversionOverflow)?)
     }
 
     /// Business-day-adjusted maturity on which principal is paid.
@@ -836,79 +513,102 @@ impl InflationLinkedBond {
         crate::cashflow::builder::calendar::adjust_date(
             self.maturity,
             self.business_day_convention,
-            self.calendar_id
-                .as_deref()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+            self.schedule_calendar_id(),
         )
     }
 
-    /// Calculate real accrued interest at the given date
-    fn accrued_real_interest(&self, as_of: Date) -> Result<f64> {
-        if self.issue_date >= self.maturity {
-            return Ok(0.0);
-        }
-        // Reconstruct the date schedule
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: self.issue_date,
-                end: self.maturity,
-                frequency: self.frequency,
-                stub: self.stub,
-                business_day_convention: self.business_day_convention,
-                calendar_id: self
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-                end_of_month: false,
-                day_count: self.day_count,
-                payment_lag_days: 0,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )?;
-        if periods.is_empty() {
-            return Ok(0.0);
-        }
+    /// Real (unindexed) cashflow schedule: one coupon per period carrying its
+    /// contractual accrual boundaries, plus principal at the adjusted maturity.
+    ///
+    /// The coupon's ACT/ACT ICMA reference period is its own accrual period.
+    fn real_cashflow_schedule(&self) -> Result<crate::cashflow::builder::CashFlowSchedule> {
+        use crate::cashflow::primitives::{CFKind, CashFlow, CashFlowAccrual};
 
+        let coupon_rate = self.real_coupon_rate()?;
+        let currency = self.notional.currency();
+        let periods = if self.issue_date < self.maturity {
+            self.periods()?
+        } else {
+            Vec::new()
+        };
+        let mut flows = Vec::with_capacity(periods.len() + 1);
         for period in &periods {
-            let start = period.accrual_start;
-            let end = period.accrual_end;
-            if start <= as_of && as_of < end {
-                // Found the active period
-                // ACT/ACT (ISMA) — the default real day count for TIPS/linkers —
-                // requires the coupon frequency and reference period; otherwise
-                // year_fraction errors with MissingFrequencyForActActIsma.
-                let isma_ctx = DayCountContext {
-                    frequency: Some(self.frequency),
-                    coupon_period: Some((start, end)),
-                    ..Default::default()
-                };
-                let total_yf = self.day_count.year_fraction(start, end, isma_ctx)?;
-                let elapsed_yf = self.day_count.year_fraction(start, as_of, isma_ctx)?;
-
-                if total_yf <= 0.0 {
-                    return Ok(0.0);
-                }
-
-                // Real coupon amount for the full period
-                let coupon_rate = self
-                    .real_coupon
-                    .to_f64()
-                    .ok_or(finstack_quant_core::InputError::ConversionOverflow)?;
-                let full_coupon = self.notional.amount() * coupon_rate * total_yf;
-
-                // Linear accrual: Coupon * (elapsed / total)
-                // Note: This matches standard bond accrual for fixed coupons.
-                // If we need exact day-based fraction (e.g. Act/Act), year_fraction handles it roughly,
-                // but strictly generic accrual uses Coupon * (AccrualDays / PeriodDays).
-                // For Act/Act, year_fraction(start, as_of) / year_fraction(start, end) is the standard ratio.
-                return Ok(full_coupon * (elapsed_yf / total_yf));
-            }
+            let accrual_factor = period.accrual_year_fraction.max(0.0);
+            flows.push(
+                CashFlow::new(
+                    period.payment_date,
+                    None,
+                    Money::new(
+                        self.notional.amount() * coupon_rate * accrual_factor,
+                        currency,
+                    )?,
+                    CFKind::Fixed,
+                    accrual_factor,
+                    Some(coupon_rate),
+                )
+                .with_accrual(CashFlowAccrual {
+                    start: period.accrual_start,
+                    end: period.accrual_end,
+                    day_count: self.day_count,
+                    projected_index_rate: None,
+                    calendar_id: None,
+                    coupon_period: Some((period.accrual_start, period.accrual_end)),
+                    end_is_termination_date: false,
+                }),
+            );
         }
+        if !periods.is_empty() {
+            flows.push(CashFlow::new(
+                self.principal_payment_date()?,
+                None,
+                self.notional,
+                CFKind::Notional,
+                0.0,
+                None,
+            ));
+        }
+        Ok(crate::cashflow::traits::schedule_from_classified_flows(
+            flows,
+            self.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    issue_date: Some(self.issue_date),
+                    ..Default::default()
+                },
+            },
+        ))
+    }
 
-        // If we are past maturity or before issue
-        Ok(0.0)
+    /// Real accrued interest at `as_of` on the real schedule, from the shared
+    /// schedule accrual engine (linear accrual; ACT/ACT ICMA uses the bond's
+    /// coupon frequency).
+    fn real_accrued_from(
+        &self,
+        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        as_of: Date,
+    ) -> Result<f64> {
+        crate::cashflow::accrual::AccrualIndex::build(
+            schedule,
+            &crate::cashflow::accrual::AccrualConfig {
+                frequency: Some(self.frequency),
+                ..Default::default()
+            },
+        )?
+        .accrued_at(as_of)
+    }
+
+    /// Real flows paid on or after `as_of` (earlier flows are settled).
+    fn real_flows_from(
+        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        as_of: Date,
+    ) -> DatedFlows {
+        schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.date >= as_of)
+            .map(|cf| (cf.date, cf.amount))
+            .collect()
     }
 
     /// Build unadjusted real cashflow schedule (no inflation indexation).
@@ -916,57 +616,10 @@ impl InflationLinkedBond {
     /// Cashflows with `payment_date < as_of` are excluded (already settled).
     /// The principal payment date is business-day adjusted via the bond's BDC.
     pub(crate) fn build_real_schedule(&self, as_of: Date) -> Result<DatedFlows> {
-        if self.issue_date >= self.maturity {
-            return Ok(vec![]);
-        }
-        let cal_id = self
-            .calendar_id
-            .as_deref()
-            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
-
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: self.issue_date,
-                end: self.maturity,
-                frequency: self.frequency,
-                stub: self.stub,
-                business_day_convention: self.business_day_convention,
-                calendar_id: cal_id,
-                end_of_month: false,
-                day_count: self.day_count,
-                payment_lag_days: 0,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )?;
-        if periods.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let mut flows = Vec::with_capacity(periods.len() + 1);
-        for period in &periods {
-            if period.payment_date < as_of {
-                continue;
-            }
-            let year_frac = period.accrual_year_fraction.max(0.0);
-            let coupon_rate = self
-                .real_coupon
-                .to_f64()
-                .ok_or(finstack_quant_core::InputError::ConversionOverflow)?;
-            let base_amount = self.notional.amount() * coupon_rate * year_frac;
-            flows.push((
-                period.payment_date,
-                Money::new(base_amount, self.notional.currency())?,
-            ));
-        }
-
-        let principal_date = self.principal_payment_date()?;
-        if principal_date >= as_of {
-            flows.push((principal_date, self.notional));
-        }
-
-        Ok(flows)
+        Ok(Self::real_flows_from(
+            &self.real_cashflow_schedule()?,
+            as_of,
+        ))
     }
 
     /// Calculate real yield (yield in real terms, before inflation)
@@ -982,12 +635,7 @@ impl InflationLinkedBond {
     /// - The clean price is non-positive or non-finite
     /// - There are no cashflows remaining
     /// - The YTM solver fails to converge
-    pub fn real_yield(
-        &self,
-        clean_price: f64,
-        _curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<f64> {
+    pub fn real_yield(&self, clean_price: f64, as_of: Date) -> Result<f64> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::YieldCompounding;
         use crate::instruments::fixed_income::bond::pricing::ytm_solver::{
             solve_ytm, YtmPricingSpec,
@@ -998,14 +646,15 @@ impl InflationLinkedBond {
         }
 
         // 1. Build real cashflows (unadjusted for inflation)
-        let flows = self.build_real_schedule(as_of)?;
+        let schedule = self.real_cashflow_schedule()?;
+        let flows = Self::real_flows_from(&schedule, as_of);
         if flows.is_empty() {
             return Err(finstack_quant_core::InputError::TooFewPoints.into());
         }
 
         // 2. Calculate Real Accrued Interest
         // Needed to convert Clean Real Price -> Dirty Real Price
-        let real_accrued = self.accrued_real_interest(as_of)?;
+        let real_accrued = self.real_accrued_from(&schedule, as_of)?;
 
         // 3. Calculate Target Dirty Real Price
         // Price is per 100 notional.
@@ -1015,10 +664,7 @@ impl InflationLinkedBond {
         let spec = YtmPricingSpec {
             day_count: self.day_count,
             notional: self.notional,
-            coupon_rate: self
-                .real_coupon
-                .to_f64()
-                .ok_or(finstack_quant_core::InputError::ConversionOverflow)?,
+            coupon_rate: self.real_coupon_rate()?,
             compounding: YieldCompounding::Street,
             frequency: self.frequency,
         };
@@ -1055,7 +701,6 @@ impl InflationLinkedBond {
     pub fn breakeven_inflation(
         &self,
         nominal_bond_yield: f64,
-        curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::periods_per_year;
@@ -1069,7 +714,7 @@ impl InflationLinkedBond {
                     .to_string(),
             )
         })?;
-        let real_yield_street = self.real_yield(clean_price, curves, as_of)?;
+        let real_yield_street = self.real_yield(clean_price, as_of)?;
 
         // Convert the Street-compounded (periodic, aligned with coupon frequency)
         // real yield to effective-annual compounding so both legs of the Fisher
@@ -1124,7 +769,7 @@ impl InflationLinkedBond {
     ///
     /// Computes the modified duration of the bond based on its real (unadjusted)
     /// cashflows. This measures sensitivity to changes in real yield.
-    pub fn real_duration(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
+    pub fn real_duration(&self, as_of: Date) -> Result<f64> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
             price_from_ytm_compounded_params, YieldCompounding,
         };
@@ -1135,7 +780,7 @@ impl InflationLinkedBond {
                 "Real duration requires quoted_clean, the same clean price per 100 used for real yield".into(),
             )
         })?;
-        let y0 = self.real_yield(base_clean, curves, as_of)?;
+        let y0 = self.real_yield(base_clean, as_of)?;
         // Bump yield by 1bp in decimal terms
         let bp = 1e-4;
 
@@ -1231,34 +876,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             ));
         }
         let inflation_source = self.inflation_source(curves)?;
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: self.issue_date,
-                end: self.maturity,
-                frequency: self.frequency,
-                stub: self.stub,
-                business_day_convention: self.business_day_convention,
-                calendar_id: self
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-                end_of_month: false,
-                day_count: self.day_count,
-                payment_lag_days: 0,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )?;
+        let periods = self.periods()?;
+        let coupon_rate = self.real_coupon_rate()?;
 
         let mut detailed_flows = Vec::with_capacity(periods.len() + 1);
         let mut coupon_rows = Vec::with_capacity(periods.len());
         for period in &periods {
             let accrual_factor = period.accrual_year_fraction.max(0.0);
-            let coupon_rate = self
-                .real_coupon
-                .to_f64()
-                .ok_or(finstack_quant_core::InputError::ConversionOverflow)?;
             let base_amount = self.notional.amount() * coupon_rate * accrual_factor;
             let raw_ratio = inflation_source.ratio(self, period.payment_date)?;
             let ratio = match self.deflation_protection {
@@ -1314,6 +938,7 @@ mod tests {
     use crate::cashflow::traits::CashflowProvider;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use time::Month;
 
@@ -1340,21 +965,6 @@ mod tests {
     fn breakeven_inflation_uses_consistent_annual_compounding_c8() {
         let as_of = d(2024, Month::January, 15);
         let maturity = d(2034, Month::January, 15); // 10-year bond
-
-        // Flat discount curve (not used in the calculation itself, just needed
-        // for the MarketContext that real_yield passes through).
-        let discount = DiscountCurve::builder("USD-NOM")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (10.0, 1.0)])
-            .build()
-            .expect("discount curve");
-        let inflation = InflationCurve::builder("US-CPI")
-            .base_date(as_of)
-            .base_cpi(100.0)
-            .knots([(0.0, 100.0), (10.0, 100.0)])
-            .build()
-            .expect("inflation curve");
-        let market = MarketContext::new().insert(discount).insert(inflation);
 
         // Semi-annual ILB with a 4% real coupon, priced at par (100).
         // At par the real YTM equals the coupon: 4 % Street (semi-annual).
@@ -1405,7 +1015,7 @@ mod tests {
         );
 
         let result = bond
-            .breakeven_inflation(nominal_annual, &market, as_of)
+            .breakeven_inflation(nominal_annual, as_of)
             .expect("breakeven_inflation should succeed");
 
         // Must be within 0.5 bp of the analytically-correct answer.
@@ -1430,7 +1040,7 @@ mod tests {
         bond.frequency = Tenor::annual();
         bond.real_coupon = Decimal::try_from(0.04).expect("valid");
         let result_annual_frequency = bond
-            .breakeven_inflation(nominal_annual, &market, as_of)
+            .breakeven_inflation(nominal_annual, as_of)
             .expect("annual-frequency breakeven");
         // For annual frequency Street ≡ Annual, so the correction is zero;
         // result should be within 0.5 bp of the "wrong" annual calculation.
@@ -1458,8 +1068,7 @@ mod tests {
             .expect("ACT/ACT (ISMA) real schedule must not require a day-count override");
         assert!(!schedule.is_empty(), "schedule should contain future flows");
 
-        let accrued = bond
-            .accrued_real_interest(as_of)
+        let accrued = real_accrued(&bond, as_of)
             .expect("ACT/ACT (ISMA) accrued interest must not require a day-count override");
         assert!(accrued.is_finite() && accrued >= 0.0, "accrued = {accrued}");
     }
@@ -1497,25 +1106,8 @@ mod tests {
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
-        let market = MarketContext::new()
-            .insert(
-                DiscountCurve::builder("USD-OIS")
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (10.0, 1.0)])
-                    .build()
-                    .expect("discount curve"),
-            )
-            .insert(
-                InflationCurve::builder("US-CPI")
-                    .base_date(as_of)
-                    .base_cpi(100.0)
-                    .knots([(0.0, 100.0), (10.0, 100.0)])
-                    .build()
-                    .expect("inflation curve"),
-            );
-
-        let duration = bond.real_duration(&market, as_of).expect("real duration");
-        let y0 = bond.real_yield(100.0, &market, as_of).expect("real yield");
+        let duration = bond.real_duration(as_of).expect("real duration");
+        let y0 = bond.real_yield(100.0, as_of).expect("real yield");
         let flows = bond.build_real_schedule(as_of).expect("real schedule");
         let price_from_yield = |y: f64| -> Result<f64> {
             let price = price_from_ytm_compounded_params(
@@ -1594,6 +1186,45 @@ mod tests {
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
+    }
+
+    fn real_accrued(bond: &InflationLinkedBond, as_of: Date) -> Result<f64> {
+        bond.real_accrued_from(&bond.real_cashflow_schedule()?, as_of)
+    }
+
+    #[test]
+    fn accrued_real_interest_matches_hand_calculation() {
+        // 30/360 annual 2% on 1,000,000: coupon 20,000; 2024-01-15 → 2024-07-15
+        // is 180/360 of the period, so accrued = 10,000.
+        let bond = sample_bond(DeflationProtection::None);
+        let accrued = real_accrued(&bond, d(2024, Month::July, 15)).expect("accrued");
+        assert!(
+            (accrued - 10_000.0).abs() < 1e-6,
+            "30/360 accrued {accrued}"
+        );
+
+        // ACT/ACT ICMA semi-annual 2%: coupon 10,000 over 2024-01-15 → 07-15
+        // (182 days); 2024-03-01 is 46 days in, so 10,000 × 46/182.
+        let mut icma = sample_bond(DeflationProtection::None);
+        icma.frequency = Tenor::semi_annual();
+        icma.day_count = DayCount::ActActIsma;
+        icma.maturity = d(2029, Month::January, 15);
+        let accrued = real_accrued(&icma, d(2024, Month::March, 1)).expect("accrued");
+        let expected = 10_000.0 * 46.0 / 182.0;
+        assert!(
+            (accrued - expected).abs() < 1e-6,
+            "ICMA accrued {accrued} vs {expected}"
+        );
+
+        // Before issue and on/after maturity nothing accrues.
+        assert_eq!(
+            real_accrued(&icma, d(2023, Month::December, 1)).expect("accrued"),
+            0.0
+        );
+        assert_eq!(
+            real_accrued(&icma, d(2029, Month::January, 15)).expect("accrued"),
+            0.0
+        );
     }
 
     #[test]

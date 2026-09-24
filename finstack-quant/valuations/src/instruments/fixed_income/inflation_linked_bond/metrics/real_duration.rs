@@ -9,6 +9,6 @@ pub(crate) struct RealDurationCalculator;
 impl MetricCalculator for RealDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let ilb: &InflationLinkedBond = context.instrument_as()?;
-        ilb.real_duration(&context.curves, context.as_of)
+        ilb.real_duration(context.as_of)
     }
 }

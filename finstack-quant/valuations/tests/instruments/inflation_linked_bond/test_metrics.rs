@@ -255,7 +255,7 @@ fn test_metrics_consistency_with_direct_calls() {
     let duration_via_framework = result.measures[MetricId::RealDuration.as_str()];
 
     // Calculate via direct method
-    let duration_direct = ilb.real_duration(&ctx, as_of).unwrap();
+    let duration_direct = ilb.real_duration(as_of).unwrap();
 
     // Assert - should be identical
     relative_eq(
@@ -287,7 +287,7 @@ fn test_metrics_real_yield_consistency() {
 
     // Calculate via direct method
     let clean_price = ilb.quoted_clean.unwrap();
-    let yield_direct = ilb.real_yield(clean_price, &ctx, as_of).unwrap();
+    let yield_direct = ilb.real_yield(clean_price, as_of).unwrap();
 
     // Assert - should be identical since both call the same real_yield method
     relative_eq(
@@ -458,7 +458,7 @@ fn test_breakeven_inflation_metric_consistency() {
         )
         .unwrap();
     let nominal_yield = disc.zero_annual(t); // annual convention, matching the calculator
-    let breakeven_direct = ilb.breakeven_inflation(nominal_yield, &ctx, as_of).unwrap();
+    let breakeven_direct = ilb.breakeven_inflation(nominal_yield, as_of).unwrap();
 
     // Assert - should be identical since both use the same calculation path
     relative_eq(

@@ -168,18 +168,6 @@ fn test_indexation_method_standard_lags() {
 }
 
 #[test]
-fn test_indexation_method_interpolation_flags() {
-    // Arrange & Act & Assert
-    assert!(IndexationMethod::Tips.uses_daily_interpolation());
-    assert!(IndexationMethod::Canadian.uses_daily_interpolation());
-    // Legacy UK gilts (pre-Sep 2005) are the only step-interpolated convention.
-    assert!(!IndexationMethod::Uk.uses_daily_interpolation());
-    assert!(IndexationMethod::French.uses_daily_interpolation());
-    // Post-2004 JGBi use daily-interpolated reference CPI (same as TIPS).
-    assert!(IndexationMethod::Japanese.uses_daily_interpolation());
-}
-
-#[test]
 fn test_deflation_protection_display() {
     // Arrange & Act & Assert
     assert_eq!(DeflationProtection::None.to_string(), "none");

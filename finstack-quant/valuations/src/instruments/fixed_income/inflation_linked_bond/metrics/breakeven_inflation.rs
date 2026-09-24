@@ -39,6 +39,6 @@ impl MetricCalculator for BreakevenInflationCalculator {
         // the real yield after its Street→Annual conversion inside that method.
         let nominal_yield = disc_curve.zero_annual(t);
 
-        ilb.breakeven_inflation(nominal_yield, curves, context.as_of)
+        ilb.breakeven_inflation(nominal_yield, context.as_of)
     }
 }
