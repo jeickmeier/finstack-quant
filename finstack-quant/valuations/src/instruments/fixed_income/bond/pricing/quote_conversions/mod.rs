@@ -22,8 +22,7 @@ pub use compute::compute_quotes;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
 pub use types::{BondQuoteInput, BondQuoteSet, YieldCompounding};
 pub use yield_price::{
-    df_from_yield, price_from_ytm, price_from_ytm_compounded, price_from_ytm_compounded_params,
-    price_from_ytw,
+    df_from_yield, price_from_ytm, price_from_ytm_compounded_params, price_from_ytw,
 };
 
 pub(crate) use annuity::floating_leg_pv_and_annuity;

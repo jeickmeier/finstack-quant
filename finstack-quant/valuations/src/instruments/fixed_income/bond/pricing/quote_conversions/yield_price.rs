@@ -475,34 +475,6 @@ fn moosmuller_df_for_coupon(ytm: f64, m: f64, w: f64, k: u32) -> finstack_quant_
     Ok(df_simple * periodic_base.powf(-f64::from(k.saturating_sub(1))))
 }
 
-/// Price from ytm compounded.
-///
-/// # Arguments
-///
-/// * `bond` - Bond supplying coupon day count and frequency conventions.
-/// * `flows` - Dated signed bond cashflows to discount; flows on or before
-///   `as_of` are excluded.
-/// * `as_of` - Yield settlement/valuation date from which cashflows discount.
-/// * `ytm` - Annual yield to maturity as a decimal under `comp`.
-/// * `comp` - Yield compounding convention used to turn `ytm` into discount
-///   factors.
-pub fn price_from_ytm_compounded(
-    bond: &Bond,
-    flows: &[(Date, Money)],
-    as_of: Date,
-    ytm: f64,
-    comp: YieldCompounding,
-) -> finstack_quant_core::Result<f64> {
-    price_from_ytm_compounded_params(
-        bond.cashflow_spec.day_count(),
-        bond.cashflow_spec.frequency(),
-        flows,
-        as_of,
-        ytm,
-        comp,
-    )
-}
-
 /// Price from ytm (using Street convention).
 ///
 /// # Arguments
@@ -518,7 +490,14 @@ pub fn price_from_ytm(
     as_of: Date,
     ytm: f64,
 ) -> finstack_quant_core::Result<f64> {
-    price_from_ytm_compounded(bond, flows, as_of, ytm, YieldCompounding::Street)
+    price_from_ytm_compounded_params(
+        bond.cashflow_spec.day_count(),
+        bond.cashflow_spec.frequency(),
+        flows,
+        as_of,
+        ytm,
+        YieldCompounding::Street,
+    )
 }
 
 /// JSDA inputs of a Japanese simple yield (単利): annual coupon rate and
