@@ -2,23 +2,15 @@ use super::annuity::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
 };
 use super::compute::clear_price_driving_overrides;
+use crate::instruments::fixed_income::bond::metrics::price_yield_spread::asw::resolved_asw_forward_curve_id;
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
 use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use crate::pricer::ModelKey;
 use finstack_quant_core::dates::calendar::calendar_by_id;
 use finstack_quant_core::dates::{Date, ScheduleBuilder};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
-
-fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
-    bond.instrument_pricing_overrides
-        .model_config
-        .asw_forward_curve_id
-        .clone()
-        .or_else(|| bond.forward_curve_id.clone())
-}
 
 /// Price from Z-spread added to zero rates in the bond's compounding convention.
 ///
