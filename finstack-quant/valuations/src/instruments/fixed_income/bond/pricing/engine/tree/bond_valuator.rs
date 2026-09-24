@@ -737,7 +737,7 @@ impl BondValuator {
         }
 
         // Source recovery rate from the bond's explicit credit_curve_id,
-        // consistent with HazardBondEngine and TreePricer::calculate_oas.
+        // consistent with HazardBondEngine.
         let recovery_rate = Self::resolve_recovery_rate(&bond, market_context);
         let call_friction_cents = bond
             .instrument_pricing_overrides

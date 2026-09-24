@@ -74,7 +74,7 @@ impl Bond {
         }
     }
 
-    fn validate_model_contract(
+    pub(crate) fn validate_model_contract(
         &self,
         model: crate::pricer::ModelKey,
         curves: &finstack_quant_core::market_data::context::MarketContext,

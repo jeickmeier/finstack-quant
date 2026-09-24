@@ -65,14 +65,6 @@ pub enum OasQuoteCompounding {
 }
 
 impl OasQuoteCompounding {
-    /// Convert an internal continuous spread in decimal form to the quote convention.
-    pub(crate) fn quote_from_continuous_decimal(self, spread: f64) -> f64 {
-        match self {
-            Self::Continuous => spread,
-            Self::SemiAnnual => 2.0 * ((spread / 2.0).exp() - 1.0),
-        }
-    }
-
     /// Convert a quoted spread in decimal form to the internal continuous convention.
     pub(crate) fn continuous_from_quote_decimal(self, spread: f64) -> f64 {
         match self {

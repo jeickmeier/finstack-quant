@@ -117,28 +117,48 @@ fn test_bond_valuator_creation() {
     assert!(valuator.cashflow_vec.iter().any(|&c| c > 0.0));
     assert!(market_context.get_discount("USD-OIS").is_ok());
 }
-#[test]
-fn test_oas_calculator_plain_bond() {
-    let bond = create_test_bond();
-    let market_context = create_test_market_context();
+/// Price `bond` on its own tree configuration at `oas_bp`, quote the result
+/// as a clean price, and solve it back through the production OAS metric.
+fn oas_metric_round_trip_bp(bond: &Bond, oas_bp: f64) -> f64 {
+    use crate::instruments::common_impl::traits::Instrument;
+    use crate::metrics::MetricId;
+
+    let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let calculator = TreePricer::new();
-    let oas = calculator.calculate_oas(&bond, &market_context, as_of, 98.5);
-    assert!(oas.is_ok());
-    let oas_bp = oas.expect("OAS calculation should succeed in test");
-    assert!(oas_bp > 0.0);
-    assert!(oas_bp < 5000.0);
+    let quote = crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext::new(
+        bond, &market, as_of,
+    )
+    .expect("quote context");
+    let pricer = TreePricer::with_config(super::bond_tree_config(bond).expect("tree config"));
+    let dirty = pricer
+        .price_at_oas(bond, &market, quote.quote_date, oas_bp)
+        .expect("price at OAS");
+    let clean_pct = (dirty - quote.accrued_at_quote_date) / bond.notional.amount() * 100.0;
+    let mut quoted = bond.clone();
+    quoted
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(clean_pct);
+    let result = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Oas],
+            crate::instruments::PricingOptions::default().with_model(crate::pricer::ModelKey::Tree),
+        )
+        .expect("OAS metric");
+    result.measures["oas"] * 10_000.0
 }
 #[test]
-fn test_oas_calculator_callable_bond() {
-    let bond = create_callable_bond();
-    let market_context = create_test_market_context();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let calculator = TreePricer::new();
-    let oas = calculator.calculate_oas(&bond, &market_context, as_of, 98.5);
-    assert!(oas.is_ok());
-    let oas_bp = oas.expect("OAS calculation should succeed in test");
-    assert!(oas_bp > 0.0);
+fn oas_metric_round_trips_a_tree_price_for_plain_and_callable_bonds() {
+    for bond in [create_test_bond(), create_callable_bond()] {
+        let implied = oas_metric_round_trip_bp(&bond, 150.0);
+        assert!(
+            (implied - 150.0).abs() < 1.0e-4,
+            "{}: OAS metric must recover 150bp, got {implied}",
+            bond.id.as_str()
+        );
+    }
 }
 #[test]
 fn test_bond_valuator_with_calls() {

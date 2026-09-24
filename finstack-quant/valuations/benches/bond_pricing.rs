@@ -19,7 +19,6 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::TreePricer;
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, CashflowSpec,
 };
@@ -312,36 +311,32 @@ fn bench_callable_bond_tree_pv(c: &mut Criterion) {
     group.finish();
 }
 
+/// OAS through the production metric (prepared tree, Brent on OAS).
 fn bench_tree_oas_solver(c: &mut Criterion) {
+    use finstack_quant_valuations::instruments::PricingOptions;
+
     let mut group = c.benchmark_group("bond_tree_oas");
     let market = create_market();
     let market_ref = &market;
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let tree_pricer = TreePricer::new();
-    let pricer_ref = &tree_pricer;
 
     for tenor in [5, 10, 30] {
         let bond = create_callable_bond(tenor);
-        let clean = bond
-            .instrument_pricing_overrides
-            .market_quotes
-            .quoted_clean_price
-            .unwrap_or(99.0);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             &tenor,
             {
                 move |b, _| {
                     b.iter(|| {
-                        let oas = pricer_ref
-                            .calculate_oas(
-                                &bond,
+                        let result = bond
+                            .price_with_metrics(
                                 black_box(market_ref),
                                 black_box(as_of),
-                                black_box(clean),
+                                &[MetricId::Oas],
+                                PricingOptions::default(),
                             )
                             .unwrap_or_else(|e| panic!("tree oas failed: {e:?}"));
-                        black_box(oas)
+                        black_box(result)
                     });
                 }
             },
@@ -350,62 +345,39 @@ fn bench_tree_oas_solver(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark tree pricing at different step counts to measure backward induction performance.
-///
-/// This benchmark is useful for measuring the impact of the Vec vs HashMap optimization
-/// in `BondValuator`. Higher step counts magnify the difference since backward induction
-/// visits more nodes.
+/// OAS metric on a 10Y callable at an explicit 100-step Hull-White tree.
 fn bench_tree_step_scaling(c: &mut Criterion) {
-    use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::TreePricerConfig;
+    use finstack_quant_valuations::instruments::PricingOptions;
 
     let mut group = c.benchmark_group("tree_step_scaling");
     let market = create_market();
     let market_ref = &market;
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    // Use a 10Y callable bond for consistent comparison
-    let bond = create_callable_bond(10);
-    let clean = bond
-        .instrument_pricing_overrides
+    let mut bond = create_callable_bond(10);
+    bond.instrument_pricing_overrides.model_config.tree_steps = Some(100);
+    bond.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price
-        .unwrap_or(99.0);
+        .implied_volatility = Some(0.01);
 
-    {
-        let steps = 100;
-        let config = TreePricerConfig {
-            tree_steps: steps,
-            volatility: 0.01,
-            tolerance: 1e-6,
-            max_iterations: 50,
-            initial_bracket_size_bp: Some(1000.0),
-            mean_reversion: None,
-            tree_model: Default::default(),
-            tree_discount_curve_id: None,
-            oas_quote_compounding: Default::default(),
-            oas_price_basis: Default::default(),
-            tree_compounding: Default::default(),
-        };
-        let pricer = TreePricer::with_config(config);
-
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}steps", steps)),
-            &steps,
-            |b, _| {
-                b.iter(|| {
-                    let oas = pricer
-                        .calculate_oas(
-                            &bond,
-                            black_box(market_ref),
-                            black_box(as_of),
-                            black_box(clean),
-                        )
-                        .unwrap_or_else(|e| panic!("tree oas failed: {e:?}"));
-                    black_box(oas)
-                });
-            },
-        );
-    }
+    let steps = 100;
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{}steps", steps)),
+        &steps,
+        |b, _| {
+            b.iter(|| {
+                let result = bond
+                    .price_with_metrics(
+                        black_box(market_ref),
+                        black_box(as_of),
+                        &[MetricId::Oas],
+                        PricingOptions::default(),
+                    )
+                    .unwrap_or_else(|e| panic!("tree oas failed: {e:?}"));
+                black_box(result)
+            });
+        },
+    );
     group.finish();
 }
 

@@ -6,10 +6,9 @@ use super::config::{TreeModelChoice, TreePricerConfig};
 use super::lsmc::{price_bond_lsmc, BondLsmcConfig};
 use crate::cashflow::primitives::is_cash_settlement_kind;
 use crate::instruments::common_impl::pricing::rates_credit::build_daily_bond_rates_credit_targets;
-use crate::instruments::pricing_overrides::{resolve_rates_credit_config, OasPriceBasis};
+use crate::instruments::pricing_overrides::resolve_rates_credit_config;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
@@ -217,42 +216,6 @@ impl TreePricer {
         BondValuator::new_with_time_steps(bond.clone(), market_context, as_of, time_steps)
     }
 
-    fn solve_deterministic_discount_curve_oas(
-        &self,
-        valuator: &BondValuator,
-        dirty_target: f64,
-    ) -> Result<f64> {
-        let pricing_error = std::cell::RefCell::new(None);
-        let objective = |oas_bp: f64| match valuator.price_deterministic_discount_curve(oas_bp) {
-            Ok(model_price) => model_price - dirty_target,
-            Err(error) => {
-                let mut slot = pricing_error.borrow_mut();
-                if slot.is_none() {
-                    *slot = Some(error);
-                }
-                1.0e12
-            }
-        };
-        let mut solver = BrentSolver::new()
-            .tolerance(self.config.tolerance)
-            .initial_bracket_size(self.config.initial_bracket_size_bp);
-        solver.max_iterations = self.config.max_iterations;
-        let continuous_oas_bp =
-            solver.solve(objective, 0.0).map_err(|error| {
-                match pricing_error.borrow_mut().take() {
-                    Some(pricing) => Error::Validation(format!(
-                        "deterministic OAS solve failed: {error}; first pricing error: {pricing}"
-                    )),
-                    None => error,
-                }
-            })?;
-        Ok(self
-            .config
-            .oas_quote_compounding
-            .quote_from_continuous_decimal(continuous_oas_bp / 10_000.0)
-            * 10_000.0)
-    }
-
     /// Resolve the explicitly required hazard curve for joint rates-credit
     /// pricing. Missing opt-in or market data is an error.
     fn resolve_required_hazard_curve(
@@ -440,37 +403,53 @@ impl TreePricer {
         as_of: Date,
         oas_bp: f64,
     ) -> Result<TreePriceOutcome> {
+        self.prepare(bond, market_context, as_of)?.price(oas_bp)
+    }
+
+    /// Calibrate the configured model for `bond` once and return a pricer
+    /// that revalues it at any OAS without rebuilding the tree or valuator.
+    ///
+    /// Direct pricing and the OAS metric's root search both go through this,
+    /// so they cannot disagree about the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `bond` - Bond to value; a return floor is lowered into its issuer
+    ///   call schedule first.
+    /// * `market_context` - Market data holding the discount (or tree
+    ///   discount) curve and, for the rates-credit model, the hazard curve.
+    /// * `as_of` - Valuation date at the tree root.
+    pub(crate) fn prepare<'a>(
+        &self,
+        bond: &Bond,
+        market_context: &'a MarketContext,
+        as_of: Date,
+    ) -> Result<OasPricer<'a>> {
         self.validate_selected_model_capabilities(bond)?;
         let effective_bond = self.pricing_bond_for_return_floor(bond, market_context, as_of)?;
         let bond = effective_bond.as_ref();
-        let continuous_oas_bp = self
-            .config
-            .oas_quote_compounding
-            .continuous_from_quote_decimal(oas_bp / 10_000.0)
-            * 10_000.0;
         let tree_discount_curve_id = self
             .config
             .tree_discount_curve_id
             .as_ref()
             .unwrap_or(&bond.discount_curve_id);
         let discount_curve = market_context.get_discount(tree_discount_curve_id.as_str())?;
-        let tree_bond_storage;
-        let tree_bond = if tree_discount_curve_id != &bond.discount_curve_id {
-            tree_bond_storage = {
-                let mut cloned = bond.clone();
-                cloned.discount_curve_id = tree_discount_curve_id.clone();
-                cloned
-            };
-            &tree_bond_storage
-        } else {
-            bond
-        };
+        let mut tree_bond = bond.clone();
+        tree_bond.discount_curve_id = tree_discount_curve_id.clone();
         let hazard_curve = match self.model {
             BondTreeModel::RatesOnly => None,
             BondTreeModel::RatesCredit => {
                 Some(Self::resolve_required_hazard_curve(bond, market_context)?)
             }
         };
+        let pricer = |model| OasPricer {
+            market: market_context,
+            as_of,
+            quote_compounding: self.config.oas_quote_compounding,
+            bond: tree_bond.clone(),
+            model,
+        };
+
         if as_of >= bond.maturity && hazard_curve.is_none() {
             // The contractual maturity can roll to a later business-day
             // payment date. A live maturity-date option is exercised before
@@ -478,11 +457,11 @@ impl TreePricer {
             // and exercise ordering while applying OAS on the short interval.
             let flows = tree_bond.pricing_dated_cashflows(market_context, as_of)?;
             if flows.is_empty() {
-                return Ok(TreePriceOutcome::deterministic(0.0));
+                return Ok(pricer(PreparedTree::Zero));
             }
-            return Self::deterministic_short_rate_valuator(tree_bond, market_context, as_of)?
-                .price_deterministic_discount_curve(continuous_oas_bp)
-                .map(TreePriceOutcome::deterministic);
+            return Ok(pricer(PreparedTree::Deterministic(
+                Self::deterministic_short_rate_valuator(&tree_bond, market_context, as_of)?,
+            )));
         }
         let time_to_maturity = discount_curve.day_count().year_fraction(
             as_of,
@@ -490,14 +469,14 @@ impl TreePricer {
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
         if time_to_maturity <= 0.0 && hazard_curve.is_none() {
-            return Ok(TreePriceOutcome::deterministic(0.0));
+            return Ok(pricer(PreparedTree::Zero));
         }
 
         if let Some(hc) = hazard_curve.as_ref() {
             let Some(horizon_date) =
-                Self::final_adjusted_payment_date(tree_bond, market_context, as_of)?
+                Self::final_adjusted_payment_date(&tree_bond, market_context, as_of)?
             else {
-                return Ok(TreePriceOutcome::deterministic(0.0));
+                return Ok(pricer(PreparedTree::Zero));
             };
             let targets = build_daily_bond_rates_credit_targets(
                 discount_curve.as_ref(),
@@ -511,16 +490,10 @@ impl TreePricer {
                 resolve_rates_credit_config(&bond.instrument_pricing_overrides, effective_steps)?;
             let mut tree = RatesCreditTree::new(cfg);
             tree.calibrate(&targets)?;
-            if Self::uses_path_dependent_lsmc(&tree, tree_bond)
-                || Self::uses_sampled_bullet(&tree, tree_bond)
+            if Self::uses_path_dependent_lsmc(&tree, &tree_bond)
+                || Self::uses_sampled_bullet(&tree, &tree_bond)
             {
-                let lsmc_config = BondLsmcConfig::for_bond(tree_bond, continuous_oas_bp)?;
-                let lsmc =
-                    price_bond_lsmc(&tree, tree_bond, market_context, as_of, &lsmc_config, None)?;
-                return Ok(TreePriceOutcome {
-                    amount: lsmc.estimate.mean.amount(),
-                    lsmc: Some(lsmc),
-                });
+                return Ok(pricer(PreparedTree::RatesCreditLsmc(tree)));
             }
             let valuator = BondValuator::new_with_time_steps_and_day_count(
                 tree_bond.clone(),
@@ -529,27 +502,15 @@ impl TreePricer {
                 targets.times.clone(),
                 DayCount::Act365F,
             )?;
-            return valuator
-                .price_deterministic_rates_credit(&tree, continuous_oas_bp)
-                .map(TreePriceOutcome::deterministic);
+            return Ok(pricer(PreparedTree::RatesCredit(tree, valuator)));
         }
         if self.uses_deterministic_short_rate() {
-            return Self::deterministic_short_rate_valuator(tree_bond, market_context, as_of)?
-                .price_deterministic_discount_curve(continuous_oas_bp)
-                .map(TreePriceOutcome::deterministic);
+            return Ok(pricer(PreparedTree::Deterministic(
+                Self::deterministic_short_rate_valuator(&tree_bond, market_context, as_of)?,
+            )));
         }
 
-        let valuator = BondValuator::new(
-            tree_bond.clone(),
-            market_context,
-            as_of,
-            time_to_maturity,
-            self.config.tree_steps,
-        )?;
-
-        let effective_model = self.config.tree_model.clone();
-
-        let amount = match effective_model {
+        let prepared = match self.config.tree_model.clone() {
             TreeModelChoice::HullWhite { kappa, sigma } => {
                 let hw_config = HullWhiteTreeConfig {
                     kappa,
@@ -562,34 +523,36 @@ impl TreePricer {
                 // exercise decisions and cashflows land exactly on nodes,
                 // and build the valuator on the tree's (non-uniform) grid.
                 let mandatory =
-                    BondValuator::mandatory_grid_times(tree_bond, market_context, as_of)?;
-                let hw_tree = HullWhiteTree::calibrate_with_times(
+                    BondValuator::mandatory_grid_times(&tree_bond, market_context, as_of)?;
+                let tree = HullWhiteTree::calibrate_with_times(
                     hw_config,
                     discount_curve.as_ref(),
                     time_to_maturity,
                     &mandatory,
                 )?;
-                let hw_valuator = BondValuator::new_with_time_steps(
+                let valuator = BondValuator::new_with_time_steps(
                     tree_bond.clone(),
                     market_context,
                     as_of,
-                    hw_tree.time_grid().to_vec(),
+                    tree.time_grid().to_vec(),
                 )?;
-                hw_valuator.price_with_hw_tree(&hw_tree, continuous_oas_bp)
+                PreparedTree::HullWhite(tree, valuator)
             }
-            TreeModelChoice::BlackDermanToy {
+            model @ TreeModelChoice::BlackDermanToy {
                 mean_reversion,
                 sigma,
             } => {
                 let tree_steps = self.effective_steps_for_model(
-                    tree_bond,
+                    &tree_bond,
                     as_of,
                     discount_curve.day_count(),
-                    &TreeModelChoice::BlackDermanToy {
-                        mean_reversion,
-                        sigma,
-                    },
+                    &model,
                 );
+                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma, mean_reversion)
+                    .with_compounding(self.config.tree_compounding);
+                let mut tree = ShortRateTree::new(tree_config);
+                tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
+                validate_bdt_calibration_quality(tree.calibration_result())?;
                 let valuator = BondValuator::new(
                     tree_bond.clone(),
                     market_context,
@@ -597,15 +560,11 @@ impl TreePricer {
                     time_to_maturity,
                     tree_steps,
                 )?;
-                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma, mean_reversion)
-                    .with_compounding(self.config.tree_compounding);
-                let mut tree = ShortRateTree::new(tree_config);
-                tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
-                validate_bdt_calibration_quality(tree.calibration_result())?;
-                let mut vars = HashMap::<&'static str, f64>::default();
-                vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
-                vars.insert(short_rate_keys::OAS, continuous_oas_bp);
-                tree.price(vars, time_to_maturity, market_context, &valuator)
+                PreparedTree::ShortRate {
+                    tree,
+                    valuator,
+                    time_to_maturity,
+                }
             }
             TreeModelChoice::HoLee => {
                 let tree_config = ShortRateTreeConfig {
@@ -617,363 +576,98 @@ impl TreePricer {
                 };
                 let mut tree = ShortRateTree::new(tree_config);
                 tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
-                let mut vars = HashMap::<&'static str, f64>::default();
-                vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
-                vars.insert(short_rate_keys::OAS, continuous_oas_bp);
-                tree.price(vars, time_to_maturity, market_context, &valuator)
+                let valuator = BondValuator::new(
+                    tree_bond.clone(),
+                    market_context,
+                    as_of,
+                    time_to_maturity,
+                    self.config.tree_steps,
+                )?;
+                PreparedTree::ShortRate {
+                    tree,
+                    valuator,
+                    time_to_maturity,
+                }
             }
-        }?;
-        Ok(TreePriceOutcome::deterministic(amount))
+        };
+        Ok(pricer(prepared))
     }
+}
 
-    /// Calculate option-adjusted spread (OAS) for a bond.
-    ///
-    /// Solves for the constant spread that equates the tree price to the market price.
-    /// Uses Brent's method for root finding under the factor family selected
-    /// when this pricer was constructed.
-    ///
-    /// # OAS Convention
-    ///
-    /// Under either model the OAS is a **parallel shift to the calibrated risk-free
-    /// short rate lattice** (in basis points). When the rates+credit two-factor tree
-    /// is used, the hazard tree captures the credit spread independently, so the OAS
-    /// represents the option-adjusted spread **over the risk-free curve** — consistent
-    /// with the Bloomberg OAS convention for risky bonds.
+/// Model state calibrated once by [`TreePricer::prepare`].
+enum PreparedTree {
+    /// Nothing left to value (expired bond or no remaining flows).
+    Zero,
+    /// Deterministic short rate: the discount curve plus OAS.
+    Deterministic(BondValuator),
+    /// Joint rates-credit tree priced by path-dependent LSMC.
+    RatesCreditLsmc(RatesCreditTree),
+    /// Joint rates-credit lattice with backward induction.
+    RatesCredit(RatesCreditTree, BondValuator),
+    /// Hull-White trinomial tree through the bond's mandatory dates.
+    HullWhite(HullWhiteTree, BondValuator),
+    /// BDT or Ho-Lee short-rate tree on a uniform grid.
+    ShortRate {
+        tree: ShortRateTree,
+        valuator: BondValuator,
+        time_to_maturity: f64,
+    },
+}
+
+/// A bond with its tree model calibrated once, revalued at any OAS.
+///
+/// Built by [`TreePricer::prepare`]; the OAS metric's root search reprices
+/// through one instance instead of recalibrating per trial.
+pub(crate) struct OasPricer<'a> {
+    market: &'a MarketContext,
+    as_of: Date,
+    quote_compounding: crate::instruments::pricing_overrides::OasQuoteCompounding,
+    bond: Bond,
+    model: PreparedTree,
+}
+
+impl OasPricer<'_> {
+    /// Value the bond at a quoted OAS.
     ///
     /// # Arguments
     ///
-    /// * `bond` - The bond to calculate OAS for (must have call/put options)
-    /// * `market_context` - Market context with discount and optionally hazard curves
-    /// * `as_of` - Valuation date
-    /// * `clean_price_pct_of_par` - Market clean price as percentage of par (e.g., 98.5)
-    ///
-    /// # Returns
-    ///
-    /// OAS in basis points (e.g., 150.0 means 150 basis points).
-    ///
-    /// # Errors
-    ///
-    /// Returns `Err` when:
-    /// - Discount curve is not found
-    /// - Tree calibration fails
-    /// - Root finding fails to converge
-    pub fn calculate_oas(
-        &self,
-        bond: &Bond,
-        market_context: &MarketContext,
-        as_of: Date,
-        clean_price_pct_of_par: f64,
-    ) -> Result<f64> {
-        use crate::instruments::fixed_income::bond::pricing::settlement::{
-            quote_dirty_at_as_of, QuoteDateContext,
-        };
-
-        self.validate_selected_model_capabilities(bond)?;
-        let effective_bond = self.pricing_bond_for_return_floor(bond, market_context, as_of)?;
-        let bond = effective_bond.as_ref();
-
-        // Dirty target must use accrued at the quote/settlement date to match
-        // the market convention used by YTM, Z-spread, and the quote engine.
-        let quote_ctx = QuoteDateContext::new(bond, market_context, as_of)?;
-        let quote_date = quote_ctx.quote_date;
-        let clean_target = clean_price_pct_of_par * bond.notional.amount() / 100.0;
-        let dirty_target_at_quote = match self.config.oas_price_basis {
-            OasPriceBasis::SettlementDirty => {
-                quote_ctx.dirty_from_clean_pct(clean_price_pct_of_par, bond.notional.amount())
+    /// * `oas_bp` - OAS in basis points on the configured quote compounding;
+    ///   it is converted to a continuous shift of the short rate.
+    pub(crate) fn price(&self, oas_bp: f64) -> Result<TreePriceOutcome> {
+        let oas = self
+            .quote_compounding
+            .continuous_from_quote_decimal(oas_bp / 10_000.0)
+            * 10_000.0;
+        let amount = match &self.model {
+            PreparedTree::Zero => 0.0,
+            PreparedTree::Deterministic(valuator) => {
+                valuator.price_deterministic_discount_curve(oas)?
             }
-            OasPriceBasis::ForwardAccruedClean => {
-                let schedule = bond.full_cashflow_schedule(market_context)?;
-                let accrued_at_as_of = crate::cashflow::accrual::accrued_interest_amount(
-                    &schedule,
-                    as_of,
-                    &bond.accrual_config(),
-                )?;
-                clean_target + quote_ctx.accrued_at_quote_date - accrued_at_as_of
+            PreparedTree::RatesCreditLsmc(tree) => {
+                let config = BondLsmcConfig::for_bond(&self.bond, oas)?;
+                let lsmc =
+                    price_bond_lsmc(tree, &self.bond, self.market, self.as_of, &config, None)?;
+                return Ok(TreePriceOutcome {
+                    amount: lsmc.estimate.mean.amount(),
+                    lsmc: Some(lsmc),
+                });
             }
-        };
-        let dirty_target = quote_dirty_at_as_of(
-            bond,
-            market_context,
-            as_of,
-            quote_date,
-            dirty_target_at_quote,
-        )?;
-        let use_rates_credit = self.model == BondTreeModel::RatesCredit;
-        let mut use_rates_credit_lsmc = false;
-        let mut rc_tree: Option<RatesCreditTree> = None;
-        let tree_discount_curve_id = self
-            .config
-            .tree_discount_curve_id
-            .as_ref()
-            .unwrap_or(&bond.discount_curve_id);
-        let discount_curve = market_context.get_discount(tree_discount_curve_id.as_str())?;
-        let tree_bond_storage;
-        let tree_bond = if tree_discount_curve_id != &bond.discount_curve_id {
-            tree_bond_storage = {
-                let mut cloned = bond.clone();
-                cloned.discount_curve_id = tree_discount_curve_id.clone();
-                cloned
-            };
-            &tree_bond_storage
-        } else {
-            bond
-        };
-        let hazard_curve = match self.model {
-            BondTreeModel::RatesOnly => None,
-            BondTreeModel::RatesCredit => {
-                Some(Self::resolve_required_hazard_curve(bond, market_context)?)
+            PreparedTree::RatesCredit(tree, valuator) => {
+                valuator.price_deterministic_rates_credit(tree, oas)?
             }
-        };
-        // Align tree time basis with the discount curve's own day-count.
-        if as_of >= bond.maturity && hazard_curve.is_none() {
-            let flows = tree_bond.pricing_dated_cashflows(market_context, as_of)?;
-            if flows.is_empty() {
-                return Ok(0.0);
-            }
-            let valuator =
-                Self::deterministic_short_rate_valuator(tree_bond, market_context, as_of)?;
-            return self.solve_deterministic_discount_curve_oas(&valuator, dirty_target);
-        }
-        let dc_curve = discount_curve.day_count();
-        let time_to_maturity = dc_curve.year_fraction(
-            as_of,
-            bond.maturity,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if time_to_maturity <= 0.0 && hazard_curve.is_none() {
-            return Ok(0.0);
-        }
-        if let Some(hc) = hazard_curve.as_ref() {
-            let Some(horizon_date) =
-                Self::final_adjusted_payment_date(tree_bond, market_context, as_of)?
-            else {
-                return Ok(0.0);
-            };
-            let targets = build_daily_bond_rates_credit_targets(
-                discount_curve.as_ref(),
-                hc.as_ref(),
-                as_of,
-                horizon_date,
-                self.config.tree_steps,
-            )?;
-            let effective_steps = targets.times.len() - 1;
-            let cfg =
-                resolve_rates_credit_config(&bond.instrument_pricing_overrides, effective_steps)?;
-            let mut tree = RatesCreditTree::new(cfg);
-            tree.calibrate(&targets)?;
-            use_rates_credit_lsmc = Self::uses_path_dependent_lsmc(&tree, tree_bond)
-                || Self::uses_sampled_bullet(&tree, tree_bond);
-            rc_tree = Some(tree);
-        }
-
-        let effective_model = self.config.tree_model.clone();
-        let deterministic_short_rate = !use_rates_credit && self.uses_deterministic_short_rate();
-
-        let mut sr_tree: Option<ShortRateTree> = None;
-        let mut hw_tree: Option<HullWhiteTree> = None;
-        let mut valuation_steps = self.config.tree_steps;
-
-        if !use_rates_credit && !deterministic_short_rate {
-            match &effective_model {
-                TreeModelChoice::HullWhite { kappa, sigma } => {
-                    let hw_config = HullWhiteTreeConfig {
-                        kappa: *kappa,
-                        sigma: *sigma,
-                        steps: self.config.tree_steps,
-                        max_nodes: None,
-                        compounding: self.config.tree_compounding,
-                    };
-                    // Grid through coupon and call/put dates (per-step dt).
-                    let mandatory =
-                        BondValuator::mandatory_grid_times(tree_bond, market_context, as_of)?;
-                    hw_tree = Some(HullWhiteTree::calibrate_with_times(
-                        hw_config,
-                        discount_curve.as_ref(),
-                        time_to_maturity,
-                        &mandatory,
-                    )?);
-                }
-                TreeModelChoice::HoLee => {
-                    let tree_config = ShortRateTreeConfig {
-                        steps: self.config.tree_steps,
-                        volatility: self.config.volatility,
-                        mean_reversion: 0.0,
-                        ..Default::default()
-                    };
-                    let mut tree = ShortRateTree::new(tree_config);
-                    tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
-                    sr_tree = Some(tree);
-                }
-                TreeModelChoice::BlackDermanToy {
-                    mean_reversion,
-                    sigma,
-                } => {
-                    valuation_steps = self.effective_steps_for_model(
-                        tree_bond,
-                        as_of,
-                        discount_curve.day_count(),
-                        &effective_model,
-                    );
-                    let tree_config =
-                        ShortRateTreeConfig::bdt(valuation_steps, *sigma, *mean_reversion)
-                            .with_compounding(self.config.tree_compounding);
-                    let mut tree = ShortRateTree::new(tree_config);
-                    tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
-                    validate_bdt_calibration_quality(tree.calibration_result())?;
-                    sr_tree = Some(tree);
-                }
-            }
-        }
-
-        // The HW path prices on the tree's (possibly non-uniform) grid; all
-        // other models use the uniform grid implied by `valuation_steps`.
-        let valuator = if deterministic_short_rate {
-            Self::deterministic_short_rate_valuator(tree_bond, market_context, as_of)?
-        } else if let Some(ref tree) = hw_tree {
-            BondValuator::new_with_time_steps(
-                tree_bond.clone(),
-                market_context,
-                as_of,
-                tree.time_grid().to_vec(),
-            )?
-        } else if let Some(ref tree) = rc_tree {
-            BondValuator::new_with_time_steps_and_day_count(
-                tree_bond.clone(),
-                market_context,
-                as_of,
-                tree.time_grid()?.to_vec(),
-                DayCount::Act365F,
-            )?
-        } else {
-            BondValuator::new(
-                tree_bond.clone(),
-                market_context,
-                as_of,
+            PreparedTree::HullWhite(tree, valuator) => valuator.price_with_hw_tree(tree, oas)?,
+            PreparedTree::ShortRate {
+                tree,
+                valuator,
                 time_to_maturity,
-                valuation_steps,
-            )?
-        };
-
-        // Get initial short rate for state variables (needed by short-rate tree)
-        let initial_rate = if let Some(tree) = sr_tree.as_ref() {
-            tree.rate_at_node(0, 0)?
-        } else {
-            0.0 // Not used for rates+credit or HW tree
-        };
-
-        // Capture the first tree-pricing error so a solver failure can report
-        // the underlying cause instead of a generic bracket/convergence error.
-        let pricing_error: std::cell::RefCell<Option<finstack_quant_core::Error>> =
-            std::cell::RefCell::new(None);
-        let record_error = |e: finstack_quant_core::Error| -> f64 {
-            let mut slot = pricing_error.borrow_mut();
-            if slot.is_none() {
-                *slot = Some(e);
-            }
-            // Flat large positive residual — same pattern as the YTM/DM
-            // solvers. The model price is monotonically decreasing in OAS and
-            // tree pricing fails in the divergent (deeply negative OAS)
-            // regime where the true price → +∞, so `price - target` is
-            // unambiguously large and positive. The previous `±1e6` keyed to
-            // `sign(oas)` flipped sign at oas = 0 and could hand Brent a
-            // fabricated bracket around a non-root.
-            1.0e12
-        };
-
-        // Reprice on the tree calibrated above. Do not rebuild or recalibrate
-        // the short-rate / rates+credit lattice inside the OAS solver loop.
-        let objective_fn = |oas: f64| -> f64 {
-            if use_rates_credit {
-                if use_rates_credit_lsmc {
-                    if let Some(tree) = rc_tree.as_ref() {
-                        let mut config = match BondLsmcConfig::for_bond(tree_bond, oas) {
-                            Ok(config) => config,
-                            Err(error) => return record_error(error),
-                        };
-                        // The CI threshold applies to the final solved estimate,
-                        // not noisy intermediate root trials.
-                        config.target_ci_half_width = None;
-                        return match price_bond_lsmc(
-                            tree,
-                            tree_bond,
-                            market_context,
-                            as_of,
-                            &config,
-                            None,
-                        ) {
-                            Ok(result) => result.estimate.mean.amount() - dirty_target,
-                            Err(error) => record_error(error),
-                        };
-                    }
-                    return record_error(finstack_quant_core::Error::internal(
-                        "rates+credit LSMC OAS solve invoked without a calibrated tree",
-                    ));
-                }
-                if let Some(tree) = rc_tree.as_ref() {
-                    match valuator.price_deterministic_rates_credit(tree, oas) {
-                        Ok(model_price) => model_price - dirty_target,
-                        Err(e) => record_error(e),
-                    }
-                } else {
-                    record_error(finstack_quant_core::Error::internal(
-                        "rates+credit OAS solve invoked without a calibrated tree",
-                    ))
-                }
-            } else if deterministic_short_rate {
-                match valuator.price_deterministic_discount_curve(oas) {
-                    Ok(model_price) => model_price - dirty_target,
-                    Err(e) => record_error(e),
-                }
-            } else if let Some(ref tree) = hw_tree {
-                // Hull-White trinomial tree: OAS applied inside backward induction
-                match valuator.price_with_hw_tree(tree, oas) {
-                    Ok(model_price) => model_price - dirty_target,
-                    Err(e) => record_error(e),
-                }
-            } else {
+            } => {
                 let mut vars = HashMap::<&'static str, f64>::default();
-                vars.insert(short_rate_keys::SHORT_RATE, initial_rate);
+                vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
                 vars.insert(short_rate_keys::OAS, oas);
-                if let Some(tree) = sr_tree.as_ref() {
-                    match tree.price(vars, time_to_maturity, market_context, &valuator) {
-                        Ok(model_price) => model_price - dirty_target,
-                        Err(e) => record_error(e),
-                    }
-                } else {
-                    record_error(finstack_quant_core::Error::internal(
-                        "short-rate OAS solve invoked without a calibrated tree",
-                    ))
-                }
+                tree.price(vars, *time_to_maturity, self.market, valuator)?
             }
         };
-
-        let mut solver = BrentSolver::new()
-            .tolerance(self.config.tolerance)
-            .initial_bracket_size(self.config.initial_bracket_size_bp);
-        // Respect the configured maximum iteration cap for OAS root-finding.
-        solver.max_iterations = self.config.max_iterations;
-        let initial_guess = 0.0;
-        let continuous_oas_bp = solver.solve(objective_fn, initial_guess).map_err(|e| {
-            match pricing_error.borrow_mut().take() {
-                Some(tree_err) => finstack_quant_core::Error::Validation(format!(
-                    "OAS tree solve failed: {e}; first underlying tree-pricing error: {tree_err}"
-                )),
-                None => e,
-            }
-        })?;
-        if use_rates_credit_lsmc {
-            if let Some(tree) = rc_tree.as_ref() {
-                let final_config = BondLsmcConfig::for_bond(tree_bond, continuous_oas_bp)?;
-                if final_config.target_ci_half_width.is_some() {
-                    price_bond_lsmc(tree, tree_bond, market_context, as_of, &final_config, None)?;
-                }
-            }
-        }
-        Ok(self
-            .config
-            .oas_quote_compounding
-            .quote_from_continuous_decimal(continuous_oas_bp / 10_000.0)
-            * 10_000.0)
+        Ok(TreePriceOutcome::deterministic(amount))
     }
 }
 
@@ -1120,9 +814,21 @@ mod tests {
         assert_eq!(quote.quote_date, as_of);
         let clean_pct =
             (dirty - quote.accrued_at_quote_date) / high_strike.notional.amount() * 100.0;
-        let implied = pricer
-            .calculate_oas(&high_strike, &market, as_of, clean_pct)
-            .expect("rolled-maturity OAS");
+        let mut quoted = high_strike;
+        quoted
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price = Some(clean_pct);
+        let implied = crate::instruments::common_impl::traits::Instrument::price_with_metrics(
+            &quoted,
+            &market,
+            as_of,
+            &[crate::metrics::MetricId::Oas],
+            crate::instruments::PricingOptions::default().with_model(crate::pricer::ModelKey::Tree),
+        )
+        .expect("rolled-maturity OAS")
+        .measures["oas"]
+            * 10_000.0;
         assert!(
             (implied - expected_oas_bp).abs() < 1.0e-5,
             "rolled-maturity OAS must round trip: implied={implied}, expected={expected_oas_bp}"
