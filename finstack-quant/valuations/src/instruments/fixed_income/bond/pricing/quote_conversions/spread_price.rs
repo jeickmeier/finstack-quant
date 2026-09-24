@@ -11,7 +11,6 @@ use crate::pricer::ModelKey;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use rust_decimal::prelude::ToPrimitive;
 
 /// Price from Z-spread added to zero rates in the bond's compounding convention.
 ///
@@ -181,7 +180,9 @@ pub(super) fn price_from_asw_market(
     }
     let (coupon, frequency, stub) = match &bond.cashflow_spec {
         CashflowSpec::Fixed(spec) => (
-            spec.rate.to_f64().unwrap_or(0.0),
+            bond.cashflow_spec
+                .plain_fixed_rate()?
+                .ok_or(finstack_quant_core::InputError::Invalid)?,
             spec.schedule.frequency,
             spec.schedule.stub,
         ),

@@ -930,12 +930,7 @@ fn solve_workout_path_yield(
         return Ok(f64::INFINITY);
     }
 
-    let coupon_rate = match &bond.cashflow_spec {
-        crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => {
-            spec.rate.to_f64().unwrap_or(0.0)
-        }
-        _ => 0.0,
-    };
+    let coupon_rate = bond.cashflow_spec.plain_fixed_rate()?.unwrap_or(0.0);
     solve_ytm(
         &future_flows,
         quote_date,

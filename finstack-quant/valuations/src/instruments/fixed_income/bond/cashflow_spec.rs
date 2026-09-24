@@ -751,6 +751,27 @@ impl CashflowSpec {
             Self::Amortizing { base, .. } => base.fixed_coupon_rate(),
         }
     }
+
+    /// Stated coupon of a plain `Fixed` spec as a decimal (`0.05` = 5%).
+    ///
+    /// Returns `Ok(None)` for step-up, floating and amortizing specs, so
+    /// callers choose whether those shapes are an error or fall back.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the `Decimal` rate is not
+    /// representable as `f64`, instead of coercing it to zero.
+    pub(crate) fn plain_fixed_rate(&self) -> finstack_quant_core::Result<Option<f64>> {
+        match self {
+            Self::Fixed(spec) => f64::try_from(spec.rate).map(Some).map_err(|_| {
+                finstack_quant_core::Error::Validation(format!(
+                    "fixed coupon rate {} is not representable as f64",
+                    spec.rate
+                ))
+            }),
+            Self::Floating(_) | Self::StepUp(_) | Self::Amortizing { .. } => Ok(None),
+        }
+    }
 }
 
 impl Default for CashflowSpec {

@@ -343,11 +343,9 @@ pub fn asw_par_with_forward(
         let pv_coupon = pv_coupon_from_custom_schedule(disc.as_ref(), custom, as_of)?;
         pv_coupon / (bond.notional.amount() * ann)
     } else {
-        // Extract fixed coupon rate from cashflow_spec (converting Decimal to f64)
-        match &bond.cashflow_spec {
-            CashflowSpec::Fixed(spec) => spec.rate.to_f64().unwrap_or(0.0),
-            _ => return Err(finstack_quant_core::InputError::Invalid.into()),
-        }
+        bond.cashflow_spec
+            .plain_fixed_rate()?
+            .ok_or(finstack_quant_core::InputError::Invalid)?
     };
     Ok((eq_coupon * fixed_ann - float_pv) / float_ann)
 }
@@ -434,14 +432,9 @@ pub fn asw_market_with_forward(
         let pv_coupon = pv_coupon_from_custom_schedule(disc.as_ref(), custom, as_of)?;
         pv_coupon / (notional * ann)
     } else {
-        match &bond.cashflow_spec {
-            CashflowSpec::Fixed(spec) => spec.rate.to_f64().unwrap_or(0.0),
-            CashflowSpec::Floating(_)
-            | CashflowSpec::StepUp(_)
-            | CashflowSpec::Amortizing { .. } => {
-                return Err(finstack_quant_core::InputError::Invalid.into())
-            }
-        }
+        bond.cashflow_spec
+            .plain_fixed_rate()?
+            .ok_or(finstack_quant_core::InputError::Invalid)?
     };
     let par_asw = (eq_coupon * fixed_ann - float_pv) / float_ann;
     Ok(par_asw + (1.0 - price_pct) / float_ann)
@@ -523,10 +516,10 @@ impl MetricCalculator for AssetSwapParCalculator {
             ));
         }
         // Use stated coupon for non-custom bonds; for custom bonds, this branch is not reached
-        let coupon = match &bond.cashflow_spec {
-            CashflowSpec::Fixed(spec) => spec.rate.to_f64().unwrap_or(0.0),
-            _ => return Err(finstack_quant_core::InputError::Invalid.into()),
-        };
+        let coupon = bond
+            .cashflow_spec
+            .plain_fixed_rate()?
+            .ok_or(finstack_quant_core::InputError::Invalid)?;
         if let Some((float_pv, fixed_ann, float_ann)) = forward_components {
             Ok((coupon * fixed_ann - float_pv) / float_ann)
         } else {
@@ -558,10 +551,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
             asw_forward_curve_id,
         ) = {
             let b: &Bond = context.instrument_as()?;
-            let coupon_rate = match &b.cashflow_spec {
-                CashflowSpec::Fixed(spec) => spec.rate.to_f64().unwrap_or(0.0),
-                _ => 0.0, // Will be handled later if needed
-            };
+            let coupon_rate = b.cashflow_spec.plain_fixed_rate()?.unwrap_or(0.0);
             (
                 b.discount_curve_id.to_owned(),
                 b.maturity,
