@@ -2,16 +2,14 @@
 //!
 use crate::cashflow::{builder::CashFlowSchedule, primitives::CFKind};
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-    asset_swap_forward_components, asset_swap_projection_rate, fixed_leg_annuity,
+    asset_swap_forward_components, fixed_leg_annuity, floating_leg_pv_and_annuity,
     par_rate_and_annuity_from_discount,
 };
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::CashflowSpec;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::types::CurveId;
@@ -221,42 +219,15 @@ fn asset_swap_forward_components_split(
         inputs.fixed_frequency,
         inputs.fixed_schedule,
     )?;
-    let float_schedule = inputs.float_schedule;
-    if float_schedule.len() < 2 {
-        return Ok((0.0, fixed_ann, 0.0));
-    }
-
-    let spread = inputs.float_spread_bp * 1e-4;
-    let mut float_pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-    let mut float_ann = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-
-    let mut prev = float_schedule[0];
-    for &date in &float_schedule[1..] {
-        let yf = inputs
-            .float_day_count
-            .year_fraction(prev, date, DayCountContext::default())?;
-        let df = inputs.disc.df_on_date_curve(date)?;
-        let forward = if prev < inputs.as_of {
-            let fixing_id = finstack_quant_core::market_data::fixings::fixing_series_id(
-                inputs.fwd.id().as_str(),
-            );
-            let fixings = inputs.market.get_series(&fixing_id).map_err(|_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Seasoned asset swap requires historical fixing series '{}' for reset date {}; \
-                     started term coupons must use observed fixings, not projection",
-                    fixing_id, prev
-                ))
-            })?;
-            fixings.value_on_exact(prev)?
-        } else {
-            asset_swap_projection_rate(inputs.fwd, prev, date)?
-        };
-        float_pv.add((forward + spread) * yf * df);
-        float_ann.add(yf * df);
-        prev = date;
-    }
-
-    Ok((float_pv.total(), fixed_ann, float_ann.total()))
+    let (float_pv, float_ann) = floating_leg_pv_and_annuity(
+        inputs.disc,
+        inputs.fwd,
+        inputs.float_day_count,
+        inputs.float_schedule,
+        inputs.float_spread_bp,
+        Some((inputs.market, inputs.as_of)),
+    )?;
+    Ok((float_pv, fixed_ann, float_ann))
 }
 
 /// PV of coupon-only leg from a custom schedule (excludes amortization and principal).

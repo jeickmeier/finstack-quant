@@ -16,7 +16,7 @@ mod yield_price;
 
 pub use annuity::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
-    par_rate_and_annuity_from_forward, periods_per_year,
+    periods_per_year,
 };
 pub use compute::compute_quotes;
 pub use spread_price::{price_from_dm, price_from_oas, price_from_z_spread};
@@ -26,7 +26,7 @@ pub use yield_price::{
     price_from_ytw,
 };
 
-pub(crate) use annuity::asset_swap_projection_rate;
+pub(crate) use annuity::floating_leg_pv_and_annuity;
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
 pub(crate) use yield_price::{
     clean_price_from_japanese_simple_yield, enumerate_exit_paths, exercise_redemption_amount,

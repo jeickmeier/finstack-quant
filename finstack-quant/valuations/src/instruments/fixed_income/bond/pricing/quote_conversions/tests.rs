@@ -158,7 +158,7 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
         integrated_float_pv += fwd.rate_period(t1, t2) * yf * df;
     }
 
-    let (float_pv, fixed_ann, _) = asset_swap_forward_components(
+    let (float_pv, _, _) = asset_swap_forward_components(
         &disc,
         &fwd,
         finstack_quant_core::dates::DayCount::Act360,
@@ -167,20 +167,9 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
         0.0,
     )
     .expect("asset-swap components should succeed");
-    let (par_rate, par_ann) = par_rate_and_annuity_from_forward(
-        &disc,
-        &fwd,
-        finstack_quant_core::dates::DayCount::Act360,
-        None,
-        &schedule,
-        0.0,
-    )
-    .expect("forward par rate should succeed");
 
     assert!((expected_float_pv - integrated_float_pv).abs() > 1e-6);
     assert!((float_pv - expected_float_pv).abs() < 1e-14);
-    assert!((par_ann - fixed_ann).abs() < 1e-14);
-    assert!((par_rate - expected_float_pv / fixed_ann).abs() < 1e-14);
 }
 
 #[test]
