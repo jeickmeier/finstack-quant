@@ -250,7 +250,7 @@ pub(crate) fn assemble_factor_model_config(
         matching,
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: Default::default(),
-        bump_size: None,
+        bump_config: None,
         // Warn rather than the silent Residual default: a calibrated
         // artifact knows its factor universe, so a runtime issuer matching
         // a bucket outside it is a data gap worth surfacing.

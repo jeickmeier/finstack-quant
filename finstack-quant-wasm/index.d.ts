@@ -3783,7 +3783,7 @@ export interface FactorModelConfig {
   /**
    * Optional finite-difference bump overrides.
    */
-  bump_size?: FactorBumpSizeConfig;
+  bump_config?: FactorBumpSizeConfig;
   /**
    * Optional policy for unmatched dependencies.
    */

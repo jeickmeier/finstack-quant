@@ -1236,7 +1236,7 @@
     },
     "FactorCovarianceMatrix": {
       "additionalProperties": false,
-      "description": "User-supplied factor covariance matrix with row-major storage.\n\nThe factor ID order is part of the contract: row `i`, column `j`\ncorresponds to `factor_ids[i]` and `factor_ids[j]`.\n\n# Units contract\n\nEntries are **annualized (co)variances of factor moves expressed in each\nfactor's canonical bump unit** — the same unit the sensitivity engines use\nfor deltas (see [`crate::factor::BumpSizeConfig`] / [`crate::factor::FactorBumpUnit`]):\nbasis points for rates/credit/inflation, percent for equity/commodity/FX,\nvol points for volatility. With sensitivities `s` in P&L-per-canonical-unit\nand `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.\nMixing conventions — e.g. a covariance in decimal² (`0.0001²` per bp²)\nagainst per-bp sensitivities — mis-scales portfolio variance by `1e8`.\nThe credit calibrator produces matrices in this convention from the spread\npanel's native units; hand-built matrices must match it.",
+      "description": "User-supplied factor covariance matrix with row-major storage.\n\nThe factor ID order is part of the contract: row `i`, column `j`\ncorresponds to `factor_ids[i]` and `factor_ids[j]`.\n\n# Units contract\n\nEntries are **annualized (co)variances of factor moves expressed in each\nfactor's canonical bump unit** — the same unit the sensitivity engines use\nfor deltas (see [`crate::factor::BumpSizeConfig`] / [`crate::factor::FactorType::bump_units`]):\nbasis points for rates/credit/inflation, percent for equity/commodity/FX,\nvol points for volatility. With sensitivities `s` in P&L-per-canonical-unit\nand `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.\nMixing conventions — e.g. a covariance in decimal² (`0.0001²` per bp²)\nagainst per-bp sensitivities — mis-scales portfolio variance by `1e8`.\nThe credit calibrator produces matrices in this convention from the spread\npanel's native units; hand-built matrices must match it.",
       "properties": {
         "data": {
           "description": "Annualized (co)variances in row-major order, `n * n` entries, each in\nits factors' canonical bump units squared. The matrix is symmetric, so\n`data[i * n + j]` equals `data[j * n + i]`.",
@@ -1334,7 +1334,7 @@
       "additionalProperties": false,
       "description": "Serializable configuration bundle for constructing a factor-model workflow.\n\nThe `factors` vector defines the canonical factor ordering. The covariance\nmatrix must use the same factor IDs and ordering, and the matching\nconfiguration is expected to emit exposures against that same universe.",
       "properties": {
-        "bump_size": {
+        "bump_config": {
           "anyOf": [
             {
               "$ref": "#/$defs/BumpSizeConfig"
@@ -1343,7 +1343,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional finite-difference bump overrides for sensitivity engines."
+          "description": "Optional finite-difference bump overrides for sensitivity engines;\n`None` uses [`BumpSizeConfig::default`] (1 bp rates/credit, 1 %\nequity/FX, one vol point)."
         },
         "covariance": {
           "$ref": "#/$defs/FactorCovarianceMatrix",

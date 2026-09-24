@@ -1413,7 +1413,7 @@ class FactorModelConfig:
         ...
 
     @property
-    def bump_size(self) -> dict[str, Any] | None:
+    def bump_config(self) -> dict[str, Any] | None:
         """Return optional finite-difference bump overrides.
 
         Returns

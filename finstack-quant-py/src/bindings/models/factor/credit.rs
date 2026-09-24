@@ -1404,9 +1404,9 @@ impl PyFactorModelConfig {
 
     /// Optional finite-difference bump overrides as a Python dictionary.
     #[getter]
-    fn bump_size<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    fn bump_config<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
-            .bump_size
+            .bump_config
             .as_ref()
             .map(|value| serde_to_py(py, value))
             .transpose()

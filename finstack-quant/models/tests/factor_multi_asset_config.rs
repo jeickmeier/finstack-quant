@@ -19,7 +19,7 @@ fn factor_model_config_envelope_strict_loader_enforces_schema_and_validation() {
         matching: MatchingConfig::MappingTable(Vec::new()),
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: RiskMeasure::Variance,
-        bump_size: None,
+        bump_config: None,
         unmatched_policy: None,
     };
     let envelope = FactorModelConfigEnvelope::new(config);
@@ -135,7 +135,7 @@ fn factor_model_config_supports_multi_asset_factor_universe() {
         matching,
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: RiskMeasure::Variance,
-        bump_size: Some(BumpSizeConfig::default()),
+        bump_config: Some(BumpSizeConfig::default()),
         unmatched_policy: Some(UnmatchedPolicy::Strict),
     };
 
@@ -176,7 +176,7 @@ fn matching_config_validation_rejects_undeclared_non_credit_factor() {
         }]),
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: RiskMeasure::Variance,
-        bump_size: None,
+        bump_config: None,
         unmatched_policy: None,
     };
 

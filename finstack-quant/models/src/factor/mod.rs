@@ -93,9 +93,7 @@ pub mod schema;
 /// Positions × factors sensitivity matrix storage.
 mod sensitivity_matrix;
 
-pub use config::{
-    BumpSizeConfig, FactorBumpUnit, FactorModelConfig, PricingMode, RiskMeasure, UnmatchedPolicy,
-};
+pub use config::{BumpSizeConfig, FactorModelConfig, PricingMode, RiskMeasure, UnmatchedPolicy};
 pub use covariance::FactorCovarianceMatrix;
 pub use envelope::{
     FactorModelConfigEnvelope, FactorModelConfigSchema, FACTOR_MODEL_CONFIG_CONTRACT,

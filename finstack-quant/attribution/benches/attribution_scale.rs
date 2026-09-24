@@ -339,7 +339,7 @@ fn build_credit_model_for_n(n: usize) -> CreditFactorModel {
         matching: MatchingConfig::MappingTable(vec![]),
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: Default::default(),
-        bump_size: None,
+        bump_config: None,
         unmatched_policy: None,
     };
 

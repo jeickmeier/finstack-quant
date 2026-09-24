@@ -183,8 +183,8 @@ credit             = { python = "finstack_quant.models.factor.credit", status = 
 risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. parametric_es_decomposition returns the ParametricEsDecompositionView reporting view (WASM parametricEsDecomposition returns the same view as a plain object). Rust-only families: the decomposer engines (ParametricDecomposer, ParametricPositionDecomposer, HistoricalPositionDecomposer, DecompositionMethod as a bare enum - hosts read DecompositionConfig.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the VaR/budget view structs ParametricVarDecompositionView, PositionVarContributionView, PositionBudgetEntryView, RiskBudgetResultView and their builders parametric_var_decomposition_view/risk_budget_result_view (hosts use the typed PositionRiskDecomposition/RiskBudgetResult wrappers), the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (host extractors accept lists, NumPy and pandas directly), evaluate_risk_budget_arrays (bound as evaluate_risk_budget), and risk::math kernels." }
 schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; no WASM twin." }
 
-# The remaining crate-root `pub use` surface (BumpSizeConfig, FactorBumpUnit,
-# PricingMode, RiskMeasure, UnmatchedPolicy, SensitivityMatrix, envelope types,
+# The remaining crate-root `pub use` surface (BumpSizeConfig, PricingMode,
+# RiskMeasure, UnmatchedPolicy, SensitivityMatrix, envelope types,
 # and primitive factor/dependency types) remains Rust-owned. Hosts consume these
 # inside FactorModelConfig or through explicit JSON inputs rather than parallel
 # constructor APIs.

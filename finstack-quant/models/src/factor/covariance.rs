@@ -17,7 +17,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 ///
 /// Entries are **annualized (co)variances of factor moves expressed in each
 /// factor's canonical bump unit** — the same unit the sensitivity engines use
-/// for deltas (see [`crate::factor::BumpSizeConfig`] / [`crate::factor::FactorBumpUnit`]):
+/// for deltas (see [`crate::factor::BumpSizeConfig`] / [`crate::factor::FactorType::bump_units`]):
 /// basis points for rates/credit/inflation, percent for equity/commodity/FX,
 /// vol points for volatility. With sensitivities `s` in P&L-per-canonical-unit
 /// and `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.

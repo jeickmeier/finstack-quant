@@ -291,7 +291,7 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
             matching: finstack_quant_models::factor::MatchingConfig::MappingTable(vec![]),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Residual),
         })
         .build()?;
@@ -344,5 +344,115 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
         stressed.total_pnl.abs() > 1e-8,
         "FX factor stress must convert through the bumped spot matrix"
     );
+    Ok(())
+}
+
+// ------------------------------------------------------------------
+// Volatility factors
+// ------------------------------------------------------------------
+
+const VOL_SPOT: f64 = 100.0;
+const VOL_LEVEL: f64 = 0.20;
+const VOL_RATE: f64 = 0.03;
+const VOL_DIV: f64 = 0.01;
+
+fn equity_vol_market(as_of: Date) -> Result<MarketContext> {
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (5.0, (-VOL_RATE * 5.0).exp())])
+        .build()?;
+    let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
+    let expiries = [0.25, 0.5, 1.0, 2.0];
+    let mut surface = VolSurface::builder("EQUITY-VOL")
+        .expiries(&expiries)
+        .strikes(&strikes);
+    for _ in expiries {
+        surface = surface.row(&[VOL_LEVEL; 5]);
+    }
+    Ok(MarketContext::new()
+        .insert(discount)
+        .insert_surface(surface.build()?)
+        .insert_price("EQUITY-SPOT", MarketScalar::Unitless(VOL_SPOT))
+        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(VOL_DIV)))
+}
+
+fn equity_vol_factor() -> FactorDefinition {
+    FactorDefinition {
+        id: FactorId::new("spx-vol"),
+        factor_type: FactorType::Volatility,
+        market_mapping: MarketMapping::VolShift {
+            vol_surface_ids: vec!["EQUITY-VOL".to_string()],
+            units: BumpUnits::Percent,
+        },
+        description: Some("SPX implied vol parallel shift".to_string()),
+    }
+}
+
+/// A volatility factor resolves to a one-vol-point bump (`vol_points = 1.0`,
+/// canonical unit `BumpUnits::Percent`, i.e. +0.01 absolute vol), so its
+/// delta is P&L per vol point and must equal the instrument's Vega.
+///
+/// Independent reference: the option's `Vega` metric (per one vol point) and
+/// the Black-Scholes closed form `N·S·e^{-qT}·φ(d1)·√T·0.01`. The engine's
+/// central difference of width one vol point differs from the analytic
+/// derivative by `O(h²)·∂³V/∂σ³/6`, which is below 1e-3 relative for a
+/// 6-month ATM option at σ = 20%, so both comparisons use 1e-3 relative.
+#[test]
+fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
+    use finstack_quant_core::math::special_functions::norm_pdf;
+    use finstack_quant_valuations::instruments::EquityOption;
+
+    let as_of = make_date(2025, Month::January, 2)?;
+    let expiry = make_date(2025, Month::July, 2)?;
+    let option = EquityOption::european_call(
+        "EQ-VOL-FACTOR",
+        "SPX",
+        100.0,
+        expiry,
+        Money::new(100.0, Currency::USD)?,
+    )?;
+    let market = equity_vol_market(as_of)?;
+
+    let metric = option.price_with_metrics(
+        &market,
+        as_of,
+        &[MetricId::Vega],
+        finstack_quant_valuations::instruments::PricingOptions::default(),
+    )?;
+    let vega = metric.measures[MetricId::Vega.as_str()];
+
+    let t = (expiry - as_of).whole_days() as f64 / 365.0;
+    let d1 = ((VOL_SPOT / 100.0).ln() + (VOL_RATE - VOL_DIV + 0.5 * VOL_LEVEL * VOL_LEVEL) * t)
+        / (VOL_LEVEL * t.sqrt());
+    let bs_vega_per_point =
+        100.0 * VOL_SPOT * (-VOL_DIV * t).exp() * norm_pdf(d1) * t.sqrt() * 0.01;
+
+    let positions = vec![("opt-pos".to_string(), &option as &dyn Instrument, 1.0)];
+    let factors = vec![equity_vol_factor()];
+    let delta_matrix = DeltaBasedEngine::new(BumpSizeConfig::default()).compute_sensitivities(
+        &positions,
+        &factors,
+        &market,
+        as_of,
+        Currency::USD,
+    )?;
+    let repricing_matrix = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?
+        .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)?;
+
+    for (label, actual) in [
+        ("delta engine", delta_matrix.delta(0, 0)),
+        ("full repricing", repricing_matrix.delta(0, 0)),
+    ] {
+        for (reference_label, reference) in [("Vega metric", vega), ("BS vega", bs_vega_per_point)]
+        {
+            assert!(
+                (actual - reference).abs() <= 1e-3 * reference.abs(),
+                "{label} vol-factor delta {actual} should match {reference_label} {reference}"
+            );
+        }
+    }
     Ok(())
 }

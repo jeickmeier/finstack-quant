@@ -123,7 +123,7 @@ impl FactorModelBuilder {
         config.validate()?;
 
         let matcher = config.matching.build_matcher();
-        let bump_config = config.bump_size.clone().unwrap_or_default();
+        let bump_config = config.bump_config.clone().unwrap_or_default();
         let sensitivity_engine = {
             #[cfg(test)]
             let engine = match self.custom_sensitivity_engine {
@@ -737,7 +737,6 @@ impl FactorModel {
         stresses: &[(finstack_quant_models::factor::FactorId, f64)],
     ) -> Result<(MarketContext, Option<Vec<MarketFactorKey>>)> {
         use crate::sensitivity::mapping_to_market_bumps;
-        use finstack_quant_models::factor::FactorBumpUnit;
 
         let stress_by_id: HashMap<_, _> = stresses.iter().map(|(id, shift)| (id, *shift)).collect();
         for (factor_id, _) in stresses {
@@ -770,7 +769,7 @@ impl FactorModel {
                 stressed = stressed.bump(mapping_to_market_bumps(
                     &factor.market_mapping,
                     shift,
-                    FactorBumpUnit::canonical_for(&factor.factor_type),
+                    factor.factor_type.bump_units(),
                     as_of,
                 )?)?;
                 None
@@ -1107,7 +1106,7 @@ pub(super) mod tests {
             }]),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: Some(BumpSizeConfig::default()),
+            bump_config: Some(BumpSizeConfig::default()),
             unmatched_policy: Some(UnmatchedPolicy::Residual),
         }
     }
@@ -1120,7 +1119,7 @@ pub(super) mod tests {
             matching: MatchingConfig::MappingTable(Vec::new()),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: None,
         }
     }
@@ -1180,7 +1179,7 @@ pub(super) mod tests {
                 matching: MatchingConfig::MappingTable(vec![]),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .build();
@@ -1274,7 +1273,7 @@ pub(super) mod tests {
                 matching: MatchingConfig::MappingTable(vec![]),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .with_custom_sensitivity_engine(CountingSensitivityEngine {
@@ -1335,7 +1334,7 @@ pub(super) mod tests {
                 matching: MatchingConfig::MappingTable(vec![]),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Strict),
             })
             .with_custom_sensitivity_engine(FixedSensitivityEngine)
@@ -1617,7 +1616,7 @@ pub(super) mod tests {
                 matching: MatchingConfig::MappingTable(vec![]),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .with_custom_sensitivity_engine(KnownDeltaEngine { deltas: vec![10.0] })
@@ -1708,7 +1707,7 @@ pub(super) mod tests {
                 matching: MatchingConfig::MappingTable(vec![]),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .with_custom_sensitivity_engine(KnownDeltaEngine {
@@ -2034,7 +2033,7 @@ pub(super) mod tests {
                 }),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .build()
@@ -2171,7 +2170,7 @@ pub(super) mod tests {
                     ]),
                     pricing_mode: PricingMode::DeltaBased,
                     risk_measure: RiskMeasure::Variance,
-                    bump_size: None,
+                    bump_config: None,
                     unmatched_policy: Some(policy),
                 })
                 .build()
@@ -2284,7 +2283,7 @@ pub(super) mod tests {
                 }),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .build()
@@ -2401,7 +2400,7 @@ pub(super) mod tests {
                 }),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .build()

@@ -360,7 +360,7 @@ mod tests {
                 matching: MatchingConfig::MappingTable(vec![]),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: None,
             },
             issuer_betas: vec![],

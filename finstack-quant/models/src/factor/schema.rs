@@ -249,7 +249,7 @@ fn factor_model_config_examples() -> finstack_quant_core::Result<Vec<serde_json:
         matching,
         pricing_mode: crate::factor::PricingMode::DeltaBased,
         risk_measure: Default::default(),
-        bump_size: None,
+        bump_config: None,
         unmatched_policy: None,
     };
     let value = serde_json::to_value(crate::factor::FactorModelConfigEnvelope::new(config))

@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Factor-model bumps (2026-09-24)
+
+Numbers change: volatility factors now produce sensitivities. The portfolio
+`DeltaBasedEngine`, `FullRepricingEngine` and factor-model stress/what-if paths
+used to reject every `FactorType::Volatility` factor ("VolPoint incompatible
+with MarketMapping units Percent"). A volatility factor now bumps its
+`VolShift` surfaces by `vol_points` as an additive `BumpUnits::Percent` shift
+(1.0 = one vol point = 0.01 absolute vol), so its delta is P&L per vol point.
+Reference: an ATM 6-month EquityOption's vol-factor delta equals its `Vega`
+metric and the Black-Scholes vega per vol point within 1e-3 relative
+(`portfolio/tests/factor_model_engines.rs`). Rates, credit, equity and FX
+factor outputs are unchanged.
+
+#### Changed (BREAKING)
+
+- `FactorModelConfig.bump_size` (now `bump_config`); Rust, the
+  `finstack_quant.factor_model_config/1` and attribution JSON wire (the old key
+  is rejected), Python `FactorModelConfig.bump_config` getter and WASM
+  `FactorModelConfig.bump_config`.
+- `BumpSizeConfig::bump_size_with_unit_for_factor` returns
+  `(f64, BumpUnits)` (core `BumpUnits`), and the canonical unit comes from the
+  new `FactorType::bump_units()`: `RateBp` for rates, credit, inflation and
+  custom factors; `Percent` for equity, commodity, FX and volatility (Rust).
+- A `MarketMapping::CurveParallel`/`VolShift` mapping must declare the factor
+  type's canonical `BumpUnits`; `CurveBucketed` requires `RateBp` (Rust error
+  text now reads "factor bump units ... incompatible with MarketMapping units").
+
+#### Removed
+
+- `FactorBumpUnit` (`Absolute`, `BasisPoint`, `Percent`, `VolPoint`,
+  `Fraction`, `Multiplier`), `FactorBumpUnit::canonical_for` and
+  `FactorBumpUnit::to_fraction`; use core `BumpUnits` and
+  `FactorType::bump_units` (Rust).
+
 ### Bump sizes: one field per bump (2026-09-24)
 
 Numbers change only when a bump override is set, plus CliquetOption rho and

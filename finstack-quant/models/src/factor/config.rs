@@ -10,6 +10,7 @@ use super::covariance::FactorCovarianceMatrix;
 use super::matching::MatchingConfig;
 use super::primitives::definition::FactorDefinition;
 use super::primitives::factor_types::{FactorId, FactorType};
+use finstack_quant_core::market_data::bumps::BumpUnits;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -241,7 +242,7 @@ impl BumpSizeConfig {
     /// vol points for volatility. Callers that cannot statically
     /// know the unit should use [`Self::bump_size_with_unit_for_factor`]
     /// instead — same numeric, but the unit flows through as a
-    /// [`FactorBumpUnit`] tag.
+    /// [`BumpUnits`] tag.
     #[must_use]
     pub fn bump_size_for_factor(&self, factor_id: &FactorId, factor_type: &FactorType) -> f64 {
         if let Some(&size) = self.overrides.get(factor_id) {
@@ -257,7 +258,8 @@ impl BumpSizeConfig {
         }
     }
 
-    /// Return the configured bump size along with its [`FactorBumpUnit`].
+    /// Return the configured bump size along with its canonical [`BumpUnits`]
+    /// (see [`FactorType::bump_units`]).
     ///
     /// A bare-`f64` return would obscure that the unit depends on
     /// `factor_type` — a numeric value of `1.0` is 1 bp for a rates
@@ -280,96 +282,9 @@ impl BumpSizeConfig {
         &self,
         factor_id: &FactorId,
         factor_type: &FactorType,
-    ) -> (f64, FactorBumpUnit) {
+    ) -> (f64, BumpUnits) {
         let size = self.bump_size_for_factor(factor_id, factor_type);
-        (size, FactorBumpUnit::canonical_for(factor_type))
-    }
-}
-
-/// Unit semantics for a factor bump magnitude, carried alongside the
-/// numeric value returned by
-/// [`BumpSizeConfig::bump_size_with_unit_for_factor`].
-///
-/// `BumpSizeConfig` itself encodes units only implicitly in the field
-/// name (`rates_bp`, `equity_pct`, `vol_points`), which previously let
-/// a caller thread a rates-bp magnitude into the `EquitySpot` path
-/// (which assumes percent) and silently produce a 100× scaling error.
-/// `FactorBumpUnit` makes the interpretation explicit and lets
-/// downstream code validate against or convert to the mapping's
-/// expected unit.
-///
-/// The variants intentionally mirror [`finstack_quant_core::market_data::bumps::BumpUnits`]
-/// plus `VolPoint` and `Absolute`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum FactorBumpUnit {
-    /// Absolute dimensionless shift applied as-is (`0.01` means +0.01 on the
-    /// quoted quantity). Not the canonical unit for any factor type; kept
-    /// for callers that pre-convert magnitudes themselves.
-    Absolute,
-    /// Basis-point shift; `1.0` means 1 bp = 0.0001 fractional.
-    BasisPoint,
-    /// Percent shift; `1.0` means 1 % = 0.01 fractional.
-    Percent,
-    /// Vol-point shift; `1.0` means one vol point = 0.01 absolute vol.
-    ///
-    /// This matches [`BumpSizeConfig::vol_points`] (default `1.0` = one vol
-    /// point). Treating that magnitude as an `Absolute` shift would apply a
-    /// 100× oversized vol bump.
-    VolPoint,
-    /// Direct fractional shift; `0.01` means 1 %.
-    Fraction,
-    /// Multiplicative factor on the base; `1.10` means +10 %.
-    Multiplier,
-}
-
-impl FactorBumpUnit {
-    /// Canonical unit for a given [`FactorType`].
-    ///
-    /// * Rates / Credit / Inflation / Custom → `BasisPoint` (matches
-    ///   `BumpSizeConfig::rates_bp`, `credit_bp`).
-    /// * Equity / Commodity / FX → `Percent` (matches
-    ///   `BumpSizeConfig::equity_pct`, `fx_pct`).
-    /// * Volatility → `VolPoint` (matches `BumpSizeConfig::vol_points`;
-    ///   `1.0` = one vol point = `0.01` absolute vol).
-    #[must_use]
-    pub fn canonical_for(factor_type: &FactorType) -> Self {
-        match factor_type {
-            FactorType::Rates
-            | FactorType::Credit
-            | FactorType::Inflation
-            | FactorType::Custom(_) => FactorBumpUnit::BasisPoint,
-            FactorType::Equity | FactorType::Commodity | FactorType::Fx => FactorBumpUnit::Percent,
-            FactorType::Volatility => FactorBumpUnit::VolPoint,
-        }
-    }
-
-    /// Convert a magnitude in this unit to a plain fraction (dimensionless
-    /// proportion of the base). Useful when a consumer only knows how to
-    /// apply fractional shifts, e.g. an equity-spot multiplier of
-    /// `1.0 + fraction`.
-    ///
-    /// `Multiplier` is returned unchanged — the fractional form doesn't
-    /// capture a multiplicative shock; callers that want that branch
-    /// should match on the variant explicitly.
-    #[must_use]
-    // Multiplier passthrough is semantically distinct from Absolute/Fraction
-    // even though the arm bodies coincide; keep the arms explicit.
-    #[allow(clippy::match_same_arms)]
-    pub fn to_fraction(self, value: f64) -> f64 {
-        match self {
-            FactorBumpUnit::Absolute | FactorBumpUnit::Fraction => value,
-            FactorBumpUnit::BasisPoint => value * 1e-4,
-            // One percent and one vol point both convert at 1e-2: a vol
-            // point is 0.01 of absolute vol just as a percent is 0.01 of
-            // the base.
-            FactorBumpUnit::Percent | FactorBumpUnit::VolPoint => value * 1e-2,
-            // Multiplier is not a linear shift; expose as-is for callers
-            // that know to build a multiplicative bump spec.
-            FactorBumpUnit::Multiplier => value,
-        }
+        (size, factor_type.bump_units())
     }
 }
 
@@ -393,9 +308,11 @@ pub struct FactorModelConfig {
     /// Risk measure used when aggregating factor sensitivities.
     #[serde(default)]
     pub risk_measure: RiskMeasure,
-    /// Optional finite-difference bump overrides for sensitivity engines.
+    /// Optional finite-difference bump overrides for sensitivity engines;
+    /// `None` uses [`BumpSizeConfig::default`] (1 bp rates/credit, 1 %
+    /// equity/FX, one vol point).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bump_size: Option<BumpSizeConfig>,
+    pub bump_config: Option<BumpSizeConfig>,
     /// Policy used when a dependency does not map to a configured factor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unmatched_policy: Option<UnmatchedPolicy>,
@@ -699,7 +616,7 @@ mod tests {
             matching: MatchingConfig::MappingTable(vec![]),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Residual),
         };
 
@@ -744,7 +661,7 @@ mod tests {
             matching: MatchingConfig::MappingTable(vec![]),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: None,
         };
 
@@ -758,7 +675,7 @@ mod tests {
             return;
         };
         object.remove("risk_measure");
-        object.remove("bump_size");
+        object.remove("bump_config");
         object.remove("unmatched_policy");
 
         let config_result: Result<FactorModelConfig, _> = serde_json::from_value(value);
@@ -768,22 +685,48 @@ mod tests {
         };
 
         assert_eq!(config.risk_measure, RiskMeasure::Variance);
-        assert_eq!(config.bump_size, None);
+        assert_eq!(config.bump_config, None);
         assert_eq!(config.unmatched_policy, None);
     }
 
-    // a vol bump of 1.0 vol point must convert to 0.01
-    // absolute vol, not 1.0 (a 100x oversized bump).
+    // A vol bump of 1.0 vol point is an additive percent bump: it resolves to
+    // 0.01 absolute vol, not 1.0 (a 100x oversized bump).
     #[test]
-    fn vol_point_unit_converts_one_point_to_one_percent() {
-        let (size, unit) = BumpSizeConfig::default()
+    fn vol_point_resolves_to_one_percent_additive() {
+        use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType};
+
+        let (size, units) = BumpSizeConfig::default()
             .bump_size_with_unit_for_factor(&FactorId::new("VOL-1"), &FactorType::Volatility);
         assert!((size - 1.0).abs() < 1e-12);
-        assert_eq!(unit, FactorBumpUnit::VolPoint);
-        assert!(
-            (unit.to_fraction(size) - 0.01).abs() < 1e-15,
+        assert_eq!(units, BumpUnits::Percent);
+        let spec = BumpSpec {
+            mode: BumpMode::Additive,
+            units,
+            value: size,
+            bump_type: BumpType::Parallel,
+        };
+        assert_eq!(
+            spec.resolve_standard_values(),
+            Some((0.01, false)),
             "one vol point must be 0.01 absolute vol"
         );
+    }
+
+    #[test]
+    fn factor_model_config_rejects_retired_bump_size_key() {
+        let mut value = serde_json::json!({
+            "factors": [],
+            "covariance": {"data": [], "factor_ids": [], "n": 0},
+            "matching": {"mapping_table": []},
+            "pricing_mode": "delta_based",
+        });
+        assert!(serde_json::from_value::<FactorModelConfig>(value.clone()).is_ok());
+        value["bump_size"] = serde_json::json!({}); // schema-rejection-test
+        let err = serde_json::from_value::<FactorModelConfig>(value)
+            .err()
+            .map(|e| e.to_string())
+            .unwrap_or_default();
+        assert!(err.contains("unknown field"), "unexpected error: {err}");
     }
 
     #[test]
@@ -850,7 +793,7 @@ mod tests {
             matching: MatchingConfig::CreditHierarchical(credit_config),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: None,
         };
 
@@ -890,7 +833,7 @@ mod tests {
             }]),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: None,
         };
         assert!(config.validate().is_ok());
@@ -914,7 +857,7 @@ mod tests {
             matching: MatchingConfig::MappingTable(Vec::new()),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: None,
         };
 
@@ -977,7 +920,7 @@ mod tests {
             }),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: None,
         };
         let err = config
@@ -1050,7 +993,7 @@ mod tests {
             matching: MatchingConfig::Cascade(vec![member(row()), member(row())]),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
-            bump_size: None,
+            bump_config: None,
             unmatched_policy: None,
         };
         let err = config

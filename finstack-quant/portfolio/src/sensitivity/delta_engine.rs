@@ -5,12 +5,14 @@ use super::traits::{
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, MarketBump};
+use finstack_quant_core::market_data::bumps::{
+    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, InputError, Result};
 use finstack_quant_models::factor::{
-    BumpSizeConfig, FactorBumpUnit, FactorDefinition, MarketMapping, SensitivityMatrix,
+    BumpSizeConfig, FactorDefinition, MarketMapping, SensitivityMatrix,
 };
 use finstack_quant_valuations::instruments::Instrument;
 
@@ -36,7 +38,7 @@ impl DeltaBasedEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<Vec<f64>> {
-        let (bump_size, bump_unit) = self
+        let (bump_size, bump_units) = self
             .bump_config
             .bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
         if !bump_size.is_finite() || bump_size.abs() < f64::EPSILON {
@@ -46,13 +48,13 @@ impl DeltaBasedEngine {
         let up_market = market.bump(mapping_to_market_bumps(
             &factor.market_mapping,
             bump_size,
-            bump_unit,
+            bump_units,
             as_of,
         )?)?;
         let down_market = market.bump(mapping_to_market_bumps(
             &factor.market_mapping,
             -bump_size,
-            bump_unit,
+            bump_units,
             as_of,
         )?)?;
 
@@ -81,73 +83,74 @@ impl DeltaBasedEngine {
 /// Convert a `MarketMapping` into concrete `MarketBump`s that can be applied
 /// to a market.
 ///
-/// `bump_size` is the magnitude; `bump_unit` tags its interpretation
-/// ([basis points](FactorBumpUnit::BasisPoint), [percent](FactorBumpUnit::Percent),
-/// [absolute](FactorBumpUnit::Absolute), etc.). Making the unit
-/// explicit prevents silent 100× errors where a rates-bp magnitude is
-/// fed into the `EquitySpot` branch (which assumes percent), or vice
+/// `bump_size` is the magnitude and `bump_units` its core [`BumpUnits`]
+/// (`RateBp`, `Percent`, `Fraction` or `Factor`); the factor engines pass the
+/// factor type's canonical unit ([`FactorType::bump_units`]). Making the unit
+/// explicit prevents silent 100× errors where a rates-bp magnitude is fed into
+/// the `EquitySpot` branch (which applies a fractional multiplier), or vice
 /// versa.
 ///
 /// Branches that already carry their own `BumpUnits` (`CurveParallel`,
-/// `CurveBucketed`, `VolShift`) require `bump_unit` to match the mapping's
-/// declared `BumpUnits`; mismatches are rejected with
+/// `VolShift`) require `bump_units` to equal the mapping's declared units, and
+/// `CurveBucketed` requires `RateBp`; mismatches are rejected with
 /// [`Error::Validation`] so the disagreement surfaces at bump construction
 /// rather than propagating a silently mis-scaled shock.
 ///
-/// `EquitySpot` and `FxRate` do not carry `BumpUnits` and use
-/// `bump_unit.to_fraction(...)` to reduce any input unit to a common
-/// fractional form before applying the multiplier / fxpct shock.
+/// `EquitySpot` and `FxRate` do not carry `BumpUnits`; they reduce the additive
+/// magnitude to a fraction (`RateBp` ÷ 10 000, `Percent` ÷ 100, `Fraction` as
+/// is) before applying the multiplier / FX percent shock.
+///
+/// [`FactorType::bump_units`]: finstack_quant_models::factor::FactorType::bump_units
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`] if a supplied unit conflicts with a
-/// curve/vol mapping's declared units, or if a bucketed curve is not bumped in
-/// basis points. Invalid bump specifications produced by the underlying market
-/// types are also propagated.
+/// Returns [`Error::Validation`] if `bump_units` conflicts with a curve/vol
+/// mapping's declared units, if a bucketed curve is not bumped in basis
+/// points, or if `Factor` units reach a spot/FX mapping. Invalid bump
+/// specifications produced by the underlying market types are also propagated.
 ///
 /// # Arguments
 ///
 /// * `mapping` - Factor-to-market mapping that selects the curve, surface, or
 ///   scalar to bump and its declared bump convention.
-/// * `bump_size` - Requested bump magnitude expressed in `bump_unit`.
-/// * `bump_unit` - Unit of `bump_size`; it must match mappings that declare
-///   curve or volatility bump units.
+/// * `bump_size` - Requested bump magnitude expressed in `bump_units`.
+/// * `bump_units` - Unit of `bump_size`; it must equal the units declared by
+///   curve or volatility mappings.
 /// * `as_of` - Valuation date attached to generated dated market bumps.
 pub(crate) fn mapping_to_market_bumps(
     mapping: &MarketMapping,
     bump_size: f64,
-    bump_unit: FactorBumpUnit,
+    bump_units: BumpUnits,
     as_of: Date,
 ) -> Result<Vec<MarketBump>> {
-    use finstack_quant_core::market_data::bumps::BumpUnits;
-
-    // Enforce that `bump_unit` matches the mapping-level `BumpUnits` for
-    // branches that declare one. This catches the misconfigured
-    // rates-factor-into-percent-mapping case at bump construction time
-    // instead of at P&L reconciliation.
-    let require_unit_matches = |mapping_units: BumpUnits| -> Result<()> {
-        let ok = matches!(
-            (bump_unit, mapping_units),
-            (FactorBumpUnit::BasisPoint, BumpUnits::RateBp)
-                | (FactorBumpUnit::Percent, BumpUnits::Percent)
-                | (FactorBumpUnit::Fraction, BumpUnits::Fraction)
-                | (FactorBumpUnit::Multiplier, BumpUnits::Factor)
-                // Absolute vol-points flow through as fractional magnitude
-                // for VolShift surfaces that store fractional vols.
-                | (FactorBumpUnit::Absolute, BumpUnits::Fraction)
-        );
-        if ok {
+    let require_units = |mapping_units: BumpUnits| -> Result<()> {
+        if bump_units == mapping_units {
             Ok(())
         } else {
             Err(Error::Validation(format!(
-                "FactorBumpUnit::{bump_unit:?} incompatible with MarketMapping units {mapping_units:?}"
+                "factor bump units {bump_units:?} incompatible with MarketMapping units {mapping_units:?}"
             )))
         }
+    };
+    let additive_fraction = || -> Result<f64> {
+        BumpSpec {
+            mode: BumpMode::Additive,
+            units: bump_units,
+            value: bump_size,
+            bump_type: BumpType::Parallel,
+        }
+        .resolve_standard_values()
+        .map(|(fraction, _)| fraction)
+        .ok_or_else(|| {
+            Error::Validation(format!(
+                "factor bump units {bump_units:?} cannot express an additive spot/FX shift"
+            ))
+        })
     };
 
     match mapping {
         MarketMapping::CurveParallel { curve_ids, units } => {
-            require_unit_matches(*units)?;
+            require_units(*units)?;
             Ok(curve_ids
                 .iter()
                 .cloned()
@@ -168,9 +171,9 @@ pub(crate) fn mapping_to_market_bumps(
         } => {
             // Bucketed bumps are always bp-scaled per
             // `BumpSpec::triangular_key_rate_bp`.
-            if !matches!(bump_unit, FactorBumpUnit::BasisPoint) {
+            if bump_units != BumpUnits::RateBp {
                 return Err(Error::Validation(format!(
-                    "MarketMapping::CurveBucketed requires BasisPoint bump_unit, got {bump_unit:?}"
+                    "MarketMapping::CurveBucketed requires RateBp bump units, got {bump_units:?}"
                 )));
             }
             let last_idx = tenor_weights.len().saturating_sub(1);
@@ -216,11 +219,9 @@ pub(crate) fn mapping_to_market_bumps(
                 .collect())
         }
         MarketMapping::EquitySpot { tickers } => {
-            // Equity spot expects a *multiplicative* shock. Convert any
-            // input unit to a fractional shift first, then wrap as
-            // `1.0 + fraction`. This removes the previous hardcoded
-            // `bump_size / 100.0` that assumed percent-only input.
-            let fraction = bump_unit.to_fraction(bump_size);
+            // Equity spot expects a *multiplicative* shock: reduce the
+            // additive magnitude to a fraction, then wrap as `1.0 + fraction`.
+            let fraction = additive_fraction()?;
             Ok(tickers
                 .iter()
                 .map(|ticker| MarketBump::Curve {
@@ -231,8 +232,8 @@ pub(crate) fn mapping_to_market_bumps(
         }
         MarketMapping::FxRate { pair } => {
             // `MarketBump::FxPct::pct` is a *percent* scalar, so convert
-            // any input unit to percent (fraction × 100) for consistency.
-            let pct = bump_unit.to_fraction(bump_size) * 100.0;
+            // the additive magnitude to percent (fraction × 100).
+            let pct = additive_fraction()? * 100.0;
             Ok(vec![MarketBump::FxPct {
                 base: pair.0,
                 quote: pair.1,
@@ -244,7 +245,7 @@ pub(crate) fn mapping_to_market_bumps(
             vol_surface_ids,
             units,
         } => {
-            require_unit_matches(*units)?;
+            require_units(*units)?;
             Ok(vol_surface_ids
                 .iter()
                 .map(|vol_surface_id| MarketBump::Curve {
@@ -313,7 +314,6 @@ impl FactorSensitivityEngine for DeltaBasedEngine {
 mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
@@ -549,12 +549,8 @@ mod tests {
             units: BumpUnits::RateBp,
         };
 
-        let bumps = mapping_to_market_bumps(
-            &mapping,
-            1.0,
-            FactorBumpUnit::BasisPoint,
-            date!(2025 - 01 - 01),
-        )?;
+        let bumps =
+            mapping_to_market_bumps(&mapping, 1.0, BumpUnits::RateBp, date!(2025 - 01 - 01))?;
 
         assert_eq!(bumps.len(), 1);
         assert!(matches!(bumps[0], MarketBump::Curve { .. }));
@@ -573,12 +569,8 @@ mod tests {
             tenor_weights: vec![(2.0, 0.5), (5.0, 1.0), (10.0, 0.5)],
         };
 
-        let bumps = mapping_to_market_bumps(
-            &mapping,
-            1.0,
-            FactorBumpUnit::BasisPoint,
-            date!(2025 - 01 - 01),
-        )?;
+        let bumps =
+            mapping_to_market_bumps(&mapping, 1.0, BumpUnits::RateBp, date!(2025 - 01 - 01))?;
 
         assert_eq!(bumps.len(), 3);
         assert!(matches!(bumps[1], MarketBump::Curve { .. }));
@@ -607,16 +599,12 @@ mod tests {
             curve_ids: vec![CurveId::new("USD-OIS")],
             units: BumpUnits::RateBp,
         };
-        let result = mapping_to_market_bumps(
-            &mapping,
-            1.0,
-            FactorBumpUnit::Percent,
-            date!(2025 - 01 - 01),
-        );
+        let result =
+            mapping_to_market_bumps(&mapping, 1.0, BumpUnits::Percent, date!(2025 - 01 - 01));
         assert!(result.is_err(), "unit mismatch must be rejected");
         let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
         assert!(
-            msg.contains("FactorBumpUnit") && msg.contains("incompatible"),
+            msg.contains("factor bump units") && msg.contains("incompatible"),
             "error should name the offending unit: {msg}"
         );
         Ok(())
@@ -632,18 +620,10 @@ mod tests {
         let mapping = MarketMapping::EquitySpot {
             tickers: vec!["SPX".into()],
         };
-        let pct = mapping_to_market_bumps(
-            &mapping,
-            2.0,
-            FactorBumpUnit::Percent,
-            date!(2025 - 01 - 01),
-        )?;
-        let frac = mapping_to_market_bumps(
-            &mapping,
-            0.02,
-            FactorBumpUnit::Fraction,
-            date!(2025 - 01 - 01),
-        )?;
+        let pct =
+            mapping_to_market_bumps(&mapping, 2.0, BumpUnits::Percent, date!(2025 - 01 - 01))?;
+        let frac =
+            mapping_to_market_bumps(&mapping, 0.02, BumpUnits::Fraction, date!(2025 - 01 - 01))?;
         // Both should yield a multiplier bump of 1.02.
         for bumps in [&pct, &frac] {
             assert_eq!(bumps.len(), 1);

@@ -37,7 +37,7 @@ dependency, and sensitivity types. The public submodules are `matching`,
 |-------|-------|
 | Factor identity | `FactorId`, `FactorType` (`Rates`, `Credit`, `Equity`, `Fx`, `Volatility`, `Commodity`, `Inflation`, `Custom(String)`), `FactorDefinition` |
 | Market mapping | `MarketMapping` (`CurveParallel`, `CurveBucketed`, `EquitySpot`, `FxRate`, `VolShift`), `MarketDependency`, `DependencyType`, `CurveType` |
-| Run configuration | `FactorModelConfig`, `RiskMeasure`, `PricingMode`, `BumpSizeConfig`, `FactorBumpUnit`, `UnmatchedPolicy` |
+| Run configuration | `FactorModelConfig`, `RiskMeasure`, `PricingMode`, `BumpSizeConfig`, `UnmatchedPolicy` |
 | Covariance | `FactorCovarianceMatrix` |
 | Persistence | `FactorModelConfigEnvelope`, `FactorModelConfigSchema`, `FACTOR_MODEL_CONFIG_CONTRACT` |
 | Matching (`matching`) | `MatchingConfig`, `MappingRule`, `DependencyFilter`, `AttributeFilter`, `FactorMatcher`, `CascadeMatcher`, `HierarchicalMatcher`, `MappingTableMatcher`, `CreditHierarchicalMatcher`, `HierarchicalConfig`, `CreditHierarchicalConfig`, `FactorMatchEntry`, `FactorMatchError`, `FactorNode`, `bucket_factor_id`, `dimension_key`, `CREDIT_GENERIC_FACTOR_ID`, `ISSUER_ID_META_KEY` |

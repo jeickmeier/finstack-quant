@@ -1,5 +1,6 @@
 //! Core identifiers and definitions used by the factor model.
 //!
+use finstack_quant_core::market_data::bumps::BumpUnits;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -49,6 +50,27 @@ pub enum FactorType {
     Inflation,
     /// User-defined factor bucket.
     Custom(String),
+}
+
+impl FactorType {
+    /// Canonical unit of a bump magnitude for this factor type.
+    ///
+    /// The unit matches the [`crate::factor::BumpSizeConfig`] field that sizes
+    /// the bump:
+    ///
+    /// * Rates / Credit / Inflation / Custom → [`BumpUnits::RateBp`]
+    ///   (`rates_bp`, `credit_bp`; `1.0` = 1 bp = `0.0001`).
+    /// * Equity / Commodity / FX → [`BumpUnits::Percent`] (`equity_pct`,
+    ///   `fx_pct`; `1.0` = 1 % = `0.01` of the base).
+    /// * Volatility → [`BumpUnits::Percent`] (`vol_points`; an additive
+    ///   percent bump on a vol surface is one vol point = `0.01` absolute vol).
+    #[must_use]
+    pub fn bump_units(&self) -> BumpUnits {
+        match self {
+            Self::Rates | Self::Credit | Self::Inflation | Self::Custom(_) => BumpUnits::RateBp,
+            Self::Equity | Self::Commodity | Self::Fx | Self::Volatility => BumpUnits::Percent,
+        }
+    }
 }
 
 impl fmt::Display for FactorType {

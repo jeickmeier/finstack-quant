@@ -857,7 +857,7 @@ mod tests {
                 }),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .with_custom_sensitivity_engine(FixedSensitivityEngine)
@@ -1025,7 +1025,7 @@ mod tests {
                 }]),
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
-                bump_size: None,
+                bump_config: None,
                 unmatched_policy: Some(UnmatchedPolicy::Residual),
             })
             .with_custom_sensitivity_engine(FixedSensitivityEngine)
