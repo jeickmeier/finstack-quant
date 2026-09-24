@@ -2,12 +2,13 @@ use super::annuity::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
 };
 use super::compute::clear_price_driving_overrides;
-use crate::instruments::fixed_income::bond::metrics::price_yield_spread::asw::resolved_asw_forward_curve_id;
+use crate::instruments::fixed_income::bond::metrics::price_yield_spread::asw::{
+    asw_leg_schedule, resolved_asw_forward_curve_id,
+};
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::BondZSpreadPricingKernel;
 use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use crate::pricer::ModelKey;
-use finstack_quant_core::dates::calendar::calendar_by_id;
-use finstack_quant_core::dates::{Date, ScheduleBuilder};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
@@ -178,14 +179,11 @@ pub(super) fn price_from_asw_market(
     if bond.custom_cashflows.is_some() {
         return Err(finstack_quant_core::InputError::Invalid.into());
     }
-    let (coupon, frequency, stub, business_day_convention, calendar_id) = match &bond.cashflow_spec
-    {
+    let (coupon, frequency, stub) = match &bond.cashflow_spec {
         CashflowSpec::Fixed(spec) => (
             spec.rate.to_f64().unwrap_or(0.0),
             spec.schedule.frequency,
             spec.schedule.stub,
-            spec.schedule.business_day_convention,
-            Some(spec.schedule.calendar_id.as_str()),
         ),
         _ => return Err(finstack_quant_core::InputError::Invalid.into()),
     };
@@ -199,17 +197,7 @@ pub(super) fn price_from_asw_market(
             "ASW market price inversion requires at least two fixed-leg schedule dates".to_string(),
         ));
     }
-    let mut builder = ScheduleBuilder::new(as_of, bond.maturity)?
-        .frequency(frequency)
-        .stub_rule(stub);
-
-    if let Some(id) = calendar_id {
-        if let Some(cal) = calendar_by_id(id) {
-            builder = builder.adjust_with(business_day_convention, cal);
-        }
-    }
-
-    let sched: Vec<Date> = builder.build()?.into_iter().collect();
+    let sched = asw_leg_schedule(as_of, bond.maturity, frequency, stub, None)?;
     if sched.len() < 2 {
         return Err(finstack_quant_core::Error::Validation(
             "ASW market price inversion requires at least two fixed-leg schedule dates".to_string(),
