@@ -67,7 +67,7 @@ pub use pricing::{
     execute_waterfall, generate_cashflows, generate_tranche_cashflows, run_simulation,
 };
 
-pub use pricing::coverage_tests::{CoverageTest, TestContext, TestResult};
+pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::stochastic::PricingMode;
 pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
 pub use pricing::waterfall::execute_waterfall_with_explanation;

@@ -60,15 +60,20 @@ fn execute(
 
 #[test]
 fn production_waterfall_principal_cannot_fund_fees_unless_the_tier_draws_on_it() {
-    let waterfall = Waterfall::new(Currency::USD).add_tier(fee("fee", 1, 50.0));
+    let waterfall = Waterfall::builder(Currency::USD)
+        .add_tier(fee("fee", 1, 50.0))
+        .build()
+        .expect("valid waterfall");
     let result = execute(&waterfall, 10.0, 100.0).expect("waterfall");
     assert_eq!(result.tier_allocations[0].1, usd(10.0));
     assert_eq!(result.remaining_cash, usd(100.0));
     assert_eq!(result.principal_used_for_interest, usd(0.0));
 
     // The same tier funded interest-then-principal tops up from principal.
-    let waterfall = Waterfall::new(Currency::USD)
-        .add_tier(fee("fee", 1, 50.0).funding(FundingSource::InterestThenPrincipal));
+    let waterfall = Waterfall::builder(Currency::USD)
+        .add_tier(fee("fee", 1, 50.0).funding(FundingSource::InterestThenPrincipal))
+        .build()
+        .expect("valid waterfall");
     let result = execute(&waterfall, 10.0, 100.0).expect("waterfall");
     assert_eq!(result.tier_allocations[0].1, usd(50.0));
     assert_eq!(result.principal_used_for_interest, usd(40.0));
@@ -80,11 +85,14 @@ fn production_waterfall_principal_cannot_fund_fees_unless_the_tier_draws_on_it()
 #[test]
 fn production_waterfall_interest_cannot_repay_principal_without_diversion() {
     let deal = StructuredCredit::example();
-    let waterfall = Waterfall::new(Currency::USD).add_tier(
-        WaterfallTier::new("principal", 1, PaymentType::Principal).add_recipient(
-            Recipient::tranche_principal("debt", deal.tranches.tranches[0].id.as_str(), None),
-        ),
-    );
+    let waterfall = Waterfall::builder(Currency::USD)
+        .add_tier(
+            WaterfallTier::new("principal", 1, PaymentType::Principal).add_recipient(
+                Recipient::tranche_principal("debt", deal.tranches.tranches[0].id.as_str(), None),
+            ),
+        )
+        .build()
+        .expect("valid waterfall");
     let result = execute(&waterfall, 100.0, 10.0).expect("waterfall");
     assert_eq!(result.tier_allocations[0].1, usd(10.0));
     assert_eq!(result.remaining_cash, usd(100.0));
@@ -92,7 +100,9 @@ fn production_waterfall_interest_cannot_repay_principal_without_diversion() {
 
 #[test]
 fn production_waterfall_deserialized_tiers_execute_by_priority() {
-    let mut waterfall = Waterfall::new(Currency::USD);
+    let mut waterfall = Waterfall::builder(Currency::USD)
+        .build()
+        .expect("valid waterfall");
     waterfall.tiers = vec![fee("junior", 2, 30.0), fee("senior", 1, 20.0)];
     let wire = serde_json::to_string(&waterfall).expect("serialize");
     let waterfall: Waterfall = serde_json::from_str(&wire).expect("deserialize");
@@ -105,7 +115,9 @@ fn production_waterfall_deserialized_tiers_execute_by_priority() {
 
 #[test]
 fn production_waterfall_duplicate_priorities_are_rejected() {
-    let mut waterfall = Waterfall::new(Currency::USD);
+    let mut waterfall = Waterfall::builder(Currency::USD)
+        .build()
+        .expect("valid waterfall");
     waterfall.tiers = vec![fee("a", 1, 20.0), fee("b", 1, 20.0)];
     assert!(execute(&waterfall, 25.0, 0.0).is_err());
 }

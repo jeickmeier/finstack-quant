@@ -14,8 +14,10 @@
 //! principal proceeds are not reinvested but repay the notes.
 
 use super::*;
+use crate::instruments::fixed_income::structured_credit::pricing::coverage_tests::TestContext;
 use crate::instruments::fixed_income::structured_credit::pricing::waterfall::{
-    evaluate_coverage_tests, senior_fee_accrual, special_serviced_balance, SeniorFeeInputs,
+    coverage_inputs, evaluate_coverage_tests, senior_fee_accrual, special_serviced_balance,
+    SeniorFeeInputs,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
     CoverageTestAction, CoverageTestSpec, CoverageTrigger, PaymentCalculation, PaymentType,
@@ -222,27 +224,31 @@ pub(super) fn advance(
         })
         .collect();
     let all_specs: Vec<&CoverageTestSpec> = specs.iter().chain(waterfall_specs.iter()).collect();
+    let (claim_caps, coverage_rules) = coverage_inputs(waterfall);
     let results = evaluate_coverage_tests(
-        waterfall,
         &all_specs,
-        state.tranches,
-        &state.pool,
-        period.payment,
-        period_start,
-        period.valuation,
-        principal,
-        interest,
-        pool_balance,
-        market,
-        Some(&state.tranche_balances),
-        Some(&state.pool_state.balances),
-        Some(state.live_collateral(&unresolved_npl)),
-        &payable,
-        fees,
-        state.principal_funding_account,
-        defaulted_collateral_value,
-        state.floating_rate_shift,
-        Some(&state.deferred_interest),
+        &TestContext {
+            pool: &state.pool,
+            tranches: state.tranches,
+            as_of: period.payment,
+            valuation_date: period.valuation,
+            period_start: Some(period_start),
+            cash_balance: principal,
+            interest_collections: interest,
+            rules: coverage_rules,
+            market: Some(market),
+            tranche_balances: Some(&state.tranche_balances),
+            payable_principal_tranche_ids: Some(&payable),
+            asset_balances: Some(&state.pool_state.balances),
+            live_collateral: Some(state.live_collateral(&unresolved_npl)),
+            current_pool_balance: Some(pool_balance),
+            senior_fees: fees,
+            restricted_cash: state.principal_funding_account,
+            defaulted_collateral_value,
+            interest_claim_caps: &claim_caps,
+            floating_rate_shift: state.floating_rate_shift,
+            deferred_interest: Some(&state.deferred_interest),
+        },
     )?;
 
     let mut actions = TriggerActions::default();

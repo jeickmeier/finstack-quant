@@ -25,7 +25,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Wat
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AllocationMode, AssetPool, DealType, ManagementFeeType, PaymentCalculation, PaymentType,
     Recipient, RecipientType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-    Waterfall, WaterfallBuilder, WaterfallTier,
+    Waterfall, WaterfallTier,
 };
 use time::Duration;
 
@@ -200,7 +200,7 @@ fn test_golden_clo_2_0_full_payment() {
     let tranches = create_test_tranches(currency);
 
     // Build waterfall matching CLO 2.0 template
-    let waterfall = WaterfallBuilder::new(currency)
+    let waterfall = Waterfall::builder(currency)
         // Tier 1: Fees
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee)
@@ -362,7 +362,7 @@ fn test_golden_clo_oc_breach_diversion() {
 
     let tranches = create_test_tranches(currency);
 
-    let waterfall = WaterfallBuilder::new(currency)
+    let waterfall = Waterfall::builder(currency)
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee)
                 .allocation_mode(AllocationMode::Sequential)
@@ -532,7 +532,7 @@ fn test_golden_cmbs_sequential_pay() {
 
     let tranches = TrancheStructure::new(vec![class_a, class_b, class_c]).unwrap();
 
-    let waterfall = WaterfallBuilder::new(currency)
+    let waterfall = Waterfall::builder(currency)
         .add_tier(
             WaterfallTier::new("servicing", 1, PaymentType::Fee).add_recipient(Recipient::new(
                 "master_servicer",
@@ -642,7 +642,7 @@ fn test_golden_cre_pro_rata_distribution() {
 
     let tranches = TrancheStructure::new(vec![lp, gp]).unwrap();
 
-    let waterfall = WaterfallBuilder::new(currency)
+    let waterfall = Waterfall::builder(currency)
         // Operating expenses
         .add_tier(
             WaterfallTier::new("opex", 1, PaymentType::Fee).add_recipient(Recipient::new(
@@ -783,7 +783,7 @@ fn test_golden_cash_conservation() {
     let pool = create_test_pool(100_000_000.0, currency);
     let tranches = create_test_tranches(currency);
 
-    let waterfall = WaterfallBuilder::new(currency)
+    let waterfall = Waterfall::builder(currency)
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::new(
                 "fee1",

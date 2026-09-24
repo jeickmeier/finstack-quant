@@ -1681,42 +1681,23 @@ pub struct Waterfall {
 }
 
 impl Waterfall {
-    /// Create a [`WaterfallBuilder`] for constructing a new waterfall engine.
-    ///
-    /// This is the preferred entry point, consistent with other builder patterns.
-    #[must_use]
-    pub fn builder(base_currency: Currency) -> WaterfallBuilder {
-        WaterfallBuilder::new(base_currency)
-    }
-
-    /// Create new waterfall engine
-    #[must_use]
-    pub fn new(base_currency: Currency) -> Self {
-        Self {
-            tiers: Vec::new(),
-            base_currency,
-            coverage_rules: None,
-        }
-    }
-
-    /// Add a tier
-    #[must_use]
-    pub fn add_tier(mut self, tier: WaterfallTier) -> Self {
-        self.tiers.push(tier);
-        self.tiers.sort_by_key(|t| t.priority);
-        self
-    }
-
-    /// Attach collateral valuation rules for the OC tests.
+    /// Start building a waterfall in `base_currency`; tiers are added with
+    /// [`WaterfallBuilder::add_tier`] and [`WaterfallBuilder::build`]
+    /// validates the result.
     ///
     /// # Arguments
     ///
-    /// * `rules` - Rating haircuts, defaulted-asset valuation, CCC bucket and
-    ///   discount-obligation rules applied by every OC test.
+    /// * `base_currency` - Currency every tier allocates in.
     #[must_use]
-    pub fn with_coverage_rules(mut self, rules: CoverageRules) -> Self {
-        self.coverage_rules = Some(rules);
-        self
+    pub fn builder(base_currency: Currency) -> WaterfallBuilder {
+        WaterfallBuilder {
+            engine: Self {
+                tiers: Vec::new(),
+                base_currency,
+                coverage_rules: None,
+            },
+            next_priority: 1,
+        }
     }
 
     /// Every coverage test in the waterfall, in tier priority order.
@@ -1846,7 +1827,11 @@ impl Waterfall {
         fees: TemplateFees,
         coverage_tests: &[CoverageTestSpec],
     ) -> Self {
-        let mut engine = Self::new(base_currency);
+        let mut engine = Self {
+            tiers: Vec::new(),
+            base_currency,
+            coverage_rules: None,
+        };
         let mut priority = 1;
 
         if !fees.senior.is_empty() {
@@ -2099,42 +2084,69 @@ pub struct TemplateFees {
     pub carryover: Vec<Recipient>,
 }
 
-/// Builder for waterfall engine
+/// Builder for a [`Waterfall`], started by [`Waterfall::builder`].
 pub struct WaterfallBuilder {
     engine: Waterfall,
     next_priority: usize,
 }
 
 impl WaterfallBuilder {
-    /// Create new builder
-    #[must_use]
-    pub fn new(base_currency: Currency) -> Self {
-        Self {
-            engine: Waterfall::new(base_currency),
-            next_priority: 1,
-        }
-    }
-
-    /// Add a tier
+    /// Add a tier; a tier with priority `0` takes the next free priority.
+    /// Tiers are kept in priority order.
+    ///
+    /// # Arguments
+    ///
+    /// * `tier` - Tier to append.
     #[must_use]
     pub fn add_tier(mut self, mut tier: WaterfallTier) -> Self {
         if tier.priority == 0 {
             tier.priority = self.next_priority;
             self.next_priority += 1;
         }
-        self.engine = self.engine.add_tier(tier);
+        self.engine.tiers.push(tier);
+        self.engine.tiers.sort_by_key(|t| t.priority);
         self
     }
 
-    /// Attach coverage test rules (haircuts, par thresholds).
+    /// Attach collateral valuation rules for the OC tests (rating haircuts,
+    /// defaulted-asset valuation, CCC bucket and discount-obligation rules).
+    ///
+    /// # Arguments
+    ///
+    /// * `rules` - Coverage rules applied by every OC test.
     #[must_use]
     pub fn coverage_rules(mut self, rules: CoverageRules) -> Self {
-        self.engine = self.engine.with_coverage_rules(rules);
+        self.engine.coverage_rules = Some(rules);
         self
     }
 
-    /// Build the waterfall engine
+    /// Validate and return the waterfall.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when two tiers share a priority or
+    /// [`crate::instruments::fixed_income::structured_credit::validate_tiers`]
+    /// reports a structural error (duplicate ids, empty tiers, invalid
+    /// weights or non-finite payment parameters).
     pub fn build(self) -> finstack_quant_core::Result<Waterfall> {
+        let tiers = &self.engine.tiers;
+        if let Some(pair) = tiers
+            .windows(2)
+            .find(|pair| pair[0].priority == pair[1].priority)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "waterfall tiers '{}' and '{}' have duplicate priority {}",
+                pair[0].id, pair[1].id, pair[0].priority
+            )));
+        }
+        let errors =
+            crate::instruments::fixed_income::structured_credit::utils::validate_tiers(tiers);
+        if let Some(first) = errors.first() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "waterfall is structurally invalid ({} error(s); first: {first})",
+                errors.len()
+            )));
+        }
         Ok(self.engine)
     }
 }

@@ -12,8 +12,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AllocationMode, CoverageTestSpec, FundingSource, ManagementFeeType, PaymentCalculation,
-    PaymentType, Recipient, RecipientType, TemplateFees, Waterfall, WaterfallBuilder,
-    WaterfallTier,
+    PaymentType, Recipient, RecipientType, TemplateFees, Waterfall, WaterfallTier,
 };
 
 // Waterfall Builder Tests
@@ -21,7 +20,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 #[test]
 fn test_waterfall_builder_creates_proper_priority_order() {
     // Arrange & Act
-    let waterfall = WaterfallBuilder::new(Currency::USD)
+    let waterfall = Waterfall::builder(Currency::USD)
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::new(
                 "trustee",
@@ -56,7 +55,7 @@ fn test_waterfall_builder_creates_proper_priority_order() {
 #[test]
 fn test_waterfall_builder_tier_types() {
     // Arrange & Act
-    let waterfall = WaterfallBuilder::new(Currency::USD)
+    let waterfall = Waterfall::builder(Currency::USD)
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::new(
                 "mgmt",
@@ -85,7 +84,7 @@ fn test_waterfall_builder_tier_types() {
 #[test]
 fn test_waterfall_coverage_test_tier() {
     // Arrange & Act: a coverage-test position between interest and principal.
-    let waterfall = WaterfallBuilder::new(Currency::USD)
+    let waterfall = Waterfall::builder(Currency::USD)
         .add_tier(
             WaterfallTier::new("interest", 1, PaymentType::Interest)
                 .add_recipient(Recipient::tranche_interest("a_int", "A")),
@@ -117,9 +116,9 @@ fn test_waterfall_coverage_test_tier() {
 #[test]
 fn test_payment_priority_ordering() {
     // Arrange
-    let mut waterfall = Waterfall::new(Currency::USD);
+    let mut builder = Waterfall::builder(Currency::USD);
 
-    waterfall = waterfall.add_tier(
+    builder = builder.add_tier(
         WaterfallTier::new("third", 3, PaymentType::Residual).add_recipient(Recipient::new(
             "equity",
             RecipientType::Equity,
@@ -127,7 +126,7 @@ fn test_payment_priority_ordering() {
         )),
     );
 
-    waterfall = waterfall.add_tier(
+    builder = builder.add_tier(
         WaterfallTier::new("first", 1, PaymentType::Fee).add_recipient(Recipient::new(
             "fee",
             RecipientType::ServiceProvider("Test".into()),
@@ -138,10 +137,11 @@ fn test_payment_priority_ordering() {
         )),
     );
 
-    waterfall = waterfall.add_tier(
+    builder = builder.add_tier(
         WaterfallTier::new("second", 2, PaymentType::Interest)
             .add_recipient(Recipient::tranche_interest("int", "A")),
     );
+    let waterfall = builder.build().expect("valid waterfall");
 
     // Assert - tiers should be auto-sorted by priority
     assert_eq!(waterfall.tiers[0].id, "first");
@@ -269,7 +269,9 @@ fn test_tier_multiple_recipients() {
 
 #[test]
 fn test_waterfall_engine_creation() {
-    let engine = Waterfall::new(Currency::USD);
+    let engine = Waterfall::builder(Currency::USD)
+        .build()
+        .expect("valid waterfall");
 
     assert_eq!(engine.base_currency, Currency::USD);
     assert_eq!(engine.tiers.len(), 0);
@@ -287,7 +289,10 @@ fn test_waterfall_engine_add_tier() {
         },
     ));
 
-    let engine = Waterfall::new(Currency::USD).add_tier(tier);
+    let engine = Waterfall::builder(Currency::USD)
+        .add_tier(tier)
+        .build()
+        .expect("valid waterfall");
 
     assert_eq!(engine.tiers.len(), 1);
     assert_eq!(engine.tiers[0].id, "test");
@@ -380,4 +385,33 @@ fn abs_template_does_not_trap_junior_coupon() {
         FundingSource::Interest,
         "the mezzanine coupon stays on interest proceeds"
     );
+}
+
+/// `build()` validates: duplicate priorities and structurally invalid tiers
+/// (here an empty fee tier) are rejected at construction, not at execution.
+#[test]
+fn builder_rejects_invalid_waterfalls() {
+    let fee = |id: &str, priority: usize| {
+        WaterfallTier::new(id, priority, PaymentType::Fee).add_recipient(Recipient::fixed_fee(
+            "trustee",
+            "Trustee",
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
+    };
+    let duplicate = Waterfall::builder(Currency::USD)
+        .add_tier(fee("a", 1))
+        .add_tier(fee("b", 1))
+        .build();
+    assert!(duplicate.is_err(), "duplicate priorities must be rejected");
+
+    let empty = Waterfall::builder(Currency::USD)
+        .add_tier(WaterfallTier::new("fees", 1, PaymentType::Fee))
+        .build();
+    assert!(empty.is_err(), "an empty fee tier must be rejected");
+
+    assert!(Waterfall::builder(Currency::USD)
+        .add_tier(fee("a", 1))
+        .add_tier(fee("b", 2))
+        .build()
+        .is_ok());
 }

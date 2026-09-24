@@ -208,11 +208,11 @@ Pool collections → Fees → Senior interest → Subordinate interest → Princ
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    execute_waterfall, AllocationMode, PaymentType, Recipient, WaterfallBuilder, WaterfallContext,
+    execute_waterfall, AllocationMode, PaymentType, Recipient, Waterfall, WaterfallContext,
     WaterfallTier,
 };
 
-let waterfall = WaterfallBuilder::new(Currency::USD)
+let waterfall = Waterfall::builder(Currency::USD)
     .add_tier(
         WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::fixed_fee(
             "trustee",
@@ -231,7 +231,7 @@ let waterfall = WaterfallBuilder::new(Currency::USD)
 let distribution = execute_waterfall(&waterfall, &tranches, &pool, context)?;
 ```
 
-`WaterfallBuilder::build()` returns `Result<Waterfall>`. `WaterfallContext`
+`Waterfall::builder(..)...build()` validates the tiers and returns `Result<Waterfall>`. `WaterfallContext`
 carries the full period state: `available_cash`, `interest_collections`,
 `principal_collections`, `payment_date`, `period_start`, `valuation_date`,
 `pool_balance`, the `MarketContext`, plus optional current tranche/asset
@@ -400,7 +400,7 @@ let deal = deal.with_coverage_triggers(vec![
 
 ```rust
 // Custom waterfall: an explicit test position between two interest tiers.
-let waterfall = WaterfallBuilder::new(Currency::USD)
+let waterfall = Waterfall::builder(Currency::USD)
     .add_tier(WaterfallTier::new("a_interest", 1, PaymentType::Interest)
         .add_recipient(Recipient::tranche_interest("a_int", "CLASS_A")))
     .add_tier(WaterfallTier::coverage_tests("a_coverage", 2, vec![

@@ -508,7 +508,10 @@ mod step_down_weight_tests {
     #[test]
     fn step_down_weights_principal_by_current_balance() {
         let date = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let base = Waterfall::new(Currency::USD).add_tier(principal_tier());
+        let base = Waterfall::builder(Currency::USD)
+            .add_tier(principal_tier())
+            .build()
+            .expect("valid waterfall");
         let rules = stepped_down_rules(date);
         let metrics = healthy_metrics();
 
@@ -551,7 +554,10 @@ mod step_down_weight_tests {
     #[test]
     fn step_down_with_all_tranches_retired_leaves_weights_unset() {
         let date = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let base = Waterfall::new(Currency::USD).add_tier(principal_tier());
+        let base = Waterfall::builder(Currency::USD)
+            .add_tier(principal_tier())
+            .build()
+            .expect("valid waterfall");
         let rules = stepped_down_rules(date);
 
         assert!(step_down_in_effect(Some(&rules), date, &healthy_metrics()));

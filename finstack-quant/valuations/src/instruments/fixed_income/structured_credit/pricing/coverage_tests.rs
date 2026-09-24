@@ -3,7 +3,8 @@
 //! This module provides OC and IC test calculations for waterfall diversion.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AssetPool, CoverageRules, LiveCollateral, PoolAsset, Tranche, TrancheStructure,
+    AssetPool, CoverageRules, CoverageTestSpec, CoverageTestType, LiveCollateral, PoolAsset,
+    Tranche, TrancheStructure,
 };
 use crate::instruments::fixed_income::structured_credit::utils::frequency_periods_per_year;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -15,478 +16,380 @@ use finstack_quant_core::{Error as CoreError, InputError};
 
 use serde::{Deserialize, Serialize};
 
-/// Coverage test type (OC/IC).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-#[non_exhaustive]
-pub enum CoverageTest {
-    /// Overcollateralization test.
-    Oc {
-        /// Unique test identifier.
-        id: String,
-        /// Required OC ratio (e.g., 1.25 = 125%).
-        required_ratio: f64,
-        /// Include cash in numerator.
-        include_cash: bool,
-        /// Include only performing assets.
-        performing_only: bool,
-    },
-    /// Interest coverage test.
-    Ic {
-        /// Unique test identifier.
-        id: String,
-        /// Required IC ratio (e.g., 1.20 = 120%).
-        required_ratio: f64,
-    },
-    /// Borrowing-base coverage: advance-rate-weighted eligible collateral over
-    /// the tested class and its seniors.
-    BorrowingBase {
-        /// Test identifier.
-        id: String,
-        /// Minimum passing ratio.
-        required_ratio: f64,
-    },
+impl CoverageTestSpec {
+    /// Evaluate the test on `context`: the ratio for the tested tranche and
+    /// every class senior to it against `trigger_level`, and the cure when it
+    /// fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The period's pool, tranche balances, collections and
+    ///   coverage rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tested tranche is missing, a borrowing-base
+    /// test has no `coverage_rules.borrowing_base`, or a balance, rate or
+    /// money computation fails.
+    pub fn evaluate(&self, context: &TestContext) -> Result<TestResult> {
+        match self.kind {
+            CoverageTestType::Oc => oc_test(self, context),
+            CoverageTestType::Ic => ic_test(self, context),
+            CoverageTestType::BorrowingBase => borrowing_base_test(self, context),
+        }
+    }
 }
 
-impl CoverageTest {
-    /// Create new OC test with standard settings.
-    pub fn new_oc(required_ratio: f64) -> Self {
-        Self::Oc {
-            id: format!("oc_test_{}", (required_ratio * 100.0).round() as u32),
-            required_ratio,
-            include_cash: true,
-            performing_only: true,
-        }
-    }
-
-    /// Create new IC test.
-    pub fn new_ic(required_ratio: f64) -> Self {
-        Self::Ic {
-            id: format!("ic_test_{}", (required_ratio * 100.0).round() as u32),
-            required_ratio,
-        }
-    }
-
-    /// Borrowing-base test at `required_ratio` (1.0 = the base must cover
-    /// the tested stack); the rules come from `TestContext::rules`.
-    pub fn new_borrowing_base(required_ratio: f64) -> Self {
-        Self::BorrowingBase {
-            id: format!("bb_test_{}", (required_ratio * 100.0).round() as u32),
-            required_ratio,
-        }
-    }
-
-    /// Get the test ID.
-    pub fn id(&self) -> &str {
-        match self {
-            Self::Oc { id, .. } | Self::Ic { id, .. } | Self::BorrowingBase { id, .. } => {
-                id.as_str()
-            }
-        }
-    }
-
-    /// Get the required ratio for this test.
-    pub fn required_level(&self) -> f64 {
-        match self {
-            Self::Oc { required_ratio, .. }
-            | Self::Ic { required_ratio, .. }
-            | Self::BorrowingBase { required_ratio, .. } => *required_ratio,
-        }
-    }
-
-    /// Calculate the test result.
-    pub fn calculate(&self, context: &TestContext) -> Result<TestResult> {
-        match self {
-            Self::Oc {
-                id,
-                required_ratio,
-                include_cash,
-                performing_only,
-            } => self.calculate_oc(
-                context,
-                id.clone(),
-                *required_ratio,
-                *include_cash,
-                *performing_only,
-            ),
-            Self::Ic { id, required_ratio } => {
-                self.calculate_ic(context, id.clone(), *required_ratio)
-            }
-            Self::BorrowingBase { id, required_ratio } => {
-                self.calculate_borrowing_base(context, id.clone(), *required_ratio)
-            }
-        }
-    }
-
-    /// Borrowing base over the tested stack: numerator from the live asset
-    /// balances (or the closing balances) under `rules.borrowing_base`, the
-    /// OC denominator; the cure is the paydown that restores the ratio.
-    fn calculate_borrowing_base(
-        &self,
-        context: &TestContext,
-        test_id: String,
-        required_ratio: f64,
-    ) -> Result<TestResult> {
-        let rules = context
-            .rules
-            .and_then(|rules| rules.borrowing_base.as_ref())
-            .ok_or_else(|| {
-                CoreError::Validation(format!(
-                    "borrowing-base test {test_id} needs coverage_rules.borrowing_base"
-                ))
-            })?;
-        let tranche = context
-            .tranches
-            .tranches
-            .iter()
-            .find(|t| t.id.as_str() == context.tranche_id)
-            .ok_or_else(|| {
-                CoreError::from(InputError::NotFound {
-                    id: format!("tranche:{}", context.tranche_id),
-                })
-            })?;
-        let tranche_balance = context
-            .tranche_balances
-            .and_then(|b| b.get(tranche.id.as_str()))
-            .copied()
-            .unwrap_or(tranche.current_balance);
-        let senior_balance = if let Some(tb) = context.tranche_balances {
-            context
-                .tranches
-                .senior_to(context.tranche_id)
-                .iter()
-                .try_fold(
-                    Money::from((0_i64, tranche_balance.currency())),
-                    |acc, t| {
-                        let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
-                        acc.checked_add(bal)
-                    },
-                )?
-        } else {
-            context.tranches.senior_balance(context.tranche_id)
-        };
-        // Cash held for the collateral counts at a 100% advance rate: the
-        // principal funding account and this period's principal collections
-        // (both sit in the trust's accounts until reinvested or applied).
-        let numerator = rules
-            .evaluate_live(
-                context.pool,
-                context.asset_balances,
-                context.live_collateral,
-            )?
-            .borrowing_base
-            .checked_add(context.restricted_cash)?
-            .checked_add(context.cash_balance)?;
-        let denominator = tranche_balance.checked_add(senior_balance)?;
-        let ratio = if denominator.amount() > 0.0 {
-            numerator.amount() / denominator.amount()
-        } else {
-            f64::INFINITY
-        };
-        let is_passing = ratio >= required_ratio;
-        let cure_amount = if !is_passing && required_ratio > 0.0 {
-            let paydown = (denominator.amount() - numerator.amount() / required_ratio)
-                .max(0.0)
-                .min(denominator.amount());
-            Some(Money::new(paydown, denominator.currency())?)
-        } else {
-            None
-        };
-        Ok(TestResult {
-            test_id,
-            tranche_id: context.tranche_id.to_string(),
-            current_ratio: ratio,
-            is_passing,
-            cure_amount,
-        })
-    }
-
-    fn calculate_oc(
-        &self,
-        context: &TestContext,
-        test_id: String,
-        required_ratio: f64,
-        include_cash: bool,
-        performing_only: bool,
-    ) -> Result<TestResult> {
-        let tranche = context
-            .tranches
-            .tranches
-            .iter()
-            .find(|t| t.id.as_str() == context.tranche_id)
-            .ok_or_else(|| {
-                CoreError::from(InputError::NotFound {
-                    id: format!("tranche:{}", context.tranche_id),
-                })
-            })?;
-
-        // Coverage tests use live tranche balances when available.
-        let tranche_balance = context
-            .tranche_balances
-            .and_then(|b| b.get(tranche.id.as_str()))
-            .copied()
-            .unwrap_or(tranche.current_balance);
-
-        let senior_balance = if let Some(tb) = context.tranche_balances {
-            context
-                .tranches
-                .senior_to(context.tranche_id)
-                .iter()
-                .try_fold(
-                    Money::from((0_i64, tranche_balance.currency())),
-                    |acc, t| {
-                        let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
-                        acc.checked_add(bal)
-                    },
-                )?
-        } else {
-            context.tranches.senior_balance(context.tranche_id)
-        };
-
-        // Apply rating haircuts to live per-asset notionals. If only an
-        // aggregate current balance is available, preserve that balance and
-        // approximate composition with the closing pool's haircut factor.
-        let mut numerator = if let Some(asset_balances) = context.asset_balances {
-            collateral_value(
-                context.pool,
-                performing_only,
-                context.rules,
-                Some(asset_balances),
-            )?
-        } else {
-            match context.current_pool_balance {
-                Some(current) if context.rules.is_some_and(CoverageRules::adjusts_collateral) => {
-                    let gross = collateral_value(context.pool, performing_only, None, None)?;
-                    let haircut =
-                        collateral_value(context.pool, performing_only, context.rules, None)?;
-                    let factor = if gross.amount() > 0.0 {
-                        (haircut.amount() / gross.amount()).clamp(0.0, 1.0)
-                    } else {
-                        1.0
-                    };
-                    Money::new(current.amount() * factor, current.currency())?
-                }
-                Some(current) => current,
-                None => collateral_value(context.pool, performing_only, context.rules, None)?,
-            }
-        };
-
-        if include_cash {
-            numerator = numerator.checked_add(context.cash_balance)?;
-        }
-        // N2: trust-held collateral cash counts regardless of `include_cash`,
-        // which governs whether this period's principal COLLECTIONS are
-        // included. The funding account is an accumulated balance, not a
-        // collection, and secures the notes either way.
-        numerator = numerator.checked_add(context.restricted_cash)?;
-        // Defaulted collateral is carried at its modeled recovery value until
-        // the recovery cash arrives (CLO indenture convention: defaulted
-        // obligations at the lower of market value and the assumed recovery),
-        // so a default reduces par-OC by the expected loss, not by the whole
-        // defaulted par.
-        numerator = numerator.checked_add(context.defaulted_collateral_value)?;
-
-        // OC denominator = test tranche balance + all senior tranche balances
-        // i.e., Sum(all tranche balances at this seniority level and above)
-        let denominator = tranche_balance.checked_add(senior_balance)?;
-
-        let ratio = if denominator.amount() > 0.0 {
-            numerator.amount() / denominator.amount()
-        } else {
-            f64::INFINITY
-        };
-
-        let is_passing = ratio >= required_ratio;
-
-        // Note paydown needed to restore OC. The cure is paid from INTEREST
-        // proceeds (the executor diverts the interest ranked below the test
-        // position), which never enter the OC numerator, so the diversion
-        // only shrinks the denominator:
-        //   numerator / (denominator - X) >= required_ratio
-        //   => X >= denominator - numerator / required_ratio
-        // `include_cash` decides whether the period's principal collections
-        // count in the numerator; it does not change the cure algebra.
-        //
-        // A diversion cannot retire more than the OC stack, so cap the cure at
-        // the denominator.
-        let cure_amount = if !is_passing && required_ratio > 0.0 {
-            let paydown_needed = denominator.amount() - numerator.amount() / required_ratio;
-            let capped = paydown_needed.max(0.0).min(denominator.amount());
-            Some(Money::new(capped, denominator.currency())?)
-        } else {
-            None
-        };
-
-        Ok(TestResult {
-            test_id,
-            tranche_id: context.tranche_id.to_string(),
-            current_ratio: ratio,
-            is_passing,
-            cure_amount,
-        })
-    }
-
-    fn calculate_ic(
-        &self,
-        context: &TestContext,
-        test_id: String,
-        required_ratio: f64,
-    ) -> Result<TestResult> {
-        let tranche = context
-            .tranches
-            .tranches
-            .iter()
-            .find(|t| t.id.as_str() == context.tranche_id)
-            .ok_or_else(|| {
-                CoreError::from(InputError::NotFound {
-                    id: format!("tranche:{}", context.tranche_id),
-                })
-            })?;
-
-        // Coverage tests use live tranche balances when available.
-        let tranche_bal = context
-            .tranche_balances
-            .and_then(|b| b.get(tranche.id.as_str()))
-            .copied()
-            .unwrap_or(tranche.current_balance);
-
-        let (tranche_rate, accrual_factor) = rate_and_accrual(tranche, context)?;
-
-        let interest_due = Money::new(
-            tranche_bal.amount() * tranche_rate * accrual_factor
-                + carried_deferred(context, tranche.id.as_str()),
-            tranche_bal.currency(),
-        )?;
-
-        let senior_tranches = context.tranches.senior_to(context.tranche_id);
-
-        let mut delevering_set = vec![tranche];
-        delevering_set.extend(senior_tranches.iter().copied());
-        let mut payable_tranches = Vec::with_capacity(context.tranches.tranches.len());
-        if let Some(payable_ids) = context.payable_principal_tranche_ids {
-            for payable_id in payable_ids {
-                if let Some(payable) = context
-                    .tranches
-                    .tranches
-                    .iter()
-                    .find(|candidate| candidate.id.as_str() == *payable_id)
-                {
-                    if !payable_tranches
-                        .iter()
-                        .any(|(existing, _): &(&Tranche, bool)| existing.id == payable.id)
-                    {
-                        let reduces_test_interest = delevering_set
-                            .iter()
-                            .any(|candidate| candidate.id == payable.id);
-                        payable_tranches.push((payable, reduces_test_interest));
-                    }
-                }
-            }
-        } else {
-            payable_tranches.extend(
-                delevering_set
-                    .iter()
-                    .copied()
-                    .map(|candidate| (candidate, true)),
-            );
-            payable_tranches.sort_by_key(|(candidate, _)| candidate.payment_priority);
-        }
-
-        let senior_interest_due = senior_tranches.iter().try_fold(
-            Money::from((0_i64, interest_due.currency())),
+/// Borrowing base over the tested stack: numerator from the live asset
+/// balances (or the closing balances) under `rules.borrowing_base`, the
+/// OC denominator; the cure is the paydown that restores the ratio.
+fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult> {
+    let (test_id, tranche_id, required_ratio) = (
+        spec.id.clone(),
+        spec.tranche_id.as_str(),
+        spec.trigger_level,
+    );
+    let rules = context
+        .rules
+        .and_then(|rules| rules.borrowing_base.as_ref())
+        .ok_or_else(|| {
+            CoreError::Validation(format!(
+                "borrowing-base test {test_id} needs coverage_rules.borrowing_base"
+            ))
+        })?;
+    let tranche = context
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.id.as_str() == tranche_id)
+        .ok_or_else(|| {
+            CoreError::from(InputError::NotFound {
+                id: format!("tranche:{}", tranche_id),
+            })
+        })?;
+    let tranche_balance = context
+        .tranche_balances
+        .and_then(|b| b.get(tranche.id.as_str()))
+        .copied()
+        .unwrap_or(tranche.current_balance);
+    let senior_balance = if let Some(tb) = context.tranche_balances {
+        context.tranches.senior_to(tranche_id).iter().try_fold(
+            Money::from((0_i64, tranche_balance.currency())),
             |acc, t| {
-                let (rate, accrual) = rate_and_accrual(t, context)?;
-                let t_bal = context
-                    .tranche_balances
-                    .and_then(|b| b.get(t.id.as_str()))
-                    .copied()
-                    .unwrap_or(t.current_balance);
-                let interest = Money::new(
-                    t_bal.amount() * rate * accrual + carried_deferred(context, t.id.as_str()),
-                    t_bal.currency(),
-                )?;
-                acc.checked_add(interest)
+                let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
+                acc.checked_add(bal)
             },
-        )?;
+        )?
+    } else {
+        context.tranches.senior_balance(tranche_id)
+    };
+    // Cash held for the collateral counts at a 100% advance rate: the
+    // principal funding account and this period's principal collections
+    // (both sit in the trust's accounts until reinvested or applied).
+    let numerator = rules
+        .evaluate_live(
+            context.pool,
+            context.asset_balances,
+            context.live_collateral,
+        )?
+        .borrowing_base
+        .checked_add(context.restricted_cash)?
+        .checked_add(context.cash_balance)?;
+    let denominator = tranche_balance.checked_add(senior_balance)?;
+    let ratio = if denominator.amount() > 0.0 {
+        numerator.amount() / denominator.amount()
+    } else {
+        f64::INFINITY
+    };
+    let is_passing = ratio >= required_ratio;
+    let cure_amount = if !is_passing && required_ratio > 0.0 {
+        let paydown = (denominator.amount() - numerator.amount() / required_ratio)
+            .max(0.0)
+            .min(denominator.amount());
+        Some(Money::new(paydown, denominator.currency())?)
+    } else {
+        None
+    };
+    Ok(TestResult {
+        test_id,
+        tranche_id: tranche_id.to_string(),
+        current_ratio: ratio,
+        is_passing,
+        cure_amount,
+    })
+}
 
-        let total_interest_due = interest_due.checked_add(senior_interest_due)?;
+/// Overcollateralization: performing collateral (after the coverage rules)
+/// plus the period's principal collections, trust-held cash and defaulted
+/// collateral at its recovery value, over the tested class and its seniors.
+fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult> {
+    let (test_id, tranche_id, required_ratio) = (
+        spec.id.clone(),
+        spec.tranche_id.as_str(),
+        spec.trigger_level,
+    );
+    let tranche = context
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.id.as_str() == tranche_id)
+        .ok_or_else(|| {
+            CoreError::from(InputError::NotFound {
+                id: format!("tranche:{}", tranche_id),
+            })
+        })?;
 
-        // Senior fees rank ahead of every note and reduce the IC numerator.
-        let net_collections =
-            (context.interest_collections.amount() - context.senior_fees.amount()).max(0.0);
+    // Coverage tests use live tranche balances when available.
+    let tranche_balance = context
+        .tranche_balances
+        .and_then(|b| b.get(tranche.id.as_str()))
+        .copied()
+        .unwrap_or(tranche.current_balance);
 
-        let ratio = if total_interest_due.amount() > 0.0 {
-            net_collections / total_interest_due.amount()
-        } else {
-            f64::INFINITY
-        };
+    let senior_balance = if let Some(tb) = context.tranche_balances {
+        context.tranches.senior_to(tranche_id).iter().try_fold(
+            Money::from((0_i64, tranche_balance.currency())),
+            |acc, t| {
+                let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
+                acc.checked_add(bal)
+            },
+        )?
+    } else {
+        context.tranches.senior_balance(tranche_id)
+    };
 
-        let is_passing = ratio >= required_ratio;
-
-        // Size the cure as principal paydown in the diversion tier's recipient
-        // order. Every recipient consumes cure cash, while only tested-or-senior
-        // notes with positive `rate × accrual` reduce interest due toward
-        // `net_collections / required_ratio`. Exhausted stacks return the
-        // principal consumed; an absent payable stack reports the cash shortfall.
-        let cure_amount = if !is_passing {
-            let cash_shortfall =
-                (required_ratio * total_interest_due.amount() - net_collections).max(0.0);
-            let cure = if required_ratio > 0.0 {
-                let target_due = net_collections / required_ratio;
-                let mut remaining_reduction = (total_interest_due.amount() - target_due).max(0.0);
-                let mut principal_cure = 0.0;
-                let mut found_payable_principal = false;
-                for (payable, reduces_test_interest) in &payable_tranches {
-                    let balance = context
-                        .tranche_balances
-                        .and_then(|balances| balances.get(payable.id.as_str()))
-                        .copied()
-                        .unwrap_or(payable.current_balance)
-                        .amount()
-                        .max(0.0);
-                    if balance <= 0.0 {
-                        continue;
-                    }
-                    found_payable_principal = true;
-                    if !reduces_test_interest {
-                        principal_cure += balance;
-                        continue;
-                    }
-                    let (rate, accrual) = rate_and_accrual(payable, context)?;
-                    let rate_accrual = rate * accrual;
-                    if rate_accrual <= 1e-12 {
-                        principal_cure += balance;
-                        continue;
-                    }
-                    let paydown = (remaining_reduction / rate_accrual).min(balance);
-                    principal_cure += paydown;
-                    remaining_reduction = (remaining_reduction - paydown * rate_accrual).max(0.0);
-                    if remaining_reduction <= 1e-12 {
-                        break;
-                    }
-                }
-                if found_payable_principal {
-                    principal_cure
+    // Apply rating haircuts to live per-asset notionals. If only an
+    // aggregate current balance is available, preserve that balance and
+    // approximate composition with the closing pool's haircut factor.
+    let mut numerator = if let Some(asset_balances) = context.asset_balances {
+        collateral_value(context.pool, context.rules, Some(asset_balances))?
+    } else {
+        match context.current_pool_balance {
+            Some(current) if context.rules.is_some_and(CoverageRules::adjusts_collateral) => {
+                let gross = collateral_value(context.pool, None, None)?;
+                let haircut = collateral_value(context.pool, context.rules, None)?;
+                let factor = if gross.amount() > 0.0 {
+                    (haircut.amount() / gross.amount()).clamp(0.0, 1.0)
                 } else {
-                    cash_shortfall
+                    1.0
+                };
+                Money::new(current.amount() * factor, current.currency())?
+            }
+            Some(current) => current,
+            None => collateral_value(context.pool, context.rules, None)?,
+        }
+    };
+
+    // This period's principal collections and the trust-held collateral
+    // cash (the funding account, an accumulated balance) both secure the
+    // notes.
+    numerator = numerator.checked_add(context.cash_balance)?;
+    numerator = numerator.checked_add(context.restricted_cash)?;
+    // Defaulted collateral is carried at its modeled recovery value until
+    // the recovery cash arrives (CLO indenture convention: defaulted
+    // obligations at the lower of market value and the assumed recovery),
+    // so a default reduces par-OC by the expected loss, not by the whole
+    // defaulted par.
+    numerator = numerator.checked_add(context.defaulted_collateral_value)?;
+
+    // OC denominator = test tranche balance + all senior tranche balances
+    // i.e., Sum(all tranche balances at this seniority level and above)
+    let denominator = tranche_balance.checked_add(senior_balance)?;
+
+    let ratio = if denominator.amount() > 0.0 {
+        numerator.amount() / denominator.amount()
+    } else {
+        f64::INFINITY
+    };
+
+    let is_passing = ratio >= required_ratio;
+
+    // Note paydown needed to restore OC. The cure is paid from INTEREST
+    // proceeds (the executor diverts the interest ranked below the test
+    // position), which never enter the OC numerator, so the diversion
+    // only shrinks the denominator:
+    //   numerator / (denominator - X) >= required_ratio
+    //   => X >= denominator - numerator / required_ratio
+    // A diversion cannot retire more than the OC stack, so cap the cure at
+    // the denominator.
+    let cure_amount = if !is_passing && required_ratio > 0.0 {
+        let paydown_needed = denominator.amount() - numerator.amount() / required_ratio;
+        let capped = paydown_needed.max(0.0).min(denominator.amount());
+        Some(Money::new(capped, denominator.currency())?)
+    } else {
+        None
+    };
+
+    Ok(TestResult {
+        test_id,
+        tranche_id: tranche_id.to_string(),
+        current_ratio: ratio,
+        is_passing,
+        cure_amount,
+    })
+}
+
+/// Interest coverage: interest collections net of senior fees over the
+/// interest due to the tested class and its seniors.
+fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult> {
+    let (test_id, tranche_id, required_ratio) = (
+        spec.id.clone(),
+        spec.tranche_id.as_str(),
+        spec.trigger_level,
+    );
+    let tranche = context
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.id.as_str() == tranche_id)
+        .ok_or_else(|| {
+            CoreError::from(InputError::NotFound {
+                id: format!("tranche:{}", tranche_id),
+            })
+        })?;
+
+    // Coverage tests use live tranche balances when available.
+    let tranche_bal = context
+        .tranche_balances
+        .and_then(|b| b.get(tranche.id.as_str()))
+        .copied()
+        .unwrap_or(tranche.current_balance);
+
+    let (tranche_rate, accrual_factor) = rate_and_accrual(tranche, context)?;
+
+    let interest_due = Money::new(
+        tranche_bal.amount() * tranche_rate * accrual_factor
+            + carried_deferred(context, tranche.id.as_str()),
+        tranche_bal.currency(),
+    )?;
+
+    let senior_tranches = context.tranches.senior_to(tranche_id);
+
+    let mut delevering_set = vec![tranche];
+    delevering_set.extend(senior_tranches.iter().copied());
+    let mut payable_tranches = Vec::with_capacity(context.tranches.tranches.len());
+    if let Some(payable_ids) = context.payable_principal_tranche_ids {
+        for payable_id in payable_ids {
+            if let Some(payable) = context
+                .tranches
+                .tranches
+                .iter()
+                .find(|candidate| candidate.id.as_str() == *payable_id)
+            {
+                if !payable_tranches
+                    .iter()
+                    .any(|(existing, _): &(&Tranche, bool)| existing.id == payable.id)
+                {
+                    let reduces_test_interest = delevering_set
+                        .iter()
+                        .any(|candidate| candidate.id == payable.id);
+                    payable_tranches.push((payable, reduces_test_interest));
                 }
+            }
+        }
+    } else {
+        payable_tranches.extend(
+            delevering_set
+                .iter()
+                .copied()
+                .map(|candidate| (candidate, true)),
+        );
+        payable_tranches.sort_by_key(|(candidate, _)| candidate.payment_priority);
+    }
+
+    let senior_interest_due = senior_tranches.iter().try_fold(
+        Money::from((0_i64, interest_due.currency())),
+        |acc, t| {
+            let (rate, accrual) = rate_and_accrual(t, context)?;
+            let t_bal = context
+                .tranche_balances
+                .and_then(|b| b.get(t.id.as_str()))
+                .copied()
+                .unwrap_or(t.current_balance);
+            let interest = Money::new(
+                t_bal.amount() * rate * accrual + carried_deferred(context, t.id.as_str()),
+                t_bal.currency(),
+            )?;
+            acc.checked_add(interest)
+        },
+    )?;
+
+    let total_interest_due = interest_due.checked_add(senior_interest_due)?;
+
+    // Senior fees rank ahead of every note and reduce the IC numerator.
+    let net_collections =
+        (context.interest_collections.amount() - context.senior_fees.amount()).max(0.0);
+
+    let ratio = if total_interest_due.amount() > 0.0 {
+        net_collections / total_interest_due.amount()
+    } else {
+        f64::INFINITY
+    };
+
+    let is_passing = ratio >= required_ratio;
+
+    // Size the cure as principal paydown in the diversion tier's recipient
+    // order. Every recipient consumes cure cash, while only tested-or-senior
+    // notes with positive `rate × accrual` reduce interest due toward
+    // `net_collections / required_ratio`. Exhausted stacks return the
+    // principal consumed; an absent payable stack reports the cash shortfall.
+    let cure_amount = if !is_passing {
+        let cash_shortfall =
+            (required_ratio * total_interest_due.amount() - net_collections).max(0.0);
+        let cure = if required_ratio > 0.0 {
+            let target_due = net_collections / required_ratio;
+            let mut remaining_reduction = (total_interest_due.amount() - target_due).max(0.0);
+            let mut principal_cure = 0.0;
+            let mut found_payable_principal = false;
+            for (payable, reduces_test_interest) in &payable_tranches {
+                let balance = context
+                    .tranche_balances
+                    .and_then(|balances| balances.get(payable.id.as_str()))
+                    .copied()
+                    .unwrap_or(payable.current_balance)
+                    .amount()
+                    .max(0.0);
+                if balance <= 0.0 {
+                    continue;
+                }
+                found_payable_principal = true;
+                if !reduces_test_interest {
+                    principal_cure += balance;
+                    continue;
+                }
+                let (rate, accrual) = rate_and_accrual(payable, context)?;
+                let rate_accrual = rate * accrual;
+                if rate_accrual <= 1e-12 {
+                    principal_cure += balance;
+                    continue;
+                }
+                let paydown = (remaining_reduction / rate_accrual).min(balance);
+                principal_cure += paydown;
+                remaining_reduction = (remaining_reduction - paydown * rate_accrual).max(0.0);
+                if remaining_reduction <= 1e-12 {
+                    break;
+                }
+            }
+            if found_payable_principal {
+                principal_cure
             } else {
                 cash_shortfall
-            };
-            Some(Money::new(cure, context.interest_collections.currency())?)
+            }
         } else {
-            None
+            cash_shortfall
         };
+        Some(Money::new(cure, context.interest_collections.currency())?)
+    } else {
+        None
+    };
 
-        Ok(TestResult {
-            test_id,
-            tranche_id: context.tranche_id.to_string(),
-            current_ratio: ratio,
-            is_passing,
-            cure_amount,
-        })
-    }
+    Ok(TestResult {
+        test_id,
+        tranche_id: tranche_id.to_string(),
+        current_ratio: ratio,
+        is_passing,
+        cure_amount,
+    })
 }
 
 fn carried_deferred(context: &TestContext<'_>, tranche_id: &str) -> f64 {
@@ -563,14 +466,13 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     Ok((rate, accrual))
 }
 
-/// Context needed to calculate coverage tests.
+/// The period state a coverage test is evaluated on; the tested tranche and
+/// trigger level come from the [`CoverageTestSpec`].
 pub struct TestContext<'a> {
     /// AssetPool reference.
     pub pool: &'a AssetPool,
     /// Tranche structure reference.
     pub tranches: &'a TrancheStructure,
-    /// Target tranche ID.
-    pub tranche_id: &'a str,
     /// As-of date.
     pub as_of: finstack_quant_core::dates::Date,
     #[doc = "Valuation date determining fixing availability, independent of the coverage payment date in `as_of`."]
@@ -681,7 +583,6 @@ fn is_ccc_or_below(rating: CreditRating) -> bool {
 /// rules in `rules`; plain par when no rule adjusts collateral.
 fn collateral_value(
     pool: &AssetPool,
-    performing_only: bool,
     rules: Option<&CoverageRules>,
     current_balances: Option<&[f64]>,
 ) -> Result<Money> {
@@ -705,11 +606,7 @@ fn collateral_value(
 
     let adjusts = rules.is_some_and(CoverageRules::adjusts_collateral);
     if current_balances.is_none() && !adjusts {
-        return Ok(if performing_only {
-            pool.performing_balance()?
-        } else {
-            pool.total_balance()?
-        });
+        return pool.performing_balance();
     }
 
     let haircuts = rules.map(|r| &r.rating_haircuts);
@@ -721,7 +618,7 @@ fn collateral_value(
     let mut ccc_par = 0.0_f64;
     let mut ccc_market_value = 0.0_f64;
     for (index, asset) in pool.assets.iter().enumerate() {
-        if performing_only && asset.is_defaulted {
+        if asset.is_defaulted {
             continue;
         }
         let balance = current_balances
@@ -806,14 +703,14 @@ mod tests {
 
     #[test]
     fn test_oc_test_creation() {
-        let test = CoverageTest::new_oc(1.15);
-        assert_eq!(test.required_level(), 1.15);
+        let test = CoverageTestSpec::oc("A", 1.15);
+        assert_eq!(test.trigger_level, 1.15);
     }
 
     #[test]
     fn test_oc_test_calculation() {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
-        let test = CoverageTest::new_oc(1.25);
+        let test = CoverageTestSpec::oc("TEST_TRANCHE", 1.25);
 
         let tranche = Tranche::new(
             "TEST_TRANCHE",
@@ -831,7 +728,6 @@ mod tests {
         let context = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
@@ -852,9 +748,7 @@ mod tests {
             deferred_interest: None,
         };
 
-        let result = test
-            .calculate(&context)
-            .expect("calculation should succeed");
+        let result = test.evaluate(&context).expect("calculation should succeed");
 
         assert_eq!(result.current_ratio, 0.0);
         assert!(!result.is_passing);
@@ -863,7 +757,7 @@ mod tests {
     #[test]
     fn test_ic_test_calculation() {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
-        let test = CoverageTest::new_ic(1.20);
+        let test = CoverageTestSpec::ic("TEST_TRANCHE", 1.20);
 
         let tranche = Tranche::new(
             "TEST_TRANCHE",
@@ -881,7 +775,6 @@ mod tests {
         let context = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
@@ -902,9 +795,7 @@ mod tests {
             deferred_interest: None,
         };
 
-        let result = test
-            .calculate(&context)
-            .expect("calculation should succeed");
+        let result = test.evaluate(&context).expect("calculation should succeed");
 
         assert!((result.current_ratio - 1.2).abs() < 0.01);
         assert!(result.is_passing);
@@ -916,7 +807,7 @@ mod tests {
     #[test]
     fn ic_denominator_includes_deferred_arrears() {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
-        let test = CoverageTest::new_ic(1.20);
+        let test = CoverageTestSpec::ic("TEST_TRANCHE", 1.20);
         let tranche = Tranche::new(
             "TEST_TRANCHE",
             0.0,
@@ -936,7 +827,6 @@ mod tests {
         let context = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
@@ -957,9 +847,7 @@ mod tests {
             deferred_interest: Some(&deferred),
         };
 
-        let result = test
-            .calculate(&context)
-            .expect("calculation should succeed");
+        let result = test.evaluate(&context).expect("calculation should succeed");
         // Coupon ≈ 100k × 5% / 4 = 1,250; plus 1,250 deferred => 2,500 due.
         // Collections 1,500 / 2,500 = 0.60, which fails a 1.20 test.
         // Without deferred the ratio would be 1.20 and the test would pass.
@@ -976,7 +864,7 @@ mod tests {
     #[test]
     fn ic_denominator_ignores_deferred_on_pik_tranche() {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
-        let test = CoverageTest::new_ic(1.20);
+        let test = CoverageTestSpec::ic("TEST_TRANCHE", 1.20);
         let mut tranche = Tranche::new(
             "TEST_TRANCHE",
             0.0,
@@ -997,7 +885,6 @@ mod tests {
         let context = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
@@ -1018,9 +905,7 @@ mod tests {
             deferred_interest: Some(&deferred),
         };
 
-        let result = test
-            .calculate(&context)
-            .expect("calculation should succeed");
+        let result = test.evaluate(&context).expect("calculation should succeed");
         // Coupon ≈ 100k × 5% / 4 = 1,250; stale deferred is ignored.
         // Collections 1,500 / 1,250 = 1.20.
         assert!(
@@ -1040,7 +925,7 @@ mod tests {
         // Denominator = 100k. Ratio = 120k / 100k = 1.20, breaches a 1.25 trigger.
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
         let required_ratio = 1.25_f64;
-        let test = CoverageTest::new_oc(required_ratio);
+        let test = CoverageTestSpec::oc("SENIOR", required_ratio);
 
         let tranche = Tranche::new(
             "SENIOR",
@@ -1059,7 +944,6 @@ mod tests {
         let context = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "SENIOR",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
@@ -1082,9 +966,7 @@ mod tests {
             deferred_interest: None,
         };
 
-        let result = test
-            .calculate(&context)
-            .expect("calculation should succeed");
+        let result = test.evaluate(&context).expect("calculation should succeed");
         assert!(
             !result.is_passing,
             "OC test should breach (ratio 1.20 < 1.25)"
@@ -1122,7 +1004,7 @@ mod tests {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
         // Trigger just above 1.0 — the pathological regime for the cure.
         let required_ratio = 1.001_f64;
-        let test = CoverageTest::new_oc(required_ratio);
+        let test = CoverageTestSpec::oc("SENIOR", required_ratio);
 
         let tranche = Tranche::new(
             "SENIOR",
@@ -1142,7 +1024,6 @@ mod tests {
         let context = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "SENIOR",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
@@ -1165,9 +1046,7 @@ mod tests {
             deferred_interest: None,
         };
 
-        let result = test
-            .calculate(&context)
-            .expect("calculation should succeed");
+        let result = test.evaluate(&context).expect("calculation should succeed");
         assert!(
             !result.is_passing,
             "OC test must breach (ratio 0.5 < 1.001)"
@@ -1292,7 +1171,7 @@ mod tests {
     fn test_ic_breach_yields_senior_interest_shortfall_cure() {
         let pool = AssetPool::new("TEST", DealType::Clo, Currency::USD);
         let required_ratio = 1.20_f64;
-        let test = CoverageTest::new_ic(required_ratio);
+        let test = CoverageTestSpec::ic("TEST_TRANCHE", required_ratio);
 
         let tranche = Tranche::new(
             "TEST_TRANCHE",
@@ -1310,7 +1189,6 @@ mod tests {
         let context = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "TEST_TRANCHE",
             as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             valuation_date: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
             period_start: None,
@@ -1331,9 +1209,7 @@ mod tests {
             deferred_interest: None,
         };
 
-        let result = test
-            .calculate(&context)
-            .expect("calculation should succeed");
+        let result = test.evaluate(&context).expect("calculation should succeed");
         assert!(!result.is_passing, "IC test should breach");
         let cure = result
             .cure_amount
@@ -1430,7 +1306,6 @@ mod haircut_tests {
             let ctx = TestContext {
                 pool: &pool,
                 tranches: &tranches,
-                tranche_id: "A",
                 as_of,
                 valuation_date: as_of,
                 period_start: Some(period_start),
@@ -1450,8 +1325,8 @@ mod haircut_tests {
                 floating_rate_shift: 0.0,
                 deferred_interest: None,
             };
-            CoverageTest::new_ic(1.20)
-                .calculate(&ctx)
+            CoverageTestSpec::ic("A", 1.20)
+                .evaluate(&ctx)
                 .expect("ic test")
                 .current_ratio
         };
@@ -1498,7 +1373,6 @@ mod haircut_tests {
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "A",
             as_of,
             valuation_date: as_of,
             period_start: Some(period_start),
@@ -1520,7 +1394,9 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTest::new_ic(1.20).calculate(&ctx).expect("ic test");
+        let result = CoverageTestSpec::ic("A", 1.20)
+            .evaluate(&ctx)
+            .expect("ic test");
         assert!(!result.is_passing, "the IC test must breach");
 
         let cure = result
@@ -1585,7 +1461,6 @@ mod haircut_tests {
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "B",
             as_of,
             valuation_date: as_of,
             period_start: Some(period_start),
@@ -1607,8 +1482,8 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTest::new_ic(required_ratio)
-            .calculate(&ctx)
+        let result = CoverageTestSpec::ic("B", required_ratio)
+            .evaluate(&ctx)
             .expect("IC test");
         let actual = result.cure_amount.expect("breach cure").amount();
         let senior = &tranches.tranches[0];
@@ -1690,7 +1565,6 @@ mod haircut_tests {
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "A",
             as_of,
             valuation_date: as_of,
             period_start: None,
@@ -1712,8 +1586,8 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTest::new_ic(required_ratio)
-            .calculate(&ctx)
+        let result = CoverageTestSpec::ic("A", required_ratio)
+            .evaluate(&ctx)
             .expect("IC test");
         let actual = result.cure_amount.expect("breach cure").amount();
         let all_in_rate = tranches.tranches[0]
@@ -1738,8 +1612,8 @@ mod haircut_tests {
             period_start: Some(start),
             ..ctx
         };
-        let result = CoverageTest::new_ic(required_ratio)
-            .calculate(&projected)
+        let result = CoverageTestSpec::ic("A", required_ratio)
+            .evaluate(&projected)
             .expect("future coverage dates must not require future fixings");
         let rate = tranches.tranches[0]
             .coupon
@@ -1761,8 +1635,8 @@ mod haircut_tests {
             valuation_date: start,
             ..projected
         };
-        let error = CoverageTest::new_ic(required_ratio)
-            .calculate(&missing_fixing)
+        let error = CoverageTestSpec::ic("A", required_ratio)
+            .evaluate(&missing_fixing)
             .expect_err("a reset on the valuation date still requires its exact fixing");
         assert!(error.to_string().contains("2025-05-01"), "{error}");
     }
@@ -1791,7 +1665,6 @@ mod haircut_tests {
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "A",
             as_of,
             valuation_date: as_of,
             period_start: None,
@@ -1812,7 +1685,9 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");
+        let result = CoverageTestSpec::oc("A", 1.0)
+            .evaluate(&ctx)
+            .expect("oc test");
 
         // Haircut factor: (500k + 0.5*500k) / 1,000k = 0.75.
         // Numerator must be 400k * 0.75 = 300k against a 500k tranche => 0.60.
@@ -1845,7 +1720,6 @@ mod haircut_tests {
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "A",
             as_of,
             valuation_date: as_of,
             period_start: None,
@@ -1866,7 +1740,9 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("OC test");
+        let result = CoverageTestSpec::oc("A", 1.0)
+            .evaluate(&ctx)
+            .expect("OC test");
         assert!(
             (result.current_ratio - 0.50).abs() < 1e-9,
             "live per-asset haircut should be (100k + 50% × 300k) / 500k = \
@@ -1887,7 +1763,6 @@ mod haircut_tests {
         let ctx = TestContext {
             pool: &pool,
             tranches: &tranches,
-            tranche_id: "A",
             as_of,
             valuation_date: as_of,
             period_start: None,
@@ -1908,7 +1783,9 @@ mod haircut_tests {
             deferred_interest: None,
         };
 
-        let result = CoverageTest::new_oc(1.0).calculate(&ctx).expect("oc test");
+        let result = CoverageTestSpec::oc("A", 1.0)
+            .evaluate(&ctx)
+            .expect("oc test");
         assert!(
             (result.current_ratio - 0.80).abs() < 1e-9,
             "without haircuts the ratio is 400k / 500k = 0.80, got {}",
