@@ -72,6 +72,7 @@ pub(crate) mod pricing;
 pub(crate) mod types;
 
 mod utils;
+mod validation;
 
 // Numerical Constants
 // Centralized thresholds for numerical stability and consistency across the module.

@@ -365,17 +365,8 @@ impl<'a> CashflowEngine<'a> {
             let mut current_balance = if i == 0 {
                 self.facility.drawn_amount
             } else {
-                let mut balance = self.facility.drawn_amount;
-                for event in draw_repay_events.iter() {
-                    if event.date <= period_start {
-                        balance = super::utils::apply_draw_repay_event(
-                            balance,
-                            event,
-                            self.facility.commitment_at(event.date),
-                        )?;
-                    }
-                }
-                balance
+                self.facility
+                    .drawn_balance_at(&draw_repay_events, anchor, period_start)?
             };
 
             // Accumulators for aggregated accruals
@@ -718,27 +709,9 @@ impl<'a> CashflowEngine<'a> {
 
         // Add terminal repayment. Same validated replay as the period
         // balances — maturity-dated events are boundary events too.
-        let mut final_balance = self.facility.drawn_amount;
-        for event in draw_repay_events.iter() {
-            if event.date < self.facility.maturity {
-                final_balance = super::utils::apply_draw_repay_event(
-                    final_balance,
-                    event,
-                    self.facility.commitment_at(event.date),
-                )?;
-            }
-        }
-
-        let mut final_balance_for_terminal = final_balance;
-        for event in draw_repay_events.iter() {
-            if event.date == self.facility.maturity {
-                final_balance_for_terminal = super::utils::apply_draw_repay_event(
-                    final_balance_for_terminal,
-                    event,
-                    self.facility.commitment_at(event.date),
-                )?;
-            }
-        }
+        let final_balance_for_terminal =
+            self.facility
+                .drawn_balance_at(&draw_repay_events, anchor, self.facility.maturity)?;
 
         let terminal_payment_date = self
             .payment_periods
@@ -1242,18 +1215,7 @@ pub fn calculate_drawn_balance_at_date(
     draw_repay_events.sort_by_key(|event| event.date);
 
     let anchor = facility.commitment_date.max(as_of);
-    let mut balance = facility.drawn_amount;
-    for event in draw_repay_events.iter() {
-        if event.date > anchor && event.date <= target_date {
-            balance = super::utils::apply_draw_repay_event(
-                balance,
-                event,
-                facility.commitment_at(event.date),
-            )?;
-        }
-    }
-
-    Ok(balance)
+    facility.drawn_balance_at(&draw_repay_events, anchor, target_date)
 }
 
 #[cfg(test)]
