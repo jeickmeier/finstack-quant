@@ -54,7 +54,7 @@
 //!
 //! # See Also
 //!
-//! - [`spec`] for the term-sheet component types (DDTL, covenants, amortization, calls)
+//! - [`crate::instruments::fixed_income::term_loan::spec`] for the term-sheet component types (DDTL, covenants, amortization, calls)
 //! - [`TermLoan`] for the instrument type
 //! - term loan cashflows module for cashflow generation details
 //! - term loan pricing module for valuation methodology
