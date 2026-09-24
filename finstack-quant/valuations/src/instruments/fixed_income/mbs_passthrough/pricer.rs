@@ -2,14 +2,6 @@
 //!
 //! This module provides discounting-based pricing for agency MBS passthroughs,
 //! generating projected cashflows with prepayment and payment delay adjustments.
-//!
-//! # SIFMA Settlement
-//!
-//! TBA-eligible agency MBS settle on published SIFMA Good Delivery dates. The
-//! [`sifma_settlement_for_period`] helper uses an exact embedded date when
-//! available and an explicitly approximate nth-weekday date for long-dated
-//! projected cash flows. Operational trade settlement must use the published
-//! calendar, not the projection estimate.
 
 use super::AgencyMbsPassthrough;
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
@@ -29,8 +21,6 @@ pub struct MbsCashflow {
     pub period_end: Date,
     /// Actual payment date (after delay)
     pub payment_date: Date,
-    /// SIFMA Good Delivery date, estimated outside published calendar coverage.
-    pub sifma_date: Date,
     /// Scheduled principal payment
     pub scheduled_principal: f64,
     /// Prepayment (unscheduled principal)
@@ -57,23 +47,6 @@ pub(crate) struct MbsProjection {
     pub(crate) schedule: CashFlowSchedule,
     /// Pool-state diagnostics aligned by payment date with schedule rows.
     pub(crate) diagnostics: Vec<MbsCashflow>,
-}
-
-/// Derive the SIFMA Good Delivery settlement date for a given accrual period.
-pub(crate) fn sifma_settlement_for_period(period_end: Date) -> Result<Date> {
-    use finstack_quant_core::dates::{
-        estimated_sifma_settlement_date_for_class, sifma_settlement_date, SifmaSettlementClass,
-    };
-
-    Ok(
-        sifma_settlement_date(period_end.month(), period_end.year()).unwrap_or_else(|| {
-            estimated_sifma_settlement_date_for_class(
-                period_end.month(),
-                period_end.year(),
-                SifmaSettlementClass::A,
-            )
-        }),
-    )
 }
 
 /// Generate projected cashflows for an agency MBS.
@@ -125,6 +98,7 @@ pub fn generate_cashflows(
     // convention and is intentionally not day-counted.
     let monthly_mortgage_rate = mbs.wac / 12.0;
 
+    let calendar = finstack_quant_core::dates::calendar_by_id_strict("usny")?;
     let mut projected_count: u32 = 0;
     loop {
         if balance < 0.01 || projected_count >= max_periods {
@@ -132,7 +106,7 @@ pub fn generate_cashflows(
         }
 
         let period_end = end_of_month(period_start)?;
-        let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
+        let payment_date = mbs.payment_date_on(period_start, calendar)?;
 
         if payment_date < as_of {
             period_start = next_month_start(period_start)?;
@@ -190,13 +164,10 @@ pub fn generate_cashflows(
         let total_principal = scheduled_principal + prepayment;
         let ending_balance = (balance - total_principal).max(0.0);
 
-        let sifma_date = sifma_settlement_for_period(period_end)?;
-
         cashflows.push(MbsCashflow {
             period_start,
             period_end,
             payment_date,
-            sifma_date,
             scheduled_principal,
             prepayment,
             interest,

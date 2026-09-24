@@ -195,6 +195,45 @@ fn bench_agency_mbs_pv(c: &mut Criterion) {
     group.finish();
 }
 
+/// MBS risk metrics: 512-path MC-OAS solve plus effective duration/convexity.
+fn bench_agency_mbs_metrics(c: &mut Criterion) {
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let mut group = c.benchmark_group("agency_mbs_metrics");
+    let as_of = as_of();
+    let disc = discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05);
+    let market = MarketContext::new().insert(disc);
+    let mut mbs = AgencyMbsPassthrough::example().unwrap();
+    mbs.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(95.0);
+
+    group.bench_function("oas", |b| {
+        b.iter(|| {
+            mbs.price_with_metrics(
+                black_box(&market),
+                black_box(as_of),
+                &[MetricId::Oas],
+                PricingOptions::default(),
+            )
+            .unwrap()
+        });
+    });
+    group.bench_function("duration_convexity", |b| {
+        b.iter(|| {
+            mbs.price_with_metrics(
+                black_box(&market),
+                black_box(as_of),
+                &[MetricId::DurationMod, MetricId::Convexity],
+                PricingOptions::default(),
+            )
+            .unwrap()
+        });
+    });
+    group.finish();
+}
+
 // FI Index TRS
 
 /// Market context for FI TRS: discount, forward, and scalar yield/duration data.
@@ -379,6 +418,7 @@ criterion_group!(
     bench_term_loan_pv,
     bench_revolving_credit_pv,
     bench_agency_mbs_pv,
+    bench_agency_mbs_metrics,
     bench_fi_trs_pv,
     bench_cmo_waterfall_pv,
     bench_cmo_structure_type,

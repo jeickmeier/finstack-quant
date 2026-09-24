@@ -104,12 +104,22 @@ impl AgencyProgram {
     /// * `accrual_month` - Accrual month whose following-month payment date is
     ///   computed and adjusted on the Federal Reserve banking calendar.
     pub fn payment_date_for_period(&self, accrual_year: i32, accrual_month: Month) -> Result<Date> {
-        let pay_day = match self {
+        payment_date_after(
+            accrual_year,
+            accrual_month,
+            1,
+            self.payment_day(),
+            finstack_quant_core::dates::calendar_by_id_strict("usny")?,
+        )
+    }
+
+    /// Day of the month after accrual on which the agency pays P&I.
+    fn payment_day(&self) -> u8 {
+        match self {
             AgencyProgram::Fnma | AgencyProgram::Fhlmc => 25,
             AgencyProgram::GnmaI => 15,
             AgencyProgram::GnmaII => 20,
-        };
-        payment_date_after(accrual_year, accrual_month, 1, pay_day)
+        }
     }
 
     /// Returns the canonical string representation.
@@ -140,6 +150,7 @@ fn payment_date_after(
     accrual_month: Month,
     months_ahead: u32,
     pay_day: u8,
+    calendar: &dyn finstack_quant_core::dates::HolidayCalendar,
 ) -> Result<Date> {
     let index = accrual_year * 12 + i32::from(u8::from(accrual_month)) - 1 + months_ahead as i32;
     let pay_year = index.div_euclid(12);
@@ -155,7 +166,7 @@ fn payment_date_after(
     finstack_quant_core::dates::adjust(
         payment,
         finstack_quant_core::dates::BusinessDayConvention::Following,
-        finstack_quant_core::dates::calendar_by_id_strict("usny")?,
+        calendar,
     )
 }
 
@@ -440,25 +451,40 @@ impl AgencyMbsPassthrough {
     /// Returns `Error::Validation` for a zero custom delay or a payment date
     /// outside the supported calendar range.
     pub fn payment_date_for_accrual_period(&self, period_start: Date) -> Result<Date> {
-        match self.payment_lag_days {
-            Some(0) => Err(finstack_quant_core::Error::Validation(
-                "MBS payment_lag_days must be at least 1".into(),
-            )),
+        self.payment_date_on(
+            period_start,
+            finstack_quant_core::dates::calendar_by_id_strict("usny")?,
+        )
+    }
+
+    /// [`Self::payment_date_for_accrual_period`] with the `usny` calendar
+    /// already resolved, for projection loops.
+    pub(crate) fn payment_date_on(
+        &self,
+        period_start: Date,
+        calendar: &dyn finstack_quant_core::dates::HolidayCalendar,
+    ) -> Result<Date> {
+        let (months_ahead, pay_day) = match self.payment_lag_days {
+            Some(0) => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "MBS payment_lag_days must be at least 1".into(),
+                ))
+            }
             Some(delay) => {
                 let months_ahead = (delay - 1) / 30;
                 let pay_day = u8::try_from(delay - 30 * months_ahead)
                     .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
-                payment_date_after(
-                    period_start.year(),
-                    period_start.month(),
-                    months_ahead,
-                    pay_day,
-                )
+                (months_ahead, pay_day)
             }
-            None => self
-                .agency
-                .payment_date_for_period(period_start.year(), period_start.month()),
-        }
+            None => (1, self.agency.payment_day()),
+        };
+        payment_date_after(
+            period_start.year(),
+            period_start.month(),
+            months_ahead,
+            pay_day,
+            calendar,
+        )
     }
 
     /// Calculate seasoning in months from issue date to given date.

@@ -174,9 +174,10 @@ struct McStepSchedule {
     payment_extras: Vec<f64>,
     /// Pool day-count year fraction of each accrual month.
     accrual_fractions: Vec<f64>,
-    /// Pool seasoning (months) at each accrual period end, driving the
-    /// PSA/CPR ramp exactly as in the deterministic pricer.
-    seasonings: Vec<u32>,
+    /// Base (rate-unadjusted) SMM of each step from the pool's prepayment
+    /// model at the pool seasoning of the accrual period end, exactly as in
+    /// the deterministic pricer. Validated finite and in `[0, 1]`.
+    base_smms: Vec<f64>,
 }
 
 impl McStepSchedule {
@@ -199,7 +200,7 @@ fn mc_step_schedule(
 
     let mut payment_extras = Vec::with_capacity(num_steps);
     let mut accrual_fractions = Vec::with_capacity(num_steps);
-    let mut seasonings = Vec::with_capacity(num_steps);
+    let mut base_smms = Vec::with_capacity(num_steps);
     for m in 0..num_steps {
         let period_start = start_month.add_months(m as i32);
         let accrual_end = period_start.add_months(1);
@@ -215,12 +216,19 @@ fn mc_step_schedule(
             DayCountContext::default(),
         )?);
         let period_end = accrual_end - time::Duration::days(1);
-        seasonings.push(mbs.seasoning_months(period_end));
+        let seasoning = mbs.seasoning_months(period_end);
+        let base_smm = mbs.prepayment_model.smm(seasoning)?;
+        if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
+            return Err(CoreError::Validation(format!(
+                "MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]"
+            )));
+        }
+        base_smms.push(base_smm);
     }
     Ok(McStepSchedule {
         payment_extras,
         accrual_fractions,
-        seasonings,
+        base_smms,
     })
 }
 
@@ -265,10 +273,6 @@ fn rate_adjusted_smm(base_smm: f64, current_rate: f64, base_rate: f64, sensitivi
 /// in-flight receivable), interest accrues on the pool day-count over the
 /// actual calendar month, and the PSA/CPR ramp reflects the true pool age.
 ///
-/// # Errors
-///
-/// Returns `Error::Validation` when the prepayment model returns an
-/// out-of-range or non-finite SMM.
 fn price_on_path(
     mbs: &AgencyMbsPassthrough,
     path: &RatePath,
@@ -276,7 +280,7 @@ fn price_on_path(
     oas: f64,
     prepay_sensitivity: f64,
     steps: &McStepSchedule,
-) -> Result<f64> {
+) -> f64 {
     let monthly_mortgage_rate = mbs.wac / 12.0;
     let dt = 1.0 / 12.0;
 
@@ -303,13 +307,7 @@ fn price_on_path(
         let step_df = (-(current_rate + oas) * dt).exp();
         cumulative_df *= step_df;
 
-        let seasoning = steps.seasonings[month];
-        let base_smm = mbs.prepayment_model.smm(seasoning)?;
-        if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
-            return Err(CoreError::Validation(format!(
-                "MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]"
-            )));
-        }
+        let base_smm = steps.base_smms[month];
 
         // Rate-adjusted SMM
         let smm = rate_adjusted_smm(base_smm, current_rate, base_rate, prepay_sensitivity);
@@ -359,7 +357,7 @@ fn price_on_path(
         balance = (balance - scheduled_principal - prepayment).max(0.0);
     }
 
-    Ok(pv)
+    pv
 }
 
 /// Calculate Monte Carlo OAS for an agency MBS.
@@ -436,11 +434,6 @@ pub(crate) fn calculate_mc_oas(
     // payment-delay discounting offsets (actual payment dates).
     let steps = mc_step_schedule(mbs, as_of, num_steps, discount_curve.day_count())?;
 
-    // Capture pricing errors raised by price_on_path so they propagate
-    // through the f64-only Brent objective rather than being silently coerced
-    // to NaN. The first non-zero error is preserved across iterations.
-    let pricing_error: std::cell::RefCell<Option<CoreError>> = std::cell::RefCell::new(None);
-
     // Objective: average price across paths minus market price.
     //
     // Paths are independent, so price them in parallel and collect the results
@@ -460,28 +453,16 @@ pub(crate) fn calculate_mc_oas(
         };
 
         #[cfg(not(target_arch = "wasm32"))]
-        let path_pvs: Vec<Result<f64>> = {
+        let path_pvs: Vec<f64> = {
             use rayon::prelude::*;
             paths.par_iter().map(price_one).collect()
         };
 
         #[cfg(target_arch = "wasm32")]
-        let path_pvs: Vec<Result<f64>> = paths.iter().map(price_one).collect();
+        let path_pvs: Vec<f64> = paths.iter().map(price_one).collect();
 
-        let mut total = 0.0_f64;
-        for pv in path_pvs {
-            match pv {
-                Ok(pv) => total += pv,
-                Err(e) => {
-                    if pricing_error.borrow().is_none() {
-                        *pricing_error.borrow_mut() = Some(e);
-                    }
-                    return f64::NAN;
-                }
-            }
-        }
-        let avg_price = total / config.num_paths as f64;
-        avg_price - market_price
+        let total: f64 = path_pvs.iter().sum();
+        total / config.num_paths as f64 - market_price
     };
 
     // Solve for OAS using Brent's method
@@ -492,11 +473,6 @@ pub(crate) fn calculate_mc_oas(
         .initial_bracket_size(Some(0.05));
 
     let result = solver.solve(objective, 0.0);
-
-    // Surface a captured pricing error before reporting the solver outcome.
-    if let Some(err) = pricing_error.borrow_mut().take() {
-        return Err(err);
-    }
 
     // Solver failure is now informative: the underlying pricing succeeded but
     // no OAS bracketed the target market price (likely far-from-feasible
@@ -678,7 +654,7 @@ mod tests {
         // Use the MBS issue date so seasoning starts at 0 (fresh pool).
         let as_of = mbs.issue_date;
         let steps = mc_step_schedule(&mbs, as_of, wam, DayCount::Act365F).expect("steps");
-        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, &steps).expect("price");
+        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, &steps);
         assert!(
             pv.is_finite() && pv > 0.0,
             "path PV must be finite/positive"
@@ -716,7 +692,6 @@ mod tests {
                     config.prepay_rate_sensitivity,
                     &steps,
                 )
-                .expect("test fixture is well-formed")
             })
             .sum();
         let avg_price: f64 = total / 64.0;
@@ -769,10 +744,8 @@ mod tests {
             gnma1_steps.payment_extras[0]
         );
 
-        let pv_fnma =
-            price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, &fnma_steps).expect("fnma pv");
-        let pv_gnma1 =
-            price_on_path(&gnma1, &flat_path, base_rate, 0.0, 7.0, &gnma1_steps).expect("gnma pv");
+        let pv_fnma = price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, &fnma_steps);
+        let pv_gnma1 = price_on_path(&gnma1, &flat_path, base_rate, 0.0, 7.0, &gnma1_steps);
 
         assert!(
             pv_fnma < pv_gnma1,
@@ -892,8 +865,7 @@ mod tests {
             mc_step_schedule(&fresh_mbs, as_of, wam, DayCount::Act365F).expect("fresh steps");
         let seasoned_steps =
             mc_step_schedule(&seasoned_mbs, as_of, wam, DayCount::Act365F).expect("seasoned steps");
-        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps)
-            .expect("fresh pv");
+        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, &fresh_steps);
         let seasoned_pv = price_on_path(
             &seasoned_mbs,
             &flat_path,
@@ -901,8 +873,7 @@ mod tests {
             0.0,
             7.0,
             &seasoned_steps,
-        )
-        .expect("seasoned pv");
+        );
 
         // The seasoned pool (60+ months, PSA plateau at 100 PSA ≈ 6% CPR) must
         // price differently from the fresh pool (still on the ramp, CPR < 6%).
@@ -988,7 +959,7 @@ mod tests {
             .expect("curve")
             .day_count();
         let steps = mc_step_schedule(&mbs, as_of, wam, curve_dc).expect("steps");
-        let mc_pv = price_on_path(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps).expect("mc pv");
+        let mc_pv = price_on_path(&mbs, &flat_path, flat_rate, 0.0, 7.0, &steps);
 
         assert!(det_pv > 0.0 && mc_pv > 0.0);
         let rel_diff = (mc_pv - det_pv).abs() / det_pv;

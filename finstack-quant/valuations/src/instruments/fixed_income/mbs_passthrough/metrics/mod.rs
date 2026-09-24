@@ -27,19 +27,33 @@ pub(crate) mod mc_oas;
 /// prepayment option consistently; the MC config field remains overridable.
 pub(crate) const PREPAY_RATE_SENSITIVITY: f64 = std::f64::consts::LN_2 / 0.01;
 
-pub(crate) use duration::{effective_convexity, effective_duration};
 pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
 
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
-use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
+use crate::metrics::{MetricCalculator, MetricContext, MetricId, MetricRegistry};
+
+/// Compute effective duration and convexity in one bumped-repricing pass and
+/// store both in `context.computed`, so a request for both metrics reprices
+/// the pool three times, not six (the registry skips a metric that is already
+/// computed).
+fn duration_and_convexity(context: &mut MetricContext) -> finstack_quant_core::Result<(f64, f64)> {
+    let mbs: &AgencyMbsPassthrough = context.instrument_as()?;
+    let result = duration::duration_convexity(mbs, context.curves.as_ref(), context.as_of, None)?;
+    context
+        .computed
+        .insert(MetricId::DurationMod, result.duration);
+    context
+        .computed
+        .insert(MetricId::Convexity, result.convexity);
+    Ok((result.duration, result.convexity))
+}
 
 /// Calculator for effective duration (mapped to DurationMod).
 pub(crate) struct EffectiveDurationCalculator;
 
 impl MetricCalculator for EffectiveDurationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let mbs: &AgencyMbsPassthrough = context.instrument_as()?;
-        effective_duration(mbs, context.curves.as_ref(), context.as_of, None)
+        Ok(duration_and_convexity(context)?.0)
     }
 }
 
@@ -48,8 +62,7 @@ pub(crate) struct EffectiveConvexityCalculator;
 
 impl MetricCalculator for EffectiveConvexityCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let mbs: &AgencyMbsPassthrough = context.instrument_as()?;
-        effective_convexity(mbs, context.curves.as_ref(), context.as_of, None)
+        Ok(duration_and_convexity(context)?.1)
     }
 }
 
