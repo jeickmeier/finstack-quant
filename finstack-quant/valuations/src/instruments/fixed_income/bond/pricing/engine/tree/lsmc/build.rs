@@ -489,19 +489,10 @@ pub(super) fn return_floor_dates(
     as_of: Date,
     event_dates: &[Date],
 ) -> Result<Vec<Date>> {
-    let first_life_date = issue_date.next_day().ok_or_else(|| {
-        Error::Validation("return-floor issue date has no following day".to_string())
-    })?;
-    let last_life_date = maturity.previous_day().ok_or_else(|| {
-        Error::Validation("return-floor maturity has no preceding day".to_string())
-    })?;
-    let (window_start, window_end) = match window {
-        ProtectionWindow::Full => (first_life_date, last_life_date),
-        ProtectionWindow::From(start) => (start.max(first_life_date), last_life_date),
-        ProtectionWindow::Between { start, end } => {
-            (start.max(first_life_date), end.min(last_life_date))
-        }
-    };
+    let (window_start, window_end) =
+        crate::instruments::fixed_income::bond::pricing::return_floor::protection_window_bounds(
+            window, issue_date, maturity,
+        )?;
     Ok(BondValuator::exercise_candidates(
         window_start.max(as_of),
         window_end,

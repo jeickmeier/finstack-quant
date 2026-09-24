@@ -134,7 +134,6 @@ pub enum TreeModelChoice {
 /// let hw = TreePricerConfig {
 ///     tree_steps: 100,
 ///     volatility: 0.01,
-///     mean_reversion: Some(0.03),
 ///     tree_model: TreeModelChoice::HullWhite { kappa: 0.03, sigma: 0.01 },
 ///     ..Default::default()
 /// };
@@ -178,16 +177,6 @@ pub struct TreePricerConfig {
     /// slow convergence for tight spreads. Default: 1000 bp.
     pub initial_bracket_size_bp: Option<f64>,
 
-    /// Mean reversion speed (annualized).
-    ///
-    /// Used by `HullWhite` and `BlackDermanToy` tree models. Ignored by
-    /// `HoLee` — for mean-reverting normal models, use `HullWhite` instead.
-    ///
-    /// - `None` (default): no mean reversion
-    /// - `Some(0.03)`: 3% annual mean reversion (moderate)
-    /// - `Some(0.10)`: 10% annual mean reversion (strong)
-    pub mean_reversion: Option<f64>,
-
     /// Short-rate model for the pricing tree.
     ///
     /// - `HoLee` (default): Uses the existing `ShortRateTree` path.
@@ -217,7 +206,6 @@ impl Default for TreePricerConfig {
             tolerance: 1e-6,
             max_iterations: 50,
             initial_bracket_size_bp: Some(1000.0),
-            mean_reversion: None,
             tree_model: TreeModelChoice::default(),
             tree_discount_curve_id: None,
             oas_quote_compounding: OasQuoteCompounding::Continuous,
@@ -340,10 +328,6 @@ pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerCo
         tolerance: 1e-6,
         max_iterations: 50,
         initial_bracket_size_bp: Some(1000.0),
-        mean_reversion: bond
-            .instrument_pricing_overrides
-            .model_config
-            .mean_reversion,
         tree_model,
         tree_discount_curve_id: bond
             .instrument_pricing_overrides
@@ -360,41 +344,6 @@ pub fn bond_tree_config(bond: &Bond) -> finstack_quant_core::Result<TreePricerCo
             .oas_price_basis,
         tree_compounding,
     })
-}
-
-impl TreePricerConfig {
-    /// Create a high-precision configuration for regulatory/audit purposes.
-    ///
-    /// Uses 200 tree steps for < 0.5 bp OAS accuracy and tighter convergence
-    /// tolerance. Approximately 4x slower than production configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `calibrated_vol` - Annualized short rate volatility from market calibration
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::TreePricerConfig;
-    ///
-    /// // High precision for regulatory reporting
-    /// let config = TreePricerConfig::high_precision(0.012);
-    /// ```
-    pub fn high_precision(calibrated_vol: f64) -> Self {
-        Self {
-            tree_steps: 200,
-            volatility: calibrated_vol,
-            tolerance: 1e-8,
-            max_iterations: 100,
-            initial_bracket_size_bp: Some(1500.0),
-            mean_reversion: None,
-            tree_model: TreeModelChoice::HoLee,
-            tree_discount_curve_id: None,
-            oas_quote_compounding: OasQuoteCompounding::Continuous,
-            oas_price_basis: OasPriceBasis::SettlementDirty,
-            tree_compounding: TreeCompounding::default(),
-        }
-    }
 }
 
 #[cfg(test)]

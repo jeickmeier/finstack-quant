@@ -134,6 +134,40 @@ pub(crate) fn realized_distributions(
     Ok(points)
 }
 
+/// Protection window clipped to the bond's life: from the day after issue to
+/// the day before maturity (the floor binds only on early redemption).
+///
+/// # Arguments
+///
+/// * `window` - Contractual protection window.
+/// * `issue` - Bond issue date.
+/// * `maturity` - Bond contractual maturity date.
+///
+/// Returns `(start, end)`; the window is empty when `start > end`.
+pub(crate) fn protection_window_bounds(
+    window: ProtectionWindow,
+    issue: Date,
+    maturity: Date,
+) -> finstack_quant_core::Result<(Date, Date)> {
+    let first_life_date = issue.next_day().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "return-floor issue date has no representable following day".to_string(),
+        )
+    })?;
+    let last_life_date = maturity.previous_day().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "return-floor maturity has no representable preceding day".to_string(),
+        )
+    })?;
+    Ok(match window {
+        ProtectionWindow::Full => (first_life_date, last_life_date),
+        ProtectionWindow::From(start) => (start.max(first_life_date), last_life_date),
+        ProtectionWindow::Between { start, end } => {
+            (start.max(first_life_date), end.min(last_life_date))
+        }
+    })
+}
+
 // ── Return-floor lowering ─────────────────────────────────────────────────────
 
 /// Lower a [`ReturnFloorSpec`] into a [`CallPutSchedule`].
@@ -232,23 +266,7 @@ pub(crate) fn lower_return_floor(
         .max(0.0)
     };
 
-    let first_life_date = issue.next_day().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(
-            "return-floor issue date has no representable following day".to_string(),
-        )
-    })?;
-    let last_life_date = bond.maturity.previous_day().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(
-            "return-floor maturity has no representable preceding day".to_string(),
-        )
-    })?;
-    let (window_start, window_end) = match spec.window {
-        ProtectionWindow::Full => (first_life_date, last_life_date),
-        ProtectionWindow::From(start) => (start.max(first_life_date), last_life_date),
-        ProtectionWindow::Between { start, end } => {
-            (start.max(first_life_date), end.min(last_life_date))
-        }
-    };
+    let (window_start, window_end) = protection_window_bounds(spec.window, issue, bond.maturity)?;
     let candidate_start = window_start.max(as_of);
     // Exercise candidates: the protection and contractual call windows' ends
     // plus every schedule date (distributions and balance changes). Between

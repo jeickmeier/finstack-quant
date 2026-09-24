@@ -359,7 +359,10 @@ impl TreePricer {
     /// ```rust
     /// use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::{TreePricer, TreePricerConfig};
     ///
-    /// let config = TreePricerConfig::high_precision(0.015);
+    /// let config = TreePricerConfig {
+    ///     tree_steps: 400,
+    ///     ..TreePricerConfig::default()
+    /// };
     /// let pricer = TreePricer::with_config(config);
     /// ```
     pub fn with_config(config: TreePricerConfig) -> Self {
@@ -651,8 +654,7 @@ impl OasPricer<'_> {
             }
             PreparedTree::RatesCreditLsmc(tree) => {
                 let config = BondLsmcConfig::for_bond(&self.bond, oas)?;
-                let lsmc =
-                    price_bond_lsmc(tree, &self.bond, self.market, self.as_of, &config, None)?;
+                let lsmc = price_bond_lsmc(tree, &self.bond, self.market, self.as_of, &config)?;
                 return Ok(TreePriceOutcome {
                     amount: lsmc.estimate.mean.amount(),
                     lsmc: Some(lsmc),

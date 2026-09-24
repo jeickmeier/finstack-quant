@@ -348,6 +348,5 @@ pub(super) struct ExerciseInputs<'a> {
     pub(super) coupon_states: &'a [FloatingRuntimeState],
     pub(super) cumulative_distribution_cash: f64,
     pub(super) cumulative_distribution_target_pv: f64,
-    pub(super) provider: Option<&'a dyn BondLsmcExerciseProvider>,
     pub(super) make_whole_policies: Option<&'a [RegressionPolicy]>,
 }
