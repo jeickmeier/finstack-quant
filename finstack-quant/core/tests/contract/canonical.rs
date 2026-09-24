@@ -278,11 +278,11 @@ fn persisted_contract_fields_do_not_use_fx_hash_maps() {
             "TrancheValuation",
         ),
         (
-            "valuations/src/instruments/fixed_income/structured_credit/types/waterfall.rs",
+            "valuations/src/instruments/fixed_income/structured_credit/types/waterfall/mod.rs",
             "WaterfallDistribution",
         ),
         (
-            "valuations/src/instruments/fixed_income/structured_credit/types/waterfall.rs",
+            "valuations/src/instruments/fixed_income/structured_credit/types/waterfall/coverage.rs",
             "CoverageRules",
         ),
         ("margin/src/regulatory/sa_ccr/types.rs", "EadResult"),

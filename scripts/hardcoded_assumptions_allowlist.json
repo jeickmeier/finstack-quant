@@ -2366,7 +2366,7 @@
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/simulation_engine/simulate_period.rs",
+      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/simulation_engine/simulate_period/mod.rs",
       "category": "credit_assumption",
       "contains": "(pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0)",
       "reason": "Financial formula or unit conversion, not an external default to configure."
