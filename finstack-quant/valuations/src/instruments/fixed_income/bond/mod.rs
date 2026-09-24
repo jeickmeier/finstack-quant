@@ -121,7 +121,7 @@ pub mod pricing;
 mod types;
 
 pub use crate::cashflow::accrual::AccrualMethod;
-pub use cashflow_spec::{CashflowSpec, FloatingConventionParams};
+pub use cashflow_spec::CashflowSpec;
 pub use json::bond_from_cashflows_json;
 #[doc(hidden)]
 pub use metrics::price_yield_spread::asw::{asw_market_with_forward, asw_par_with_forward};

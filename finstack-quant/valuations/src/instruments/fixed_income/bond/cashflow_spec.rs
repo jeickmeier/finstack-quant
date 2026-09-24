@@ -75,30 +75,6 @@ fn decimal_from_finite_f64(value: f64, context: &str) -> finstack_quant_core::Re
     })
 }
 
-/// Parameters for [`CashflowSpec::floating_with_conventions`].
-pub struct FloatingConventionParams {
-    /// Forward curve / rate index identifier (e.g. `"USD-SOFR-3M"`).
-    pub index_id: CurveId,
-    /// Spread over the index in basis points.
-    pub spread_bp: Decimal,
-    /// Index rate multiplier (1.0 = no leverage).
-    pub gearing: Decimal,
-    /// Business days between observation and accrual start.
-    pub reset_lag_days: i32,
-    /// Cash vs PIK coupon split.
-    pub coupon_type: CouponType,
-    /// Payment / reset frequency.
-    pub frequency: Tenor,
-    /// Day-count convention for accrual.
-    pub day_count: DayCount,
-    /// Business-day convention for date adjustment.
-    pub business_day_convention: BusinessDayConvention,
-    /// Holiday calendar identifier.
-    pub calendar_id: String,
-    /// Stub period treatment.
-    pub stub: StubKind,
-}
-
 /// Thin facade over canonical builder coupon specs for bond cashflows.
 ///
 /// Wraps `FixedCouponSpec` and `FloatingCouponSpec` from the cashflow builder,
@@ -469,106 +445,6 @@ impl CashflowSpec {
                 roll_rule: crate::cashflow::builder::specs::RollRule::None,
             },
         }))
-    }
-
-    /// Create a fixed-rate specification with full convention control.
-    ///
-    /// Unlike [`fixed()`](Self::fixed) which applies hardcoded defaults, this
-    /// constructor accepts all schedule conventions (BDC, calendar, stub, coupon
-    /// type) so callers can thread through user-provided values while the method
-    /// still fills in implementation-detail defaults (`end_of_month`, `payment_lag_days`).
-    ///
-    /// # Defaults filled in
-    ///
-    /// - `end_of_month`: `false`
-    /// - `payment_lag_days`: `0`
-    pub fn fixed_with_conventions(
-        rate: Decimal,
-        coupon_type: CouponType,
-        frequency: Tenor,
-        day_count: DayCount,
-        business_day_convention: BusinessDayConvention,
-        calendar_id: String,
-        stub: StubKind,
-    ) -> Self {
-        Self::Fixed(FixedCouponSpec {
-            coupon_type,
-            rate,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-
-                day_count,
-
-                business_day_convention,
-
-                calendar_id,
-
-                stub,
-
-                end_of_month: false,
-
-                payment_lag_days: 0,
-
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        })
-    }
-
-    /// Create a floating-rate specification with full convention control.
-    ///
-    /// Unlike [`floating()`](Self::floating) which applies hardcoded defaults
-    /// and registry look-ups, this constructor accepts all schedule conventions
-    /// and floating-rate knobs (`gearing`, `reset_lag_days`, `coupon_type`, etc.)
-    /// so callers can thread through user-provided values.
-    ///
-    /// # Defaults filled in
-    ///
-    /// - `gearing_includes_spread`: `true`
-    /// - `index_floor_bp` / `all_in_cap_bp` / `all_in_floor_bp` / `index_cap_bp`: `None`
-    /// - `fixing_calendar_id`: `None` (falls back to `calendar_id`)
-    /// - `end_of_month`: `false`
-    /// - `payment_lag_days`: `0`
-    /// - `overnight_compounding`: `None`
-    /// - `overnight_basis`: `None`
-    /// - `fallback`: `FloatingRateFallback::Error`
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Validated model or algorithm parameters controlling this calculation.
-    pub fn floating_with_conventions(params: FloatingConventionParams) -> Self {
-        Self::Floating(FloatingCouponSpec {
-            rate_spec: FloatingRateSpec {
-                index_id: params.index_id,
-                spread_bp: params.spread_bp,
-                gearing: params.gearing,
-                gearing_includes_spread: true,
-                index_floor_bp: None,
-                all_in_floor_bp: None,
-                all_in_cap_bp: None,
-                index_cap_bp: None,
-                overnight_index_constraints: Default::default(),
-                reset_frequency: params.frequency,
-                index_tenor: None,
-                reset_lag_days: params.reset_lag_days,
-                fixing_calendar_id: None,
-                overnight_compounding: None,
-                overnight_basis: None,
-                fallback: Default::default(),
-            },
-            coupon_type: params.coupon_type,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency: params.frequency,
-                day_count: params.day_count,
-                business_day_convention: params.business_day_convention,
-                calendar_id: params.calendar_id,
-                stub: params.stub,
-                end_of_month: false,
-                payment_lag_days: 0,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        })
     }
 
     /// Create a step-up coupon specification with sensible defaults.
