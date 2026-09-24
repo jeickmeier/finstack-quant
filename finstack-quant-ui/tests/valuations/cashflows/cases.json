@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-      "sha256": "61fd7bcf22b7c3b339716a5eea3b29c2ac401a60441293b91a269fe7edbc4ba3"
+      "sha256": "1872cd386197b8ca9cea20ec3877b291f47fddad4a1f41a65439895744414e71"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
