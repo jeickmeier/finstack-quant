@@ -262,18 +262,12 @@ fn test_realistic_ust_10y_future_full_workflow() {
 
     // Calculate conversion factors for all deliverable bonds
     // Using standard UST 10Y parameters: 6% coupon, 10-year maturity
-    let standard_coupon = 0.06;
-    let standard_maturity = 10.0;
+    let specs = BondFutureSpecs::ust_10y();
     let as_of = date!(2025 - 01 - 15);
 
     for (i, bond) in bonds.iter().enumerate() {
-        let cf = BondFuturePricer::calculate_conversion_factor(
-            bond,
-            standard_coupon,
-            standard_maturity,
-            as_of,
-        )
-        .expect("Conversion factor calculation should succeed");
+        let cf = BondFuturePricer::calculate_conversion_factor(bond, &specs, as_of)
+            .expect("Conversion factor calculation should succeed");
 
         deliverable_bonds[i].conversion_factor = cf;
 
@@ -414,9 +408,12 @@ fn test_bond_future_pricer_registry_ctd_npv() {
 
     let market = create_realistic_market();
 
-    let conversion_factor =
-        BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, delivery_start)
-            .expect("Failed to calculate conversion factor");
+    let conversion_factor = BondFuturePricer::calculate_conversion_factor(
+        &ctd_bond,
+        &BondFutureSpecs::ust_10y(),
+        delivery_start,
+    )
+    .expect("Failed to calculate conversion factor");
 
     let basket = vec![DeliverableBond {
         bond_id: InstrumentId::new("US912828XG33"),
@@ -492,8 +489,9 @@ fn test_short_position_npv() {
 
     // Calculate conversion factor for first bond only (for speed)
     let ctd_bond = &bonds[0];
-    let ctd_cf = BondFuturePricer::calculate_conversion_factor(ctd_bond, 0.06, 10.0, as_of)
-        .expect("CF calculation should succeed");
+    let ctd_cf =
+        BondFuturePricer::calculate_conversion_factor(ctd_bond, &BondFutureSpecs::ust_10y(), as_of)
+            .expect("CF calculation should succeed");
 
     deliverable_bonds[0].conversion_factor = ctd_cf;
 
@@ -706,8 +704,9 @@ fn test_multiple_contracts_scaling() {
     let as_of = date!(2025 - 01 - 15);
 
     let ctd_bond = &bonds[0];
-    let ctd_cf = BondFuturePricer::calculate_conversion_factor(ctd_bond, 0.06, 10.0, as_of)
-        .expect("CF calculation should succeed");
+    let ctd_cf =
+        BondFuturePricer::calculate_conversion_factor(ctd_bond, &BondFutureSpecs::ust_10y(), as_of)
+            .expect("CF calculation should succeed");
 
     deliverable_bonds[0].conversion_factor = ctd_cf;
 
@@ -815,16 +814,26 @@ fn test_conversion_factor_calculation_accuracy() {
         date!(2035 - 01 - 15),
     );
 
-    let cf_below =
-        BondFuturePricer::calculate_conversion_factor(&bond_below_par, 0.06, 10.0, as_of)
-            .expect("CF for 3% bond should succeed");
+    let cf_below = BondFuturePricer::calculate_conversion_factor(
+        &bond_below_par,
+        &BondFutureSpecs::ust_10y(),
+        as_of,
+    )
+    .expect("CF for 3% bond should succeed");
 
-    let cf_at = BondFuturePricer::calculate_conversion_factor(&bond_at_par, 0.06, 10.0, as_of)
-        .expect("CF for 6% bond should succeed");
+    let cf_at = BondFuturePricer::calculate_conversion_factor(
+        &bond_at_par,
+        &BondFutureSpecs::ust_10y(),
+        as_of,
+    )
+    .expect("CF for 6% bond should succeed");
 
-    let cf_above =
-        BondFuturePricer::calculate_conversion_factor(&bond_above_par, 0.06, 10.0, as_of)
-            .expect("CF for 9% bond should succeed");
+    let cf_above = BondFuturePricer::calculate_conversion_factor(
+        &bond_above_par,
+        &BondFutureSpecs::ust_10y(),
+        as_of,
+    )
+    .expect("CF for 9% bond should succeed");
 
     println!("3% coupon bond CF: {:.4}", cf_below);
     println!("6% coupon bond CF: {:.4}", cf_at);
@@ -892,8 +901,7 @@ fn test_bond_future_dv01_calculation() {
     // Calculate conversion factor
     let conversion_factor = BondFuturePricer::calculate_conversion_factor(
         &ctd_bond,
-        0.06, // 6% standard coupon for UST 10Y
-        10.0, // 10-year standard maturity
+        &BondFutureSpecs::ust_10y(),
         delivery_start,
     )
     .expect("Failed to calculate conversion factor");
@@ -1049,9 +1057,12 @@ fn test_bond_future_dv01_sign_convention() {
     // Create market context (CTD bond is embedded in the instrument itself)
     let market = create_realistic_market();
 
-    let conversion_factor =
-        BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, delivery_start)
-            .expect("Failed to calculate conversion factor");
+    let conversion_factor = BondFuturePricer::calculate_conversion_factor(
+        &ctd_bond,
+        &BondFutureSpecs::ust_10y(),
+        delivery_start,
+    )
+    .expect("Failed to calculate conversion factor");
 
     let basket = vec![DeliverableBond {
         bond_id: InstrumentId::new("US912828XG33"),
@@ -1153,17 +1164,11 @@ fn test_invoice_price() {
     let as_of = date!(2025 - 01 - 15);
 
     // Calculate conversion factors
-    let standard_coupon = 0.06;
-    let standard_maturity = 10.0;
+    let specs = BondFutureSpecs::ust_10y();
 
     for (i, bond) in bonds.iter().enumerate() {
-        let cf = BondFuturePricer::calculate_conversion_factor(
-            bond,
-            standard_coupon,
-            standard_maturity,
-            as_of,
-        )
-        .expect("Failed to calculate conversion factor");
+        let cf = BondFuturePricer::calculate_conversion_factor(bond, &specs, as_of)
+            .expect("Failed to calculate conversion factor");
         deliverable_bonds[i].conversion_factor = cf;
         println!(
             "Bond {} ({}): CF = {:.4}",
@@ -1370,7 +1375,7 @@ fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
     let as_of = date!(2025 - 01 - 15);
     for (i, bond) in bonds.iter().enumerate() {
         deliverable_bonds[i].conversion_factor =
-            BondFuturePricer::calculate_conversion_factor(bond, 0.06, 10.0, as_of)
+            BondFuturePricer::calculate_conversion_factor(bond, &BondFutureSpecs::ust_10y(), as_of)
                 .expect("conversion factor");
     }
     let ctd_bond = bonds[0].clone();

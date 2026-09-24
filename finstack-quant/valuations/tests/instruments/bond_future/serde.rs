@@ -143,14 +143,11 @@ fn test_bond_future_specs_default_roundtrip() {
         serde_json::from_str(&json).expect("Deserialization failed");
 
     assert_eq!(specs.contract_size, deserialized.contract_size);
-    assert_eq!(specs.tick_size, deserialized.tick_size);
-    assert_eq!(specs.tick_value, deserialized.tick_value);
     assert_eq!(specs.standard_coupon, deserialized.standard_coupon);
     assert_eq!(
         specs.standard_maturity_years,
         deserialized.standard_maturity_years
     );
-    assert_eq!(specs.settlement_days, deserialized.settlement_days);
 }
 
 #[test]
@@ -170,8 +167,6 @@ fn test_bond_future_specs_ust_5y_roundtrip() {
     let json = serde_json::to_string(&specs).expect("Serialization failed");
     let _deserialized: BondFutureSpecs =
         serde_json::from_str(&json).expect("Deserialization failed");
-
-    assert_eq!(specs.tick_size, 1.0 / 128.0);
     assert_eq!(specs.standard_maturity_years, 5.0);
 }
 
@@ -191,8 +186,6 @@ fn test_bond_future_specs_bund_roundtrip() {
     let json = serde_json::to_string(&specs).expect("Serialization failed");
     let _deserialized: BondFutureSpecs =
         serde_json::from_str(&json).expect("Deserialization failed");
-
-    assert_eq!(specs.tick_size, 0.01);
     assert_eq!(specs.standard_coupon, 0.06);
 }
 
@@ -213,11 +206,32 @@ fn test_bond_future_specs_json_structure() {
 
     // Verify all required fields are present
     assert!(json.contains("contract_size"));
-    assert!(json.contains("tick_size"));
-    assert!(json.contains("tick_value"));
     assert!(json.contains("standard_coupon"));
     assert!(json.contains("standard_maturity_years"));
-    assert!(json.contains("settlement_days"));
+    assert!(json.contains("repo_day_count"));
+    // Tick economics and a settlement lag are not part of the pricing spec.
+    for removed in ["tick_size", "tick_value", "settlement_days", "calendar_id"] {
+        assert!(!json.contains(removed), "{removed} must not serialize");
+    }
+}
+
+#[test]
+fn test_bond_future_specs_rejects_removed_fields() {
+    for removed in [
+        r#""tick_size": 0.015625"#,
+        r#""tick_value": 15.625"#,
+        r#""settlement_days": 2"#,
+        r#""calendar_id": "nyse""#,
+    ] {
+        let json = format!(
+            r#"{{"contract_size": 100000.0, "standard_coupon": 0.06,
+                "standard_maturity_years": 10.0, {removed}}}"#
+        );
+        assert!(
+            serde_json::from_str::<BondFutureSpecs>(&json).is_err(),
+            "BondFutureSpecs must reject removed field {removed}"
+        );
+    }
 }
 
 // BondFuture Serialization Tests
@@ -434,11 +448,8 @@ fn test_bond_future_deny_unknown_fields() {
         "position": "long",
         "contract_specs": {
             "contract_size": 100000.0,
-            "tick_size": 0.015625,
-            "tick_value": 15.625,
             "standard_coupon": 0.06,
-            "standard_maturity_years": 10.0,
-            "settlement_days": 2
+            "standard_maturity_years": 10.0
         },
         "deliverable_basket": [
             {
@@ -475,11 +486,8 @@ fn test_bond_future_deny_unknown_fields() {
 fn test_bond_future_specs_rejects_unknown_field() {
     let json = r#"{
         "contract_size": 100000.0,
-        "tick_size": 0.015625,
-        "tick_value": 15.625,
         "standard_coupon": 0.06,
         "standard_maturity_years": 10.0,
-        "settlement_days": 2,
         "extra_field": "ignored"
     }"#;
 
@@ -509,11 +517,8 @@ fn test_bond_future_minimal_json() {
         "position": "long",
         "contract_specs": {
             "contract_size": 100000.0,
-            "tick_size": 0.015625,
-            "tick_value": 15.625,
             "standard_coupon": 0.06,
-            "standard_maturity_years": 10.0,
-            "settlement_days": 2
+            "standard_maturity_years": 10.0
         },
         "deliverable_basket": [
             {

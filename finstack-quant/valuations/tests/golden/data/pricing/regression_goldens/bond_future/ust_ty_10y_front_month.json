@@ -152,12 +152,8 @@
         "position": "long",
         "contract_specs": {
           "contract_size": 100000.0,
-          "tick_size": 0.015625,
-          "tick_value": 15.625,
           "standard_coupon": 0.06,
           "standard_maturity_years": 10.0,
-          "settlement_days": 2,
-          "calendar_id": "nyse",
           "repo_day_count": "act_360"
         },
         "deliverable_basket": [

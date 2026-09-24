@@ -7,12 +7,8 @@
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
       "contract_size": 100000.0,
-      "tick_size": 0.015625,
-      "tick_value": 15.625,
       "standard_coupon": 0.06,
       "standard_maturity_years": 10.0,
-      "settlement_days": 2,
-      "calendar_id": "nyse",
       "repo_day_count": "act_360"
     },
     {
@@ -21,12 +17,8 @@
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
       "contract_size": 100000.0,
-      "tick_size": 0.0078125,
-      "tick_value": 7.8125,
       "standard_coupon": 0.06,
       "standard_maturity_years": 5.0,
-      "settlement_days": 2,
-      "calendar_id": "nyse",
       "repo_day_count": "act_360"
     },
     {
@@ -35,12 +27,8 @@
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
       "contract_size": 200000.0,
-      "tick_size": 0.00390625,
-      "tick_value": 7.8125,
       "standard_coupon": 0.06,
       "standard_maturity_years": 2.0,
-      "settlement_days": 2,
-      "calendar_id": "nyse",
       "repo_day_count": "act_360"
     },
     {
@@ -49,12 +37,8 @@
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
       "contract_size": 100000.0,
-      "tick_size": 0.01,
-      "tick_value": 10.0,
       "standard_coupon": 0.06,
       "standard_maturity_years": 10.0,
-      "settlement_days": 2,
-      "calendar_id": "target2",
       "repo_day_count": "act_360"
     },
     {
@@ -63,12 +47,8 @@
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
       "contract_size": 100000.0,
-      "tick_size": 0.01,
-      "tick_value": 10.0,
       "standard_coupon": 0.04,
       "standard_maturity_years": 10.0,
-      "settlement_days": 2,
-      "calendar_id": "gblo",
       "repo_day_count": "act_365f"
     }
   ],

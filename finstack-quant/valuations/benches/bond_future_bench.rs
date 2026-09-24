@@ -127,8 +127,7 @@ fn bench_conversion_factor(c: &mut Criterion) {
         b.iter(|| {
             finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuturePricer::calculate_conversion_factor(
                 black_box(&ctd_bond),
-                black_box(specs.standard_coupon),
-                black_box(specs.standard_maturity_years),
+                black_box(&specs),
                 black_box(as_of),
             )
         });

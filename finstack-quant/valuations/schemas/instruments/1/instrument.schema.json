@@ -2997,7 +2997,7 @@
         },
         "contract_specs": {
           "$ref": "#/$defs/BondFutureSpecs",
-          "description": "Contract specifications (tick size, standard coupon, etc.)"
+          "description": "Contract specifications (contract size, standard coupon, repo day count)"
         },
         "ctd_bond": {
           "anyOf": [
@@ -3102,13 +3102,8 @@
     },
     "BondFutureSpecs": {
       "additionalProperties": false,
-      "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract including\ncontract size, tick size, and the notional bond parameters used for\nconversion factor calculations.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```",
+      "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract: contract\nsize, the notional bond parameters used for conversion factor\ncalculations, and the implied-repo day count.\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`delivery_end` and the caller-supplied invoice settlement date, so the\nspec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```",
       "properties": {
-        "calendar_id": {
-          "default": "nyse",
-          "description": "Holiday calendar identifier for business day calculations.\n\nDefaults to \"nyse\" for US Treasury futures.\nUse \"target2\" for European government bond futures.",
-          "type": "string"
-        },
         "contract_size": {
           "description": "Face value of a single contract (e.g., $100,000 for UST)",
           "format": "double",
@@ -3119,12 +3114,6 @@
           "default": "act_360",
           "description": "Day-count convention for implied repo rate annualization.\n\nBond-future repo supports `act_360` and `act_365f`."
         },
-        "settlement_days": {
-          "description": "Number of business days for settlement after expiry",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
         "standard_coupon": {
           "description": "Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)",
           "format": "double",
@@ -3134,25 +3123,12 @@
           "description": "Standard maturity in years for conversion factor calculation",
           "format": "double",
           "type": "number"
-        },
-        "tick_size": {
-          "description": "Minimum quoted-price increment, in the contract's quote units.",
-          "format": "double",
-          "type": "number"
-        },
-        "tick_value": {
-          "description": "Cash value of one tick for one contract, in the notional currency.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
         "contract_size",
-        "tick_size",
-        "tick_value",
         "standard_coupon",
-        "standard_maturity_years",
-        "settlement_days"
+        "standard_maturity_years"
       ],
       "type": "object"
     },
@@ -27076,14 +27052,10 @@
         "spec": {
           "attributes": {},
           "contract_specs": {
-            "calendar_id": "nyse",
             "contract_size": 100000.0,
             "repo_day_count": "act_360",
-            "settlement_days": 2,
             "standard_coupon": 0.06,
-            "standard_maturity_years": 10.0,
-            "tick_size": 0.015625,
-            "tick_value": 15.625
+            "standard_maturity_years": 10.0
           },
           "ctd_bond_id": "US91282CJL54",
           "deliverable_basket": [
