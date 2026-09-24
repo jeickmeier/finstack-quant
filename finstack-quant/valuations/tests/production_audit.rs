@@ -329,7 +329,7 @@ fn b12_dm_inversion_applies_settlement_once() {
         Money::from((1_000_000_i64, Currency::USD)),
         MetricContext::default_config(),
     );
-    let dm = DiscountMarginCalculator::new()
+    let dm = DiscountMarginCalculator
         .calculate(&mut context)
         .expect("DM solve");
     assert!((dm - target).abs() < 1e-9, "expected {target}, got {dm}");

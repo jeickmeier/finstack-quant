@@ -1033,7 +1033,7 @@ fn test_z_spread_missing_discount_curve_returns_error() {
     // the Z-spread pricing helper (missing discount curve), not missing accrued.
     mctx.computed.insert(MetricId::Accrued, 0.0);
 
-    let calc = ZSpreadCalculator::default();
+    let calc = ZSpreadCalculator;
     let result = calc.calculate(&mut mctx);
 
     // Expect a propagated input error (missing discount curve), never an apparent "perfect fit" z=0.0.

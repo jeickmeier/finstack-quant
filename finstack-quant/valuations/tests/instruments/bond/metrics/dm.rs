@@ -103,7 +103,7 @@ fn test_dm_missing_forward_curve_returns_error() {
     );
 
     // No need to pre-compute Accrued; DM calculator will treat missing accrued as 0.
-    let calc = DiscountMarginCalculator::default();
+    let calc = DiscountMarginCalculator;
     let result = calc.calculate(&mut mctx);
 
     // Expect a propagated input error (missing curve), never an apparent "perfect fit" DM of 0.0.
