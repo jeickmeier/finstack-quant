@@ -17,7 +17,6 @@ Import path:
 | Item | Purpose |
 |------|---------|
 | `TermLoan` | The runtime instrument. Build with `TermLoan::builder()`; examples: `example`, `example_floating_with_ddtl`, `example_callable`. |
-| `TermLoanSpec` | Serde-stable specification. `spec.try_into()` yields a `TermLoan`. |
 | `RateSpec` | `Fixed { rate_bp }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `AmortizationSpec` | `None` (bullet), `Linear { start, end }`, `PercentPerPeriod { bp }`, `PercentOfOriginalNotional { .. }`, `Custom(..)`. |
 | `DdtlSpec`, `DrawEvent`, `CommitmentStepDown`, `CommitmentFeeBase` | Delayed-draw commitment, draw calendar, step-downs, commitment/usage fee bases. |
@@ -36,7 +35,7 @@ conventions and the parts that are easy to get wrong.
 term_loan/
 ├── mod.rs         # re-exports + module-level overview
 ├── types.rs       # TermLoan, RateSpec, builder, examples, Instrument impl
-├── spec.rs        # serde-stable TermLoanSpec and all nested spec types
+├── spec.rs        # serde-stable term-sheet component types (DDTL, covenants, amortization, calls)
 ├── overrides.rs   # TermLoanOverrides
 ├── cashflows.rs   # full internal cashflow schedule (draws, interest, amort, PIK, fees)
 ├── pricing/
@@ -47,9 +46,9 @@ term_loan/
 
 ## Construction
 
-Two equivalent entry points. The builder is ergonomic; `TermLoanSpec` is the
-serde-stable shape for stored configurations. (The
-`finstack_quant.instrument/1` envelope carries `TermLoan` itself, not the spec.)
+Build with `TermLoan::builder()`; `build()` validates the complete contract.
+`TermLoan` is itself the serde-stable shape (the `finstack_quant.instrument/1`
+envelope carries it directly).
 
 ```rust
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
@@ -81,14 +80,6 @@ let loan = TermLoan::builder()
     .instrument_pricing_overrides(InstrumentPricingOverrides::default())
     .attributes(Attributes::new())
     .build()?;
-```
-
-From a spec:
-
-```rust
-use finstack_quant_valuations::instruments::fixed_income::term_loan::{TermLoan, TermLoanSpec};
-
-let loan: TermLoan = spec.try_into()?;   // spec: TermLoanSpec
 ```
 
 Notes that bite:

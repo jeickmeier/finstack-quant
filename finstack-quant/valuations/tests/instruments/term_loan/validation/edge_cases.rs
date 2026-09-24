@@ -8,7 +8,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent, OidPolicy, RateSpec, TermLoan,
-    TermLoanSpec,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -166,42 +165,33 @@ fn test_negative_rate_environment() {
     assert!(pv.amount() > 10_000_000.0);
 }
 
-// DDTL draw capacity validation (m4) -- via TermLoanSpec TryFrom path
+// DDTL draw capacity validation (m4) -- `TermLoan::build()` validates the contract
 
-fn ddtl_spec_template() -> TermLoanSpec {
-    TermLoanSpec {
-        id: "TL-DDTL".into(),
-        discount_curve_id: CurveId::from("USD-OIS"),
-        credit_curve_id: None,
-        currency: Currency::USD,
-        notional_limit: Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")),
-        issue: date!(2025 - 01 - 01),
-        maturity: date!(2030 - 01 - 01),
-        rate: RateSpec::Fixed { rate_bp: 500 },
-        frequency: Tenor::semi_annual(),
-        day_count: DayCount::Act360,
-        business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: None,
-        stub: StubKind::None,
-        amortization: AmortizationSpec::None,
-        coupon_type: CouponType::Cash,
-        upfront_fee: None,
-        ddtl: None,
-        covenants: None,
-        instrument_pricing_overrides: Default::default(),
-        metric_pricing_overrides: Default::default(),
-        scenario_pricing_overrides: Default::default(),
-        oid_eir: None,
-        call_schedule: None,
-        settlement_days: 2,
-    }
+/// Build a 5Y fixed-rate loan carrying `ddtl`, returning the validation result.
+fn build_ddtl_loan(ddtl: DdtlSpec) -> finstack_quant_core::Result<TermLoan> {
+    TermLoan::builder()
+        .id("TL-DDTL".into())
+        .currency(Currency::USD)
+        .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+        .issue_date(date!(2025 - 01 - 01))
+        .maturity(date!(2030 - 01 - 01))
+        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .frequency(Tenor::semi_annual())
+        .day_count(DayCount::Act360)
+        .business_day_convention(BusinessDayConvention::ModifiedFollowing)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .amortization(AmortizationSpec::None)
+        .coupon_type(CouponType::Cash)
+        .ddtl_opt(Some(ddtl))
+        .attributes(Default::default())
+        .build()
 }
 
 #[test]
 fn test_ddtl_draws_exceeding_commitment_rejected() {
     // Cumulative draws ($6M + $6M = $12M) exceed $10M commitment
-    let mut spec = ddtl_spec_template();
-    spec.ddtl = Some(DdtlSpec {
+    let result = build_ddtl_loan(DdtlSpec {
         commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
@@ -221,15 +211,18 @@ fn test_ddtl_draws_exceeding_commitment_rejected() {
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
-    let result: Result<TermLoan, _> = spec.try_into();
-    assert!(result.is_err(), "should reject draws exceeding commitment");
+    let err = result.expect_err("should reject draws exceeding commitment");
+    assert!(
+        err.to_string()
+            .contains("cumulative DDTL draws exceed the effective commitment"),
+        "unexpected error: {err}"
+    );
 }
 
 #[test]
 fn test_ddtl_draws_within_commitment_accepted() {
     // Cumulative draws ($4M + $4M = $8M) within $10M
-    let mut spec = ddtl_spec_template();
-    spec.ddtl = Some(DdtlSpec {
+    let result = build_ddtl_loan(DdtlSpec {
         commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
@@ -249,16 +242,14 @@ fn test_ddtl_draws_within_commitment_accepted() {
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
-    let result: Result<TermLoan, _> = spec.try_into();
     assert!(result.is_ok(), "draws within commitment should be accepted");
 }
 
-// Negative OID percentage validation (n3) -- via TermLoanSpec TryFrom path
+// Negative OID percentage validation (n3)
 
 #[test]
 fn test_negative_oid_pct_rejected() {
-    let mut spec = ddtl_spec_template();
-    spec.ddtl = Some(DdtlSpec {
+    let result = build_ddtl_loan(DdtlSpec {
         commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
@@ -269,17 +260,16 @@ fn test_negative_oid_pct_rejected() {
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: Some(OidPolicy::WithheldPct(-100)),
     });
-    let result: Result<TermLoan, _> = spec.try_into();
+    let err = result.expect_err("negative OID percentage should be rejected");
     assert!(
-        result.is_err(),
-        "negative OID percentage should be rejected"
+        err.to_string().contains("OID percentage"),
+        "unexpected error: {err}"
     );
 }
 
 #[test]
 fn test_zero_oid_pct_accepted() {
-    let mut spec = ddtl_spec_template();
-    spec.ddtl = Some(DdtlSpec {
+    let result = build_ddtl_loan(DdtlSpec {
         commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
@@ -290,6 +280,5 @@ fn test_zero_oid_pct_accepted() {
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: Some(OidPolicy::WithheldPct(0)),
     });
-    let result: Result<TermLoan, _> = spec.try_into();
     assert!(result.is_ok(), "zero OID percentage should be valid");
 }

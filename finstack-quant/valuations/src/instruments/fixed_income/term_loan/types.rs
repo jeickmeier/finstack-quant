@@ -1,7 +1,7 @@
 //! Term loan instrument type and core specifications.
 //!
 //! This module defines the [`TermLoan`] instrument type and its associated specifications
-//! including rate types, trait implementations, and conversion from [`TermLoanSpec`].
+//! including rate types and trait implementations.
 //!
 //! # Overview
 //!
@@ -34,7 +34,6 @@
 //!
 //! # See Also
 //!
-//! - [`TermLoanSpec`] for the serializable specification type
 //! - [`RateSpec`] for rate type definitions
 //! - [`super::spec`] module for all specification types
 
@@ -47,7 +46,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use finstack_quant_core::InputError;
 
 use super::spec::{
-    AmortizationSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents, TermLoanSpec,
+    AmortizationSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents,
 };
 use crate::cashflow::builder::specs::CouponType;
 use crate::cashflow::builder::FloatingRateSpec;
@@ -154,17 +153,16 @@ impl RateSpec {
 ///
 /// # Construction
 ///
-/// Create via [`TermLoanSpec`] conversion or use the builder pattern:
+/// Build with [`TermLoan::builder()`]; `build()` validates the complete
+/// contract (dates, currencies, DDTL draws against the commitment in force,
+/// covenant and call schedules):
 ///
 /// ```
-/// use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::TermLoanSpec;
 /// use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 ///
-/// # fn example(spec: TermLoanSpec) -> Result<(), Box<dyn std::error::Error>> {
-/// let loan: TermLoan = spec.try_into()?;
-/// # let _ = loan;
-/// # Ok(())
-/// # }
+/// let loan = TermLoan::example()?;
+/// loan.validate()?;
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 ///
 /// # Cashflow Generation
@@ -883,164 +881,6 @@ impl TermLoan {
     }
 }
 
-impl TryFrom<TermLoanSpec> for TermLoan {
-    type Error = finstack_quant_core::Error;
-
-    fn try_from(spec: TermLoanSpec) -> Result<Self, Self::Error> {
-        if spec.issue >= spec.maturity {
-            return Err(InputError::InvalidDateRange.into());
-        }
-
-        let TermLoanSpec {
-            id,
-            discount_curve_id,
-            credit_curve_id,
-            currency,
-            notional_limit,
-            issue,
-            maturity,
-            rate,
-            frequency,
-            day_count,
-            business_day_convention,
-            calendar_id,
-            stub,
-            amortization,
-            coupon_type,
-            upfront_fee,
-            ddtl,
-            covenants,
-            instrument_pricing_overrides,
-            metric_pricing_overrides,
-            scenario_pricing_overrides,
-            oid_eir,
-            call_schedule,
-            settlement_days,
-        } = spec;
-
-        let resolved_notional = match (notional_limit, ddtl.as_ref()) {
-            (Some(limit), _) => limit,
-            (None, Some(ddtl_spec)) => ddtl_spec.commitment_limit,
-            (None, None) => {
-                return Err(InputError::NotFound {
-                    id: "notional_limit".to_string(),
-                }
-                .into())
-            }
-        };
-
-        validate_currency(currency, resolved_notional)?;
-        if let Some(fee) = upfront_fee.as_ref() {
-            validate_currency(currency, *fee)?;
-        }
-
-        if let AmortizationSpec::Custom(items) = &amortization {
-            for (_, amt) in items {
-                validate_currency(currency, *amt)?;
-            }
-        }
-
-        if let Some(cov) = &covenants {
-            for sweep in &cov.cash_sweeps {
-                validate_currency(currency, sweep.amount)?;
-            }
-        }
-
-        if let Some(ddtl_spec) = &ddtl {
-            validate_currency(currency, ddtl_spec.commitment_limit)?;
-            if resolved_notional.amount() > ddtl_spec.commitment_limit.amount() {
-                return Err(InputError::Invalid.into());
-            }
-            for draw in &ddtl_spec.draws {
-                validate_currency(currency, draw.amount)?;
-            }
-            // Validate cumulative draws do not exceed commitment limit (accounting
-            // for step-downs).  Only valid draws within the availability window
-            // are considered, mirroring the cashflow generator's filtering logic.
-            {
-                let mut sorted_draws: Vec<_> = ddtl_spec
-                    .draws
-                    .iter()
-                    .filter(|d| {
-                        d.date >= ddtl_spec.availability_start
-                            && d.date <= ddtl_spec.availability_end
-                    })
-                    .collect();
-                sorted_draws.sort_by_key(|d| d.date);
-
-                let mut cumulative = 0.0_f64;
-                for draw in &sorted_draws {
-                    // Determine effective limit at draw date (after step-downs)
-                    let mut limit = ddtl_spec.commitment_limit.amount();
-                    for sd in &ddtl_spec.commitment_step_downs {
-                        if sd.date <= draw.date {
-                            limit = sd.new_limit.amount();
-                        }
-                    }
-                    cumulative += draw.amount.amount();
-                    if cumulative > limit + 1e-6 {
-                        return Err(InputError::Invalid.into());
-                    }
-                }
-            }
-            for step in &ddtl_spec.commitment_step_downs {
-                validate_currency(currency, step.new_limit)?;
-            }
-            match &ddtl_spec.oid_policy {
-                Some(
-                    super::spec::OidPolicy::WithheldAmount(m)
-                    | super::spec::OidPolicy::SeparateAmount(m),
-                ) => {
-                    validate_currency(currency, *m)?;
-                }
-                Some(
-                    super::spec::OidPolicy::WithheldPct(bp)
-                    | super::spec::OidPolicy::SeparatePct(bp),
-                ) if *bp < 0 => return Err(InputError::Invalid.into()),
-                Some(
-                    super::spec::OidPolicy::WithheldPct(_) | super::spec::OidPolicy::SeparatePct(_),
-                )
-                | None => {}
-            }
-        }
-
-        TermLoan::builder()
-            .id(id)
-            .currency(currency)
-            .notional_limit(resolved_notional)
-            .issue_date(issue)
-            .maturity(maturity)
-            .rate(rate)
-            .frequency(frequency)
-            .day_count(day_count)
-            .business_day_convention(business_day_convention)
-            .calendar_id_opt(calendar_id)
-            .stub(stub)
-            .discount_curve_id(discount_curve_id)
-            .credit_curve_id_opt(credit_curve_id)
-            .amortization(amortization)
-            .coupon_type(coupon_type)
-            .upfront_fee_opt(upfront_fee)
-            .ddtl_opt(ddtl)
-            .covenants_opt(covenants)
-            .instrument_pricing_overrides(instrument_pricing_overrides)
-            .metric_pricing_overrides(metric_pricing_overrides)
-            .scenario_pricing_overrides(scenario_pricing_overrides)
-            .oid_eir_opt(oid_eir)
-            .call_schedule_opt(call_schedule)
-            .settlement_days(settlement_days)
-            .attributes(Attributes::new())
-            .build()
-    }
-}
-
-fn validate_currency(expected: Currency, money: Money) -> Result<(), finstack_quant_core::Error> {
-    if money.currency() != expected {
-        return Err(InputError::Invalid.into());
-    }
-    Ok(())
-}
-
 impl crate::instruments::common_impl::traits::Instrument for TermLoan {
     impl_instrument_base!(crate::pricer::InstrumentType::TermLoan);
 
@@ -1201,8 +1041,6 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cashflow::builder::specs::CouponType;
-    use crate::instruments::fixed_income::term_loan::spec::CommitmentFeeBase;
     use finstack_quant_core::dates::Date;
     use time::Month;
 
@@ -1238,130 +1076,5 @@ mod tests {
         let deps =
             crate::instruments::Instrument::market_dependencies(&loan).expect("dependencies");
         assert_eq!(deps.series_ids, vec![expected]);
-    }
-
-    #[test]
-    fn test_term_loan_spec_conversion_plain() {
-        let issue = Date::from_calendar_date(2024, Month::January, 2).expect("valid date");
-        let maturity = Date::from_calendar_date(2029, Month::January, 2).expect("valid date");
-
-        let spec = TermLoanSpec {
-            id: InstrumentId::new("TL-PLAIN"),
-            discount_curve_id: CurveId::new("USD-CREDIT"),
-            credit_curve_id: None,
-            currency: Currency::USD,
-            notional_limit: Some(Money::from((5_000_000_i64, Currency::USD))),
-            issue,
-            maturity,
-            rate: RateSpec::Fixed { rate_bp: 550 },
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: None,
-            stub: StubKind::None,
-            amortization: AmortizationSpec::None,
-            coupon_type: CouponType::Cash,
-            upfront_fee: None,
-            ddtl: None,
-            covenants: None,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            oid_eir: None,
-            call_schedule: None,
-            settlement_days: 2,
-        };
-
-        let loan: TermLoan = spec.try_into().expect("conversion should succeed");
-        assert_eq!(loan.notional_limit.amount(), 5_000_000.0);
-        assert_eq!(loan.currency, Currency::USD);
-    }
-
-    #[test]
-    fn test_term_loan_spec_conversion_ddtl_defaults_notional() {
-        let issue = Date::from_calendar_date(2025, Month::March, 1).expect("valid date");
-        let maturity = Date::from_calendar_date(2030, Month::March, 1).expect("valid date");
-        let commitment = Money::from((12_000_000_i64, Currency::USD));
-
-        let ddtl = DdtlSpec {
-            commitment_limit: commitment,
-            availability_start: issue,
-            availability_end: issue,
-            draws: Vec::new(),
-            commitment_step_downs: Vec::new(),
-            usage_fee_bp: 0,
-            commitment_fee_bp: 0,
-            fee_base: CommitmentFeeBase::Undrawn,
-            oid_policy: None,
-        };
-
-        let spec = TermLoanSpec {
-            id: InstrumentId::new("TL-DDTL"),
-            discount_curve_id: CurveId::new("USD-CREDIT"),
-            credit_curve_id: None,
-            currency: Currency::USD,
-            notional_limit: None,
-            issue,
-            maturity,
-            rate: RateSpec::Fixed { rate_bp: 450 },
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: None,
-            stub: StubKind::None,
-            amortization: AmortizationSpec::None,
-            coupon_type: CouponType::Cash,
-            upfront_fee: None,
-            ddtl: Some(ddtl),
-            covenants: None,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            oid_eir: None,
-            call_schedule: None,
-            settlement_days: 2,
-        };
-
-        let loan: TermLoan = spec.try_into().expect("conversion should succeed");
-        assert_eq!(loan.notional_limit, commitment);
-    }
-
-    #[test]
-    fn test_term_loan_spec_conversion_missing_notional() {
-        let issue = Date::from_calendar_date(2024, Month::January, 2).expect("valid date");
-        let maturity = Date::from_calendar_date(2026, Month::January, 2).expect("valid date");
-
-        let spec = TermLoanSpec {
-            id: InstrumentId::new("TL-MISSING"),
-            discount_curve_id: CurveId::new("USD-CREDIT"),
-            credit_curve_id: None,
-            currency: Currency::USD,
-            notional_limit: None,
-            issue,
-            maturity,
-            rate: RateSpec::Fixed { rate_bp: 500 },
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: None,
-            stub: StubKind::None,
-            amortization: AmortizationSpec::None,
-            coupon_type: CouponType::Cash,
-            upfront_fee: None,
-            ddtl: None,
-            covenants: None,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            oid_eir: None,
-            call_schedule: None,
-            settlement_days: 2,
-        };
-
-        let err = TermLoan::try_from(spec).expect_err("missing notional should fail");
-        match err {
-            finstack_quant_core::Error::Input(InputError::NotFound { .. }) => {}
-            _ => panic!("unexpected error: {err:?}"),
-        }
     }
 }
