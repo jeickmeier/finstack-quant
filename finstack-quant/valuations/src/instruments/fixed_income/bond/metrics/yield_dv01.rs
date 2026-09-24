@@ -22,11 +22,12 @@ use std::borrow::Cow;
 pub(crate) struct YieldDv01Calculator;
 
 pub(crate) fn yield_basis_dv01(
-    bond: &Bond,
-    context: &MetricContext,
+    context: &mut MetricContext,
     duration_mod: f64,
     ytm: f64,
 ) -> finstack_quant_core::Result<f64> {
+    let workout = super::context_workout_path(context)?;
+    let bond: &Bond = context.instrument_as()?;
     let flows: &Vec<(Date, Money)> = context
         .cashflows
         .as_ref()
@@ -34,9 +35,7 @@ pub(crate) fn yield_basis_dv01(
 
     let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
     let (yield_rate, risk_flows, quote_date) =
-        if let Some((workout_yield, workout_flows, workout_quote_date)) =
-            super::quoted_workout_path(bond, context.curves.as_ref(), context.as_of, flows)?
-        {
+        if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
             (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
         } else {
             (ytm, Cow::Borrowed(flows.as_slice()), quote_ctx.quote_date)
@@ -60,7 +59,6 @@ impl MetricCalculator for YieldDv01Calculator {
     }
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bond: &Bond = context.instrument_as()?;
         let duration_mod = context
             .computed
             .get(&MetricId::DurationMod)
@@ -72,6 +70,6 @@ impl MetricCalculator for YieldDv01Calculator {
             .copied()
             .ok_or_else(|| crate::metrics::metric_not_found(MetricId::Ytm))?;
 
-        yield_basis_dv01(bond, context, duration_mod, ytm)
+        yield_basis_dv01(context, duration_mod, ytm)
     }
 }

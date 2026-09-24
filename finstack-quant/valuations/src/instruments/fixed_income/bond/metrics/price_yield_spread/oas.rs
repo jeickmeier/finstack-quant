@@ -64,18 +64,58 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         .model_config
         .mc_target_ci_half_width
         .take();
-    let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
-    let objective = |oas_bp: f64| -> f64 {
-        let mut trial = trial_template.clone();
-        trial.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
-        let priced = if context.pricing_model().is_some() {
-            context.reprice_instrument_raw(
-                &trial,
+    // The standard tree models calibrate once and reprice the prepared
+    // lattice per root trial. A custom registry stays authoritative and is
+    // repriced through its own dispatch.
+    let standard_dispatch = match &pricing_dispatch {
+        crate::pricer::PricingDispatch::InstrumentDefault => true,
+        crate::pricer::PricingDispatch::Registered { registry, .. } => {
+            std::sync::Arc::ptr_eq(registry, &crate::pricer::shared_standard_registry())
+        }
+    };
+    let tree_pricer = if standard_dispatch
+        && trial_template
+            .scenario_pricing_overrides
+            .scenario_spread_shock_bp
+            .is_none()
+    {
+        use crate::instruments::fixed_income::bond::pricing::engine::tree::TreePricer;
+        match model {
+            crate::pricer::ModelKey::Tree => Some(TreePricer::with_config(config.clone())),
+            crate::pricer::ModelKey::RatesCredit => Some(TreePricer::rates_credit(config.clone())),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let prepared = match tree_pricer {
+        Some(pricer) => {
+            trial_template.validate_model_contract(model, context.curves.as_ref())?;
+            Some(pricer.prepare(
+                &trial_template,
                 context.curves.as_ref(),
                 quote_context.quote_date,
-            )
+            )?)
+        }
+        None => None,
+    };
+
+    let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
+    let objective = |oas_bp: f64| -> f64 {
+        let priced = if let Some(prepared) = prepared.as_ref() {
+            prepared.price(oas_bp).map(|outcome| outcome.amount)
         } else {
-            trial.price_for_model_raw(model, context.curves.as_ref(), quote_context.quote_date)
+            let mut trial = trial_template.clone();
+            trial.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
+            if context.pricing_model().is_some() {
+                context.reprice_instrument_raw(
+                    &trial,
+                    context.curves.as_ref(),
+                    quote_context.quote_date,
+                )
+            } else {
+                trial.price_for_model_raw(model, context.curves.as_ref(), quote_context.quote_date)
+            }
         };
         match priced {
             Ok(value) => value - dirty_target_at_quote,

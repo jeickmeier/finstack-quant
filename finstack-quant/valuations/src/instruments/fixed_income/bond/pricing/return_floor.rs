@@ -13,6 +13,7 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 
 use crate::cashflow::primitives::CFKind;
+use crate::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use crate::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec,
 };
@@ -133,13 +134,49 @@ pub(crate) fn realized_distributions(
     Ok(points)
 }
 
+/// Protection window clipped to the bond's life: from the day after issue to
+/// the day before maturity (the floor binds only on early redemption).
+///
+/// # Arguments
+///
+/// * `window` - Contractual protection window.
+/// * `issue` - Bond issue date.
+/// * `maturity` - Bond contractual maturity date.
+///
+/// Returns `(start, end)`; the window is empty when `start > end`.
+pub(crate) fn protection_window_bounds(
+    window: ProtectionWindow,
+    issue: Date,
+    maturity: Date,
+) -> finstack_quant_core::Result<(Date, Date)> {
+    let first_life_date = issue.next_day().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "return-floor issue date has no representable following day".to_string(),
+        )
+    })?;
+    let last_life_date = maturity.previous_day().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "return-floor maturity has no representable preceding day".to_string(),
+        )
+    })?;
+    Ok(match window {
+        ProtectionWindow::Full => (first_life_date, last_life_date),
+        ProtectionWindow::From(start) => (start.max(first_life_date), last_life_date),
+        ProtectionWindow::Between { start, end } => {
+            (start.max(first_life_date), end.min(last_life_date))
+        }
+    })
+}
+
 // ── Return-floor lowering ─────────────────────────────────────────────────────
 
 /// Lower a [`ReturnFloorSpec`] into a [`CallPutSchedule`].
 ///
-/// For each calendar date that falls inside the protection window and on or after
-/// `as_of`, the minimum redemption price is computed so the investor meets the
-/// target MOIC or XIRR (anchored at the bond's issue date and issue price).
+/// For each exercise candidate inside the protection window and on or after
+/// `as_of` (the window ends, contractual call window ends and every schedule
+/// date; see [`BondValuator::exercise_candidates`]), the minimum redemption
+/// price is computed so the investor meets the target MOIC or XIRR (anchored
+/// at the bond's issue date and issue price).
 /// Any contractual call already on the bond is merged at shared dates (max
 /// price). The resulting price is floored at par (100).
 ///
@@ -229,109 +266,93 @@ pub(crate) fn lower_return_floor(
         .max(0.0)
     };
 
-    let first_life_date = issue.next_day().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(
-            "return-floor issue date has no representable following day".to_string(),
-        )
-    })?;
-    let last_life_date = bond.maturity.previous_day().ok_or_else(|| {
-        finstack_quant_core::Error::Validation(
-            "return-floor maturity has no representable preceding day".to_string(),
-        )
-    })?;
-    let (window_start, window_end) = match spec.window {
-        ProtectionWindow::Full => (first_life_date, last_life_date),
-        ProtectionWindow::From(start) => (start.max(first_life_date), last_life_date),
-        ProtectionWindow::Between { start, end } => {
-            (start.max(first_life_date), end.min(last_life_date))
-        }
-    };
+    let (window_start, window_end) = protection_window_bounds(spec.window, issue, bond.maturity)?;
     let candidate_start = window_start.max(as_of);
-    let mut floor_by_date = BTreeMap::<Date, f64>::new();
-    if candidate_start <= window_end {
-        let mut cash_through = distributions
-            .range(..candidate_start)
-            .map(|(_, amount)| *amount)
-            .sum::<f64>();
-        let mut pv_distributions = match target {
-            Target::Moic(_) => 0.0,
-            Target::Xirr(rate) => distributions
-                .range(..candidate_start)
-                .map(|(date, amount)| {
-                    day_count
-                        .year_fraction(issue, *date, DayCountContext::default())
-                        .map(|yf| *amount / (1.0 + rate).powf(yf))
-                })
-                .collect::<finstack_quant_core::Result<Vec<_>>>()?
-                .into_iter()
-                .sum(),
-        };
+    // Exercise candidates: the protection and contractual call windows' ends
+    // plus every schedule date (distributions and balance changes). Between
+    // two such dates the required dirty proceeds are constant (MOIC) or grow
+    // with time (XIRR) and the clean floor falls with accrued, so the issuer's
+    // cheapest exercise within each interval is at its start.
+    let mut event_dates = BondValuator::exercise_event_dates(&schedule);
+    event_dates.extend([candidate_start, window_end]);
+    let contractual_calls: Vec<&CallPut> = bond
+        .call_put
+        .as_ref()
+        .map(|call_put| call_put.calls.iter().collect())
+        .unwrap_or_default();
+    for call in &contractual_calls {
+        event_dates.extend([call.start_date.max(as_of), call.end_date.min(bond.maturity)]);
+    }
+    event_dates.sort_unstable();
+    event_dates.dedup();
 
-        let mut date = candidate_start;
-        loop {
-            let distribution = distributions.get(&date).copied().unwrap_or(0.0);
-            cash_through += distribution;
-            let yf = day_count.year_fraction(issue, date, DayCountContext::default())?;
+    let mut floor_by_date = BTreeMap::<Date, f64>::new();
+    let mut cash_through = 0.0;
+    let mut pv_distributions = 0.0;
+    let mut counted_through: Option<Date> = None;
+    for date in BondValuator::exercise_candidates(candidate_start, window_end, &event_dates) {
+        let pending = match counted_through {
+            None => distributions.range(..=date),
+            Some(previous) => distributions.range((
+                std::ops::Bound::Excluded(previous),
+                std::ops::Bound::Included(date),
+            )),
+        };
+        for (distribution_date, amount) in pending {
+            cash_through += amount;
             if let Target::Xirr(rate) = target {
-                pv_distributions += distribution / (1.0 + rate).powf(yf);
+                let yf = day_count.year_fraction(
+                    issue,
+                    *distribution_date,
+                    DayCountContext::default(),
+                )?;
+                pv_distributions += amount / (1.0 + rate).powf(yf);
             }
-            let outstanding = outstanding_on(date);
-            if outstanding > 0.0 {
-                let dirty_required = match target {
-                    Target::Moic(multiple) => multiple * v0 - cash_through,
-                    Target::Xirr(rate) => (v0 - pv_distributions) * (1.0 + rate).powf(yf),
-                };
-                // Call schedule percentages are clean redemption amounts.
-                // BondValuator adds accrued interest to the exercise barrier,
-                // so subtract it here to avoid paying accrued twice relative
-                // to the total-return target.
-                let accrued = accrual_index.accrued_at(date)?;
-                let clean_required = dirty_required - accrued;
-                floor_by_date.insert(date, (100.0 * clean_required / outstanding).max(100.0));
-            }
-            if date == window_end {
-                break;
-            }
-            date = date.next_day().ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "return-floor protection window exceeds the supported date range".to_string(),
-                )
-            })?;
+        }
+        counted_through = Some(date);
+        let outstanding = outstanding_on(date);
+        if outstanding > 0.0 {
+            let dirty_required = match target {
+                Target::Moic(multiple) => multiple * v0 - cash_through,
+                Target::Xirr(rate) => {
+                    let yf = day_count.year_fraction(issue, date, DayCountContext::default())?;
+                    (v0 - pv_distributions) * (1.0 + rate).powf(yf)
+                }
+            };
+            // Call schedule percentages are clean redemption amounts.
+            // BondValuator adds accrued interest to the exercise barrier,
+            // so subtract it here to avoid paying accrued twice relative
+            // to the total-return target.
+            let accrued = accrual_index.accrued_at(date)?;
+            let clean_required = dirty_required - accrued;
+            floor_by_date.insert(date, (100.0 * clean_required / outstanding).max(100.0));
         }
     }
 
-    // Expand contractual call windows once so each protected date can carry
-    // both the return floor and the original make-whole terms. Multiple active
-    // issuer rights remain separate; the exercise engine selects the cheapest
-    // effective call after applying the common floor to every right.
+    // Each contractual call candidate carries both the return floor and the
+    // original make-whole terms. Multiple active issuer rights remain
+    // separate; the exercise engine selects the cheapest effective call after
+    // applying the common floor to every right.
     let mut calls = Vec::<CallPut>::new();
     let mut contractual_dates = BTreeSet::<Date>::new();
-    if let Some(call_put) = &bond.call_put {
-        for call in &call_put.calls {
-            let mut date = call.start_date.max(as_of);
-            let end = call.end_date.min(bond.maturity);
-            while date <= end {
-                contractual_dates.insert(date);
-                calls.push(CallPut {
-                    start_date: date,
-                    end_date: date,
-                    price_pct_of_par: floor_by_date
-                        .get(&date)
-                        .copied()
-                        .map_or(call.price_pct_of_par, |floor| {
-                            floor.max(call.price_pct_of_par)
-                        }),
-                    make_whole: call.make_whole.clone(),
-                });
-                if date == end {
-                    break;
-                }
-                date = date.next_day().ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "contractual call window exceeds the supported date range".to_string(),
-                    )
-                })?;
-            }
+    for call in contractual_calls {
+        for date in BondValuator::exercise_candidates(
+            call.start_date.max(as_of),
+            call.end_date.min(bond.maturity),
+            &event_dates,
+        ) {
+            contractual_dates.insert(date);
+            calls.push(CallPut {
+                start_date: date,
+                end_date: date,
+                price_pct_of_par: floor_by_date
+                    .get(&date)
+                    .copied()
+                    .map_or(call.price_pct_of_par, |floor| {
+                        floor.max(call.price_pct_of_par)
+                    }),
+                make_whole: call.make_whole.clone(),
+            });
         }
     }
     for (date, floor_pct) in floor_by_date {
@@ -616,12 +637,13 @@ mod tests {
     fn floor_is_exercisable_between_coupon_dates() {
         let bond = fixed_10pct_bullet();
         let curves = MarketContext::new();
+        // Valued between coupons: the first exercise candidate is `as_of`.
         let between_coupon_date = date!(2024 - 03 - 20);
         let schedule = lower_return_floor(
             &bond,
             &ReturnFloorSpec::moic(1.25),
             &curves,
-            date!(2024 - 01 - 15),
+            between_coupon_date,
         )
         .unwrap();
 
@@ -629,7 +651,7 @@ mod tests {
             .calls
             .iter()
             .find(|call| call.start_date == between_coupon_date)
-            .expect("full protection window must include every calendar date");
+            .expect("the protection window starts at as_of");
         assert_eq!(call.end_date, between_coupon_date);
         let full_schedule = bond.full_cashflow_schedule(&curves).unwrap();
         let accrued =
@@ -649,7 +671,8 @@ mod tests {
     fn between_coupon_xirr_floor_adds_accrued_exactly_once() {
         let bond = fixed_10pct_bullet();
         let curves = MarketContext::new();
-        let exercise_date = date!(2024 - 03 - 20);
+        // A month-end exercise candidate between the Jan/Jul coupons.
+        let exercise_date = date!(2024 - 03 - 31);
         let target = 0.12;
         let schedule = lower_return_floor(
             &bond,

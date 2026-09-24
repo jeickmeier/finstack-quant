@@ -460,70 +460,44 @@ pub(super) fn has_exercise_claim_on_date(bond: &Bond, date: Date) -> Result<bool
         return Ok(false);
     };
     Ok(
-        return_floor_dates(floor.window, bond.issue_date, bond.maturity, date)?
+        return_floor_dates(floor.window, bond.issue_date, bond.maturity, date, &[])?
             .first()
             .is_some_and(|claim_date| *claim_date == date),
     )
 }
 
-pub(super) fn exercise_dates(option: &CallPut, as_of: Date, maturity: Date) -> Vec<Date> {
-    let first = option.start_date.max(as_of);
-    let last = option.end_date.min(maturity);
-    if first > last {
-        return Vec::new();
-    }
-    let mut result = Vec::with_capacity((last - first).whole_days().max(0) as usize + 1);
-    let mut date = first;
-    loop {
-        result.push(date);
-        if date == last {
-            break;
-        }
-        let Some(next) = date.next_day() else {
-            break;
-        };
-        date = next;
-    }
-    result
+pub(super) fn exercise_dates(
+    option: &CallPut,
+    as_of: Date,
+    maturity: Date,
+    event_dates: &[Date],
+) -> Vec<Date> {
+    BondValuator::exercise_candidates(
+        option.start_date.max(as_of),
+        option.end_date.min(maturity),
+        event_dates,
+    )
 }
 
+/// Return-floor exercise candidates: the protection window (clipped to the
+/// bond's life after issue and before maturity, and to `as_of`) ends plus the
+/// interior `event_dates` (distribution and balance dates).
 pub(super) fn return_floor_dates(
     window: ProtectionWindow,
     issue_date: Date,
     maturity: Date,
     as_of: Date,
+    event_dates: &[Date],
 ) -> Result<Vec<Date>> {
-    let first_life_date = issue_date.next_day().ok_or_else(|| {
-        Error::Validation("return-floor issue date has no following day".to_string())
-    })?;
-    let last_life_date = maturity.previous_day().ok_or_else(|| {
-        Error::Validation("return-floor maturity has no preceding day".to_string())
-    })?;
-    let (window_start, window_end) = match window {
-        ProtectionWindow::Full => (first_life_date, last_life_date),
-        ProtectionWindow::From(start) => (start.max(first_life_date), last_life_date),
-        ProtectionWindow::Between { start, end } => {
-            (start.max(first_life_date), end.min(last_life_date))
-        }
-    };
-    let first = window_start.max(as_of);
-    if first > window_end {
-        return Ok(Vec::new());
-    }
-    let mut dates = Vec::with_capacity((window_end - first).whole_days().max(0) as usize + 1);
-    let mut date = first;
-    loop {
-        dates.push(date);
-        if date == window_end {
-            break;
-        }
-        date = date.next_day().ok_or_else(|| {
-            Error::Validation(
-                "return-floor protection window exceeds the supported date range".to_string(),
-            )
-        })?;
-    }
-    Ok(dates)
+    let (window_start, window_end) =
+        crate::instruments::fixed_income::bond::pricing::return_floor::protection_window_bounds(
+            window, issue_date, maturity,
+        )?;
+    Ok(BondValuator::exercise_candidates(
+        window_start.max(as_of),
+        window_end,
+        event_dates,
+    ))
 }
 
 pub(super) fn nearest_step(times: &[f64], time: f64) -> usize {

@@ -112,8 +112,10 @@ impl MetricCalculator for XirrToWorstCalculator {
         let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
         let flows = lifetime_dated_cashflows(&eff, &ctx.curves)?;
         let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
-        let accrual_index =
-            crate::cashflow::accrual::AccrualIndex::build(&schedule, &eff.accrual_config())?;
+        let basis = crate::instruments::fixed_income::bond::pricing::quote_conversions::RedemptionBasis::new(
+            &schedule,
+            &eff.accrual_config(),
+        )?;
 
         let candidates = crate::instruments::fixed_income::bond::pricing::quote_conversions::enumerate_exit_paths(
             &eff, &flows, ctx.as_of,
@@ -142,8 +144,7 @@ impl MetricCalculator for XirrToWorstCalculator {
                 &eff,
                 &ctx.curves,
                 &flows,
-                &schedule,
-                &accrual_index,
+                &basis,
                 &cand,
             )?;
             path.push((cand.date, redemption));

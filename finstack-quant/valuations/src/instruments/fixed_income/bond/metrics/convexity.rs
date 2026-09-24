@@ -61,6 +61,8 @@ impl MetricCalculator for ConvexityCalculator {
         if has_options && super::bond_risk_basis(context) == BondRiskBasis::CallableOas {
             return Ok(super::effective::effective_convexity(bond, context, None)? / 100.0);
         }
+        let workout = super::context_workout_path(context)?;
+        let bond: &Bond = context.instrument_as()?;
 
         let ytm = context
             .computed
@@ -86,9 +88,7 @@ impl MetricCalculator for ConvexityCalculator {
         // Compute quote-date context (settlement date) for yield-based convexity
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
         let (yield_rate, risk_flows, quote_date) =
-            if let Some((workout_yield, workout_flows, workout_quote_date)) =
-                super::quoted_workout_path(bond, context.curves.as_ref(), context.as_of, flows)?
-            {
+            if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
                 (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
             } else {
                 (ytm, Cow::Borrowed(flows.as_slice()), quote_ctx.quote_date)

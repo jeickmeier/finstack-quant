@@ -302,10 +302,11 @@ fn antithetic_budget_counts_independent_estimators() {
 fn default_daily_training_budget_is_time_blocked_without_path_truncation() {
     let template = synthetic_daily_template(3_650, true);
     let physical_paths = simulated_path_count(DEFAULT_BOND_LSMC_PATHS, true).expect("count");
-    let block_len = training_block_len(&template, physical_paths, 3_650)
-        .expect("ten-year daily training plan must fit its memory bound");
-    let boundaries = training_boundaries(&template, physical_paths).expect("boundaries");
-    assert!(block_len > 0 && block_len < 3_650);
+    // ⌈√3650⌉ = 61 decisions per block.
+    let block_len = training_block_len(3_650);
+    let boundaries = training_boundaries(&template).expect("boundaries");
+    assert_eq!(block_len, 61);
+    assert_eq!(boundaries.len(), 3_650_usize.div_ceil(61) + 1);
     assert_eq!(boundaries.first(), Some(&0));
     assert_eq!(boundaries.last(), Some(&3_650));
     assert_eq!(physical_paths, 40_000);
@@ -346,14 +347,11 @@ fn stochastic_option_ordering_is_reproducible_with_exact_stage_counts() {
         oas_bp: 17.0,
         target_ci_half_width: None,
     };
-    let bullet_result =
-        price_bond_lsmc(&tree, &bullet, &market, as_of, &config, None).expect("bullet");
-    let call_result =
-        price_bond_lsmc(&tree, &callable, &market, as_of, &config, None).expect("callable");
-    let repeated_call = price_bond_lsmc(&tree, &callable, &market, as_of, &config, None)
-        .expect("repeated callable");
-    let put_result =
-        price_bond_lsmc(&tree, &puttable, &market, as_of, &config, None).expect("puttable");
+    let bullet_result = price_bond_lsmc(&tree, &bullet, &market, as_of, &config).expect("bullet");
+    let call_result = price_bond_lsmc(&tree, &callable, &market, as_of, &config).expect("callable");
+    let repeated_call =
+        price_bond_lsmc(&tree, &callable, &market, as_of, &config).expect("repeated callable");
+    let put_result = price_bond_lsmc(&tree, &puttable, &market, as_of, &config).expect("puttable");
     let bullet_value = bullet_result.estimate.mean.amount();
     let call_value = call_result.estimate.mean.amount();
     let put_value = put_result.estimate.mean.amount();
@@ -397,7 +395,7 @@ fn issue_date_initial_exchange_does_not_double_replay_outstanding() {
     tree.sample_path_into(1, 0, false, &mut path)
         .expect("factor path");
     let replay = template
-        .replay(&tree, &bond, &path, &config, None, None)
+        .replay(&bond, &path, &config, None, &mut ReplayBuffers::default())
         .expect("product replay");
     assert_eq!(replay.snapshots[0].features[2], 100.0);
 }
@@ -556,12 +554,12 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
         }],
         puts: Vec::new(),
     });
-    let bullet_value = price_bond_lsmc(&tree, &bullet, &market, as_of, &config, None)
+    let bullet_value = price_bond_lsmc(&tree, &bullet, &market, as_of, &config)
         .expect("term PIK bullet")
         .estimate
         .mean
         .amount();
-    let call_value = price_bond_lsmc(&tree, &callable, &market, as_of, &config, None)
+    let call_value = price_bond_lsmc(&tree, &callable, &market, as_of, &config)
         .expect("callable term PIK bond")
         .estimate
         .mean
@@ -599,10 +597,22 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
     tree.sample_path_into(41, 0, false, &mut sampled)
         .expect("factor path");
     let capped_path = capped_template
-        .replay(&tree, &capped, &sampled, &config, None, None)
+        .replay(
+            &capped,
+            &sampled,
+            &config,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("capped overnight replay");
     let uncapped_path = uncapped_template
-        .replay(&tree, &uncapped, &sampled, &config, None, None)
+        .replay(
+            &uncapped,
+            &sampled,
+            &config,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("uncapped overnight replay");
     assert!(
         capped_path
@@ -632,7 +642,13 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
     let callable_template =
         ReplayTemplate::new(&tree, &callable, &market, as_of).expect("callable template");
     let callable_path = callable_template
-        .replay(&tree, &callable, &sampled, &config, None, None)
+        .replay(
+            &callable,
+            &sampled,
+            &config,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("callable overnight replay");
     let exercise_step =
         exact_grid_step(tree.time_grid().expect("times"), as_of, exercise).expect("exercise step");
@@ -645,12 +661,12 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
         exercise_snapshot.features[5] > 0.0,
         "overnight PIK must carry partial daily accrual into the exercise state"
     );
-    let capped_value = price_bond_lsmc(&tree, &capped, &market, as_of, &config, None)
+    let capped_value = price_bond_lsmc(&tree, &capped, &market, as_of, &config)
         .expect("overnight PIK bullet")
         .estimate
         .mean
         .amount();
-    let call_value = price_bond_lsmc(&tree, &callable, &market, as_of, &config, None)
+    let call_value = price_bond_lsmc(&tree, &callable, &market, as_of, &config)
         .expect("callable overnight PIK")
         .estimate
         .mean
@@ -675,7 +691,7 @@ fn fixed_budget_rejects_unmet_final_confidence_target() {
         oas_bp: 0.0,
         target_ci_half_width: Some(f64::MIN_POSITIVE),
     };
-    let error = price_bond_lsmc(&tree, &bond, &market, as_of, &config, None)
+    let error = price_bond_lsmc(&tree, &bond, &market, as_of, &config)
         .expect_err("a finite stochastic sample cannot satisfy a near-zero CI target");
     assert!(
         error.to_string().contains("exhausted its fixed budget"),
@@ -742,8 +758,8 @@ fn stochastic_maturity_make_whole_uses_contractual_floor_without_training_target
         oas_bp: 0.0,
         target_ci_half_width: None,
     };
-    let result = price_bond_lsmc(&tree, &bond, &market, as_of, &config, None)
-        .expect("maturity make-whole price");
+    let result =
+        price_bond_lsmc(&tree, &bond, &market, as_of, &config).expect("maturity make-whole price");
     assert!(result.estimate.mean.amount().is_finite());
     assert_eq!(result.make_whole_training_paths, 0);
 }
@@ -780,7 +796,7 @@ fn rolled_maturity_make_whole_retains_later_reference_cash() {
         oas_bp: 0.0,
         target_ci_half_width: None,
     };
-    let result = price_bond_lsmc(&tree, &bond, &market, as_of, &config, None)
+    let result = price_bond_lsmc(&tree, &bond, &market, as_of, &config)
         .expect("rolled-maturity make-whole price");
     assert!(result.estimate.mean.amount().is_finite());
     assert_eq!(result.make_whole_training_paths, 16);
@@ -814,7 +830,7 @@ fn option_bearing_custom_cashflows_are_rejected_before_replay() {
         oas_bp: 0.0,
         target_ci_half_width: None,
     };
-    let error = price_bond_lsmc(&tree, &bond, &market, as_of, &config, None)
+    let error = price_bond_lsmc(&tree, &bond, &market, as_of, &config)
         .expect_err("custom optional schedule must be rejected");
     assert!(
         error.to_string().contains("custom cashflows"),
@@ -863,7 +879,13 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
     tree.sample_path_into(seed, 0, false, &mut full_path)
         .expect("full factor path");
     let full = template
-        .replay(&tree, &bond, &full_path, &config, None, None)
+        .replay(
+            &bond,
+            &full_path,
+            &config,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("full product replay");
 
     let initial_cursor = ReplayCursor::new(&template).expect("initial cursor");
@@ -894,7 +916,6 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
             0,
             1,
             None,
-            None,
             &mut segment,
         )
         .expect("low block");
@@ -909,7 +930,6 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
             &checkpoint_two,
             1,
             2,
-            None,
             None,
             &mut segment,
         )

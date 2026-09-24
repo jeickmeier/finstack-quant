@@ -117,28 +117,48 @@ fn test_bond_valuator_creation() {
     assert!(valuator.cashflow_vec.iter().any(|&c| c > 0.0));
     assert!(market_context.get_discount("USD-OIS").is_ok());
 }
-#[test]
-fn test_oas_calculator_plain_bond() {
-    let bond = create_test_bond();
-    let market_context = create_test_market_context();
+/// Price `bond` on its own tree configuration at `oas_bp`, quote the result
+/// as a clean price, and solve it back through the production OAS metric.
+fn oas_metric_round_trip_bp(bond: &Bond, oas_bp: f64) -> f64 {
+    use crate::instruments::common_impl::traits::Instrument;
+    use crate::metrics::MetricId;
+
+    let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let calculator = TreePricer::new();
-    let oas = calculator.calculate_oas(&bond, &market_context, as_of, 98.5);
-    assert!(oas.is_ok());
-    let oas_bp = oas.expect("OAS calculation should succeed in test");
-    assert!(oas_bp > 0.0);
-    assert!(oas_bp < 5000.0);
+    let quote = crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext::new(
+        bond, &market, as_of,
+    )
+    .expect("quote context");
+    let pricer = TreePricer::with_config(super::bond_tree_config(bond).expect("tree config"));
+    let dirty = pricer
+        .price_at_oas(bond, &market, quote.quote_date, oas_bp)
+        .expect("price at OAS");
+    let clean_pct = (dirty - quote.accrued_at_quote_date) / bond.notional.amount() * 100.0;
+    let mut quoted = bond.clone();
+    quoted
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(clean_pct);
+    let result = quoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Oas],
+            crate::instruments::PricingOptions::default().with_model(crate::pricer::ModelKey::Tree),
+        )
+        .expect("OAS metric");
+    result.measures["oas"] * 10_000.0
 }
 #[test]
-fn test_oas_calculator_callable_bond() {
-    let bond = create_callable_bond();
-    let market_context = create_test_market_context();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let calculator = TreePricer::new();
-    let oas = calculator.calculate_oas(&bond, &market_context, as_of, 98.5);
-    assert!(oas.is_ok());
-    let oas_bp = oas.expect("OAS calculation should succeed in test");
-    assert!(oas_bp > 0.0);
+fn oas_metric_round_trips_a_tree_price_for_plain_and_callable_bonds() {
+    for bond in [create_test_bond(), create_callable_bond()] {
+        let implied = oas_metric_round_trip_bp(&bond, 150.0);
+        assert!(
+            (implied - 150.0).abs() < 1.0e-4,
+            "{}: OAS metric must recover 150bp, got {implied}",
+            bond.id.as_str()
+        );
+    }
 }
 #[test]
 fn test_bond_valuator_with_calls() {
@@ -152,10 +172,11 @@ fn test_bond_valuator_with_calls() {
 }
 
 #[test]
-fn test_bond_valuator_maps_call_window_to_calendar_steps() {
-    // A call window is exercisable on every calendar date in [start, end]. On
-    // this coarser uniform grid, adjacent dates coalesce onto tree steps, but
-    // the result must still contain more than the old endpoint/coupon-only set.
+fn test_bond_valuator_maps_call_window_to_exercise_candidates() {
+    // A call window is exercisable at its ends, the coupon dates inside it and
+    // month-ends. Month-ends are closer together than this 0.1-year uniform
+    // grid, so each of the 11 steps spanning 2027-01-01..2028-01-01 carries a
+    // call.
     let bond = create_test_bond();
     let mut json = serde_json::to_value(&bond).expect("Bond serialization should succeed");
     json.as_object_mut()
@@ -179,9 +200,9 @@ fn test_bond_valuator_maps_call_window_to_calendar_steps() {
         .expect("BondValuator creation should succeed in test");
 
     let call_steps = valuator.call_vec.iter().filter(|c| c.is_some()).count();
-    assert!(
-        call_steps > 3,
-        "daily call window should map to more than endpoint/coupon-only steps, got {call_steps}"
+    assert_eq!(
+        call_steps, 11,
+        "every step inside the window should carry a call"
     );
 }
 
@@ -447,4 +468,33 @@ fn test_accrued_interest_via_quote_context() {
         ctx_mid.accrued_at_quote_date > 0.0,
         "Accrued mid-period should be positive"
     );
+}
+#[test]
+fn bdt_tree_accepts_more_than_one_thousand_steps() {
+    // The BDT step-alignment search used `clamp(tree_steps, 1000)`, which
+    // panics (min > max) once tree_steps exceeds 1000.
+    let mut bond = create_test_bond();
+    bond.call_put = Some(CallPutSchedule {
+        calls: vec![CallPut {
+            start_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+            end_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        }],
+        puts: Vec::new(),
+    });
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.20);
+    bond.instrument_pricing_overrides.model_config.vol_model =
+        Some(crate::instruments::common_impl::parameters::VolatilityModel::Black);
+    let mut config = super::bond_tree_config(&bond).expect("config");
+    config.tree_steps = 1200;
+    let market = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let price = TreePricer::with_config(config)
+        .price_at_oas(&bond, &market, as_of, 0.0)
+        .expect("1,200-step BDT price");
+    assert!(price.is_finite() && price > 0.0);
 }

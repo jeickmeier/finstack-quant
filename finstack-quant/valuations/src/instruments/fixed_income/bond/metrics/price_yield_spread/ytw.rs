@@ -44,6 +44,11 @@ pub(crate) struct YtwCalculator;
 
 impl MetricCalculator for YtwCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        // Bonds with exercise rights and a quoted price share the workout path
+        // cached for the other workout metrics.
+        if let Some((ytw, _, _)) = super::super::context_workout_path(context)? {
+            return Ok(ytw);
+        }
         let bond: &Bond = context.instrument_as()?;
 
         // Compute quote-date context (settlement date and accrued at settlement)

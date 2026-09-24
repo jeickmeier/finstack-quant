@@ -33,6 +33,7 @@ impl MetricCalculator for MacaulayDurationCalculator {
     }
 
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let workout = super::context_workout_path(context)?;
         let ytm = context
             .computed
             .get(&MetricId::Ytm)
@@ -55,9 +56,7 @@ impl MetricCalculator for MacaulayDurationCalculator {
         // Compute quote-date context (settlement date) for yield-based duration
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
         let (yield_rate, risk_flows, quote_date) =
-            if let Some((workout_yield, workout_flows, workout_quote_date)) =
-                super::quoted_workout_path(bond, context.curves.as_ref(), context.as_of, flows)?
-            {
+            if let Some((workout_yield, workout_flows, workout_quote_date)) = workout {
                 (workout_yield, Cow::Owned(workout_flows), workout_quote_date)
             } else {
                 (ytm, Cow::Borrowed(flows.as_slice()), quote_ctx.quote_date)

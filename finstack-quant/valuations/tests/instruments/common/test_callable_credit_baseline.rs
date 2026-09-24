@@ -155,7 +155,13 @@ fn apply_baseline_regime(
 /// The callable stochastic bond now uses the pathwise LSMC exercise engine.
 /// The pinned value uses the deterministic instrument-derived seed and the
 /// test-only 128-estimator budget set by [`apply_baseline_regime`].
-const BASELINE_BOND_PV: f64 = 986_735.637_112_065;
+///
+/// Re-blessed for the exercise-candidate grid (W3.1): the call window is now
+/// exercisable at its ends, schedule dates and month-ends instead of every
+/// calendar day. The PV moved from 986_735.637_112_065 by -19.79 on 1MM face
+/// (-0.002 per 100), inside the 0.01-per-100 gate pinned by
+/// tests/instruments/bond/exercise_grid.rs.
+const BASELINE_BOND_PV: f64 = 986_715.843_219_591;
 /// Settlement-date tree value of the callable credit-risky term loan under
 /// the same regime after dirty-call settlement and survival-on-continuation
 /// rollback. Accrued coupons remain payable through adjusted payment dates,

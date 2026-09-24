@@ -601,65 +601,90 @@ pub(crate) fn clean_price_from_japanese_simple_yield(
     Ok(clean_pct)
 }
 
-/// Compute outstanding principal at a given date from the cashflow schedule.
-///
-/// This is used by YTW and other return calculations to determine the
-/// redemption amount for callable/putable bonds after every seasoned balance
-/// event, including amortization, PIK, later draws, and repayments.
-pub(crate) fn outstanding_principal_at_date(
-    schedule: &CashFlowSchedule,
-    target_date: Date,
-) -> finstack_quant_core::Result<f64> {
-    let path = schedule.outstanding_by_date()?;
-    let index = path.partition_point(|(date, _)| *date <= target_date);
-    Ok(if index == 0 {
-        schedule.get_notional().initial.amount()
-    } else {
-        path[index - 1].1.amount()
-    }
-    .max(0.0))
+/// Schedule-derived inputs to exercise redemption amounts: the replayed
+/// outstanding-balance path and the accrual index, built once per schedule
+/// and shared by every workout candidate.
+pub(crate) struct RedemptionBasis<'a> {
+    schedule: &'a CashFlowSchedule,
+    outstanding_by_date: Vec<(Date, Money)>,
+    accrual_index: AccrualIndex,
 }
 
-/// Resolve the principal struck by an exercise right and any contractual
-/// redemption that the exercise proceeds replace on the same date.
-///
-/// Scheduled amortization and PIK are applied before exercise. At contractual
-/// maturity, however, the positive `Notional` flow is the hold alternative,
-/// so the strike is quoted on the balance immediately before that redemption
-/// and the normal redemption must be removed from the candidate cashflow path.
-pub(crate) fn exercise_principal_and_replaced_redemption(
-    schedule: &CashFlowSchedule,
-    exercise_date: Date,
-    maturity: Date,
-) -> finstack_quant_core::Result<(f64, f64)> {
-    let after_events = outstanding_principal_at_date(schedule, exercise_date)?;
-    let (principal_redeemed, replaced_redemption) = if exercise_date == maturity {
-        schedule
-            .get_flows()
-            .iter()
-            .filter(|flow| {
-                flow.get_balance_date() == exercise_date
-                    && flow.kind == CFKind::Notional
-                    && flow.amount.amount() > 0.0
-            })
-            .fold((0.0, 0.0), |(principal, same_day_cash), flow| {
-                (
-                    principal + flow.amount.amount(),
-                    same_day_cash
-                        + if flow.date == exercise_date {
-                            flow.amount.amount()
-                        } else {
-                            0.0
-                        },
-                )
-            })
-    } else {
-        (0.0, 0.0)
-    };
-    Ok((
-        (after_events + principal_redeemed).max(0.0),
-        replaced_redemption,
-    ))
+impl<'a> RedemptionBasis<'a> {
+    /// Replay the balance path and index accruals of `schedule`.
+    ///
+    /// # Arguments
+    ///
+    /// * `schedule` - The bond's full cashflow schedule.
+    /// * `accrual_config` - The bond's accrual conventions (ex-coupon,
+    ///   accrual method) used for accrued interest at exercise dates.
+    pub(crate) fn new(
+        schedule: &'a CashFlowSchedule,
+        accrual_config: &crate::cashflow::accrual::AccrualConfig,
+    ) -> finstack_quant_core::Result<Self> {
+        Ok(Self {
+            schedule,
+            outstanding_by_date: schedule.outstanding_by_date()?,
+            accrual_index: AccrualIndex::build(schedule, accrual_config)?,
+        })
+    }
+
+    /// Outstanding principal after every balance event on or before `date`
+    /// (amortization, PIK, later draws and repayments).
+    fn outstanding_at(&self, date: Date) -> f64 {
+        let index = self
+            .outstanding_by_date
+            .partition_point(|(event_date, _)| *event_date <= date);
+        if index == 0 {
+            self.schedule.get_notional().initial.amount()
+        } else {
+            self.outstanding_by_date[index - 1].1.amount()
+        }
+        .max(0.0)
+    }
+
+    /// Resolve the principal struck by an exercise right and any contractual
+    /// redemption that the exercise proceeds replace on the same date.
+    ///
+    /// Scheduled amortization and PIK are applied before exercise. At
+    /// contractual maturity, however, the positive `Notional` flow is the hold
+    /// alternative, so the strike is quoted on the balance immediately before
+    /// that redemption and the normal redemption must be removed from the
+    /// candidate cashflow path.
+    pub(crate) fn exercise_principal_and_replaced_redemption(
+        &self,
+        exercise_date: Date,
+        maturity: Date,
+    ) -> (f64, f64) {
+        let after_events = self.outstanding_at(exercise_date);
+        let (principal_redeemed, replaced_redemption) = if exercise_date == maturity {
+            self.schedule
+                .get_flows()
+                .iter()
+                .filter(|flow| {
+                    flow.get_balance_date() == exercise_date
+                        && flow.kind == CFKind::Notional
+                        && flow.amount.amount() > 0.0
+                })
+                .fold((0.0, 0.0), |(principal, same_day_cash), flow| {
+                    (
+                        principal + flow.amount.amount(),
+                        same_day_cash
+                            + if flow.date == exercise_date {
+                                flow.amount.amount()
+                            } else {
+                                0.0
+                            },
+                    )
+                })
+        } else {
+            (0.0, 0.0)
+        };
+        (
+            (after_events + principal_redeemed).max(0.0),
+            replaced_redemption,
+        )
+    }
 }
 
 /// Resolve the dirty exercise-date cash amount for one workout candidate.
@@ -672,13 +697,12 @@ pub(crate) fn exercise_redemption_amount(
     bond: &Bond,
     curves: &MarketContext,
     flows: &[(Date, Money)],
-    schedule: &CashFlowSchedule,
-    accrual_index: &AccrualIndex,
+    basis: &RedemptionBasis<'_>,
     candidate: &ExitCandidate,
 ) -> finstack_quant_core::Result<f64> {
     let (outstanding, replaced_redemption) =
-        exercise_principal_and_replaced_redemption(schedule, candidate.date, bond.maturity)?;
-    let accrued = accrual_index.accrued_at(candidate.date)?;
+        basis.exercise_principal_and_replaced_redemption(candidate.date, bond.maturity);
+    let accrued = basis.accrual_index.accrued_at(candidate.date)?;
     let floor_price = outstanding * candidate.price_pct_of_par / 100.0;
     let clean_redemption = if let Some(spec) = &candidate.make_whole {
         let reference_curve = curves.get_discount(&spec.reference_curve_id)?;
@@ -825,7 +849,7 @@ fn workout_cashflow_paths(
         make_whole: None,
     });
 
-    let accrual_index = AccrualIndex::build(schedule, &bond.accrual_config())?;
+    let basis = RedemptionBasis::new(schedule, &bond.accrual_config())?;
     let mut paths = Vec::with_capacity(candidates.len());
     for candidate in candidates {
         let mut path: Vec<(Date, Money)> = path_flows
@@ -837,14 +861,7 @@ fn workout_cashflow_paths(
             })
             .collect();
         let redemption = if candidate.price_pct_of_par > 0.0 {
-            exercise_redemption_amount(
-                bond,
-                curves,
-                path_flows,
-                schedule,
-                &accrual_index,
-                &candidate,
-            )?
+            exercise_redemption_amount(bond, curves, path_flows, &basis, &candidate)?
         } else {
             0.0
         };
@@ -1252,22 +1269,15 @@ mod tests {
         let schedule = bond
             .full_cashflow_schedule(&market)
             .expect("cashflow schedule");
-        let accrual_index =
-            AccrualIndex::build(&schedule, &bond.accrual_config()).expect("accrual index");
+        let basis =
+            RedemptionBasis::new(&schedule, &bond.accrual_config()).expect("redemption basis");
         let candidate = enumerate_exit_paths(&bond, &flows, as_of)
             .into_iter()
             .find(|candidate| candidate.date == exercise_date)
             .expect("make-whole candidate");
 
-        let redemption = exercise_redemption_amount(
-            &bond,
-            &market,
-            &flows,
-            &schedule,
-            &accrual_index,
-            &candidate,
-        )
-        .expect("make-whole redemption");
+        let redemption = exercise_redemption_amount(&bond, &market, &flows, &basis, &candidate)
+            .expect("make-whole redemption");
         let remaining_reference_value: f64 = flows
             .iter()
             .filter(|(date, _)| *date > exercise_date)
@@ -1586,9 +1596,12 @@ mod tests {
             },
         );
 
-        let (principal, replaced) =
-            exercise_principal_and_replaced_redemption(&schedule, maturity, maturity)
-                .expect("terminal principal decomposition");
+        let (principal, replaced) = RedemptionBasis::new(
+            &schedule,
+            &crate::cashflow::accrual::AccrualConfig::default(),
+        )
+        .expect("redemption basis")
+        .exercise_principal_and_replaced_redemption(maturity, maturity);
         assert_eq!(principal, 100.0);
         assert_eq!(replaced, 100.0);
     }

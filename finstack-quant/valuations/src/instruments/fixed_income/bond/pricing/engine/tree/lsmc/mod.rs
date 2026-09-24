@@ -5,6 +5,7 @@
 //! accrued-interest, and cumulative-distribution state, then frozen before
 //! the pricing paths are sampled.
 
+use super::bond_valuator::BondValuator;
 use crate::cashflow::builder::calendar::resolve_calendar_strict;
 use crate::cashflow::builder::specs::{CouponType, FloatingCouponSpec, FloatingRateFallback};
 use crate::cashflow::builder::{
@@ -37,7 +38,6 @@ use finstack_quant_models::trees::two_factor_rates_credit::{
 use rust_decimal::prelude::ToPrimitive;
 use smallvec::SmallVec;
 use std::collections::{BTreeMap, BTreeSet};
-use std::mem::size_of;
 
 mod build;
 mod policy;
@@ -59,10 +59,6 @@ const TRAINING_DOMAIN: &str = "bond_hazard_lsmc_training";
 const MAKE_WHOLE_TRAINING_DOMAIN: &str = "bond_hazard_lsmc_make_whole_training";
 const PRICING_DOMAIN: &str = "bond_hazard_lsmc_pricing";
 const FEATURE_COUNT: usize = 8;
-const MAX_TRAINING_BYTES: usize = 1_073_741_824;
-const QUADRATIC_TERM_COUNT: usize =
-    1 + FEATURE_COUNT + FEATURE_COUNT + FEATURE_COUNT * (FEATURE_COUNT - 1) / 2;
-const REGRESSION_WORKSPACE_COPIES: usize = 4;
 
 /// Runtime controls for bond LSMC.
 #[derive(Debug, Clone, Copy)]
@@ -164,105 +160,15 @@ pub(crate) struct BondLsmcResult {
     pub(crate) antithetic: bool,
 }
 
-/// Path state supplied to state-dependent exercise-price callbacks.
-pub(crate) struct BondLsmcExerciseState<'a> {
-    /// Bond being valued.
-    pub(crate) bond: &'a Bond,
-    /// Contractual exercise date represented by this decision.
-    pub(crate) date: Date,
-    /// Rates-credit lattice step carrying the decision state.
-    pub(crate) step: usize,
-    /// Calibrated short rate at the sampled node, in annual decimal units.
-    pub(crate) short_rate: f64,
-    /// Effective sampled hazard rate, in annual decimal units.
-    pub(crate) hazard_rate: f64,
-    /// Principal outstanding after same-step capitalization and amortization.
-    pub(crate) outstanding: f64,
-    /// Total amount of coupons already fixed but not yet paid.
-    pub(crate) locked_coupon: f64,
-    /// Accrued cash-pay coupon amount at the exercise date.
-    pub(crate) accrued_cash: f64,
-    /// Accrued PIK coupon amount at the exercise date.
-    pub(crate) accrued_pik: f64,
-    /// Holder cash distributions accumulated through the exercise date.
-    pub(crate) cumulative_distribution_cash: f64,
-    /// Return-floor target-present-value accumulator through the exercise date.
-    pub(crate) cumulative_distribution_target_pv: f64,
-    /// Static contractual call amount, including accrued coupon, when active.
-    pub(crate) default_call: Option<f64>,
-    /// Static contractual put amount, including accrued coupon, when active.
-    pub(crate) default_put: Option<f64>,
-}
-
-impl BondLsmcExerciseState<'_> {
-    fn validate(&self) -> Result<()> {
-        let finite_state = [
-            self.short_rate,
-            self.hazard_rate,
-            self.outstanding,
-            self.locked_coupon,
-            self.accrued_cash,
-            self.accrued_pik,
-            self.cumulative_distribution_cash,
-            self.cumulative_distribution_target_pv,
-        ]
-        .into_iter()
-        .all(f64::is_finite);
-        if !finite_state || self.hazard_rate < 0.0 || self.outstanding < 0.0 {
-            return Err(Error::Validation(format!(
-                "Bond '{}' has invalid hazard LSMC exercise state at {} (step {})",
-                self.bond.id.as_str(),
-                self.date,
-                self.step
-            )));
-        }
-        validate_exercise_amount("default call", self.default_call)?;
-        validate_exercise_amount("default put", self.default_put)
-    }
-}
-
-/// Exercise barriers returned by a state-dependent provider.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct BondLsmcExerciseAmounts {
-    /// Issuer call amount or `None` when no call is active.
-    pub(crate) call: Option<f64>,
-    /// Holder put amount or `None` when no put is active.
-    pub(crate) put: Option<f64>,
-}
-
-/// Supplies state-dependent make-whole or return-floor exercise amounts.
-pub(crate) trait BondLsmcExerciseProvider: Send + Sync {
-    /// Return exercise amounts for one sampled decision state.
-    fn exercise_amounts(
-        &self,
-        state: &BondLsmcExerciseState<'_>,
-    ) -> Result<BondLsmcExerciseAmounts>;
-}
-
-impl<F> BondLsmcExerciseProvider for F
-where
-    F: for<'a> Fn(&BondLsmcExerciseState<'a>) -> Result<BondLsmcExerciseAmounts> + Send + Sync,
-{
-    fn exercise_amounts(
-        &self,
-        state: &BondLsmcExerciseState<'_>,
-    ) -> Result<BondLsmcExerciseAmounts> {
-        self(state)
-    }
-}
-
 /// Fit an exercise policy and value it on an independent factor-path stream.
 ///
-/// The `tree` must already be calibrated.  Ordinary fixed-price call and put
-/// schedules and return floors need no callback. The provider is an optional
-/// product hook for overriding an otherwise resolved exercise amount.
+/// The `tree` must already be calibrated.
 pub(crate) fn price_bond_lsmc(
     tree: &RatesCreditTree,
     bond: &Bond,
     market: &MarketContext,
     as_of: Date,
     config: &BondLsmcConfig,
-    exercise_provider: Option<&dyn BondLsmcExerciseProvider>,
 ) -> Result<BondLsmcResult> {
     config.validate()?;
     let has_embedded_options = bond.return_floor.is_some()
@@ -292,7 +198,6 @@ pub(crate) fn price_bond_lsmc(
 
     let pricing_estimators = config.paths;
     let pricing_simulated_paths = simulated_path_count(pricing_estimators, config.antithetic)?;
-    let mut sampled = Vec::new();
     let needs_training = template.exercise.iter().any(|entries| !entries.is_empty());
     let training_estimators = usize::from(needs_training) * config.paths;
     let training_simulated_paths = if needs_training {
@@ -322,7 +227,6 @@ pub(crate) fn price_bond_lsmc(
             &template,
             bond,
             config,
-            exercise_provider,
             train_seed,
             training_estimators,
             training_simulated_paths,
@@ -332,37 +236,49 @@ pub(crate) fn price_bond_lsmc(
         vec![None; template.decision_steps.len()]
     };
 
-    let mut stats = OnlineStats::new();
-    for path_index in 0..pricing_estimators {
-        tree.sample_path_into(pricing_seed, path_index as u64, false, &mut sampled)?;
+    // Pricing estimators are independent: each draws its own factor path
+    // stream. They run in parallel and are folded into the statistics in
+    // path order, so the estimate is bit-identical to a serial run.
+    let make_whole_policies = make_whole_policies.as_slice();
+    let policies = policies.as_slice();
+    let template = &template;
+    let price_estimator = |(sampled, buffers): &mut (Vec<RatesCreditPathState>, ReplayBuffers),
+                           path_index: usize|
+     -> Result<f64> {
+        tree.sample_path_into(pricing_seed, path_index as u64, false, sampled)?;
         let primary = value_with_policy(
-            &template.replay(
-                tree,
-                bond,
-                &sampled,
-                config,
-                exercise_provider,
-                Some(&make_whole_policies),
-            )?,
-            &policies,
+            &template.replay(bond, sampled, config, Some(make_whole_policies), buffers)?,
+            policies,
         )?;
-        if config.antithetic {
-            tree.sample_path_into(pricing_seed, path_index as u64, true, &mut sampled)?;
-            let antithetic = value_with_policy(
-                &template.replay(
-                    tree,
-                    bond,
-                    &sampled,
-                    config,
-                    exercise_provider,
-                    Some(&make_whole_policies),
-                )?,
-                &policies,
-            )?;
-            stats.update(0.5 * (primary + antithetic));
-        } else {
-            stats.update(primary);
+        if !config.antithetic {
+            return Ok(primary);
         }
+        tree.sample_path_into(pricing_seed, path_index as u64, true, sampled)?;
+        let antithetic = value_with_policy(
+            &template.replay(bond, sampled, config, Some(make_whole_policies), buffers)?,
+            policies,
+        )?;
+        Ok(0.5 * (primary + antithetic))
+    };
+    let init_buffers = || (Vec::new(), ReplayBuffers::default());
+    #[cfg(not(target_arch = "wasm32"))]
+    let estimators: Vec<Result<f64>> = {
+        use rayon::prelude::*;
+        (0..pricing_estimators)
+            .into_par_iter()
+            .map_init(init_buffers, price_estimator)
+            .collect()
+    };
+    #[cfg(target_arch = "wasm32")]
+    let estimators: Vec<Result<f64>> = {
+        let mut buffers = init_buffers();
+        (0..pricing_estimators)
+            .map(|path_index| price_estimator(&mut buffers, path_index))
+            .collect()
+    };
+    let mut stats = OnlineStats::new();
+    for estimator in estimators {
+        stats.update(estimator?);
     }
 
     if let Some(target) = config.target_ci_half_width {
@@ -405,167 +321,16 @@ fn simulated_path_count(estimators: usize, antithetic: bool) -> Result<usize> {
     }
 }
 
-fn training_block_len(
-    template: &ReplayTemplate,
-    simulated_paths: usize,
-    decision_count: usize,
-) -> Result<usize> {
-    let decision_count = decision_count.max(1);
-    let max_live = template
-        .decision_steps
-        .iter()
-        .map(|&step| {
-            template
-                .floating
-                .iter()
-                .filter(|coupon| {
-                    let live_from = match &coupon.rate_model {
-                        FloatingRateModel::Term(_) => {
-                            coupon.reset_step.min(coupon.accrual_start_step)
-                        }
-                        FloatingRateModel::Overnight(_) => coupon.accrual_start_step,
-                    };
-                    live_from < step && step <= coupon.payment_step
-                })
-                .count()
-        })
-        .max()
-        .unwrap_or(0);
-    let heap_live_slots = if max_live <= 1 {
-        0
-    } else {
-        max_live.checked_next_power_of_two().unwrap_or(usize::MAX)
-    };
-    let heap_live_bytes = heap_live_slots.saturating_mul(size_of::<LiveFloatingCheckpoint>());
-    let checkpoint_bytes = size_of::<TrainingCheckpoint>()
-        .saturating_add(heap_live_bytes)
-        .saturating_add(size_of::<usize>() * 2);
-    let snapshot_bytes = size_of::<DecisionSnapshot>();
-    let checkpoint_build_scratch = template
-        .times
-        .len()
-        .saturating_mul(size_of::<RatesCreditPathState>())
-        .saturating_add(
-            template
-                .floating
-                .len()
-                .saturating_mul(size_of::<FloatingRuntimeState>()),
-        );
-    let regression_workspace = simulated_paths
-        .saturating_mul(QUADRATIC_TERM_COUNT)
-        .saturating_mul(size_of::<f64>())
-        .saturating_mul(REGRESSION_WORKSPACE_COPIES);
-    let carried_make_whole = template
-        .make_whole_bases
-        .len()
-        .saturating_mul(simulated_paths)
-        .saturating_mul(size_of::<f64>())
-        .saturating_add(
-            template
-                .make_whole_bases
-                .len()
-                .saturating_mul(size_of::<Vec<f64>>()),
-        );
-    // Each fitted policy retains two heap vectors (terms and coefficients).
-    // The models-owned basis term is private, so three indices conservatively
-    // bound its per-term storage here.
-    let policy_bytes = size_of::<RegressionPolicy>().saturating_add(
-        QUADRATIC_TERM_COUNT
-            .saturating_mul(size_of::<f64>().saturating_add(size_of::<[usize; 3]>())),
-    );
-    let make_whole_policy_storage = template
-        .make_whole_claims
-        .len()
-        .saturating_mul(policy_bytes);
-    let exercise_policy_storage = decision_count.saturating_mul(policy_bytes);
-    let mut make_whole_claim_prefix = vec![0_usize; decision_count.saturating_add(1)];
-    for claim in &template.make_whole_claims {
-        if claim.decision_index < decision_count {
-            make_whole_claim_prefix[claim.decision_index + 1] =
-                make_whole_claim_prefix[claim.decision_index + 1].saturating_add(1);
-        }
-    }
-    for decision in 0..decision_count {
-        make_whole_claim_prefix[decision + 1] =
-            make_whole_claim_prefix[decision + 1].saturating_add(make_whole_claim_prefix[decision]);
-    }
-    let mut best = None;
-    for block_len in 1..=decision_count {
-        let boundary_count = decision_count.div_ceil(block_len).saturating_add(1);
-        let checkpoint_total = boundary_count
-            .saturating_mul(simulated_paths)
-            .saturating_mul(checkpoint_bytes)
-            .saturating_add(boundary_count.saturating_mul(size_of::<Vec<TrainingCheckpoint>>()));
-        let mut max_owned = 0_usize;
-        let mut max_claims = 0_usize;
-        let mut max_step_span = 0_usize;
-        let mut low = 0_usize;
-        while low < decision_count {
-            let high = (low + block_len).min(decision_count);
-            max_owned = max_owned.max(high - low);
-            max_claims = max_claims
-                .max(make_whole_claim_prefix[high].saturating_sub(make_whole_claim_prefix[low]));
-            max_step_span = max_step_span.max(
-                template.decision_steps[high]
-                    .saturating_sub(template.decision_steps[low])
-                    .saturating_add(template.max_rate_history_steps),
-            );
-            low = high;
-        }
-        let path_scratch = max_step_span
-            .saturating_add(1)
-            .saturating_mul(
-                size_of::<RatesCreditPathState>().saturating_add(size_of::<StepReplay>()),
-            )
-            .saturating_add(max_owned.saturating_add(1).saturating_mul(snapshot_bytes))
-            .saturating_add(
-                template
-                    .floating
-                    .len()
-                    .saturating_mul(size_of::<FloatingRuntimeState>()),
-            );
-        let exercise_workspace = simulated_paths
-            .saturating_mul(
-                max_owned
-                    .saturating_mul(snapshot_bytes)
-                    .saturating_add(size_of::<f64>() * 2)
-                    .saturating_add(size_of::<[f64; FEATURE_COUNT]>()),
-            )
-            .saturating_add(regression_workspace)
-            .saturating_add(exercise_policy_storage)
-            .saturating_add(path_scratch);
-        let make_whole_workspace =
-            carried_make_whole
-                .saturating_add(make_whole_policy_storage)
-                .saturating_add(max_claims.saturating_mul(simulated_paths).saturating_mul(
-                    size_of::<[f64; FEATURE_COUNT]>().saturating_add(size_of::<f64>()),
-                ))
-                .saturating_add(
-                    max_claims
-                        .saturating_mul(2)
-                        .saturating_mul(size_of::<Vec<f64>>()),
-                )
-                .saturating_add(max_owned.saturating_mul(size_of::<Vec<usize>>()))
-                .saturating_add(regression_workspace)
-                .saturating_add(path_scratch);
-        let total = checkpoint_total.saturating_add(
-            checkpoint_build_scratch.max(exercise_workspace.max(make_whole_workspace)),
-        );
-        if best.is_none_or(|(_, best_total)| total < best_total) {
-            best = Some((block_len, total));
-        }
-    }
-    let (block_len, estimated_bytes) =
-        best.ok_or_else(|| Error::internal("bond hazard LSMC could not size its training blocks"))?;
-    if estimated_bytes > MAX_TRAINING_BYTES {
-        return Err(Error::Validation(format!(
-            "bond hazard LSMC checkpoint and regression workspace requires an estimated {estimated_bytes} bytes for {simulated_paths} physical paths and {decision_count} decisions, above the fixed {MAX_TRAINING_BYTES}-byte training-memory bound; reduce mc_paths or exercise dates"
-        )));
-    }
-    Ok(block_len)
+/// Decisions per training block: `⌈√D⌉` for `D` decision transitions.
+///
+/// Training stores one factor/product checkpoint per path at each block
+/// boundary and replays paths within a block, so `√D` balances checkpoint
+/// storage (`D / block` boundaries) against replay length per block.
+fn training_block_len(decision_count: usize) -> usize {
+    ((decision_count.max(1) as f64).sqrt().ceil() as usize).max(1)
 }
 
-fn training_boundaries(template: &ReplayTemplate, simulated_paths: usize) -> Result<Vec<usize>> {
+fn training_boundaries(template: &ReplayTemplate) -> Result<Vec<usize>> {
     let transitions = template
         .decision_steps
         .len()
@@ -573,7 +338,7 @@ fn training_boundaries(template: &ReplayTemplate, simulated_paths: usize) -> Res
         .ok_or_else(|| {
             Error::internal("bond hazard LSMC requires at least one decision transition")
         })?;
-    let block_len = training_block_len(template, simulated_paths, transitions)?;
+    let block_len = training_block_len(transitions);
     let mut boundaries = Vec::with_capacity(transitions.div_ceil(block_len) + 1);
     boundaries.push(0);
     let mut decision = 0;

@@ -16,7 +16,7 @@
 //! where `shock` is the parallel rate bump in decimal (e.g., 0.0025 for 25 bp).
 
 use crate::instruments::Bond;
-use crate::metrics::MetricContext;
+use crate::metrics::{MetricContext, MetricId};
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::context::BumpSpec;
 use finstack_quant_core::types::CurveId;
@@ -120,13 +120,17 @@ pub(crate) fn option_risk_bond_and_base_price(
         return Ok((risk_bond, base));
     }
 
-    let oas_decimal =
-        super::price_yield_spread::oas::oas_decimal_from_quote_overrides(bond, context)?
+    // Reuse the OAS metric when it was computed in this request (as CS01
+    // does); otherwise solve it from the quote.
+    let oas_decimal = match context.computed.get(&MetricId::Oas).copied() {
+        Some(oas) => oas,
+        None => super::price_yield_spread::oas::oas_decimal_from_quote_overrides(bond, context)?
             .ok_or_else(|| {
                 finstack_quant_core::Error::internal(
                     "bond option risk found a price-driving quote but could not resolve its OAS",
                 )
-            })?;
+            })?,
+    };
 
     clear_price_driving_overrides(&mut risk_bond);
     risk_bond

@@ -68,7 +68,7 @@ pub(super) fn fit_make_whole_policies(
     if template.make_whole_claims.is_empty() {
         return Ok(Vec::new());
     }
-    let boundaries = training_boundaries(template, simulated_paths)?;
+    let boundaries = training_boundaries(template)?;
     let checkpoints = build_training_checkpoints(
         tree,
         template,
@@ -120,7 +120,6 @@ pub(super) fn fit_make_whole_policies(
                 &checkpoints[block_index][physical],
                 low,
                 high,
-                None,
                 None,
                 &mut sampled,
             )?;
@@ -185,7 +184,6 @@ pub(super) fn fit_policies(
     template: &ReplayTemplate,
     bond: &Bond,
     config: &BondLsmcConfig,
-    exercise_provider: Option<&dyn BondLsmcExerciseProvider>,
     seed: u64,
     estimators: usize,
     simulated_paths: usize,
@@ -195,7 +193,7 @@ pub(super) fn fit_policies(
     let last = decisions
         .checked_sub(1)
         .ok_or_else(|| Error::internal("bond hazard LSMC replay produced no decision snapshots"))?;
-    let boundaries = training_boundaries(template, simulated_paths)?;
+    let boundaries = training_boundaries(template)?;
     let checkpoints = build_training_checkpoints(
         tree,
         template,
@@ -237,7 +235,6 @@ pub(super) fn fit_policies(
                 checkpoint,
                 low,
                 high,
-                exercise_provider,
                 Some(make_whole_policies),
                 &mut sampled,
             )?;
