@@ -152,10 +152,11 @@ fn test_bond_valuator_with_calls() {
 }
 
 #[test]
-fn test_bond_valuator_maps_call_window_to_calendar_steps() {
-    // A call window is exercisable on every calendar date in [start, end]. On
-    // this coarser uniform grid, adjacent dates coalesce onto tree steps, but
-    // the result must still contain more than the old endpoint/coupon-only set.
+fn test_bond_valuator_maps_call_window_to_exercise_candidates() {
+    // A call window is exercisable at its ends, the coupon dates inside it and
+    // month-ends. Month-ends are closer together than this 0.1-year uniform
+    // grid, so each of the 11 steps spanning 2027-01-01..2028-01-01 carries a
+    // call.
     let bond = create_test_bond();
     let mut json = serde_json::to_value(&bond).expect("Bond serialization should succeed");
     json.as_object_mut()
@@ -179,9 +180,9 @@ fn test_bond_valuator_maps_call_window_to_calendar_steps() {
         .expect("BondValuator creation should succeed in test");
 
     let call_steps = valuator.call_vec.iter().filter(|c| c.is_some()).count();
-    assert!(
-        call_steps > 3,
-        "daily call window should map to more than endpoint/coupon-only steps, got {call_steps}"
+    assert_eq!(
+        call_steps, 11,
+        "every step inside the window should carry a call"
     );
 }
 

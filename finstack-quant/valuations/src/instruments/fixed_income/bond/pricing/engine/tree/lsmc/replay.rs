@@ -533,12 +533,13 @@ impl ReplayTemplate {
             });
         }
 
+        let event_dates = BondValuator::exercise_event_dates(&schedule);
         let mut exercise_by_date = BTreeMap::<Date, ExerciseDate>::new();
         let mut make_whole_claims = Vec::new();
         let mut make_whole_bases = Vec::<MakeWholeBasis>::new();
         if let Some(call_put) = &bond.call_put {
             for call in &call_put.calls {
-                for date in exercise_dates(call, as_of, bond.maturity) {
+                for date in exercise_dates(call, as_of, bond.maturity, &event_dates) {
                     let entry = exercise_by_date
                         .entry(date)
                         .or_insert_with(|| ExerciseDate {
@@ -597,7 +598,7 @@ impl ReplayTemplate {
                 }
             }
             for put in &call_put.puts {
-                for date in exercise_dates(put, as_of, bond.maturity) {
+                for date in exercise_dates(put, as_of, bond.maturity, &event_dates) {
                     let entry = exercise_by_date
                         .entry(date)
                         .or_insert_with(|| ExerciseDate {
@@ -611,7 +612,13 @@ impl ReplayTemplate {
             }
         }
         if let Some(spec) = bond.return_floor.as_ref() {
-            for date in return_floor_dates(spec.window, bond.issue_date, bond.maturity, as_of)? {
+            for date in return_floor_dates(
+                spec.window,
+                bond.issue_date,
+                bond.maturity,
+                as_of,
+                &event_dates,
+            )? {
                 exercise_by_date
                     .entry(date)
                     .or_insert_with(|| ExerciseDate {

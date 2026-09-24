@@ -3,6 +3,7 @@
 use super::super::super::super::types::Bond;
 use super::TreePricer;
 use crate::instruments::common_impl::pricing::rates_credit::continuous_frp_weight;
+use finstack_quant_core::dates::DateExt;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Duration};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
@@ -148,20 +149,21 @@ impl BondValuator {
         as_of: Date,
         grid_day_count: DayCount,
     ) -> Result<Vec<f64>> {
-        let flows = bond.pricing_dated_cashflows(market_context, as_of)?;
-        let cashflow_dates: Vec<Date> = flows.iter().map(|(date, _)| *date).collect();
-        let mut dates: Vec<Date> = cashflow_dates
+        let schedule = bond.full_cashflow_schedule(market_context)?;
+        let flows = bond.pricing_dated_cashflows_from_schedule(&schedule, as_of, as_of)?;
+        let event_dates = Self::exercise_event_dates(&schedule);
+        let mut dates: Vec<Date> = flows
             .iter()
-            .copied()
+            .map(|(date, _)| *date)
             .filter(|d| *d > as_of)
             .collect();
         if let Some(ref call_put) = bond.call_put {
             for opt in call_put.calls.iter().chain(call_put.puts.iter()) {
-                dates.extend(Self::exercise_dates_for_period(
-                    opt.start_date,
-                    opt.end_date,
+                dates.extend(Self::right_exercise_dates(
+                    opt,
                     as_of,
                     bond.maturity,
+                    &event_dates,
                 ));
             }
         }
@@ -174,36 +176,66 @@ impl BondValuator {
             .collect()
     }
 
-    fn exercise_dates_for_period(
-        start_date: Date,
-        end_date: Date,
-        as_of: Date,
-        maturity: Date,
-    ) -> Vec<Date> {
-        // A call/put period is an exercise *window*: the option is exercisable
-        // on every calendar date in `[start_date, end_date]`, including the
-        // valuation date when the right is already active. Restricting the
-        // window to endpoints and coupon dates misses economically valid
-        // between-coupon exercise.
-        let first = start_date.max(as_of);
-        let last = end_date.min(maturity);
+    /// Exercise dates of a right whose window is clipped to `[first, last]`:
+    /// the window ends, every event date strictly inside it and every
+    /// month-end inside it.
+    ///
+    /// Callers pass the bond's schedule dates (coupons, amortization) and, for
+    /// return floors, the protection and contractual-call breakpoints. This
+    /// replaces exercise on every calendar day, which put one tree node per
+    /// day of a window. Measured on six callable, puttable and return-floor
+    /// fixtures (tests/instruments/bond/exercise_grid.rs) the candidate set
+    /// prices within 0.005 per 100 of daily exercise; window ends and coupon
+    /// dates alone moved them by up to 0.094 per 100, so the month-end
+    /// anchors stay. A 5-year window drops from ~1,830 exercise dates to ~70.
+    ///
+    /// Returns an empty set when `first > last`.
+    pub(crate) fn exercise_candidates(first: Date, last: Date, event_dates: &[Date]) -> Vec<Date> {
         if first > last {
             return Vec::new();
         }
-
-        let mut dates = Vec::with_capacity((last - first).whole_days().max(0) as usize + 1);
-        let mut date = first;
-        loop {
-            dates.push(date);
-            if date == last {
-                break;
-            }
-            let Some(next) = date.next_day() else {
-                break;
-            };
-            date = next;
+        let mut dates = Vec::with_capacity(event_dates.len() + 2);
+        dates.push(first);
+        dates.extend(
+            event_dates
+                .iter()
+                .copied()
+                .filter(|date| *date > first && *date < last),
+        );
+        let mut month_end = first.end_of_month();
+        while month_end < last {
+            dates.push(month_end);
+            month_end = (month_end + Duration::days(1)).end_of_month();
         }
+        dates.push(last);
+        dates.sort_unstable();
+        dates.dedup();
         dates
+    }
+
+    /// Sorted, distinct dates of every flow in `schedule`: the event dates
+    /// that split an exercise window into candidate decisions.
+    pub(crate) fn exercise_event_dates(
+        schedule: &crate::cashflow::builder::CashFlowSchedule,
+    ) -> Vec<Date> {
+        let mut dates: Vec<Date> = schedule.get_flows().iter().map(|flow| flow.date).collect();
+        dates.sort_unstable();
+        dates.dedup();
+        dates
+    }
+
+    /// Exercise candidates of one call/put right, clipped to `[as_of, maturity]`.
+    fn right_exercise_dates(
+        right: &crate::instruments::fixed_income::bond::CallPut,
+        as_of: Date,
+        maturity: Date,
+        event_dates: &[Date],
+    ) -> Vec<Date> {
+        Self::exercise_candidates(
+            right.start_date.max(as_of),
+            right.end_date.min(maturity),
+            event_dates,
+        )
     }
 
     pub(crate) fn make_whole_call_price(
@@ -348,14 +380,15 @@ impl BondValuator {
         // Exercise windows are inclusive of the valuation date. Contractual
         // holder cash on that date is paid before the exercise decision, while
         // ordinary settlement pricing continues to exclude `as_of` cashflows.
+        let event_dates = Self::exercise_event_dates(&full_schedule);
         let mut exercise_dates = std::collections::HashSet::new();
         if let Some(ref call_put) = bond.call_put {
             for option in call_put.calls.iter().chain(&call_put.puts) {
-                exercise_dates.extend(Self::exercise_dates_for_period(
-                    option.start_date,
-                    option.end_date,
+                exercise_dates.extend(Self::right_exercise_dates(
+                    option,
                     as_of,
                     bond.maturity,
+                    &event_dates,
                 ));
             }
         }
@@ -605,12 +638,9 @@ impl BondValuator {
             let accrual_index =
                 crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &accrual_cfg)?;
             for call in &call_put.calls {
-                for exercise_date in Self::exercise_dates_for_period(
-                    call.start_date,
-                    call.end_date,
-                    as_of,
-                    bond.maturity,
-                ) {
+                for exercise_date in
+                    Self::right_exercise_dates(call, as_of, bond.maturity, &event_dates)
+                {
                     let exercise_time = grid_day_count.year_fraction(
                         as_of,
                         exercise_date,
@@ -660,12 +690,9 @@ impl BondValuator {
                 }
             }
             for put in &call_put.puts {
-                for exercise_date in Self::exercise_dates_for_period(
-                    put.start_date,
-                    put.end_date,
-                    as_of,
-                    bond.maturity,
-                ) {
+                for exercise_date in
+                    Self::right_exercise_dates(put, as_of, bond.maturity, &event_dates)
+                {
                     let exercise_time = grid_day_count.year_fraction(
                         as_of,
                         exercise_date,
@@ -1327,21 +1354,34 @@ mod tests {
     }
 
     #[test]
-    fn exercise_window_includes_every_calendar_date_and_as_of() {
-        let dates = BondValuator::exercise_dates_for_period(
-            date!(2025 - 01 - 01),
-            date!(2025 - 01 - 03),
-            date!(2025 - 01 - 01),
-            date!(2026 - 01 - 01),
+    fn exercise_candidates_are_window_ends_interior_events_and_month_ends() {
+        let dates = BondValuator::exercise_candidates(
+            date!(2025 - 01 - 15),
+            date!(2025 - 04 - 10),
+            &[
+                date!(2024 - 07 - 15),
+                date!(2025 - 01 - 15),
+                date!(2025 - 02 - 17),
+                date!(2025 - 07 - 15),
+            ],
         );
         assert_eq!(
             dates,
             vec![
-                date!(2025 - 01 - 01),
-                date!(2025 - 01 - 02),
-                date!(2025 - 01 - 03)
+                date!(2025 - 01 - 15),
+                date!(2025 - 01 - 31),
+                date!(2025 - 02 - 17),
+                date!(2025 - 02 - 28),
+                date!(2025 - 03 - 31),
+                date!(2025 - 04 - 10)
             ]
         );
+        assert!(BondValuator::exercise_candidates(
+            date!(2025 - 02 - 01),
+            date!(2025 - 01 - 01),
+            &[]
+        )
+        .is_empty());
     }
 
     #[test]

@@ -296,8 +296,8 @@ impl TreePricer {
 
         // Window endpoints drive the step-count alignment. Interior coupon
         // dates are also exercise dates (see `BondValuator::
-        // exercise_dates_for_period`) but fall on the regular coupon grid,
-        // which uniform steps already approximate well.
+        // exercise_candidates`) but fall on the regular coupon grid, which
+        // uniform steps already approximate well.
         let exercise_times: Vec<f64> = call_put
             .calls
             .iter()

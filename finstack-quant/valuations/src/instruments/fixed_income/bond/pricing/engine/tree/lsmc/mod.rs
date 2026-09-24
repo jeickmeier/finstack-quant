@@ -5,6 +5,7 @@
 //! accrued-interest, and cumulative-distribution state, then frozen before
 //! the pricing paths are sampled.
 
+use super::bond_valuator::BondValuator;
 use crate::cashflow::builder::calendar::resolve_calendar_strict;
 use crate::cashflow::builder::specs::{CouponType, FloatingCouponSpec, FloatingRateFallback};
 use crate::cashflow::builder::{
