@@ -19,8 +19,7 @@ impl MetricCalculator for ForwardPv01Calculator {
         let original_fwd = context.curves.get_forward(&option.forward_curve_id)?;
 
         // Use shared sensitivity config to keep forward PV01 bump aligned with DV01 settings.
-        let bump_bp =
-            crate::metrics::resolve_sensitivities_config(context.get_config())?.rate_bump_bp;
+        let bump_bp = crate::metrics::sensitivities::config::resolve(context)?.rate_bump_bp;
         let bump_amount = bump_bp * 0.0001;
 
         let bumped_rates: Vec<(f64, f64)> = original_fwd

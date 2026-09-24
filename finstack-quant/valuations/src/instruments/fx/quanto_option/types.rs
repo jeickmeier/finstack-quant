@@ -366,6 +366,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         &self,
         _market: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: finstack_quant_core::dates::Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Err(finstack_quant_core::Error::Validation(format!(
             "QuantoOption {}: Theta is not supported by the analytical quanto \
@@ -378,6 +379,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         let t = self.day_count.year_fraction(
             as_of,
@@ -392,7 +394,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             market,
             as_of,
             &self.spot_id,
-            crate::metrics::bump_sizes::SPOT,
+            bumps.spot_bump_pct,
         )?))
     }
 
@@ -400,6 +402,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -416,22 +419,14 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
 
         let spot_scalar = market.get_price(&self.spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
-        let bump_size = current_spot * crate::metrics::bump_sizes::SPOT;
+        let bump_size = current_spot * bumps.spot_bump_pct;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let up = crate::metrics::bump_scalar_price(
-            market,
-            &self.spot_id,
-            crate::metrics::bump_sizes::SPOT,
-        )?;
+        let up = crate::metrics::bump_scalar_price(market, &self.spot_id, bumps.spot_bump_pct)?;
         let pv_up = self.value(&up, as_of)?.amount();
-        let dn = crate::metrics::bump_scalar_price(
-            market,
-            &self.spot_id,
-            -crate::metrics::bump_sizes::SPOT,
-        )?;
+        let dn = crate::metrics::bump_scalar_price(market, &self.spot_id, -bumps.spot_bump_pct)?;
         let pv_dn = self.value(&dn, as_of)?.amount();
 
         Ok(Some(
@@ -443,6 +438,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -459,18 +455,17 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         let bumped = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),
-            crate::metrics::bump_sizes::VOLATILITY,
+            bumps.vol_bump_pct,
         )?;
         let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some(
-            (pv_bumped - base_pv) / crate::metrics::bump_sizes::VOLATILITY,
-        ))
+        Ok(Some((pv_bumped - base_pv) / bumps.vol_bump_pct))
     }
 
     fn option_rho_bp(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -484,7 +479,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = self.metric_pricing_overrides.rho_bump_bp();
+        let bump_bp = bumps.rate_bump_bp;
         let bumped = crate::metrics::bump_discount_curve_parallel(
             market,
             &self.domestic_discount_curve_id,
@@ -498,6 +493,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -511,7 +507,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = self.metric_pricing_overrides.rho_bump_bp();
+        let bump_bp = bumps.rate_bump_bp;
         let bumped = crate::metrics::bump_discount_curve_parallel(
             market,
             &self.foreign_discount_curve_id,
@@ -525,6 +521,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -539,11 +536,11 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
 
         let spot_scalar = market.get_price(&self.spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
-        let spot_bump = current_spot * crate::metrics::bump_sizes::SPOT;
+        let spot_bump = current_spot * bumps.spot_bump_pct;
         if spot_bump <= 0.0 {
             return Ok(Some(0.0));
         }
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump = bumps.vol_bump_pct;
 
         // Delta at vol_up
         let vol_up = crate::metrics::bump_surface_vol_absolute(
@@ -551,16 +548,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             self.vol_surface_id.as_str(),
             vol_bump,
         )?;
-        let up = crate::metrics::bump_scalar_price(
-            &vol_up,
-            &self.spot_id,
-            crate::metrics::bump_sizes::SPOT,
-        )?;
-        let dn = crate::metrics::bump_scalar_price(
-            &vol_up,
-            &self.spot_id,
-            -crate::metrics::bump_sizes::SPOT,
-        )?;
+        let up = crate::metrics::bump_scalar_price(&vol_up, &self.spot_id, bumps.spot_bump_pct)?;
+        let dn = crate::metrics::bump_scalar_price(&vol_up, &self.spot_id, -bumps.spot_bump_pct)?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
         let delta_up = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -571,16 +560,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             self.vol_surface_id.as_str(),
             -vol_bump,
         )?;
-        let up = crate::metrics::bump_scalar_price(
-            &vol_dn,
-            &self.spot_id,
-            crate::metrics::bump_sizes::SPOT,
-        )?;
-        let dn = crate::metrics::bump_scalar_price(
-            &vol_dn,
-            &self.spot_id,
-            -crate::metrics::bump_sizes::SPOT,
-        )?;
+        let up = crate::metrics::bump_scalar_price(&vol_dn, &self.spot_id, bumps.spot_bump_pct)?;
+        let dn = crate::metrics::bump_scalar_price(&vol_dn, &self.spot_id, -bumps.spot_bump_pct)?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
         let delta_dn = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -597,6 +578,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         base_pv: f64,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -609,7 +591,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             return Ok(Some(0.0));
         }
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump = bumps.vol_bump_pct;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),

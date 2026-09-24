@@ -27,6 +27,7 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
 };
+use finstack_quant_valuations::instruments::GreekBumps;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
@@ -342,7 +343,7 @@ fn bench_greeks_calculation(c: &mut Criterion) {
                         black_box(&bond),
                         black_box(&market),
                         black_box(ConvertibleTreeType::Binomial(s)),
-                        black_box(Some(0.01)),
+                        black_box(GreekBumps::default()),
                         base_date(),
                     )
                 });
@@ -365,7 +366,7 @@ fn bench_greeks_by_moneyness(c: &mut Criterion) {
                     black_box(&bond),
                     black_box(&market),
                     black_box(ConvertibleTreeType::Binomial(50)),
-                    black_box(Some(0.01)),
+                    black_box(GreekBumps::default()),
                     base_date(),
                 )
             });

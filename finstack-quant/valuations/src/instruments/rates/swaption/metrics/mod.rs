@@ -73,9 +73,7 @@ pub(crate) fn register_bermudan_swaption_metrics(
         registry: registry,
         instrument: InstrumentType::BermudanSwaption,
         metrics: [
-            (Delta, BermudanDeltaCalculator {
-                bump_bp: bermudan_greeks::DEFAULT_RATE_BUMP_BP,
-            }),
+            (Delta, BermudanDeltaCalculator),
             (Gamma, BermudanGammaCalculator {
                 bump_bp: bermudan_greeks::DEFAULT_GAMMA_BUMP_BP,
             }),
@@ -84,9 +82,7 @@ pub(crate) fn register_bermudan_swaption_metrics(
             // different vol axis than the Black-vol `Vega` reported for
             // European swaptions. Sharing the `vega` key would silently mix
             // incomparable units in cross-instrument aggregation.
-            (HwSigmaVega, BermudanVegaCalculator {
-                bump_pct: bermudan_greeks::DEFAULT_VOL_BUMP_PCT,
-            })
+            (HwSigmaVega, BermudanVegaCalculator)
             // Note: UnifiedDv01Calculator and BucketedDv01 are NOT
             // registered here because BermudanSwaption::value() returns Err.
             // Use BermudanDeltaCalculator for rate sensitivity instead.

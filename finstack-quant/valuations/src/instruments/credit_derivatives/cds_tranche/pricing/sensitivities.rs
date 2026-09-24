@@ -586,7 +586,7 @@ impl CDSTranchePricer {
     ///
     /// Every issuer curve consumed by heterogeneous pricing (or the index
     /// curve for homogeneous pricing) is re-bootstrapped after a simultaneous
-    /// ±`cs01_bump_size` bp parallel quote shock — the same
+    /// ±`credit_spread_bump_bp` parallel quote shock — the same
     /// market convention as the registered tranche CS01 metric calculator.
     /// Bumping the hazard intensity λ directly instead would overstate the
     /// spread sensitivity by ≈ `1/(1−R)` (≈1.67x at R=40%).
@@ -605,6 +605,11 @@ impl CDSTranchePricer {
     /// * `as_of` - Valuation date used identically for both bumped prices.
     /// * `provider` - Exact quote-rebootstrap service; every active hazard curve
     ///   must carry its original calibration recipe.
+    /// * `credit_spread_bump_bp` - Parallel par-spread quote shock in basis
+    ///   points (1.0 = 1bp); must be finite and positive. The result is
+    ///   normalised to one basis point whatever the shock size. The registered
+    ///   CS01 metric passes the resolved
+    ///   `metric_pricing_overrides.bump_config.credit_spread_bump_bp`.
     #[must_use = "CS01 result should be used for hedging"]
     pub fn calculate_cs01(
         &self,
@@ -612,12 +617,13 @@ impl CDSTranchePricer {
         market_ctx: &MarketContext,
         as_of: Date,
         provider: &dyn crate::recalibration::RecalibrationProvider,
+        credit_spread_bump_bp: f64,
     ) -> Result<f64> {
         tranche.validate()?;
-        if self.params.cs01_bump_size <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "CS01 bump size must be positive".to_string(),
-            ));
+        if !credit_spread_bump_bp.is_finite() || credit_spread_bump_bp <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CS01 credit_spread_bump_bp must be finite and positive, got {credit_spread_bump_bp}"
+            )));
         }
 
         let index = market_ctx.get_credit_index(&tranche.credit_index_id)?;
@@ -629,7 +635,7 @@ impl CDSTranchePricer {
             tranche.credit_index_id.as_str(),
             &tranche.discount_curve_id,
             &hazards,
-            self.params.cs01_bump_size,
+            credit_spread_bump_bp,
             |market| {
                 self.price_tranche(tranche, market, as_of)
                     .map(|pv| pv.amount())
@@ -643,9 +649,9 @@ impl CDSTranchePricer {
     ///
     /// Returns the PV change for a **+1% (0.01 absolute)** parallel shift of
     /// the base-correlation curve, matching the per-1% convention of
-    /// `Recovery01`. (Internally the curve is bumped by
-    /// `params.corr_bump_abs` and the central difference is rescaled to the
-    /// 1% reporting unit.)
+    /// `Recovery01`. The curve is bumped by `CORRELATION_BUMP` (0.01 absolute),
+    /// the same shift the quanto Correlation01 uses, which is also the
+    /// reporting unit.
     #[must_use = "Correlation01 result should be used for hedging"]
     pub fn calculate_correlation_delta(
         &self,
@@ -654,7 +660,7 @@ impl CDSTranchePricer {
         as_of: Date,
     ) -> Result<f64> {
         tranche.validate()?;
-        let bump_abs = self.params.corr_bump_abs;
+        let bump_abs = crate::metrics::CORRELATION_BUMP;
         let original_index_arc = market_ctx.get_credit_index(&tranche.credit_index_id)?;
 
         // Central difference: (PV_up - PV_down) / (2 * bump) for O(h²) accuracy
@@ -689,7 +695,7 @@ impl CDSTranchePricer {
 
         // Central difference per unit ρ, rescaled to the per-1% (0.01 absolute
         // correlation) reporting convention shared with Recovery01.
-        Ok((pv_up - pv_down) / (2.0 * bump_abs) * 0.01)
+        Ok((pv_up - pv_down) / (2.0 * bump_abs) * crate::metrics::CORRELATION_BUMP)
     }
 
     /// Calculate jump-to-default (immediate loss from specific entity default).

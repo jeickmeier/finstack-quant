@@ -28,15 +28,13 @@
 //! inflation sensitivity. Production linkers should normally provide both a
 //! published index and a projected inflation curve.
 
+use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-
-/// Standard inflation curve bump: 1bp (0.0001)
-const INFLATION_BUMP_BP: f64 = 0.0001;
 
 /// Inflation01 calculator for inflation-linked bonds.
 pub(crate) struct Inflation01Calculator;
@@ -71,19 +69,19 @@ impl MetricCalculator for Inflation01Calculator {
 
         // Use MarketContext::bump() API to bump the inflation curve
         // Bump by 1bp using parallel shift
-        let bump_spec = BumpSpec::inflation_shift_pct(INFLATION_BUMP_BP * 100.0); // Convert bp to percent
+        let bump_spec = BumpSpec::inflation_shift_pct(ONE_BASIS_POINT * 100.0); // Convert bp to percent
         let curves_up = bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec)?;
         let pv_up = bond.value(&curves_up, as_of)?.amount();
 
         // Bump down
-        let bump_spec_down = BumpSpec::inflation_shift_pct(-INFLATION_BUMP_BP * 100.0);
+        let bump_spec_down = BumpSpec::inflation_shift_pct(-ONE_BASIS_POINT * 100.0);
         let curves_down =
             bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec_down)?;
         let pv_down = bond.value(&curves_down, as_of)?.amount();
 
         // Inflation01 = (PV_up − PV_down) / 2
         //
-        // The curve was bumped by exactly ±1bp (INFLATION_BUMP_BP = 0.0001).
+        // The curve was bumped by exactly ±1bp (ONE_BASIS_POINT = 0.0001).
         // A symmetric ±1bp central difference already produces the PV change for
         // a 1bp move; no further normalization is needed. Dividing by 2 (not by
         // 2 × bump_size) is the correct per-1bp convention — consistent with
@@ -97,7 +95,7 @@ impl MetricCalculator for Inflation01Calculator {
 
 #[cfg(test)]
 mod tests {
-    use super::INFLATION_BUMP_BP;
+    use super::ONE_BASIS_POINT;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
     use crate::instruments::PricingOptions;
@@ -145,7 +143,7 @@ mod tests {
         let market = market(as_of);
 
         // Compute the two bumped PVs the same way the calculator does.
-        let bump = INFLATION_BUMP_BP;
+        let bump = ONE_BASIS_POINT;
         let curves_up = market
             .bump([MarketBump::Curve {
                 id: bond.inflation_index_id.clone(),

@@ -24,12 +24,12 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::Result;
 
-/// Parallel rate bump for the central second difference (0.1%).
+/// Default parallel rate bump for the central second difference: 10bp.
 ///
 /// Larger than the 1 bp duration bump to keep the second difference clear of
 /// floating-point cancellation noise while remaining within the `O(Δy²)`
 /// truncation tolerance.
-const CONVEXITY_BUMP: f64 = 1e-3;
+pub(crate) const DEFAULT_CONVEXITY_YTM_BUMP_BP: f64 = 10.0;
 
 /// Calculate the modified convexity of a tranche from its (fixed) cashflows.
 ///
@@ -38,6 +38,9 @@ const CONVEXITY_BUMP: f64 = 1e-3;
 /// * `cashflows` - The dated cashflows for the tranche.
 /// * `discount_curve` - The discount curve for PV calculation.
 /// * `as_of` - The valuation date.
+/// * `ytm_bump_bp` - Continuously compounded yield shock Δy in basis points
+///   (1.0 = 1bp); must be finite and positive. [`ConvexityCalculator`] passes
+///   `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to 10bp.
 ///
 /// # Returns
 ///
@@ -51,7 +54,14 @@ pub fn calculate_tranche_convexity(
     cashflows: &DatedFlows,
     discount_curve: &DiscountCurve,
     as_of: Date,
+    ytm_bump_bp: f64,
 ) -> Result<f64> {
+    if !ytm_bump_bp.is_finite() || ytm_bump_bp <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "tranche convexity ytm_bump_bp must be finite and positive, got {ytm_bump_bp}"
+        )));
+    }
+    let bump = ytm_bump_bp / 10_000.0;
     let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
     let mut pv0 = NeumaierAccumulator::new();
     let mut pv_up = NeumaierAccumulator::new();
@@ -66,8 +76,8 @@ pub fn calculate_tranche_convexity(
         let base = amount.amount() * df;
         pv0.add(base);
         // Higher rate -> lower PV: bump up multiplies by exp(-Δy·t).
-        pv_up.add(base * (-CONVEXITY_BUMP * t).exp());
-        pv_dn.add(base * (CONVEXITY_BUMP * t).exp());
+        pv_up.add(base * (-bump * t).exp());
+        pv_dn.add(base * (bump * t).exp());
     }
 
     let p0 = pv0.total();
@@ -87,7 +97,7 @@ pub fn calculate_tranche_convexity(
     if p0.abs() <= scale * 1e-12 {
         return Ok(0.0);
     }
-    Ok((pv_up.total() + pv_dn.total() - 2.0 * p0) / (p0 * CONVEXITY_BUMP * CONVEXITY_BUMP))
+    Ok((pv_up.total() + pv_dn.total() - 2.0 * p0) / (p0 * bump * bump))
 }
 
 /// Modified convexity calculator for structured credit.
@@ -113,7 +123,10 @@ impl MetricCalculator for ConvexityCalculator {
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
 
         let settlement = super::super::quote::settlement_date(context.instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>()?, context.as_of)?;
-        calculate_tranche_convexity(flows, disc.as_ref(), settlement)
+        let ytm_bump_bp = crate::metrics::sensitivities::config::resolve(context)?
+            .ytm_bump_bp
+            .unwrap_or(DEFAULT_CONVEXITY_YTM_BUMP_BP);
+        calculate_tranche_convexity(flows, disc.as_ref(), settlement, ytm_bump_bp)
     }
 
     fn dependencies(&self) -> &[MetricId] {

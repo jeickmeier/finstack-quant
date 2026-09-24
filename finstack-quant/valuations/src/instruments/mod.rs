@@ -264,7 +264,7 @@ pub use common_impl::dependencies::{
 };
 pub use common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
 pub use common_impl::traits::{
-    Attributes, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
+    Attributes, GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
     OptionGreeksRequest, PricingOptions,
 };
 

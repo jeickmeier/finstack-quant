@@ -65,8 +65,8 @@ pub struct TaylorAttributionConfig {
     pub rate_bump_bp: f64,
 
     /// Credit spread bump size for CS01 computation (basis points).
-    #[serde(default = "default_credit_bump_bp")]
-    pub credit_bump_bp: f64,
+    #[serde(default = "default_credit_spread_bump_bp")]
+    pub credit_spread_bump_bp: f64,
 
     /// Vol bump size for vega computation (absolute vol points, e.g. 0.01 = 1%).
     #[serde(default = "default_vol_bump")]
@@ -76,7 +76,7 @@ pub struct TaylorAttributionConfig {
 fn default_rate_bump_bp() -> f64 {
     1.0
 }
-fn default_credit_bump_bp() -> f64 {
+fn default_credit_spread_bump_bp() -> f64 {
     1.0
 }
 fn default_vol_bump() -> f64 {
@@ -88,7 +88,7 @@ impl Default for TaylorAttributionConfig {
         Self {
             include_gamma: false,
             rate_bump_bp: default_rate_bump_bp(),
-            credit_bump_bp: default_credit_bump_bp(),
+            credit_spread_bump_bp: default_credit_spread_bump_bp(),
             vol_bump: default_vol_bump(),
         }
     }
@@ -119,11 +119,11 @@ impl TaylorAttributionConfig {
                 self.rate_bump_bp
             )));
         }
-        if self.credit_bump_bp < 0.01 || self.credit_bump_bp > 100.0 {
+        if self.credit_spread_bump_bp < 0.01 || self.credit_spread_bump_bp > 100.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Credit bump size must lie in [0.01, 100] bp (below 0.01bp the second-difference \
                  gamma is cancellation noise), got {:.6}",
-                self.credit_bump_bp
+                self.credit_spread_bump_bp
             )));
         }
         if self.vol_bump < 1e-4 || self.vol_bump > 0.20 {
@@ -1214,7 +1214,7 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
                 instrument,
                 as_of_t0,
                 pv_t0,
-                config.credit_bump_bp,
+                config.credit_spread_bump_bp,
                 &shifts,
                 |scale| {
                     bump_credit_market(
@@ -1248,20 +1248,20 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
     let bumped_up = bump_credit_market(
         market_t0,
         curve_id,
-        QuoteBump::ParallelBp(config.credit_bump_bp),
+        QuoteBump::ParallelBp(config.credit_spread_bump_bp),
         recalibration_provider,
     )?;
     let pv_up = reprice_instrument(instrument, &bumped_up, as_of_t0)?;
     let bumped_down = bump_credit_market(
         market_t0,
         curve_id,
-        QuoteBump::ParallelBp(-config.credit_bump_bp),
+        QuoteBump::ParallelBp(-config.credit_spread_bump_bp),
         recalibration_provider,
     )?;
     let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
 
     // Central difference CS01: O(h²) accuracy, $ per bp of credit-curve move.
-    let cs01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.credit_bump_bp);
+    let cs01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.credit_spread_bump_bp);
 
     let spread_move_bp = measure_credit_curve_shift(
         curve_id.as_str(),
@@ -1274,7 +1274,7 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
 
     let gamma_pnl = if config.include_gamma {
         let gamma = (pv_up.amount() - 2.0 * pv_t0.amount() + pv_down.amount())
-            / (config.credit_bump_bp * config.credit_bump_bp);
+            / (config.credit_spread_bump_bp * config.credit_spread_bump_bp);
         Some(0.5 * gamma * spread_move_bp * spread_move_bp)
     } else {
         None
@@ -1588,7 +1588,7 @@ mod tests {
         let config = TaylorAttributionConfig::default();
         assert!(!config.include_gamma);
         assert_eq!(config.rate_bump_bp, 1.0);
-        assert_eq!(config.credit_bump_bp, 1.0);
+        assert_eq!(config.credit_spread_bump_bp, 1.0);
         assert_eq!(config.vol_bump, 0.01);
     }
 
@@ -1611,11 +1611,22 @@ mod tests {
     }
 
     #[test]
+    fn taylor_config_rejects_retired_credit_bump_key() {
+        // schema-rejection-test
+        let err = serde_json::from_str::<TaylorAttributionConfig>(r#"{"credit_bump_bp": 1.0}"#)
+            .expect_err("retired credit bump key must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+        let parsed: TaylorAttributionConfig =
+            serde_json::from_str(r#"{"credit_spread_bump_bp": 2.0}"#).expect("canonical key");
+        assert_eq!(parsed.credit_spread_bump_bp, 2.0);
+    }
+
+    #[test]
     fn test_taylor_config_serde_roundtrip() {
         let config = TaylorAttributionConfig {
             include_gamma: true,
             rate_bump_bp: 0.5,
-            credit_bump_bp: 2.0,
+            credit_spread_bump_bp: 2.0,
             vol_bump: 0.005,
         };
 
@@ -1979,11 +1990,11 @@ mod tests {
                 ..TaylorAttributionConfig::default()
             },
             TaylorAttributionConfig {
-                credit_bump_bp: 0.0,
+                credit_spread_bump_bp: 0.0,
                 ..TaylorAttributionConfig::default()
             },
             TaylorAttributionConfig {
-                credit_bump_bp: 200.0,
+                credit_spread_bump_bp: 200.0,
                 ..TaylorAttributionConfig::default()
             },
         ] {
@@ -2962,7 +2973,7 @@ mod tests {
                 ..TaylorAttributionConfig::default()
             },
             TaylorAttributionConfig {
-                credit_bump_bp: 1e-6,
+                credit_spread_bump_bp: 1e-6,
                 ..TaylorAttributionConfig::default()
             },
             TaylorAttributionConfig {
@@ -2979,7 +2990,7 @@ mod tests {
         // Boundary values remain valid.
         let ok = TaylorAttributionConfig {
             rate_bump_bp: 0.01,
-            credit_bump_bp: 0.01,
+            credit_spread_bump_bp: 0.01,
             vol_bump: 1e-4,
             ..TaylorAttributionConfig::default()
         };

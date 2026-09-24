@@ -1,7 +1,7 @@
 //! Duration calculators for structured credit.
 
 use crate::cashflow::traits::DatedFlows;
-use crate::constants::ONE_BASIS_POINT;
+use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -116,20 +116,27 @@ impl MetricCalculator for ModifiedDurationCalculator {
             .curves
             .get_discount(deal.discount_curve_id.as_str())?;
         let base = quote.model_dirty(flows, &curve)?;
+        let ytm_bump_bp = sens_config::resolve(context)?
+            .ytm_bump_bp
+            .unwrap_or(DEFAULT_DURATION_YTM_BUMP_BP);
         calculate_tranche_duration(
             flows,
             &curve,
             quote.settlement,
             Money::new(base, deal.pool.get_base_currency())?,
+            ytm_bump_bp,
         )
     }
 }
 
+/// Default yield shock for modified duration: 1bp.
+pub(crate) const DEFAULT_DURATION_YTM_BUMP_BP: f64 = 1.0;
+
 /// Calculate tranche-specific modified duration from cashflows and discount curve.
 ///
 /// True modified duration: `-(1/P)·dP/dy` measured by bumping the
-/// continuously-compounded discounting of the tranche's cashflows by 1bp
-/// (the same approach as [`ModifiedDurationCalculator`]). The previous
+/// continuously-compounded discounting of the tranche's cashflows by
+/// `ytm_bump_bp` (the same approach as [`ModifiedDurationCalculator`]). The previous
 /// implementation returned the Macaulay duration (PV-weighted time) under
 /// this name.
 ///
@@ -139,6 +146,10 @@ impl MetricCalculator for ModifiedDurationCalculator {
 /// * `discount_curve` - The discount curve for PV calculation
 /// * `as_of` - The valuation date
 /// * `pv` - The present value of the tranche (guards the degenerate case)
+/// * `ytm_bump_bp` - Continuously compounded yield shock in basis points
+///   (1.0 = 1bp); must be finite and positive. `ModifiedDurationCalculator`
+///   passes `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to
+///   1bp.
 ///
 /// # Returns
 ///
@@ -148,13 +159,19 @@ pub fn calculate_tranche_duration(
     discount_curve: &DiscountCurve,
     as_of: Date,
     pv: Money,
+    ytm_bump_bp: f64,
 ) -> Result<f64> {
+    if !ytm_bump_bp.is_finite() || ytm_bump_bp <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "tranche duration ytm_bump_bp must be finite and positive, got {ytm_bump_bp}"
+        )));
+    }
     if pv.amount() <= 0.0 {
         return Ok(0.0);
     }
 
     let day_count = crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
-    let yield_shift = ONE_BASIS_POINT;
+    let yield_shift = ytm_bump_bp / 10_000.0;
 
     let mut base_pv = 0.0;
     let mut shifted_pv = 0.0;
@@ -263,8 +280,8 @@ mod time_basis_tests {
 
         let p0 = pv_at(0.0);
         let pv = Money::new(p0, Currency::USD).expect("valid money fixture");
-        let d = calculate_tranche_duration(&cf, &disc, as_of(), pv).expect("duration");
-        let c = calculate_tranche_convexity(&cf, &disc, as_of()).expect("convexity");
+        let d = calculate_tranche_duration(&cf, &disc, as_of(), pv, 1.0).expect("duration");
+        let c = calculate_tranche_convexity(&cf, &disc, as_of(), 10.0).expect("convexity");
 
         // 10bp. Sizing matters here: a mismatched basis biases `D` by the
         // Act/360-vs-Act/365F ratio (~1.39%), giving an error of about

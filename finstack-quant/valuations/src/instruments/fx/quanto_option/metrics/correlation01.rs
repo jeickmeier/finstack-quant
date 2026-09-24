@@ -3,13 +3,13 @@
 //! Bumps the equity-FX correlation by an absolute amount on each side and
 //! returns a central finite difference per absolute correlation point. The
 //! pair of bumps is shrunk symmetrically when the base correlation sits
-//! within `bump_sizes::CORRELATION` of [-1, 1] so that the divisor matches
+//! within `CORRELATION_BUMP` of [-1, 1] so that the divisor matches
 //! the actual width applied — avoiding the bias the asymmetric clamp would
 //! otherwise introduce near the boundary.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::quanto_option::QuantoOption;
-use crate::metrics::{bump_sizes, MetricCalculator, MetricContext};
+use crate::metrics::{MetricCalculator, MetricContext, CORRELATION_BUMP};
 use finstack_quant_core::Result;
 
 /// Correlation01 calculator for quanto options.
@@ -39,10 +39,7 @@ impl MetricCalculator for Correlation01Calculator {
 
         // Symmetric, boundary-aware bump: shrink the half-width so both bumped
         // correlations remain within [-1, 1]. The denominator below matches.
-        let half_bump = bump_sizes::CORRELATION
-            .min(1.0 - rho)
-            .min(1.0 + rho)
-            .max(0.0);
+        let half_bump = CORRELATION_BUMP.min(1.0 - rho).min(1.0 + rho).max(0.0);
         if half_bump <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "QuantoOption {}: cannot bump correlation at boundary (rho={rho})",
@@ -61,6 +58,6 @@ impl MetricCalculator for Correlation01Calculator {
         // Report the PV change for one correlation percentage point.  Near a
         // boundary the actual bump can be smaller, so recover the local
         // derivative and rescale it to the public one-point unit.
-        Ok((pv_up - pv_down) / (2.0 * half_bump) * bump_sizes::CORRELATION)
+        Ok((pv_up - pv_down) / (2.0 * half_bump) * CORRELATION_BUMP)
     }
 }

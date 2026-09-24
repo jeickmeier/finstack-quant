@@ -11,6 +11,7 @@
 //! Uses numerical differentiation with 1bp bumps to the inflation curve.
 
 use crate::constants::numerical::ZERO_TOLERANCE;
+use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -18,9 +19,6 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::Result;
 
 use super::inflation01::bumped_inflation_market;
-
-/// Standard inflation curve bump: 1bp (0.0001)
-const INFLATION_BUMP_BP: f64 = 0.0001;
 
 /// Calculates inflation convexity for inflation-linked bonds.
 pub(crate) struct InflationConvexityCalculator;
@@ -32,15 +30,15 @@ impl MetricCalculator for InflationConvexityCalculator {
 
         let base_pv = context.base_value.amount();
 
-        // Bump size: 1bp for numerical convexity
-        let bump_bp = INFLATION_BUMP_BP;
+        // Bump size: 1bp (decimal 0.0001) for numerical convexity
+        let bump = ONE_BASIS_POINT;
 
-        let bump_spec_up = BumpSpec::inflation_shift_pct(bump_bp * 100.0); // Convert bp to percent
+        let bump_spec_up = BumpSpec::inflation_shift_pct(bump * 100.0); // decimal -> percent
         let curves_up =
             bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec_up)?;
         let pv_up = bond.value(&curves_up, as_of)?.amount();
 
-        let bump_spec_down = BumpSpec::inflation_shift_pct(-bump_bp * 100.0);
+        let bump_spec_down = BumpSpec::inflation_shift_pct(-bump * 100.0);
         let curves_down =
             bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec_down)?;
         let pv_down = bond.value(&curves_down, as_of)?.amount();
@@ -53,7 +51,7 @@ impl MetricCalculator for InflationConvexityCalculator {
         // — the raw dollar second derivative d²PV/dπ² ($ per decimal²),
         // matching the inflation swap producer and the attribution consumer
         // (one MetricId = one unit).
-        let inflation_convexity = (pv_up + pv_down - 2.0 * base_pv) / (bump_bp * bump_bp);
+        let inflation_convexity = (pv_up + pv_down - 2.0 * base_pv) / (bump * bump);
 
         Ok(inflation_convexity)
     }
@@ -61,7 +59,7 @@ impl MetricCalculator for InflationConvexityCalculator {
 
 #[cfg(test)]
 mod tests {
-    use super::INFLATION_BUMP_BP;
+    use super::ONE_BASIS_POINT;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
     use crate::instruments::{InstrumentPricingOverrides, PricingOptions};
@@ -110,7 +108,7 @@ mod tests {
 
         let base_pv = bond.value(&market, as_of).expect("base pv").amount();
 
-        let bump = INFLATION_BUMP_BP;
+        let bump = ONE_BASIS_POINT;
         let curves_up = market
             .bump([MarketBump::Curve {
                 id: bond.inflation_index_id.clone(),

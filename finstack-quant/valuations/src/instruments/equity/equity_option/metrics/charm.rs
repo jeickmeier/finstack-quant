@@ -10,7 +10,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_option::EquityOption;
-use crate::metrics::{bump_scalar_price, bump_sizes};
+use crate::metrics::bump_scalar_price;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
@@ -36,16 +36,7 @@ impl MetricCalculator for CharmCalculator {
             option.notional.currency(),
         )?;
 
-        // Use adaptive/custom bump from pricing overrides if configured
-        let overrides = &option.metric_pricing_overrides.bump_config;
-        let bump_pct = if let Some(custom) = overrides.spot_bump_pct {
-            custom
-        } else if overrides.adaptive_bumps {
-            let moneyness = (current_spot - option.strike).abs() / option.strike;
-            bump_sizes::SPOT * (1.0 + 2.0 * moneyness).min(5.0)
-        } else {
-            bump_sizes::SPOT
-        };
+        let bump_pct = super::spot_bump_pct(context, option, current_spot)?;
         let spot_bump = current_spot * bump_pct;
 
         // Guard near-expiry: avoid time bumps when T < 2 days.

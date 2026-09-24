@@ -198,6 +198,7 @@ fn option_greeks_errors_on_unsupported_kind() {
     let request = OptionGreeksRequest {
         greek: OptionGreekKind::Theta,
         base_pv: None,
+        bumps: finstack_quant_valuations::instruments::GreekBumps::default(),
     };
     let result = option.option_greeks(&market, AS_OF, &request);
     assert!(

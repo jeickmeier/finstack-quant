@@ -17,7 +17,7 @@ fn test_real_duration_positive() {
     let as_of = d(2025, 1, 2);
 
     // Act
-    let dur = ilb.real_duration(as_of).unwrap();
+    let dur = ilb.real_duration(as_of, 1.0).unwrap();
 
     // Assert - duration should be positive for standard bonds
     assert!(dur > 0.0);
@@ -47,9 +47,9 @@ fn test_real_duration_increases_with_maturity() {
     ilb_long.real_coupon = Decimal::try_from(0.02).expect("valid decimal");
 
     // Act
-    let dur_short = ilb_short.real_duration(as_of).unwrap();
-    let dur_mid = ilb_mid.real_duration(as_of).unwrap();
-    let dur_long = ilb_long.real_duration(as_of).unwrap();
+    let dur_short = ilb_short.real_duration(as_of, 1.0).unwrap();
+    let dur_mid = ilb_mid.real_duration(as_of, 1.0).unwrap();
+    let dur_long = ilb_long.real_duration(as_of, 1.0).unwrap();
 
     // Assert - longer maturity → higher duration
     assert!(dur_mid > dur_short);
@@ -74,8 +74,8 @@ fn test_real_duration_decreases_with_higher_coupon() {
     ilb_high.real_coupon = Decimal::try_from(0.05).expect("valid decimal"); // 5%
 
     // Act
-    let dur_low = ilb_low.real_duration(as_of).unwrap();
-    let dur_high = ilb_high.real_duration(as_of).unwrap();
+    let dur_low = ilb_low.real_duration(as_of, 1.0).unwrap();
+    let dur_high = ilb_high.real_duration(as_of, 1.0).unwrap();
 
     // Assert - higher coupon → lower duration (more front-loaded cashflows)
     assert!(dur_low > dur_high);
@@ -92,7 +92,7 @@ fn test_real_duration_reasonable_range() {
     let as_of = d(2025, 1, 2);
 
     // Act
-    let dur = ilb.real_duration(as_of).unwrap();
+    let dur = ilb.real_duration(as_of, 1.0).unwrap();
 
     // Assert - for 5-year bond with 2% coupon, duration should be ~4.5 years
     assert!(dur > 3.5);
@@ -108,9 +108,9 @@ fn test_real_duration_decreases_over_time() {
     ilb.real_coupon = Decimal::try_from(0.02).expect("valid decimal");
 
     // Act - calculate duration at different valuation dates
-    let dur_2020 = ilb.real_duration(d(2020, 1, 2)).unwrap();
-    let dur_2025 = ilb.real_duration(d(2025, 1, 2)).unwrap();
-    let dur_2028 = ilb.real_duration(d(2028, 1, 2)).unwrap();
+    let dur_2020 = ilb.real_duration(d(2020, 1, 2), 1.0).unwrap();
+    let dur_2025 = ilb.real_duration(d(2025, 1, 2), 1.0).unwrap();
+    let dur_2028 = ilb.real_duration(d(2028, 1, 2), 1.0).unwrap();
 
     // Assert - as time passes, duration decreases
     assert!(dur_2025 < dur_2020);
@@ -127,7 +127,7 @@ fn test_real_duration_at_maturity() {
     let as_of = ilb.maturity;
 
     // Act - duration calculation at maturity may fail or return small value
-    let dur_result = ilb.real_duration(as_of);
+    let dur_result = ilb.real_duration(as_of, 1.0);
 
     // Assert - either errors gracefully or returns small value
     if let Ok(dur) = dur_result {
@@ -158,8 +158,8 @@ fn test_real_duration_with_different_frequencies() {
     ilb_semi.real_coupon = Decimal::try_from(0.02).expect("valid decimal");
 
     // Act
-    let dur_annual = ilb_annual.real_duration(as_of).unwrap();
-    let dur_semi = ilb_semi.real_duration(as_of).unwrap();
+    let dur_annual = ilb_annual.real_duration(as_of, 1.0).unwrap();
+    let dur_semi = ilb_semi.real_duration(as_of, 1.0).unwrap();
 
     // Assert - duration should be positive for both
     assert!(dur_annual > 0.0);
@@ -180,8 +180,8 @@ fn test_real_duration_uses_quoted_price() {
     let as_of = d(2025, 1, 2);
 
     // Act
-    let dur1 = ilb1.real_duration(as_of).unwrap();
-    let dur2 = ilb2.real_duration(as_of).unwrap();
+    let dur1 = ilb1.real_duration(as_of, 1.0).unwrap();
+    let dur2 = ilb2.real_duration(as_of, 1.0).unwrap();
 
     // Assert - duration calculation uses quoted price as base
     // Different prices may lead to slightly different durations due to yield differences
@@ -196,7 +196,7 @@ fn test_real_duration_uk_gilt() {
     let as_of = d(2025, 1, 2);
 
     // Act
-    let dur = ilb.real_duration(as_of).unwrap();
+    let dur = ilb.real_duration(as_of, 1.0).unwrap();
 
     // Assert - 20-year gilt should have substantial duration
     assert!(dur > 10.0);

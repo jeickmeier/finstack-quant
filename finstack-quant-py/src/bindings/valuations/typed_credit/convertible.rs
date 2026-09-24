@@ -597,9 +597,10 @@ impl PyConvertibleBond {
     ///     coupons require the forward curve and realized historical fixings.
     /// as_of : datetime.date | str
     ///     Valuation date.
-    /// bump_size : float | None
-    ///     Finite-difference bump for delta/gamma as a fraction of spot;
-    ///     ``None`` uses the pricer default.
+    ///
+    /// Bump sizes come from the bond's ``metric_pricing_overrides.bump_config``
+    /// (``spot_bump_pct``, ``vol_bump_pct``, ``rate_bump_bp``), defaulting to
+    /// 1% of spot, 1 vol point and 1bp.
     ///
     /// Returns
     /// -------
@@ -614,20 +615,18 @@ impl PyConvertibleBond {
     ///     If the tree pricer fails.
     /// ValueError
     ///     If inputs violate the selected lattice's admissible numerical domain.
-    #[pyo3(signature = (market, as_of, bump_size=None))]
-    #[pyo3(text_signature = "($self, market, as_of, bump_size=None)")]
+    #[pyo3(text_signature = "($self, market, as_of)")]
     fn greeks<'py>(
         &self,
         py: Python<'py>,
         market: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
-        bump_size: Option<f64>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let market = extract_market(py, market)?;
         let as_of = extract_date(as_of)?;
         let greeks = self
             .inner
-            .greeks(&market, None, bump_size, as_of)
+            .greeks(&market, None, as_of)
             .map_err(core_to_py)?;
         serde_to_py(py, &greeks)
     }

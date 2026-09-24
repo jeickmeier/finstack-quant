@@ -3,14 +3,18 @@
 //! Both use bump-and-reprice (central finite difference) since there are no
 //! closed-form analytical greeks for arithmetic Asian options.
 //!
-//! - **Delta**: Bumps the forward price curve (PriceCurve) by ±1% parallel
-//!   and computes the central difference.
-//! - **Vega**: Bumps the vol surface by ±1 vol point (absolute) and computes
-//!   the central difference, scaled to per-1-vol-point sensitivity.
+//! - **Delta**: Bumps the forward price curve (PriceCurve) by ±`spot_bump_pct`
+//!   (default 1%) parallel and computes the central difference.
+//! - **Vega**: Bumps the vol surface by ±`vol_bump_pct` (default 1 vol point,
+//!   absolute) and reports the central difference per 1 vol point.
+//!
+//! Bump sizes resolve from `metric_pricing_overrides.bump_config` and the
+//! `valuations.sensitivities.v1` config extension.
 
 use crate::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::metrics::{MetricCalculator, MetricContext};
+use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::{MetricCalculator, MetricContext, VOL_POINTS_PER_ABSOLUTE_VOL};
 use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
 };
@@ -23,8 +27,8 @@ use finstack_quant_core::Result;
 /// ```text
 /// Delta = (PV_up - PV_down) / (2 * bump_size)
 /// ```
-/// where `bump_size` is 1% of the average forward price, and the PriceCurve
-/// is bumped by ±1% parallel.
+/// where `bump_size` is the resolved spot bump (default 1%) of the average
+/// forward price, and the PriceCurve is bumped by the same relative amount.
 pub(super) struct AsianDeltaCalculator;
 
 impl MetricCalculator for AsianDeltaCalculator {
@@ -40,7 +44,7 @@ impl MetricCalculator for AsianDeltaCalculator {
             return Ok(0.0);
         }
 
-        let bump_pct = crate::metrics::bump_sizes::SPOT; // 1% = 0.01
+        let bump_pct = sens_config::resolve(context)?.spot_bump_pct;
 
         let (fwd_sum, fwd_count) = asian.future_forwards(&context.curves, context.as_of)?;
         if fwd_count == 0 {
@@ -52,7 +56,7 @@ impl MetricCalculator for AsianDeltaCalculator {
             return Ok(0.0);
         }
 
-        // Bump forward curve up by 1%
+        // Bump forward curve up
         let curve_id = CurveId::new(asian.forward_curve_id.as_str());
         let market_up = context.curves.bump([MarketBump::Curve {
             id: curve_id.clone(),
@@ -65,7 +69,7 @@ impl MetricCalculator for AsianDeltaCalculator {
         }])?;
         let pv_up = asian.value(&market_up, context.as_of)?.amount();
 
-        // Bump forward curve down by 1%
+        // Bump forward curve down
         let market_down = context.curves.bump([MarketBump::Curve {
             id: curve_id,
             spec: BumpSpec {
@@ -86,10 +90,10 @@ impl MetricCalculator for AsianDeltaCalculator {
 ///
 /// Uses central finite difference on the vol surface:
 /// ```text
-/// Vega = (PV_up - PV_down) / (2 * vol_bump)
+/// Vega = (PV_up - PV_down) / (2 * vol_bump * 100)
 /// ```
-/// where `vol_bump` is 1 absolute vol point (0.01), giving sensitivity per
-/// 1 vol point move in implied volatility.
+/// where `vol_bump` is the resolved absolute vol bump (default 0.01), giving
+/// sensitivity per 1 vol point move in implied volatility.
 pub(super) struct AsianVegaCalculator;
 
 impl MetricCalculator for AsianVegaCalculator {
@@ -104,7 +108,7 @@ impl MetricCalculator for AsianVegaCalculator {
             return Ok(0.0);
         }
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY; // 1 vol point = 0.01
+        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
 
         // Bump vol surface up
         let market_up = crate::metrics::bump_surface_vol_absolute(
@@ -123,9 +127,8 @@ impl MetricCalculator for AsianVegaCalculator {
         let pv_down = asian.value(&market_down, context.as_of)?.amount();
 
         // `MetricId::Vega` is cash P&L for a one-vol-point move, not
-        // dPV/d(absolute volatility).  Because the scenarios already move the
-        // surface by +/- one vol point, the central P&L is simply half the
-        // difference between the two valuations.
-        Ok((pv_up - pv_down) / 2.0)
+        // dPV/d(absolute volatility): normalise by the bump width expressed in
+        // vol points (2.0 at the 1 vol-point default).
+        Ok((pv_up - pv_down) / (2.0 * vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL))
     }
 }

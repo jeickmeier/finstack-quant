@@ -42,14 +42,12 @@
 //! The bumped-curve `value()` already carries the leg signs, so the finite
 //! difference reproduces the correct sign without an explicit branch.
 
+use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_swap::InflationSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::Result;
-
-/// Standard inflation curve bump: 1bp (0.0001 in decimal).
-pub(crate) const INFLATION_BUMP_BP: f64 = 0.0001;
 
 /// Calculates Inflation01 (1bp inflation rate sensitivity) for zero-coupon
 /// inflation swaps via central finite differences on the inflation curve.
@@ -61,7 +59,7 @@ impl MetricCalculator for Inflation01Calculator {
         let as_of = context.as_of;
 
         // Bump the inflation curve up by 1bp and reprice.
-        let bump_up = BumpSpec::inflation_shift_pct(INFLATION_BUMP_BP * 100.0);
+        let bump_up = BumpSpec::inflation_shift_pct(ONE_BASIS_POINT * 100.0);
         let curves_up = context.curves.as_ref().bump([MarketBump::Curve {
             id: swap.inflation_index_id.clone(),
             spec: bump_up,
@@ -69,7 +67,7 @@ impl MetricCalculator for Inflation01Calculator {
         let pv_up = swap.value(&curves_up, as_of)?.amount();
 
         // Bump the inflation curve down by 1bp and reprice.
-        let bump_down = BumpSpec::inflation_shift_pct(-INFLATION_BUMP_BP * 100.0);
+        let bump_down = BumpSpec::inflation_shift_pct(-ONE_BASIS_POINT * 100.0);
         let curves_down = context.curves.as_ref().bump([MarketBump::Curve {
             id: swap.inflation_index_id.clone(),
             spec: bump_down,
@@ -78,10 +76,10 @@ impl MetricCalculator for Inflation01Calculator {
 
         // Central difference: Inflation01 = (PV_up - PV_down) / 2.
         //
-        // The curve was bumped by exactly ±1bp (INFLATION_BUMP_BP = 0.0001).
+        // The curve was bumped by exactly ±1bp (ONE_BASIS_POINT = 0.0001).
         // A symmetric ±1bp central difference already produces the PV change
         // for a 1bp move; no further normalization by the decimal bump value is
-        // needed. Dividing by 2 (not by 2 × INFLATION_BUMP_BP) is the correct
+        // needed. Dividing by 2 (not by 2 × ONE_BASIS_POINT) is the correct
         // per-1bp convention — consistent with DV01 and CS01 in the workspace.
         Ok((pv_up - pv_down) / 2.0)
     }
@@ -89,7 +87,7 @@ impl MetricCalculator for Inflation01Calculator {
 
 #[cfg(test)]
 mod tests {
-    use super::INFLATION_BUMP_BP;
+    use super::ONE_BASIS_POINT;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::rates::inflation_swap::InflationSwap;
     use crate::instruments::PricingOptions;
@@ -169,7 +167,7 @@ mod tests {
         let market = market(as_of);
 
         // Compute the two bumped PVs the same way the calculator does.
-        let bump = INFLATION_BUMP_BP;
+        let bump = ONE_BASIS_POINT;
         let curves_up = market
             .bump([MarketBump::Curve {
                 id: swap.inflation_index_id.clone(),

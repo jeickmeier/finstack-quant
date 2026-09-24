@@ -369,6 +369,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -394,7 +395,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
                 as_of,
             ))?
             .rate;
-        let bump_size = current_spot * crate::metrics::bump_sizes::SPOT;
+        let bump_size = current_spot * bumps.spot_bump_pct;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
@@ -411,7 +412,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_up.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 + crate::metrics::bump_sizes::SPOT),
+                current_spot * (1.0 + bumps.spot_bump_pct),
             )?;
             market.clone().insert_fx(fx_up)
         };
@@ -420,7 +421,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_dn.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 - crate::metrics::bump_sizes::SPOT),
+                current_spot * (1.0 - bumps.spot_bump_pct),
             )?;
             market.clone().insert_fx(fx_dn)
         };
@@ -435,6 +436,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -461,7 +463,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
                 as_of,
             ))?
             .rate;
-        let bump_size = current_spot * crate::metrics::bump_sizes::SPOT;
+        let bump_size = current_spot * bumps.spot_bump_pct;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
@@ -473,7 +475,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_up.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 + crate::metrics::bump_sizes::SPOT),
+                current_spot * (1.0 + bumps.spot_bump_pct),
             )?;
             market.clone().insert_fx(fx_up)
         };
@@ -482,7 +484,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_dn.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 - crate::metrics::bump_sizes::SPOT),
+                current_spot * (1.0 - bumps.spot_bump_pct),
             )?;
             market.clone().insert_fx(fx_dn)
         };
@@ -499,6 +501,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -517,7 +520,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             .implied_volatility
             == Some(0.0)
         {
-            let bump = crate::metrics::bump_sizes::VOLATILITY;
+            let bump = bumps.vol_bump_pct;
             let (up, market_up) = crate::metrics::bump_active_volatility(
                 self,
                 market,
@@ -534,8 +537,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility
-            .map_or(crate::metrics::bump_sizes::VOLATILITY, |volatility| {
-                crate::metrics::bump_sizes::VOLATILITY.min(volatility * 0.5)
+            .map_or(bumps.vol_bump_pct, |volatility| {
+                bumps.vol_bump_pct.min(volatility * 0.5)
             });
         let (up, market_up) = crate::metrics::bump_active_volatility(
             self,
@@ -559,6 +562,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -572,7 +576,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = self.metric_pricing_overrides.rho_bump_bp();
+        let bump_bp = bumps.rate_bump_bp;
         let bumped = crate::metrics::bump_discount_curve_parallel(
             market,
             &self.domestic_discount_curve_id,
@@ -817,7 +821,13 @@ mod tests {
             .rate;
 
         // Running the FD gamma exercises the bump-and-rebuild path.
-        let _gamma = OptionGreeksProvider::option_gamma(&touch, &market, as_of).expect("gamma");
+        let _gamma = OptionGreeksProvider::option_gamma(
+            &touch,
+            &market,
+            as_of,
+            crate::instruments::GreekBumps::default(),
+        )
+        .expect("gamma");
 
         let spot_after = market
             .fx()
@@ -839,7 +849,7 @@ mod tests {
             "base PV must be stable after FD Greeks ran: pv1={pv1} pv2={pv2}"
         );
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump = 0.01;
         let up = crate::metrics::bump_surface_vol_absolute(
             &market,
             touch.vol_surface_id.as_str(),
@@ -855,9 +865,14 @@ mod tests {
         let expected_vega = (touch.value(&up, as_of).expect("up pv").amount()
             - touch.value(&down, as_of).expect("down pv").amount())
             / (2.0 * vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL);
-        let vega = OptionGreeksProvider::option_vega(&touch, &market, as_of)
-            .expect("vega")
-            .expect("touch vega");
+        let vega = OptionGreeksProvider::option_vega(
+            &touch,
+            &market,
+            as_of,
+            crate::instruments::GreekBumps::default(),
+        )
+        .expect("vega")
+        .expect("touch vega");
         assert!(
             (vega - expected_vega).abs() <= 1e-9 * expected_vega.abs().max(1.0),
             "touch vega must be cash PV per vol point: expected {expected_vega}, got {vega}"

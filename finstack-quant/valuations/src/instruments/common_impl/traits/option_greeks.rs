@@ -26,6 +26,41 @@ pub enum OptionGreekKind {
     Volga,
 }
 
+/// Finite-difference bump sizes passed to every [`OptionGreeksProvider`] method.
+///
+/// The metric layer resolves them from the `valuations.sensitivities.v1`
+/// `FinstackConfig` extension layered with
+/// `metric_pricing_overrides.bump_config`, so a provider never reads bump
+/// sizes from anywhere else. [`GreekBumps::default`] holds the library
+/// defaults: a 1% relative spot bump, a 1 vol-point absolute volatility bump
+/// and a 1bp parallel rate bump.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_valuations::instruments::GreekBumps;
+///
+/// let bumps = GreekBumps::default();
+/// assert_eq!(bumps.spot_bump_pct, 0.01);
+/// assert_eq!(bumps.vol_bump_pct, 0.01);
+/// assert_eq!(bumps.rate_bump_bp, 1.0);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GreekBumps {
+    /// Relative spot bump as a decimal fraction of spot (0.01 = 1%).
+    pub spot_bump_pct: f64,
+    /// Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
+    pub vol_bump_pct: f64,
+    /// Parallel rate bump in basis points (1.0 = 1bp).
+    pub rate_bump_bp: f64,
+}
+
+impl Default for GreekBumps {
+    fn default() -> Self {
+        (&crate::metrics::sensitivities::config::SensitivitiesConfig::default()).into()
+    }
+}
+
 /// Inputs needed to request a specific option greek.
 ///
 /// `base_pv` is required only for [`OptionGreekKind::Volga`].
@@ -35,6 +70,8 @@ pub struct OptionGreeksRequest {
     pub greek: OptionGreekKind,
     /// Base PV required by some greeks such as volga.
     pub base_pv: Option<f64>,
+    /// Finite-difference bump sizes resolved by the metric layer.
+    pub bumps: GreekBumps,
 }
 
 impl OptionGreeksRequest {
@@ -79,79 +116,160 @@ pub struct OptionGreeks {
 /// supported for this instrument" rather than as a zero-valued greek.
 pub trait OptionGreeksProvider: Send + Sync {
     /// Return cash delta per instrument conventions.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_delta(
         &self,
         _market: &MarketContext,
         _as_of: Date,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return cash gamma per instrument conventions.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_gamma(
         &self,
         _market: &MarketContext,
         _as_of: Date,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return cash vega per instrument conventions (1 vol point).
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_vega(
         &self,
         _market: &MarketContext,
         _as_of: Date,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return theta per instrument conventions.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_theta(
         &self,
         _market: &MarketContext,
         _as_of: Date,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return domestic rho per instrument conventions (per 1bp).
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_rho_bp(
         &self,
         _market: &MarketContext,
         _as_of: Date,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return foreign/dividend rho per instrument conventions (per 1bp).
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_foreign_rho_bp(
         &self,
         _market: &MarketContext,
         _as_of: Date,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return vanna per instrument conventions.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_vanna(
         &self,
         _market: &MarketContext,
         _as_of: Date,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return volga per instrument conventions.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
+    ///   bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `base_pv` - Unbumped present value in instrument currency, reused as the
+    ///   centre of the second difference.
+    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
+    ///   rather than hard-coded constants.
     fn option_volga(
         &self,
         _market: &MarketContext,
         _as_of: Date,
         _base_pv: f64,
+        _bumps: GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(None)
     }
 
     /// Return the requested greek in a sparse [`OptionGreeks`] payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data used for base and bumped repricing.
+    /// * `as_of` - Valuation date.
+    /// * `request` - Requested greek, optional base PV (required for volga) and
+    ///   the resolved finite-difference bump sizes.
     fn option_greeks(
         &self,
         market: &MarketContext,
@@ -159,18 +277,20 @@ pub trait OptionGreeksProvider: Send + Sync {
         request: &OptionGreeksRequest,
     ) -> finstack_quant_core::Result<OptionGreeks> {
         let mut greeks = OptionGreeks::default();
+        let bumps = request.bumps;
         match request.greek {
-            OptionGreekKind::Delta => greeks.delta = self.option_delta(market, as_of)?,
-            OptionGreekKind::Gamma => greeks.gamma = self.option_gamma(market, as_of)?,
-            OptionGreekKind::Vega => greeks.vega = self.option_vega(market, as_of)?,
-            OptionGreekKind::Theta => greeks.theta = self.option_theta(market, as_of)?,
-            OptionGreekKind::Rho => greeks.rho_bp = self.option_rho_bp(market, as_of)?,
+            OptionGreekKind::Delta => greeks.delta = self.option_delta(market, as_of, bumps)?,
+            OptionGreekKind::Gamma => greeks.gamma = self.option_gamma(market, as_of, bumps)?,
+            OptionGreekKind::Vega => greeks.vega = self.option_vega(market, as_of, bumps)?,
+            OptionGreekKind::Theta => greeks.theta = self.option_theta(market, as_of, bumps)?,
+            OptionGreekKind::Rho => greeks.rho_bp = self.option_rho_bp(market, as_of, bumps)?,
             OptionGreekKind::ForeignRho => {
-                greeks.foreign_rho_bp = self.option_foreign_rho_bp(market, as_of)?;
+                greeks.foreign_rho_bp = self.option_foreign_rho_bp(market, as_of, bumps)?;
             }
-            OptionGreekKind::Vanna => greeks.vanna = self.option_vanna(market, as_of)?,
+            OptionGreekKind::Vanna => greeks.vanna = self.option_vanna(market, as_of, bumps)?,
             OptionGreekKind::Volga => {
-                greeks.volga = self.option_volga(market, as_of, request.require_base_pv()?)?;
+                greeks.volga =
+                    self.option_volga(market, as_of, request.require_base_pv()?, bumps)?;
             }
         }
         Ok(greeks)
@@ -221,6 +341,7 @@ mod tests {
             &self,
             _market: &MarketContext,
             _as_of: Date,
+            _bumps: GreekBumps,
         ) -> finstack_quant_core::Result<Option<f64>> {
             Ok(Some(42.0))
         }
@@ -237,6 +358,7 @@ mod tests {
                 &OptionGreeksRequest {
                     greek: OptionGreekKind::Delta,
                     base_pv: None,
+                    bumps: GreekBumps::default(),
                 },
             )
             .expect("delta should compute");

@@ -768,8 +768,18 @@ impl InflationLinkedBond {
     /// Calculate inflation-adjusted duration (Real Duration)
     ///
     /// Computes the modified duration of the bond based on its real (unadjusted)
-    /// cashflows. This measures sensitivity to changes in real yield.
-    pub fn real_duration(&self, as_of: Date) -> Result<f64> {
+    /// cashflows by a central difference in the real yield. This measures
+    /// sensitivity to changes in real yield.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; the real yield is solved from `quoted_clean`
+    ///   at this date.
+    /// * `ytm_bump_bp` - Real-yield shock in basis points (1.0 = 1bp) used for
+    ///   the central difference; must be finite and positive. The
+    ///   `RealDuration` metric passes
+    ///   `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to 1bp.
+    pub fn real_duration(&self, as_of: Date, ytm_bump_bp: f64) -> Result<f64> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
             price_from_ytm_compounded_params, YieldCompounding,
         };
@@ -780,9 +790,14 @@ impl InflationLinkedBond {
                 "Real duration requires quoted_clean, the same clean price per 100 used for real yield".into(),
             )
         })?;
+        if !ytm_bump_bp.is_finite() || ytm_bump_bp <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "real duration ytm_bump_bp must be finite and positive, got {ytm_bump_bp}"
+            )));
+        }
         let y0 = self.real_yield(base_clean, as_of)?;
-        // Bump yield by 1bp in decimal terms
-        let bp = 1e-4;
+        // Yield shock in decimal terms.
+        let bp = ytm_bump_bp / 10_000.0;
 
         // Use real schedule to calculate sensitivity to real yield (Real Duration)
         // This assumes the "Duration" metric refers to the duration of the real bond component.
@@ -1106,7 +1121,7 @@ mod tests {
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
-        let duration = bond.real_duration(as_of).expect("real duration");
+        let duration = bond.real_duration(as_of, 1.0).expect("real duration");
         let y0 = bond.real_yield(100.0, as_of).expect("real yield");
         let flows = bond.build_real_schedule(as_of).expect("real schedule");
         let price_from_yield = |y: f64| -> Result<f64> {

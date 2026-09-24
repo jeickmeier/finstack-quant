@@ -10,7 +10,34 @@ mod dividend_risk;
 mod implied_vol;
 mod speed;
 
-use crate::metrics::MetricRegistry;
+use crate::instruments::equity::equity_option::EquityOption;
+use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::{MetricContext, MetricRegistry};
+
+/// Relative spot bump shared by the charm, speed and color stencils.
+///
+/// Starts from the resolved spot bump (`valuations.sensitivities.v1` layered
+/// with `metric_pricing_overrides.bump_config`). When
+/// `bump_config.adaptive_bumps` is set and no explicit
+/// `bump_config.spot_bump_pct` is given, the bump widens with moneyness,
+/// capped at 5× the resolved bump, so deep ITM/OTM stencils stay out of the
+/// noise floor.
+fn spot_bump_pct(
+    context: &MetricContext,
+    option: &EquityOption,
+    spot: f64,
+) -> finstack_quant_core::Result<f64> {
+    let resolved = sens_config::resolve(context)?.spot_bump_pct;
+    let adaptive = context
+        .get_metric_overrides()
+        .is_some_and(|po| po.bump_config.adaptive_bumps && po.bump_config.spot_bump_pct.is_none());
+    if adaptive {
+        let moneyness = (spot - option.strike).abs() / option.strike;
+        Ok(resolved * (1.0 + 2.0 * moneyness).min(5.0))
+    } else {
+        Ok(resolved)
+    }
+}
 
 /// Register equity option metrics with the registry.
 pub(crate) fn register_equity_option_metrics(

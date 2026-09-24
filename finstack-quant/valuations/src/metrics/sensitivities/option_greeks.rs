@@ -7,7 +7,8 @@
 use std::marker::PhantomData;
 
 use crate::instruments::common_impl::traits::{
-    Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest,
+    GreekBumps, Instrument, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
+    OptionGreeksRequest,
 };
 use crate::metrics::{metric_not_found, MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
@@ -146,6 +147,7 @@ where
         }
 
         let base_pv = (self.base_pv)(context);
+        let bumps = GreekBumps::from(&super::config::resolve(context)?);
         let inst: &I = context.instrument_as()?;
         let greeks = inst.option_greeks(
             &context.curves,
@@ -153,6 +155,7 @@ where
             &OptionGreeksRequest {
                 greek: self.kind,
                 base_pv,
+                bumps,
             },
         )?;
         store_available_greeks(context, greeks);

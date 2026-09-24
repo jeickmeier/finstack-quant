@@ -1003,21 +1003,26 @@ impl ConvertibleBond {
     ///   lookup otherwise uses the contractual conversion strike.
     /// * `tree_type` - Optional binomial/trinomial grid and step count; `None`
     ///   uses the canonical 200-step binomial tree for every repricing.
-    /// * `bump_size` - Optional finite positive spot-relative bump for delta and
-    ///   gamma; `None` uses 1%. Vega is per volatility point and rho per bp.
     /// * `as_of` - Valuation date and origin of the ACT/365F equity model clock.
+    ///
+    /// Bump sizes come from `metric_pricing_overrides.bump_config`
+    /// (`spot_bump_pct`, `vol_bump_pct`, `rate_bump_bp`), defaulting to 1%,
+    /// 1 vol point and 1bp. Vega is per volatility point and rho per bp.
     pub fn greeks(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         tree_type: Option<pricing::ConvertibleTreeType>,
-        bump_size: Option<f64>,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<ConvertibleGreeks> {
+        let bumps = crate::metrics::sensitivities::config::from_context_or_default(
+            &finstack_quant_core::config::FinstackConfig::default(),
+            Some(&self.metric_pricing_overrides),
+        )?;
         let greeks = pricing::calculate_convertible_greeks(
             self,
             curves,
             tree_type.unwrap_or_default(),
-            bump_size,
+            crate::instruments::GreekBumps::from(&bumps),
             as_of,
         )?;
         Ok(greeks.into())
@@ -1029,7 +1034,7 @@ impl ConvertibleBond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, None, as_of)?;
+        let greeks = self.greeks(curves, None, as_of)?;
         Ok(greeks.delta)
     }
 
@@ -1039,7 +1044,7 @@ impl ConvertibleBond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, None, as_of)?;
+        let greeks = self.greeks(curves, None, as_of)?;
         Ok(greeks.gamma)
     }
 
@@ -1049,7 +1054,7 @@ impl ConvertibleBond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, None, as_of)?;
+        let greeks = self.greeks(curves, None, as_of)?;
         Ok(greeks.vega)
     }
 
@@ -1059,7 +1064,7 @@ impl ConvertibleBond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, None, as_of)?;
+        let greeks = self.greeks(curves, None, as_of)?;
         Ok(greeks.rho)
     }
 
@@ -1069,7 +1074,7 @@ impl ConvertibleBond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        let greeks = self.greeks(curves, None, None, as_of)?;
+        let greeks = self.greeks(curves, None, as_of)?;
         Ok(greeks.theta)
     }
 }

@@ -2,6 +2,81 @@
 
 ## [Unreleased]
 
+### Bump sizes: one field per bump (2026-09-24)
+
+Numbers change only when a bump override is set, plus CliquetOption rho and
+Bermudan swaption `hw_sigma_vega`. Every other default output is bit-identical,
+pinned by `tests/metrics/bump_config_routing.rs`.
+
+#### Changed (BREAKING)
+
+- `BumpConfig.ytm_bump_decimal` (now `ytm_bump_bp`, in bp: 1.0 = 1bp) and
+  `MetricPricingOverrides::with_ytm_bump_decimal` (now `with_ytm_bump`); Rust,
+  Python docs and the `metric_pricing_overrides` JSON wire. It now sizes the
+  InflationLinkedBond `RealDuration` shock and the structured-credit
+  `DurationMod` and `Convexity` shocks. Structured-credit convexity keeps its
+  10bp default when the field is unset.
+- `TaylorAttributionConfig.credit_bump_bp` (now `credit_spread_bump_bp`); Rust,
+  attribution JSON wire, notebooks and docs-site.
+- `OptionGreeksProvider` methods take a `bumps: GreekBumps` argument and
+  `OptionGreeksRequest` carries a `bumps` field (Rust). The new public
+  `GreekBumps { spot_bump_pct, vol_bump_pct, rate_bump_bp }` is resolved from
+  `valuations.sensitivities.v1` layered with `metric_pricing_overrides.bump_config`.
+- `ConvertibleBond::greeks(curves, tree_type, bump_size, as_of)` (now
+  `greeks(curves, tree_type, as_of)`) and Python `ConvertibleBond.greeks(market,
+  as_of, bump_size=None)` (now `greeks(market, as_of)`). Bumps come from the
+  bond's `metric_pricing_overrides.bump_config`. `calculate_convertible_greeks`
+  takes `bumps: GreekBumps` in place of `bump_size: Option<f64>`.
+- `CDSTranchePricer::calculate_cs01` takes `credit_spread_bump_bp: f64`;
+  `InflationLinkedBond::real_duration` takes `ytm_bump_bp: f64`;
+  `calculate_tranche_duration` and `calculate_tranche_convexity` take
+  `ytm_bump_bp: f64` (Rust).
+
+#### Removed
+
+- `BumpConfig.rho_bump_decimal` and `BumpConfig.vega_bump_decimal` (twins of
+  `rate_bump_bp` and `vol_bump_pct`) and their resolver fallbacks; Rust and the
+  `metric_pricing_overrides` JSON wire, which now rejects both keys.
+- `MetricPricingOverrides::rho_bump_bp()` (Rust).
+- `CDSTranchePricerConfig.cs01_bump_size` (use `bump_config.credit_spread_bump_bp`)
+  and `CDSTranchePricerConfig.corr_bump_abs` (Correlation01 uses the shared
+  0.01 correlation bump); Rust only.
+- The crate-internal `metrics::bump_sizes` constants, the local
+  `DIVIDEND_BUMP_BP`/`INFLATION_BUMP_BP` constants (now `ONE_BASIS_POINT`) and
+  the Bermudan `DEFAULT_VOL_BUMP_PCT`/cap-floor `DEFAULT_HW_VEGA_BUMP` (now one
+  `rates::hw1f::HW_SIGMA_BUMP = 1e-4`).
+
+#### Fixed
+
+- **Every finite-difference greek honours `bump_config`.** EquityOption,
+  FxOption, FxBarrierOption, FxTouchOption, QuantoOption and commodity option
+  vanna/volga/delta/gamma/vega, EquityTRS delta, quanto `fx_delta`/`fx_vega`,
+  commodity Asian and spread option greeks, CmsOption delta/rho/vega/volga,
+  InflationCapFloor vega, CapFloor forward PV01, VarianceSwap DV01 and the
+  Bermudan swaption delta ignored `spot_bump_pct`, `vol_bump_pct` or
+  `rate_bump_bp`. Results stay in their reporting units (per 1%, per vol point,
+  per bp) whatever the bump size.
+- **Every Rho reports per 1bp** as `(pv_bumped - pv) / rate_bump_bp`: Quanto,
+  FxBarrier, FxTouch, RangeAccrual, Lookback, Cliquet and CmsOption.
+- **Charm, speed and color** share one spot bump that starts from the resolved
+  bump; `adaptive_bumps` widens it only when no explicit `spot_bump_pct` is set.
+
+**Numbers change:**
+
+- CliquetOption `rho`: it was 0 for a cliquet whose resets are all observed
+  (the time guard stopped at the last reset, not `expiry`) and otherwise the PV
+  change for a 0.0001bp bump. It is now the per-1bp discount sensitivity,
+  checked against `PV·(exp(−δr·τ) − 1)/bp` at 1bp and 10bp
+  (`fully_observed_cliquet_rho_is_discount_sensitivity`, 1e-9·|PV|).
+- Bermudan swaption `hw_sigma_vega` shifts σ by the absolute 1e-4 used by
+  cap/floor `hw_sigma_vega`, not by 1% of σ; checked against σ ± 1e-4 tree
+  re-runs (`bermudan_hw_sigma_vega_uses_absolute_bump`). The Bloomberg
+  `usd_cap_5y_atm_black` cap/floor golden is unchanged.
+- Any greek above whose `bump_config` override was set and ignored now moves to
+  the overridden stencil (test-side stencil re-runs at 1e-12; EquityOption
+  vanna/volga against Black-Scholes and FxOption volga against Garman-Kohlhagen
+  at 5e-3).
+
 ### Fixed income: senior-review remediation (2026-09-23)
 
 Numbers change for the instruments listed under **Fixed**; each change is

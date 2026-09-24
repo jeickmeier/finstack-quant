@@ -35,8 +35,8 @@ pub(super) fn binding_pricing_options() -> PricingOptions {
 /// ----------
 /// bump_config : dict | None
 ///     Finite-difference bump sizes (``spot_bump_pct``, ``vol_bump_pct``,
-///     ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_decimal``,
-///     ``rho_bump_decimal``, ``adaptive_bumps``). ``None`` keeps defaults.
+///     ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp``,
+///     ``adaptive_bumps``). ``None`` keeps defaults.
 /// mc_seed_scenario : str | None
 ///     Scenario name used to derive deterministic Monte Carlo seeds for
 ///     finite-difference Greeks (e.g. ``"delta_up"``).

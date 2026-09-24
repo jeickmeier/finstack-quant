@@ -255,7 +255,7 @@ fn test_metrics_consistency_with_direct_calls() {
     let duration_via_framework = result.measures[MetricId::RealDuration.as_str()];
 
     // Calculate via direct method
-    let duration_direct = ilb.real_duration(as_of).unwrap();
+    let duration_direct = ilb.real_duration(as_of, 1.0).unwrap();
 
     // Assert - should be identical
     relative_eq(

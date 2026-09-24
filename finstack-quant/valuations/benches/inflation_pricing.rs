@@ -270,7 +270,7 @@ fn inflation_linked_bond_analytics(c: &mut Criterion) {
     group.bench_function(BenchmarkId::new("real_duration", "5Y"), |b| {
         b.iter(|| {
             let result = tips_5y
-                .real_duration(black_box(as_of))
+                .real_duration(black_box(as_of), 1.0)
                 .expect("TIPS real duration should calculate successfully");
             black_box(result)
         });

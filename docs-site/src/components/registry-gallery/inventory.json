@@ -709,7 +709,7 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "763128511616934fd64e3bb804af9240c504b6c6d5dccbf0878b8271dcad1e9f"
+      "sha256": "a769ebf6fe0de46e77d8dd53c80e2305eb5a84b9e4d7b61abad692345353e940"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
@@ -729,11 +729,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "adbbf1a1bf86e25ab6924c9836e2ae6dd39c3687422bc743b22f905897211aa4"
+      "sha256": "ca6065d5e18d2250b1a47533964d2e044a834501ab10fca294bb1c691bc4464f"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "1d11a1053b04365b17822f2f72c75d38830dbb3d4d15a5c13b6e923562348851"
+      "sha256": "c9e2e45555485373494d9901c7e3f2709199eef3b9bf184cf4457938bac643dd"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

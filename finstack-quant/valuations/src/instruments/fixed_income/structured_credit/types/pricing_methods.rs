@@ -531,6 +531,11 @@ impl StructuredCredit {
                 &disc,
                 quote.settlement,
                 Money::new(model_dirty, pv.currency())?,
+                crate::metrics::sensitivities::config::resolve(&metric_context)?
+                    .ytm_bump_bp
+                    .unwrap_or(
+                        crate::instruments::fixed_income::structured_credit::metrics::risk::duration::DEFAULT_DURATION_YTM_BUMP_BP,
+                    ),
             )?,
         };
         let z_spread = match computed_metrics.get(&MetricId::ZSpread) {

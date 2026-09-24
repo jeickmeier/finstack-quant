@@ -101,10 +101,13 @@ the implementation defines that invariant.
 
 ## Finite differences
 
-`core/finite_difference.rs` is crate-private and holds the standard bump sizes
-(`bump_sizes`) plus curve and scalar bump helpers. Use the bump documented on
-the metric so PV and risk stay consistent. The only public item from it is
-`bump_surface_vol_absolute`.
+`core/finite_difference.rs` is crate-private and holds the curve and scalar
+bump helpers plus `CORRELATION_BUMP`. Spot, volatility, rate, credit-spread and
+yield bump sizes are never hard-coded: calculators resolve them with
+`sensitivities::config::resolve(context)`, which layers
+`metric_pricing_overrides.bump_config` over the `valuations.sensitivities.v1`
+config extension. Option-greek providers receive them as `GreekBumps`. The only
+public item from `finite_difference.rs` is `bump_surface_vol_absolute`.
 
 ## Adding a metric
 

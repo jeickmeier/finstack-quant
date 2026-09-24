@@ -11,10 +11,8 @@
 #![allow(clippy::field_reassign_with_default)]
 
 use super::helpers::*;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricer;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::TrancheSide;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-    CDSTranchePricer, CDSTranchePricerConfig,
-};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
@@ -32,7 +30,7 @@ fn test_standard_cs01_requires_replay_recipe() {
 
     // Act
     let error = pricer
-        .calculate_cs01(&tranche, &market, as_of, &provider)
+        .calculate_cs01(&tranche, &market, as_of, &provider, 1.0)
         .expect_err("standard tranche CS01 requires quote-space replay");
 
     // Assert
@@ -115,22 +113,14 @@ fn test_standard_cs01_is_normalized_across_bump_sizes() {
     let as_of = base_date();
     let tranche = mezzanine_tranche();
 
-    let mut config_1bp = CDSTranchePricerConfig::default();
-    config_1bp.cs01_bump_size = 1.0;
-    let pricer_1bp =
-        CDSTranchePricer::with_params(config_1bp).expect("valid tranche pricer config");
-
-    let mut config_2bp = CDSTranchePricerConfig::default();
-    config_2bp.cs01_bump_size = 2.0;
-    let pricer_2bp =
-        CDSTranchePricer::with_params(config_2bp).expect("valid tranche pricer config");
+    let pricer = CDSTranchePricer::new();
     let provider = finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
 
-    let cs01_1bp = pricer_1bp
-        .calculate_cs01(&tranche, &market, as_of, &provider)
+    let cs01_1bp = pricer
+        .calculate_cs01(&tranche, &market, as_of, &provider, 1.0)
         .expect("1bp replay-backed CS01");
-    let cs01_2bp = pricer_2bp
-        .calculate_cs01(&tranche, &market, as_of, &provider)
+    let cs01_2bp = pricer
+        .calculate_cs01(&tranche, &market, as_of, &provider, 2.0)
         .expect("2bp replay-backed CS01");
 
     assert!(cs01_1bp.is_finite() && cs01_2bp.is_finite());
@@ -163,13 +153,11 @@ fn test_direct_and_registered_cs01_share_quote_replay_convention() {
     market = market.insert_credit_index(&tranche.credit_index_id, index);
 
     let bump_bp = 2.0;
-    let mut pricer_config = CDSTranchePricerConfig::default();
-    pricer_config.cs01_bump_size = bump_bp;
-    let pricer = CDSTranchePricer::with_params(pricer_config).expect("valid tranche pricer config");
+    let pricer = CDSTranchePricer::new();
     let provider =
         Arc::new(finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new());
     let direct = pricer
-        .calculate_cs01(&tranche, &market, as_of, provider.as_ref())
+        .calculate_cs01(&tranche, &market, as_of, provider.as_ref(), bump_bp)
         .expect("direct replay-backed CS01 should calculate");
 
     let mut config = finstack_quant_core::config::FinstackConfig::default();
@@ -243,27 +231,6 @@ fn test_correlation_delta_equity_vs_senior() {
     assert!(corr_delta_equity.is_finite());
     assert!(corr_delta_senior.is_finite());
 }
-
-#[test]
-fn test_correlation_delta_with_custom_bump() {
-    // Arrange
-    let mut config = CDSTranchePricerConfig::default();
-    config.corr_bump_abs = 0.02; // 2% bump instead of default 1%
-    let pricer = CDSTranchePricer::with_params(config).expect("valid tranche pricer config");
-
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.calculate_correlation_delta(&tranche, &market, as_of);
-
-    // Assert
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_finite());
-}
-
-// ==================== Jump-to-Default Tests ====================
 
 #[test]
 fn test_jump_to_default_is_non_negative() {

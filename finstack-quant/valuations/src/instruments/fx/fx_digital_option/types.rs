@@ -254,6 +254,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.delta))
     }
@@ -262,6 +263,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.gamma))
     }
@@ -270,6 +272,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.vega))
     }
@@ -278,6 +281,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.theta))
     }
@@ -286,6 +290,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         // Rho domestic per 1bp
         Ok(Some(

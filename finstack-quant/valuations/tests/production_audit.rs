@@ -77,7 +77,8 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
             .expect("price")
     };
     let delta = (pv(0.0301, 0.025) - pv(0.0299, 0.025)) / 0.0002;
-    let vega = (pv(0.03, 0.02525) - pv(0.03, 0.02475)) / 0.0005 * 0.01;
+    // HwSigmaVega: absolute σ ± 1e-4 (HW_SIGMA_BUMP), reported per 0.01 σ.
+    let vega = (pv(0.03, 0.0251) - pv(0.03, 0.0249)) / 0.0002 * 0.01;
     assert!((result.measures["delta"] - delta).abs() < 1e-5);
     assert!((result.measures["hw_sigma_vega"] - vega).abs() < 1e-5);
     assert!(result.measures["theta"].is_finite());
@@ -897,13 +898,14 @@ fn m11_hw_greeks_use_the_active_parameters_and_tree_grid() {
         "reported={}, actual={delta}",
         base.measures["delta"]
     );
+    // HwSigmaVega: absolute σ ± 1e-4 (HW_SIGMA_BUMP), reported per 0.01 σ.
     let mut vol_up = swaption.clone();
-    vol_up.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.025 * 1.01);
+    vol_up.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.025 + 1e-4);
     let mut vol_down = swaption;
     vol_down
         .instrument_pricing_overrides
         .model_config
-        .hw1f_sigma = Some(0.025 * 0.99);
+        .hw1f_sigma = Some(0.025 - 1e-4);
     let vega = (vol_up
         .price_with_metrics(&market, as_of, &[], PricingOptions::default())
         .expect("vol up")
@@ -914,9 +916,56 @@ fn m11_hw_greeks_use_the_active_parameters_and_tree_grid() {
             .expect("vol down")
             .value
             .amount())
-        / (2.0 * 0.025 * 0.01)
+        / (2.0 * 1e-4)
         * 0.01;
     assert!((base.measures["hw_sigma_vega"] - vega).abs() < 1e-5);
+}
+
+/// Bermudan `HwSigmaVega` shifts σ by the absolute `HW_SIGMA_BUMP` (1e-4), the
+/// same step as cap/floor `HwSigmaVega`, not by 1% of σ. The reference re-runs
+/// the tree at σ ± 1e-4; the only difference is f64 re-association, so the
+/// tolerance is 1e-12 relative.
+#[test]
+fn bermudan_hw_sigma_vega_uses_absolute_bump() {
+    use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
+    let as_of = date!(2025 - 01 - 01);
+    let sigma = 0.008;
+    let mut swaption = BermudanSwaption::example();
+    swaption.underlying_float_leg.forward_curve_id = swaption.get_discount_curve_id().clone();
+    let config = &mut swaption.instrument_pricing_overrides.model_config;
+    config.hw1f_mean_reversion = Some(0.05);
+    config.hw1f_sigma = Some(sigma);
+    config.tree_steps = Some(60);
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder(swaption.get_discount_curve_id().clone())
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (20.0, (-0.6_f64).exp())])
+            .build()
+            .expect("curve"),
+    );
+    let reported = swaption
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::HwSigmaVega],
+            PricingOptions::default(),
+        )
+        .expect("risk")
+        .measures["hw_sigma_vega"];
+    let pv_at = |s: f64| {
+        let mut bumped = swaption.clone();
+        bumped.instrument_pricing_overrides.model_config.hw1f_sigma = Some(s);
+        bumped
+            .price_with_metrics(&market, as_of, &[], PricingOptions::default())
+            .expect("pv")
+            .value
+            .amount()
+    };
+    let expected = (pv_at(sigma + 1e-4) - pv_at(sigma - 1e-4)) / (2.0 * 1e-4) * 0.01;
+    assert!(
+        (reported - expected).abs() <= 1e-12 * expected.abs().max(1.0),
+        "hw_sigma_vega: expected {expected}, got {reported}"
+    );
 }
 
 #[test]

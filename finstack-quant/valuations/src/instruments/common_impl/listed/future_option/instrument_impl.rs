@@ -167,6 +167,7 @@ macro_rules! impl_future_option_instrument {
                 &self,
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
+                _bumps: crate::instruments::common_impl::traits::GreekBumps,
             ) -> finstack_quant_core::Result<Option<f64>> {
                 Ok(Some(self.cash_delta(market, as_of)?))
             }
@@ -175,6 +176,7 @@ macro_rules! impl_future_option_instrument {
                 &self,
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
+                _bumps: crate::instruments::common_impl::traits::GreekBumps,
             ) -> finstack_quant_core::Result<Option<f64>> {
                 Ok(Some(self.cash_gamma(market, as_of)?))
             }
@@ -183,6 +185,7 @@ macro_rules! impl_future_option_instrument {
                 &self,
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
+                _bumps: crate::instruments::common_impl::traits::GreekBumps,
             ) -> finstack_quant_core::Result<Option<f64>> {
                 Ok(Some(self.cash_vega(market, as_of)?))
             }
@@ -191,6 +194,7 @@ macro_rules! impl_future_option_instrument {
                 &self,
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
+                _bumps: crate::instruments::common_impl::traits::GreekBumps,
             ) -> finstack_quant_core::Result<Option<f64>> {
                 Ok(Some(self.cash_theta(market, as_of)?))
             }

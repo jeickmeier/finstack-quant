@@ -201,10 +201,10 @@ fn production_convertible_volatility_override_drives_price_and_greeks() {
     let reference_market = market(as_of, 0.03, 90.0, 0.4);
     let inactive_market = market(as_of, 0.03, 90.0, 0.1);
     let reference = bond
-        .greeks(&reference_market, None, None, as_of)
+        .greeks(&reference_market, None, as_of)
         .expect("reference Greeks");
     let actual = overridden
-        .greeks(&inactive_market, None, None, as_of)
+        .greeks(&inactive_market, None, as_of)
         .expect("override Greeks");
     assert!((actual.price - reference.price).abs() < 1e-9);
     assert!((actual.vega - reference.vega).abs() < 1e-9);

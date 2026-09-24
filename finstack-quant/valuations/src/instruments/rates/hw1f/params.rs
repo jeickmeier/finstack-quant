@@ -13,6 +13,11 @@ use finstack_quant_models::rates::hull_white::{
     capfloor_hw1f_scalar_keys, hw1f_scalar_keys, HullWhiteCalibrationParams,
 };
 
+/// Finite-difference step for Hull-White short-rate σ sensitivities
+/// (`MetricId::HwSigmaVega`): an **absolute** shift of 1e-4 (1bp of annual
+/// short-rate volatility). Results are reported per 0.01 absolute σ.
+pub const HW_SIGMA_BUMP: f64 = 1e-4;
+
 /// Parameter family that determines the market-scalar key convention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hw1fParamFamily {

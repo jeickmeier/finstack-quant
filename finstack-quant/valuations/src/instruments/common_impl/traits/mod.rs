@@ -76,7 +76,9 @@ mod option_greeks;
 mod pricing_options;
 
 pub use instrument::Instrument;
-pub use option_greeks::{OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest};
+pub use option_greeks::{
+    GreekBumps, OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest,
+};
 pub use pricing_options::PricingOptions;
 
 /// Metadata for instrument categorization, tagging, and scenario selection.

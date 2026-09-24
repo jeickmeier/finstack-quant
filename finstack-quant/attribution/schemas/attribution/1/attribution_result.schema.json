@@ -1954,7 +1954,7 @@
       "additionalProperties": false,
       "description": "Configuration for Taylor-based P&L attribution.",
       "properties": {
-        "credit_bump_bp": {
+        "credit_spread_bump_bp": {
           "default": 1.0,
           "description": "Credit spread bump size for CS01 computation (basis points).",
           "format": "double",

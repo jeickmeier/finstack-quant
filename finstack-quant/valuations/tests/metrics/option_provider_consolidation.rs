@@ -54,6 +54,7 @@ fn equity_option_provider_matches_registered_metrics_and_omits_foreign_rho() {
             &OptionGreeksRequest {
                 greek: OptionGreekKind::Delta,
                 base_pv: None,
+                bumps: finstack_quant_valuations::instruments::GreekBumps::default(),
             },
         )
         .expect("delta request should succeed");
@@ -67,6 +68,7 @@ fn equity_option_provider_matches_registered_metrics_and_omits_foreign_rho() {
             &OptionGreeksRequest {
                 greek: OptionGreekKind::ForeignRho,
                 base_pv: None,
+                bumps: finstack_quant_valuations::instruments::GreekBumps::default(),
             },
         )
         .expect("unsupported greek requests should still succeed");
@@ -79,6 +81,7 @@ fn equity_option_provider_matches_registered_metrics_and_omits_foreign_rho() {
             &OptionGreeksRequest {
                 greek: OptionGreekKind::Volga,
                 base_pv: Some(priced.value.amount()),
+                bumps: finstack_quant_valuations::instruments::GreekBumps::default(),
             },
         )
         .expect("volga request should succeed");
@@ -109,6 +112,7 @@ fn fx_option_provider_matches_registered_foreign_rho_and_volga() {
             &OptionGreeksRequest {
                 greek: OptionGreekKind::ForeignRho,
                 base_pv: None,
+                bumps: finstack_quant_valuations::instruments::GreekBumps::default(),
             },
         )
         .expect("foreign rho request should succeed");
@@ -124,6 +128,7 @@ fn fx_option_provider_matches_registered_foreign_rho_and_volga() {
             &OptionGreeksRequest {
                 greek: OptionGreekKind::Volga,
                 base_pv: Some(priced.value.amount()),
+                bumps: finstack_quant_valuations::instruments::GreekBumps::default(),
             },
         )
         .expect("volga request should succeed");

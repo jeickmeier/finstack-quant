@@ -784,7 +784,7 @@ mod production_credit_audit {
         let provider =
             finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
         let direct = CDSTranchePricer::new()
-            .calculate_cs01(&tranche, &market, base_date(), &provider)
+            .calculate_cs01(&tranche, &market, base_date(), &provider, 1.0)
             .expect("direct hedge sensitivity");
         assert!((direct - expected).abs() < 1e-4 * expected.abs());
     }

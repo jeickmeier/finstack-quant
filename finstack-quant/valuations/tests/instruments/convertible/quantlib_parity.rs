@@ -32,6 +32,7 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
 };
+use finstack_quant_valuations::instruments::GreekBumps;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -291,7 +292,7 @@ fn quantlib_parity_delta_in_the_money() {
         &bond,
         &market,
         ConvertibleTreeType::Binomial(100),
-        Some(0.01),
+        GreekBumps::default(),
         base,
     )
     .unwrap();
@@ -337,7 +338,7 @@ fn quantlib_parity_delta_out_of_the_money() {
         &bond,
         &market,
         ConvertibleTreeType::Binomial(100),
-        Some(0.01),
+        GreekBumps::default(),
         base,
     )
     .unwrap();
@@ -376,7 +377,7 @@ fn quantlib_parity_gamma() {
         &bond,
         &market,
         ConvertibleTreeType::Binomial(100),
-        Some(0.01),
+        GreekBumps::default(),
         base,
     )
     .unwrap();
@@ -410,7 +411,7 @@ fn quantlib_parity_vega() {
         &bond,
         &market,
         ConvertibleTreeType::Binomial(100),
-        Some(0.01),
+        GreekBumps::default(),
         base,
     )
     .unwrap();
@@ -443,7 +444,7 @@ fn quantlib_parity_theta() {
         &bond,
         &market,
         ConvertibleTreeType::Binomial(100),
-        Some(0.01),
+        GreekBumps::default(),
         base,
     )
     .unwrap();
@@ -482,7 +483,7 @@ fn quantlib_parity_rho() {
         &bond,
         &market,
         ConvertibleTreeType::Binomial(100),
-        Some(0.01),
+        GreekBumps::default(),
         base,
     )
     .unwrap();

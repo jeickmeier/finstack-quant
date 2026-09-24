@@ -322,27 +322,30 @@ impl MarketQuoteOverrides {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct BumpConfig {
-    /// Rho bump size in **decimal rate** units (default `0.0001 = 1bp`).
+    /// Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
+    /// convexity: InflationLinkedBond `RealDuration` and structured-credit
+    /// `DurationMod`/`Convexity`.
     ///
-    /// Note: internal curve-bump APIs often take bump sizes in **bp** units (`1.0 = 1bp`).
-    /// Prefer using [`MetricPricingOverrides::rho_bump_bp`] when wiring into `BumpSpec::parallel_bp`
-    /// or `metrics::bump_discount_curve_parallel` to avoid unit mistakes.
-    pub rho_bump_decimal: Option<f64>,
-    /// Vega bump size in decimal (default 0.01 = 1%)
-    pub vega_bump_decimal: Option<f64>,
-    /// Optional YTM bump size for numerical metrics (e.g., convexity/duration), in decimal (1 bp = 1e-4)
-    pub ytm_bump_decimal: Option<f64>,
-    /// Custom spot bump size override (as percentage, e.g., 0.01 for 1%)
+    /// `None` keeps each metric's default shock (1bp for duration, 10bp for
+    /// structured-credit convexity).
+    pub ytm_bump_bp: Option<f64>,
+    /// Spot bump as a decimal fraction of spot (0.01 = 1%).
     ///
-    /// When set, overrides both standard and adaptive spot bump calculations.
+    /// Sizes every finite-difference spot greek (delta, gamma, vanna, charm,
+    /// speed, color, FX delta). When set it also replaces the adaptive spot
+    /// bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
     pub spot_bump_pct: Option<f64>,
-    /// Custom volatility bump size override (as absolute vol, e.g., 0.01 for 1% vol)
+    /// Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
     ///
-    /// When set, overrides both standard and adaptive volatility bump calculations.
+    /// Sizes every finite-difference volatility greek (vega, vanna, volga, FX
+    /// vega). `None` uses the `valuations.sensitivities.v1` value (default
+    /// 1 vol point). Results stay reported per 1 vol point.
     pub vol_bump_pct: Option<f64>,
-    /// Custom rate bump size override (in basis points, e.g., 1.0 for 1bp)
+    /// Parallel rate bump in basis points (1.0 = 1bp).
     ///
-    /// When set, overrides both standard and adaptive rate bump calculations.
+    /// Sizes DV01, rho, foreign rho and forward PV01. Results stay reported per
+    /// 1bp: `(pv_bumped - pv) / rate_bump_bp`. `None` uses the
+    /// `valuations.sensitivities.v1` value (default 1bp).
     pub rate_bump_bp: Option<f64>,
     /// Custom credit spread bump size override (in basis points, e.g., 1.0 for 1bp).
     ///
@@ -369,12 +372,10 @@ impl BumpConfig {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         // Every bump size must be finite and non-negative.
         check_finite_fields(&[
-            (self.ytm_bump_decimal, true),
+            (self.ytm_bump_bp, true),
             (self.spot_bump_pct, true),
             (self.vol_bump_pct, true),
             (self.rate_bump_bp, true),
-            (self.rho_bump_decimal, true),
-            (self.vega_bump_decimal, true),
             (self.credit_spread_bump_bp, true),
         ])
     }
@@ -1061,11 +1062,6 @@ impl MetricPricingOverrides {
         Ok(())
     }
 
-    /// Rho bump size in basis points for curve-bump APIs.
-    pub fn rho_bump_bp(&self) -> f64 {
-        self.bump_config.rho_bump_decimal.unwrap_or(0.0001) * 10_000.0
-    }
-
     /// Bond risk basis, defaulting to Bloomberg-style workout/bullet risk.
     pub fn bond_risk_basis_or_default(&self) -> BondRiskBasis {
         self.bond_risk_basis.unwrap_or_default()
@@ -1095,9 +1091,14 @@ impl MetricPricingOverrides {
         self
     }
 
-    /// Set custom YTM bump size in decimal form. For one basis point, pass `1e-4`.
-    pub fn with_ytm_bump_decimal(mut self, bump: f64) -> Self {
-        self.bump_config.ytm_bump_decimal = Some(bump);
+    /// Set the yield bump for numerical yield duration and convexity.
+    ///
+    /// # Arguments
+    ///
+    /// * `bump_bp` - Yield shock in basis points (1.0 = 1bp); must be finite and
+    ///   positive at metric time.
+    pub fn with_ytm_bump(mut self, bump_bp: f64) -> Self {
+        self.bump_config.ytm_bump_bp = Some(bump_bp);
         self
     }
 
@@ -1327,10 +1328,29 @@ mod tests {
     }
 
     #[test]
+    fn bump_config_rejects_retired_twin_bump_keys() {
+        // schema-rejection-test
+        for retired in ["rho_bump_decimal", "vega_bump_decimal", "ytm_bump_decimal"] {
+            let json = format!(r#"{{"{retired}": 0.0001}}"#);
+            let err = serde_json::from_str::<BumpConfig>(&json)
+                .expect_err("retired bump key must be rejected");
+            assert!(
+                err.to_string().contains("unknown field"),
+                "{retired}: unexpected error {err}"
+            );
+        }
+        let current: BumpConfig =
+            serde_json::from_str(r#"{"ytm_bump_bp": 1.0, "rate_bump_bp": 2.0}"#)
+                .expect("canonical bump keys parse");
+        assert_eq!(current.ytm_bump_bp, Some(1.0));
+        assert_eq!(current.rate_bump_bp, Some(2.0));
+    }
+
+    #[test]
     fn focused_categories_validate_independently() {
         let instrument = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
         let metrics = MetricPricingOverrides::default()
-            .with_ytm_bump_decimal(1e-4)
+            .with_ytm_bump(1.0)
             .with_spot_bump(0.01)
             .with_vol_bump(0.01)
             .with_rate_bump(1.0);

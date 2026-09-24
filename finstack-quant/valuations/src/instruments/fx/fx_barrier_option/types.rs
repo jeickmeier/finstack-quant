@@ -247,6 +247,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         let t = self.day_count.year_fraction(
             as_of,
@@ -267,7 +268,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             market,
             as_of,
             spot_id,
-            crate::metrics::bump_sizes::SPOT,
+            bumps.spot_bump_pct,
         )?))
     }
 
@@ -275,6 +276,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -297,16 +299,14 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         })?;
         let spot_scalar = market.get_price(spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
-        let bump_size = current_spot * crate::metrics::bump_sizes::SPOT;
+        let bump_size = current_spot * bumps.spot_bump_pct;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let up =
-            crate::metrics::bump_scalar_price(market, spot_id, crate::metrics::bump_sizes::SPOT)?;
+        let up = crate::metrics::bump_scalar_price(market, spot_id, bumps.spot_bump_pct)?;
         let pv_up = self.value(&up, as_of)?.amount();
-        let down =
-            crate::metrics::bump_scalar_price(market, spot_id, -crate::metrics::bump_sizes::SPOT)?;
+        let down = crate::metrics::bump_scalar_price(market, spot_id, -bumps.spot_bump_pct)?;
         let pv_down = self.value(&down, as_of)?.amount();
 
         Ok(Some(
@@ -318,6 +318,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -330,7 +331,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             return Ok(Some(0.0));
         }
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump = bumps.vol_bump_pct;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),
@@ -351,6 +352,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -364,7 +366,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         }
 
         let base_pv = self.value(market, as_of)?.amount();
-        let bump_bp = self.metric_pricing_overrides.rho_bump_bp();
+        let bump_bp = bumps.rate_bump_bp;
         let bumped = crate::metrics::bump_discount_curve_parallel(
             market,
             &self.domestic_discount_curve_id,
@@ -378,6 +380,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -399,11 +402,11 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         let spot_scalar = market.get_price(spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
 
-        let spot_bump = current_spot * crate::metrics::bump_sizes::SPOT;
+        let spot_bump = current_spot * bumps.spot_bump_pct;
         if spot_bump <= 0.0 {
             return Ok(Some(0.0));
         }
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump = bumps.vol_bump_pct;
 
         // Delta at vol_up (central diff in spot)
         let curves_vol_up = crate::metrics::bump_surface_vol_absolute(
@@ -411,16 +414,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             self.vol_surface_id.as_str(),
             vol_bump,
         )?;
-        let curves_up = crate::metrics::bump_scalar_price(
-            &curves_vol_up,
-            spot_id,
-            crate::metrics::bump_sizes::SPOT,
-        )?;
-        let curves_dn = crate::metrics::bump_scalar_price(
-            &curves_vol_up,
-            spot_id,
-            -crate::metrics::bump_sizes::SPOT,
-        )?;
+        let curves_up =
+            crate::metrics::bump_scalar_price(&curves_vol_up, spot_id, bumps.spot_bump_pct)?;
+        let curves_dn =
+            crate::metrics::bump_scalar_price(&curves_vol_up, spot_id, -bumps.spot_bump_pct)?;
         let pv_up = self.value(&curves_up, as_of)?.amount();
         let pv_dn = self.value(&curves_dn, as_of)?.amount();
         let delta_vol_up = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -431,16 +428,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             self.vol_surface_id.as_str(),
             -vol_bump,
         )?;
-        let curves_up = crate::metrics::bump_scalar_price(
-            &curves_vol_dn,
-            spot_id,
-            crate::metrics::bump_sizes::SPOT,
-        )?;
-        let curves_dn = crate::metrics::bump_scalar_price(
-            &curves_vol_dn,
-            spot_id,
-            -crate::metrics::bump_sizes::SPOT,
-        )?;
+        let curves_up =
+            crate::metrics::bump_scalar_price(&curves_vol_dn, spot_id, bumps.spot_bump_pct)?;
+        let curves_dn =
+            crate::metrics::bump_scalar_price(&curves_vol_dn, spot_id, -bumps.spot_bump_pct)?;
         let pv_up = self.value(&curves_up, as_of)?.amount();
         let pv_dn = self.value(&curves_dn, as_of)?.amount();
         let delta_vol_dn = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -457,6 +448,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         base_pv: f64,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -469,7 +461,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             return Ok(Some(0.0));
         }
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump = bumps.vol_bump_pct;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),

@@ -2136,39 +2136,38 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    */
   credit_spread_bump_bp?: number | null;
   /**
-   * Custom rate bump size override (in basis points, e.g., 1.0 for 1bp)
+   * Parallel rate bump in basis points (1.0 = 1bp).
    *
-   * When set, overrides both standard and adaptive rate bump calculations.
+   * Sizes DV01, rho, foreign rho and forward PV01. Results stay reported per
+   * 1bp: `(pv_bumped - pv) / rate_bump_bp`. `None` uses the
+   * `valuations.sensitivities.v1` value (default 1bp).
    */
   rate_bump_bp?: number | null;
   /**
-   * Rho bump size in **decimal rate** units (default `0.0001 = 1bp`).
+   * Spot bump as a decimal fraction of spot (0.01 = 1%).
    *
-   * Note: internal curve-bump APIs often take bump sizes in **bp** units (`1.0 = 1bp`).
-   * Prefer using [`MetricPricingOverrides::rho_bump_bp`] when wiring into `BumpSpec::parallel_bp`
-   * or `metrics::bump_discount_curve_parallel` to avoid unit mistakes.
-   */
-  rho_bump_decimal?: number | null;
-  /**
-   * Custom spot bump size override (as percentage, e.g., 0.01 for 1%)
-   *
-   * When set, overrides both standard and adaptive spot bump calculations.
+   * Sizes every finite-difference spot greek (delta, gamma, vanna, charm,
+   * speed, color, FX delta). When set it also replaces the adaptive spot
+   * bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
    */
   spot_bump_pct?: number | null;
   /**
-   * Vega bump size in decimal (default 0.01 = 1%)
-   */
-  vega_bump_decimal?: number | null;
-  /**
-   * Custom volatility bump size override (as absolute vol, e.g., 0.01 for 1% vol)
+   * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
    *
-   * When set, overrides both standard and adaptive volatility bump calculations.
+   * Sizes every finite-difference volatility greek (vega, vanna, volga, FX
+   * vega). `None` uses the `valuations.sensitivities.v1` value (default
+   * 1 vol point). Results stay reported per 1 vol point.
    */
   vol_bump_pct?: number | null;
   /**
-   * Optional YTM bump size for numerical metrics (e.g., convexity/duration), in decimal (1 bp = 1e-4)
+   * Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
+   * convexity: InflationLinkedBond `RealDuration` and structured-credit
+   * `DurationMod`/`Convexity`.
+   *
+   * `None` keeps each metric's default shock (1bp for duration, 10bp for
+   * structured-credit convexity).
    */
-  ytm_bump_decimal?: number | null;
+  ytm_bump_bp?: number | null;
 }
 /**
  * Configuration for VaR calculation.

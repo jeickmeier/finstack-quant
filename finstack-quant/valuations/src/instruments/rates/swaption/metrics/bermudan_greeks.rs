@@ -18,8 +18,12 @@
 //! ```text
 //! Delta = (V(r+dr) - V(r-dr)) / (2*dr)
 //! Gamma = (V(r+dr) - 2*V(r) + V(r-dr)) / (dr^2)
-//! Vega = (V(σ+dσ) - V(σ-dσ)) / (2*dσ)
+//! Vega = (V(σ+dσ) - V(σ-dσ)) / (2*dσ) * 0.01
 //! ```
+//!
+//! Delta uses the resolved `rate_bump_bp` (default 1bp); the HW σ vega uses
+//! the absolute [`HW_SIGMA_BUMP`](crate::instruments::rates::hw1f::HW_SIGMA_BUMP)
+//! step shared with cap/floor `HwSigmaVega`.
 
 use crate::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::instruments::rates::swaption::{BermudanSwaption, PreparedHullWhiteModel};
@@ -28,9 +32,6 @@ use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 
-/// Default bump size for parallel rate shift (1 basis point).
-pub(crate) const DEFAULT_RATE_BUMP_BP: f64 = 1.0;
-
 /// Default bump size for the second-order (gamma) rate shift (10 basis points).
 ///
 /// Gamma divides by `bump²`; with a ±1bp bump on a recalibrated 50-step tree
@@ -38,9 +39,6 @@ pub(crate) const DEFAULT_RATE_BUMP_BP: f64 = 1.0;
 /// the estimate. A 10bp bump trades a small O(bump²) truncation error for a
 /// 100× reduction in noise amplification.
 pub(crate) const DEFAULT_GAMMA_BUMP_BP: f64 = 10.0;
-
-/// Default bump size for volatility (1% relative).
-pub(crate) const DEFAULT_VOL_BUMP_PCT: f64 = 0.01;
 
 /// Validates Hull–White parameters used by Bermudan Greek calculators.
 ///
@@ -115,18 +113,16 @@ fn price_bumped_pair(
 
 /// Delta calculator for Bermudan swaptions.
 ///
-/// Computes sensitivity to parallel rate shifts via bump-and-revalue.
+/// Computes sensitivity to parallel rate shifts via bump-and-revalue, sized by
+/// the resolved `rate_bump_bp`.
 #[derive(Debug, Clone)]
-pub(crate) struct BermudanDeltaCalculator {
-    /// Rate bump size in basis points
-    pub(crate) bump_bp: f64,
-}
+pub(crate) struct BermudanDeltaCalculator;
 
 impl MetricCalculator for BermudanDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bump_bp = crate::metrics::sensitivities::config::resolve(context)?.rate_bump_bp;
         let swaption = context.instrument_as::<BermudanSwaption>()?;
 
-        let bump_bp = self.bump_bp.abs();
         let bump = bump_bp / 10000.0;
         if bump <= 0.0 {
             return Ok(0.0);
@@ -138,47 +134,54 @@ impl MetricCalculator for BermudanDeltaCalculator {
 
 // Bermudan Vega Calculator
 
-/// Vega calculator for Bermudan swaptions.
+/// Hull-White σ vega calculator for Bermudan swaptions.
 ///
-/// Computes sensitivity to Hull-White volatility changes.
+/// Shifts the short-rate σ by the absolute
+/// [`HW_SIGMA_BUMP`](crate::instruments::rates::hw1f::HW_SIGMA_BUMP) and
+/// reports the PV change per 0.01 absolute σ. A forward step replaces the
+/// central difference when σ does not exceed the bump.
 #[derive(Debug, Clone)]
-pub(crate) struct BermudanVegaCalculator {
-    /// Volatility bump (relative fraction of σ)
-    pub(crate) bump_pct: f64,
-}
+pub(crate) struct BermudanVegaCalculator;
 
 impl MetricCalculator for BermudanVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        use crate::instruments::rates::hw1f::HW_SIGMA_BUMP;
+
         let swaption = context.instrument_as::<BermudanSwaption>()?;
         let hw = HwGreekParams::resolve(swaption, context)?;
 
         validate_hw_greek_params(hw.kappa, hw.sigma)?;
 
-        // Bump volatility
-        let sigma_up = hw.sigma * (1.0 + self.bump_pct);
-        let sigma_down = hw.sigma * (1.0 - self.bump_pct);
-        validate_hw_greek_params(hw.kappa, sigma_up)?;
-        validate_hw_greek_params(hw.kappa, sigma_down)?;
+        let with_sigma = |sigma: f64| {
+            let mut bumped = swaption.clone();
+            bumped
+                .instrument_pricing_overrides
+                .model_config
+                .hw1f_mean_reversion = Some(hw.kappa);
+            bumped.instrument_pricing_overrides.model_config.hw1f_sigma = Some(sigma);
+            bumped
+        };
+        let price_up = context.reprice_instrument_raw(
+            &with_sigma(hw.sigma + HW_SIGMA_BUMP),
+            &context.curves,
+            context.as_of,
+        )?;
 
-        let denom = 2.0 * self.bump_pct * hw.sigma;
-        if !denom.is_finite() || denom.abs() <= f64::EPSILON * 1024.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "Bermudan vega: bump_pct and sigma must yield a non-zero finite denominator".into(),
-            ));
+        if hw.sigma > HW_SIGMA_BUMP {
+            let price_down = context.reprice_instrument_raw(
+                &with_sigma(hw.sigma - HW_SIGMA_BUMP),
+                &context.curves,
+                context.as_of,
+            )?;
+            Ok((price_up - price_down) / (2.0 * HW_SIGMA_BUMP) * 0.01)
+        } else {
+            let price_base = context.reprice_instrument_raw(
+                &with_sigma(hw.sigma),
+                &context.curves,
+                context.as_of,
+            )?;
+            Ok((price_up - price_base) / HW_SIGMA_BUMP * 0.01)
         }
-
-        let mut up = swaption.clone();
-        up.instrument_pricing_overrides
-            .model_config
-            .hw1f_mean_reversion = Some(hw.kappa);
-        up.instrument_pricing_overrides.model_config.hw1f_sigma = Some(sigma_up);
-        let mut down = up.clone();
-        down.instrument_pricing_overrides.model_config.hw1f_sigma = Some(sigma_down);
-        let price_up = context.reprice_instrument_raw(&up, &context.curves, context.as_of)?;
-        let price_down = context.reprice_instrument_raw(&down, &context.curves, context.as_of)?;
-
-        // Central difference, scaled to a 1% volatility change.
-        Ok((price_up - price_down) / denom * 0.01)
     }
 }
 

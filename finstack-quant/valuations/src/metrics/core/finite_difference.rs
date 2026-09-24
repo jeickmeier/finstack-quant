@@ -1,32 +1,24 @@
 //! Generic finite difference utilities for risk metric calculations.
 //!
-//! Provides standard bump sizes and helper functions for bump-and-reprice
+//! Provides helper functions for bump-and-reprice
 //! sensitivity calculations. Each metric calculator implements its own
 //! bumping and revaluation logic based on the instrument type.
 //!
-//! # Bump Size Standards
+//! # Bump sizes
 //!
-//! Following market conventions:
-//! - Spot/Underlying: 1% (0.01)
-//! - Volatility: 1% (0.01)
-//! - Interest rates: 1bp (**expressed as 1.0**) when using `BumpSpec::parallel_bp`
-//! - Credit spreads: 1bp (**expressed as 1.0**) when using `BumpSpec::parallel_bp`
-//! - Correlations: 1% (0.01)
+//! Spot, volatility and rate bump sizes are resolved per request from the
+//! `valuations.sensitivities.v1` config extension and
+//! `metric_pricing_overrides.bump_config` (see
+//! `metrics::sensitivities::config`); calculators never hard-code them.
+//! Interest-rate and credit bumps are expressed in bp (**1.0 = 1bp**) when
+//! passed to `BumpSpec::parallel_bp`.
 
-/// Standard bump sizes for finite difference calculations.
-pub(crate) mod bump_sizes {
-    /// Spot/underlying price bump: 1% (0.01)
-    pub(crate) const SPOT: f64 = 0.01;
-    /// Volatility bump: **absolute** 1 vol point (0.01).
-    ///
-    /// This represents an **absolute** change in implied volatility, e.g. 20% → 21%.
-    /// (Not a 1% relative scaling of the surface.)
-    pub(crate) const VOLATILITY: f64 = 0.01;
-    /// Correlation bump: 1% (0.01)
-    ///
-    /// Used by correlation sensitivity calculators (e.g., quanto options).
-    pub(crate) const CORRELATION: f64 = 0.01;
-}
+/// Correlation bump for Correlation01: an absolute shift of 0.01.
+///
+/// It is both the central-difference half-width (shrunk near ±1 where the
+/// correlation bound binds) and the reporting unit: Correlation01 is the PV
+/// change per 0.01 of correlation.
+pub(crate) const CORRELATION_BUMP: f64 = 0.01;
 
 /// Number of vol points in one unit (1.00) of absolute implied volatility.
 ///

@@ -74,7 +74,7 @@ pub(super) fn apply_dividend(
         if let Some(scalar_id) = inputs.instrument.dividend_schedule_id() {
             // Note: the `Dividend01` producers emit **$ per
             // 1bp** of absolute dividend-yield move (the central difference is
-            // rescaled by `DIVIDEND_BUMP_BP`, see equity_option/convertible
+            // rescaled by the 1bp `ONE_BASIS_POINT` bump, see equity_option/convertible
             // `dividend_risk.rs`). `measure_scalar_absolute_shift` returns the
             // DECIMAL Δq, so the move must be converted to bp before
             // multiplying.

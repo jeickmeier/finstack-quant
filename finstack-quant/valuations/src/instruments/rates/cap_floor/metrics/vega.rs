@@ -10,7 +10,9 @@ use finstack_quant_core::Result;
 
 use super::common::CapletInputs;
 
-const DEFAULT_HW_VEGA_BUMP: f64 = 0.0001;
+/// Absolute normal-vol bump for the Hull-White market vega: 1bp of normal
+/// volatility (1e-4). Results are rescaled to per 0.01 of normal vol.
+const NORMAL_VOL_BUMP: f64 = 1e-4;
 
 /// Vega calculator (model-consistent vega per 1% vol, aggregated for caps/floors).
 ///
@@ -80,7 +82,7 @@ fn caplet_vega(c: CapletInputs) -> f64 {
 }
 
 fn hull_white_surface_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
-    let bump = DEFAULT_HW_VEGA_BUMP;
+    let bump = NORMAL_VOL_BUMP;
     let market = context.curves.as_ref();
     market
         .get_surface(option.vol_surface_id.as_str())?
@@ -94,7 +96,7 @@ fn hull_white_surface_vega_per_pct(option: &CapFloor, context: &MetricContext) -
 
 fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
     let market = context.curves.as_ref();
-    let bump = DEFAULT_HW_VEGA_BUMP;
+    let bump = crate::instruments::rates::hw1f::HW_SIGMA_BUMP;
     let base = resolve_capfloor_hw1f_model_params(option, market)?;
     let with_sigma = |shift: f64| -> Result<CapFloor> {
         let mut bumped = option.clone();

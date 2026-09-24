@@ -19,8 +19,8 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_cap_floor::InflationCapFloor;
-use crate::metrics::bump_sizes;
 use crate::metrics::bump_surface_vol_absolute;
+use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext, VOL_POINTS_PER_ABSOLUTE_VOL};
 use finstack_quant_core::Result;
 
@@ -31,6 +31,7 @@ pub(crate) struct VegaCalculator;
 
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
         let option: &InflationCapFloor = context.instrument_as()?;
         let as_of = context.as_of;
 
@@ -39,23 +40,17 @@ impl MetricCalculator for VegaCalculator {
         }
 
         // Bump vol surface up
-        let curves_up = bump_surface_vol_absolute(
-            &context.curves,
-            option.vol_surface_id.as_str(),
-            bump_sizes::VOLATILITY,
-        )?;
+        let curves_up =
+            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
         let pv_up = option.value(&curves_up, as_of)?.amount();
 
         // Bump vol surface down
-        let curves_down = bump_surface_vol_absolute(
-            &context.curves,
-            option.vol_surface_id.as_str(),
-            -bump_sizes::VOLATILITY,
-        )?;
+        let curves_down =
+            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), -vol_bump)?;
         let pv_down = option.value(&curves_down, as_of)?.amount();
 
         // Central difference per unit vol, rescaled to per vol point (1% = 0.01
         // absolute vol) to match the workspace vega convention.
-        Ok((pv_up - pv_down) / (2.0 * bump_sizes::VOLATILITY * VOL_POINTS_PER_ABSOLUTE_VOL))
+        Ok((pv_up - pv_down) / (2.0 * vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL))
     }
 }

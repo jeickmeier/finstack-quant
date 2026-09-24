@@ -11,8 +11,7 @@ pub(crate) struct Dv01Calculator;
 impl MetricCalculator for Dv01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let swap: &VarianceSwap = context.instrument_as()?;
-        let bump_bp =
-            crate::metrics::resolve_sensitivities_config(context.get_config())?.rate_bump_bp;
+        let bump_bp = crate::metrics::sensitivities::config::resolve(context)?.rate_bump_bp;
 
         let base_pv = context.base_value.amount();
         let bumped_ctx = context.curves.as_ref().bump([MarketBump::Curve {

@@ -541,11 +541,16 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
                 })
             }
             OptionGreekKind::Vanna => Ok(OptionGreeks {
-                vanna: self.option_vanna(market, as_of)?,
+                vanna: self.option_vanna(market, as_of, request.bumps)?,
                 ..OptionGreeks::default()
             }),
             OptionGreekKind::Volga => Ok(OptionGreeks {
-                volga: self.option_volga(market, as_of, request.require_base_pv()?)?,
+                volga: self.option_volga(
+                    market,
+                    as_of,
+                    request.require_base_pv()?,
+                    request.bumps,
+                )?,
                 ..OptionGreeks::default()
             }),
         }
@@ -555,6 +560,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         let t = self
             .day_count
@@ -586,7 +592,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
         if sigma <= 0.0 {
             return Ok(Some(0.0));
         }
-        let delta_sigma = crate::metrics::bump_sizes::VOLATILITY.min(sigma * 0.5);
+        let delta_sigma = bumps.vol_bump_pct.min(sigma * 0.5);
         let (up, curves_up) = crate::metrics::bump_active_volatility(
             self,
             market,
@@ -615,6 +621,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
         _base_pv: f64,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         let t = self
             .day_count
@@ -646,7 +653,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
         if sigma <= 0.0 {
             return Ok(Some(0.0));
         }
-        let delta_sigma = crate::metrics::bump_sizes::VOLATILITY.min(sigma * 0.5);
+        let delta_sigma = bumps.vol_bump_pct.min(sigma * 0.5);
         let (up, curves_up) = crate::metrics::bump_active_volatility(
             self,
             market,

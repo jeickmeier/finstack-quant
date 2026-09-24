@@ -9,7 +9,7 @@ use finstack_quant_core::InputError;
 use finstack_quant_core::{Error, Result};
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::common_impl::traits::{GreekBumps, Instrument};
 use crate::instruments::fixed_income::convertible::{
     market_inputs::{resolve_dividend_yield, volatility_candidate_ids},
     ConversionEvent, ConversionPolicy, ConvertibleBond,
@@ -455,12 +455,13 @@ pub(crate) fn price_bond_floor(
 ///
 /// # Greek Definitions
 ///
-/// - **Delta**: `(P(S+h) - P(S-h)) / (2h)` where `h = bump_pct * S`
+/// - **Delta**: `(P(S+h) - P(S-h)) / (2h)` where `h = spot_bump_pct * S`
 /// - **Gamma**: `(P(S+h) - 2*P(S) + P(S-h)) / h^2`
-/// - **Vega**: `(P(σ+0.01) - P(σ-0.01)) / (vol_up - vol_down) * 0.01` — per 1% absolute vol move
+/// - **Vega**: `(P(σ+δσ) - P(σ-δσ)) / (vol_up - vol_down) * 0.01` with
+///   `δσ = vol_bump_pct` — per 1% absolute vol move
 ///   Uses a forward difference when the lower quote is outside the selected
 ///   lattice's admissible volatility range.
-/// - **Rho**: `(P(r+1bp) - P(r-1bp)) / 2` — per 1bp parallel shift of the
+/// - **Rho**: `(P(r+δr) - P(r-δr)) / (2·rate_bump_bp)` — per 1bp parallel shift of the
 ///   **risk-free discount curve only**; a configured credit curve is held
 ///   fixed (spread implicitly narrows by the bump). Use the DV01 metric
 ///   (parallel, all curves) for the full parallel-rate sensitivity.
@@ -479,24 +480,32 @@ pub(crate) fn price_bond_floor(
 ///   volatility, and credit data for full repricing.
 /// * `tree_type` - Recombining tree specification used consistently for every
 ///   bumped valuation.
-/// * `bump_size` - Optional relative equity-spot bump as a decimal; `None`
-///   uses `0.01` (one percent) for delta and gamma.
+/// * `bumps` - Finite-difference bump sizes: relative equity-spot bump for
+///   delta and gamma, absolute volatility bump for vega and parallel
+///   risk-free rate bump in bp for rho. Each must be finite and positive;
+///   [`GreekBumps::default`] gives 1%, 1 vol point and 1bp.
 /// * `as_of` - Valuation date from which the one-day theta roll is measured.
 pub fn calculate_convertible_greeks(
     bond: &ConvertibleBond,
     market_context: &MarketContext,
     tree_type: ConvertibleTreeType,
-    bump_size: Option<f64>,
+    bumps: GreekBumps,
     as_of: Date,
 ) -> Result<TreeGreeks> {
     bond.validate_for_pricing()?;
     validate_tree_type(tree_type)?;
-    let bump_pct = bump_size.unwrap_or(0.01);
-    if !bump_pct.is_finite() || bump_pct <= 0.0 {
-        return Err(Error::Validation(format!(
-            "convertible Greek spot bump must be finite and positive, got {bump_pct}"
-        )));
+    for (name, value) in [
+        ("spot_bump_pct", bumps.spot_bump_pct),
+        ("vol_bump_pct", bumps.vol_bump_pct),
+        ("rate_bump_bp", bumps.rate_bump_bp),
+    ] {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(Error::Validation(format!(
+                "convertible Greek {name} must be finite and positive, got {value}"
+            )));
+        }
     }
+    let bump_pct = bumps.spot_bump_pct;
 
     // Resolve market data and compute base price in one pass.
     // The base price is computed inline to avoid a second prepare_for_pricing call
@@ -545,7 +554,7 @@ pub fn calculate_convertible_greeks(
 
     // ---- Vega: bump volatility (B1: central differences) ----
     {
-        let h_vol = 0.01; // 1% absolute
+        let h_vol = bumps.vol_bump_pct; // absolute vol
         let mut vol_down = (inputs.volatility - h_vol).max(1e-6);
         let vol_up = inputs.volatility + h_vol;
 
@@ -584,7 +593,7 @@ pub fn calculate_convertible_greeks(
 
     // ---- Rho: bump discount curve (B2: central differences) ----
     {
-        let h_rate = 1.0; // 1bp in bp-count units (BumpSpec::parallel_bp convention)
+        let h_rate = bumps.rate_bump_bp; // bp-count units (BumpSpec::parallel_bp convention)
         let market_rate_up =
             bump_discount_curve_parallel(market_context, &bond.discount_curve_id, h_rate)?;
         let market_rate_down =
@@ -595,8 +604,8 @@ pub fn calculate_convertible_greeks(
         let price_rate_down =
             price_convertible_bond(bond, &market_rate_down, tree_type, as_of)?.amount();
 
-        // Rho per 1bp: central difference
-        greeks.rho = (price_rate_up - price_rate_down) / 2.0;
+        // Rho per 1bp: central difference over the 2·h_rate bp width
+        greeks.rho = (price_rate_up - price_rate_down) / (2.0 * h_rate);
     }
 
     // ---- Theta: 1-day roll (forward difference), reported per calendar day ----

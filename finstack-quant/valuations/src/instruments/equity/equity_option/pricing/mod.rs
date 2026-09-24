@@ -638,7 +638,10 @@ mod tests {
         let curves = market(as_of, 100.0, 0.20, 0.03, 0.0);
         let option = option(expiry, OptionType::Call, ExerciseStyle::European);
         let theta = crate::instruments::common_impl::traits::OptionGreeksProvider::option_theta(
-            &option, &curves, as_of,
+            &option,
+            &curves,
+            as_of,
+            crate::instruments::GreekBumps::default(),
         )
         .expect("theta")
         .expect("supported");

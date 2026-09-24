@@ -11303,11 +11303,14 @@ class ConvertibleBond:
         self,
         market: MarketContext | str,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        bump_size: float | None = None,
     ) -> dict[str, float]:
         """
         Tree Greeks of the convertible (mirrors Rust ``ConvertibleBond::greeks``
         with the default tree).
+
+        Bump sizes come from the bond's ``metric_pricing_overrides.bump_config``
+        (``spot_bump_pct``, ``vol_bump_pct``, ``rate_bump_bp``), defaulting to
+        1% of spot, 1 vol point and 1bp.
 
         Parameters
         ----------
@@ -11318,9 +11321,6 @@ class ConvertibleBond:
             coupons require their forward curve and realized historical fixings.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
-        bump_size : float | None
-            Finite-difference bump for delta/gamma as a fraction of spot;
-            ``None`` uses the pricer default.
 
         Returns
         -------
@@ -31222,9 +31222,8 @@ class MetricPricingOverrides:
         bump_config : dict[str, Any], optional
             Finite-difference bump sizes: ``spot_bump_pct`` (``0.01`` = 1%),
             ``vol_bump_pct`` (absolute vol, ``0.01`` = 1 vol point),
-            ``rate_bump_bp``, ``credit_spread_bump_bp`` (basis points),
-            ``ytm_bump_decimal``, ``rho_bump_decimal`` (decimal) and
-            ``adaptive_bumps`` (bool). ``None`` keeps the defaults.
+            ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp`` (basis
+            points) and ``adaptive_bumps`` (bool). ``None`` keeps the defaults.
         mc_seed_scenario : str, optional
             Scenario name used to derive deterministic Monte Carlo seeds for
             finite-difference Greeks (for example ``"delta_up"``).

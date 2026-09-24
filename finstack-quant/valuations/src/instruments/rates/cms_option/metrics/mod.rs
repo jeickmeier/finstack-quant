@@ -10,8 +10,8 @@ use crate::instruments::rates::cms_common::ConvexityAdjustmentRiskCalculator;
 use crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency;
 use crate::instruments::rates::cms_option::types::CmsOption;
 use crate::metrics::bump_discount_curve_parallel;
-use crate::metrics::bump_sizes;
 use crate::metrics::bump_surface_vol_absolute;
+use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId, MetricRegistry};
 use finstack_quant_core::dates::{DateExt, DayCountContext};
@@ -62,23 +62,20 @@ pub(crate) struct DeltaCalculator;
 
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         let option: &CmsOption = context.instrument_as()?;
         let base_pv = context.base_value.amount();
 
-        // Determine which curve drives the forward rate
-        let curve_to_bump = &option.forward_curve_id;
-
-        // Bump the relevant curve by 1bp (parallel shift)
-        let bump_bp = 1.0;
+        // Parallel shift of the curve that drives the forward swap rate.
         let curves_bumped = context.curves.bump([MarketBump::Curve {
-            id: curve_to_bump.clone(),
+            id: option.forward_curve_id.clone(),
             spec: BumpSpec::parallel_bp(bump_bp),
         }])?;
 
         let pv_bumped = option.value(&curves_bumped, context.as_of)?.amount();
 
-        // Delta = Change in PV
-        Ok(pv_bumped - base_pv)
+        // Delta = PV change per 1bp of the forward curve.
+        Ok((pv_bumped - base_pv) / bump_bp)
     }
 }
 
@@ -89,6 +86,7 @@ pub(crate) struct VegaCalculator;
 
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
         let option: &CmsOption = context.instrument_as()?;
         let as_of = context.as_of;
         let base_pv = context.base_value.amount();
@@ -104,11 +102,8 @@ impl MetricCalculator for VegaCalculator {
         }
 
         // Bump volatility surface by an absolute vol amount (vol points).
-        let curves_bumped = bump_surface_vol_absolute(
-            &context.curves,
-            option.vol_surface_id.as_str(),
-            bump_sizes::VOLATILITY,
-        )?;
+        let curves_bumped =
+            bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
 
         // Reprice with bumped vol
         let pv_bumped = option.value(&curves_bumped, as_of)?.amount();
@@ -117,7 +112,7 @@ impl MetricCalculator for VegaCalculator {
         // FD/analytic vega used elsewhere): normalize by the bump expressed in
         // vol points (`bump * VOL_POINTS_PER_ABSOLUTE_VOL`), not the raw
         // absolute-vol bump, which would overstate vega by 100×.
-        let vega = (pv_bumped - base_pv) / (bump_sizes::VOLATILITY * VOL_POINTS_PER_ABSOLUTE_VOL);
+        let vega = (pv_bumped - base_pv) / (vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL);
 
         Ok(vega)
     }
@@ -130,6 +125,7 @@ pub(crate) struct RhoCalculator;
 
 impl MetricCalculator for RhoCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         let option: &CmsOption = context.instrument_as()?;
         let as_of = context.as_of;
         let base_pv = context.base_value.amount();
@@ -144,19 +140,15 @@ impl MetricCalculator for RhoCalculator {
             return Ok(0.0);
         }
 
-        // Bump discount curve by 1bp. The helper's argument is already in
-        // basis points, so pass `1.0`, not `0.0001`.
-        let bump_bp = 1.0;
+        // The helper's argument is in basis points (1.0 = 1bp).
         let curves_bumped =
             bump_discount_curve_parallel(&context.curves, &option.discount_curve_id, bump_bp)?;
 
         // Reprice with bumped curve
         let pv_bumped = option.value(&curves_bumped, as_of)?.amount();
 
-        // Rho = PV(rate + 1bp) − PV(base)
-        let rho = pv_bumped - base_pv;
-
-        Ok(rho)
+        // Rho per 1bp = (PV(rate + bump) − PV(base)) / bump_bp
+        Ok((pv_bumped - base_pv) / bump_bp)
     }
 }
 
@@ -290,7 +282,7 @@ impl MetricCalculator for VolgaCalculator {
             return Ok(0.0);
         }
 
-        let vol_bump = bump_sizes::VOLATILITY;
+        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
 
         let curves_vol_up =
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;

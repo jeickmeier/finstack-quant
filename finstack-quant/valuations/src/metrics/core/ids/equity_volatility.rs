@@ -238,7 +238,7 @@ impl MetricId {
     /// Produced by `CrossFactorCalculator` (SpotCredit pair) via a four-corner
     /// central finite difference whose denominators are:
     /// - spot: `spot_bump_pct × 100`  (e.g. 1.0 per 1 % spot move)
-    /// - credit: `credit_bump_bp`     (e.g. 1.0 per 1 bp credit move)
+    /// - credit: `credit_spread_bump_bp`   (e.g. 1.0 per 1 bp credit move)
     ///
     /// Units: currency per (1 pct-pt spot move) per (1 bp credit spread move).
     ///
@@ -263,7 +263,7 @@ impl MetricId {
     ///
     /// Produced by `CrossFactorCalculator` (CreditVol pair) via a four-corner
     /// central finite difference whose denominators are:
-    /// - credit: `credit_bump_bp`   (e.g. 1.0 per 1 bp credit move)
+    /// - credit: `credit_spread_bump_bp` (e.g. 1.0 per 1 bp credit move)
     /// - vol: `vol_bump_abs × 100`  (e.g. 1.0 per 1 vol-point move)
     ///
     /// Units: currency per (1 bp credit spread move) per (1 vol-point move).

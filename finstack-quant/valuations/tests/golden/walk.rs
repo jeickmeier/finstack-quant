@@ -273,8 +273,6 @@ fn strip_default_instrument_inputs(value: &mut serde_json::Value) {
     remove_default_bool(object, "end_of_month", false);
     remove_default_i64(object, "payment_lag_days", 0);
     remove_default_f64(object, "vol_shift", 0.0);
-    remove_default_f64(object, "rho_bump_decimal", 0.0001);
-    remove_default_f64(object, "vega_bump_decimal", 0.0001);
     remove_empty_array(object, "discrete_dividends");
     remove_empty_object(object, "instrument_pricing_overrides");
     remove_empty_object(object, "metric_pricing_overrides");

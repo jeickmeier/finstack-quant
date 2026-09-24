@@ -18,7 +18,7 @@ pub use mc_config::RateExoticMcConfig;
 
 /// HW1F parameter resolution from complete overrides or pre-fitted market scalars.
 pub mod params;
-pub use params::{resolve_hw1f_params, Hw1fParamFamily};
+pub use params::{resolve_hw1f_params, Hw1fParamFamily, HW_SIGMA_BUMP};
 
 /// HW1F θ(t) preparation and term-forward bond reconstruction.
 pub mod hw1f_curve;

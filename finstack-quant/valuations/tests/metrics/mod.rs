@@ -4,6 +4,7 @@
 //!
 //! ## Test Organization
 //!
+//! - `bump_config_routing` - Every finite-difference greek honours `bump_config`
 //! - `convergence` - Analytical vs finite difference Greek convergence
 //! - `determinism` - Deterministic results for identical inputs
 //! - `edge_cases` - Boundary conditions and degenerate cases
@@ -18,6 +19,7 @@
 //! - `vanna_volga_pockets` exercises internal bumping helpers; keep it in this module so
 //!   integration coverage includes vanna/volga paths.
 
+mod bump_config_routing;
 mod convergence;
 mod determinism;
 mod edge_cases;

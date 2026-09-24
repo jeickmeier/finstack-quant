@@ -303,12 +303,11 @@ pub use sensitivities::theta::collect_cashflows_in_period;
 // supported as a stable downstream API. Keep them `pub(crate)` so we can refactor module layout
 // without creating public breakage surface.
 pub(crate) use core::finite_difference::{
-    bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price, bump_sizes,
+    bump_active_volatility, bump_discount_curve_parallel, bump_scalar_price,
     central_diff_by_half_bump, central_diff_by_width, central_diff_scalar_relative,
-    replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width,
+    replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, CORRELATION_BUMP,
     VOL_POINTS_PER_ABSOLUTE_VOL,
 };
-pub(crate) use sensitivities::config::from_finstack_config_or_default as resolve_sensitivities_config;
 pub(crate) use sensitivities::cross_factor::{
     make_credit_bumper, make_fx_bumper, make_rates_bumper, make_spot_bumper, make_vol_bumper,
 };

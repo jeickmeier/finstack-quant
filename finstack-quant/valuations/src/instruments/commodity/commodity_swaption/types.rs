@@ -561,6 +561,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         &self,
         market: &MarketContext,
         as_of: Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_cdf;
 
@@ -613,6 +614,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         &self,
         market: &MarketContext,
         as_of: Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
         use finstack_quant_core::market_data::bumps::{
@@ -623,7 +625,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             return Ok(Some(0.0));
         }
 
-        let bump_pct = crate::metrics::bump_sizes::SPOT;
+        let bump_pct = bumps.spot_bump_pct;
         let inputs = self.black76_inputs(market, as_of)?;
         if inputs.time <= 0.0 || inputs.sigma <= 0.0 {
             return Ok(Some(0.0));
@@ -664,6 +666,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         &self,
         market: &MarketContext,
         as_of: Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_pdf;
 
@@ -1214,9 +1217,21 @@ mod tests {
             };
 
             assert_validation(swaption.base_value(&market, as_of).map(|_| ()));
-            assert_validation(swaption.option_delta(&market, as_of).map(|_| ()));
-            assert_validation(swaption.option_gamma(&market, as_of).map(|_| ()));
-            assert_validation(swaption.option_vega(&market, as_of).map(|_| ()));
+            assert_validation(
+                swaption
+                    .option_delta(&market, as_of, crate::instruments::GreekBumps::default())
+                    .map(|_| ()),
+            );
+            assert_validation(
+                swaption
+                    .option_gamma(&market, as_of, crate::instruments::GreekBumps::default())
+                    .map(|_| ()),
+            );
+            assert_validation(
+                swaption
+                    .option_vega(&market, as_of, crate::instruments::GreekBumps::default())
+                    .map(|_| ()),
+            );
         }
     }
 

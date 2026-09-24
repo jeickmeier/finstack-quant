@@ -63,30 +63,6 @@ fn test_default_config_correlation_bounds() {
 }
 
 #[test]
-fn test_default_config_cs01_parameters() {
-    // Arrange & Act
-    let config = CDSTranchePricerConfig::default();
-
-    // Assert
-    assert_eq!(
-        config.cs01_bump_size, 1.0,
-        "Default CS01 bump size should be 1bp"
-    );
-}
-
-#[test]
-fn test_default_config_correlation_bump() {
-    // Arrange & Act
-    let config = CDSTranchePricerConfig::default();
-
-    // Assert
-    assert_eq!(
-        config.corr_bump_abs, 0.01,
-        "Default correlation bump should be 1%"
-    );
-}
-
-#[test]
 fn test_default_config_accrual_on_default() {
     // Arrange & Act
     let config = CDSTranchePricerConfig::default();
@@ -240,7 +216,6 @@ fn test_config_cloneable() {
     // Assert
     assert_eq!(config2.integration_tolerance, config1.integration_tolerance);
     assert_eq!(config2.min_correlation, config1.min_correlation);
-    assert_eq!(config2.cs01_bump_size, config1.cs01_bump_size);
 }
 
 #[test]

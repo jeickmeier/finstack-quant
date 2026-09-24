@@ -8,7 +8,10 @@
 
 use crate::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::metrics::{MetricCalculator, MetricContext, MetricId, MetricRegistry};
+use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::{
+    MetricCalculator, MetricContext, MetricId, MetricRegistry, VOL_POINTS_PER_ABSOLUTE_VOL,
+};
 use crate::pricer::InstrumentType;
 use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
@@ -26,7 +29,7 @@ impl MetricCalculator for SpreadDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let inst: &CommoditySpreadOption = context.instrument_as()?;
 
-        let bump_pct = crate::metrics::bump_sizes::SPOT; // 1% = 0.01
+        let bump_pct = sens_config::resolve(context)?.spot_bump_pct;
 
         let (curve_id, forward) = match self.leg {
             1 => (
@@ -76,7 +79,8 @@ impl MetricCalculator for SpreadDeltaCalculator {
 
 /// Vega calculator: combined sensitivity to both vol surfaces.
 ///
-/// Bumps both leg 1 and leg 2 vol surfaces simultaneously by 1 vol point.
+/// Bumps both leg 1 and leg 2 vol surfaces simultaneously by the resolved vol
+/// bump (default 1 vol point) and reports the result per vol point.
 struct SpreadVegaCalculator {
     leg: Option<u8>,
 }
@@ -85,7 +89,7 @@ impl MetricCalculator for SpreadVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let inst: &CommoditySpreadOption = context.instrument_as()?;
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY; // 1 vol point = 0.01
+        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
 
         let bump_market = |amount: f64| -> Result<_> {
             match self.leg {
@@ -121,9 +125,9 @@ impl MetricCalculator for SpreadVegaCalculator {
             .value(&bump_market(-vol_bump)?, context.as_of)?
             .amount();
 
-        // Report cash P&L per one-vol-point move. The scenarios are already
-        // shifted by +/- `vol_bump`, so do not normalize back to dPV/dsigma.
-        Ok((pv_up - pv_dn) / 2.0)
+        // Report cash P&L per one-vol-point move: normalise by the bump width
+        // expressed in vol points (2.0 at the 1 vol-point default).
+        Ok((pv_up - pv_dn) / (2.0 * vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL))
     }
 }
 

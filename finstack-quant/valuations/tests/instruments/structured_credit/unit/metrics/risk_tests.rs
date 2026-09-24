@@ -80,6 +80,7 @@ fn test_tranche_duration_is_true_modified_duration() {
         &curve,
         as_of,
         Money::new(pv, Currency::USD).expect("valid money fixture"),
+        1.0,
     )
     .unwrap();
 
@@ -156,7 +157,7 @@ fn test_tranche_convexity_matches_analytic() {
     }
     let expected = weighted_t2 / pv;
 
-    let convexity = calculate_tranche_convexity(&flows, &curve, as_of).unwrap();
+    let convexity = calculate_tranche_convexity(&flows, &curve, as_of, 10.0).unwrap();
     assert!(
         convexity > 0.0,
         "convexity should be positive, got {convexity}"

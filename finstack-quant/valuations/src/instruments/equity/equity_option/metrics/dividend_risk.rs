@@ -8,8 +8,9 @@
 //! shock moves the prepaid-forward-equivalent yield and proportionally scales
 //! future cash dividends while preserving dates.
 
+use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::dividend01::{dividend01_central_diff, DIVIDEND_BUMP_BP};
+use crate::instruments::equity::dividend01::dividend01_central_diff;
 use crate::instruments::equity::equity_option::EquityOption;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
@@ -57,8 +58,8 @@ impl MetricCalculator for DividendRiskCalculator {
         // q = -ln((S-PV(D))/S)/T. Move q by one bp, scaling future cash amounts
         // proportionally and preserving their dates. Past dividends stay fixed.
         let q = -(inputs.spot / raw_spot).ln() / t;
-        let q_down = (q - DIVIDEND_BUMP_BP).max(0.0);
-        let q_up = q + DIVIDEND_BUMP_BP;
+        let q_down = (q - ONE_BASIS_POINT).max(0.0);
+        let q_up = q + ONE_BASIS_POINT;
         let price = |yield_quote: f64| -> Result<f64> {
             let scale = raw_spot * -(-yield_quote * t).exp_m1() / dividend_pv;
             let mut bumped = option.clone();
@@ -77,7 +78,7 @@ impl MetricCalculator for DividendRiskCalculator {
             price(q_up)?,
             price(q_down)?,
             q_up - q_down,
-            DIVIDEND_BUMP_BP,
+            ONE_BASIS_POINT,
         )
     }
 }

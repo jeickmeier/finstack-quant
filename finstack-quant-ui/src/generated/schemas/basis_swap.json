@@ -463,16 +463,7 @@
         },
         "rate_bump_bp": {
           "default": null,
-          "description": "Custom rate bump size override (in basis points, e.g., 1.0 for 1bp)\n\nWhen set, overrides both standard and adaptive rate bump calculations.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "rho_bump_decimal": {
-          "default": null,
-          "description": "Rho bump size in **decimal rate** units (default `0.0001 = 1bp`).\n\nNote: internal curve-bump APIs often take bump sizes in **bp** units (`1.0 = 1bp`).\nPrefer using [`MetricPricingOverrides::rho_bump_bp`] when wiring into `BumpSpec::parallel_bp`\nor `metrics::bump_discount_curve_parallel` to avoid unit mistakes.",
+          "description": "Parallel rate bump in basis points (1.0 = 1bp).\n\nSizes DV01, rho, foreign rho and forward PV01. Results stay reported per\n1bp: `(pv_bumped - pv) / rate_bump_bp`. `None` uses the\n`valuations.sensitivities.v1` value (default 1bp).",
           "format": "double",
           "type": [
             "number",
@@ -481,16 +472,7 @@
         },
         "spot_bump_pct": {
           "default": null,
-          "description": "Custom spot bump size override (as percentage, e.g., 0.01 for 1%)\n\nWhen set, overrides both standard and adaptive spot bump calculations.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "vega_bump_decimal": {
-          "default": null,
-          "description": "Vega bump size in decimal (default 0.01 = 1%)",
+          "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
           "format": "double",
           "type": [
             "number",
@@ -499,16 +481,16 @@
         },
         "vol_bump_pct": {
           "default": null,
-          "description": "Custom volatility bump size override (as absolute vol, e.g., 0.01 for 1% vol)\n\nWhen set, overrides both standard and adaptive volatility bump calculations.",
+          "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
           "format": "double",
           "type": [
             "number",
             "null"
           ]
         },
-        "ytm_bump_decimal": {
+        "ytm_bump_bp": {
           "default": null,
-          "description": "Optional YTM bump size for numerical metrics (e.g., convexity/duration), in decimal (1 bp = 1e-4)",
+          "description": "Yield bump in basis points (1.0 = 1bp) for numerical yield duration and\nconvexity: InflationLinkedBond `RealDuration` and structured-credit\n`DurationMod`/`Convexity`.\n\n`None` keeps each metric's default shock (1bp for duration, 10bp for\nstructured-credit convexity).",
           "format": "double",
           "type": [
             "number",

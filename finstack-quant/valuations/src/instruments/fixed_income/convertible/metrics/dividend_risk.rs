@@ -7,6 +7,7 @@
 //! For convertibles, dividend yield affects the equity option component.
 //! Higher dividend yield reduces the forward price, making conversion less attractive.
 
+use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::convertible::{
     market_inputs::resolve_dividend_yield_market_value_id, ConvertibleBond,
@@ -16,9 +17,6 @@ use crate::metrics::{
     MetricContext,
 };
 use finstack_quant_core::Result;
-
-/// Standard dividend yield bump: 1bp (0.0001)
-const DIVIDEND_BUMP_BP: f64 = 0.0001;
 
 /// Dividend risk calculator for convertible bonds.
 pub(crate) struct DividendRiskCalculator;
@@ -38,8 +36,8 @@ impl MetricCalculator for DividendRiskCalculator {
 
         // Extract numeric baseline for robust bump-width handling (clamped at 0 on the downside).
         let q0 = scalar_numeric_value(current_scalar);
-        let q_up_val = q0 + DIVIDEND_BUMP_BP;
-        let q_down_val = (q0 - DIVIDEND_BUMP_BP).max(0.0);
+        let q_up_val = q0 + ONE_BASIS_POINT;
+        let q_down_val = (q0 - ONE_BASIS_POINT).max(0.0);
         let actual_width = q_up_val - q_down_val;
 
         let curves_up = replace_scalar_value(
@@ -60,8 +58,8 @@ impl MetricCalculator for DividendRiskCalculator {
 
         // MetricId contract: Dividend01 is $/bp (dPV for a 1bp absolute q move).
         // Use the *actual* bump width since the downside bump is clamped at 0;
-        // the up-bump always lifts the width by `DIVIDEND_BUMP_BP`, so it is
+        // the up-bump always lifts the width by `ONE_BASIS_POINT`, so it is
         // non-degenerate. A degenerate width surfaces as an `Err`.
-        scaled_central_diff_by_width(pv_up, pv_down, actual_width, DIVIDEND_BUMP_BP)
+        scaled_central_diff_by_width(pv_up, pv_down, actual_width, ONE_BASIS_POINT)
     }
 }

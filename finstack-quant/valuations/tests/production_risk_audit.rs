@@ -276,11 +276,20 @@ fn fx_vanna_volga_shift_effective_volatility_at_off_grid_quotes() {
         }
         let base = option.value(&market, as_of).expect("PV").amount();
         let vanna = option
-            .option_vanna(&market, as_of)
+            .option_vanna(
+                &market,
+                as_of,
+                finstack_quant_valuations::instruments::GreekBumps::default(),
+            )
             .expect("vanna")
             .expect("some");
         let volga = option
-            .option_volga(&market, as_of, base)
+            .option_volga(
+                &market,
+                as_of,
+                base,
+                finstack_quant_valuations::instruments::GreekBumps::default(),
+            )
             .expect("volga")
             .expect("some");
         assert!(

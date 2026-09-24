@@ -21,12 +21,6 @@ const DEFAULT_MIN_CORRELATION: f64 = 0.01;
 /// Maximum correlation value for numerical stability (avoids degenerate cases)
 const DEFAULT_MAX_CORRELATION: f64 = 0.99;
 
-/// Default bump size for CS01 calculation in basis points
-const DEFAULT_CS01_BUMP_SIZE: f64 = 1.0;
-
-/// Default correlation bump for Correlation01 calculation (absolute, e.g., 0.01 = 1%)
-const DEFAULT_CORR_BUMP_ABS: f64 = 0.01;
-
 /// Boundary width for smooth correlation clamping transitions
 const DEFAULT_CORR_BOUNDARY_WIDTH: f64 = 0.005;
 
@@ -148,13 +142,6 @@ pub struct CDSTranchePricerConfig {
     /// Maximum correlation value for numerical stability
     pub max_correlation: f64,
 
-    // Risk Metric Parameters
-    /// CS01 bump size in basis points, applied as a parallel par-spread bump
-    /// with hazard-curve recalibration.
-    pub cs01_bump_size: f64,
-    /// Correlation bump for correlation delta calculation (absolute)
-    pub corr_bump_abs: f64,
-
     // ISDA Convention Settings
     /// Whether to use mid-period discounting for protection leg (ISDA standard: true)
     pub mid_period_protection: bool,
@@ -194,10 +181,6 @@ impl Default for CDSTranchePricerConfig {
             use_issuer_curves: true,
             min_correlation: DEFAULT_MIN_CORRELATION,
             max_correlation: DEFAULT_MAX_CORRELATION,
-
-            // Risk metrics
-            cs01_bump_size: DEFAULT_CS01_BUMP_SIZE,
-            corr_bump_abs: DEFAULT_CORR_BUMP_ABS,
 
             // ISDA conventions
             mid_period_protection: true, // ISDA standard
@@ -265,8 +248,6 @@ impl CDSTranchePricerConfig {
                 self.min_correlation, self.max_correlation
             )));
         }
-        validate_positive("cs01_bump_size", self.cs01_bump_size)?;
-        validate_positive("corr_bump_abs", self.corr_bump_abs)?;
         validate_range("corr_boundary_width", self.corr_boundary_width, 0.0, 1.0)?;
         validate_positive("grid_step", self.grid_step)?;
         if self.index_settlement_lag < 0 || self.bespoke_settlement_lag < 0 {

@@ -64,6 +64,16 @@ pub(crate) fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, s
     std::borrow::Cow::Owned(s)
 }
 
+/// Default relative spot bump: 1% of spot (0.01).
+const DEFAULT_SPOT_BUMP_PCT: f64 = 0.01;
+
+/// Default volatility bump: **absolute** 1 vol point (0.01), e.g. 20% → 21%.
+/// It is an additive shift of implied volatility, not a 1% relative scaling.
+const DEFAULT_VOL_BUMP_PCT: f64 = 0.01;
+
+/// Default parallel rate and credit-spread bump: 1bp (1.0 in bp units).
+const DEFAULT_BUMP_BP: f64 = 1.0;
+
 /// Resolved (fully-populated) sensitivities configuration.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SensitivitiesConfig {
@@ -71,10 +81,14 @@ pub(crate) struct SensitivitiesConfig {
     pub(crate) rate_bump_bp: f64,
     /// Credit spread bump size in basis points (e.g., 1.0 = 1bp).
     pub(crate) credit_spread_bump_bp: f64,
-    /// Spot bump size as a percentage (e.g., 0.01 = 1%).
+    /// Spot bump size as a decimal fraction of spot (e.g., 0.01 = 1%).
     pub(crate) spot_bump_pct: f64,
-    /// Vol bump size (absolute) as a percentage (e.g., 0.01 = 1% vol).
+    /// Vol bump size (absolute) in decimal volatility (e.g., 0.01 = 1 vol point).
     pub(crate) vol_bump_pct: f64,
+    /// Yield bump in basis points for numerical yield duration/convexity, when
+    /// set by `metric_pricing_overrides.bump_config.ytm_bump_bp`. `None` lets
+    /// each calculator keep its own default shock.
+    pub(crate) ytm_bump_bp: Option<f64>,
     /// Default DV01 key-rate buckets in years.
     pub(crate) dv01_buckets_years: Vec<f64>,
     /// Default CS01 key-rate buckets in years.
@@ -84,14 +98,34 @@ pub(crate) struct SensitivitiesConfig {
 impl Default for SensitivitiesConfig {
     fn default() -> Self {
         Self {
-            rate_bump_bp: 1.0,
-            credit_spread_bump_bp: 1.0,
-            spot_bump_pct: crate::metrics::bump_sizes::SPOT,
-            vol_bump_pct: crate::metrics::bump_sizes::VOLATILITY,
+            rate_bump_bp: DEFAULT_BUMP_BP,
+            credit_spread_bump_bp: DEFAULT_BUMP_BP,
+            spot_bump_pct: DEFAULT_SPOT_BUMP_PCT,
+            vol_bump_pct: DEFAULT_VOL_BUMP_PCT,
+            ytm_bump_bp: None,
             dv01_buckets_years: STANDARD_BUCKETS_YEARS.to_vec(),
             cs01_buckets_years: STANDARD_BUCKETS_YEARS.to_vec(),
         }
     }
+}
+
+impl From<&SensitivitiesConfig> for crate::instruments::GreekBumps {
+    fn from(cfg: &SensitivitiesConfig) -> Self {
+        Self {
+            spot_bump_pct: cfg.spot_bump_pct,
+            vol_bump_pct: cfg.vol_bump_pct,
+            rate_bump_bp: cfg.rate_bump_bp,
+        }
+    }
+}
+
+/// Resolve the sensitivities config of a metric request: the
+/// `valuations.sensitivities.v1` extension of its `FinstackConfig`, then the
+/// request's `metric_pricing_overrides.bump_config`.
+pub(crate) fn resolve(
+    context: &crate::metrics::MetricContext,
+) -> finstack_quant_core::Result<SensitivitiesConfig> {
+    from_context_or_default(context.get_config(), context.get_metric_overrides())
 }
 
 /// Optional-override form of [`SensitivitiesConfig`], deserialized from the
@@ -212,29 +246,29 @@ pub(crate) fn apply_pricing_overrides(
         return Ok(base);
     };
 
-    if let Some(v) = po
-        .bump_config
-        .rate_bump_bp
-        .or_else(|| po.bump_config.rho_bump_decimal.map(|x| x * 10_000.0))
-    {
-        ensure_finite_positive("pricing_overrides.rate_bump_bp", v)?;
+    let bumps = &po.bump_config;
+    if let Some(v) = bumps.rate_bump_bp {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.rate_bump_bp", v)?;
         base.rate_bump_bp = v;
     }
-    if let Some(v) = po.bump_config.credit_spread_bump_bp {
-        ensure_finite_positive("pricing_overrides.credit_spread_bump_bp", v)?;
+    if let Some(v) = bumps.credit_spread_bump_bp {
+        ensure_finite_positive(
+            "metric_pricing_overrides.bump_config.credit_spread_bump_bp",
+            v,
+        )?;
         base.credit_spread_bump_bp = v;
     }
-    if let Some(v) = po.bump_config.spot_bump_pct {
-        ensure_finite_positive("pricing_overrides.spot_bump_pct", v)?;
+    if let Some(v) = bumps.spot_bump_pct {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.spot_bump_pct", v)?;
         base.spot_bump_pct = v;
     }
-    if let Some(v) = po
-        .bump_config
-        .vol_bump_pct
-        .or(po.bump_config.vega_bump_decimal)
-    {
-        ensure_finite_positive("pricing_overrides.vol_bump_pct", v)?;
+    if let Some(v) = bumps.vol_bump_pct {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.vol_bump_pct", v)?;
         base.vol_bump_pct = v;
+    }
+    if let Some(v) = bumps.ytm_bump_bp {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.ytm_bump_bp", v)?;
+        base.ytm_bump_bp = Some(v);
     }
 
     Ok(base)
@@ -269,15 +303,21 @@ mod tests {
     }
 
     #[test]
-    fn apply_pricing_overrides_uses_fallback_units() {
+    fn apply_pricing_overrides_carries_ytm_bump_only_when_set() {
         let base = SensitivitiesConfig::default();
-        let mut po = crate::instruments::MetricPricingOverrides::default();
-        po.bump_config.rho_bump_decimal = Some(0.0002);
-        po.bump_config.vega_bump_decimal = Some(0.015);
-
+        assert_eq!(base.ytm_bump_bp, None);
+        let po = crate::instruments::MetricPricingOverrides::default().with_ytm_bump(2.5);
         let resolved = apply_pricing_overrides(base, Some(&po)).expect("valid overrides");
-        assert_eq!(resolved.rate_bump_bp, 2.0);
-        assert_eq!(resolved.vol_bump_pct, 0.015);
+        assert_eq!(resolved.ytm_bump_bp, Some(2.5));
+    }
+
+    #[test]
+    fn greek_bumps_default_matches_resolved_default_config() {
+        let bumps = crate::instruments::GreekBumps::from(&SensitivitiesConfig::default());
+        assert_eq!(bumps, crate::instruments::GreekBumps::default());
+        assert_eq!(bumps.spot_bump_pct, 0.01);
+        assert_eq!(bumps.vol_bump_pct, 0.01);
+        assert_eq!(bumps.rate_bump_bp, 1.0);
     }
 
     #[test]

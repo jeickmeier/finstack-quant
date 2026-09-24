@@ -826,6 +826,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         &self,
         market: &MarketContext,
         as_of: Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_cdf;
 
@@ -891,6 +892,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         &self,
         market: &MarketContext,
         as_of: Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_pdf;
 
@@ -934,6 +936,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         &self,
         market: &MarketContext,
         as_of: Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -969,7 +972,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             ));
         };
 
-        let bump_pct = crate::metrics::bump_sizes::SPOT;
+        let bump_pct = bumps.spot_bump_pct;
         let forward_price = self.forward_price(market, as_of)?;
         let bump_size = forward_price * bump_pct;
         if bump_size <= 0.0 {
@@ -1035,6 +1038,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         &self,
         market: &MarketContext,
         as_of: Date,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         if as_of > self.expiry {
             return Ok(Some(0.0));
@@ -1067,8 +1071,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             ));
         };
 
-        let fwd_bump_pct = crate::metrics::bump_sizes::SPOT;
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let fwd_bump_pct = bumps.spot_bump_pct;
+        let vol_bump = bumps.vol_bump_pct;
 
         let forward_price = self.forward_price(market, as_of)?;
         let fwd_bump_size = forward_price * fwd_bump_pct;
@@ -1142,6 +1146,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         market: &MarketContext,
         as_of: Date,
         base_pv: f64,
+        bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
@@ -1154,7 +1159,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             ));
         }
 
-        let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
+        let vol_bump = bumps.vol_bump_pct;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),

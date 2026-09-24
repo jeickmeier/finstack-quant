@@ -8,6 +8,7 @@ use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
+use crate::instruments::GreekBumps;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -326,7 +327,7 @@ fn test_convertible_greeks_calculation() {
         &bond,
         &market_context,
         ConvertibleTreeType::Binomial(50),
-        Some(0.01),
+        GreekBumps::default(),
         as_of,
     );
 
@@ -371,8 +372,8 @@ fn theta_rolls_the_discount_curve() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     let tree = ConvertibleTreeType::Binomial(80);
-    let greeks =
-        calculate_convertible_greeks(&bond, &market, tree, Some(0.01), as_of).expect("greeks");
+    let greeks = calculate_convertible_greeks(&bond, &market, tree, GreekBumps::default(), as_of)
+        .expect("greeks");
     assert!(greeks.theta.is_finite(), "theta must be finite");
 
     let next_day = as_of.next_day().expect("next day");
@@ -823,7 +824,7 @@ fn theta_propagates_market_roll_failure() {
         &bond,
         &market,
         ConvertibleTreeType::Binomial(50),
-        Some(0.01),
+        GreekBumps::default(),
         as_of,
     );
     assert!(result.is_err(), "theta hid a roll failure: {result:?}");
@@ -839,7 +840,7 @@ fn registry_greeks_match_single_greeks_run() {
     let bond = create_test_bond();
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let direct = bond.greeks(&market, None, None, as_of).expect("greeks");
+    let direct = bond.greeks(&market, None, as_of).expect("greeks");
     let result = bond
         .price_with_metrics(
             &market,

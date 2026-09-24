@@ -13,7 +13,10 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::quanto_option::QuantoOption;
-use crate::metrics::{bump_sizes, bump_surface_vol_absolute, MetricCalculator, MetricContext};
+use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::{
+    bump_surface_vol_absolute, MetricCalculator, MetricContext, VOL_POINTS_PER_ABSOLUTE_VOL,
+};
 use finstack_quant_core::Result;
 
 /// FX Vega calculator for quanto options.
@@ -21,6 +24,7 @@ pub struct FxVegaCalculator;
 
 impl MetricCalculator for FxVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let bump = sens_config::resolve(context)?.vol_bump_pct;
         let option: &QuantoOption = context.instrument_as()?;
         let as_of = context.as_of;
 
@@ -42,7 +46,6 @@ impl MetricCalculator for FxVegaCalculator {
         })?;
 
         // Absolute bump in vol units (e.g. 20% -> 21%); central difference for O(h^2).
-        let bump = bump_sizes::VOLATILITY;
         let curves_up =
             bump_surface_vol_absolute(context.curves.as_ref(), fx_vol_id.as_str(), bump)?;
         let curves_down =
@@ -51,9 +54,9 @@ impl MetricCalculator for FxVegaCalculator {
         let pv_up = option.value(&curves_up, as_of)?.amount();
         let pv_down = option.value(&curves_down, as_of)?.amount();
 
-        // The scenarios are ±1 vol point.  Dividing by `2*bump` would return
-        // the derivative per unit volatility (100 vol points), not the cash
-        // P&L for the one-point move represented by this metric.
-        Ok((pv_up - pv_down) / 2.0)
+        // Report the cash P&L per one vol point: normalise by the bump width
+        // expressed in vol points (2.0 at the 1 vol-point default), not by the
+        // raw `2*bump`, which would give the derivative per unit volatility.
+        Ok((pv_up - pv_down) / (2.0 * bump * VOL_POINTS_PER_ABSOLUTE_VOL))
     }
 }

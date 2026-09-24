@@ -2,7 +2,8 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_trs::EquityTotalReturnSwap;
-use crate::metrics::{bump_scalar_price, bump_sizes, MetricCalculator, MetricContext};
+use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::{bump_scalar_price, MetricCalculator, MetricContext};
 use finstack_quant_core::{Error, Result};
 
 /// Calculates delta to the underlying equity index level.
@@ -14,6 +15,7 @@ pub(crate) struct EquityDeltaCalculator;
 
 impl MetricCalculator for EquityDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let spot_bump = sens_config::resolve(context)?.spot_bump_pct;
         let trs: &EquityTotalReturnSwap = context.instrument_as()?;
 
         let scalar = context.curves.get_price(&trs.underlying.spot_id)?;
@@ -31,18 +33,10 @@ impl MetricCalculator for EquityDeltaCalculator {
         if frozen.initial_level.is_none() {
             frozen.initial_level = Some(spot);
         }
-        let up = bump_scalar_price(
-            context.curves.as_ref(),
-            &trs.underlying.spot_id,
-            bump_sizes::SPOT,
-        )?;
-        let down = bump_scalar_price(
-            context.curves.as_ref(),
-            &trs.underlying.spot_id,
-            -bump_sizes::SPOT,
-        )?;
+        let up = bump_scalar_price(context.curves.as_ref(), &trs.underlying.spot_id, spot_bump)?;
+        let down = bump_scalar_price(context.curves.as_ref(), &trs.underlying.spot_id, -spot_bump)?;
         let pv_up = frozen.value(&up, context.as_of)?.amount();
         let pv_down = frozen.value(&down, context.as_of)?.amount();
-        Ok((pv_up - pv_down) / (2.0 * spot * bump_sizes::SPOT))
+        Ok((pv_up - pv_down) / (2.0 * spot * spot_bump))
     }
 }

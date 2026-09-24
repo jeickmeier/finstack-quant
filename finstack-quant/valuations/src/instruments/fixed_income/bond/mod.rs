@@ -341,7 +341,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .instrument_pricing_overrides(overrides)
-            .metric_pricing_overrides(MetricPricingOverrides::default().with_ytm_bump_decimal(1e-4))
+            .metric_pricing_overrides(MetricPricingOverrides::default().with_ytm_bump(1.0))
             .attributes(Attributes::new())
             .build()
             .expect("should succeed");
@@ -353,8 +353,8 @@ mod tests {
             Some(98.5)
         );
         assert_eq!(
-            bond.metric_pricing_overrides.bump_config.ytm_bump_decimal,
-            Some(1e-4)
+            bond.metric_pricing_overrides.bump_config.ytm_bump_bp,
+            Some(1.0)
         );
     }
 
