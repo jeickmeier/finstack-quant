@@ -2,6 +2,86 @@
 
 ## [Unreleased]
 
+### Fixed income: senior-review remediation (2026-09-23)
+
+Numbers change for the instruments listed under **Fixed**; each change is
+pinned by a regression test against an independent hand calculation.
+
+#### Fixed
+
+- **Asset-backed facility PV nets future draws.** Draws were missing from the
+  priced schedule while the lender IRR included them; a 10M draw one year out
+  overstated PV by 9.51M. Indexed interest is tagged `FloatReset`.
+- **Merton MC prices ACT/ACT ICMA bonds and books dirty PV.** Gilts and other
+  ICMA bonds errored before simulating; seasoned bonds dropped the accrued part
+  of the next coupon (102.894 vs 104.131 hand dirty PV). Clean and dirty
+  prices now differ by accrued.
+- **Bond futures use the current futures price** for gross basis, implied
+  repo and invoice price, and look up the conversion factor by the delivered
+  bond. The entry price could reorder the cheapest-to-deliver.
+- **Overnight floors on term loans and revolvers** honour
+  `overnight_index_constraints` (daily vs period) and the term loan passes
+  `reset_frequency`/`index_tenor` through; both instruments now pay identical
+  coupons for the same spec.
+- **Term loans:** commitment fees are paid once per period on the payment date;
+  PV is anchored at `as_of` (discount margin, yields, OAS and quoted CS01 stay
+  on settlement).
+- **Revolver:** unknown `pricing_model`, NaN utilization and fee-tier errors now
+  raise; the stochastic engine books sub-threshold draws, so principal
+  conserves.
+- **Structured credit:** differently capped coverage tests at one position keep
+  their own `divert_pct`; OAS and stochastic sources share the deterministic
+  base rates (zero-vol OAS equals Z-spread); antithetic prepayment draws pair;
+  WAM propagates errors and is measured on Act/365F, the same clock as WAL.
+- **Japanese simple yield** uses the JSDA clean-price form in the metric and
+  its inverse, so mid-period quotes round-trip.
+- **Callable I-spread** uses the swap par rate to the workout date in both
+  directions, so the quote round-trips. BHCCN moves from within 2 bp of
+  Bloomberg to 3.5 bp and is recorded in `known_non_executable.json`.
+- **FI TRS** prices mid-period from `initial_level`; ILB principal pays on the
+  same adjusted date in PV and real yield; UK step-lag CPI anchors on the first
+  of the month; convertible theta reports a failed market roll.
+- **Core:** a discount curve with one pillar after `t = 0` rolls forward.
+
+#### Performance
+
+- Callable exercise windows use candidate dates (window ends, schedule dates,
+  month-ends) instead of every calendar day; the largest move on six gate
+  fixtures is 0.005 per 100. A 5-year call window: tree PV 108 ms → 0.4 ms,
+  OAS metric 951 ms → 4.5 ms. OAS reuses one prepared tree; the workout path
+  is computed once per metric request; LSMC pricing runs in parallel.
+- Structured credit Monte Carlo 3–5× faster; convertible Greeks share one
+  lattice run; term-loan discount margin 293 → 78 µs; CMO waterfalls
+  1.4–2.8× faster.
+
+#### Changed (BREAKING)
+
+- Removed: `TreePricer::calculate_oas`, `TreePricerConfig::{high_precision,
+  mean_reversion}`, the LSMC exercise-provider hook,
+  `price_from_ytm_compounded`, `par_rate_and_annuity_from_forward`,
+  `CashflowSpec::{fixed_with_conventions, floating_with_conventions}`,
+  `FloatingConventionParams`, `calculate_conversion_premium`,
+  `IndexationMethod::{standard_lag_modern, uses_daily_interpolation,
+  uses_daily_interpolation_modern}`.
+- Bond futures: `determine_ctd`, `determine_ctd_by_implied_repo`,
+  `implied_repo_rate` and `invoice_price` take the current futures price
+  (`DeliverableQuote`); `calculate_conversion_factor(bond, &specs, month)`;
+  `BondFutureSpecs` drops `tick_size`, `tick_value`, `settlement_days` and
+  `calendar_id` on the wire.
+- FI TRS drops `contract_size`; `initial_level` is the reset level of the
+  period in progress. ILB `real_yield`, `real_duration` and
+  `breakeven_inflation` drop the market argument.
+- Asset-backed facility `lender_cashflows()` and the revolver fee-tier
+  functions return `Result`; `TermLoanTreePricer` is a unit struct.
+- Structured credit: `TrancheBehaviorType`/`Tranche.behavior_type` (also in
+  Python), `ConcentrationCheckResult`, `get_tranche_cashflows`, the Rust
+  `structured_credit_tranche_*` string wrappers, `WaterfallWorkspace`, the
+  `CoverageTest` enum and `Waterfall::new` are removed; `TrancheStructure`
+  drops `total_size` and `Tranche` drops `payment_priority` on the wire;
+  `WaterfallBuilder::build()` validates; `calculate_pool_stats` and
+  `weighted_avg_maturity` return `Result`.
+- Dilution events on a convertible must be in date order.
+
 ### Agency mortgages: quote-basis spreads, IO notional, prepayment-aware DV01 (2026-09-23)
 
 #### Fixed
