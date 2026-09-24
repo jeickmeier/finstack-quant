@@ -14,7 +14,7 @@
 //!
 //! # Key Features
 //!
-//! - **Prepayment modeling**: PSA curves, constant CPR, and stochastic models
+//! - **Prepayment modeling**: PSA curves, constant CPR and CPR vectors via `PrepaymentModelSpec`; stochastic paths through MC-OAS
 //! - **Payment delays**: Agency-specific conventions (FNMA 25d, FHLMC/GNMA 45d)
 //! - **Fee decomposition**: Servicing fees and guarantee fees
 //! - **Risk metrics**: OAS, effective duration/convexity, key-rate DV01
@@ -65,9 +65,7 @@
 //! ```
 
 pub(crate) mod metrics;
-pub mod prepayment;
 pub(crate) mod pricer;
-pub mod servicing;
 mod types;
 
 pub use pricer::{generate_cashflows, MbsCashflow};

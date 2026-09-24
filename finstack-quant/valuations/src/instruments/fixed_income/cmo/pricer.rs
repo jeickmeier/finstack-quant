@@ -6,7 +6,7 @@
 use super::tranches::pac_support::PacSchedule;
 use super::types::{AgencyCmo, CmoTranche, CmoTrancheType, PacCollar};
 use super::waterfall::{execute_waterfall_with_principal_breakdown, PacContext};
-use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
+use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows;
@@ -21,12 +21,9 @@ use finstack_quant_core::Result;
 
 /// Tranche cashflow for a single period.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // `principal` and `ending_balance` support invariant tests.
 pub(crate) struct TrancheCashflow {
     /// Payment date
     pub(crate) payment_date: Date,
-    /// Principal payment
-    pub(crate) principal: f64,
     /// Scheduled principal payment
     pub(crate) scheduled_principal: f64,
     /// Prepayment principal payment
@@ -35,7 +32,9 @@ pub(crate) struct TrancheCashflow {
     pub(crate) interest: f64,
     /// Total payment
     pub(crate) total: f64,
-    /// Ending balance after this period
+    /// Ending balance after this period. Pricing reads only cash; the
+    /// balance path is kept for the accretion/amortization invariant tests.
+    #[cfg(test)]
     pub(crate) ending_balance: f64,
 }
 
@@ -45,27 +44,6 @@ pub(crate) fn resolve_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyM
         Ok(pool.as_ref().clone())
     } else {
         create_assumed_collateral(cmo, as_of)
-    }
-}
-
-/// Extract the actual PSA speed multiplier from a prepayment model spec.
-///
-/// PAC collar checks compare the realized prepayment speed (PSA multiple) of
-/// the collateral against the PAC band. A `Psa { speed_multiplier }` model maps
-/// directly. For non-PSA models the speed is approximated by converting the
-/// terminal CPR back to a PSA multiple (terminal PSA CPR is 6%), which lets the
-/// collar check still distinguish slow/fast pools.
-fn actual_psa_from_model(model: &PrepaymentModelSpec) -> f64 {
-    match &model.curve {
-        Some(PrepaymentCurve::Psa { speed_multiplier }) => *speed_multiplier,
-        // Explicit vectors: the held terminal CPR is the pool's long-run speed.
-        Some(PrepaymentCurve::Vector { monthly_cpr }) => {
-            (monthly_cpr.last().copied().unwrap_or(model.cpr) / 0.06).max(0.0)
-        }
-        // Constant / lockout / ABS (annualized month-1 speed): map CPR to a
-        // PSA-equivalent multiple (100% PSA terminal CPR = 6%). Clamped
-        // non-negative for safety.
-        _ => (model.cpr / 0.06).max(0.0),
     }
 }
 
@@ -114,7 +92,6 @@ fn build_pac_context(
     Some(PacContext {
         schedule: Some(schedule),
         period_index: 0,
-        actual_psa: actual_psa_from_model(&collateral.prepayment_model),
     })
 }
 
@@ -192,11 +169,11 @@ pub(crate) fn tranche_cashflows_on(
 
             tranche_cfs.push(TrancheCashflow {
                 payment_date: cf.payment_date,
-                principal: 0.0,
                 scheduled_principal: 0.0,
                 prepayment_principal: 0.0,
                 interest: io_payment,
                 total: io_payment,
+                #[cfg(test)]
                 ending_balance: io_tranche.current_face.amount() * cf.ending_balance
                     / collateral_face,
             });
@@ -219,11 +196,11 @@ pub(crate) fn tranche_cashflows_on(
             if let Some(alloc) = result.allocations.iter().find(|a| a.tranche_id == *ref_id) {
                 tranche_cfs.push(TrancheCashflow {
                     payment_date: cf.payment_date,
-                    principal: alloc.principal,
                     scheduled_principal: alloc.scheduled_principal,
                     prepayment_principal: alloc.prepayment_principal,
                     interest: alloc.interest,
                     total: alloc.principal + alloc.interest,
+                    #[cfg(test)]
                     ending_balance: alloc.ending_balance,
                 });
             }
@@ -536,12 +513,12 @@ mod tests {
         let mut total_pac_principal = 0.0;
         for (i, cf) in pac_cfs.iter().enumerate() {
             let scheduled = schedule.scheduled_at(i);
-            total_pac_principal += cf.principal;
+            let principal = cf.total - cf.interest;
+            total_pac_principal += principal;
             assert!(
-                cf.principal <= scheduled + 1.0,
-                "period {i}: PAC principal {} exceeds PAC schedule {scheduled}; \
-                 PAC is being priced as a plain sequential",
-                cf.principal
+                principal <= scheduled + 1.0,
+                "period {i}: PAC principal {principal} exceeds PAC schedule {scheduled}; \
+                 PAC is being priced as a plain sequential"
             );
         }
 
@@ -750,7 +727,7 @@ mod tests {
         assert!(first_cash > 0, "Z must not pay cash in period 0");
         for cf in &cfs[..first_cash] {
             assert!(
-                cf.interest.abs() < 1e-9 && cf.principal.abs() < 1e-9,
+                cf.interest.abs() < 1e-9 && (cf.total - cf.interest).abs() < 1e-9,
                 "no phantom cash during accretion"
             );
         }

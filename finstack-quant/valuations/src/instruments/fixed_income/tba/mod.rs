@@ -14,7 +14,9 @@
 //!
 //! - **Forward pricing**: Value based on assumed pool characteristics
 //! - **Settlement conventions**: SIFMA standard notification and settlement dates
-//! - **Simplified CTD**: Uses on-the-run pool assumptions
+//! - **Delivered pool**: an explicit `assumed_pool` must carry the TBA coupon and a
+//!   deliverable agency (FNMA/FHLMC UMBS interchangeable); otherwise a generic pool
+//!   is built from embedded assumptions
 //!
 //! # Examples
 //!
@@ -39,10 +41,8 @@
 //!     .expect("Valid TBA");
 //! ```
 
-pub mod allocation;
 pub(crate) mod metrics;
 pub(crate) mod pricer;
-pub mod settlement;
 mod types;
 
 pub use types::{AgencyTba, TbaSettlement, TbaTerm};

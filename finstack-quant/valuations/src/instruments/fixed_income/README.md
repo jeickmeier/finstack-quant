@@ -22,10 +22,10 @@ worked examples. This file links to them and does not repeat them.
 | `dollar_roll/` | MBS dollar rolls (sell front month, buy back month) | Drop converted to an implied ACT/360 financing rate for comparison against repo ("specialness"); carry inputs come from the MBS cashflow engine, not stylized amortization | no |
 | `fi_trs/` | Fixed-income index total-return swaps | Deterministic carry analytic: the return leg earns a supplied continuously compounded index yield against a curve-driven financing leg. Not a full index mark-to-market model | no |
 | `inflation_linked_bond/` | TIPS, index-linked gilts and other linkers | `IndexationMethod` = `Tips`, `Uk`, `Canadian`, `French`, `Japanese`; `DeflationProtection` = `None`, `MaturityOnly`, `AllPayments`. **Discounting is nominal** — the schedule already carries inflation-projected nominal cashflows, so `discount_curve_id` must name a nominal curve. Real yield solves against the unindexed real cashflows and the real dirty price | no |
-| `mbs_passthrough/` | Agency MBS pass-throughs (FNMA, FHLMC, GNMA I/II) | PSA / constant-CPR / Richard–Roll prepayment; stated payment delay 55d for UMBS (FNMA and FHLMC), 45d GNMA I, 50d GNMA II, overridable per pool; net coupon = WAC − servicing fee − guarantee fee | no |
+| `mbs_passthrough/` | Agency MBS pass-throughs (FNMA, FHLMC, GNMA I/II) | PSA / constant-CPR / CPR-vector prepayment (`PrepaymentModelSpec`), scaled by an exponential rate multiplier for MC-OAS and effective duration; stated payment delay 55d for UMBS (FNMA and FHLMC), 45d GNMA I, 50d GNMA II, overridable per pool; net coupon = WAC − servicing fee − guarantee fee | no |
 | `revolving_credit/` | Corporate revolvers with deterministic or stochastic utilization, tiered fees and optional hazard weighting | One cashflow engine drives both the deterministic and the Monte Carlo path | [yes](revolving_credit/README.md) |
 | `structured_credit/` | ABS, RMBS, CMBS and CLO deals — pool, tranche stack, waterfall, coverage tests | Period-by-period pool and waterfall simulation; stochastic mode runs the same engine over simulated prepayment/default paths | [yes](structured_credit/README.md) |
-| `tba/` | Agency TBA forwards | SIFMA good-delivery conventions: third-week settlement with a 48-hour notification deadline (`TbaTerm` = 15y/20y/30y). Pool allocation is a simplified on-the-run assumed pool, not full good-delivery rules; assumptions load from `data/assumptions/tba_assumptions.v1.json` | no |
+| `tba/` | Agency TBA forwards | SIFMA good-delivery conventions: third-week settlement with a 48-hour notification deadline (`TbaTerm` = 15y/20y/30y). Without an explicit delivered pool it prices a generic on-the-run pool whose assumptions load from `data/assumptions/tba_assumptions.v1.json`; an explicit `assumed_pool` must carry the TBA coupon and a deliverable agency (FNMA/FHLMC UMBS are interchangeable). No specified-pool allocation or pay-up model | no |
 | `term_loan/` | Institutional term loans and DDTLs — PIK and split coupons, OID, covenant events, borrower call schedules | Commitment limit plus draw calendar (contrast `bond`'s single funded notional); discounting or rates-credit tree | [yes](term_loan/README.md) |
 
 The four mortgage leaves form one stack: `mbs_passthrough` owns the cashflow
@@ -56,9 +56,8 @@ conversion and greeks types, and everything the four README'd leaves export.
 Inside a leaf, `metrics/`, `pricer.rs`/`pricing/` and `types.rs`/`types/` are
 `pub(crate)` or private; their supported items surface through the leaf's
 `pub use` list. The exceptions — genuinely public submodules — are
-`cmo::tranches`, `cmo::waterfall`, `dollar_roll::carry`,
-`mbs_passthrough::prepayment`, `mbs_passthrough::servicing`, `tba::allocation`,
-`tba::settlement`, `bond::cashflow_spec`, `bond::cashflows`, `bond::pricing`,
+`cmo::tranches` (the PAC schedule only), `cmo::waterfall`, `dollar_roll::carry`,
+`bond::cashflow_spec`, `bond::cashflows`, `bond::pricing`,
 `revolving_credit::cashflow_engine`, `structured_credit::waterfall`,
 `term_loan::spec` and `term_loan::overrides`.
 

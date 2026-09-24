@@ -2102,12 +2102,6 @@
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/pricer/merton_mc.rs",
-      "category": "credit_assumption",
-      "contains": "crate::metrics::MetricId::custom(\"default_rate\"),",
-      "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
-    },
-    {
       "path": "finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/ytm_solver.rs",
       "category": "contract_spec",
       "contains": "let (maturity_date, face_value) = &cashflows[0];",
@@ -2174,24 +2168,6 @@
       "reason": "Binding metadata, repr text, or module/export label; not a mutable financial assumption."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/cmo/tranches/io_po.rs",
-      "category": "structured_credit",
-      "contains": "let prepayment = (remaining - scheduled).max(0.0) * smm;",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/cmo/tranches/io_po.rs",
-      "category": "structured_credit",
-      "contains": "let smm = 1.0 - (1.0 - cpr).powf(1.0 / 12.0);",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/cmo/tranches/io_po.rs",
-      "category": "structured_credit",
-      "contains": "theoretical_po_value_with_wac(face, wam, discount_rate, psa, 0.0)",
-      "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
-    },
-    {
       "path": "finstack-quant/valuations/src/instruments/fixed_income/cmo/tranches/pac_support.rs",
       "category": "structured_credit",
       "contains": "1.0 - (1.0 - cpr).powf(1.0 / 12.0)",
@@ -2240,36 +2216,6 @@
       "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/prepayment.rs",
-      "category": "structured_credit",
-      "contains": "Ok(1.0 - (1.0 - cpr).powf(1.0 / 12.0))",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/prepayment.rs",
-      "category": "structured_credit",
-      "contains": "PrepaymentModelSpec::psa(1.0)",
-      "reason": "100 percent PSA canonical model constructor; mutable CPR curve parameters are registry-backed."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/prepayment.rs",
-      "category": "structured_credit",
-      "contains": "cpr_to_smm: CPR must be",
-      "reason": "Validation error text, not a prepayment default."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/prepayment.rs",
-      "category": "structured_credit",
-      "contains": "if !cpr.is_finite()",
-      "reason": "CPR validation bound, not a prepayment default."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/prepayment.rs",
-      "category": "structured_credit",
-      "contains": "smm_to_cpr: SMM must be",
-      "reason": "Validation error text, not a prepayment default."
-    },
-    {
       "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/pricer.rs",
       "category": "market_convention",
       "contains": "let pv = discount_schedule(&schedule, &discount_curve, as_of, 0.0)?;",
@@ -2286,12 +2232,6 @@
       "category": "structured_credit",
       "contains": "let prepayment = (balance - scheduled_principal).max(0.0) * smm;",
       "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/servicing.rs",
-      "category": "market_convention",
-      "contains": "calendar_id: \"weekends_only\".to_string(),",
-      "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
       "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/types.rs",
@@ -2436,78 +2376,6 @@
       "category": "market_convention",
       "contains": "schedule generation. Specify a valid calendar ID (e.g., 'nyse', 'target2') \\",
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/default/copula_based.rs",
-      "category": "credit_assumption",
-      "contains": "let p = pd.clamp(1e-10, 1.0 - 1e-10);",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/default/hazard_curve_adapter.rs",
-      "category": "credit_assumption",
-      "contains": "\"Hazard Curve Default Model\"",
-      "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/default/hazard_curve_adapter.rs",
-      "category": "credit_assumption",
-      "contains": "let monthly_hazard = hazard / 12.0;",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/metrics/calculator.rs",
-      "category": "credit_assumption",
-      "contains": "0.60 // Default LGD",
-      "reason": "Credit-model formula, validation, or API text; mutable PD/recovery/LGD defaults live in credit registries."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/metrics/calculator.rs",
-      "category": "credit_assumption",
-      "contains": "lgd_sum += (1.0 - node.recovery_rate) * node.cumulative_probability;",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/prepayment/factor_correlated.rs",
-      "category": "structured_credit",
-      "contains": "if self.base_spec.cpr < 1e-10 {",
-      "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/prepayment/factor_correlated.rs",
-      "category": "structured_credit",
-      "contains": "let shocked_cpr = (base_cpr * shock * burnout).clamp(0.0, 1.0);",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/prepayment/regime_switching.rs",
-      "category": "structured_credit",
-      "contains": "cpr_to_smm((base_cpr * shock * burnout).clamp(0.0, 1.0))",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/prepayment/spec.rs",
-      "category": "structured_credit",
-      "contains": "0.0, // no seasonality by default",
-      "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/tree/node.rs",
-      "category": "credit_assumption",
-      "contains": "let loss = default_amt * (1.0 - self.recovery_rate);",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/tree/node.rs",
-      "category": "credit_assumption",
-      "contains": "self.default_amount * (1.0 - self.recovery_rate)",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
-    },
-    {
-      "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/pricing/stochastic/tree/tree.rs",
-      "category": "credit_assumption",
-      "contains": "recovery.clamp(0.0, 1.0)",
-      "reason": "Financial formula or unit conversion, not an external default to configure."
     },
     {
       "path": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/types/mod.rs",

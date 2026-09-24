@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Agency MBS/TBA/CMO: unused parallel models removed (2026-09-23)
+
+#### Removed (BREAKING, Rust only; none of these were bound in Python or WASM)
+
+- `mbs_passthrough::prepayment` (`AgencyPrepaymentModel`,
+  `StochasticPrepaymentClone`). The pricer uses `PrepaymentModelSpec`
+  directly; rate-dependent speeds live in MC-OAS and effective duration.
+- `mbs_passthrough::servicing`. Fees are the pool's `servicing_fee_rate` and
+  `guarantee_fee_rate` fields.
+- `tba::settlement`. Use `AgencyTba::get_settlement_date`.
+- `tba::allocation` (`allocate_generic_pool`, `AllocationResult`,
+  `PoolCharacteristics`, `validate_sifma_variance`) and the
+  `pool_characteristics` block of `data/assumptions/tba_assumptions.v1.json`.
+  It was a generic-pool stub, not a cheapest-to-deliver model.
+- `cmo::tranches::io_po` (`IoStripCharacteristics`,
+  `PoStripCharacteristics`). The CMO waterfall pricer prices IO/PO strips.
+- `cmo::tranches::sequential` (`SequentialOrder`, `average_life`,
+  `estimate_payment_window`). Waterfall priorities and WAL metrics cover them.
+- `PacSchedule::is_within_collar` and `PacContext::actual_psa` (written but
+  never read).
+
+#### Changed
+
+- A TBA priced on an explicit `assumed_pool` now rejects a pool whose
+  pass-through coupon differs from the TBA coupon, or whose agency is not good
+  delivery (FNMA and FHLMC UMBS are interchangeable; GNMA I and GNMA II are
+  separate programs).
+- `tba_assumptions.v1.json` must carry `schema`
+  `finstack_quant.tba_assumptions/1` and `version` 1; both are now checked.
+
 ### Component source registry 0.2.0 (2026-09-20)
 
 - Prepares 150 registry items for financial forms, views and a composed pricing

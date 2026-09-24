@@ -79,20 +79,11 @@ pub(crate) fn rate_risk_pool(
 
 /// Duration and convexity result.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // public API result struct
 pub(crate) struct DurationResult {
     /// Effective duration (years)
     pub duration: f64,
     /// Effective convexity (years^2)
     pub convexity: f64,
-    /// Base price used in calculation
-    pub base_price: f64,
-    /// Price at up shock
-    pub price_up: f64,
-    /// Price at down shock
-    pub price_down: f64,
-    /// Shock size in basis points
-    pub shock_bp: f64,
 }
 
 /// Calculate effective duration using parallel curve bumps.
@@ -182,10 +173,6 @@ pub(crate) fn duration_convexity(
         return Ok(DurationResult {
             duration: 0.0,
             convexity: 0.0,
-            base_price,
-            price_up: 0.0,
-            price_down: 0.0,
-            shock_bp,
         });
     }
 
@@ -223,10 +210,6 @@ pub(crate) fn duration_convexity(
     Ok(DurationResult {
         duration,
         convexity,
-        base_price,
-        price_up,
-        price_down,
-        shock_bp,
     })
 }
 
@@ -371,15 +354,15 @@ mod tests {
 
         // The bumped prices must NOT be the symmetric (zero-convexity) pair a
         // static PSA bump produces: with rate-dependent prepayment the up/down
-        // cashflows genuinely differ.
-        let linear_midpoint = (result.price_up + result.price_down) / 2.0;
+        // cashflows genuinely differ. Convexity = (P_up + P_down - 2 P_base) /
+        // (P_base * shock^2), so the midpoint gap is convexity * P_base * shock^2 / 2.
+        let base_price = price_mbs(&mbs, &market, as_of).expect("base").amount();
+        let shock = 50.0 / 10_000.0;
+        let midpoint_gap = result.convexity * base_price * shock * shock / 2.0;
         assert!(
-            (linear_midpoint - result.base_price).abs() > 1.0,
+            midpoint_gap.abs() > 1.0,
             "rate-dependent prepayment should make P_up+P_down-2*P_base \
-             non-zero (negative convexity); got base={} up={} down={}",
-            result.base_price,
-            result.price_up,
-            result.price_down
+             non-zero (negative convexity); got midpoint gap {midpoint_gap}"
         );
 
         // A premium agency MBS exhibits negative effective convexity.
@@ -422,14 +405,13 @@ mod tests {
 
         let result = duration_convexity(&mbs, &market, as_of, Some(25.0)).expect("result");
 
-        // Base price should be positive
-        assert!(result.base_price > 0.0);
-
-        // Price changes should be consistent with duration sign
-        // If duration > 0, price_down > price_up (inverse relationship)
-        if result.duration > 0.0 {
-            assert!(result.price_down > result.price_up);
-        }
+        // The combined pass must agree with the single-measure entry points,
+        // and a par-area pass-through loses value when rates rise.
+        let duration = effective_duration(&mbs, &market, as_of, Some(25.0)).expect("duration");
+        let convexity = effective_convexity(&mbs, &market, as_of, Some(25.0)).expect("convexity");
+        assert_eq!(result.duration, duration);
+        assert_eq!(result.convexity, convexity);
+        assert!(result.duration > 0.0, "duration {}", result.duration);
     }
 
     #[test]
@@ -478,7 +460,10 @@ mod production_mortgage_audit {
         let result = mbs
             .price_with_metrics(&market, as_of, &[MetricId::Dv01], PricingOptions::default())
             .expect("metrics");
-        let expected = (dynamic.price_up - dynamic.price_down) / 2.0;
+        // Duration = (P_down - P_up) / (2 P_base shock), so the 1bp central
+        // difference (P_up - P_down) / 2 is -Duration * P_base * 1e-4.
+        let base_price = price_mbs(&mbs, &market, as_of).expect("base").amount();
+        let expected = -dynamic.duration * base_price * 1e-4;
         assert!(
             (result.measures["dv01"] - expected).abs() < 1e-7,
             "dv01 {} versus {expected}",

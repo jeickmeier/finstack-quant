@@ -80,8 +80,6 @@ pub struct PacContext {
     pub schedule: Option<PacSchedule>,
     /// Current period index into the schedule.
     pub period_index: usize,
-    /// Actual PSA speed for collar check.
-    pub actual_psa: f64,
 }
 
 /// Execute waterfall for a single period (convenience entry point).
@@ -932,7 +930,6 @@ mod tests {
         let pac_context = PacContext {
             schedule: Some(pac_schedule),
             period_index: 0,
-            actual_psa: 2.0, // within the 100-300 collar
         };
 
         // Waterfall A: [SR, PAC]
@@ -1433,7 +1430,6 @@ mod tests {
         let pac_context = PacContext {
             schedule: None, // triggers balance-limited fallback allocation
             period_index: 0,
-            actual_psa: 5.0,
         };
 
         let tranches = vec![CmoTranche::pac(
@@ -1536,7 +1532,6 @@ mod tests {
         let pac_context = PacContext {
             schedule: Some(pac_schedule),
             period_index: 0,
-            actual_psa: 5.0, // fast prepay, above the 100-300 collar
         };
 
         // Fast-prepay pool: 4,000 scheduled + 6,000 prepayment = 10,000 total.
@@ -1626,7 +1621,6 @@ mod tests {
         let pac_context = PacContext {
             schedule: Some(pac_schedule),
             period_index: 0,
-            actual_psa: 2.0, // within the 100-300 collar
         };
 
         // Period principal: 6,000 scheduled + 3,000 prepayment = 9,000 total.
