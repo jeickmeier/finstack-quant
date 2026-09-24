@@ -374,13 +374,13 @@ impl PyMertonMcResult {
 
 #[pymethods]
 impl PyMertonMcResult {
-    /// Clean price as a percentage of par.
+    /// Clean price as a percentage of par: the dirty price less accrued interest.
     #[getter]
     fn clean_price_pct(&self) -> f64 {
         self.inner.clean_price_pct
     }
 
-    /// Dirty price as a percentage of par.
+    /// Dirty price as a percentage of par: the mean simulated present value.
     #[getter]
     fn dirty_price_pct(&self) -> f64 {
         self.inner.dirty_price_pct

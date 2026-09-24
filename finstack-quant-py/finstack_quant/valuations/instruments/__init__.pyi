@@ -2031,9 +2031,8 @@ class MertonMcResult:
         Returns
         -------
         float
-            Mean discounted path value divided by notional, times 100, so
-            ``98.7`` means 98.7% of par. Quoted on the same discount basis the
-            configuration supplied.
+            :attr:`dirty_price_pct` less the accrued interest at the valuation
+            date, as a percentage of par (``98.7`` means 98.7% of par).
 
         Notes
         -----
@@ -2049,9 +2048,9 @@ class MertonMcResult:
         Returns
         -------
         float
-            Always equal to :attr:`clean_price_pct`: the Monte Carlo engine
-            works in continuous time and never separates accrued interest. Use
-            the pricer's metrics pipeline for a genuine clean/dirty split.
+            Mean discounted path value divided by notional, times 100, at the
+            valuation date. The simulation pays every remaining coupon in full,
+            so this includes accrued interest; :attr:`clean_price_pct` removes it.
 
         Notes
         -----
