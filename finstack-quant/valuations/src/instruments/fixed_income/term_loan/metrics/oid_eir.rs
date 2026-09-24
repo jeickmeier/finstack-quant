@@ -10,11 +10,10 @@ impl MetricCalculator for OidEirAmortizationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let loan: &TermLoan = context.instrument_as()?;
         let market = &context.curves;
-        let as_of = context.as_of;
 
         let schedule =
             crate::instruments::fixed_income::term_loan::cashflows::build_oid_eir_schedule(
-                loan, market, as_of,
+                loan, market,
             )?;
 
         context

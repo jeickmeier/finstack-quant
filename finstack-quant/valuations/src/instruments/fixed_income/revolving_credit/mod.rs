@@ -56,7 +56,6 @@
 //! # Numerical Constants
 //!
 //! This module uses centralized numerical tolerances for consistency:
-//! - `ZERO_TOLERANCE`: General zero comparison threshold (1e-8)
 //! - `INTERPOLATION_TOLERANCE`: Tolerance for interpolation equality checks (1e-10)
 //!
 //! # See Also
@@ -76,10 +75,6 @@ mod validation;
 
 // Numerical Constants
 // Centralized thresholds for numerical stability and consistency across the module.
-
-/// General zero comparison threshold for numerical stability.
-/// Used for comparing floating-point values to zero.
-pub const ZERO_TOLERANCE: f64 = 1e-8;
 
 /// Tolerance for interpolation equality checks.
 /// Used when comparing time points or interpolation boundaries.

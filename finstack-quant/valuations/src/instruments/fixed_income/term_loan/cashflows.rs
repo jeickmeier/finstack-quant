@@ -38,7 +38,6 @@ fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
 pub(crate) fn generate_cashflows(
     loan: &TermLoan,
     market: &MarketContext,
-    _as_of: Date,
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
     let mut principal_events: Vec<PrincipalEvent> = Vec::new();
     let mut fees: Vec<FeeSpec> = Vec::new();
@@ -722,9 +721,8 @@ pub(crate) use crate::instruments::fixed_income::loan_quotes::OidEirSchedule;
 pub(crate) fn build_oid_eir_schedule(
     loan: &TermLoan,
     market: &MarketContext,
-    as_of: Date,
 ) -> finstack_quant_core::Result<OidEirSchedule> {
-    let schedule = generate_cashflows(loan, market, as_of)?;
+    let schedule = generate_cashflows(loan, market)?;
     let spec = loan.oid_eir.clone().unwrap_or_default();
     crate::instruments::fixed_income::loan_quotes::oid_eir_schedule_from_flows(
         &schedule,

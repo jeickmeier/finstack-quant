@@ -8,7 +8,7 @@ use finstack_quant_core::dates::{
     calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
+use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use rust_decimal::Decimal;
 
 use crate::cashflow::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
@@ -514,28 +514,6 @@ impl RevolvingCreditFees {
     /// * `date` - Accrual date the steps are evaluated on.
     pub fn facility_fee_bp_at(&self, date: Date) -> f64 {
         (self.facility_fee_bp + self.deltas_at(date).facility_bp).max(0.0)
-    }
-
-    /// Create fees with flat (non-tiered) commitment and usage fees using typed bp.
-    pub fn flat_bp(commitment_fee_bp: Bps, usage_fee_bp: Bps, facility_fee_bp: Bps) -> Self {
-        let make_tier = |bp: Bps| -> Vec<FeeTier> {
-            if !bp.is_zero() {
-                vec![FeeTier {
-                    threshold: Decimal::ZERO,
-                    bp: Decimal::from(bp.as_bp()),
-                }]
-            } else {
-                Vec::new()
-            }
-        };
-
-        Self {
-            upfront_fee: None,
-            commitment_fee_tiers: make_tier(commitment_fee_bp),
-            usage_fee_tiers: make_tier(usage_fee_bp),
-            facility_fee_bp: facility_fee_bp.as_bp() as f64,
-            steps: Vec::new(),
-        }
     }
 
     /// Commitment fee in basis points for a utilization: the rate of the

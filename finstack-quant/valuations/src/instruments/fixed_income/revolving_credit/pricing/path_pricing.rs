@@ -481,7 +481,7 @@ impl RevolvingCreditPricer {
         if let Some(ref path_data) = path_schedule.path_data {
             dates.extend(path_data.payment_dates.iter().copied());
         } else {
-            dates.extend(super::super::utils::build_payment_dates(facility, false)?);
+            dates.extend(super::super::utils::build_payment_dates(facility)?);
         }
 
         // Seed with deterministic draw/repay event dates (exposure jumps)

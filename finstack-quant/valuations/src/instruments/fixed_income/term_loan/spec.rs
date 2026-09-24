@@ -105,8 +105,6 @@ pub enum OidPolicy {
     SeparateAmount(Money),
 }
 
-impl OidPolicy {}
-
 /// Draw event for delayed-draw term loans (DDTL).
 ///
 /// Represents a scheduled or actual draw against the commitment, reducing
@@ -380,8 +378,6 @@ pub enum AmortizationSpec {
         Vec<(Date, Money)>,
     ),
 }
-
-impl AmortizationSpec {}
 
 /// Type of borrower call provision on a term loan.
 ///

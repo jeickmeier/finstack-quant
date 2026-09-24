@@ -50,8 +50,6 @@ pub struct MarginStepUp {
     pub delta_bp: i32,
 }
 
-impl MarginStepUp {}
-
 /// Optional configuration for effective interest rate (EIR) amortization schedules.
 ///
 /// When enabled, EIR amortization schedules are computed for reporting using

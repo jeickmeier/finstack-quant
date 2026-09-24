@@ -961,10 +961,10 @@ impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {
     fn raw_cashflow_schedule(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: finstack_quant_core::dates::Date,
+        _as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let schedule = crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows(
-            self, curves, as_of,
+            self, curves,
         )?;
 
         Ok(schedule
