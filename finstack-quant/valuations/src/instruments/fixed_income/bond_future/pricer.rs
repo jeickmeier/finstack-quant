@@ -266,10 +266,14 @@ impl BondFuturePricer {
         let financing_curve_id = repo_curve_id.unwrap_or(&ctd_bond.discount_curve_id);
         let disc = market.get_discount(financing_curve_id)?;
 
+        // One CTD schedule feeds both the interim flows and the accrued at
+        // delivery.
+        let schedule = ctd_bond.full_cashflow_schedule(market)?;
+
         // Present value of coupons/principal received strictly between today
         // and delivery — these are credited to the carry (the long forward
         // does not receive them).
-        let flows = ctd_bond.pricing_dated_cashflows(market, as_of)?;
+        let flows = ctd_bond.pricing_dated_cashflows_from_schedule(&schedule, as_of, as_of)?;
         let mut pv_interim = NeumaierAccumulator::new();
         for (date, amount) in &flows {
             if *date > as_of && *date <= delivery_date {
@@ -292,7 +296,6 @@ impl BondFuturePricer {
         let forward_dirty = (spot_dirty - pv_interim.total()) / df_to_delivery;
 
         // Forward clean price = forward dirty minus accrued at the delivery date.
-        let schedule = ctd_bond.full_cashflow_schedule(market)?;
         let accrued_at_delivery =
             accrued_interest_amount(&schedule, delivery_date, &ctd_bond.accrual_config())?;
         let forward_clean = forward_dirty - accrued_at_delivery;
