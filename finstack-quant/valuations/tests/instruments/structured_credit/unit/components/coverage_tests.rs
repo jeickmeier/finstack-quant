@@ -519,7 +519,7 @@ fn test_ic_test_no_cure_amount() {
     // Act
     let result = test.evaluate(&context).expect("coverage calculation");
 
-    // SC-M08: the cure is a PRINCIPAL PAYDOWN, because that is how the
+    // The cure is a PRINCIPAL PAYDOWN, because that is how the
     // diversion applies it — paying down senior principal adds nothing to
     // interest collections, so a cash-shortfall cure cured nothing.
     //
@@ -539,7 +539,7 @@ fn test_ic_test_no_cure_amount() {
     assert!(
         (cure.amount() - expected).abs() < 1.0,
         "IC cure must be the de-levering paydown {expected:.2}, got {:.2}. \
-         500,000 would be the pre-SC-M08 cash shortfall.",
+         500,000 would be the cash shortfall, not a paydown.",
         cure.amount()
     );
 

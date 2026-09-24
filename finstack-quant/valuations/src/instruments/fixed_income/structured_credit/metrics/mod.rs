@@ -9,7 +9,7 @@
 
 /// Time basis shared by every structured-credit risk metric.
 ///
-/// SC-m02: duration measured time with the DISCOUNT CURVE's day count while
+/// Duration measured time with the DISCOUNT CURVE's day count while
 /// convexity, z-spread, CS01, discount margin, OAS and WAL all hardcoded
 /// Act/365F. On an Act/360 curve that is a 1.39% relative difference in `t`,
 /// so the second-order price expansion

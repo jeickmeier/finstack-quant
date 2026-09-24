@@ -124,7 +124,7 @@ pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
 
             // Check recipient weights.
             //
-            // SC-m10: `weight < 0.0` is FALSE for NaN, so a NaN weight passed
+            // `weight < 0.0` is FALSE for NaN, so a NaN weight passed
             // validation and reached `allocate_pro_rata`, where it poisons the
             // weight total and every share derived from it. `Money::new` then
             // panics on the non-finite result (core/src/money/types.rs), so a
@@ -139,7 +139,7 @@ pub fn validate_tiers(tiers: &[WaterfallTier]) -> Vec<ValidationError> {
                     });
                 }
             }
-            // SC-m10: a non-finite payment PARAMETER reaches `Money::new` in
+            // A non-finite payment PARAMETER reaches `Money::new` in
             // `calculate_payment_amount` and panics there. Validation is the
             // right place to reject it, with the tier and recipient named.
             let bad_amount = match &recipient.calculation {

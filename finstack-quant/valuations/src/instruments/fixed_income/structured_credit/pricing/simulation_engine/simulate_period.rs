@@ -244,7 +244,7 @@ pub(super) fn simulate_period(
     // write-down reflect per-name recovery dispersion; it reduces to the old
     // formula when every default recovers at the period systematic rate.
     // This is a permanent, irreversible write-down.
-    // SC-m19 — why there is no writedown REVERSAL (writeup) mechanism.
+    // Why there is no writedown REVERSAL (writeup) mechanism.
     //
     // The writedown is taken NET of the period's realized recovery, and that
     // recovery is determined at default time (the lag affects only when the
@@ -587,7 +587,7 @@ pub(super) fn simulate_period(
     // N1: senior fees are part of what the waterfall owes AHEAD of the notes.
     //
     // `debt_interest_due` below was written for the reserve/excess-spread work
-    // (SC-C07) BEFORE the fee tier existed (SC-M03), and was never revisited
+    // BEFORE the fee tier existed, and was never revisited
     // when it did. It summed note coupon + deferred interest only, so the
     // excess-spread account measured "surplus" against a claim that omitted
     // every fee the waterfall pays first.
@@ -1123,7 +1123,7 @@ pub(super) fn simulate_period(
             .copied()
             .unwrap_or(Money::from((0_i64, state.base_currency)));
 
-        // SC-M28: take the waterfall's OWN interest/principal classification
+        // Take the waterfall's OWN interest/principal classification
         // rather than re-deriving it from the aggregate.
         //
         // `distributions` keys a tranche's interest and principal under the
@@ -1138,7 +1138,7 @@ pub(super) fn simulate_period(
         // the balance was never retired, and the next period's OC denominator
         // was unchanged: the cure could not de-lever the ratio it was sized to
         // fix. The defect bound precisely in the stress scenarios the cure
-        // mechanics (SC-M07/M08/M09) were built for.
+        // mechanics were built for.
         //
         // The waterfall already knows which payments were `TranchePrincipal`;
         // `principal_distributions` reports it. Interest is then the remainder,
@@ -1234,7 +1234,7 @@ pub(super) fn simulate_period(
                 res.principal_flows.push((pay_date, principal_payment));
                 res.total_principal = res.total_principal.checked_add(principal_payment)?;
             }
-            // SC-m11: PIK and DEFERRED interest are different things and are
+            // PIK and DEFERRED interest are different things and are
             // now recorded separately. PIK capitalizes the shortfall into the
             // tranche balance (it accrues thereafter and enlarges the OC
             // denominator); a non-PIK deferral is a separate senior claim that

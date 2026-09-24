@@ -1209,7 +1209,7 @@ pub struct WaterfallDistribution {
     pub distributions: BTreeMap<RecipientType, Money>,
     /// The PRINCIPAL portion of `distributions`, per recipient.
     ///
-    /// SC-M28: `distributions` aggregates a tranche's interest and principal
+    /// `distributions` aggregates a tranche's interest and principal
     /// into one number, because `RecipientType::Tranche(id)` is the same key
     /// for both. Step 5 therefore had to RE-DERIVE the split by assuming
     /// interest is satisfied first — which silently reclassified a diverted

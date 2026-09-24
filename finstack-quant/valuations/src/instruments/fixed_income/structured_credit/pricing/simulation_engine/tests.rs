@@ -532,7 +532,7 @@ mod cases {
         );
     }
 
-    /// SC-M13 — an OAS rate shift must move FLOATING coupon projections.
+    /// An OAS rate shift must move FLOATING coupon projections.
     ///
     /// If the simulated rate path scaled prepayment only, pool-asset and
     /// tranche floating coupons would still project off the deterministic
@@ -578,7 +578,7 @@ mod cases {
         assert!(
             (shifted - unshifted - 0.01).abs() < 1e-12,
             "a +100bp path shift must raise the projected floating coupon by \
-             exactly that: {unshifted:.6} -> {shifted:.6} (SC-M13)"
+             exactly that: {unshifted:.6} -> {shifted:.6}"
         );
 
         // An index floor binds before the spread: SOFR+400 with a 1% floor on
@@ -1762,7 +1762,7 @@ mod cases {
     ///
     /// `release_spread_account` required a `TrancheSeniority::Equity` tranche
     /// and silently zeroed the balance otherwise — the same cash-sink class as
-    /// the original reserve defect (SC-C07). A deal whose junior class is
+    /// the original reserve defect. A deal whose junior class is
     /// Subordinated is an ordinary structure and lost the whole balance.
     ///
     /// Only the junior tranche's SENIORITY LABEL differs between the two runs,
@@ -1839,7 +1839,7 @@ mod cases {
 
     /// N1 — excess-spread capture must rank senior fees ahead of note interest.
     ///
-    /// `debt_interest_due` predates the fee tier (SC-C07 before SC-M03) and
+    /// `debt_interest_due` predated the fee tier and
     /// summed note coupon + deferred only, so the capture skimmed surplus the
     /// fee tier needed and the notes deferred despite ample excess spread.
     #[test]
@@ -1852,7 +1852,7 @@ mod cases {
         )
         .expect("simulation");
 
-        // SC-m11: the tranche is NOT pik_enabled, so its shortfalls land in
+        // The tranche is NOT pik_enabled, so its shortfalls land in
         // `total_deferred`. Reading `total_pik` here would pass vacuously.
         let total_deferred: f64 = results.values().map(|tc| tc.total_deferred.amount()).sum();
         assert!(
@@ -2096,7 +2096,7 @@ mod cases {
              interest WAL was {mezz_wal_with:.4}y with the trigger vs \
              {mezz_wal_without:.4}y without. Equal values mean the cure has no \
              source — the test position is not placed between the senior and \
-             subordinated interest tiers (SC-M30)."
+             subordinated interest tiers."
         );
 
         // Faster delevering reduces lifetime interest, so measure the senior

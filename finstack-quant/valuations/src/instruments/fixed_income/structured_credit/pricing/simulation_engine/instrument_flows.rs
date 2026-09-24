@@ -1023,16 +1023,14 @@ impl PoolFlowSource for InstrumentScheduleFlowSource {
 
         // Deal-level behavioural rates for instruments without a hazard curve.
         let deal_mdr = period_averaged_monthly_rate(
-            request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |_, seasoning| deal.credit_model.default_spec.mdr(seasoning),
+            |seasoning| deal.credit_model.default_spec.mdr(seasoning),
         )?;
         let deal_smm = period_averaged_monthly_rate(
-            request.pay_date,
             request.seasoning_months,
             request.months_per_period,
-            |_, seasoning| deal.credit_model.prepayment_spec.smm(seasoning),
+            |seasoning| deal.credit_model.prepayment_spec.smm(seasoning),
         )?;
         let period_pd = 1.0 - (1.0 - deal_mdr.clamp(0.0, 1.0)).powf(request.months_per_period);
         let period_smm = 1.0 - (1.0 - deal_smm.clamp(0.0, 1.0)).powf(request.months_per_period);

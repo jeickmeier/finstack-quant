@@ -101,7 +101,7 @@ pub struct WaterfallContext<'a> {
     pub defaulted_collateral_value: Money,
     /// Recovery proceeds released this period (tracked separately for reporting).
     pub recovery_proceeds: Money,
-    /// Simulated shift applied to FLOATING tranche coupons (SC-M13 OAS rate
+    /// Simulated shift applied to FLOATING tranche coupons (OAS rate
     /// path). Zero outside OAS runs. Applied before any available-funds cap so
     /// the interest the waterfall allocates matches the interest the engine
     /// records on the same rate path.
@@ -565,7 +565,7 @@ pub(crate) struct AllocationContext<'a> {
     pub(crate) deferred_interest: Option<&'a HashMap<String, Money>>,
     /// Current reserve account balance (passed dynamically each period)
     pub(crate) reserve_balance: Money,
-    /// Simulated shift applied to FLOATING tranche coupons (SC-M13 OAS rate
+    /// Simulated shift applied to FLOATING tranche coupons (OAS rate
     /// path); zero outside OAS runs. Threading it here keeps the cash the
     /// waterfall *allocates* on the same rate path as the interest the engine
     /// *records* in Step 5.
@@ -580,7 +580,7 @@ pub(crate) struct AllocationContext<'a> {
 pub(crate) struct AllocationOutput {
     /// Accumulated distributions by recipient
     pub(crate) distributions: HashMap<RecipientType, Money>,
-    /// The PRINCIPAL portion of `distributions`, per recipient (SC-M28).
+    /// The PRINCIPAL portion of `distributions`, per recipient.
     pub(crate) principal_distributions: HashMap<RecipientType, Money>,
     /// Payment records for audit trail
     pub(crate) payment_records: Vec<PaymentRecord>,
@@ -680,7 +680,7 @@ fn allocate_sequential(
                 e.insert(paid);
             }
         }
-        // SC-M28: record the PRINCIPAL portion separately, keyed off the
+        // Record the PRINCIPAL portion separately, keyed off the
         // payment calculation that produced it, so the engine never has to
         // re-derive the split from an aggregate.
         if is_principal_payment(&recipient.calculation, tier.payment_type) {
@@ -858,7 +858,7 @@ fn allocate_pro_rata(
                 e.insert(paid);
             }
         }
-        // SC-M28: record the PRINCIPAL portion separately, keyed off the
+        // Record the PRINCIPAL portion separately, keyed off the
         // payment calculation that produced it, so the engine never has to
         // re-derive the split from an aggregate.
         if is_principal_payment(&recipient.calculation, tier.payment_type) {
@@ -1052,7 +1052,7 @@ fn water_fill_allocation(total_units: i64, weights: &[f64], caps: &[i64]) -> Vec
 /// (standard CLO par-OC counts only principal proceeds, never interest).
 /// Whether a payment calculation pays PRINCIPAL rather than interest.
 ///
-/// SC-M28: the waterfall's own classification, decided in exactly one place.
+/// The waterfall's own classification, decided in exactly one place.
 /// `RecipientType::Tranche(id)` is the same map key for a tranche's interest
 /// and its principal, so `distributions` aggregates them; without this the
 /// engine had to guess the split by assuming interest is satisfied first.
@@ -1066,7 +1066,7 @@ fn is_principal_payment(calculation: &PaymentCalculation, payment_type: PaymentT
 
 /// Contractual coupon for the period with the simulated rate-path shift applied.
 ///
-/// SC-M13: a FLOATING tranche's coupon moves with the simulated short-rate path
+/// A FLOATING tranche's coupon moves with the simulated short-rate path
 /// (`floating_rate_shift`), floored at zero; a fixed coupon is contractual and
 /// unaffected. This is the same shift-then-floor rule as the engine's
 /// interest-due kernel, so allocation and recording cannot diverge on the path.
@@ -1156,7 +1156,7 @@ pub(crate) struct SeniorFeeInputs<'a> {
     pub market: &'a MarketContext,
     /// Reserve balance, for reserve-linked calculations.
     pub reserve_balance: Money,
-    /// Simulated floating-coupon shift (SC-M13); zero outside OAS runs.
+    /// Simulated floating-coupon shift; zero outside OAS runs.
     pub floating_rate_shift: f64,
 }
 
@@ -1168,7 +1168,7 @@ pub(crate) struct SeniorFeeInputs<'a> {
 ///
 /// This is the single source of truth for "what the fee tier will take",
 /// shared by three call sites that must agree:
-///   * the IC numerator (SC-M29), which nets it from interest collections;
+///   * the IC numerator, which nets it from interest collections;
 ///   * the excess-spread capture/draw and the reserve draw (N1), which must
 ///     treat it as a senior claim ranking ahead of note interest;
 ///   * the waterfall itself, which actually pays it.
@@ -2282,7 +2282,7 @@ mod water_fill_tests {
     use finstack_quant_core::money::Money;
     use time::Month;
 
-    /// SC-M28 — the waterfall must report its OWN interest/principal split.
+    /// The waterfall must report its OWN interest/principal split.
     ///
     /// `distributions` keys a tranche's interest and principal under the same
     /// `RecipientType::Tranche(id)`, so the engine's Step 5 had to reconstruct
@@ -2380,7 +2380,7 @@ mod water_fill_tests {
             "principal_distributions must hold ONLY the principal portion: got \
              {principal:.2} of {total:.2} total. Equal values mean interest was \
              misclassified as principal; zero means the split is not being \
-             reported at all (SC-M28)."
+             reported at all."
         );
         let interest = total - principal;
         assert!(

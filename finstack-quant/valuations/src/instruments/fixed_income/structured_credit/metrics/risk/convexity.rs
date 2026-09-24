@@ -71,7 +71,7 @@ pub fn calculate_tranche_convexity(
     }
 
     let p0 = pv0.total();
-    // SC-m04: guard relative to the cashflow scale, not `f64::EPSILON`.
+    // Guard relative to the cashflow scale, not `f64::EPSILON`.
     //
     // `f64::EPSILON` is 2.2e-16 — an absolute threshold on a CURRENCY amount.
     // A tranche whose PV has collapsed to a residual 1e-12 sails past it and

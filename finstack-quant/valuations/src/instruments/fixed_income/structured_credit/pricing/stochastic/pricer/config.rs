@@ -16,7 +16,7 @@ use std::sync::Arc;
 ///
 /// # Tree mode is bounded by construction — read this before selecting it
 ///
-/// SC-M25: path-preserving tree pricing keeps `3^n` terminal nodes for `n`
+/// Path-preserving tree pricing keeps `3^n` terminal nodes for `n`
 /// periods, checked against `max_tree_paths` (default 100,000). `3^11 =
 /// 177,147`, so **Tree hard-errors for any deal with more than ten periods
 /// remaining** — which is essentially every real deal, since
@@ -67,7 +67,7 @@ pub enum PricingMode {
 }
 
 impl Default for PricingMode {
-    /// SC-M25: Monte Carlo, not Tree.
+    /// Monte Carlo, not Tree.
     ///
     /// Tree is bounded to roughly ten periods by its `3^n` node count, so it
     /// cannot price a deal at any realistic horizon. Defaulting to it made the
@@ -215,7 +215,7 @@ mod tests {
         Date::from_calendar_date(2024, Month::January, 15).expect("Valid date")
     }
 
-    /// SC-M25 — the default must be a mode that can actually price a deal.
+    /// The default must be a mode that can actually price a deal.
     ///
     /// Tree keeps `3^n` terminal nodes against a 100,000 cap, so it hard-errors
     /// past ten periods — essentially every real deal. Defaulting to it made
@@ -227,7 +227,7 @@ mod tests {
         assert!(
             matches!(mode, PricingMode::MonteCarlo { .. }),
             "the default pricing mode must be Monte Carlo, not Tree — Tree \
-             cannot price a deal at a realistic horizon (SC-M25)"
+             cannot price a deal at a realistic horizon"
         );
         // And it must agree with what `default_stochastic_pricing_mode`
         // already selects, so the standalone default is not a second opinion.

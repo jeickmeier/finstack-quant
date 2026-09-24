@@ -15,7 +15,7 @@ pub struct StochasticPricingResult {
     /// Clean price (percent of the sum of current tranche balances),
     /// UNADJUSTED for accrued interest.
     ///
-    /// SC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic
+    /// This equals [`Self::dirty_price`]. The deal-level stochastic
     /// result carries no per-tranche interest flows, so accrued cannot be
     /// computed here (the same constraint documented on the accrued
     /// calculator). It is reported unadjusted rather than fabricated: the

@@ -4,23 +4,31 @@ use crate::instruments::fixed_income::structured_credit::types::{
 };
 use finstack_quant_core::dates::DayCount;
 
-/// Per-period cash-conservation invariant (debug/test builds only).
+/// Per-period cash-conservation invariant, checked in every build.
 ///
 /// Verifies two identities for one payment period:
 ///
 /// 1. **Input identity** — the cash handed to the waterfall equals the pool
-///    cash that is actually distributable this period:
-///    `total_cash_for_waterfall = interest + released_recoveries`
-///    (`+ scheduled_principal + prepayment` when reinvestment is inactive;
-///    during reinvestment that principal is recycled into collateral, not
-///    distributed).
+///    cash that is distributable this period, net of the side accounts:
+///    `total_cash_for_waterfall = interest + released_recoveries
+///    (+ scheduled_principal + prepayment unless principal is diverted into
+///    reinvestment or accumulation) − side_net_capture`, where
+///    `side_net_capture` is the net cash moved into the excess-spread,
+///    reserve, funding and carried-cash accounts (negative when they supply
+///    cash, as call premia, reserve interest and hedge receipts do).
 ///
 /// 2. **Output identity** — the waterfall conserves cash:
 ///    `Σ distributions + remaining_cash = total_available`.
 ///
-/// Compiled out entirely in release builds (`debug_assert!`), so there is no
-/// hot-path cost; it exists to fail loudly in tests and debug runs if a future
-/// change breaks the engine's cash accounting.
+/// Cash has vanished through side-account sinks before, and a violated
+/// identity corrupts every tranche cashflow downstream, so a violation is a
+/// hard error naming the discrepancy. The tolerance scales with deal size
+/// (`max(1e-9 · cash, 1.0)`) for penny rounding in pro-rata allocation.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when either identity fails by more than the
+/// tolerance.
 #[inline]
 pub(super) fn assert_cash_conserved(
     total_cash_for_waterfall: Money,
@@ -30,20 +38,6 @@ pub(super) fn assert_cash_conserved(
     waterfall_result: &WaterfallDistribution,
     side_net_capture: f64,
 ) -> Result<()> {
-    // SC-m13: this runs in RELEASE builds, not only under `debug_assertions`.
-    //
-    // Compiling it out of production runs would leave the one invariant that
-    // catches a cash-accounting regression — the waterfall neither creating
-    // nor destroying cash — checked only in tests, and cash has vanished
-    // through at least three sinks before (the reserve sink SC-C07, the
-    // cleanup-call excess SC-M22, and the spread-account sink N7); a
-    // silently-violated conservation identity corrupts every tranche
-    // cashflow and PV downstream with no diagnostic.
-    //
-    // The cost is a handful of float operations per payment period against a
-    // full waterfall execution, which is not measurable. A violation is now a
-    // hard error naming the discrepancy rather than a wrong number.
-
     // Tolerance scales with deal size: penny-safe pro-rata allocation in the
     // waterfall rounds to the currency's smallest unit per recipient.
     let tol = (total_cash_for_waterfall.amount().abs() * 1e-9).max(1.0);

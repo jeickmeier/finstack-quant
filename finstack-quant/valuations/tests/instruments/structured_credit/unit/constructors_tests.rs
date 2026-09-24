@@ -150,11 +150,11 @@ fn test_prepayment_overrides_use_expected_priority() {
     );
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::abs(0.02);
-    let abs_rate = sc.calculate_prepayment_rate(test_date(), 1).unwrap();
+    let abs_rate = sc.calculate_prepayment_rate(1).unwrap();
     assert!((abs_rate - 0.02).abs() < 1e-12);
 
     sc.behavior_overrides.cpr_annual = Some(0.12);
-    let cpr_rate = sc.calculate_prepayment_rate(test_date(), 1).unwrap();
+    let cpr_rate = sc.calculate_prepayment_rate(1).unwrap();
     assert!((cpr_rate - clamped_cpr_to_smm(0.12)).abs() < 1e-12);
 
     sc.behavior_overrides.cpr_annual = None;
@@ -162,9 +162,7 @@ fn test_prepayment_overrides_use_expected_priority() {
     let seasoning = 3;
     let base_cpr = (seasoning as f64 / psa_ramp_months() as f64) * psa_terminal_cpr();
     let expected = clamped_cpr_to_smm(base_cpr * 2.0);
-    let psa_rate = sc
-        .calculate_prepayment_rate(test_date(), seasoning)
-        .unwrap();
+    let psa_rate = sc.calculate_prepayment_rate(seasoning).unwrap();
     assert!((psa_rate - expected).abs() < 1e-12);
 }
 
@@ -182,7 +180,7 @@ fn test_default_overrides_use_expected_priority() {
     );
 
     sc.behavior_overrides.cdr_annual = Some(0.12);
-    let cdr_rate = sc.calculate_default_rate(test_date(), 1).unwrap();
+    let cdr_rate = sc.calculate_default_rate(1).unwrap();
     assert!((cdr_rate - clamped_cdr_to_mdr(0.12)).abs() < 1e-12);
 
     sc.behavior_overrides.cdr_annual = None;
@@ -192,9 +190,7 @@ fn test_default_overrides_use_expected_priority() {
     let plateau_seasoning = sda_peak_month() + 1;
     let plateau_cdr = sda_peak_cdr() * 1.5;
     let expected_plateau = 1.0 - (1.0 - plateau_cdr).powf(1.0 / 12.0);
-    let plateau_rate = sc
-        .calculate_default_rate(test_date(), plateau_seasoning)
-        .unwrap();
+    let plateau_rate = sc.calculate_default_rate(plateau_seasoning).unwrap();
     assert!((plateau_rate - expected_plateau).abs() < 1e-12);
 
     // Months 61-120 decline linearly from the peak to the terminal CDR;
@@ -203,9 +199,7 @@ fn test_default_overrides_use_expected_priority() {
     let frac = f64::from(decline_seasoning - 60) / 60.0;
     let decline_cdr = (sda_peak_cdr() - frac * (sda_peak_cdr() - sda_terminal_cdr())) * 1.5;
     let expected_decline = 1.0 - (1.0 - decline_cdr).powf(1.0 / 12.0);
-    let decline_rate = sc
-        .calculate_default_rate(test_date(), decline_seasoning)
-        .unwrap();
+    let decline_rate = sc.calculate_default_rate(decline_seasoning).unwrap();
     assert!((decline_rate - expected_decline).abs() < 1e-12);
 }
 

@@ -433,7 +433,7 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     } else {
         tranche.coupon.current_rate(context.as_of)
     };
-    // SC-M13: a floating coupon rides the simulated rate path (shift-then-floor,
+    // A floating coupon rides the simulated rate path (shift-then-floor,
     // matching the engine's interest-due kernel). Fixed coupons are contractual.
     let rate = match tranche.coupon {
         crate::instruments::fixed_income::structured_credit::types::TrancheCoupon::Floating(_) => {
@@ -527,7 +527,7 @@ pub struct TestContext<'a> {
     /// Always supplied from the waterfall spec, so IC measures coverage of
     /// what the structure actually owes.
     pub interest_claim_caps: &'a HashMap<&'a str, Option<f64>>,
-    /// Simulated floating-coupon shift (SC-M13 OAS rate path); zero outside
+    /// Simulated floating-coupon shift (OAS rate path); zero outside
     /// OAS runs. Keeps the IC due on the same rate path as collections.
     pub floating_rate_shift: f64,
     /// Outstanding non-PIK deferred interest by tranche id.
@@ -1283,15 +1283,14 @@ mod haircut_tests {
         m
     }
 
-    /// SC-M29 — senior fees must be deducted from the IC numerator.
+    /// Senior fees must be deducted from the IC numerator.
     ///
     /// Fees rank AHEAD of every note, so cash spent on them is not available to
     /// cover note interest. Market convention is
     /// `(collections − senior fees) / interest due`. Using raw collections
     /// overstates IC and lets a deal pass a test it should fail.
     ///
-    /// This was latent until SC-M03 wired the fee tier — with no fees modelled
-    /// the deduction was always zero.
+    /// With no fee tier modelled the deduction is zero, which hid the defect.
     #[test]
     fn senior_fees_tighten_the_ic_test() {
         let pool = rated_pool();
@@ -1338,7 +1337,7 @@ mod haircut_tests {
             with < without,
             "senior fees must REDUCE the IC ratio: {with:.4} with a 4,000 fee \
              vs {without:.4} without. Equal values mean the numerator is still \
-             raw collections (SC-M29)."
+             raw collections."
         );
         // 10,000 collections less 4,000 of fees is 60% of the un-netted figure.
         assert!(
@@ -1349,7 +1348,7 @@ mod haircut_tests {
         );
     }
 
-    /// SC-M08 — the IC cure must be a PRINCIPAL paydown, since that is how the
+    /// The IC cure must be a PRINCIPAL paydown, since that is how the
     /// diversion applies it.
     ///
     /// The old cure was the cash shortfall `R*I_due - I_coll`, which answers
@@ -1415,7 +1414,7 @@ mod haircut_tests {
             "the de-levering cure {cure:.2} must be far larger than the cash \
              shortfall {cash_shortfall:.2} — they are different quantities, and \
              using the shortfall under-cures an IC breach by roughly 1/(r*tau) \
-             (SC-M08)"
+            "
         );
 
         // Sanity: paying down exactly `cure` of principal must clear the test.
@@ -1641,7 +1640,7 @@ mod haircut_tests {
         assert!(error.to_string().contains("2025-05-01"), "{error}");
     }
 
-    /// SC-M09 — a configured haircut must track the CURRENT pool balance, not
+    /// A configured haircut must track the CURRENT pool balance, not
     /// freeze at the closing-date snapshot.
     ///
     /// `context.pool` is `&instrument.pool`, never mutated during simulation.
@@ -1695,7 +1694,7 @@ mod haircut_tests {
             (result.current_ratio - 0.60).abs() < 1e-9,
             "the haircut must scale the CURRENT balance: expected 0.60 \
              (400k x 0.75 / 500k), got {}. A ratio near 1.5 means the numerator \
-             is still the frozen closing pool (SC-M09).",
+             is still the frozen closing pool.",
             result.current_ratio
         );
         assert!(
@@ -1751,7 +1750,7 @@ mod haircut_tests {
         );
     }
 
-    /// SC-M09 — without haircuts the current-balance override is used directly,
+    /// Without haircuts the current-balance override is used directly,
     /// so this path is unchanged.
     #[test]
     fn absent_haircuts_use_the_current_balance_unscaled() {
