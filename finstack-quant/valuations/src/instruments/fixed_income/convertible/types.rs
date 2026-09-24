@@ -488,8 +488,9 @@ pub struct ConversionSpec {
     pub anti_dilution: AntiDilutionPolicy,
     /// Dividend adjustment mechanism.
     pub dividend_adjustment: DividendAdjustment,
-    /// Historical dilution events that affect the conversion ratio.
-    /// Events are applied in chronological order.
+    /// Historical dilution events that affect the conversion ratio, recorded
+    /// in chronological (non-decreasing date) order and applied in that
+    /// order. Validation rejects out-of-order events.
     #[serde(default)]
     pub dilution_events: Vec<DilutionEvent>,
 }
@@ -589,6 +590,20 @@ impl ConvertibleBond {
             }
         }
 
+        if let Some(pair) = self
+            .conversion
+            .dilution_events
+            .windows(2)
+            .find(|pair| pair[1].date < pair[0].date)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "convertible bond '{}' dilution events must be in chronological order; \
+                 {} is recorded after {}",
+                self.id.as_str(),
+                pair[1].date,
+                pair[0].date
+            )));
+        }
         for event in &self.conversion.dilution_events {
             validate_conversion_date(event.date, self.issue_date, self.maturity, "dilution event")?;
             validation::validate_f64_positive(
@@ -707,11 +722,9 @@ impl ConvertibleBond {
         let notional = self.notional.amount();
         let mut current_cp = notional / base_ratio;
 
-        // Sort events by date and apply sequentially
-        let mut events = self.conversion.dilution_events.clone();
-        events.sort_by_key(|e| e.date);
-
-        for event in &events {
+        // Events are stored in chronological order (enforced by validation)
+        // and applied sequentially.
+        for event in &self.conversion.dilution_events {
             match &self.conversion.anti_dilution {
                 AntiDilutionPolicy::None => unreachable!(
                     "effective_conversion_ratio reached AntiDilutionPolicy::None; the \
@@ -1376,6 +1389,29 @@ mod tests {
             err.to_string().contains("collapse"),
             "error must explain the anti-dilution collapse; got: {err}"
         );
+    }
+
+    /// Weighted-average adjustments are order dependent, so dilution events
+    /// must be recorded chronologically; out-of-order events fail validation.
+    #[test]
+    fn validation_rejects_out_of_order_dilution_events() {
+        let mut bond = ConvertibleBond::example().expect("example");
+        bond.conversion.anti_dilution = AntiDilutionPolicy::WeightedAverage;
+        let event = |date| DilutionEvent {
+            date,
+            new_issue_price: 50.0,
+            new_shares_issued: 10.0,
+            shares_outstanding_before: 100.0,
+        };
+        let later = bond.issue_date + time::Duration::days(60);
+        bond.conversion.dilution_events = vec![event(later), event(bond.issue_date)];
+        let err = bond
+            .validate_for_pricing()
+            .expect_err("out-of-order dilution events must fail");
+        assert!(err.to_string().contains("chronological"), "{err}");
+
+        bond.conversion.dilution_events = vec![event(bond.issue_date), event(later)];
+        bond.validate_for_pricing().expect("chronological events");
     }
 
     #[test]
