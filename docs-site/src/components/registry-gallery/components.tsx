@@ -26,6 +26,15 @@ import { Example as Example22 } from "./examples/scenario-heatmap";
 import { Example as Example23 } from "./examples/curve-link-example";
 import { Example as Example24 } from "./examples/pricing-forms-example";
 import { Example as Example25 } from "./examples/pricing-workbench";
+import {
+  EditorExample,
+  GridExample,
+  ChartExample,
+  ExplanationExample,
+  ChecksExample,
+  CheckReportExample,
+  WorkbenchExample,
+} from "./examples/statements";
 export const nativeItems = new Set([
   "schema-form",
   "instrument-form",
@@ -35,6 +44,13 @@ export const nativeItems = new Set([
   "fx-surface-chart",
   "vol-cube-explorer",
   "pricing-workbench",
+  "financial-model-editor",
+  "statement-grid",
+  "statement-chart",
+  "statement-explanation",
+  "statement-checks",
+  "statement-check-report",
+  "statements-workbench",
 ]);
 const examples = {
   "schema-form": Example0,
@@ -63,6 +79,13 @@ const examples = {
   "curve-link-example": Example23,
   "pricing-forms-example": Example24,
   "pricing-workbench": Example25,
+  "financial-model-editor": EditorExample,
+  "statement-grid": GridExample,
+  "statement-chart": ChartExample,
+  "statement-explanation": ExplanationExample,
+  "statement-checks": ChecksExample,
+  "statement-check-report": CheckReportExample,
+  "statements-workbench": WorkbenchExample,
 };
 export function ComponentDemo({
   name,

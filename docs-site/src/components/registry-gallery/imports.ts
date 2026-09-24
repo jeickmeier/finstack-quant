@@ -86,6 +86,13 @@ export const importHarnesses = {
       name: "use-cube-samples",
       modules: modules.length,
     })),
+  "use-evaluate-statement": () =>
+    Promise.all([
+      import("@/hooks/statements/use-evaluate-statement/use-evaluate-statement"),
+    ]).then((modules) => ({
+      name: "use-evaluate-statement",
+      modules: modules.length,
+    })),
   "finstack-fixtures": () =>
     Promise.all([import("@/lib/finstack/fixtures/results/bond.json")]).then(
       (modules) => ({ name: "finstack-fixtures", modules: modules.length }),
@@ -1006,6 +1013,7 @@ export const importHarnesses = {
       import("@/lib/finstack/generated/schemas/financial_model_spec.json"),
       import("@/lib/finstack/generated/types/financial_model_spec"),
       import("@/lib/finstack/generated/meta/financial_model_spec"),
+      import("@/lib/finstack/generated/examples/financial_model_spec.json"),
     ]).then((modules) => ({
       name: "contract-financial-model-spec",
       modules: modules.length,

@@ -239,6 +239,41 @@
       "name": "vol-cube-explorer",
       "type": "registry:component",
       "docs": "Checked native volatility cube exploration. Supply canonical cube state, initial absolute strike and explicit normal or Black/lognormal convention, plus color extents for both output units. Original SABR parameters, forwards and shifts remain separate from evaluated samples. Requires FinstackQueryProvider; editing uses market-context-form and native validation."
+    },
+    {
+      "name": "financial-model-editor",
+      "type": "registry:component",
+      "docs": "Edit explicit FinancialModelSpec fields from the generated Rust schema. Native WASM validates and canonicalizes the model; formula fields show the opaque native parse preview. Requires FinstackQueryProvider and remounting for a new document."
+    },
+    {
+      "name": "statement-grid",
+      "type": "registry:component",
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation."
+    },
+    {
+      "name": "statement-chart",
+      "type": "registry:component",
+      "docs": "Plot finite native values for one supplied statement node in explicit period order. Missing and nonfinite values are omitted from marks and remain visible in the grid; Money stays exact there. Selection links by node and period."
+    },
+    {
+      "name": "statement-explanation",
+      "type": "registry:component",
+      "docs": "Call native explanation, text explanation and dependency trace for a matching model/result/node/period request. Render structured returned components and opaque native text without parsing formulas in JavaScript."
+    },
+    {
+      "name": "statement-check-report",
+      "type": "registry:component",
+      "docs": "Display native check summary, statuses, severity, findings and materiality without local pass/fail calculations. Supplied cell selection is a notification only; the full report remains exportable."
+    },
+    {
+      "name": "statement-checks",
+      "type": "registry:component",
+      "docs": "Run native check suites or raw three-statement and credit mappings against the supplied matching result. Native suite validation and execution own all check semantics; the editable JSON is never inferred from examples."
+    },
+    {
+      "name": "statements-workbench",
+      "type": "registry:block",
+      "docs": "Open on complete host-supplied financial statements with report-style inline editing, selectable periods, configurable native forecast methods, service-supplied roll forward, formula-backed calculated metrics, and checks. The schema editor and JSON import are in Advanced. Host owns data ingestion and persistence. Requires FinstackQueryProvider."
     }
   ],
   "nonvisual": [
@@ -292,6 +327,10 @@
     },
     {
       "name": "use-cube-samples",
+      "type": "registry:hook"
+    },
+    {
+      "name": "use-evaluate-statement",
       "type": "registry:hook"
     },
     {

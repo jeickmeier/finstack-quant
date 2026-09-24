@@ -41,6 +41,8 @@ for (const { schema } of roots) {
       `generated/instrument/${name}.ts`,
       `generated/examples/${name}.json`,
     );
+  if (name === "financial_model_spec")
+    files.push(`generated/examples/${name}.json`);
   const text = await readFile(`${root}src/generated/${schema}`, "utf8");
   const dependencies = [];
   if (instrument) dependencies.push("finstack-codec");
@@ -139,6 +141,7 @@ const output = await prettier.format(
       "calibration",
       "covenants",
       "models",
+      "statements",
     ].map((category) => `registry/${category}/registry.json`),
     items,
   }),

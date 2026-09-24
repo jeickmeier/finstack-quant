@@ -10,7 +10,8 @@
     "registry/valuations/registry.json",
     "registry/calibration/registry.json",
     "registry/covenants/registry.json",
-    "registry/models/registry.json"
+    "registry/models/registry.json",
+    "registry/statements/registry.json"
   ],
   "items": [
     {
@@ -3579,6 +3580,11 @@
           "path": "src/generated/meta/financial_model_spec.ts",
           "type": "registry:file",
           "target": "lib/finstack/generated/meta/financial_model_spec.ts"
+        },
+        {
+          "path": "src/generated/examples/financial_model_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/examples/financial_model_spec.json"
         }
       ],
       "registryDependencies": [],

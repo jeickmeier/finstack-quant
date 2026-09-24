@@ -5,6 +5,7 @@ finstack-quant-ui/registry/theme/registry.json
 finstack-quant-ui/src/contract-provenance.json
 finstack-quant-ui/src/generated/catalogue.json
 finstack-quant-ui/src/generated/curve-views.json
+finstack-quant-ui/src/generated/defs/shared.json
 finstack-quant-ui/src/generated/examples/agency_cmo.json
 finstack-quant-ui/src/generated/examples/agency_mbs_passthrough.json
 finstack-quant-ui/src/generated/examples/agency_tba.json
@@ -45,6 +46,7 @@ finstack-quant-ui/src/generated/examples/equity_future.json
 finstack-quant-ui/src/generated/examples/equity_future_option.json
 finstack-quant-ui/src/generated/examples/equity_option.json
 finstack-quant-ui/src/generated/examples/equity_total_return_future.json
+finstack-quant-ui/src/generated/examples/financial_model_spec.json
 finstack-quant-ui/src/generated/examples/forward_rate_agreement.json
 finstack-quant-ui/src/generated/examples/fx_barrier_option.json
 finstack-quant-ui/src/generated/examples/fx_digital_option.json
@@ -204,6 +206,7 @@ finstack-quant-ui/src/generated/meta/equity_future.ts
 finstack-quant-ui/src/generated/meta/equity_future_option.ts
 finstack-quant-ui/src/generated/meta/equity_option.ts
 finstack-quant-ui/src/generated/meta/equity_total_return_future.ts
+finstack-quant-ui/src/generated/meta/financial_model_spec.ts
 finstack-quant-ui/src/generated/meta/forward_rate_agreement.ts
 finstack-quant-ui/src/generated/meta/fx_barrier_option.ts
 finstack-quant-ui/src/generated/meta/fx_digital_option.ts
@@ -232,7 +235,9 @@ finstack-quant-ui/src/generated/meta/range_accrual.ts
 finstack-quant-ui/src/generated/meta/real_estate_asset.ts
 finstack-quant-ui/src/generated/meta/repo.ts
 finstack-quant-ui/src/generated/meta/revolving_credit.ts
+finstack-quant-ui/src/generated/meta/shared.ts
 finstack-quant-ui/src/generated/meta/snowball.ts
+finstack-quant-ui/src/generated/meta/statement_result.ts
 finstack-quant-ui/src/generated/meta/structured_credit.ts
 finstack-quant-ui/src/generated/meta/swaption.ts
 finstack-quant-ui/src/generated/meta/tarn.ts
@@ -288,6 +293,7 @@ finstack-quant-ui/src/generated/schemas/equity_future.json
 finstack-quant-ui/src/generated/schemas/equity_future_option.json
 finstack-quant-ui/src/generated/schemas/equity_option.json
 finstack-quant-ui/src/generated/schemas/equity_total_return_future.json
+finstack-quant-ui/src/generated/schemas/financial_model_spec.json
 finstack-quant-ui/src/generated/schemas/forward_rate_agreement.json
 finstack-quant-ui/src/generated/schemas/fx_barrier_option.json
 finstack-quant-ui/src/generated/schemas/fx_digital_option.json
@@ -317,6 +323,7 @@ finstack-quant-ui/src/generated/schemas/real_estate_asset.json
 finstack-quant-ui/src/generated/schemas/repo.json
 finstack-quant-ui/src/generated/schemas/revolving_credit.json
 finstack-quant-ui/src/generated/schemas/snowball.json
+finstack-quant-ui/src/generated/schemas/statement_result.json
 finstack-quant-ui/src/generated/schemas/structured_credit.json
 finstack-quant-ui/src/generated/schemas/swaption.json
 finstack-quant-ui/src/generated/schemas/tarn.json
@@ -370,6 +377,7 @@ finstack-quant-ui/src/generated/types/equity_future.ts
 finstack-quant-ui/src/generated/types/equity_future_option.ts
 finstack-quant-ui/src/generated/types/equity_option.ts
 finstack-quant-ui/src/generated/types/equity_total_return_future.ts
+finstack-quant-ui/src/generated/types/financial_model_spec.ts
 finstack-quant-ui/src/generated/types/forward_rate_agreement.ts
 finstack-quant-ui/src/generated/types/fx_barrier_option.ts
 finstack-quant-ui/src/generated/types/fx_digital_option.ts
@@ -398,7 +406,9 @@ finstack-quant-ui/src/generated/types/range_accrual.ts
 finstack-quant-ui/src/generated/types/real_estate_asset.ts
 finstack-quant-ui/src/generated/types/repo.ts
 finstack-quant-ui/src/generated/types/revolving_credit.ts
+finstack-quant-ui/src/generated/types/shared.ts
 finstack-quant-ui/src/generated/types/snowball.ts
+finstack-quant-ui/src/generated/types/statement_result.ts
 finstack-quant-ui/src/generated/types/structured_credit.ts
 finstack-quant-ui/src/generated/types/swaption.ts
 finstack-quant-ui/src/generated/types/tarn.ts

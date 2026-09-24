@@ -88,6 +88,8 @@ const service = createService({
     dryRun: wasm.dryRun,
     validateCalibrationJson: wasm.validateCalibrationJson,
   },
+  statements: wasm,
+  statements_analytics: wasm,
   valuations: {
     Market,
     validateValuationResultJson: wasm.validateValuationResultJson,
