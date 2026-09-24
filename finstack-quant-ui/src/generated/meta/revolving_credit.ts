@@ -4565,7 +4565,7 @@ export default [
   {
     "path": "#/$defs/d_ba391d15759d4194c067",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/CommitmentStep",
-    "description": "A scheduled change of a revolving facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic facility books the\nimplied principal change at the step."
+    "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`)."
   },
   {
     "path": "#/$defs/d_ba391d15759d4194c067/properties/amount",

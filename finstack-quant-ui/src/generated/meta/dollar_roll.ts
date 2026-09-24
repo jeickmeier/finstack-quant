@@ -308,6 +308,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
+    "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/prepayment_model",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/prepayment_model",
+    "description": "Prepayment model of the generic pool both legs deliver.\n\n`None` uses the embedded generic PSA assumption of the TBA legs."
+  },
+  {
+    "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/prepayment_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/prepayment_model/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/prepayment_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/prepayment_model/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_05625cf1aa46e3810fc5/properties/repo_curve_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/dollar_roll.schema.json#/$defs/DollarRoll/properties/repo_curve_id",
     "description": "Optional repo/financing curve identifier (carry-only).\n\nForward curve used by roll specialness to calculate the simple\nfinancing rate over the front/back settlement interval on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
@@ -1315,6 +1330,90 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DecimalWire",
     "description": "Exact decimal encoded only as a JSON string.",
     "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve",
+    "description": "Prepayment curve shape."
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/0",
+    "description": "Constant CPR (no seasoning effect)"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/0/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/0/properties/curve",
+    "const": "constant"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/1",
+    "description": "PSA standard curve: ramps to 6% CPR over 30 months"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/1/properties/curve",
+    "const": "psa"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
+    "description": "Speed multiplier (1.0 = 100% PSA)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/2",
+    "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR."
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/2/properties/curve",
+    "const": "cmbs_lockout"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
+    "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/3",
+    "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention). The `cpr` field is ignored."
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/3/properties/curve",
+    "const": "abs"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
+    "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4",
+    "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months. The `cpr` field is ignored."
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/curve",
+    "const": "vector"
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr",
+    "description": "Annual CPR per month of seasoning as decimals, month 1 first."
+  },
+  {
+    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_780b68ee5d41351b65ca",
@@ -2548,6 +2647,40 @@ export default [
       "US912828XG33"
     ],
     "title": "Id"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#",
+    "description": "Cashflow prepayment-model specification.",
+    "examples": [
+      {
+        "cpr": 0.06,
+        "curve": null
+      }
+    ],
+    "title": "PrepaymentModelSpec"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/cpr",
+    "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`],\n[`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the\nmonthly rate is then derived entirely from the curve. It IS used by\n[`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/curve",
+    "default": null,
+    "description": "Optional curve shape (default: constant)"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/curve/anyOf/0",
+    "ref": "#/$defs/PrepaymentCurve",
+    "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/curve/anyOf/1"
   },
   {
     "path": "#/$defs/d_ae5d75ed4e313ae3bc25",

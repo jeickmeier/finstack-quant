@@ -1209,6 +1209,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_54049d1588e6ed129bca/properties/prepayment_model",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_54049d1588e6ed129bca/properties/settlement_class",
             "keyword": "anyOf"
           },
@@ -2017,6 +2021,8 @@
           "#/$defs/RevolvingCredit/properties/leq",
           "#/$defs/RevolvingCredit/properties/recovery_rate",
           "#/$defs/LoanCall/properties/price_pct_of_par",
+          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
+          "#/$defs/DdtlSpec/properties/usage_fee_bp",
           "#/$defs/ReinvestmentAssumptions/properties/coupon_floor",
           "#/$defs/ReinvestmentAssumptions/properties/price_pct",
           "#/$defs/ReinvestmentAssumptions/properties/spread_bp",
@@ -2126,10 +2132,8 @@
           "#/$defs/TermLoanAmortizationSpec/oneOf/2/properties/percent_per_period/properties/bp",
           "#/$defs/TermLoanAmortizationSpec/oneOf/3/properties/percent_of_original_notional/properties/bp",
           "#/$defs/LoanCallType/oneOf/2/properties/make_whole/properties/treasury_spread_bp",
-          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
           "#/$defs/OidPolicy/oneOf/0/properties/withheld_pct",
           "#/$defs/OidPolicy/oneOf/2/properties/separate_pct",
-          "#/$defs/DdtlSpec/properties/usage_fee_bp",
           "#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate_bp"
         ],
         "internal-union": [
@@ -4366,7 +4370,6 @@
           "#/$defs/CommoditySwap/properties/calendar_id",
           "#/$defs/CommoditySwaption/properties/calendar_id",
           "#/$defs/d_176cce21985eadf0161c/properties/calendar_id",
-          "#/$defs/BondFutureSpecs/properties/calendar_id",
           "#/$defs/StructuredCredit/properties/payment_calendar_id",
           "#/$defs/AssetBackedFacility/properties/payment_calendar_id",
           "#/$defs/RebalanceRule/oneOf/2/properties/calendar_id"
@@ -4619,8 +4622,10 @@
           "#/$defs/InflationLinkedBond/properties/base_index",
           "#/$defs/InflationLinkedBond/properties/quoted_clean",
           "#/$defs/LoanCall/properties/price_pct_of_par",
-          "#/$defs/BaseRateSpec/oneOf/0/properties/fixed/properties/rate",
+          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
           "#/$defs/CommitmentStep/properties/fee_bp",
+          "#/$defs/DdtlSpec/properties/usage_fee_bp",
+          "#/$defs/BaseRateSpec/oneOf/0/properties/fixed/properties/rate",
           "#/$defs/McConfig/properties/correlation_matrix/items/items",
           "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/initial",
           "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/kappa",
@@ -4817,7 +4822,6 @@
           "#/$defs/EquityTotalReturnSwap/properties/past_fixings/items/prefixItems/1",
           "#/$defs/EquityUnderlyingParams/properties/contract_size",
           "#/$defs/FIIndexTotalReturnSwap/properties/initial_level",
-          "#/$defs/IndexUnderlyingParams/properties/contract_size",
           "#/$defs/ClawbackSpec/properties/holdback_pct",
           "#/$defs/PeFundWaterfallTranche/oneOf/1/properties/preferred_irr/properties/irr",
           "#/$defs/PeFundWaterfallTranche/oneOf/2/properties/catch_up/properties/gp_share",
@@ -4858,8 +4862,6 @@
           "#/$defs/BondFutureSpecs/properties/contract_size",
           "#/$defs/BondFutureSpecs/properties/standard_coupon",
           "#/$defs/BondFutureSpecs/properties/standard_maturity_years",
-          "#/$defs/BondFutureSpecs/properties/tick_size",
-          "#/$defs/BondFutureSpecs/properties/tick_value",
           "#/$defs/Overrides/properties/cdr_annual",
           "#/$defs/Overrides/properties/cpr_annual",
           "#/$defs/Overrides/properties/psa_speed_multiplier",
@@ -5070,10 +5072,8 @@
           "#/$defs/TermLoanAmortizationSpec/oneOf/3/properties/percent_of_original_notional/properties/bp",
           "#/$defs/LoanCallType/oneOf/2/properties/make_whole/properties/treasury_spread_bp",
           "#/$defs/MarginStepUp/properties/delta_bp",
-          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
           "#/$defs/OidPolicy/oneOf/0/properties/withheld_pct",
           "#/$defs/OidPolicy/oneOf/2/properties/separate_pct",
-          "#/$defs/DdtlSpec/properties/usage_fee_bp",
           "#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate_bp",
           "#/$defs/AgencyTba/properties/settlement_year",
           "#/$defs/DollarRoll/properties/back_settlement_year",
@@ -5919,6 +5919,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/AgencyTba/properties/prepayment_model",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/AgencyTba/properties/settlement_class",
             "keyword": "anyOf"
           },
@@ -5944,6 +5948,10 @@
           },
           {
             "pointer": "#/$defs/DollarRoll/properties/front_settlement_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DollarRoll/properties/prepayment_model",
             "keyword": "anyOf"
           },
           {
@@ -6976,7 +6984,6 @@
           "#/$defs/CDSIndex/properties/num_constituents",
           "#/$defs/CommodityOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_lag_days",
-          "#/$defs/BondFutureSpecs/properties/settlement_days",
           "#/$defs/Overrides/properties/recovery_lag_months",
           "#/$defs/CallAssumption/properties/after_early_amortization_months",
           "#/$defs/EligibilityRule/properties/max_days_past_due",
@@ -8173,7 +8180,6 @@
           "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/5"
         ],
         "calendar-id": [
-          "#/$defs/d_5193595b8b998a0dc94c/properties/calendar_id",
           "#/$defs/d_67346ed55fd8e55563e7/properties/calendar_id",
           "#/$defs/d_0555f752dff2d680b0b6/properties/calendar_id",
           "#/$defs/d_0067baa6b86c47f45a9e/properties/fixing_calendar_id",
@@ -8212,8 +8218,6 @@
           "#/$defs/d_5193595b8b998a0dc94c/properties/contract_size",
           "#/$defs/d_5193595b8b998a0dc94c/properties/standard_coupon",
           "#/$defs/d_5193595b8b998a0dc94c/properties/standard_maturity_years",
-          "#/$defs/d_5193595b8b998a0dc94c/properties/tick_size",
-          "#/$defs/d_5193595b8b998a0dc94c/properties/tick_value",
           "#/$defs/d_d0efe1e5d2e7b4186ca7/properties/spread_bp",
           "#/$defs/d_7d66c9399b9bea409d59/properties/price_pct_of_par",
           "#/$defs/d_3c60928e1d0f7a794057/oneOf/3/properties/percent_of_original_per_period/properties/pct",
@@ -8703,7 +8707,6 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "uint32": [
-          "#/$defs/d_5193595b8b998a0dc94c/properties/settlement_days",
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_cb00e3d02b1d54ce03ef/oneOf/2/properties/compounded_with_lookback/properties/lookback_days",
           "#/$defs/d_cb00e3d02b1d54ce03ef/oneOf/3/properties/compounded_with_lockout/properties/lockout_days",
@@ -16106,7 +16109,6 @@
           "#/$defs/CommoditySwap/properties/calendar_id",
           "#/$defs/CommoditySwaption/properties/calendar_id",
           "#/$defs/d_176cce21985eadf0161c/properties/calendar_id",
-          "#/$defs/BondFutureSpecs/properties/calendar_id",
           "#/$defs/StructuredCredit/properties/payment_calendar_id",
           "#/$defs/AssetBackedFacility/properties/payment_calendar_id",
           "#/$defs/RebalanceRule/oneOf/2/properties/calendar_id"
@@ -16359,8 +16361,10 @@
           "#/$defs/InflationLinkedBond/properties/base_index",
           "#/$defs/InflationLinkedBond/properties/quoted_clean",
           "#/$defs/LoanCall/properties/price_pct_of_par",
-          "#/$defs/BaseRateSpec/oneOf/0/properties/fixed/properties/rate",
+          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
           "#/$defs/CommitmentStep/properties/fee_bp",
+          "#/$defs/DdtlSpec/properties/usage_fee_bp",
+          "#/$defs/BaseRateSpec/oneOf/0/properties/fixed/properties/rate",
           "#/$defs/McConfig/properties/correlation_matrix/items/items",
           "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/initial",
           "#/$defs/CreditSpreadProcessSpec/oneOf/0/properties/cir/properties/kappa",
@@ -16557,7 +16561,6 @@
           "#/$defs/EquityTotalReturnSwap/properties/past_fixings/items/prefixItems/1",
           "#/$defs/EquityUnderlyingParams/properties/contract_size",
           "#/$defs/FIIndexTotalReturnSwap/properties/initial_level",
-          "#/$defs/IndexUnderlyingParams/properties/contract_size",
           "#/$defs/BasketConstituent/properties/units",
           "#/$defs/BasketConstituent/properties/weight",
           "#/$defs/Basket/properties/expense_ratio",
@@ -16602,8 +16605,6 @@
           "#/$defs/BondFutureSpecs/properties/contract_size",
           "#/$defs/BondFutureSpecs/properties/standard_coupon",
           "#/$defs/BondFutureSpecs/properties/standard_maturity_years",
-          "#/$defs/BondFutureSpecs/properties/tick_size",
-          "#/$defs/BondFutureSpecs/properties/tick_value",
           "#/$defs/Overrides/properties/cdr_annual",
           "#/$defs/Overrides/properties/cpr_annual",
           "#/$defs/Overrides/properties/psa_speed_multiplier",
@@ -16810,10 +16811,8 @@
           "#/$defs/TermLoanAmortizationSpec/oneOf/3/properties/percent_of_original_notional/properties/bp",
           "#/$defs/LoanCallType/oneOf/2/properties/make_whole/properties/treasury_spread_bp",
           "#/$defs/MarginStepUp/properties/delta_bp",
-          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
           "#/$defs/OidPolicy/oneOf/0/properties/withheld_pct",
           "#/$defs/OidPolicy/oneOf/2/properties/separate_pct",
-          "#/$defs/DdtlSpec/properties/usage_fee_bp",
           "#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate_bp",
           "#/$defs/AgencyTba/properties/settlement_year",
           "#/$defs/DollarRoll/properties/back_settlement_year",
@@ -17659,6 +17658,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/AgencyTba/properties/prepayment_model",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/AgencyTba/properties/settlement_class",
             "keyword": "anyOf"
           },
@@ -17684,6 +17687,10 @@
           },
           {
             "pointer": "#/$defs/DollarRoll/properties/front_settlement_date",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DollarRoll/properties/prepayment_model",
             "keyword": "anyOf"
           },
           {
@@ -18716,7 +18723,6 @@
           "#/$defs/CDSIndex/properties/num_constituents",
           "#/$defs/CommodityOption/properties/premium_settlement_days",
           "#/$defs/CommodityForward/properties/settlement_lag_days",
-          "#/$defs/BondFutureSpecs/properties/settlement_days",
           "#/$defs/Overrides/properties/recovery_lag_months",
           "#/$defs/CallAssumption/properties/after_early_amortization_months",
           "#/$defs/EligibilityRule/properties/max_days_past_due",
@@ -20847,7 +20853,8 @@
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
           "#/$defs/d_8fb25331316c6e4f3fc7/properties/extra_cash_sweeps",
           "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date",
-          "#/$defs/d_8fb25331316c6e4f3fc7/properties/pik_toggle_by_date"
+          "#/$defs/d_8fb25331316c6e4f3fc7/properties/pik_toggle_by_date",
+          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr"
         ],
         "date": [
           "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -20892,6 +20899,10 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_pct",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_decimal",
           "#/$defs/d_7e19cc4df9954b864180",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
+          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
+          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -20899,6 +20910,13 @@
           "#/$defs/d_05625cf1aa46e3810fc5/properties/back_settlement_year",
           "#/$defs/d_05625cf1aa46e3810fc5/properties/front_settlement_year",
           "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date/items/prefixItems/1"
+        ],
+        "internal-union": [
+          {
+            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "keyword": "oneOf",
+            "discriminators": ["curve"]
+          }
         ],
         "map": ["#/$defs/d_2c88e4d1e2e4f7c22e02/properties/meta"],
         "money": [
@@ -21170,6 +21188,14 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_05625cf1aa46e3810fc5/properties/prepayment_model",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_05625cf1aa46e3810fc5/properties/repo_curve_id",
             "keyword": "anyOf"
           },
@@ -21200,6 +21226,9 @@
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
+        ],
+        "uint32": [
+          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months"
         ],
         "uint8": [
           "#/$defs/d_05625cf1aa46e3810fc5/properties/back_settlement_month",
@@ -31696,8 +31725,10 @@
           "#/$defs/d_9ef403ac41e0477109eb/oneOf/0/properties/moic",
           "#/$defs/d_9ef403ac41e0477109eb/oneOf/1/properties/xirr",
           "#/$defs/d_267d8577ac642991b18b/properties/price_pct_of_par",
-          "#/$defs/d_de5554d85b2779d04efa/oneOf/0/properties/fixed/properties/rate",
+          "#/$defs/d_567a05766e75c7a74f60/properties/commitment_fee_bp",
           "#/$defs/d_488d578b2ebcb4b2fc06/properties/fee_bp",
+          "#/$defs/d_567a05766e75c7a74f60/properties/usage_fee_bp",
+          "#/$defs/d_de5554d85b2779d04efa/oneOf/0/properties/fixed/properties/rate",
           "#/$defs/d_7ab5bac7015d046b3dfb/properties/correlation_matrix/items/items",
           "#/$defs/d_7a1790f9f13c62aa55ae/oneOf/0/properties/cir/properties/initial",
           "#/$defs/d_7a1790f9f13c62aa55ae/oneOf/0/properties/cir/properties/kappa",
@@ -31759,10 +31790,8 @@
           "#/$defs/d_ba8365e12c57768c637c/oneOf/3/properties/percent_of_original_notional/properties/bp",
           "#/$defs/d_e03f269a2f027f942f8f/oneOf/2/properties/make_whole/properties/treasury_spread_bp",
           "#/$defs/d_1d8890dba33cb08e3fe4/properties/delta_bp",
-          "#/$defs/d_567a05766e75c7a74f60/properties/commitment_fee_bp",
           "#/$defs/d_282cc71e3b5b312f79c9/oneOf/0/properties/withheld_pct",
           "#/$defs/d_282cc71e3b5b312f79c9/oneOf/2/properties/separate_pct",
-          "#/$defs/d_567a05766e75c7a74f60/properties/usage_fee_bp",
           "#/$defs/d_9028c5ae285d759c7873/oneOf/0/properties/fixed/properties/rate_bp"
         ],
         "map": ["#/$defs/d_2c88e4d1e2e4f7c22e02/properties/meta"],
@@ -37382,6 +37411,8 @@
           "#/$defs/RevolvingCredit/properties/leq",
           "#/$defs/RevolvingCredit/properties/recovery_rate",
           "#/$defs/LoanCall/properties/price_pct_of_par",
+          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
+          "#/$defs/DdtlSpec/properties/usage_fee_bp",
           "#/$defs/ReinvestmentAssumptions/properties/coupon_floor",
           "#/$defs/ReinvestmentAssumptions/properties/price_pct",
           "#/$defs/ReinvestmentAssumptions/properties/spread_bp",
@@ -37494,10 +37525,8 @@
           "#/$defs/TermLoanAmortizationSpec/oneOf/2/properties/percent_per_period/properties/bp",
           "#/$defs/TermLoanAmortizationSpec/oneOf/3/properties/percent_of_original_notional/properties/bp",
           "#/$defs/LoanCallType/oneOf/2/properties/make_whole/properties/treasury_spread_bp",
-          "#/$defs/DdtlSpec/properties/commitment_fee_bp",
           "#/$defs/OidPolicy/oneOf/0/properties/withheld_pct",
           "#/$defs/OidPolicy/oneOf/2/properties/separate_pct",
-          "#/$defs/DdtlSpec/properties/usage_fee_bp",
           "#/$defs/RateSpec/oneOf/0/properties/fixed/properties/rate_bp"
         ],
         "internal-union": [
@@ -39685,6 +39714,9 @@
         ],
         "double": [
           "#/$defs/d_b70805c3f548ff75edc3/properties/price_pct_of_par",
+          "#/$defs/d_9c32ce6385c1f57509a4/properties/commitment_fee_bp",
+          "#/$defs/d_b7e04bfd47e833688482/properties/fee_bp",
+          "#/$defs/d_9c32ce6385c1f57509a4/properties/usage_fee_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
           "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_asw_market",
@@ -39728,10 +39760,8 @@
           "#/$defs/d_b0dee421d8427380268c/oneOf/3/properties/percent_of_original_notional/properties/bp",
           "#/$defs/d_5f3291ce40eb93e27799/oneOf/2/properties/make_whole/properties/treasury_spread_bp",
           "#/$defs/d_5c46e60a928fce701cc6/properties/delta_bp",
-          "#/$defs/d_9c32ce6385c1f57509a4/properties/commitment_fee_bp",
           "#/$defs/d_ab52c59e8dd68406ea31/oneOf/0/properties/withheld_pct",
           "#/$defs/d_ab52c59e8dd68406ea31/oneOf/2/properties/separate_pct",
-          "#/$defs/d_9c32ce6385c1f57509a4/properties/usage_fee_bp",
           "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date/items/prefixItems/1",
           "#/$defs/d_52fd2d73646310661adf/oneOf/0/properties/fixed/properties/rate_bp",
           "#/$defs/d_082c9df57e6f2f432594/properties/reset_lag_days"
@@ -41026,8 +41056,7 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_decimal",
           "#/$defs/d_7e19cc4df9954b864180",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
-          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
-          "#/$defs/d_302f94ee7e57481d4351/properties/contract_size"
+          "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "int32": [
           "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date/items/prefixItems/1",

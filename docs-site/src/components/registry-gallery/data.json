@@ -13800,14 +13800,10 @@
           "spec": {
             "attributes": {},
             "contract_specs": {
-              "calendar_id": "nyse",
               "contract_size": 100000,
               "repo_day_count": "act_360",
-              "settlement_days": 2,
               "standard_coupon": 0.06,
-              "standard_maturity_years": 10,
-              "tick_size": 0.015625,
-              "tick_value": 15.625
+              "standard_maturity_years": 10
             },
             "ctd_bond_id": "US91282CJL54",
             "deliverable_basket": [
@@ -15972,7 +15968,6 @@
             "side": "receive_total_return",
             "underlying": {
               "base_currency": "USD",
-              "contract_size": 1,
               "duration_id": "US-CORP-DURATION",
               "index_id": "US-CORP-INDEX",
               "yield_id": "US-CORP-YIELD"

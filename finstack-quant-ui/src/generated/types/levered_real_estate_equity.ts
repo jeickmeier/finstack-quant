@@ -1294,10 +1294,6 @@ export type BusinessDayConvention4 =
  */
 export type Date24 = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date25 = string;
-/**
  * Day-count convention.
  */
 export type DayCount8 =
@@ -1321,7 +1317,7 @@ export type Id8 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date26 = string;
+export type Date25 = string;
 /**
  * Opaque string identifier.
  */
@@ -1337,7 +1333,7 @@ export type Decimal10 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date27 = string;
+export type Date26 = string;
 /**
  * Upfront (arrangement or original-issue-discount) fee of a facility.
  *
@@ -1359,15 +1355,15 @@ export type Id10 = string;
 /**
  * ISO 8601 calendar date string.
  */
+export type Date27 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
 export type Date28 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date29 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date30 = string;
 /**
  * Business day convention
  */
@@ -1401,7 +1397,7 @@ export type Id12 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date31 = string;
+export type Date30 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -1409,7 +1405,7 @@ export type Decimal11 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date32 = string;
+export type Date31 = string;
 /**
  * Opaque string identifier.
  */
@@ -4738,17 +4734,16 @@ export interface ScenarioPricingOverrides1 {
  *
  * # Construction
  *
- * Create via [`TermLoanSpec`] conversion or use the builder pattern:
+ * Build with [`TermLoan::builder()`]; `build()` validates the complete
+ * contract (dates, currencies, DDTL draws against the commitment in force,
+ * covenant and call schedules):
  *
  * ```
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::TermLoanSpec;
  * use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
  *
- * # fn example(spec: TermLoanSpec) -> Result<(), Box<dyn std::error::Error>> {
- * let loan: TermLoan = spec.try_into()?;
- * # let _ = loan;
- * # Ok(())
- * # }
+ * let loan = TermLoan::example()?;
+ * loan.validate()?;
+ * # Ok::<(), finstack_quant_core::Error>(())
  * ```
  *
  * # Cashflow Generation
@@ -5261,8 +5256,8 @@ export interface D_587D159069C2143E3Ae8 {
  *     availability_end: create_date(2026, Month::January, 1)?,
  *     draws: vec![],
  *     commitment_step_downs: vec![],
- *     usage_fee_bp: 50,        // 50 bp usage fee
- *     commitment_fee_bp: 25,   // 25 bp commitment fee
+ *     usage_fee_bp: 50.0,        // 50 bp usage fee
+ *     commitment_fee_bp: 25.0,   // 25 bp commitment fee
  *     fee_base: CommitmentFeeBase::Undrawn,
  *     oid_policy: None,
  * };
@@ -5274,14 +5269,17 @@ export interface D_567A05766E75C7A74F60 {
   availability_end: Date18;
   availability_start: Date19;
   /**
-   * Commitment fee in basis points (on undrawn amounts)
+   * Commitment fee on the undrawn commitment, in basis points per annum
+   * (non-negative, finite; `50.0` = 0.50%).
    */
   commitment_fee_bp: number;
   commitment_limit: Money6;
   /**
-   * Commitment step-down schedule
+   * Commitment step-down schedule: strictly increasing dates inside the
+   * availability window, non-increasing `amount`s in the loan currency,
+   * and `fee_bp == 0.0` (term loans carry no reduction fee).
    */
-  commitment_step_downs: D_4E2E9Fb10A69D1590F47[];
+  commitment_step_downs: D_488D578B2Ebcb4B2Fc06[];
   /**
    * Scheduled or actual draw events
    */
@@ -5295,7 +5293,8 @@ export interface D_567A05766E75C7A74F60 {
    */
   oid_policy?: D_282Cc71E3B5B312F79C9 | null;
   /**
-   * Usage fee in basis points (on drawn amounts)
+   * Usage fee on drawn amounts, in basis points per annum (non-negative,
+   * finite; `25.0` = 0.25%).
    */
   usage_fee_bp: number;
 }
@@ -5475,14 +5474,27 @@ export interface Money6 {
     | "ZWL";
 }
 /**
- * Commitment step-down event for DDTL facilities.
+ * A scheduled change of a facility's commitment.
  *
- * Reduces the total commitment limit at a specified date, typically used
- * to match construction completion or covenant requirements.
+ * The commitment equals `amount` from `date` forward until the next step.
+ * Steps down are amortizing commitments, availability expiries and voluntary
+ * reductions; steps up are accordion exercises. Utilization is always drawn
+ * balance over the commitment in force, so a stochastic revolving facility
+ * books the implied principal change at the step.
+ *
+ * A delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only
+ * non-increasing steps inside its availability window and no reduction fee
+ * (`fee_bp` must be `0.0`).
  */
-export interface D_4E2E9Fb10A69D1590F47 {
+export interface D_488D578B2Ebcb4B2Fc06 {
+  amount: Money7;
   date: Date20;
-  new_limit: Money7;
+  /**
+   * Reduction or cancellation fee, in basis points of the reduced amount,
+   * paid by the borrower on `date` when the commitment steps down. Ignored
+   * on a step up. Defaults to `0.0`.
+   */
+  fee_bp?: number;
 }
 /**
  * Currency-tagged monetary amount.
@@ -6367,7 +6379,7 @@ export interface DBef55Fa450B231D7B330 {
     | {
         stochastic: DDb361Df79C3Ba201A17A;
       };
-  drawn_amount: Money13;
+  drawn_amount: Money12;
   fees: DE3Ab2140A3C980De74A0;
   frequency: Tenor6;
   id: Id10;
@@ -6400,7 +6412,7 @@ export interface DBef55Fa450B231D7B330 {
    * facility life. Empty by default.
    */
   margin_steps?: D_1D8890Dba33Cb08E3Fe4[];
-  maturity: Date29;
+  maturity: Date28;
   metric_pricing_overrides?: MetricPricingOverrides3;
   /**
    * Effective-interest-rate reporting switch for the
@@ -6640,205 +6652,11 @@ export interface Money10 {
     | "ZWL";
 }
 /**
- * A scheduled change of a revolving facility's commitment.
- *
- * The commitment equals `amount` from `date` forward until the next step.
- * Steps down are amortizing commitments, availability expiries and voluntary
- * reductions; steps up are accordion exercises. Utilization is always drawn
- * balance over the commitment in force, so a stochastic facility books the
- * implied principal change at the step.
- */
-export interface D_488D578B2Ebcb4B2Fc06 {
-  amount: Money11;
-  date: Date25;
-  /**
-   * Reduction or cancellation fee, in basis points of the reduced amount,
-   * paid by the borrower on `date` when the commitment steps down. Ignored
-   * on a step up. Defaults to `0.0`.
-   */
-  fee_bp?: number;
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money11 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
  * A single draw or repayment event.
  */
 export interface DC17277Fa7467F08B53F1 {
-  amount: Money12;
-  date: Date26;
+  amount: Money11;
+  date: Date25;
   /**
    * True if this is a draw, false if it's a repayment.
    */
@@ -6847,7 +6665,7 @@ export interface DC17277Fa7467F08B53F1 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money12 {
+export interface Money11 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -7203,7 +7021,7 @@ export interface D_85A377Cd9542Ce372249 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money13 {
+export interface Money12 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -7434,7 +7252,7 @@ export interface DFc3A3C7C042399741012 {
    * points per annum. Defaults to `0.0`.
    */
   commitment_delta_bp?: number;
-  date: Date27;
+  date: Date26;
   /**
    * Change to the facility fee on the total commitment, in basis points
    * per annum. Defaults to `0.0`.
@@ -7504,20 +7322,195 @@ export interface DAe3Fba4759C9Affaf77D {
    * recovered at the facility recovery rate. Defaults to `0.0`.
    */
   leq?: number;
-  outstanding: Money15;
-  sublimit: Money16;
+  outstanding: Money14;
+  sublimit: Money15;
 }
 /**
  * Issuance or expiry of a letter of credit under a facility's LC sublimit.
  */
 export interface D_80755C3C677Debee42Bd {
-  amount: Money14;
-  date: Date28;
+  amount: Money13;
+  date: Date27;
   /**
    * `true` for an issuance (LC outstanding rises), `false` for an expiry
    * or cancellation.
    */
   is_issue: boolean;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money13 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
 }
 /**
  * Currency-tagged monetary amount.
@@ -7870,181 +7863,6 @@ export interface Money15 {
     | "ZWL";
 }
 /**
- * Currency-tagged monetary amount.
- */
-export interface Money16 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
  * Metric-time pricing configuration.
  */
 export interface MetricPricingOverrides3 {
@@ -8105,13 +7923,13 @@ export interface ScenarioPricingOverrides3 {
  * consent fees the borrower pays on a known date.
  */
 export interface DFf1205B888Cf8Fba865E {
-  amount: Money17;
-  date: Date30;
+  amount: Money16;
+  date: Date29;
 }
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money17 {
+export interface Money16 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -8293,7 +8111,7 @@ export interface D_5D63D91B43268508D01D {
    * Optional calendar for business day adjustments
    */
   calendar_id?: Id3 | null;
-  cash_amount: Money18;
+  cash_amount: Money17;
   collateral: D_0462C3A38Cc828Eadadf;
   day_count: DayCount9;
   discount_curve_id: Id11;
@@ -8310,7 +8128,7 @@ export interface D_5D63D91B43268508D01D {
    * and margin interest calculations. See [`RepoMarginSpec`] for details.
    */
   margin_spec?: D_2A56C8E7799710Ddfef1 | null;
-  maturity: Date31;
+  maturity: Date30;
   metric_pricing_overrides?: MetricPricingOverrides4;
   repo_rate: Decimal11;
   /**
@@ -8318,7 +8136,7 @@ export interface D_5D63D91B43268508D01D {
    */
   repo_type: "term" | "open" | "overnight";
   scenario_pricing_overrides?: ScenarioPricingOverrides4;
-  start_date: Date32;
+  start_date: Date31;
   /**
    * Whether this is a tri-party repo
    */
@@ -8342,7 +8160,7 @@ export interface Attributes5 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money18 {
+export interface Money17 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with

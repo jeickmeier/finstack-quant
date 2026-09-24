@@ -1013,13 +1013,17 @@ export interface Money {
     | "ZWL";
 }
 /**
- * A scheduled change of a revolving facility's commitment.
+ * A scheduled change of a facility's commitment.
  *
  * The commitment equals `amount` from `date` forward until the next step.
  * Steps down are amortizing commitments, availability expiries and voluntary
  * reductions; steps up are accordion exercises. Utilization is always drawn
- * balance over the commitment in force, so a stochastic facility books the
- * implied principal change at the step.
+ * balance over the commitment in force, so a stochastic revolving facility
+ * books the implied principal change at the step.
+ *
+ * A delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only
+ * non-increasing steps inside its availability window and no reduction fee
+ * (`fee_bp` must be `0.0`).
  */
 export interface DBa391D15759D4194C067 {
   amount: Money1;

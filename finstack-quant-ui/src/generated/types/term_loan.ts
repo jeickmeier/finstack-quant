@@ -693,17 +693,16 @@ export interface D_937C784C4C0Df9557E1F {
  *
  * # Construction
  *
- * Create via [`TermLoanSpec`] conversion or use the builder pattern:
+ * Build with [`TermLoan::builder()`]; `build()` validates the complete
+ * contract (dates, currencies, DDTL draws against the commitment in force,
+ * covenant and call schedules):
  *
  * ```
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::TermLoanSpec;
  * use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
  *
- * # fn example(spec: TermLoanSpec) -> Result<(), Box<dyn std::error::Error>> {
- * let loan: TermLoan = spec.try_into()?;
- * # let _ = loan;
- * # Ok(())
- * # }
+ * let loan = TermLoan::example()?;
+ * loan.validate()?;
+ * # Ok::<(), finstack_quant_core::Error>(())
  * ```
  *
  * # Cashflow Generation
@@ -1391,8 +1390,8 @@ export interface D_6452Ed90Bbd41F2Ff746 {
  *     availability_end: create_date(2026, Month::January, 1)?,
  *     draws: vec![],
  *     commitment_step_downs: vec![],
- *     usage_fee_bp: 50,        // 50 bp usage fee
- *     commitment_fee_bp: 25,   // 25 bp commitment fee
+ *     usage_fee_bp: 50.0,        // 50 bp usage fee
+ *     commitment_fee_bp: 25.0,   // 25 bp commitment fee
  *     fee_base: CommitmentFeeBase::Undrawn,
  *     oid_policy: None,
  * };
@@ -1404,14 +1403,17 @@ export interface D_9C32Ce6385C1F57509A4 {
   availability_end: Date7;
   availability_start: Date8;
   /**
-   * Commitment fee in basis points (on undrawn amounts)
+   * Commitment fee on the undrawn commitment, in basis points per annum
+   * (non-negative, finite; `50.0` = 0.50%).
    */
   commitment_fee_bp: number;
   commitment_limit: Money2;
   /**
-   * Commitment step-down schedule
+   * Commitment step-down schedule: strictly increasing dates inside the
+   * availability window, non-increasing `amount`s in the loan currency,
+   * and `fee_bp == 0.0` (term loans carry no reduction fee).
    */
-  commitment_step_downs: D_35Bf521D3Ca6083B33Ef[];
+  commitment_step_downs: DB7E04Bfd47E833688482[];
   /**
    * Scheduled or actual draw events
    */
@@ -1425,7 +1427,8 @@ export interface D_9C32Ce6385C1F57509A4 {
    */
   oid_policy?: DAb52C59E8Dd68406Ea31 | null;
   /**
-   * Usage fee in basis points (on drawn amounts)
+   * Usage fee on drawn amounts, in basis points per annum (non-negative,
+   * finite; `25.0` = 0.25%).
    */
   usage_fee_bp: number;
 }
@@ -1605,14 +1608,27 @@ export interface Money2 {
     | "ZWL";
 }
 /**
- * Commitment step-down event for DDTL facilities.
+ * A scheduled change of a facility's commitment.
  *
- * Reduces the total commitment limit at a specified date, typically used
- * to match construction completion or covenant requirements.
+ * The commitment equals `amount` from `date` forward until the next step.
+ * Steps down are amortizing commitments, availability expiries and voluntary
+ * reductions; steps up are accordion exercises. Utilization is always drawn
+ * balance over the commitment in force, so a stochastic revolving facility
+ * books the implied principal change at the step.
+ *
+ * A delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only
+ * non-increasing steps inside its availability window and no reduction fee
+ * (`fee_bp` must be `0.0`).
  */
-export interface D_35Bf521D3Ca6083B33Ef {
+export interface DB7E04Bfd47E833688482 {
+  amount: Money3;
   date: Date9;
-  new_limit: Money3;
+  /**
+   * Reduction or cancellation fee, in basis points of the reduced amount,
+   * paid by the borrower on `date` when the commitment steps down. Ignored
+   * on a step up. Defaults to `0.0`.
+   */
+  fee_bp?: number;
 }
 /**
  * Currency-tagged monetary amount.

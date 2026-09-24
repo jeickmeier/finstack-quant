@@ -247,7 +247,7 @@ export default [
   {
     "path": "#/$defs/d_038bf279beea6aa9cf48/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyMbsPassthrough/properties/payment_lag_days",
-    "description": "Optional custom payment delay (overrides agency default).",
+    "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
     "format": "uint32",
     "minimum": 0
   },
@@ -1084,6 +1084,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba/properties/pool_factor",
     "description": "Current/original face ratio in `(0, 1]` for the assumed delivered pool.\nDefaults to 1.0 for a generic pool. Original face is `notional / factor`;\nthe purchased current face remains `notional`. When an explicit pool is\nsupplied, its factor is used and any specified factor must agree.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_54049d1588e6ed129bca/properties/prepayment_model",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba/properties/prepayment_model",
+    "description": "Prepayment model of the generic assumed pool.\n\nApplies only when `assumed_pool` is absent (an explicit pool carries its\nown model); `None` uses the embedded generic PSA assumption. Setting it\ntogether with `assumed_pool` is rejected."
+  },
+  {
+    "path": "#/$defs/d_54049d1588e6ed129bca/properties/prepayment_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba/properties/prepayment_model/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_54049d1588e6ed129bca/properties/prepayment_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_tba.schema.json#/$defs/AgencyTba/properties/prepayment_model/anyOf/1"
   },
   {
     "path": "#/$defs/d_54049d1588e6ed129bca/properties/scenario_pricing_overrides",

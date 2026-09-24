@@ -10,14 +10,10 @@ export default [
           "spec": {
             "attributes": {},
             "contract_specs": {
-              "calendar_id": "nyse",
               "contract_size": 100000,
               "repo_day_count": "act_360",
-              "settlement_days": 2,
               "standard_coupon": 0.06,
-              "standard_maturity_years": 10,
-              "tick_size": 0.015625,
-              "tick_value": 15.625
+              "standard_maturity_years": 10
             },
             "ctd_bond_id": "US91282CJL54",
             "deliverable_basket": [
@@ -1655,13 +1651,7 @@ export default [
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs",
-    "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract including\ncontract size, tick size, and the notional bond parameters used for\nconversion factor calculations.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```"
-  },
-  {
-    "path": "#/$defs/d_5193595b8b998a0dc94c/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/calendar_id",
-    "default": "nyse",
-    "description": "Holiday calendar identifier for business day calculations.\n\nDefaults to \"nyse\" for US Treasury futures.\nUse \"target2\" for European government bond futures."
+    "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract: contract\nsize, the notional bond parameters used for conversion factor\ncalculations, and the implied-repo day count.\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`delivery_end` and the caller-supplied invoice settlement date, so the\nspec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```"
   },
   {
     "path": "#/$defs/d_5193595b8b998a0dc94c/properties/contract_size",
@@ -1678,13 +1668,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/RepoDayCountWire"
   },
   {
-    "path": "#/$defs/d_5193595b8b998a0dc94c/properties/settlement_days",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/settlement_days",
-    "description": "Number of business days for settlement after expiry",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_5193595b8b998a0dc94c/properties/standard_coupon",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/standard_coupon",
     "description": "Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)",
@@ -1694,18 +1677,6 @@ export default [
     "path": "#/$defs/d_5193595b8b998a0dc94c/properties/standard_maturity_years",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/standard_maturity_years",
     "description": "Standard maturity in years for conversion factor calculation",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_5193595b8b998a0dc94c/properties/tick_size",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/tick_size",
-    "description": "Minimum quoted-price increment, in the contract's quote units.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_5193595b8b998a0dc94c/properties/tick_value",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs/properties/tick_value",
-    "description": "Cash value of one tick for one contract, in the notional currency.",
     "format": "double"
   },
   {
@@ -5696,7 +5667,7 @@ export default [
   {
     "path": "#/$defs/d_d7f0aa83744a0794bfe5/properties/contract_specs",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFuture/properties/contract_specs",
-    "description": "Contract specifications (tick size, standard coupon, etc.)",
+    "description": "Contract specifications (contract size, standard coupon, repo day count)",
     "ref": "#/$defs/BondFutureSpecs",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFutureSpecs"
   },
@@ -5807,7 +5778,7 @@ export default [
   {
     "path": "#/$defs/d_d7f0aa83744a0794bfe5/properties/quoted_price",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/BondFuture/properties/quoted_price",
-    "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",
+    "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\nUsed only for mark-to-market: `base_value` returns model-minus-contract\nvalue for a long position. Basis, implied-repo and invoice helpers take\nthe current futures price as an explicit argument instead.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",
     "ref": "#/$defs/NonNegativeF64Wire",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json#/$defs/NonNegativeF64Wire"
   },

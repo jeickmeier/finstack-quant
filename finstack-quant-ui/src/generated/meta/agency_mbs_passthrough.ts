@@ -572,7 +572,7 @@ export default [
   {
     "path": "#/$defs/d_24b4bd8fabf71247af0b/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json#/$defs/AgencyMbsPassthrough/properties/payment_lag_days",
-    "description": "Optional custom payment delay (overrides agency default).",
+    "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
     "format": "uint32",
     "minimum": 0
   },

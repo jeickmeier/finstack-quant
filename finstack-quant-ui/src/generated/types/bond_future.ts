@@ -745,7 +745,9 @@ export interface DD7F0Aa83744A0794Bfe5 {
   /**
    * Contract/entry futures price (e.g., 125.50 for 125-16/32).
    *
-   * `base_value` returns model-minus-contract value for a long position.
+   * Used only for mark-to-market: `base_value` returns model-minus-contract
+   * value for a long position. Basis, implied-repo and invoice helpers take
+   * the current futures price as an explicit argument instead.
    * Current-settlement variation margin is a separate cash-P&L workflow.
    */
   quoted_price: number;
@@ -778,16 +780,9 @@ export interface Attributes {
   tags?: string[];
 }
 /**
- * Contract specifications (tick size, standard coupon, etc.)
+ * Contract specifications (contract size, standard coupon, repo day count)
  */
 export interface D_5193595B8B998A0Dc94C {
-  /**
-   * Holiday calendar identifier for business day calculations.
-   *
-   * Defaults to "nyse" for US Treasury futures.
-   * Use "target2" for European government bond futures.
-   */
-  calendar_id?: string;
   /**
    * Face value of a single contract (e.g., $100,000 for UST)
    */
@@ -799,10 +794,6 @@ export interface D_5193595B8B998A0Dc94C {
    */
   repo_day_count?: "act_360" | "act_365f";
   /**
-   * Number of business days for settlement after expiry
-   */
-  settlement_days: number;
-  /**
    * Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)
    */
   standard_coupon: number;
@@ -810,14 +801,6 @@ export interface D_5193595B8B998A0Dc94C {
    * Standard maturity in years for conversion factor calculation
    */
   standard_maturity_years: number;
-  /**
-   * Minimum quoted-price increment, in the contract's quote units.
-   */
-  tick_size: number;
-  /**
-   * Cash value of one tick for one contract, in the notional currency.
-   */
-  tick_value: number;
 }
 /**
  * Bond instrument with fixed, floating, or amortizing cashflows.

@@ -342,7 +342,7 @@ export default [
   {
     "path": "#/$defs/AgencyMbsPassthrough/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/payment_lag_days",
-    "description": "Optional custom payment delay (overrides agency default).",
+    "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
     "format": "uint32",
     "minimum": 0
   },
@@ -505,6 +505,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba/properties/pool_factor",
     "description": "Current/original face ratio in `(0, 1]` for the assumed delivered pool.\nDefaults to 1.0 for a generic pool. Original face is `notional / factor`;\nthe purchased current face remains `notional`. When an explicit pool is\nsupplied, its factor is used and any specified factor must agree.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/AgencyTba/properties/prepayment_model",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba/properties/prepayment_model",
+    "description": "Prepayment model of the generic assumed pool.\n\nApplies only when `assumed_pool` is absent (an explicit pool carries its\nown model); `None` uses the embedded generic PSA assumption. Setting it\ntogether with `assumed_pool` is rejected."
+  },
+  {
+    "path": "#/$defs/AgencyTba/properties/prepayment_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba/properties/prepayment_model/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#"
+  },
+  {
+    "path": "#/$defs/AgencyTba/properties/prepayment_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyTba/properties/prepayment_model/anyOf/1"
   },
   {
     "path": "#/$defs/AgencyTba/properties/scenario_pricing_overrides",
@@ -3265,7 +3280,7 @@ export default [
   {
     "path": "#/$defs/BondFuture/properties/contract_specs",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFuture/properties/contract_specs",
-    "description": "Contract specifications (tick size, standard coupon, etc.)",
+    "description": "Contract specifications (contract size, standard coupon, repo day count)",
     "ref": "#/$defs/BondFutureSpecs",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs"
   },
@@ -3376,7 +3391,7 @@ export default [
   {
     "path": "#/$defs/BondFuture/properties/quoted_price",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFuture/properties/quoted_price",
-    "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",
+    "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\nUsed only for mark-to-market: `base_value` returns model-minus-contract\nvalue for a long position. Basis, implied-repo and invoice helpers take\nthe current futures price as an explicit argument instead.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",
     "ref": "#/$defs/NonNegativeF64Wire",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/NonNegativeF64Wire"
   },
@@ -3405,13 +3420,7 @@ export default [
   {
     "path": "#/$defs/BondFutureSpecs",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs",
-    "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract including\ncontract size, tick size, and the notional bond parameters used for\nconversion factor calculations.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```"
-  },
-  {
-    "path": "#/$defs/BondFutureSpecs/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs/properties/calendar_id",
-    "default": "nyse",
-    "description": "Holiday calendar identifier for business day calculations.\n\nDefaults to \"nyse\" for US Treasury futures.\nUse \"target2\" for European government bond futures."
+    "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract: contract\nsize, the notional bond parameters used for conversion factor\ncalculations, and the implied-repo day count.\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`delivery_end` and the caller-supplied invoice settlement date, so the\nspec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```"
   },
   {
     "path": "#/$defs/BondFutureSpecs/properties/contract_size",
@@ -3428,13 +3437,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RepoDayCountWire"
   },
   {
-    "path": "#/$defs/BondFutureSpecs/properties/settlement_days",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs/properties/settlement_days",
-    "description": "Number of business days for settlement after expiry",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/BondFutureSpecs/properties/standard_coupon",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs/properties/standard_coupon",
     "description": "Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)",
@@ -3444,18 +3446,6 @@ export default [
     "path": "#/$defs/BondFutureSpecs/properties/standard_maturity_years",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs/properties/standard_maturity_years",
     "description": "Standard maturity in years for conversion factor calculation",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/BondFutureSpecs/properties/tick_size",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs/properties/tick_size",
-    "description": "Minimum quoted-price increment, in the contract's quote units.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/BondFutureSpecs/properties/tick_value",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BondFutureSpecs/properties/tick_value",
-    "description": "Cash value of one tick for one contract, in the notional currency.",
     "format": "double"
   },
   {
@@ -6571,7 +6561,7 @@ export default [
   {
     "path": "#/$defs/CommitmentStep",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStep",
-    "description": "A scheduled change of a revolving facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic facility books the\nimplied principal change at the step."
+    "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`)."
   },
   {
     "path": "#/$defs/CommitmentStep/properties/amount",
@@ -6593,25 +6583,6 @@ export default [
     "default": 0,
     "description": "Reduction or cancellation fee, in basis points of the reduced amount,\npaid by the borrower on `date` when the commitment steps down. Ignored\non a step up. Defaults to `0.0`.",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/CommitmentStepDown",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStepDown",
-    "description": "Commitment step-down event for DDTL facilities.\n\nReduces the total commitment limit at a specified date, typically used\nto match construction completion or covenant requirements."
-  },
-  {
-    "path": "#/$defs/CommitmentStepDown/properties/date",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStepDown/properties/date",
-    "description": "Effective date of the step-down",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/CommitmentStepDown/properties/new_limit",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStepDown/properties/new_limit",
-    "description": "New (lower) commitment limit after step-down",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/CommodityAsianOption",
@@ -8244,7 +8215,7 @@ export default [
     "path": "#/$defs/ConversionSpec/properties/dilution_events",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ConversionSpec/properties/dilution_events",
     "default": [],
-    "description": "Historical dilution events that affect the conversion ratio.\nEvents are applied in chronological order."
+    "description": "Historical dilution events that affect the conversion ratio, recorded\nin chronological (non-decreasing date) order and applied in that\norder. Validation rejects out-of-order events."
   },
   {
     "path": "#/$defs/ConversionSpec/properties/dilution_events/items",
@@ -15903,7 +15874,7 @@ export default [
   {
     "path": "#/$defs/DdtlSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DdtlSpec",
-    "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50,        // 50 bp usage fee\n    commitment_fee_bp: 25,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```"
+    "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/DdtlSpec/properties/availability_end",
@@ -15922,8 +15893,8 @@ export default [
   {
     "path": "#/$defs/DdtlSpec/properties/commitment_fee_bp",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DdtlSpec/properties/commitment_fee_bp",
-    "description": "Commitment fee in basis points (on undrawn amounts)",
-    "format": "int32"
+    "description": "Commitment fee on the undrawn commitment, in basis points per annum\n(non-negative, finite; `50.0` = 0.50%).",
+    "format": "double"
   },
   {
     "path": "#/$defs/DdtlSpec/properties/commitment_limit",
@@ -15935,13 +15906,13 @@ export default [
   {
     "path": "#/$defs/DdtlSpec/properties/commitment_step_downs",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DdtlSpec/properties/commitment_step_downs",
-    "description": "Commitment step-down schedule"
+    "description": "Commitment step-down schedule: strictly increasing dates inside the\navailability window, non-increasing `amount`s in the loan currency,\nand `fee_bp == 0.0` (term loans carry no reduction fee)."
   },
   {
     "path": "#/$defs/DdtlSpec/properties/commitment_step_downs/items",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DdtlSpec/properties/commitment_step_downs/items",
-    "ref": "#/$defs/CommitmentStepDown",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStepDown"
+    "ref": "#/$defs/CommitmentStep",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStep"
   },
   {
     "path": "#/$defs/DdtlSpec/properties/draws",
@@ -15979,8 +15950,8 @@ export default [
   {
     "path": "#/$defs/DdtlSpec/properties/usage_fee_bp",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DdtlSpec/properties/usage_fee_bp",
-    "description": "Usage fee in basis points (on drawn amounts)",
-    "format": "int32"
+    "description": "Usage fee on drawn amounts, in basis points per annum (non-negative,\nfinite; `25.0` = 0.25%).",
+    "format": "double"
   },
   {
     "path": "#/$defs/DealFees",
@@ -16835,6 +16806,21 @@ export default [
     "description": "Trade notional (par amount).",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/DollarRoll/properties/prepayment_model",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DollarRoll/properties/prepayment_model",
+    "description": "Prepayment model of the generic pool both legs deliver.\n\n`None` uses the embedded generic PSA assumption of the TBA legs."
+  },
+  {
+    "path": "#/$defs/DollarRoll/properties/prepayment_model/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DollarRoll/properties/prepayment_model/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#"
+  },
+  {
+    "path": "#/$defs/DollarRoll/properties/prepayment_model/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DollarRoll/properties/prepayment_model/anyOf/1"
   },
   {
     "path": "#/$defs/DollarRoll/properties/repo_curve_id",
@@ -18264,7 +18250,7 @@ export default [
   {
     "path": "#/$defs/FIIndexTotalReturnSwap",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap",
-    "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits realized index price returns,\nroll-down, underlying rate/spread mark-to-market, stochastic credit,\nconstituent decomposition, early termination, and bespoke fees. Pricing\nrejects an in-progress total-return accrual period. Cashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
+    "description": "Fixed-income index total-return swap priced with a carry analytic.\n\nFor each scheduled period, the total-return leg uses\n`exp(y × accrual_fraction) - 1`, where `y` is an annual continuously\ncompounded decimal yield and the accrual fraction uses the schedule day\ncount. Both legs are discounted with `financing.discount_curve_id`; the\nfinancing leg projects `financing.forward_curve_id` plus `spread_bp`.\nReceive-total-return value is `PV(total return) - PV(financing)`;\npay-total-return value reverses that sign.\n\n# Model limitations\n\nThis deterministic carry analytic omits roll-down, underlying rate/spread\nmark-to-market, stochastic credit, constituent decomposition, early\ntermination, and bespoke fees. The period in progress on the valuation\ndate is valued from the live index level (`underlying.index_id`) against\n`initial_level`, then carried at the index yield to period end; a period\nthat has ended but is not yet paid stays in the PV at its projected carry.\nCashflow-schedule APIs\nreturn payment dates with zero amounts; use\n[`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected\nleg values.\n\n# Construction\n\n```\nuse finstack_quant_core::{\n    currency::Currency, dates::DayCount, money::Money, types::InstrumentId,\n};\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_valuations::instruments::{\n    Attributes, FinancingLegSpec, IndexUnderlyingParams,\n};\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;\nuse finstack_quant_valuations::instruments::fixed_income::fi_trs::{\n    TrsScheduleSpec, TrsSide,\n};\nuse rust_decimal::Decimal;\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet trs = FIIndexTotalReturnSwap::builder()\n    .id(InstrumentId::new(\"CORP-TRS\"))\n    .notional(Money::from((10_000_000_i64, Currency::USD)))\n    .underlying(\n        IndexUnderlyingParams::new(\"US-CORP\", Currency::USD)\n            .with_yield(\"US-CORP-YIELD\")\n            .with_duration(\"US-CORP-DURATION\"),\n    )\n    .financing(FinancingLegSpec::new(\n        \"USD-OIS\", \"USD-SOFR-3M\", Decimal::from(35), DayCount::Act360,\n    ))\n    .schedule(TrsScheduleSpec::from_params(\n        date!(2026 - 01 - 02),\n        date!(2027 - 01 - 02),\n        ScheduleParams::quarterly_act360(),\n    ))\n    .side(TrsSide::ReceiveTotalReturn)\n    .initial_level_opt(None)\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(trs.notional.currency(), Currency::USD);\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/FIIndexTotalReturnSwap/properties/attributes",
@@ -18290,7 +18276,7 @@ export default [
   {
     "path": "#/$defs/FIIndexTotalReturnSwap/properties/initial_level",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FIIndexTotalReturnSwap/properties/initial_level",
-    "description": "Optional reference level retained with the contract.\n\nThe deterministic carry pricer does not consume or fetch this value.",
+    "description": "Index level at the reset of the return period in progress, in the\nindex's own units.\n\nRequired when the valuation date falls inside a return period; the\nrealized return to date is `index_level / initial_level`. Unused for\nunseasoned trades. Must be positive and finite when set.",
     "format": "double"
   },
   {
@@ -21459,12 +21445,6 @@ export default [
     "description": "Base currency of the index",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/IndexUnderlyingParams/properties/contract_size",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/IndexUnderlyingParams/properties/contract_size",
-    "description": "Contract size (index units per contract, defaults to 1.0)",
-    "format": "double"
   },
   {
     "path": "#/$defs/IndexUnderlyingParams/properties/duration_id",
@@ -27433,7 +27413,7 @@ export default [
   {
     "path": "#/$defs/RateSpec/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RateSpec/oneOf/1",
-    "description": "Floating rate using canonical FloatingRateSpec.\n\nUses the standard floating rate specification with full support\nfor floors, caps, gearing, and reset conventions.\n\n**Note on calendars**: The `FloatingRateSpec.calendar_id` field is ignored\nfor term loans. The loan-level `TermLoan::calendar_id` drives the payment\nschedule and business-day adjustments. Only `index_id`, `spread_bp`,\n`gearing`, `index_floor_bp`, `all_in_cap_bp`, and `reset_lag_days` are used from this\nspecification."
+    "description": "Floating rate using canonical FloatingRateSpec.\n\nUses the standard floating rate specification with full support\nfor floors, caps, gearing, and reset conventions.\n\nEvery field of the spec is honored. The loan-level\n`TermLoan::calendar_id` drives the payment schedule and business-day\nadjustments; `fixing_calendar_id` (the loan calendar when unset) drives\nthe reset lag and overnight observations. Covenant and override margin\nstep-ups add to `spread_bp` from the next accrual period. Overnight\nindices compound per `overnight_compounding` and apply index floors and\ncaps per `overnight_index_constraints` (each daily fixing by default)."
   },
   {
     "path": "#/$defs/RateSpec/oneOf/1/properties/floating",
@@ -31209,7 +31189,7 @@ export default [
   {
     "path": "#/$defs/TermLoan",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TermLoan",
-    "description": "Term loan instrument with covenant and DDTL support.\n\nRepresents a fully-validated institutional term loan with support for:\n- Fixed or floating interest rates\n- Delayed-draw term loan (DDTL) features\n- Payment-in-kind (PIK) interest\n- Flexible amortization schedules\n- Covenant-driven events (margin step-ups, cash sweeps, PIK toggles)\n- Original issue discount (OID) handling\n- Borrower call schedules\n\n# Construction\n\nCreate via [`TermLoanSpec`] conversion or use the builder pattern:\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::TermLoanSpec;\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;\n\n# fn example(spec: TermLoanSpec) -> Result<(), Box<dyn std::error::Error>> {\nlet loan: TermLoan = spec.try_into()?;\n# let _ = loan;\n# Ok(())\n# }\n```\n\n# Cashflow Generation\n\nUses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:\n- `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)\n- `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata\n\n# Pricing\n\nImplements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)\nusing deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.\n\n# Invariants\n\n- `issue < maturity`\n- `notional_limit.currency() == currency`\n- All monetary amounts are in the same currency\n- Amortization does not exceed outstanding principal\n\n# Thread Safety\n\nThis type is `Send + Sync` as all fields are thread-safe."
+    "description": "Term loan instrument with covenant and DDTL support.\n\nRepresents a fully-validated institutional term loan with support for:\n- Fixed or floating interest rates\n- Delayed-draw term loan (DDTL) features\n- Payment-in-kind (PIK) interest\n- Flexible amortization schedules\n- Covenant-driven events (margin step-ups, cash sweeps, PIK toggles)\n- Original issue discount (OID) handling\n- Borrower call schedules\n\n# Construction\n\nBuild with [`TermLoan::builder()`]; `build()` validates the complete\ncontract (dates, currencies, DDTL draws against the commitment in force,\ncovenant and call schedules):\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;\n\nlet loan = TermLoan::example()?;\nloan.validate()?;\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\n# Cashflow Generation\n\nUses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:\n- `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)\n- `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata\n\n# Pricing\n\nImplements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)\nusing deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.\n\n# Invariants\n\n- `issue < maturity`\n- `notional_limit.currency() == currency`\n- All monetary amounts are in the same currency\n- Amortization does not exceed outstanding principal\n\n# Thread Safety\n\nThis type is `Send + Sync` as all fields are thread-safe."
   },
   {
     "path": "#/$defs/TermLoan/properties/amortization",
@@ -33730,12 +33710,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CommitmentStep",
     "ref": "#/$defs/CommitmentStep",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStep"
-  },
-  {
-    "path": "#/properties/CommitmentStepDown",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CommitmentStepDown",
-    "ref": "#/$defs/CommitmentStepDown",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CommitmentStepDown"
   },
   {
     "path": "#/properties/CommodityAsianOption",

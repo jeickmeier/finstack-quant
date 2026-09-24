@@ -2065,7 +2065,7 @@ export default [
     "path": "#/$defs/d_8d9e4ad211395ba91969/properties/dilution_events",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/ConversionSpec/properties/dilution_events",
     "default": [],
-    "description": "Historical dilution events that affect the conversion ratio.\nEvents are applied in chronological order."
+    "description": "Historical dilution events that affect the conversion ratio, recorded\nin chronological (non-decreasing date) order and applied in that\norder. Validation rejects out-of-order events."
   },
   {
     "path": "#/$defs/d_8d9e4ad211395ba91969/properties/dilution_events/items",

@@ -465,7 +465,7 @@
       "type": "bond_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/bond_future.json",
-        "sha256": "621d597b955b211a4f0f33240602e139bb399bdd9ce78d4d554fa9c208b950aa",
+        "sha256": "ed994401d4cf102180031b4aed4c16be48f5c5cd1aa0a13319c0cc8e528af99b",
         "pointer": []
       },
       "instrumentPatches": [
@@ -2906,7 +2906,7 @@
       "type": "trs_fixed_income_index",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/trs_fixed_income_index.json",
-        "sha256": "c1b3005e0844cc8ea1db6a6a75f0cc81afea31f52b6415ad2ba8620231113b8b",
+        "sha256": "c47cd1361dbb46df4557d394a8352d4863981092e8671984dc21fbd2e1dafafe",
         "pointer": []
       },
       "instrumentPatches": [],

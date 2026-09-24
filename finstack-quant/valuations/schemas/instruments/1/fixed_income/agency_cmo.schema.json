@@ -166,7 +166,7 @@
           "type": "number"
         },
         "payment_lag_days": {
-          "description": "Optional custom payment delay (overrides agency default).",
+          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
           "format": "uint32",
           "minimum": 0,
           "type": [

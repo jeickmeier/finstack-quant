@@ -2006,6 +2006,7 @@ export interface DB613C7Ee220C23Ada4E9 {
     | "monte_carlo_gbm"
     | "monte_carlo_heston"
     | "monte_carlo_hull_white_1f"
+    | "monte_carlo_three_factor"
     | "barrier_bs_continuous"
     | "asian_geometric_bs"
     | "asian_turnbull_wakeman"
@@ -2035,7 +2036,7 @@ export interface D_482Fa346C77E25F26A51 {
    * Clean price (percent of the sum of current tranche balances),
    * UNADJUSTED for accrued interest.
    *
-   * SC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic
+   * This equals [`Self::dirty_price`]. The deal-level stochastic
    * result carries no per-tranche interest flows, so accrued cannot be
    * computed here (the same constraint documented on the accrued
    * calculator). It is reported unadjusted rather than fabricated: the
@@ -4171,6 +4172,7 @@ export interface DAdb505B22Deadbdfe62E {
     | "monte_carlo_gbm"
     | "monte_carlo_heston"
     | "monte_carlo_hull_white_1f"
+    | "monte_carlo_three_factor"
     | "barrier_bs_continuous"
     | "asian_geometric_bs"
     | "asian_turnbull_wakeman"

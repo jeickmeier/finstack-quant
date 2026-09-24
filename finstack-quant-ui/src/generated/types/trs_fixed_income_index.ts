@@ -733,10 +733,13 @@ export interface D_29A90D894679A1E11782 {
  *
  * # Model limitations
  *
- * This deterministic carry analytic omits realized index price returns,
- * roll-down, underlying rate/spread mark-to-market, stochastic credit,
- * constituent decomposition, early termination, and bespoke fees. Pricing
- * rejects an in-progress total-return accrual period. Cashflow-schedule APIs
+ * This deterministic carry analytic omits roll-down, underlying rate/spread
+ * mark-to-market, stochastic credit, constituent decomposition, early
+ * termination, and bespoke fees. The period in progress on the valuation
+ * date is valued from the live index level (`underlying.index_id`) against
+ * `initial_level`, then carried at the index yield to period end; a period
+ * that has ended but is not yet paid stays in the PV at its projected carry.
+ * Cashflow-schedule APIs
  * return payment dates with zero amounts; use
  * [`Self::pv_total_return_leg`] and [`Self::pv_financing_leg`] for projected
  * leg values.
@@ -789,9 +792,12 @@ export interface DCb8C39A490Fd5E64F385 {
   financing: D_57Dc608Fb91A32Cf109E;
   id: Id2;
   /**
-   * Optional reference level retained with the contract.
+   * Index level at the reset of the return period in progress, in the
+   * index's own units.
    *
-   * The deterministic carry pricer does not consume or fetch this value.
+   * Required when the valuation date falls inside a return period; the
+   * realized return to date is `index_level / initial_level`. Unused for
+   * unseasoned trades. Must be positive and finite when set.
    */
   initial_level?: number | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
@@ -3571,10 +3577,6 @@ export interface Tenor {
  */
 export interface D_302F94Ee7E57481D4351 {
   base_currency: Currency1;
-  /**
-   * Contract size (index units per contract, defaults to 1.0)
-   */
-  contract_size: number;
   /**
    * Market scalar identifier for signed index duration in years. Required when
    * requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.

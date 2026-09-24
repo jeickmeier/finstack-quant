@@ -450,6 +450,14 @@ export interface D_54049D1588E6Ed129Bca {
    * supplied, its factor is used and any specified factor must agree.
    */
   pool_factor?: number | null;
+  /**
+   * Prepayment model of the generic assumed pool.
+   *
+   * Applies only when `assumed_pool` is absent (an explicit pool carries its
+   * own model); `None` uses the embedded generic PSA assumption. Setting it
+   * together with `assumed_pool` is rejected.
+   */
+  prepayment_model?: PrepaymentModelSpec1 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides1;
   /**
    * SIFMA settlement class override.
@@ -582,7 +590,11 @@ export interface D_038Bf279Beea6Aa9Cf48 {
    */
   pass_through_rate: number;
   /**
-   * Optional custom payment delay (overrides agency default).
+   * Optional custom stated payment delay in days (overrides the agency
+   * rule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`
+   * months after the accrual month, rolled Following on the `usny`
+   * calendar (55 → 25th of the next month, 75 → 15th two months later).
+   * Must be at least 1.
    */
   payment_lag_days?: number | null;
   pool_id: Id2;
@@ -2346,6 +2358,24 @@ export interface Money2 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
+}
+/**
+ * Cashflow prepayment-model specification.
+ */
+export interface PrepaymentModelSpec1 {
+  /**
+   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
+   *
+   * This field is **ignored** when [`PrepaymentCurve::Psa`],
+   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
+   * monthly rate is then derived entirely from the curve. It IS used by
+   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
+   */
+  cpr: number;
+  /**
+   * Optional curve shape (default: constant)
+   */
+  curve?: D_73686C0456Fd11C88D3E | null;
 }
 /**
  * Scenario-only pricing adjustments.

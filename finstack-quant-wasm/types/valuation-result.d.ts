@@ -413,6 +413,8 @@ export type Id = string;
  * ## Monte Carlo Models
  * - [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation
  * - [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol
+ * - [`MonteCarloThreeFactor`](Self::MonteCarloThreeFactor): revolver
+ *   utilization, short-rate and credit-spread simulation
  *
  * ## Exotic Analytical
  * - [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers
@@ -451,6 +453,7 @@ export type ModelKey =
   | "monte_carlo_gbm"
   | "monte_carlo_heston"
   | "monte_carlo_hull_white_1f"
+  | "monte_carlo_three_factor"
   | "barrier_bs_continuous"
   | "asian_geometric_bs"
   | "asian_turnbull_wakeman"
@@ -524,7 +527,7 @@ export type SchemaVersion = number;
  *
  * # Tree mode is bounded by construction — read this before selecting it
  *
- * SC-M25: path-preserving tree pricing keeps `3^n` terminal nodes for `n`
+ * Path-preserving tree pricing keeps `3^n` terminal nodes for `n`
  * periods, checked against `max_tree_paths` (default 100,000). `3^11 =
  * 177,147`, so **Tree hard-errors for any deal with more than ten periods
  * remaining** — which is essentially every real deal, since
@@ -2643,6 +2646,7 @@ export interface CreditDerivativeValuationDetails {
     | "monte_carlo_gbm"
     | "monte_carlo_heston"
     | "monte_carlo_hull_white_1f"
+    | "monte_carlo_three_factor"
     | "barrier_bs_continuous"
     | "asian_geometric_bs"
     | "asian_turnbull_wakeman"
@@ -2935,6 +2939,7 @@ export interface MonteCarloValuationDetails {
     | "monte_carlo_gbm"
     | "monte_carlo_heston"
     | "monte_carlo_hull_white_1f"
+    | "monte_carlo_three_factor"
     | "barrier_bs_continuous"
     | "asian_geometric_bs"
     | "asian_turnbull_wakeman"
@@ -3112,7 +3117,7 @@ export interface StochasticPricingResult {
    * Clean price (percent of the sum of current tranche balances),
    * UNADJUSTED for accrued interest.
    *
-   * SC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic
+   * This equals [`Self::dirty_price`]. The deal-level stochastic
    * result carries no per-tranche interest flows, so accrued cannot be
    * computed here (the same constraint documented on the accrued
    * calculator). It is reported unadjusted rather than fabricated: the

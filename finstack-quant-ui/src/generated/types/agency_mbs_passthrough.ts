@@ -454,7 +454,11 @@ export interface D_24B4Bd8Fabf71247Af0B {
    */
   pass_through_rate: number;
   /**
-   * Optional custom payment delay (overrides agency default).
+   * Optional custom stated payment delay in days (overrides the agency
+   * rule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`
+   * months after the accrual month, rolled Following on the `usny`
+   * calendar (55 → 25th of the next month, 75 → 15th two months later).
+   * Must be at least 1.
    */
   payment_lag_days?: number | null;
   pool_id: Id2;

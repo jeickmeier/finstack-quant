@@ -726,8 +726,9 @@ export interface D_8D9E4Ad211395Ba91969 {
    */
   anti_dilution: "none" | "full_ratchet" | "weighted_average";
   /**
-   * Historical dilution events that affect the conversion ratio.
-   * Events are applied in chronological order.
+   * Historical dilution events that affect the conversion ratio, recorded
+   * in chronological (non-decreasing date) order and applied in that
+   * order. Validation rejects out-of-order events.
    */
   dilution_events?: D_333679A3A80Ab492C1C2[];
   /**

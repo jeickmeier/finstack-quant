@@ -266,6 +266,17 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Trade notional (par amount)."
         },
+        "prepayment_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_a1f0b2382a0ae4ef0e72"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prepayment model of the generic pool both legs deliver.\n\n`None` uses the embedded generic PSA assumption of the TBA legs."
+        },
         "repo_curve_id": {
           "anyOf": [
             {
@@ -1350,6 +1361,104 @@
       "description": "Exact decimal encoded only as a JSON string.",
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": "string"
+    },
+    "d_73686c0456fd11c88d3e": {
+      "description": "Prepayment curve shape.",
+      "oneOf": [
+        {
+          "description": "Constant CPR (no seasoning effect)",
+          "properties": {
+            "curve": {
+              "const": "constant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curve"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "PSA standard curve: ramps to 6% CPR over 30 months",
+          "properties": {
+            "curve": {
+              "const": "psa",
+              "type": "string"
+            },
+            "speed_multiplier": {
+              "description": "Speed multiplier (1.0 = 100% PSA)",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "speed_multiplier"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR.",
+          "properties": {
+            "curve": {
+              "const": "cmbs_lockout",
+              "type": "string"
+            },
+            "lockout_months": {
+              "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "curve",
+            "lockout_months"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention). The `cpr` field is ignored.",
+          "properties": {
+            "curve": {
+              "const": "abs",
+              "type": "string"
+            },
+            "speed": {
+              "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "speed"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months. The `cpr` field is ignored.",
+          "properties": {
+            "curve": {
+              "const": "vector",
+              "type": "string"
+            },
+            "monthly_cpr": {
+              "description": "Annual CPR per month of seasoning as decimals, month 1 first.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "curve",
+            "monthly_cpr"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "d_780b68ee5d41351b65ca": {
       "description": "Barrier monitoring type for default determination.",
@@ -2454,6 +2563,41 @@
       ],
       "title": "Id",
       "type": "string"
+    },
+    "d_a1f0b2382a0ae4ef0e72": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Cashflow prepayment-model specification.",
+      "examples": [
+        {
+          "cpr": 0.06,
+          "curve": null
+        }
+      ],
+      "properties": {
+        "cpr": {
+          "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`],\n[`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the\nmonthly rate is then derived entirely from the curve. It IS used by\n[`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.",
+          "format": "double",
+          "type": "number"
+        },
+        "curve": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_73686c0456fd11c88d3e"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional curve shape (default: constant)"
+        }
+      },
+      "required": [
+        "cpr"
+      ],
+      "title": "PrepaymentModelSpec",
+      "type": "object"
     },
     "d_ae5d75ed4e313ae3bc25": {
       "description": "Which valuation parameter to solve the breakeven for.\n\n# Result units\n\nThe breakeven metric is a bare `f64` whose unit depends on the target. Read\nthe per-variant docs before interpreting a value:\n\n| Target             | Sensitivity     | Result unit          |\n|--------------------|-----------------|----------------------|\n| `ZSpread`          | CS01            | basis points         |\n| `Ytm`              | DV01            | basis points         |\n| `Oas`              | CS01            | basis points         |\n| `ImpliedVol`       | Vega            | vol points (1 = 1%)  |\n| `BaseCorrelation`  | Correlation01   | correlation points   |",

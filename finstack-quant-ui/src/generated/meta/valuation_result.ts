@@ -500,7 +500,7 @@ export default [
   {
     "path": "#/$defs/d_482fa346c77e25f26a51/properties/clean_price",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StochasticPricingResult/properties/clean_price",
-    "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nSC-m29: this equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
+    "description": "Clean price (percent of the sum of current tranche balances),\nUNADJUSTED for accrued interest.\n\nThis equals [`Self::dirty_price`]. The deal-level stochastic\nresult carries no per-tranche interest flows, so accrued cannot be\ncomputed here (the same constraint documented on the accrued\ncalculator). It is reported unadjusted rather than fabricated: the\nerror is at most one period's accrued interest, in a known direction.\nUse `calculate_tranche_metrics` when an accrued-adjusted clean price is\nrequired.",
     "format": "double"
   },
   {
@@ -2980,7 +2980,7 @@ export default [
   {
     "path": "#/$defs/d_d5837ae057e724b8713e",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey",
-    "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Credit Models\n- [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing\n- [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```"
+    "description": "Pricing model selection for the pricer registry.\n\nDetermines which mathematical model is used to price an instrument.\nEach model has different computational characteristics and accuracy\nprofiles for different instrument types.\n\n# Model Categories\n\n## Analytical Models\n- [`Discounting`](Self::Discounting): Simple present value discounting\n- [`Black76`](Self::Black76): Black-76 formula for options\n- [`Normal`](Self::Normal): Bachelier (normal) model for rate options\n\n## Tree Models\n- [`Tree`](Self::Tree): Binomial/trinomial lattice\n- [`HullWhite1F`](Self::HullWhite1F): Hull-White one-factor short rate\n\n## Credit Models\n- [`HazardRate`](Self::HazardRate): Fractional-recovery hazard-rate pricing\n- [`RatesCredit`](Self::RatesCredit): Joint short-rate and hazard-rate pricing\n\n## Monte Carlo Models\n- [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation\n- [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol\n- [`MonteCarloThreeFactor`](Self::MonteCarloThreeFactor): revolver\n  utilization, short-rate and credit-spread simulation\n\n## Exotic Analytical\n- [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers\n- [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)\n- [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::pricer::ModelKey;\n\n// Select appropriate model for instrument type\nlet model = ModelKey::Discounting;  // For bonds\nlet model = ModelKey::Black76;      // For caps/floors\nlet model = ModelKey::MonteCarloGBM; // For path-dependent exotics\n\n// Parse from string\nlet model: ModelKey = \"black76\".parse().unwrap();\nassert_eq!(model, ModelKey::Black76);\n```"
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/0",
@@ -2997,62 +2997,62 @@ export default [
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/10",
-    "const": "barrier_bs_continuous",
-    "description": "Reiner-Rubinstein continuous barrier formulas.\n\nUsed for: equity/FX barrier options with continuous monitoring."
+    "const": "monte_carlo_three_factor",
+    "description": "Monte Carlo with joint utilization, short-rate and credit-spread\nfactors.\n\nUsed for: revolving credit facilities with a stochastic draw/repay\nspecification (mean-reverting utilization, a deterministic or\nHull-White short rate, and a market-anchored or CIR credit spread)."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/11",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/11",
-    "const": "asian_geometric_bs",
-    "description": "Kemna-Vorst exact geometric Asian formula.\n\nUsed for: geometric average Asian options."
+    "const": "barrier_bs_continuous",
+    "description": "Reiner-Rubinstein continuous barrier formulas.\n\nUsed for: equity/FX barrier options with continuous monitoring."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/12",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/12",
-    "const": "asian_turnbull_wakeman",
-    "description": "Turnbull-Wakeman approximation for arithmetic Asians.\n\nUsed for: arithmetic average Asian options."
+    "const": "asian_geometric_bs",
+    "description": "Kemna-Vorst exact geometric Asian formula.\n\nUsed for: geometric average Asian options."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/13",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/13",
-    "const": "lookback_bs_continuous",
-    "description": "Conze-Viswanathan lookback option formulas.\n\nUsed for: lookback options with continuous monitoring."
+    "const": "asian_turnbull_wakeman",
+    "description": "Turnbull-Wakeman approximation for arithmetic Asians.\n\nUsed for: arithmetic average Asian options."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/14",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/14",
-    "const": "quanto_bs",
-    "description": "Quanto BS with drift adjustment.\n\nUsed for: quanto options (cross-currency)."
+    "const": "lookback_bs_continuous",
+    "description": "Conze-Viswanathan lookback option formulas.\n\nUsed for: lookback options with continuous monitoring."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/15",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/15",
-    "const": "fx_barrier_bs_continuous",
-    "description": "FX barrier with Reiner-Rubinstein mapping.\n\nUsed for: FX barrier options."
+    "const": "quanto_bs",
+    "description": "Quanto BS with drift adjustment.\n\nUsed for: quanto options (cross-currency)."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/16",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/16",
-    "const": "heston_fourier",
-    "description": "Heston semi-analytical via Fourier transform.\n\nUsed for: European options requiring stochastic vol."
+    "const": "fx_barrier_bs_continuous",
+    "description": "FX barrier with Reiner-Rubinstein mapping.\n\nUsed for: FX barrier options."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/17",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/17",
-    "const": "merton_mc",
-    "description": "Merton structural credit Monte Carlo with PIK support.\n\nUsed for: PIK bonds, credit-risky bonds with structural default model."
+    "const": "heston_fourier",
+    "description": "Heston semi-analytical via Fourier transform.\n\nUsed for: European options requiring stochastic vol."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/18",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/18",
-    "const": "monte_carlo_schwartz_smith",
-    "description": "Monte Carlo with Schwartz-Smith two-factor commodity model.\n\nUsed for: commodity options requiring mean-reverting short-term dynamics."
+    "const": "merton_mc",
+    "description": "Merton structural credit Monte Carlo with PIK support.\n\nUsed for: PIK bonds, credit-risky bonds with structural default model."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/19",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/19",
-    "const": "static_replication",
-    "description": "Static replication via a portfolio of vanilla options.\n\nUsed for: CMS options (replicates the payoff with a smile-consistent\nswaption portfolio, capturing all convexity orders beyond Hagan's\nfirst-order approximation)."
+    "const": "monte_carlo_schwartz_smith",
+    "description": "Monte Carlo with Schwartz-Smith two-factor commodity model.\n\nUsed for: commodity options requiring mean-reverting short-term dynamics."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/2",
@@ -3063,54 +3063,60 @@ export default [
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/20",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/20",
-    "const": "lmm_monte_carlo",
-    "description": "LMM/BGM Monte Carlo with predictor-corrector discretization.\n\nUsed for: Bermudan swaptions, exotic rate derivatives requiring\nmulti-factor forward rate dynamics."
+    "const": "static_replication",
+    "description": "Static replication via a portfolio of vanilla options.\n\nUsed for: CMS options (replicates the payoff with a smile-consistent\nswaption portfolio, capturing all convexity orders beyond Hagan's\nfirst-order approximation)."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/21",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/21",
-    "const": "structured_credit_stochastic",
-    "description": "Structured-credit stochastic scenario waterfall model.\n\nUsed for: ABS/CLO/RMBS/CMBS tranche PVs with path-level waterfall cashflows."
+    "const": "lmm_monte_carlo",
+    "description": "LMM/BGM Monte Carlo with predictor-corrector discretization.\n\nUsed for: Bermudan swaptions, exotic rate derivatives requiring\nmulti-factor forward rate dynamics."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/22",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/22",
-    "const": "bond_future_clean_price_proxy",
-    "description": "Bond future clean-price proxy model.\n\nUsed for: bond futures when only the current CTD clean-price proxy is\navailable. This is intentionally separate from [`Discounting`](Self::Discounting)\nbecause it does not model delivery carry, invoice economics, or delivery\noptionality."
+    "const": "structured_credit_stochastic",
+    "description": "Structured-credit stochastic scenario waterfall model.\n\nUsed for: ABS/CLO/RMBS/CMBS tranche PVs with path-level waterfall cashflows."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/23",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/23",
-    "const": "monte_carlo_rough_bergomi",
-    "description": "Monte Carlo with rough Bergomi (rBergomi) stochastic volatility.\n\nUsed for: European/exotic equity options requiring rough volatility\ndynamics with fractional Brownian motion."
+    "const": "bond_future_clean_price_proxy",
+    "description": "Bond future clean-price proxy model.\n\nUsed for: bond futures when only the current CTD clean-price proxy is\navailable. This is intentionally separate from [`Discounting`](Self::Discounting)\nbecause it does not model delivery carry, invoice economics, or delivery\noptionality."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/24",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/24",
-    "const": "monte_carlo_rough_heston",
-    "description": "Monte Carlo with rough Heston stochastic volatility.\n\nUsed for: European/exotic equity options requiring rough Heston\ndynamics with Volterra-driven variance."
+    "const": "monte_carlo_rough_bergomi",
+    "description": "Monte Carlo with rough Bergomi (rBergomi) stochastic volatility.\n\nUsed for: European/exotic equity options requiring rough volatility\ndynamics with fractional Brownian motion."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/25",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/25",
-    "const": "rough_heston_fourier",
-    "description": "Rough Heston semi-analytical via fractional Riccati Fourier transform.\n\nUsed for: European equity options with rough Heston dynamics,\nusing Lewis (2000) single-integral Fourier inversion."
+    "const": "monte_carlo_rough_heston",
+    "description": "Monte Carlo with rough Heston stochastic volatility.\n\nUsed for: European/exotic equity options requiring rough Heston\ndynamics with Volterra-driven variance."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/26",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/26",
-    "const": "pde_crank_nicolson_1d",
-    "description": "1D Crank-Nicolson finite difference PDE solver.\n\nUsed for: European/American equity options, barrier options,\nFX options. Names the scheme family: production pricers run\nRannacher-damped CN (implicit start-up steps, Rannacher 1984),\nwith a penalty method for early exercise."
+    "const": "rough_heston_fourier",
+    "description": "Rough Heston semi-analytical via fractional Riccati Fourier transform.\n\nUsed for: European equity options with rough Heston dynamics,\nusing Lewis (2000) single-integral Fourier inversion."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/27",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/27",
-    "const": "pde_adi_2d",
-    "description": "2D ADI (Craig-Sneyd) finite difference PDE solver.\n\nUsed for: Heston stochastic volatility, local-stochastic vol,\nand other 2D pricing problems. Splits the 2D PDE into\ndirectional tridiagonal sweeps with explicit cross-derivative."
+    "const": "pde_crank_nicolson_1d",
+    "description": "1D Crank-Nicolson finite difference PDE solver.\n\nUsed for: European/American equity options, barrier options,\nFX options. Names the scheme family: production pricers run\nRannacher-damped CN (implicit start-up steps, Rannacher 1984),\nwith a penalty method for early exercise."
   },
   {
     "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/28",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/28",
+    "const": "pde_adi_2d",
+    "description": "2D ADI (Craig-Sneyd) finite difference PDE solver.\n\nUsed for: Heston stochastic volatility, local-stochastic vol,\nand other 2D pricing problems. Splits the 2D PDE into\ndirectional tridiagonal sweeps with explicit cross-derivative."
+  },
+  {
+    "path": "#/$defs/d_d5837ae057e724b8713e/oneOf/29",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/ModelKey/oneOf/29",
     "const": "bloomberg_cdso",
     "description": "Bloomberg CDSO numerical-quadrature model for credit-default-swap\noptions.\n\nReference: Bloomberg L.P. Quantitative Analytics, *Pricing Credit\nIndex Options*, March 2012 (DOCS 2055833 ⟨GO⟩). The model\npreserves the lognormal-spread assumption of the original\nBlack-on-spreads model but solves `O = P(t_e) · E[(V_te + H(K) +\nD)+]` by numerical integration over the lognormal density. The\nlognormal mean `m` is calibrated by Brent root finding so that\n`F_0 = E[V_te]` (the no-knockout clean forward value); `H(K)` is\nthe strike-adjustment term `ξN(c − K)A(K)`; `D` is the realized\nloss settlement. The closed-form Black-on-spreads model was\ndecommissioned on the Bloomberg CDSO terminal in 2010.\n\nUsed for: CDS options (`InstrumentType::CdsOption`)."
   },
@@ -3333,7 +3339,7 @@ export default [
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode",
-    "description": "Pricing mode selection.\n\nChoose based on horizon × dimensionality: `Tree` for SHORT-horizon\nnon-recombining stochastic deals (deterministic, low variance),\n`MonteCarlo` for long-horizon or high-dimensional pools, `Hybrid` to\nfront-load tree precision and tail with MC.\n\n# Tree mode is bounded by construction — read this before selecting it\n\nSC-M25: path-preserving tree pricing keeps `3^n` terminal nodes for `n`\nperiods, checked against `max_tree_paths` (default 100,000). `3^11 =\n177,147`, so **Tree hard-errors for any deal with more than ten periods\nremaining** — which is essentially every real deal, since\n`build_scenario_tree_config` sets `num_periods` to months-to-maturity.\n\nThe default is [`PricingMode::MonteCarlo`] — the mode that can price the\ndeals this module is built for at realistic horizons (the public\n`price_stochastic` entry point also selects Monte Carlo). Tree remains\navailable and correct for genuinely short horizons; select it explicitly.\n\nTest coverage:\n- **Tree**: `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`, at horizons within the node bound.\n- **MonteCarlo**: the same suites plus the convergence tests.\n- **Hybrid**: structured-credit pricer integration tests."
+    "description": "Pricing mode selection.\n\nChoose based on horizon × dimensionality: `Tree` for SHORT-horizon\nnon-recombining stochastic deals (deterministic, low variance),\n`MonteCarlo` for long-horizon or high-dimensional pools, `Hybrid` to\nfront-load tree precision and tail with MC.\n\n# Tree mode is bounded by construction — read this before selecting it\n\nPath-preserving tree pricing keeps `3^n` terminal nodes for `n`\nperiods, checked against `max_tree_paths` (default 100,000). `3^11 =\n177,147`, so **Tree hard-errors for any deal with more than ten periods\nremaining** — which is essentially every real deal, since\n`build_scenario_tree_config` sets `num_periods` to months-to-maturity.\n\nThe default is [`PricingMode::MonteCarlo`] — the mode that can price the\ndeals this module is built for at realistic horizons (the public\n`price_stochastic` entry point also selects Monte Carlo). Tree remains\navailable and correct for genuinely short horizons; select it explicitly.\n\nTest coverage:\n- **Tree**: `tests/instruments/structured_credit/unit/{stochastic_pricing_tests,stochastic_tranche_pv_tests}`, at horizons within the node bound.\n- **MonteCarlo**: the same suites plus the convergence tests.\n- **Hybrid**: structured-credit pricer integration tests."
   },
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/0",

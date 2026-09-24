@@ -206,7 +206,7 @@
           "type": "number"
         },
         "payment_lag_days": {
-          "description": "Optional custom payment delay (overrides agency default).",
+          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -1087,6 +1087,17 @@
             "number",
             "null"
           ]
+        },
+        "prepayment_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_a1f0b2382a0ae4ef0e72"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Prepayment model of the generic assumed pool.\n\nApplies only when `assumed_pool` is absent (an explicit pool carries its\nown model); `None` uses the embedded generic PSA assumption. Setting it\ntogether with `assumed_pool` is rejected."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
