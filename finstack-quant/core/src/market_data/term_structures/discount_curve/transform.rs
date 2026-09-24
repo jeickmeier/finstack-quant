@@ -291,13 +291,13 @@ impl DiscountCurve {
             .map(|(t, df)| (t, df / df_dt))
             .collect();
 
-        if rolled_points.len() < 2 {
+        // Knots inside (0, dt] are dropped by `roll_knots` (expired).
+        // `build()` re-prepends a (0.0, 1.0) knot, which is now exactly
+        // correct: DF_new(0) = DF_old(dt) / DF_old(dt) = 1. One live knot is
+        // therefore enough.
+        if rolled_points.is_empty() {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
-
-        // Note: knots inside (0, dt] are dropped by `roll_knots` (expired).
-        // `build()` re-prepends a (0.0, 1.0) knot, which is now exactly
-        // correct: DF_new(0) = DF_old(dt) / DF_old(dt) = 1.
 
         // Thread the full metadata (including fx_policy) and override the base.
         self.metadata_builder(self.id.clone())

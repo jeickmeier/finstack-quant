@@ -1410,4 +1410,32 @@ mod roll_forward_realized_forward {
             );
         }
     }
+
+    /// A single-pillar curve (`(0, 1)` plus one knot) has one live knot after
+    /// the roll; `build()` re-anchors `(0, 1)`, so the roll must succeed.
+    #[test]
+    fn two_pillar_curve_rolls_forward() {
+        let curve = DiscountCurve::builder("TEST-TWO-PILLAR")
+            .base_date(date!(2025 - 01 - 01))
+            .knots([(0.0, 1.0), (5.0, 0.80)])
+            .build()
+            .unwrap();
+
+        // Roll 365 days = dt = 1.0y under Act365F.
+        let rolled = curve.roll_forward(365).unwrap();
+        let expected = 0.80 / curve.df(1.0);
+        assert!((rolled.df(4.0) - expected).abs() < 1e-12);
+        assert!((rolled.df(0.0) - 1.0).abs() < 1e-14);
+    }
+
+    /// Rolling past every pillar leaves no live knot and must still fail.
+    #[test]
+    fn roll_past_last_pillar_fails() {
+        let curve = DiscountCurve::builder("TEST-TWO-PILLAR")
+            .base_date(date!(2025 - 01 - 01))
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .build()
+            .unwrap();
+        assert!(curve.roll_forward(730).is_err());
+    }
 }
