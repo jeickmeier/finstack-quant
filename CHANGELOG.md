@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Agency mortgages: quote-basis spreads, IO notional, prepayment-aware DV01 (2026-09-23)
+
+#### Fixed
+
+- **MBS MC-OAS and CMO Z-spread price the pool the quote buys.** A clean quote
+  plus settlement-month accrued buys the settlement-month accrual onward; the
+  prior month's in-flight P&I belongs to the seller. Both spreads previously
+  projected it, so the same pool at the same quote solved 6.80 bp on Feb 10 and
+  2.41 bp on Feb 27 (MBS) and 4.60 bp versus −5.05 bp (CMO). Holder NPV is
+  unchanged. The TBA delivered pool shares the same helper.
+- **CMO IO strips accrue on their current notional** and amortize with the
+  collateral balance; the old rule scaled the IO's original face by the pool's
+  original factor (a 70mm IO on factor-0.7 collateral paid 142,916.67 instead of
+  204,166.67 in month one). `AgencyCmo::validate` now requires the collateral
+  current face to equal the principal tranches' current faces.
+- **Dollar-roll carry** uses the generic pool's prepayment model instead of a
+  hard-coded 0.5% SMM and divides by the dirty front price.
+- **DV01 of TBA, dollar roll and CMO is prepayment-aware**, like the MBS
+  pass-through, through the new `Instrument::rate_risk_rebuild`.
+- **MBS MC-OAS** reads Hull-White κ/σ from
+  `model_config.hw1f_mean_reversion`/`hw1f_sigma` (together; default 5%/1%) and
+  measures payment offsets on the discount curve's day count.
+- **Custom MBS payment delays** follow the agency day-of-month rule with a
+  `usny` roll (75 days on a January accrual → 15 March, not the Saturday 16th).
+- **CMO tranche interest** accrues on the collateral's day count, not a flat 1/12.
+
+#### Breaking (Rust only)
+
+- `dollar_roll::carry::{implied_financing_rate, roll_specialness}` drop the
+  `prepay_rate` argument; `break_even_drop` takes the dirty front price.
+- `AgencyTba` and `DollarRoll` gain an optional `prepayment_model` wire field.
+- Removed `mbs_passthrough::delay`, `MbsCashflow::sifma_date`,
+  `cmo::waterfall::{execute_waterfall, execute_waterfall_with_pac,
+  allocate_io_cashflow}`; `execute_waterfall_with_principal_breakdown` takes a
+  collateral survival ratio and an accrual fraction.
+- PSA lives in `finstack_quant_cashflows::builder::psa_cpr`.
+
 ### Component source registry 0.2.0 (2026-09-20)
 
 - Prepares 150 registry items for financial forms, views and a composed pricing
