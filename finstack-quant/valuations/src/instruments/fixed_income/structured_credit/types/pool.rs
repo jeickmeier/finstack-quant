@@ -786,7 +786,7 @@ impl AssetPool {
     ///
     /// Representative lines are expanded one row per line; instrument
     /// collateral is validated against the pool base currency and
-    /// materialized by [`InstrumentCollateral::materialize`], with the
+    /// materialized by `InstrumentCollateral::materialize`, with the
     /// instruments themselves retained on the returned pool. A pool that
     /// already holds `assets` is validated and returned unchanged.
     ///

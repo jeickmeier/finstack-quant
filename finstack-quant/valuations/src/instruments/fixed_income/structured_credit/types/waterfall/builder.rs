@@ -407,7 +407,9 @@ impl WaterfallBuilder {
     ///
     /// # Arguments
     ///
-    /// * `tier` - Tier to append.
+    /// * `tier` - Payment tier (id, payment type, recipients, allocation mode)
+    ///   appended to the waterfall at its own priority, or the next free one
+    ///   when that is `0`.
     #[must_use]
     pub fn add_tier(mut self, mut tier: WaterfallTier) -> Self {
         if tier.priority == 0 {
