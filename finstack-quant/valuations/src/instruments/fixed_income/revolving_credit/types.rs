@@ -1230,7 +1230,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        // Optional model override via attributes metadata (e.g., meta["pricing_model"] = "monte_carlo_gbm")
+        // Optional model override via attributes metadata (e.g., meta["pricing_model"] = "monte_carlo_three_factor")
         if let Some(model) = self.pricing_model_override()? {
             let registry = crate::pricer::standard_pricer_registry();
             let result = registry

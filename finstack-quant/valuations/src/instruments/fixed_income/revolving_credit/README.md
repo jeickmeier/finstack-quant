@@ -339,7 +339,7 @@ deterministic engine starts from.
 ## Pricing
 
 `RevolvingCreditPricer` is registered under both `ModelKey::Discounting` and
-`ModelKey::MonteCarloGBM` in
+`ModelKey::MonteCarloThreeFactor` (utilization, short rate, credit spread) in
 [`src/pricer/fixed_income.rs`](../../../pricer/fixed_income.rs):
 
 | Mode | Behavior |
