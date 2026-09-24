@@ -918,6 +918,9 @@ impl<'a> CashflowEngine<'a> {
             let mut weighted_lc_bp = 0.0;
             let mut weighted_fronting_bp = 0.0;
             let mut first_fixing: Option<Date> = None;
+            // Overnight all-in rate for the period and the margin it was
+            // projected with.
+            let mut overnight_rate: Option<(f64, f64)> = None;
 
             // Commitment steps inside the period move the balance on their own
             // date (they are observation dates); only the utilization-driven
@@ -985,24 +988,36 @@ impl<'a> CashflowEngine<'a> {
                         first_fixing.get_or_insert(fixing_date);
                         if let Some(fwd) = overnight_fwd.as_ref() {
                             // Overnight index: compound the forward over the
-                            // whole accrual period; only the margin in force
-                            // differs between sub-intervals.
-                            super::utils::project_revolver_floating_rate(
-                                super::utils::RevolverFloatingProjection {
-                                    accrual_start: period_start,
-                                    accrual_end: period_end,
-                                    as_of: self.as_of,
-                                    spec,
-                                    fwd: fwd.as_ref(),
-                                    day_count: self.day_count,
-                                    coupon_frequency: self.facility.frequency,
-                                    currency: ccy,
-                                    calendar_id: self.facility.calendar_id.as_deref(),
-                                    margin_delta_bp: self.facility.margin_delta_bp_at(sub_start),
-                                    fixings: self.fixing_series,
-                                },
-                                None,
-                            )?
+                            // whole accrual period once; only the margin in
+                            // force differs between sub-intervals.
+                            let margin_delta_bp = self.facility.margin_delta_bp_at(sub_start);
+                            match overnight_rate {
+                                Some((margin, rate))
+                                    if margin.to_bits() == margin_delta_bp.to_bits() =>
+                                {
+                                    rate
+                                }
+                                _ => {
+                                    let rate = super::utils::project_revolver_floating_rate(
+                                        super::utils::RevolverFloatingProjection {
+                                            accrual_start: period_start,
+                                            accrual_end: period_end,
+                                            as_of: self.as_of,
+                                            spec,
+                                            fwd: fwd.as_ref(),
+                                            day_count: self.day_count,
+                                            coupon_frequency: self.facility.frequency,
+                                            currency: ccy,
+                                            calendar_id: self.facility.calendar_id.as_deref(),
+                                            margin_delta_bp,
+                                            fixings: self.fixing_series,
+                                        },
+                                        None,
+                                    )?;
+                                    overnight_rate = Some((margin_delta_bp, rate));
+                                    rate
+                                }
+                            }
                         } else {
                             let params =
                                 super::utils::floating_params_at(self.facility, spec, sub_start)?;

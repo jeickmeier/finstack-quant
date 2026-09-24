@@ -49,13 +49,11 @@
 //! - `TermLoan` for the instrument type
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor;
 use crate::instruments::fixed_income::term_loan::types::RateSpec;
 use crate::pricer::{
     expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
@@ -80,32 +78,6 @@ fn npv_by_date(
             continue;
         }
         total = total.checked_add(*amount * disc.df_between_dates(as_of, *date)?)?;
-    }
-    Ok(total)
-}
-
-fn npv_by_date_at_spread(
-    disc: &DiscountCurve,
-    as_of: finstack_quant_core::dates::Date,
-    flows: &[(finstack_quant_core::dates::Date, Money)],
-    spread: f64,
-    compounds_per_year: f64,
-) -> finstack_quant_core::Result<Money> {
-    if flows.is_empty() {
-        return Err(finstack_quant_core::InputError::TooFewPoints.into());
-    }
-
-    let mut total = Money::from((0_i64, flows[0].1.currency()));
-    for (date, amount) in flows {
-        if *date <= as_of {
-            continue;
-        }
-        let t = disc
-            .day_count()
-            .year_fraction(as_of, *date, DayCountContext::default())?;
-        let base_df = disc.df_between_dates(as_of, *date)?;
-        let df = z_spread_discount_factor(base_df, t, spread, compounds_per_year)?;
-        total = total.checked_add(*amount * df)?;
     }
     Ok(total)
 }
@@ -194,8 +166,9 @@ impl TermLoanDiscountingPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        let settlement_value = Self::settlement_value(loan, market, as_of)?;
-        Self::value_at_as_of(loan, market, as_of, settlement_value)
+        let schedule = Self::pricing_schedule(loan, market, as_of)?;
+        let settlement_value = Self::settlement_value(loan, market, as_of, &schedule)?;
+        Self::value_at_as_of(loan, market, as_of, &schedule, settlement_value)
     }
 
     /// Model value on the settlement date of the flows a buyer settling
@@ -206,21 +179,23 @@ impl TermLoanDiscountingPricer {
     /// # Arguments
     ///
     /// * `loan` - Term loan to value.
-    /// * `market` - Discount curve and any forward curves and fixings.
+    /// * `market` - Market holding the loan's discount curve.
     /// * `as_of` - Trade date; settlement is `loan.settlement_date(as_of)`.
+    /// * `schedule` - The loan's [`Self::pricing_schedule`] on `as_of`.
     ///
     /// # Errors
     ///
-    /// Returns cashflow-generation, curve-lookup or discounting errors.
+    /// Returns curve-lookup or discounting errors.
     pub(crate) fn settlement_value(
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
     ) -> finstack_quant_core::Result<Money> {
         if loan.settlement_date(as_of)? >= loan.maturity {
             return Ok(Money::from((0_i64, loan.currency)));
         }
-        let (settlement_date, flows) = Self::pricing_flows(loan, market, as_of)?;
+        let (settlement_date, flows) = Self::pricing_flows(loan, schedule, as_of)?;
         let disc = market.get_discount(loan.discount_curve_id.as_str())?;
 
         if let Some(spread) = loan
@@ -228,19 +203,20 @@ impl TermLoanDiscountingPricer {
             .market_quotes
             .quoted_z_spread
         {
-            let years = loan.frequency.to_years();
-            let compounds_per_year = if years > 0.0 && years.is_finite() {
-                (1.0 / years).round().max(1.0)
-            } else {
-                1.0
-            };
-            npv_by_date_at_spread(
-                disc.as_ref(),
-                settlement_date,
+            let flows: Vec<(finstack_quant_core::dates::Date, f64)> = flows
+                .iter()
+                .map(|(date, amount)| (*date, amount.amount()))
+                .collect();
+            let pv = crate::instruments::fixed_income::loan_quotes::pv_with_discount_margin(
                 &flows,
+                settlement_date,
+                disc.as_ref(),
+                crate::instruments::fixed_income::loan_quotes::compounding_frequency(
+                    loan.frequency,
+                ),
                 spread,
-                compounds_per_year,
-            )
+            )?;
+            Money::new(pv, loan.currency)
         } else {
             npv_by_date(disc.as_ref(), settlement_date, &flows)
         }
@@ -253,6 +229,7 @@ impl TermLoanDiscountingPricer {
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
     ) -> finstack_quant_core::Result<(f64, Money)> {
         use finstack_quant_core::cashflow::CFKind;
 
@@ -260,12 +237,10 @@ impl TermLoanDiscountingPricer {
         let disc = market.get_discount(loan.discount_curve_id.as_str())?;
         let df_settlement = disc.df_between_dates(as_of, settlement)?;
         let mut pre_settlement = Money::from((0_i64, loan.currency));
-        if settlement > as_of {
-            for cf in Self::pricing_schedule(loan, market, as_of)?.get_flows() {
-                if cf.kind != CFKind::Pik && cf.date > as_of && cf.date <= settlement {
-                    pre_settlement = pre_settlement
-                        .checked_add(cf.amount * disc.df_between_dates(as_of, cf.date)?)?;
-                }
+        for cf in schedule.get_flows() {
+            if cf.kind != CFKind::Pik && cf.date > as_of && cf.date <= settlement {
+                pre_settlement = pre_settlement
+                    .checked_add(cf.amount * disc.df_between_dates(as_of, cf.date)?)?;
             }
         }
         Ok((df_settlement, pre_settlement))
@@ -279,25 +254,28 @@ impl TermLoanDiscountingPricer {
     ///
     /// # Arguments
     ///
-    /// * `loan` - Term loan whose settlement lag and schedule apply.
+    /// * `loan` - Term loan whose settlement lag applies.
     /// * `market` - Market holding the loan's discount curve.
     /// * `as_of` - Valuation date the PV is anchored at.
+    /// * `schedule` - The loan's [`Self::pricing_schedule`] on `as_of`.
     /// * `settlement_value` - Model value on the settlement date, in the loan
     ///   currency (from the discounting or tree engine).
     ///
     /// # Errors
     ///
-    /// Returns curve-lookup, schedule or currency errors.
+    /// Returns curve-lookup or currency errors.
     pub(crate) fn value_at_as_of(
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
         settlement_value: Money,
     ) -> finstack_quant_core::Result<Money> {
         if as_of >= loan.maturity {
             return Ok(Money::from((0_i64, loan.currency)));
         }
-        let (df_settlement, pre_settlement) = Self::settlement_carry(loan, market, as_of)?;
+        let (df_settlement, pre_settlement) =
+            Self::settlement_carry(loan, market, as_of, schedule)?;
         (settlement_value * df_settlement).checked_add(pre_settlement)
     }
 
@@ -306,22 +284,25 @@ impl TermLoanDiscountingPricer {
     ///
     /// # Arguments
     ///
-    /// * `loan` - Term loan whose settlement lag and schedule apply.
+    /// * `loan` - Term loan whose settlement lag applies.
     /// * `market` - Market holding the loan's discount curve.
     /// * `as_of` - Valuation date `value` is anchored at.
+    /// * `schedule` - The loan's [`Self::pricing_schedule`] on `as_of`.
     /// * `value` - Instrument PV on `as_of`, in the loan currency.
     ///
     /// # Errors
     ///
-    /// Returns curve-lookup, schedule or currency errors, or
-    /// `Error::Validation` when the settlement discount factor is not positive.
+    /// Returns curve-lookup or currency errors, or `Error::Validation` when
+    /// the settlement discount factor is not positive.
     pub(crate) fn value_at_settlement(
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
         value: Money,
     ) -> finstack_quant_core::Result<Money> {
-        let (df_settlement, pre_settlement) = Self::settlement_carry(loan, market, as_of)?;
+        let (df_settlement, pre_settlement) =
+            Self::settlement_carry(loan, market, as_of, schedule)?;
         if !(df_settlement.is_finite() && df_settlement > 0.0) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "TermLoan '{}' settlement discount factor must be positive, got {df_settlement}",
@@ -331,17 +312,28 @@ impl TermLoanDiscountingPricer {
         Ok(value.checked_sub(pre_settlement)? * (1.0 / df_settlement))
     }
 
-    /// Build the holder-view cashflows a buyer settling today receives, for
-    /// quote-space measures anchored at the loan's settlement date.
+    /// The flows a buyer settling today receives, for quote-space measures
+    /// anchored at the loan's settlement date.
     ///
     /// Returns `(settlement_date, flows)`: PIK capitalization and flows on or
-    /// before settlement are excluded, and seasoned floating coupons reflect
-    /// historical fixings where available. The discount margin and the
-    /// z-spread CS01 solve against a settlement-date quote with these flows;
-    /// the instrument PV ([`price`](Self::price)) is anchored at `as_of`.
+    /// before settlement are excluded; seasoned floating coupons carry the
+    /// historical fixings already applied to `schedule`. The discount margin
+    /// and the z-spread CS01 solve against a settlement-date quote with these
+    /// flows; the instrument PV ([`price`](Self::price)) is anchored at
+    /// `as_of`.
+    ///
+    /// # Arguments
+    ///
+    /// * `loan` - Term loan whose settlement lag applies.
+    /// * `schedule` - The loan's [`Self::pricing_schedule`] on `as_of`.
+    /// * `as_of` - Trade date; settlement is `loan.settlement_date(as_of)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the settlement date cannot be resolved.
     pub(crate) fn pricing_flows(
         loan: &TermLoan,
-        market: &MarketContext,
+        schedule: &crate::cashflow::builder::schedule::CashFlowSchedule,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(
         finstack_quant_core::dates::Date,
@@ -349,22 +341,13 @@ impl TermLoanDiscountingPricer {
     )> {
         use finstack_quant_core::cashflow::CFKind;
 
-        // Compute settlement date using business-day conventions when calendar is available.
         let settlement_date = loan.settlement_date(as_of)?;
-
-        let schedule = Self::pricing_schedule(loan, market, as_of)?;
-
-        // Filter flows: exclude PIK (capitalized interest) and settled flows from PV.
-        // PIK increases outstanding and is repaid via principal redemption.
-        // Flows on or before settlement_date have already settled and must not be
-        // discounted (every consumer anchors discounting strictly after settlement).
-        let flows: Vec<(finstack_quant_core::dates::Date, Money)> = schedule
+        let flows = schedule
             .get_flows()
             .iter()
             .filter(|cf| cf.kind != CFKind::Pik && cf.date > settlement_date)
             .map(|cf| (cf.date, cf.amount))
             .collect();
-
         Ok((settlement_date, flows))
     }
 
@@ -388,7 +371,6 @@ impl TermLoanDiscountingPricer {
         schedule: &mut crate::cashflow::builder::schedule::CashFlowSchedule,
     ) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::cashflow::CFKind;
-        use rust_decimal::prelude::ToPrimitive;
         use std::collections::BTreeMap;
 
         let float_spec = match &loan.rate {
@@ -448,15 +430,7 @@ impl TermLoanDiscountingPricer {
             }
         }
 
-        let base_params = crate::cashflow::builder::FloatingRateParams {
-            spread_bp: float_spec.spread_bp.to_f64().unwrap_or_default(),
-            gearing: float_spec.gearing.to_f64().unwrap_or(1.0),
-            gearing_includes_spread: float_spec.gearing_includes_spread,
-            index_floor_bp: float_spec.index_floor_bp.and_then(|value| value.to_f64()),
-            index_cap_bp: float_spec.index_cap_bp.and_then(|value| value.to_f64()),
-            all_in_floor_bp: float_spec.all_in_floor_bp.and_then(|value| value.to_f64()),
-            all_in_cap_bp: float_spec.all_in_cap_bp.and_then(|value| value.to_f64()),
-        };
+        let base_params = crate::cashflow::builder::FloatingRateParams::try_from(float_spec)?;
 
         let outstanding_path = schedule.outstanding_by_date()?;
         let initial_notional = schedule.get_notional().initial.amount();

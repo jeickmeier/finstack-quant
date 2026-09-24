@@ -111,7 +111,6 @@ impl AssetBackedFacility {
     /// or the synthetic deal fails the deal validation.
     pub fn synthesized_deal(&self) -> finstack_quant_core::Result<StructuredCredit> {
         self.validate()?;
-        let currency = self.collateral.get_base_currency();
         let residual = self.collateral.total_balance()?.checked_sub(self.drawn)?;
         let repayment_date = self.repayment_date();
 
@@ -273,7 +272,6 @@ impl AssetBackedFacility {
                 commitment: self.commitment,
             });
         }
-        let _ = currency;
         builder.build()
     }
 

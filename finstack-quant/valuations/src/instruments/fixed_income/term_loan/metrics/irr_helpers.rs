@@ -137,7 +137,7 @@ pub(super) fn target_price_from_quote_or_model(
         quoted_dirty_from_clean_px(loan, schedule, as_of, px)
     } else {
         crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer::value_at_settlement(
-            loan, market, as_of, base_value,
+            loan, market, as_of, schedule, base_value,
         )
     }
 }

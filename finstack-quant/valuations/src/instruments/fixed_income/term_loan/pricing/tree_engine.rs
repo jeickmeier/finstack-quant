@@ -181,30 +181,19 @@ fn outstanding_on_time_grid(
     (call_outstanding, recovery_outstanding)
 }
 
-/// Configuration for tree-based term loan pricing (callable PV, OAS).
-#[derive(Debug, Clone)]
-pub(crate) struct TermLoanTreePricerConfig {
-    pub(crate) tree_steps: usize,
-    /// Short-rate volatility used **only** by the risk-free short-rate tree
-    /// (no credit curve). The rates-credit path takes its volatilities from
-    /// [`resolve_rates_credit_config`], never from here.
-    pub(crate) rate_volatility: f64,
-    pub(crate) tolerance: f64,
-    pub(crate) max_iterations: usize,
-    pub(crate) initial_bracket_size_bp: Option<f64>,
-}
-
-impl Default for TermLoanTreePricerConfig {
-    fn default() -> Self {
-        Self {
-            tree_steps: 100,
-            rate_volatility: 0.01,
-            tolerance: 1e-6,
-            max_iterations: 50,
-            initial_bracket_size_bp: Some(1000.0),
-        }
-    }
-}
+/// Tree time steps when `model_config.tree_steps` is unset.
+const DEFAULT_TREE_STEPS: usize = 100;
+/// Short-rate volatility of the risk-free short-rate tree (no credit curve)
+/// when `model_config.hw1f_sigma` is unset on a fixed-rate loan. The
+/// rates-credit path takes its volatilities from
+/// [`resolve_rates_credit_config`].
+const DEFAULT_RATE_VOLATILITY: f64 = 0.01;
+/// OAS solve tolerance, in basis points.
+const OAS_TOLERANCE_BP: f64 = 1e-6;
+/// OAS solve iteration cap.
+const OAS_MAX_ITERATIONS: usize = 50;
+/// Initial Brent bracket half-width for the OAS solve, in basis points.
+const OAS_INITIAL_BRACKET_BP: f64 = 1000.0;
 
 /// Calibrated tree plus valuator shared by direct PV and OAS solves.
 enum PreparedTree {
@@ -222,6 +211,17 @@ enum PreparedTree {
         valuator: TermLoanValuator,
         time_to_maturity: f64,
     },
+}
+
+impl PreparedTree {
+    /// Pricing schedule the valuator was built from.
+    fn schedule(&self) -> &crate::cashflow::builder::schedule::CashFlowSchedule {
+        match self {
+            Self::RatesCredit { valuator, .. } | Self::ShortRate { valuator, .. } => {
+                &valuator.schedule
+            }
+        }
+    }
 }
 
 /// Term loan valuator for tree-based callable pricing.
@@ -260,10 +260,10 @@ struct TermLoanValuator {
     /// Uniform tree time grid, kept for node-coupon descriptor
     /// construction on the stochastic-rate rates-credit path.
     time_steps: Vec<f64>,
-    /// Valuation date the pricing schedule was built with.
-    as_of: Date,
     /// Settlement origin — the tree's `t = 0`.
     origin: Date,
+    /// Pricing schedule (fixings applied) the step vectors were built from.
+    schedule: crate::cashflow::builder::schedule::CashFlowSchedule,
 }
 
 impl TermLoanValuator {
@@ -274,6 +274,7 @@ impl TermLoanValuator {
         origin: Date,
         time_to_maturity: f64,
         tree_steps: usize,
+        recovery_rate: Option<f64>,
     ) -> Result<Self> {
         use crate::cashflow::primitives::CFKind;
         let dt = time_to_maturity / tree_steps as f64;
@@ -508,29 +509,6 @@ impl TermLoanValuator {
             }
         }
 
-        // Recovery rate (if hazard curve present). Precedence mirrors other credit-aware pricers:
-        // 1) credit_curve_id (if set)
-        // 2) discount_curve_id
-        // 3) "{discount_curve_id}-CREDIT"
-        let recovery_rate = {
-            if let Some(ref credit_id) = loan.credit_curve_id {
-                market
-                    .get_hazard(credit_id.as_str())
-                    .ok()
-                    .map(|hc| hc.recovery_rate())
-            } else {
-                market
-                    .get_hazard(loan.discount_curve_id.as_str())
-                    .ok()
-                    .or_else(|| {
-                        market
-                            .get_hazard(format!("{}-CREDIT", loan.discount_curve_id.as_str()))
-                            .ok()
-                    })
-                    .map(|hc| hc.recovery_rate())
-            }
-        };
-
         let call_friction_cents = loan
             .instrument_pricing_overrides
             .model_config
@@ -551,8 +529,8 @@ impl TermLoanValuator {
             recovery_rate,
             call_friction_cents,
             time_steps,
-            as_of,
             origin,
+            schedule,
         })
     }
 
@@ -566,16 +544,14 @@ impl TermLoanValuator {
         let RateSpec::Floating(ref float_spec) = self.loan.rate else {
             return Ok(Vec::new());
         };
-        let schedule = super::discounting::TermLoanDiscountingPricer::pricing_schedule(
-            &self.loan, market, self.as_of,
-        )?;
+        let schedule = &self.schedule;
         let disc = market.get_discount(&self.loan.discount_curve_id)?;
 
         // PIK first: a 100% PIK floating leg emits no cash FloatReset flows
         // at all, so an empty descriptor list must not be read as "nothing
         // stochastic here" — the capitalized amounts themselves are
         // node-dependent.
-        if has_future_pik(&schedule, self.origin) {
+        if has_future_pik(schedule, self.origin) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "TermLoan '{}' capitalizes coupons (PIK) after settlement while \
                  pricing floating resets under stochastic rates. A future \
@@ -589,7 +565,7 @@ impl TermLoanValuator {
 
         build_node_coupons(
             &NodeCouponBuildInputs {
-                schedule: &schedule,
+                schedule,
                 params: params_from_spec(float_spec),
                 grid_origin: self.origin,
                 time_steps: &self.time_steps,
@@ -761,45 +737,38 @@ impl TreeValuator for TermLoanValuator {
 }
 
 /// Tree-based pricer for callable term loans.
-#[derive(Debug, Clone)]
-pub struct TermLoanTreePricer {
-    config: TermLoanTreePricerConfig,
-}
-
-impl Default for TermLoanTreePricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+#[derive(Debug, Clone, Default)]
+pub struct TermLoanTreePricer;
 
 impl TermLoanTreePricer {
-    /// Create a tree pricer with default configuration.
+    /// Create a tree pricer; per-loan settings come from the loan's
+    /// `instrument_pricing_overrides.model_config`.
     pub fn new() -> Self {
-        Self {
-            config: TermLoanTreePricerConfig::default(),
-        }
+        Self
     }
 
-    fn resolved_config(&self, loan: &TermLoan) -> TermLoanTreePricerConfig {
-        let configured_rate_volatility = loan.instrument_pricing_overrides.model_config.hw1f_sigma;
-        let rate_volatility = configured_rate_volatility.unwrap_or_else(|| {
-            if loan.credit_curve_id.is_none() && matches!(loan.rate, RateSpec::Floating(_)) {
-                0.0
-            } else {
-                self.config.rate_volatility
-            }
-        });
-        TermLoanTreePricerConfig {
-            tree_steps: loan
-                .instrument_pricing_overrides
-                .model_config
-                .tree_steps
-                .unwrap_or(self.config.tree_steps),
-            rate_volatility,
-            tolerance: self.config.tolerance,
-            max_iterations: self.config.max_iterations,
-            initial_bracket_size_bp: self.config.initial_bracket_size_bp,
-        }
+    /// Tree steps: `model_config.tree_steps`, else [`DEFAULT_TREE_STEPS`].
+    fn tree_steps(loan: &TermLoan) -> usize {
+        loan.instrument_pricing_overrides
+            .model_config
+            .tree_steps
+            .unwrap_or(DEFAULT_TREE_STEPS)
+    }
+
+    /// Risk-free short-rate volatility: `model_config.hw1f_sigma`, else zero
+    /// for a floating loan without a credit curve (frozen projection) and
+    /// [`DEFAULT_RATE_VOLATILITY`] otherwise.
+    fn rate_volatility(loan: &TermLoan) -> f64 {
+        loan.instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma
+            .unwrap_or_else(|| {
+                if loan.credit_curve_id.is_none() && matches!(loan.rate, RateSpec::Floating(_)) {
+                    0.0
+                } else {
+                    DEFAULT_RATE_VOLATILITY
+                }
+            })
     }
 
     fn quoted_oas_bp(loan: &TermLoan) -> f64 {
@@ -829,9 +798,8 @@ impl TermLoanTreePricer {
             return Ok(None);
         }
 
-        let cfg = self.resolved_config(loan);
-        let steps = cfg.tree_steps;
-        let rate_volatility = cfg.rate_volatility;
+        let steps = Self::tree_steps(loan);
+        let rate_volatility = Self::rate_volatility(loan);
         let hazard_curve = loan
             .credit_curve_id
             .as_ref()
@@ -843,8 +811,15 @@ impl TermLoanTreePricer {
             reject_stochastic_short_rate_floating(loan, rate_volatility)?;
         }
 
-        let mut valuator =
-            TermLoanValuator::new(loan.clone(), market, as_of, origin, time_to_maturity, steps)?;
+        let mut valuator = TermLoanValuator::new(
+            loan.clone(),
+            market,
+            as_of,
+            origin,
+            time_to_maturity,
+            steps,
+            hazard_curve.as_ref().map(|hc| hc.recovery_rate()),
+        )?;
 
         if let Some(hc) = hazard_curve.as_ref() {
             let tree_cfg = resolve_rates_credit_config(&loan.instrument_pricing_overrides, steps)?;
@@ -937,44 +912,27 @@ impl TermLoanTreePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        let settlement_value = self.price_at_oas(loan, market, as_of, Self::quoted_oas_bp(loan))?;
-        super::discounting::TermLoanDiscountingPricer::value_at_as_of(
-            loan,
-            market,
-            as_of,
-            settlement_value,
-        )
-    }
-
-    /// Price the loan on the prepared tree at a fixed OAS in basis points.
-    ///
-    /// # Arguments
-    ///
-    /// * `loan` - Term loan to value, including any call schedule and model overrides.
-    /// * `market` - Discount curve and optional hazard curve named by the loan.
-    /// * `as_of` - Trade/valuation date used to resolve settlement and the schedule.
-    /// * `oas_bp` - Continuously compounded option-adjusted spread in basis points
-    ///   applied as a parallel shift to the calibrated short-rate lattice.
-    pub(crate) fn price_at_oas(
-        &self,
-        loan: &TermLoan,
-        market: &MarketContext,
-        as_of: Date,
-        oas_bp: f64,
-    ) -> Result<Money> {
+        let oas_bp = Self::quoted_oas_bp(loan);
         if !oas_bp.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "TermLoan '{}' OAS must be finite, got {oas_bp}",
                 loan.id
             )));
         }
-        match self.prepare(loan, market, as_of)? {
-            None => Ok(Money::from((0_i64, loan.currency))),
-            Some(prepared) => Ok(Money::new(
-                Self::price_on_tree(&prepared, market, oas_bp)?,
-                loan.currency,
-            )?),
-        }
+        let Some(prepared) = self.prepare(loan, market, as_of)? else {
+            return Ok(Money::from((0_i64, loan.currency)));
+        };
+        let settlement_value = Money::new(
+            Self::price_on_tree(&prepared, market, oas_bp)?,
+            loan.currency,
+        )?;
+        super::discounting::TermLoanDiscountingPricer::value_at_as_of(
+            loan,
+            market,
+            as_of,
+            prepared.schedule(),
+            settlement_value,
+        )
     }
 
     /// Calculate OAS (in bp) for a callable term loan given a market clean price (% of par).
@@ -1006,11 +964,9 @@ impl TermLoanTreePricer {
             return Ok(0.0);
         };
 
-        let quote_schedule =
-            super::discounting::TermLoanDiscountingPricer::pricing_schedule(loan, market, as_of)?;
         let dirty_target = crate::instruments::fixed_income::term_loan::metrics::irr_helpers::quoted_dirty_from_clean_px(
             loan,
-            &quote_schedule,
+            prepared.schedule(),
             as_of,
             clean_price_pct_of_par,
         )?
@@ -1033,11 +989,10 @@ impl TermLoanTreePricer {
             }
         };
 
-        let cfg = self.resolved_config(loan);
         let mut solver = BrentSolver::new()
-            .tolerance(cfg.tolerance)
-            .initial_bracket_size(cfg.initial_bracket_size_bp);
-        solver.max_iterations = cfg.max_iterations;
+            .tolerance(OAS_TOLERANCE_BP)
+            .initial_bracket_size(Some(OAS_INITIAL_BRACKET_BP));
+        solver.max_iterations = OAS_MAX_ITERATIONS;
         solver
             .solve(objective_fn, 0.0)
             .map_err(|e| match pricing_error.borrow_mut().take() {
@@ -1119,8 +1074,14 @@ mod tests {
             recovery_rate,
             call_friction_cents,
             time_steps: vec![0.0, 1.0],
-            as_of: date!(2025 - 01 - 01),
             origin: date!(2025 - 01 - 01),
+            schedule: crate::cashflow::builder::schedule::CashFlowSchedule::from_parts(
+                Vec::new(),
+                crate::cashflow::builder::Notional::par(outstanding, Currency::USD)
+                    .expect("notional"),
+                finstack_quant_core::dates::DayCount::Act360,
+                Default::default(),
+            ),
         }
     }
 
