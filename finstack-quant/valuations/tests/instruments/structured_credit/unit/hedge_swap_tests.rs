@@ -17,8 +17,7 @@ use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, HedgeSwap,
     PaymentType, PoolAsset, Recipient, StructuredCredit, SwapPriority, Tranche, TrancheCashflows,
-    TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallBuilder, WaterfallContext,
-    WaterfallTier,
+    TrancheCoupon, TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
@@ -216,7 +215,7 @@ fn ic_context(market: &MarketContext) -> WaterfallContext<'_> {
 fn swap_payments_rank_as_fees_and_tighten_the_ic_test() {
     let deal = abs(false);
     let market = MarketContext::new();
-    let waterfall = WaterfallBuilder::new(Currency::USD)
+    let waterfall = Waterfall::builder(Currency::USD)
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee)
                 .add_recipient(Recipient::fixed_fee("trustee", "Trustee", usd(50_000.0))),

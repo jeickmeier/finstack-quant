@@ -16,7 +16,7 @@ use std::sync::Arc;
 ///
 /// # Tree mode is bounded by construction — read this before selecting it
 ///
-/// SC-M25: path-preserving tree pricing keeps `3^n` terminal nodes for `n`
+/// Path-preserving tree pricing keeps `3^n` terminal nodes for `n`
 /// periods, checked against `max_tree_paths` (default 100,000). `3^11 =
 /// 177,147`, so **Tree hard-errors for any deal with more than ten periods
 /// remaining** — which is essentially every real deal, since
@@ -67,7 +67,7 @@ pub enum PricingMode {
 }
 
 impl Default for PricingMode {
-    /// SC-M25: Monte Carlo, not Tree.
+    /// Monte Carlo, not Tree.
     ///
     /// Tree is bounded to roughly ten periods by its `3^n` node count, so it
     /// cannot price a deal at any realistic horizon. Defaulting to it made the
@@ -123,14 +123,8 @@ pub(crate) struct StochasticPricerConfig {
     /// Scenario tree configuration
     pub tree_config: ScenarioTreeConfig,
 
-    /// Whether to compute risk metrics (EL, UL, ES)
-    pub compute_risk_metrics: bool,
-
     /// Expected Shortfall confidence level (e.g., 0.95 for 95% ES)
     pub es_confidence: f64,
-
-    /// Random seed for Monte Carlo
-    pub seed: u64,
 
     /// Maximum terminal paths allowed for explicit path-preserving tree mode.
     pub max_tree_paths: usize,
@@ -154,17 +148,12 @@ impl StochasticPricerConfig {
         discount_curve: Arc<DiscountCurve>,
         tree_config: ScenarioTreeConfig,
     ) -> Self {
-        // Adopt the scenario-tree seed (per deal / valuation date via
-        // `derive_seed`) so portfolio Monte Carlo error diversifies.
-        let seed = tree_config.seed;
         Self {
             valuation_date,
             discount_curve,
             pricing_mode: PricingMode::default(),
             tree_config,
-            compute_risk_metrics: true,
             es_confidence: 0.95,
-            seed,
             max_tree_paths: 100_000,
             pool_granularity: PoolGranularity::default(),
         }
@@ -192,7 +181,6 @@ impl std::fmt::Debug for StochasticPricerConfig {
         f.debug_struct("StochasticPricerConfig")
             .field("valuation_date", &self.valuation_date)
             .field("pricing_mode", &self.pricing_mode)
-            .field("compute_risk_metrics", &self.compute_risk_metrics)
             .field("es_confidence", &self.es_confidence)
             .field("max_tree_paths", &self.max_tree_paths)
             .finish()
@@ -227,41 +215,7 @@ mod tests {
         Date::from_calendar_date(2024, Month::January, 15).expect("Valid date")
     }
 
-    /// Pricer config adopts the scenario-tree seed (not a hardcoded constant).
-    #[test]
-    fn pricer_config_adopts_the_scenario_tree_seed() {
-        use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
-
-        let tree_config_with_seed = |seed| {
-            let mut config = ScenarioTreeConfig::new(12, 3);
-            config.seed = seed;
-            config
-        };
-        let seeded = tree_config_with_seed(987_654_321);
-        let config = StochasticPricerConfig::new(test_date(), test_discount_curve(), seeded);
-        assert_eq!(
-            config.seed, 987_654_321,
-            "pricer seed must come from the scenario-tree config"
-        );
-
-        // Two distinct tree seeds must yield two distinct pricer seeds.
-        let a = StochasticPricerConfig::new(
-            test_date(),
-            test_discount_curve(),
-            tree_config_with_seed(1),
-        );
-        let b = StochasticPricerConfig::new(
-            test_date(),
-            test_discount_curve(),
-            tree_config_with_seed(2),
-        );
-        assert_ne!(
-            a.seed, b.seed,
-            "distinct tree seeds must produce distinct pricer seeds"
-        );
-    }
-
-    /// SC-M25 — the default must be a mode that can actually price a deal.
+    /// The default must be a mode that can actually price a deal.
     ///
     /// Tree keeps `3^n` terminal nodes against a 100,000 cap, so it hard-errors
     /// past ten periods — essentially every real deal. Defaulting to it made
@@ -273,7 +227,7 @@ mod tests {
         assert!(
             matches!(mode, PricingMode::MonteCarlo { .. }),
             "the default pricing mode must be Monte Carlo, not Tree — Tree \
-             cannot price a deal at a realistic horizon (SC-M25)"
+             cannot price a deal at a realistic horizon"
         );
         // And it must agree with what `default_stochastic_pricing_mode`
         // already selects, so the standalone default is not a second opinion.
@@ -308,7 +262,6 @@ mod tests {
             config.pricing_mode,
             PricingMode::MonteCarlo { .. }
         ));
-        assert!(config.compute_risk_metrics);
     }
 
     #[test]

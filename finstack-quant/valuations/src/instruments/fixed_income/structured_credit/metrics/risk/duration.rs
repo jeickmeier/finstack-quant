@@ -49,7 +49,7 @@ impl MetricCalculator for MacaulayDurationCalculator {
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
 
-        // SC-m02: the shared metric time basis, NOT the curve's own day count.
+        // The shared metric time basis, NOT the curve's own day count.
         // Duration is combined with convexity in the second-order price
         // expansion, and convexity measures time in Act/365F — mixing the two
         // made `D` and `C` incommensurable. See `METRIC_TIME_BASIS`.
@@ -219,7 +219,7 @@ mod time_basis_tests {
             .collect()
     }
 
-    /// SC-m02 — duration and convexity must be measured on the SAME time
+    /// Duration and convexity must be measured on the SAME time
     /// basis, so the second-order price expansion is self-consistent:
     ///
     ///     dP/P ~= -D*dy + 0.5*C*dy^2
@@ -280,7 +280,7 @@ mod time_basis_tests {
             "the second-order expansion must reproduce the repriced move: \
              actual {actual:.8}, predicted {predicted:.8} (D={d:.6}, C={c:.6}). \
              A gap means duration and convexity are measured on different time \
-             bases (SC-m02)."
+             bases."
         );
     }
 }

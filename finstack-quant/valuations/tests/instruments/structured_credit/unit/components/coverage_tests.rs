@@ -11,7 +11,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CoverageTest, DealType, PoolAsset, TestContext, Tranche, TrancheCoupon,
+    AssetPool, CoverageTestSpec, DealType, PoolAsset, TestContext, Tranche, TrancheCoupon,
     TrancheSeniority, TrancheStructure,
 };
 use time::Month;
@@ -38,14 +38,12 @@ fn maturity_date() -> Date {
 fn context_for_tranche<'a>(
     pool: &'a AssetPool,
     tranches: &'a TrancheStructure,
-    tranche_id: &'a str,
     cash_balance: Money,
     interest_collections: Money,
 ) -> TestContext<'a> {
     TestContext {
         pool,
         tranches,
-        tranche_id,
         as_of: test_date(),
         valuation_date: test_date(),
         period_start: None,
@@ -109,15 +107,14 @@ fn test_oc_test_passing_scenario() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_oc(1.25);
+    let test = CoverageTestSpec::oc("SENIOR", 1.25);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 125M / 100M = 1.25 (exactly at threshold, should pass)
     assert!(result.is_passing);
@@ -151,16 +148,15 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "CLASS_A_1",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let result = CoverageTest::new_oc(1.25)
-        .calculate(&context)
+    let result = CoverageTestSpec::oc("CLASS_A_1", 1.25)
+        .evaluate(&context)
         .expect("coverage calculation");
 
-    assert_eq!(result.test_id, "oc_test_125");
+    assert_eq!(result.test_id, "OC_CLASS_A_1");
     assert_eq!(result.tranche_id, "CLASS_A_1");
     assert!(result.cure_amount.is_some());
 }
@@ -205,15 +201,14 @@ fn test_oc_test_failing_scenario() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_oc(1.25);
+    let test = CoverageTestSpec::oc("SENIOR", 1.25);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 120M / 100M = 1.20 < 1.25 (failing)
     assert!(!result.is_passing);
@@ -260,15 +255,14 @@ fn test_oc_test_with_cash_balance() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_oc(1.25);
+    let test = CoverageTestSpec::oc("SENIOR", 1.25);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: (120M + 5M) / 100M = 1.25 (passing)
     assert!(result.is_passing);
@@ -313,18 +307,18 @@ fn oc_numerator_carries_pending_recovery_claims_at_recovery_value() {
     let zero = Money::new(0.0, Currency::USD).expect("valid money fixture");
 
     // 115M performing par against 100M senior: 1.15, below the 1.20 trigger.
-    let without_claims = CoverageTest::new_oc(1.20)
-        .calculate(&context_for_tranche(&pool, &tranches, "SENIOR", zero, zero))
+    let without_claims = CoverageTestSpec::oc("SENIOR", 1.20)
+        .evaluate(&context_for_tranche(&pool, &tranches, zero, zero))
         .expect("coverage calculation");
     assert!(!without_claims.is_passing);
     assert!((without_claims.current_ratio - 1.15).abs() < 1e-9);
 
     // A 5M pending recovery claim (12.5M defaulted at 40%) is collateral.
-    let mut context = context_for_tranche(&pool, &tranches, "SENIOR", zero, zero);
+    let mut context = context_for_tranche(&pool, &tranches, zero, zero);
     context.defaulted_collateral_value =
         Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
-    let with_claims = CoverageTest::new_oc(1.20)
-        .calculate(&context)
+    let with_claims = CoverageTestSpec::oc("SENIOR", 1.20)
+        .evaluate(&context)
         .expect("coverage calculation");
     assert!(
         (with_claims.current_ratio - 1.20).abs() < 1e-9,
@@ -374,15 +368,14 @@ fn test_oc_test_cure_amount_calculation() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_oc(1.25);
+    let test = CoverageTestSpec::oc("SENIOR", 1.25);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Cure amount = interest diverted to pay down notes; interest is not in
     // the OC numerator, so only the denominator moves:
@@ -426,15 +419,14 @@ fn test_ic_test_passing_scenario() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(1_500_000.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_ic(1.20);
+    let test = CoverageTestSpec::ic("SENIOR", 1.20);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 1.5M / 1.25M = 1.20 (passing)
     assert!(result.is_passing);
@@ -473,15 +465,14 @@ fn test_ic_test_failing_scenario() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_ic(1.20);
+    let test = CoverageTestSpec::ic("SENIOR", 1.20);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: 1M / 1.25M = 0.80 < 1.20 (failing)
     assert!(!result.is_passing);
@@ -519,17 +510,16 @@ fn test_ic_test_no_cure_amount() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_ic(1.20);
+    let test = CoverageTestSpec::ic("SENIOR", 1.20);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
-    // SC-M08: the cure is a PRINCIPAL PAYDOWN, because that is how the
+    // The cure is a PRINCIPAL PAYDOWN, because that is how the
     // diversion applies it — paying down senior principal adds nothing to
     // interest collections, so a cash-shortfall cure cured nothing.
     //
@@ -549,7 +539,7 @@ fn test_ic_test_no_cure_amount() {
     assert!(
         (cure.amount() - expected).abs() < 1.0,
         "IC cure must be the de-levering paydown {expected:.2}, got {:.2}. \
-         500,000 would be the pre-SC-M08 cash shortfall.",
+         500,000 would be the cash shortfall, not a paydown.",
         cure.amount()
     );
 
@@ -596,15 +586,14 @@ fn test_oc_test_empty_pool() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_oc(1.25);
+    let test = CoverageTestSpec::oc("SENIOR", 1.25);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: Should fail with 0 ratio
     assert!(!result.is_passing);
@@ -643,15 +632,14 @@ fn test_ic_test_no_interest_collections() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_ic(1.20);
+    let test = CoverageTestSpec::ic("SENIOR", 1.20);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: Should fail
     assert!(!result.is_passing);
@@ -700,15 +688,14 @@ fn test_oc_test_infinity_ratio_zero_debt() {
     let context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
     );
 
-    let test = CoverageTest::new_oc(1.25);
+    let test = CoverageTestSpec::oc("SENIOR", 1.25);
 
     // Act
-    let result = test.calculate(&context).expect("coverage calculation");
+    let result = test.evaluate(&context).expect("coverage calculation");
 
     // Assert: Should pass with infinite ratio
     assert!(result.is_passing);
@@ -756,14 +743,13 @@ fn ic_measures_coverage_of_the_capped_claim() {
     let mut context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
     context.interest_claim_caps = &caps;
 
-    let result = CoverageTest::new_ic(1.20)
-        .calculate(&context)
+    let result = CoverageTestSpec::ic("SENIOR", 1.20)
+        .evaluate(&context)
         .expect("coverage calculation");
 
     // 1.0M collections / 0.5M capped due = 2.0 (passing). The legacy uncapped
@@ -788,14 +774,13 @@ fn ic_treats_a_tranche_without_interest_recipient_as_owing_nothing() {
     let mut context = context_for_tranche(
         &pool,
         &tranches,
-        "SENIOR",
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     );
     context.interest_claim_caps = &caps;
 
-    let result = CoverageTest::new_ic(1.20)
-        .calculate(&context)
+    let result = CoverageTestSpec::ic("SENIOR", 1.20)
+        .evaluate(&context)
         .expect("coverage calculation");
 
     assert!(result.is_passing);

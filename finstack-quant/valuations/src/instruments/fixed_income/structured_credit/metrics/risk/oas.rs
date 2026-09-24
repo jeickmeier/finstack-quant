@@ -259,7 +259,7 @@ pub fn calculate_tranche_oas(
             )),
             _ => None,
         };
-        // SC-M13: the path's departure from the deterministic forward curve,
+        // The path's departure from the deterministic forward curve,
         // applied to FLOATING coupon projection so a floater's coupons move
         // with the same rates that drive its discount factors.
         let rate_shift_path = match (&forwards, &rate_path) {

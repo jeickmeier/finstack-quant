@@ -8,7 +8,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Rou
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PaymentCalculation, PaymentType, Recipient, RecipientType,
-    TrancheStructure, WaterfallBuilder, WaterfallTier,
+    TrancheStructure, Waterfall, WaterfallTier,
 };
 
 fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
@@ -31,7 +31,7 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
     .unwrap();
     let market = MarketContext::new();
 
-    let waterfall = WaterfallBuilder::new(currency)
+    let waterfall = Waterfall::builder(currency)
         .add_tier(
             WaterfallTier::new("tier1", 1, PaymentType::Fee).add_recipient(Recipient::new(
                 "recipient",

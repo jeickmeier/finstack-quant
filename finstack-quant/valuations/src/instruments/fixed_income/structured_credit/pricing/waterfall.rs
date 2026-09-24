@@ -3,9 +3,9 @@
 //! This module contains pure functions for executing waterfall distributions.
 //! All type definitions are in `types::waterfall`.
 
-use super::coverage_tests::{CoverageTest, TestContext};
+use super::coverage_tests::TestContext;
 use crate::instruments::fixed_income::structured_credit::types::{
-    AfcSpec, AllocationMode, AssetPool, CoverageTestAction, CoverageTestSpec, CoverageTestType,
+    AfcSpec, AllocationMode, AssetPool, CoverageRules, CoverageTestAction, CoverageTestSpec,
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
     PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention, Tranche,
     TrancheCoupon, TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
@@ -101,7 +101,7 @@ pub struct WaterfallContext<'a> {
     pub defaulted_collateral_value: Money,
     /// Recovery proceeds released this period (tracked separately for reporting).
     pub recovery_proceeds: Money,
-    /// Simulated shift applied to FLOATING tranche coupons (SC-M13 OAS rate
+    /// Simulated shift applied to FLOATING tranche coupons (OAS rate
     /// path). Zero outside OAS runs. Applied before any available-funds cap so
     /// the interest the waterfall allocates matches the interest the engine
     /// records on the same rate path.
@@ -288,27 +288,31 @@ pub fn execute_waterfall_with_explanation(
     // the period's balances and collections. The ratio does not depend on the
     // tier's position; the position decides what cash a failure can divert.
     let specs: Vec<&CoverageTestSpec> = waterfall.coverage_tests().collect();
+    let (claim_caps, coverage_rules) = coverage_inputs(waterfall);
     let coverage_test_results = evaluate_coverage_tests(
-        waterfall,
         &specs,
-        tranches,
-        pool,
-        context.payment_date,
-        context.period_start,
-        context.valuation_date,
-        context.principal_collections,
-        context.interest_collections,
-        context.pool_balance,
-        context.market,
-        context.tranche_balances,
-        context.asset_balances,
-        context.live_collateral,
-        &payable_principal_tranche_ids,
-        senior_fees,
-        context.restricted_cash,
-        context.defaulted_collateral_value,
-        context.floating_rate_shift,
-        context.deferred_interest,
+        &TestContext {
+            pool,
+            tranches,
+            as_of: context.payment_date,
+            valuation_date: context.valuation_date,
+            period_start: Some(context.period_start),
+            cash_balance: context.principal_collections,
+            interest_collections: context.interest_collections,
+            rules: coverage_rules,
+            market: Some(context.market),
+            tranche_balances: context.tranche_balances,
+            payable_principal_tranche_ids: Some(&payable_principal_tranche_ids),
+            asset_balances: context.asset_balances,
+            live_collateral: context.live_collateral,
+            current_pool_balance: Some(context.pool_balance),
+            senior_fees,
+            restricted_cash: context.restricted_cash,
+            defaulted_collateral_value: context.defaulted_collateral_value,
+            interest_claim_caps: &claim_caps,
+            floating_rate_shift: context.floating_rate_shift,
+            deferred_interest: context.deferred_interest,
+        },
     )?;
 
     let estimated_recipients = waterfall
@@ -561,7 +565,7 @@ pub(crate) struct AllocationContext<'a> {
     pub(crate) deferred_interest: Option<&'a HashMap<String, Money>>,
     /// Current reserve account balance (passed dynamically each period)
     pub(crate) reserve_balance: Money,
-    /// Simulated shift applied to FLOATING tranche coupons (SC-M13 OAS rate
+    /// Simulated shift applied to FLOATING tranche coupons (OAS rate
     /// path); zero outside OAS runs. Threading it here keeps the cash the
     /// waterfall *allocates* on the same rate path as the interest the engine
     /// *records* in Step 5.
@@ -576,7 +580,7 @@ pub(crate) struct AllocationContext<'a> {
 pub(crate) struct AllocationOutput {
     /// Accumulated distributions by recipient
     pub(crate) distributions: HashMap<RecipientType, Money>,
-    /// The PRINCIPAL portion of `distributions`, per recipient (SC-M28).
+    /// The PRINCIPAL portion of `distributions`, per recipient.
     pub(crate) principal_distributions: HashMap<RecipientType, Money>,
     /// Payment records for audit trail
     pub(crate) payment_records: Vec<PaymentRecord>,
@@ -676,7 +680,7 @@ fn allocate_sequential(
                 e.insert(paid);
             }
         }
-        // SC-M28: record the PRINCIPAL portion separately, keyed off the
+        // Record the PRINCIPAL portion separately, keyed off the
         // payment calculation that produced it, so the engine never has to
         // re-derive the split from an aggregate.
         if is_principal_payment(&recipient.calculation, tier.payment_type) {
@@ -854,7 +858,7 @@ fn allocate_pro_rata(
                 e.insert(paid);
             }
         }
-        // SC-M28: record the PRINCIPAL portion separately, keyed off the
+        // Record the PRINCIPAL portion separately, keyed off the
         // payment calculation that produced it, so the engine never has to
         // re-derive the split from an aggregate.
         if is_principal_payment(&recipient.calculation, tier.payment_type) {
@@ -1048,7 +1052,7 @@ fn water_fill_allocation(total_units: i64, weights: &[f64], caps: &[i64]) -> Vec
 /// (standard CLO par-OC counts only principal proceeds, never interest).
 /// Whether a payment calculation pays PRINCIPAL rather than interest.
 ///
-/// SC-M28: the waterfall's own classification, decided in exactly one place.
+/// The waterfall's own classification, decided in exactly one place.
 /// `RecipientType::Tranche(id)` is the same map key for a tranche's interest
 /// and its principal, so `distributions` aggregates them; without this the
 /// engine had to guess the split by assuming interest is satisfied first.
@@ -1062,7 +1066,7 @@ fn is_principal_payment(calculation: &PaymentCalculation, payment_type: PaymentT
 
 /// Contractual coupon for the period with the simulated rate-path shift applied.
 ///
-/// SC-M13: a FLOATING tranche's coupon moves with the simulated short-rate path
+/// A FLOATING tranche's coupon moves with the simulated short-rate path
 /// (`floating_rate_shift`), floored at zero; a fixed coupon is contractual and
 /// unaffected. This is the same shift-then-floor rule as the engine's
 /// interest-due kernel, so allocation and recording cannot diverge on the path.
@@ -1152,7 +1156,7 @@ pub(crate) struct SeniorFeeInputs<'a> {
     pub market: &'a MarketContext,
     /// Reserve balance, for reserve-linked calculations.
     pub reserve_balance: Money,
-    /// Simulated floating-coupon shift (SC-M13); zero outside OAS runs.
+    /// Simulated floating-coupon shift; zero outside OAS runs.
     pub floating_rate_shift: f64,
 }
 
@@ -1164,7 +1168,7 @@ pub(crate) struct SeniorFeeInputs<'a> {
 ///
 /// This is the single source of truth for "what the fee tier will take",
 /// shared by three call sites that must agree:
-///   * the IC numerator (SC-M29), which nets it from interest collections;
+///   * the IC numerator, which nets it from interest collections;
 ///   * the excess-spread capture/draw and the reserve draw (N1), which must
 ///     treat it as a senior claim ranking ahead of note interest;
 ///   * the waterfall itself, which actually pays it.
@@ -1222,87 +1226,44 @@ pub(crate) fn senior_fee_accrual(
     Ok(total)
 }
 
-/// Evaluate `specs` on the period's balances and collections.
+/// Interest claims and coverage rules a coverage test reads from the
+/// waterfall it is evaluated in.
 ///
-/// The ratio of each test is independent of the tier position that carries
-/// it; the executor uses the position only to decide what cash a failure can
-/// divert. `waterfall` supplies the interest-claim caps and coverage rules.
-#[allow(clippy::too_many_arguments)]
-pub(super) fn evaluate_coverage_tests(
+/// The waterfall spec defines each tranche's interest CLAIM (uncapped,
+/// capped, or absent); the IC test must measure coverage of those claims,
+/// not of raw coupons the structure never owes. Caps in this waterfall are
+/// already resolved (the live AFC cap is baked in by `resolve::apply_afc_cap`),
+/// so no AFC override applies here.
+pub(super) fn coverage_inputs(
     waterfall: &Waterfall,
-    specs: &[&CoverageTestSpec],
-    tranches: &TrancheStructure,
-    pool: &AssetPool,
-    as_of: Date,
-    period_start: Date,
-    valuation_date: Date,
-    principal_collections: Money,
-    interest_collections: Money,
-    current_pool_balance: Money,
-    market: &MarketContext,
-    tranche_balances: Option<&HashMap<String, Money>>,
-    asset_balances: Option<&[f64]>,
-    live_collateral: Option<LiveCollateral<'_>>,
-    payable_principal_tranche_ids: &[&str],
-    senior_fees: Money,
-    restricted_cash: Money,
-    defaulted_collateral_value: Money,
-    floating_rate_shift: f64,
-    deferred_interest: Option<&HashMap<String, Money>>,
-) -> Result<Vec<CoverageTestResult>> {
-    let mut results = Vec::with_capacity(specs.len());
-
-    // The waterfall spec defines each tranche's interest CLAIM (uncapped,
-    // capped, or absent); the IC test must measure coverage of those claims,
-    // not of raw coupons the structure never owes. Caps in this waterfall are
-    // already resolved (the live AFC cap is baked in by `resolve::apply_afc_cap`),
-    // so no AFC override applies here.
+) -> (HashMap<&str, Option<f64>>, Option<&CoverageRules>) {
     let claim_caps = interest_claim_caps(waterfall, None, 0.0);
-
     let rules = waterfall
         .coverage_rules
         .as_ref()
         .filter(|rules| !rules.is_empty());
+    (claim_caps, rules)
+}
 
-    for spec in specs {
-        let ctx = TestContext {
-            pool,
-            tranches,
-            tranche_id: &spec.tranche_id,
-            as_of,
-            valuation_date,
-            period_start: Some(period_start),
-            cash_balance: principal_collections,
-            interest_collections,
-            rules,
-            market: Some(market),
-            tranche_balances,
-            payable_principal_tranche_ids: Some(payable_principal_tranche_ids),
-            asset_balances,
-            live_collateral,
-            current_pool_balance: Some(current_pool_balance),
-            senior_fees,
-            restricted_cash,
-            defaulted_collateral_value,
-            interest_claim_caps: &claim_caps,
-            floating_rate_shift,
-            deferred_interest,
-        };
-        let test = match spec.kind {
-            CoverageTestType::Oc => CoverageTest::new_oc(spec.trigger_level),
-            CoverageTestType::Ic => CoverageTest::new_ic(spec.trigger_level),
-            CoverageTestType::BorrowingBase => CoverageTest::new_borrowing_base(spec.trigger_level),
-        };
-        let result = test.calculate(&ctx)?;
-        results.push(CoverageTestResult {
-            test_id: spec.id.clone(),
-            current_ratio: result.current_ratio,
-            is_passing: result.is_passing,
-            cure_amount: result.cure_amount,
-        });
-    }
-
-    Ok(results)
+/// Evaluate `specs` on one period's state. The ratio of each test is
+/// independent of the tier position that carries it; the executor uses the
+/// position only to decide what cash a failure can divert.
+pub(super) fn evaluate_coverage_tests(
+    specs: &[&CoverageTestSpec],
+    context: &TestContext<'_>,
+) -> Result<Vec<CoverageTestResult>> {
+    specs
+        .iter()
+        .map(|spec| {
+            let result = spec.evaluate(context)?;
+            Ok(CoverageTestResult {
+                test_id: spec.id.clone(),
+                current_ratio: result.current_ratio,
+                is_passing: result.is_passing,
+                cure_amount: result.cure_amount,
+            })
+        })
+        .collect()
 }
 
 /// Internal coverage test result with cure amount.
@@ -1629,7 +1590,7 @@ mod coverage_position_tests {
     use crate::instruments::fixed_income::structured_credit::types::{
         AllocationMode, AssetPool, AssetType, CoverageTestSpec, DealType, PaymentCalculation,
         PaymentType, PoolAsset, Recipient, RecipientType, Tranche, TrancheCoupon, TrancheSeniority,
-        TrancheStructure, WaterfallBuilder, WaterfallTier,
+        TrancheStructure, Waterfall, WaterfallTier,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -1767,7 +1728,7 @@ mod coverage_position_tests {
         .expect("structure");
         // Collateral 120M + 0 principal cash against A + B = 80M gives 1.50,
         // so a 1.60 test on B fails while everything is otherwise healthy.
-        let waterfall = WaterfallBuilder::new(Currency::USD)
+        let waterfall = Waterfall::builder(Currency::USD)
             .add_tier(
                 WaterfallTier::new("a_interest", 1, PaymentType::Interest)
                     .add_recipient(Recipient::tranche_interest("a_int", "A")),
@@ -1874,7 +1835,7 @@ mod coverage_position_tests {
             ),
         ])
         .expect("structure");
-        let waterfall = WaterfallBuilder::new(Currency::USD)
+        let waterfall = Waterfall::builder(Currency::USD)
             .add_tier(
                 WaterfallTier::new("a_interest", 1, PaymentType::Interest)
                     .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A")),
@@ -1989,7 +1950,7 @@ mod coverage_position_tests {
             ),
         ])
         .expect("structure");
-        let waterfall = WaterfallBuilder::new(Currency::USD)
+        let waterfall = Waterfall::builder(Currency::USD)
             .add_tier(
                 WaterfallTier::new("interest", 1, PaymentType::Interest)
                     .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
@@ -2096,7 +2057,7 @@ mod coverage_position_tests {
             ),
         ])
         .expect("structure");
-        let waterfall = WaterfallBuilder::new(Currency::USD)
+        let waterfall = Waterfall::builder(Currency::USD)
             .add_tier(
                 WaterfallTier::new("interest", 1, PaymentType::Interest)
                     .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
@@ -2183,7 +2144,7 @@ mod coverage_position_tests {
             ),
         ])
         .expect("structure");
-        let waterfall = WaterfallBuilder::new(Currency::USD)
+        let waterfall = Waterfall::builder(Currency::USD)
             .add_tier(
                 WaterfallTier::new("interest", 1, PaymentType::Interest)
                     .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
@@ -2265,7 +2226,7 @@ mod coverage_position_tests {
         )])
         .expect("structure");
         let build = |late_fee: Option<f64>| {
-            let mut builder = WaterfallBuilder::new(Currency::USD)
+            let mut builder = Waterfall::builder(Currency::USD)
                 .add_tier(
                     WaterfallTier::new("note_interest", 1, PaymentType::Interest)
                         .add_recipient(Recipient::tranche_interest("class_a_interest", "CLASS_A")),
@@ -2321,7 +2282,7 @@ mod water_fill_tests {
     use finstack_quant_core::money::Money;
     use time::Month;
 
-    /// SC-M28 — the waterfall must report its OWN interest/principal split.
+    /// The waterfall must report its OWN interest/principal split.
     ///
     /// `distributions` keys a tranche's interest and principal under the same
     /// `RecipientType::Tranche(id)`, so the engine's Step 5 had to reconstruct
@@ -2351,7 +2312,7 @@ mod water_fill_tests {
         .expect("tranche");
         let tranches = TrancheStructure::new(vec![tranche]).expect("structure");
 
-        let waterfall = Waterfall::new(ccy)
+        let waterfall = Waterfall::builder(ccy)
             .add_tier(
                 WaterfallTier::new("interest", 1, PaymentType::Interest)
                     .allocation_mode(AllocationMode::Sequential)
@@ -2361,7 +2322,9 @@ mod water_fill_tests {
                 WaterfallTier::new("principal", 2, PaymentType::Principal)
                     .allocation_mode(AllocationMode::Sequential)
                     .add_recipient(Recipient::tranche_principal("A_prin", "A", None)),
-            );
+            )
+            .build()
+            .expect("valid waterfall");
 
         let market = MarketContext::new();
         let result = execute_waterfall(
@@ -2417,7 +2380,7 @@ mod water_fill_tests {
             "principal_distributions must hold ONLY the principal portion: got \
              {principal:.2} of {total:.2} total. Equal values mean interest was \
              misclassified as principal; zero means the split is not being \
-             reported at all (SC-M28)."
+             reported at all."
         );
         let interest = total - principal;
         assert!(

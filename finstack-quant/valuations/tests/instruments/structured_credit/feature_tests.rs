@@ -835,7 +835,7 @@ mod excess_spread_tests {
 
         // Sanity: without the account the senior runs an interest shortfall.
         //
-        // SC-m11: SR is not `pik_enabled`, so its shortfall is DEFERRED, not
+        // SR is not `pik_enabled`, so its shortfall is DEFERRED, not
         // capitalized — it is reported in `total_deferred`. This test read
         // `total_pik`, which is now correctly zero for a non-PIK tranche.
         assert!(

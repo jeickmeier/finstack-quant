@@ -49,7 +49,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | Tranche summary (price, WAL, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters) and scenario grids (one projection per cell, clean settlement price per current face). |
 | `calculate_tranche_wal`, `_duration`, `_convexity`, `_spread_convexity`, `_z_spread`, `_discount_margin`, `_oas` (+ `OasConfig`, `OasResult`), `_cs01`, `_breakeven_cdr` | Individual tranche analytics, the same functions the Python/WASM `structured_credit_tranche_*` entry points wrap. |
 | `clamped_cpr_to_smm`, `clamped_smm_to_cpr`, `clamped_cdr_to_mdr`, `clamped_mdr_to_cdr`, `psa_to_cpr` | Rate conversions. |
-| `is_valid_waterfall_spec`, `get_validation_errors`, `ValidationError` | Waterfall validation. |
+| `validate_tiers`, `ValidationError` | Waterfall validation. |
 | Deal-type constants | Standard speeds, fees and concentration limits, re-exported at the module root: `clo_standard_cdr`, `rmbs_standard_psa`, `sda_peak_cdr`, … (the `types` submodule itself is `pub(crate)`). |
 
 ## Module layout
@@ -208,11 +208,11 @@ Pool collections → Fees → Senior interest → Subordinate interest → Princ
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    execute_waterfall, AllocationMode, PaymentType, Recipient, WaterfallBuilder, WaterfallContext,
+    execute_waterfall, AllocationMode, PaymentType, Recipient, Waterfall, WaterfallContext,
     WaterfallTier,
 };
 
-let waterfall = WaterfallBuilder::new(Currency::USD)
+let waterfall = Waterfall::builder(Currency::USD)
     .add_tier(
         WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::fixed_fee(
             "trustee",
@@ -231,7 +231,7 @@ let waterfall = WaterfallBuilder::new(Currency::USD)
 let distribution = execute_waterfall(&waterfall, &tranches, &pool, context)?;
 ```
 
-`WaterfallBuilder::build()` returns `Result<Waterfall>`. `WaterfallContext`
+`Waterfall::builder(..)...build()` validates the tiers and returns `Result<Waterfall>`. `WaterfallContext`
 carries the full period state: `available_cash`, `interest_collections`,
 `principal_collections`, `payment_date`, `period_start`, `valuation_date`,
 `pool_balance`, the `MarketContext`, plus optional current tranche/asset
@@ -400,7 +400,7 @@ let deal = deal.with_coverage_triggers(vec![
 
 ```rust
 // Custom waterfall: an explicit test position between two interest tiers.
-let waterfall = WaterfallBuilder::new(Currency::USD)
+let waterfall = Waterfall::builder(Currency::USD)
     .add_tier(WaterfallTier::new("a_interest", 1, PaymentType::Interest)
         .add_recipient(Recipient::tranche_interest("a_int", "CLASS_A")))
     .add_tier(WaterfallTier::coverage_tests("a_coverage", 2, vec![

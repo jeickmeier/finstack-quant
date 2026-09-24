@@ -187,13 +187,13 @@ impl MetricCalculator for YtmCalculator {
                     continue;
                 }
 
-                // SC-m09: a failed date conversion previously became `0.0`,
+                // A failed date conversion previously became `0.0`,
                 // and the `t > 0.0` guard below then DROPPED that cashflow from
                 // the PV entirely — silently solving a yield against a
                 // different bond. Skipping is only correct when the flow is
                 // genuinely non-future; a conversion failure is a broken input
                 // and must not masquerade as one.
-                // SC-m09: a failed date conversion previously became `0.0`,
+                // A failed date conversion previously became `0.0`,
                 // and the `t > 0.0` guard below then DROPPED that cashflow from
                 // the PV entirely — silently solving a yield against a
                 // different bond. Skipping is only correct for a genuinely

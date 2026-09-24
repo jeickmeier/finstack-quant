@@ -64,7 +64,7 @@ pub(crate) fn collateral_asset_rate_for_period(
         return Ok(fallback_all_in_rate);
     }
 
-    // SC-M13: shift the PROJECTED forward, so a floating asset's coupon follows
+    // Shift the PROJECTED forward, so a floating asset's coupon follows
     // the simulated rate path. Floored at zero — a deeply negative shift must
     // not manufacture a negative all-in coupon.
     Ok(
@@ -160,7 +160,7 @@ pub(super) fn tranche_period_interest_due(
     let raw = tranche
         .coupon
         .try_rate_for_period(dates.start, dates.valuation, context)?;
-    // SC-M13: shift FLOATING tranche coupons onto the simulated rate path so a
+    // Shift FLOATING tranche coupons onto the simulated rate path so a
     // floating-rate note's coupon and its discount factors move together. A
     // fixed coupon is contractual and unaffected. Floored at zero so a deeply
     // negative path cannot manufacture a negative coupon.

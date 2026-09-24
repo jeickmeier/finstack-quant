@@ -36,7 +36,7 @@ const CDR_TOL: f64 = 1e-5;
 /// Writedown treated as the first dollar of principal loss, as a FRACTION of
 /// the tranche's original balance.
 ///
-/// SC-m03: this was an absolute `1.0` in currency units, which means different
+/// This was an absolute `1.0` in currency units, which means different
 /// things at different scales — noise on a ¥10bn tranche, and material on a
 /// $2m equity strip, where 1.0 of writedown is a real impairment the search
 /// should detect. One basis point of the tranche's own face is scale-free and
@@ -72,7 +72,7 @@ pub fn calculate_tranche_breakeven_cdr(
     deal.validate_for_pricing()?;
     let deal = deal.resolved_for_pricing()?;
 
-    // SC-m03: scale the "first dollar of loss" threshold to this tranche.
+    // Scale the "first dollar of loss" threshold to this tranche.
     let original_balance = deal
         .tranches
         .tranches

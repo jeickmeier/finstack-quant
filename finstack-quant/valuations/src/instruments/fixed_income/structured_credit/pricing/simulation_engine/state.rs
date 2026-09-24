@@ -112,7 +112,7 @@ pub(super) struct SimulationState<'a> {
     pub(super) undistributed_interest: Money,
     /// Principal retained by the waterfall, available for later capital payments.
     pub(super) undistributed_principal: Money,
-    /// SC-M13: additive shift applied to FLOATING rate projections this period,
+    /// Additive shift applied to FLOATING rate projections this period,
     /// so OAS-simulated coupons follow the same rate path as the discounting.
     /// Zero for every non-OAS run, making this exact identity there.
     pub(super) floating_rate_shift: f64,

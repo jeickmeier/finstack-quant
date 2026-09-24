@@ -16,4 +16,4 @@ pub(crate) use rates::frequency_periods_per_year;
 pub use rates::{
     clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, clamped_smm_to_cpr, psa_to_cpr,
 };
-pub use validation::{get_validation_errors, is_valid_waterfall_spec, ValidationError};
+pub use validation::{validate_tiers, ValidationError};

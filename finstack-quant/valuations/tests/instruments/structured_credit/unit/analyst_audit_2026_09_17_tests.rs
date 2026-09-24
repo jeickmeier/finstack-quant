@@ -21,7 +21,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CoverageTestSpec, DealType, LiquidationSpec, PaymentCalculation, PaymentType, PoolAsset,
     PricingMode, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec,
     StepDownTrigger, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-    WaterfallBuilder, WaterfallContext, WaterfallRules, WaterfallTier,
+    Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -348,7 +348,7 @@ fn p5_oc_cure_is_sized_for_an_interest_funded_paydown() {
         ),
     ])
     .expect("structure");
-    let waterfall = WaterfallBuilder::new(Currency::USD)
+    let waterfall = Waterfall::builder(Currency::USD)
         .add_tier(
             WaterfallTier::new("interest", 1, PaymentType::Interest)
                 .add_recipient(Recipient::tranche_interest("a_int", "A"))

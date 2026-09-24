@@ -40,7 +40,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::ca
 /// itself is arbitrary; only its disjointness from `0` matters.
 const PER_NAME_SEED_SALT: u64 = 0x5350_4552_4E41_4D45; // "SPERNAME"
 
-/// Salt for the INDEPENDENT component of the prepayment factor (SC-M23).
+/// Salt for the INDEPENDENT component of the prepayment factor.
 ///
 /// XOR-salting keeps this stream disjoint from the credit-factor,
 /// per-name and tree-tail streams, so adding it leaves every existing draw
@@ -103,7 +103,7 @@ pub(crate) struct PreparedRun {
     pub(crate) factor_kappa: f64,
     /// Monthly autocorrelation φ = e^{−κ/12}.
     pub(crate) factor_phi: f64,
-    /// Validated prepay/default factor correlation (SC-M23).
+    /// Validated prepay/default factor correlation.
     pub(crate) factor_correlation: Option<f64>,
     /// Loop-invariant deal simulation (validation, calendar, schedule,
     /// waterfall) prepared once for this run's valuation date.
@@ -157,18 +157,7 @@ impl StochasticPricer {
                 ))
             })?;
         let prepay_model = self.config.tree_config.prepay_spec.build();
-        let copula_rho = match &self.config.tree_config.default_spec {
-            StochasticDefaultSpec::Copula { correlation, .. } => {
-                // Explicit deal `CorrelationStructure` overrides the copula scalar.
-                Some(
-                    self.config
-                        .tree_config
-                        .asset_correlation_override
-                        .unwrap_or(*correlation),
-                )
-            }
-            _ => None,
-        };
+        let copula_rho = self.copula_rho();
         let factor_kappa = self.factor_mean_reversion();
         let factor_correlation = self.factor_correlation()?;
         let instrument_schedules = if instrument.pool.instruments.is_some() {
@@ -352,7 +341,7 @@ impl StochasticPricer {
             let prefix_index = path_index / mc_paths;
             let prefix =
                 self.tree_path_factors(prefix_index, prefix_count, branch_count, prefix_months);
-            let mut rng = PhiloxRng::new(self.config.seed).substream(path_index as u64);
+            let mut rng = PhiloxRng::new(self.config.tree_config.seed).substream(path_index as u64);
             let mut factors = Vec::with_capacity(prefix.len() + suffix_months);
             factors.extend_from_slice(&prefix);
             for _ in 0..suffix_months {
@@ -474,7 +463,7 @@ impl StochasticPricer {
         num_paths: usize,
         antithetic: bool,
     ) -> Vec<f64> {
-        let base_rng = PhiloxRng::new(self.config.seed);
+        let base_rng = PhiloxRng::new(self.config.tree_config.seed);
         let paired = antithetic && (path_index % 2 == 1 || path_index + 1 < num_paths);
         if paired {
             let mut rng = base_rng.substream((path_index / 2) as u64);
@@ -497,19 +486,24 @@ impl StochasticPricer {
     /// hazard-curve) keep the pool-wide MDR path.
     fn copula_default(&self) -> Option<(CopulaSpec, f64)> {
         match &self.config.tree_config.default_spec {
-            StochasticDefaultSpec::Copula {
-                copula_spec,
-                correlation,
-                ..
-            } => {
-                // Explicit deal `CorrelationStructure` overrides the copula scalar.
-                let rho = self
-                    .config
+            StochasticDefaultSpec::Copula { copula_spec, .. } => {
+                Some((copula_spec.clone(), self.copula_rho()?))
+            }
+            _ => None,
+        }
+    }
+
+    /// Asset correlation of a copula default model: the explicit deal
+    /// `CorrelationStructure` overrides the copula spec's scalar; `None` for
+    /// non-copula default models.
+    fn copula_rho(&self) -> Option<f64> {
+        match &self.config.tree_config.default_spec {
+            StochasticDefaultSpec::Copula { correlation, .. } => Some(
+                self.config
                     .tree_config
                     .asset_correlation_override
-                    .unwrap_or(*correlation);
-                Some((copula_spec.clone(), rho))
-            }
+                    .unwrap_or(*correlation),
+            ),
             _ => None,
         }
     }
@@ -550,7 +544,7 @@ impl StochasticPricer {
         path_index: usize,
         antithetic: bool,
     ) -> PerNameDefaultEngine {
-        let base = PhiloxRng::new(self.config.seed ^ PER_NAME_SEED_SALT);
+        let base = PhiloxRng::new(self.config.tree_config.seed ^ PER_NAME_SEED_SALT);
         let idio_recovery_vol = self.idiosyncratic_recovery_vol();
         if antithetic {
             // Both members of pair k share substream(k); the odd member is
@@ -597,7 +591,7 @@ impl StochasticPricer {
     /// `substream(k)` and the odd member negates its draws; independent
     /// paths use `substream(path_index)`.
     fn instrument_path_rng(&self, path_index: usize, antithetic: bool) -> (PhiloxRng, bool) {
-        let base = PhiloxRng::new(self.config.seed ^ INSTRUMENT_PATH_SEED_SALT);
+        let base = PhiloxRng::new(self.config.tree_config.seed ^ INSTRUMENT_PATH_SEED_SALT);
         if antithetic {
             (base.substream((path_index / 2) as u64), path_index % 2 == 1)
         } else {
@@ -757,7 +751,7 @@ impl StochasticPricer {
         }
         let mut tail_rng =
             (resolved_months < month_count && self.has_stochastic_rates()).then(|| {
-                PhiloxRng::new(self.config.seed ^ TREE_TAIL_SEED_SALT)
+                PhiloxRng::new(self.config.tree_config.seed ^ TREE_TAIL_SEED_SALT)
                     .substream(original_path_index as u64)
             });
 
@@ -801,7 +795,7 @@ impl StochasticPricer {
         }
     }
 
-    /// Configured prepay/default factor correlation (SC-M23).
+    /// Configured prepay/default factor correlation.
     ///
     /// `Some(rho)` for a two-factor spec, **including `rho == 0`**: zero means
     /// the prepayment factor is independent of credit, which is a different
@@ -900,7 +894,7 @@ impl StochasticPricer {
     /// factor spec is single-factor (prepayment then shares the credit
     /// factor).
     ///
-    /// SC-M23: a SECOND factor for prepayment. Handing ONE scalar to both
+    /// A SECOND factor for prepayment. Handing ONE scalar to both
     /// `conditional_smm` and `conditional_mdr` would drive prepayment and
     /// default off the same realization, forcing their implied correlation to
     /// +1 (or -1 through a negative loading) regardless of the -0.30
@@ -930,7 +924,7 @@ impl StochasticPricer {
         prepared: &PreparedRun,
     ) -> Option<Vec<f64>> {
         let rho = prepared.factor_correlation?;
-        let base = PhiloxRng::new(self.config.seed ^ PREPAY_FACTOR_SEED_SALT);
+        let base = PhiloxRng::new(self.config.tree_config.seed ^ PREPAY_FACTOR_SEED_SALT);
         let (mut rng, negate) = if antithetic {
             (base.substream((path_index / 2) as u64), path_index % 2 == 1)
         } else {
@@ -982,7 +976,7 @@ impl StochasticPricer {
         })? as usize;
         let months_per_period = months_per_period.max(1);
         let payment_periods = self.payment_period_count(instrument);
-        // SC-M24: burnout is PATH state — it accumulates across the whole
+        // Burnout is PATH state — it accumulates across the whole
         // path, so it is seeded once here and advanced month by month.
         let mut burnout = 1.0_f64;
         let mut shocks = Vec::with_capacity(payment_periods);
@@ -995,7 +989,7 @@ impl StochasticPricer {
             } else {
                 &[][..]
             };
-            // SC-M23: prepayment reads its OWN factor slice, correlated with
+            // Prepayment reads its OWN factor slice, correlated with
             // the credit one at the configured rho.
             let prepay_slice = if start < end {
                 &prepay_factors[start..end]
@@ -1123,7 +1117,7 @@ impl StochasticPricer {
     ) -> PeriodPoolShock {
         let stochastic = self.has_stochastic_rates();
         let factor = if stochastic { z } else { 0.0 };
-        // SC-M23: prepayment reads its own factor. With no configured
+        // Prepayment reads its own factor. With no configured
         // correlation the caller passes the credit factor through, so this is
         // exact identity with the previous single-factor behaviour.
         let prepay_factor = if stochastic { z_prepay } else { 0.0 };
@@ -1147,7 +1141,7 @@ impl StochasticPricer {
 
     /// Conditional SMM for one month, advancing the path's burnout state.
     ///
-    /// SC-M24: hard-coding `burnout = 1.0` here (or never calling
+    /// Hard-coding `burnout = 1.0` here (or never calling
     /// `update_burnout`) leaves the Richard-Roll burnout channel inert:
     /// seasoned pools that have already refinanced heavily get modelled with
     /// full prepayment propensity while `has_burnout()` still returns true.
@@ -1560,7 +1554,7 @@ impl ScenarioCollector {
             .map(|stats| stats.current_balance)
             .sum();
         if notional > f64::EPSILON {
-            // SC-m29: `mean_pv` is the present value of all FUTURE cashflows
+            // `mean_pv` is the present value of all FUTURE cashflows
             // from the valuation date, which is by definition the DIRTY price —
             // it already contains the accrued portion of the next coupon.
             // Assigning it to `clean_price` first and then copying to
@@ -1568,8 +1562,7 @@ impl ScenarioCollector {
             //
             // Clean = dirty − accrued. The deal-level stochastic result carries
             // no per-tranche interest flows, so accrued cannot be computed here
-            // (the same constraint SC-M10 documents for the accrued
-            // calculator). Rather than fabricate one, `clean_price` is set
+            // (the same constraint the accrued calculator documents). Rather than fabricate one, `clean_price` is set
             // equal to dirty and flagged as UNADJUSTED: understating accrued by
             // at most one period's interest, in a known direction, instead of
             // silently mislabelling which of the two is authoritative. Use
@@ -1648,7 +1641,7 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
     if losses.is_empty() {
         return 0.0;
     }
-    // SC-m06: `total_cmp`, not `partial_cmp(..).unwrap_or(Equal)`.
+    // `total_cmp`, not `partial_cmp(..).unwrap_or(Equal)`.
     //
     // The old comparator is not a total order when a NaN is present — NaN
     // compares Equal to everything while the finite values retain their own
@@ -2147,7 +2140,7 @@ mod tests {
 /// fast-path for genuinely granular pools.
 #[cfg(test)]
 mod per_name_copula_tests {
-    /// SC-m06 — the expected-shortfall sort must use a TOTAL order.
+    /// The expected-shortfall sort must use a TOTAL order.
     ///
     /// `partial_cmp(..).unwrap_or(Equal)` is not a total order when a NaN is
     /// present: NaN compares Equal to everything while the finite values keep
@@ -2171,7 +2164,7 @@ mod per_name_copula_tests {
         assert_eq!(&losses[2..], &[100.0, 50.0, 10.0, 5.0, 1.0]);
     }
 
-    /// SC-m06 — with clean input the measure is unchanged.
+    /// With clean input the measure is unchanged.
     #[test]
     fn expected_shortfall_is_unchanged_for_finite_losses() {
         let mut losses = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
@@ -2304,7 +2297,6 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
         tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
-        tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(PricingMode::MonteCarlo {
                 num_paths,
@@ -2339,7 +2331,6 @@ mod per_name_copula_tests {
     ) -> StochasticPricerConfig {
         let mut tree_config = ScenarioTreeConfig::new(num_periods, 2);
         tree_config.default_spec = default_spec;
-        tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
             .with_pricing_mode(PricingMode::MonteCarlo {
                 num_paths,
@@ -2668,12 +2659,12 @@ mod per_name_copula_tests {
         );
     }
 
-    /// SC-M15 — the intensity model's `mean_reversion` must drive the factor.
+    /// The intensity model's `mean_reversion` must drive the factor.
     ///
     /// `IntensityProcessDefault` documents `dX = kappa(theta - X)dt + sigma dW`
     /// and cites Duffie-Singleton, but `kappa` was stored, clamped, exposed by
     /// a getter and used in NO computation — the model was a static lognormal
-    /// shock. After SC-C05 the systematic factor is a genuine OU path, so
+    /// shock. The systematic factor is now a genuine OU path, so
     /// sourcing its kappa from this spec realizes the documented model.
     #[test]
     fn intensity_mean_reversion_drives_the_systematic_factor() {
@@ -2692,7 +2683,7 @@ mod per_name_copula_tests {
                 (mean_reversion - 2.5).abs() < 1e-12,
                 "the factor's kappa must come from the intensity spec (2.5), \
                  got {mean_reversion}. Zero means the parameter is still inert \
-                 (SC-M15)."
+                ."
             ),
             other => panic!("expected a single-factor spec, got {other:?}"),
         }
@@ -2728,7 +2719,7 @@ mod per_name_copula_tests {
         );
     }
 
-    /// SC-M23 — prepayment and default must be driven by SEPARATE factors
+    /// Prepayment and default must be driven by SEPARATE factors
     /// correlated at the configured level.
     ///
     /// `monthly_shock` built `let factors = [factor]` — one scalar handed to
@@ -2738,7 +2729,7 @@ mod per_name_copula_tests {
     /// model silently got a single-factor one.
     ///
     /// The correlation is measured ACROSS PATHS, not across months. Under the
-    /// canonical single-draw copula (SC-C05: kappa = 0 is a random walk) each
+    /// canonical single-draw copula (kappa = 0 is a random walk) each
     /// path's factor is constant over the horizon, so a time-series
     /// correlation is degenerate — any two constant series correlate at 1.
     /// Cross-sectional is also the quantity that matters: it is the dependence
@@ -2767,11 +2758,12 @@ mod per_name_copula_tests {
         let (mut sum_c, mut sum_p, mut sum_cc, mut sum_pp, mut sum_cp) =
             (0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64, 0.0_f64);
         for path in 0..PATHS as u64 {
-            let mut credit_rng = PhiloxRng::new(pricer.config.seed).substream(path);
+            let mut credit_rng = PhiloxRng::new(pricer.config.tree_config.seed).substream(path);
             let credit = credit_rng.next_std_normal();
 
             let mut indep_rng =
-                PhiloxRng::new(pricer.config.seed ^ PREPAY_FACTOR_SEED_SALT).substream(path);
+                PhiloxRng::new(pricer.config.tree_config.seed ^ PREPAY_FACTOR_SEED_SALT)
+                    .substream(path);
             let indep = indep_rng.next_std_normal();
 
             let prepay = rho * credit + scale * indep;
@@ -2795,7 +2787,7 @@ mod per_name_copula_tests {
             (realized - RHO).abs() < 0.02,
             "realized prepay/default factor correlation {realized:.4} must be \
              near the configured {RHO}. A value near +/-1 means both channels \
-             still share one factor (SC-M23)."
+             still share one factor."
         );
         assert!(
             (var_p - 1.0).abs() < 0.05,
@@ -2837,7 +2829,7 @@ mod per_name_copula_tests {
             "a two-factor spec must produce different prepayment from a \
              single-factor one on identical credit factors: {two_factor} vs \
              {single_factor}. Equal values mean the engine is still handing one \
-             scalar to both channels (SC-M23)."
+             scalar to both channels."
         );
     }
 
@@ -2879,7 +2871,7 @@ mod per_name_copula_tests {
         assert!(first.iter().zip(&second).any(|(a, b)| (a + b).abs() > 1e-3));
     }
 
-    /// SC-M24 — burnout must ACCUMULATE across a path, not sit at 1.0.
+    /// Burnout must ACCUMULATE across a path, not sit at 1.0.
     ///
     /// `update_burnout` had zero production callers and the engine passed a
     /// hard-coded 1.0, so the burnout channel of Richard-Roll was inert:
@@ -2916,7 +2908,7 @@ mod per_name_copula_tests {
             burnout < 1.0,
             "after 24 months of above-expectation prepayment the burnout factor \
              must have decayed below 1.0, got {burnout}. A value pinned at 1.0 \
-             means the channel is still inert (SC-M24)."
+             means the channel is still inert."
         );
         assert!(burnout > 0.0, "burnout must stay in (0, 1], got {burnout}");
     }

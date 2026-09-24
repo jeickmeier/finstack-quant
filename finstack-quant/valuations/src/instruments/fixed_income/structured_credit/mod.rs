@@ -58,15 +58,15 @@ pub use types::{
 };
 
 pub use utils::{
-    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, clamped_smm_to_cpr,
-    get_validation_errors, is_valid_waterfall_spec, psa_to_cpr, ValidationError,
+    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, clamped_smm_to_cpr, psa_to_cpr,
+    validate_tiers, ValidationError,
 };
 
 pub use pricing::{
     execute_waterfall, generate_cashflows, generate_tranche_cashflows, run_simulation,
 };
 
-pub use pricing::coverage_tests::{CoverageTest, TestContext, TestResult};
+pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::stochastic::PricingMode;
 pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
 pub use pricing::waterfall::execute_waterfall_with_explanation;

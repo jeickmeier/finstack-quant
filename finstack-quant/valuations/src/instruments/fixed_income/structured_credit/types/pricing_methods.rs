@@ -27,15 +27,11 @@ impl StructuredCredit {
     ///
     /// # Arguments
     ///
-    /// * `pay_date` - Contractual payment date; rate curves are currently indexed
-    ///   by collateral age rather than calendar date.
     /// * `seasoning_months` - Collateral age in months, including age at closing.
     pub fn calculate_prepayment_rate(
         &self,
-        pay_date: Date,
         seasoning_months: u32,
     ) -> finstack_quant_core::Result<f64> {
-        let _ = pay_date;
         self.resolved_credit_model()?
             .prepayment_spec
             .smm(seasoning_months)
@@ -45,15 +41,11 @@ impl StructuredCredit {
     ///
     /// # Arguments
     ///
-    /// * `pay_date` - Contractual payment date; rate curves are currently indexed
-    ///   by collateral age rather than calendar date.
     /// * `seasoning_months` - Collateral age in months, including age at closing.
     pub fn calculate_default_rate(
         &self,
-        pay_date: Date,
         seasoning_months: u32,
     ) -> finstack_quant_core::Result<f64> {
-        let _ = pay_date;
         self.resolved_credit_model()?
             .default_spec
             .mdr(seasoning_months)
@@ -244,7 +236,6 @@ impl StructuredCredit {
             ));
         }
         tree_config.market_refi_rate = self.market_conditions.refi_rate;
-        tree_config.initial_balance = self.pool.total_balance()?.amount().max(1.0);
         tree_config.initial_seasoning = self
             .pool
             .weighted_average_seasoning(as_of, self.closing_date);
@@ -605,17 +596,13 @@ mod production_structured_assumptions {
         };
         assert!(
             (prepay.smm(12).expect("SMM")
-                - deal
-                    .calculate_prepayment_rate(deal.closing_date, 12)
-                    .expect("resolved SMM"))
+                - deal.calculate_prepayment_rate(12).expect("resolved SMM"))
             .abs()
                 < 1e-14
         );
         assert!(
             (default.mdr(12).expect("MDR")
-                - deal
-                    .calculate_default_rate(deal.closing_date, 12)
-                    .expect("resolved MDR"))
+                - deal.calculate_default_rate(12).expect("resolved MDR"))
             .abs()
                 < 1e-14
         );

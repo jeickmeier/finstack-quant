@@ -16,7 +16,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CoverageTestSpec, DealType, HedgeSwap, PaymentCalculation, PaymentType, PeriodDiagnostics,
     PoolAsset, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod,
     StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, Waterfall,
-    WaterfallBuilder, WaterfallContext, WaterfallTier,
+    WaterfallContext, WaterfallTier,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
@@ -162,7 +162,7 @@ fn reinvestment_suspends_on_the_executors_test_result() {
 
 /// Fees 50k, A coupon, sub-management fee 100k, A principal, equity.
 fn junior_fee_waterfall() -> Waterfall {
-    WaterfallBuilder::new(Currency::USD)
+    Waterfall::builder(Currency::USD)
         .add_tier(
             WaterfallTier::new("fees", 1, PaymentType::Fee).add_recipient(Recipient::fixed_fee(
                 "trustee",

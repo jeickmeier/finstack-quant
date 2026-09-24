@@ -14,7 +14,7 @@ use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, FundingSource,
     PaymentType, PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon,
-    TrancheSeniority, TrancheStructure, WaterfallBuilder, WaterfallContext, WaterfallTier,
+    TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use time::Month;
 
@@ -208,7 +208,7 @@ fn interest_then_principal_tier_tops_up_the_senior_coupon_from_principal() {
         if let Some(source) = source {
             tier = tier.funding(source);
         }
-        WaterfallBuilder::new(Currency::USD)
+        Waterfall::builder(Currency::USD)
             .add_tier(tier)
             .add_tier(WaterfallTier::coverage_tests(
                 "a_coverage",

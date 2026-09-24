@@ -33,27 +33,23 @@ pub(crate) struct PoolFlowRequest<'a, 's> {
 ///
 /// # Arguments
 ///
-/// * `pay_date` - Payment date of the period, forwarded to `rate_at` for
-///   date-based rate overrides.
 /// * `seasoning_end` - Pool seasoning in months at the END of the period.
 /// * `months_per_period` - Number of months the payment period spans.
-/// * `rate_at` - Monthly rate (SMM or MDR, decimal) at a given payment date
-///   and seasoning month.
+/// * `rate_at` - Monthly rate (SMM or MDR, decimal) at a seasoning month.
 pub(super) fn period_averaged_monthly_rate(
-    pay_date: Date,
     seasoning_end: u32,
     months_per_period: f64,
-    rate_at: impl Fn(Date, u32) -> Result<f64>,
+    rate_at: impl Fn(u32) -> Result<f64>,
 ) -> Result<f64> {
     let k = months_per_period.round();
     if k <= 1.0 || (months_per_period - k).abs() > 1e-9 {
-        return rate_at(pay_date, seasoning_end);
+        return rate_at(seasoning_end);
     }
     let k = k as u32;
     let mut survival = 1.0_f64;
     for m in 0..k {
         let seasoning = seasoning_end.saturating_sub(k - 1 - m);
-        survival *= 1.0 - rate_at(pay_date, seasoning)?.clamp(0.0, 1.0);
+        survival *= 1.0 - rate_at(seasoning)?.clamp(0.0, 1.0);
     }
     Ok(1.0 - survival.max(0.0).powf(1.0 / f64::from(k)))
 }
@@ -108,18 +104,16 @@ fn asset_seasoned_rates(request: &PoolFlowRequest<'_, '_>) -> Result<AssetSeason
         };
         if prepay_seasoned {
             rates.smm[i] = Some(period_averaged_monthly_rate(
-                request.pay_date,
                 seasoning,
                 request.months_per_period,
-                |_, seasoning| model.prepayment_spec.smm(seasoning),
+                |seasoning| model.prepayment_spec.smm(seasoning),
             )?);
         }
         if default_seasoned {
             rates.mdr[i] = Some(period_averaged_monthly_rate(
-                request.pay_date,
                 seasoning,
                 request.months_per_period,
-                |_, seasoning| model.default_spec.mdr(seasoning),
+                |seasoning| model.default_spec.mdr(seasoning),
             )?);
         }
     }
@@ -152,10 +146,9 @@ pub(super) struct BasePeriodRates {
 ///   balances) that the default curves are stated against.
 pub(super) fn base_period_rates(request: &PoolFlowRequest<'_, '_>) -> Result<BasePeriodRates> {
     let smm = period_averaged_monthly_rate(
-        request.pay_date,
         request.seasoning_months,
         request.months_per_period,
-        |_, seasoning| {
+        |seasoning| {
             request
                 .instrument
                 .credit_model
@@ -215,10 +208,9 @@ pub(super) fn base_period_rates(request: &PoolFlowRequest<'_, '_>) -> Result<Bas
         .saturating_sub(request.months_per_period.round().max(1.0) as u32 - 1);
     let catch_up = request.state.period_diagnostics.is_empty();
     let mdr = period_averaged_monthly_rate(
-        request.pay_date,
         request.seasoning_months,
         request.months_per_period,
-        |_, seasoning| {
+        |seasoning| {
             let spec = &request.instrument.credit_model.default_spec;
             match curve_lookahead {
                 Some((ahead, gross_up)) => {
@@ -291,7 +283,7 @@ pub(crate) struct OasPathFlowSource {
     as_of: Date,
     /// Monthly short-rate path from `as_of` (`None` ⇒ rates not stochastic).
     rate_path: Option<Vec<f64>>,
-    /// SC-M13: per-month departure of the simulated short rate from the
+    /// Per-month departure of the simulated short rate from the
     /// deterministic forward curve, `rate_path[m] − forwards[m]`. Applied to
     /// FLOATING coupon projection so a floater's coupons follow the same path
     /// its discount factors do.
@@ -340,7 +332,7 @@ impl OasPathFlowSource {
         &self,
         request: &PoolFlowRequest<'_, '_>,
     ) -> Result<(PeriodShock, AssetSeasonedRates)> {
-        // SC-M13: this period's rate shift, so FLOATING coupons — both pool
+        // This period's rate shift, so FLOATING coupons — both pool
         // assets and tranches — follow the simulated path.
         //
         // Without it the OAS applied a stochastic discount factor to
@@ -535,7 +527,7 @@ impl PeriodShockSource for PathShocks {
 /// When `antithetic` is `true` this engine is the *second member* of an
 /// antithetic pair: it shares its RNG substream with the first member and
 /// **negates** every idiosyncratic `εᵢ` draw. Combined with the systematic
-/// factor `Z` being negated by `monte_carlo_factor_sets`, the copula latent
+/// factor `Z` being negated by `monte_carlo_path_factors`, the copula latent
 /// variable `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` becomes `−Aᵢ` for the paired path — the
 /// genuine antithetic variate. Without this the per-name idiosyncratic
 /// channel of paired paths would be independent, defeating the variance
@@ -610,6 +602,28 @@ pub(super) enum PerNameResolution {
 }
 
 impl PerNameDefaultEngine {
+    /// Realize one period's per-name default indicators into `defaults`;
+    /// the antithetic partner negates its idiosyncratic draws.
+    ///
+    /// # Arguments
+    ///
+    /// * `systematic_z` - Period systematic factor shared by every name.
+    /// * `marginal_pd` - Unconditional period default probability per live name.
+    /// * `defaults` - Filled with one realized indicator per name.
+    fn realize(&mut self, systematic_z: f64, marginal_pd: &[f64], defaults: &mut Vec<bool>) {
+        if self.antithetic {
+            self.simulator.simulate_period_antithetic(
+                systematic_z,
+                marginal_pd,
+                &mut self.rng,
+                defaults,
+            );
+        } else {
+            self.simulator
+                .simulate_period(systematic_z, marginal_pd, &mut self.rng, defaults);
+        }
+    }
+
     /// Resolve one period's defaults for names with their own marginals.
     ///
     /// `PerName` granularity realizes each name (antithetic partners negate
@@ -632,21 +646,7 @@ impl PerNameDefaultEngine {
     ) -> PerNameResolution {
         match self.granularity {
             PoolGranularity::PerName => {
-                if self.antithetic {
-                    self.simulator.simulate_period_antithetic(
-                        systematic_z,
-                        marginal_pd,
-                        &mut self.rng,
-                        defaults,
-                    );
-                } else {
-                    self.simulator.simulate_period(
-                        systematic_z,
-                        marginal_pd,
-                        &mut self.rng,
-                        defaults,
-                    );
-                }
+                self.realize(systematic_z, marginal_pd, defaults);
                 PerNameResolution::Realized
             }
             PoolGranularity::LargeHomogeneous => {
@@ -748,22 +748,12 @@ impl PoolFlowSource for StochasticPathFlowSource {
                     // Antithetic partners negate their idiosyncratic εᵢ draws
                     // so the copula latent variable is the antithetic variate
                     // of the paired path (the systematic Z is already negated
-                    // by `monte_carlo_factor_sets`).
-                    if engine.antithetic {
-                        engine.simulator.simulate_period_antithetic(
-                            plan.systematic_z,
-                            &self.marginal_scratch,
-                            &mut engine.rng,
-                            &mut self.default_scratch,
-                        );
-                    } else {
-                        engine.simulator.simulate_period(
-                            plan.systematic_z,
-                            &self.marginal_scratch,
-                            &mut engine.rng,
-                            &mut self.default_scratch,
-                        );
-                    }
+                    // by `monte_carlo_path_factors`).
+                    engine.realize(
+                        plan.systematic_z,
+                        &self.marginal_scratch,
+                        &mut self.default_scratch,
+                    );
 
                     // Per-name idiosyncratic recovery dispersion: each name
                     // recovers at its own rate, scattered around the period

@@ -91,7 +91,7 @@ pub struct TrancheCashflows {
     pub pik_flows: DatedFlows,
     /// Interest DEFERRED to future periods on a non-PIK tranche.
     ///
-    /// SC-m11: non-PIK shortfalls used to be recorded in `pik_flows`. PIK means
+    /// Non-PIK shortfalls used to be recorded in `pik_flows`. PIK means
     /// the unpaid interest is CAPITALIZED into the tranche balance and accrues
     /// thereafter; a non-PIK deferral is a separate senior claim that does not
     /// touch notional. Conflating them misleads any consumer reading
@@ -111,7 +111,7 @@ pub struct TrancheCashflows {
     pub total_principal: Money,
     /// Total PIK capitalized.
     pub total_pik: Money,
-    /// Total interest deferred on a non-PIK tranche (SC-m11).
+    /// Total interest deferred on a non-PIK tranche.
     pub total_deferred: Money,
     /// Total write-down (loss allocation).
     pub total_writedown: Money,

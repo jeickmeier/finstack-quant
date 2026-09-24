@@ -419,7 +419,7 @@ impl StructuredCredit {
 
     /// Loss-recognition timing in force: [`Self::loss_recognition`] when
     /// set, else the deal-type market convention
-    /// ([`LossRecognition::default_for`]).
+    /// ([`super::LossRecognition::default_for`]).
     pub fn effective_loss_recognition(&self) -> super::LossRecognition {
         self.loss_recognition
             .unwrap_or_else(|| super::LossRecognition::default_for(self.deal_type))
@@ -548,7 +548,7 @@ impl StructuredCredit {
         // Structural tier validation (duplicate ids, empty tiers, weights,
         // non-finite payment parameters) — shared with the executor.
         let tier_errors =
-            crate::instruments::fixed_income::structured_credit::utils::get_validation_errors(
+            crate::instruments::fixed_income::structured_credit::utils::validate_tiers(
                 &waterfall.tiers,
             );
         if let Some(first) = tier_errors.first() {

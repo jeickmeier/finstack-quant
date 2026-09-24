@@ -15,9 +15,9 @@ use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AssetPool, CccBucketRule, CoverageRules,
-    CoverageTest, CoverageTestSpec, DealType, DefaultedValuation, DiscountObligationRule,
-    InstrumentCollateral, PoolAsset, StructuredCredit, TestContext, Tranche, TrancheCashflows,
-    TrancheCoupon, TrancheSeniority, TrancheStructure,
+    CoverageTestSpec, DealType, DefaultedValuation, DiscountObligationRule, InstrumentCollateral,
+    PoolAsset, StructuredCredit, TestContext, Tranche, TrancheCashflows, TrancheCoupon,
+    TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -78,7 +78,6 @@ fn oc_ratio(pool: &AssetPool, tranches: &TrancheStructure, rules: Option<&Covera
     let ctx = TestContext {
         pool,
         tranches,
-        tranche_id: "A",
         as_of: d(2025, 1, 1),
         valuation_date: d(2025, 1, 1),
         period_start: None,
@@ -98,8 +97,8 @@ fn oc_ratio(pool: &AssetPool, tranches: &TrancheStructure, rules: Option<&Covera
         floating_rate_shift: 0.0,
         deferred_interest: None,
     };
-    CoverageTest::new_oc(1.0)
-        .calculate(&ctx)
+    CoverageTestSpec::oc("A", 1.0)
+        .evaluate(&ctx)
         .expect("oc test")
         .current_ratio
 }
