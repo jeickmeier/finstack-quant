@@ -244,11 +244,11 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
     // For yield-based optimization, require explicit quoted clean prices for all bonds.
     // Use par (100.0) for simplicity so coupon ordering drives YTM ordering.
     bond_aaa.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
     bond_bbb.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
     bond_ccc.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let pos_aaa = Position::new(
         "POS_AAA",

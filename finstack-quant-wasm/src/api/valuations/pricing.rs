@@ -216,7 +216,7 @@ pub fn validate_instrument_json(
 /// @param instrument_id - Stable instrument identifier used for pricing and metric keys.
 /// @param schedule_json - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
 /// @param discount_curve_id - Market-context discount-curve identifier for the instrument currency.
-/// @param quoted_clean - Optional observed clean bond price in the schedule's documented price quotation convention.
+/// @param quoted_clean_price_pct - Optional observed clean bond price in percent of par (99.5 = 99.5%), stored as `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
 ///
 /// # Errors
 ///
@@ -228,13 +228,13 @@ pub fn bond_from_cashflows_json(
     instrument_id: &str,
     schedule_json: &str,
     discount_curve_id: &str,
-    quoted_clean: Option<f64>,
+    quoted_clean_price_pct: Option<f64>,
 ) -> Result<String, JsValue> {
     finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
         instrument_id,
         schedule_json,
         discount_curve_id,
-        quoted_clean,
+        quoted_clean_price_pct,
     )
     .map_err(to_js_err)
 }

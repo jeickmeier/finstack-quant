@@ -129,7 +129,7 @@ fn test_structured_credit_bucketed_cs01_reconciles_to_parallel() {
         .expect("dirty price should be returned");
     sc.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(model_price);
+        .quoted_clean_price_pct = Some(model_price);
 
     let result = sc
         .price_with_metrics(

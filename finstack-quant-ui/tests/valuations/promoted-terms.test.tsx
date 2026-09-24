@@ -82,7 +82,7 @@ it("promotes the bond clean price, replaces only conflicting price quotes, and c
     const quotes = ((
       spec.instrument_pricing_overrides as Record<string, unknown>
     )?.market_quotes ?? {}) as Record<string, unknown>;
-    return quotes.quoted_clean_price === 99.5;
+    return quotes.quoted_clean_price_pct === 99.5;
   });
   const quotes = (spec.instrument_pricing_overrides as Record<string, unknown>)
     .market_quotes as Record<string, unknown>;
@@ -110,7 +110,7 @@ it("promotes the bond clean price, replaces only conflicting price quotes, and c
       >
     )?.model_config;
     return (
-      market.quoted_clean_price === undefined &&
+      market.quoted_clean_price_pct === undefined &&
       market.implied_volatility === 0.2 &&
       model?.mc_paths === 1000
     );

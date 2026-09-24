@@ -12,7 +12,7 @@
 //!
 //! # Dependencies
 //!
-//! Requires `quoted_clean_price` in `bond.instrument_pricing_overrides.market_quotes`.
+//! Requires `quoted_clean_price_pct` in `bond.instrument_pricing_overrides.market_quotes`.
 //!
 //! # Units
 //!
@@ -40,22 +40,23 @@ impl MetricCalculator for OasCalculator {
             return Ok(0.0);
         }
 
-        let quoted_clean = bond
+        let quoted_clean_price_pct = bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
             .ok_or_else(|| {
                 finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "pricing_overrides.market_quotes.quoted_clean_price".to_string(),
+                    id: "instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
+                        .to_string(),
                 })
             })?;
 
         let accrued = calculate_accrued_interest(bond, &context.curves, as_of)?;
-        // `quoted_clean` is percentage-of-par (e.g. 99.5 = 99.5% of face).
+        // `quoted_clean_price_pct` is percentage-of-par (e.g. 99.5 = 99.5% of face).
         // `accrued` and the model price are both notional-scaled currency amounts.
         // Scale the percentage quote to notional so the solver objective compares
         // commensurate values — mirroring the term-loan `target_price_from_quote_or_model`.
-        let target_dirty = quoted_clean * bond.notional.amount() / 100.0 + accrued;
+        let target_dirty = quoted_clean_price_pct * bond.notional.amount() / 100.0 + accrued;
 
         // Use the same tree discretization as the registry pricer and every
         // other convertible metric so the solved OAS reprices to the quote
@@ -213,7 +214,7 @@ mod tests {
         };
 
         let mut overrides = InstrumentPricingOverrides::default();
-        overrides.market_quotes.quoted_clean_price = Some(quoted_clean_pct);
+        overrides.market_quotes.quoted_clean_price_pct = Some(quoted_clean_pct);
 
         ConvertibleBond {
             id: "TEST_CB_OAS".to_string().into(),
@@ -259,7 +260,7 @@ mod tests {
             .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
     }
 
-    /// Regression: quoted_clean_price is percentage-of-par, so it must be scaled
+    /// Regression: quoted_clean_price_pct is percentage-of-par, so it must be scaled
     /// by notional/100 before adding notional-scaled accrued interest to form the
     /// dirty price target.  Before the fix the solver compared ~$1e6 model price
     /// against ~102 target (pct + accrued), couldn't bracket, and returned an
@@ -269,7 +270,7 @@ mod tests {
     /// dirty is ~$1,020,000 + small accrued — well within the solver's bracket.
     /// The resulting OAS should be a finite decimal spread in (-10%, +50%).
     #[test]
-    fn oas_quoted_clean_price_scaled_to_notional() {
+    fn oas_quoted_clean_price_pct_scaled_to_notional() {
         let notional = 1_000_000.0;
         let quoted_clean_pct = 102.0; // 102% of par
         let bond = make_bond_with_quote(notional, quoted_clean_pct);
@@ -345,7 +346,7 @@ mod tests {
             .unwrap();
             bond.instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price = Some(target.amount() / bond.notional.amount() * 100.0);
+                .quoted_clean_price_pct = Some(target.amount() / bond.notional.amount() * 100.0);
             let base_value = bond.value(&market, as_of).unwrap();
             let mut ctx = MetricContext::new(
                 Arc::new(bond),
@@ -412,7 +413,7 @@ mod tests {
                     .unwrap();
                     bond.instrument_pricing_overrides
                         .market_quotes
-                        .quoted_clean_price =
+                        .quoted_clean_price_pct =
                         Some(target.amount() / bond.notional.amount() * 100.0);
                     let base_value = bond.value(&market, as_of).unwrap();
                     let mut ctx = MetricContext::new(

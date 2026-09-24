@@ -205,8 +205,6 @@ pub struct InflationLinkedBond {
     pub discount_curve_id: CurveId,
     /// Inflation index identifier
     pub inflation_index_id: CurveId,
-    /// Quoted clean price (if available)
-    pub quoted_clean: Option<f64>,
     /// Additional attributes
     #[builder(default)]
     /// Instrument-owned pricing inputs.
@@ -234,6 +232,24 @@ pub struct InflationLinkedBond {
 }
 
 impl InflationLinkedBond {
+    /// Quoted clean price per 100 of real face from
+    /// `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
+    ///
+    /// # Arguments
+    ///
+    /// * `purpose` - Name of the calculation needing the quote, used in the error.
+    pub(crate) fn quoted_clean_price_pct(&self, purpose: &str) -> Result<f64> {
+        self.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "{purpose} requires the clean price per 100 of real face in \
+                     instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
+                ))
+            })
+    }
+
     /// Validate the linker contract, schedule, and market-data identifiers.
     pub fn validate(&self) -> Result<()> {
         let context = format!("Inflation-linked bond '{}'", self.id.as_str());
@@ -266,11 +282,14 @@ impl InflationLinkedBond {
             )));
         }
         if self
-            .quoted_clean
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct
             .is_some_and(|price| !price.is_finite() || price <= 0.0)
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} quoted_clean must be positive and finite"
+                "{context} instrument_pricing_overrides.market_quotes.quoted_clean_price_pct \
+                 must be positive and finite"
             )));
         }
         if self.discount_curve_id.as_str().trim().is_empty()
@@ -330,7 +349,6 @@ impl InflationLinkedBond {
             calendar_id: None,
             discount_curve_id: CurveId::new("USD-OIS"),
             inflation_index_id: CurveId::new("US-CPI"),
-            quoted_clean: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -363,7 +381,6 @@ impl InflationLinkedBond {
             calendar_id: None,
             discount_curve_id: discount_curve_id.into(),
             inflation_index_id: inflation_index_id.into(),
-            quoted_clean: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -457,7 +474,6 @@ impl InflationLinkedBond {
             calendar_id: None,
             discount_curve_id: discount_curve_id.into(),
             inflation_index_id: inflation_index_id.into(),
-            quoted_clean: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -707,13 +723,7 @@ impl InflationLinkedBond {
         use finstack_quant_core::math::Compounding;
         use std::num::NonZeroU32;
 
-        let clean_price = self.quoted_clean.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Breakeven inflation requires a quoted clean price. \
-                 Set quoted_clean on the bond or pass price explicitly."
-                    .to_string(),
-            )
-        })?;
+        let clean_price = self.quoted_clean_price_pct("Breakeven inflation")?;
         let real_yield_street = self.real_yield(clean_price, as_of)?;
 
         // Convert the Street-compounded (periodic, aligned with coupon frequency)
@@ -773,8 +783,9 @@ impl InflationLinkedBond {
     ///
     /// # Arguments
     ///
-    /// * `as_of` - Valuation date; the real yield is solved from `quoted_clean`
-    ///   at this date.
+    /// * `as_of` - Valuation date; the real yield is solved from
+    ///   `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct` at
+    ///   this date.
     /// * `ytm_bump_bp` - Real-yield shock in basis points (1.0 = 1bp) used for
     ///   the central difference; must be finite and positive. The
     ///   `RealDuration` metric passes
@@ -785,11 +796,7 @@ impl InflationLinkedBond {
         };
 
         // Determine a base clean price to center the bump around
-        let base_clean = self.quoted_clean.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Real duration requires quoted_clean, the same clean price per 100 used for real yield".into(),
-            )
-        })?;
+        let base_clean = self.quoted_clean_price_pct("Real duration")?;
         if !ytm_bump_bp.is_finite() || ytm_bump_bp <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "real duration ytm_bump_bp must be finite and positive, got {ytm_bump_bp}"
@@ -957,6 +964,17 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use time::Month;
 
+    #[test]
+    fn rejects_retired_top_level_quoted_clean_key() {
+        let mut value =
+            serde_json::to_value(InflationLinkedBond::example()).expect("serialize linker");
+        // schema-rejection-test
+        value["quoted_clean"] = serde_json::json!(100.0);
+        let error = serde_json::from_value::<InflationLinkedBond>(value)
+            .expect_err("retired quoted_clean must be rejected");
+        assert!(error.to_string().contains("unknown field"), "{error}");
+    }
+
     // ── C8 regression: breakeven inflation compounding convention ──────────────
 
     /// Regression test for C8: the Fisher identity is only exact when both the
@@ -1001,8 +1019,9 @@ mod tests {
             calendar_id: None,
             discount_curve_id: CurveId::new("USD-NOM"),
             inflation_index_id: CurveId::new("US-CPI"),
-            quoted_clean: Some(100.0), // par → real yield == coupon (4 % semi-annual)
-            instrument_pricing_overrides: Default::default(),
+            // par → real yield == coupon (4 % semi-annual)
+            instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default()
+                .with_quoted_clean_price_pct(100.0),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
@@ -1115,8 +1134,8 @@ mod tests {
             calendar_id: None,
             discount_curve_id: CurveId::new("USD-OIS"),
             inflation_index_id: CurveId::new("US-CPI"),
-            quoted_clean: Some(100.0),
-            instrument_pricing_overrides: Default::default(),
+            instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default()
+                .with_quoted_clean_price_pct(100.0),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
@@ -1195,7 +1214,6 @@ mod tests {
             calendar_id: None,
             discount_curve_id: CurveId::new("USD-OIS"),
             inflation_index_id: CurveId::new("US-CPI"),
-            quoted_clean: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),

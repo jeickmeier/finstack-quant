@@ -924,7 +924,7 @@ fn flat_consistent_market() -> MarketContext {
 fn quote_facility(
     base_rate_spec: BaseRateSpec,
     drawn: f64,
-    quoted_clean_price: Option<f64>,
+    quoted_clean_price_pct: Option<f64>,
     quoted_dm: Option<f64>,
 ) -> RevolvingCredit {
     let mut facility = RevolvingCredit::builder()
@@ -945,7 +945,7 @@ fn quote_facility(
     facility
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = quoted_clean_price;
+        .quoted_clean_price_pct = quoted_clean_price_pct;
     facility
         .instrument_pricing_overrides
         .market_quotes

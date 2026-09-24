@@ -184,7 +184,8 @@ listed=deepcopy(tracks.futures_inputs()["SPX-FUTURE-CALL"])
 listed["instrument"]["type"]="commodity_future_option"
 listed["instrument"]["spec"]["id"]="WTI-FUTURE-CALL"
 terms=listed["instrument"]["spec"]["terms"]
-terms.update(contracts=1.,multiplier=1000.,underlying="CL-SEP25",futures_price=72.,strike=75.,volatility=.30)
+terms.update(contracts=1.,multiplier=1000.,underlying="CL-SEP25",futures_price=72.,strike=75.)
+listed["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":{"implied_volatility":.30}}
 listed_value=price_instrument(json.dumps(listed),market,AS_OF,model="discounting").value.amount
 expiry=date.fromisoformat(terms["expiry"]);t=(expiry-AS_OF).days/365
 d1=(math.log(72/75)+.5*.30**2*t)/(.30*math.sqrt(t));d2=d1-.30*math.sqrt(t)

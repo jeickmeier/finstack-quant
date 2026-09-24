@@ -60,7 +60,7 @@ fn japanese_simple_yield_at_par_equals_coupon() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = two_year_jgb_style_bond();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
     let market = flat_jpy_market(as_of);
 
     let y = japanese_simple_yield(&bond, &market, as_of);
@@ -80,7 +80,7 @@ fn japanese_simple_yield_matches_closed_form_discount() {
 
     let mut bond = two_year_jgb_style_bond();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(dirty_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(dirty_pct);
     let market = flat_jpy_market(as_of);
 
     let solved = japanese_simple_yield(&bond, &market, as_of);
@@ -100,7 +100,7 @@ fn japanese_simple_yield_matches_closed_form_premium() {
 
     let mut bond = two_year_jgb_style_bond();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(dirty_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(dirty_pct);
     let market = flat_jpy_market(as_of);
 
     let solved = japanese_simple_yield(&bond, &market, as_of);
@@ -140,7 +140,7 @@ fn quote_engine_seeds_from_japanese_simple_yield_without_street_ytm() {
 
     let mut priced = bond;
     priced.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(quotes.clean_price_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(quotes.clean_price_pct);
     let recovered = japanese_simple_yield(&priced, &market, as_of);
     assert!(
         (recovered - target).abs() < 1e-12,
@@ -162,7 +162,7 @@ fn jgb_street_ytm_is_unchanged_and_distinct_from_simple_yield() {
     )
     .expect("JGB");
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5);
     let market = flat_jpy_market(as_of);
 
     let result = bond
@@ -192,7 +192,7 @@ fn japanese_simple_yield_rejects_non_positive_remaining_life() {
     let as_of = date!(2027 - 01 - 01);
     let mut bond = two_year_jgb_style_bond();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
     let market = flat_jpy_market(date!(2025 - 01 - 01));
 
     let err = bond
@@ -274,7 +274,7 @@ fn japanese_simple_yield_mid_period_uses_clean_price_and_round_trips() {
 
     let mut quoted = two_year_jgb_style_bond();
     quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean);
     let y = japanese_simple_yield(&quoted, &market, as_of);
     assert!(
         (y - expected).abs() < 1e-12,
@@ -303,7 +303,7 @@ fn japanese_simple_yield_mid_period_uses_clean_price_and_round_trips() {
     );
     let mut priced = two_year_jgb_style_bond();
     priced.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(quotes.clean_price_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(quotes.clean_price_pct);
     let recovered = japanese_simple_yield(&priced, &market, as_of);
     assert!(
         (recovered - target).abs() < 1e-12,

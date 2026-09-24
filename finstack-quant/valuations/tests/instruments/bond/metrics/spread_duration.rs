@@ -39,7 +39,7 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
     )
     .expect("finite coupon");
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(96.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(96.5);
 
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -221,7 +221,7 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
         puts: vec![],
     });
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_quote);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_quote);
 
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)

@@ -338,24 +338,38 @@ fn test_various_day_count_conventions() {
 }
 
 #[test]
-fn test_quoted_clean_price() {
+fn test_quoted_clean_price_pct() {
     // Arrange & Act
     let mut bond = sample_tips();
 
     // Assert - quoted price can be set and cleared
-    // Note: sample_tips() may or may not have a default quoted_clean
+    // Note: sample_tips() may or may not have a default quoted_clean_price_pct
 
     // Act - update quoted price
-    bond.quoted_clean = Some(105.5);
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(105.5);
 
     // Assert
-    assert_eq!(bond.quoted_clean, Some(105.5));
+    assert_eq!(
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct,
+        Some(105.5)
+    );
 
     // Act - clear quoted price
-    bond.quoted_clean = None;
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = None;
 
     // Assert
-    assert_eq!(bond.quoted_clean, None);
+    assert_eq!(
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct,
+        None
+    );
 }
 
 #[test]

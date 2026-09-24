@@ -112,7 +112,7 @@ fn test_dm_non_callable_succeeds() {
     );
 }
 
-/// DM should reject callable floating loans without quoted_clean_price.
+/// DM should reject callable floating loans without quoted_clean_price_pct.
 #[test]
 fn test_dm_callable_without_price_rejects() {
     let call_schedule = LoanCallSchedule {
@@ -139,8 +139,8 @@ fn test_dm_callable_without_price_rejects() {
         Err(e) => {
             let msg = e.to_string();
             assert!(
-                msg.contains("DiscountMargin requires quoted_clean_price"),
-                "Error should mention callable + quoted_clean_price, got: {msg}"
+                msg.contains("DiscountMargin requires quoted_clean_price_pct"),
+                "Error should mention callable + quoted_clean_price_pct, got: {msg}"
             );
         }
         Ok(r) => {
@@ -155,7 +155,7 @@ fn test_dm_callable_without_price_rejects() {
     }
 }
 
-/// DM should work on callable floating loans when quoted_clean_price is set.
+/// DM should work on callable floating loans when quoted_clean_price_pct is set.
 #[test]
 fn test_dm_callable_with_quoted_price_succeeds() {
     let call_schedule = LoanCallSchedule {
@@ -167,7 +167,7 @@ fn test_dm_callable_with_quoted_price_succeeds() {
     };
     let mut overrides = InstrumentPricingOverrides {
         market_quotes: MarketQuoteOverrides {
-            quoted_clean_price: Some(99.0),
+            quoted_clean_price_pct: Some(99.0),
             ..Default::default()
         },
         ..Default::default()
@@ -184,7 +184,7 @@ fn test_dm_callable_with_quoted_price_succeeds() {
             &[MetricId::DiscountMargin],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
-        .expect("DM should succeed when quoted_clean_price is set");
+        .expect("DM should succeed when quoted_clean_price_pct is set");
 
     let dm = *result.measures.get("discount_margin").unwrap();
     // Coupons project at ~7% (4.5% index + 250 bp) while the model discounts
@@ -229,7 +229,7 @@ fn solve_dm_at_clean_price(margin_bp: i64, clean_px: f64) -> f64 {
     let maturity = date!(2028 - 01 - 01);
     let overrides = InstrumentPricingOverrides {
         market_quotes: MarketQuoteOverrides {
-            quoted_clean_price: Some(clean_px),
+            quoted_clean_price_pct: Some(clean_px),
             ..Default::default()
         },
         ..Default::default()

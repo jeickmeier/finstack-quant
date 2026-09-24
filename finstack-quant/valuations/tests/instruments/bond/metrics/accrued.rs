@@ -92,7 +92,7 @@ fn test_quoted_price_accrued_uses_settlement_date() {
     )
     .unwrap();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5);
 
     let market = create_curve(as_of);
     let result = bond

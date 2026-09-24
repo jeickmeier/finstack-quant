@@ -174,8 +174,12 @@ fn test_real_duration_uses_quoted_price() {
     let mut ilb1 = sample_tips();
     let mut ilb2 = sample_tips();
 
-    ilb1.quoted_clean = Some(100.0);
-    ilb2.quoted_clean = Some(110.0);
+    ilb1.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
+    ilb2.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(110.0);
 
     let as_of = d(2025, 1, 2);
 

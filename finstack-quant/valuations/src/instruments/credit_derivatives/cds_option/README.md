@@ -24,8 +24,7 @@ Import path:
 | `CDSOptionStrikeKind` | Discriminant for branching pricing and metric paths. |
 | `ProtectionStartConvention` | `Spot` (default) or `Forward`. |
 
-Useful methods on `CDSOption`: `with_implied_vol(vol)` (instrument-level vol
-override, highest precedence), `effective_cash_settlement_date(as_of)`, and the
+Useful methods on `CDSOption`: `effective_cash_settlement_date(as_of)`, and the
 direct Greek entry points `delta`, `gamma`, `vega`, `theta` and
 `implied_vol(curves, as_of, target_price, initial_guess)`. Each is the same
 computation the corresponding metric calculator registers.

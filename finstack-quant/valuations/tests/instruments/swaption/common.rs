@@ -111,6 +111,17 @@ pub fn create_standard_receiver_swaption(
 }
 
 /// Create a complete market context with flat curves and vol surface
+/// Stamp the swaption's own model PV as the observed premium in
+/// `instrument_pricing_overrides.market_quotes.quoted_premium`, so `ImpliedVol`
+/// inverts back to the pricing volatility (a solver round trip).
+pub fn with_model_premium(mut swaption: Swaption, market: &MarketContext, as_of: Date) -> Swaption {
+    let pv = swaption.value(market, as_of).expect("model PV").amount();
+    swaption.instrument_pricing_overrides = swaption
+        .instrument_pricing_overrides
+        .with_quoted_premium(pv);
+    swaption
+}
+
 pub fn create_flat_market(as_of: Date, rate: f64, vol: f64) -> MarketContext {
     let disc_curve = build_flat_discount_curve(rate, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(rate, as_of, "USD_LIBOR_3M");

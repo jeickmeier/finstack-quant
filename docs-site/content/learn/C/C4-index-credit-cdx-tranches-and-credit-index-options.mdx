@@ -42,7 +42,7 @@ Recovery links an approximate flat hazard to spread through `hazard ≈ spread/(
 
 A payer buys the right to pay a fixed spread and receive protection; it benefits from spread widening. A receiver takes the opposite option direction. The native `bloomberg_cdso` selector uses a spread-option treatment with risky-annuity and front-end-protection conventions. A knockout option can terminate on the relevant default event. Non-knockout index treatment can retain protection for losses before option expiry. Always state factor, realized index loss, settlement and knockout conventions together.
 
-The spread strike is decimal: `0.01` means 100 bp. The example surface contains lognormal spread volatility, also decimal: `0.40` means 40%. This is not a 40 bp normal volatility. Surface expiry and strike axes must match the instrument's lookup convention. `implied_vol` below inverts the model's own value and is a consistency check; it is not an independent calibration to an observed premium. `par_spread` metrics are displayed in basis points, so they must not be inserted unconverted into a decimal strike field.
+The spread strike is decimal: `0.01` means 100 bp. The example surface contains lognormal spread volatility, also decimal: `0.40` means 40%. This is not a 40 bp normal volatility. Surface expiry and strike axes must match the instrument's lookup convention. `implied_vol` below inverts the model's own value, stamped as `market_quotes.quoted_premium`, and is a consistency check; it is not an independent calibration to an observed premium. `par_spread` metrics are displayed in basis points, so they must not be inserted unconverted into a decimal strike field.
 
 ### Tranche delta and correlation are different risks
 
@@ -143,7 +143,9 @@ print({"single_curve_pv":index.value.amount,"constituent_pv":by_name.value.amoun
 <ExecutedOutput lesson="C4" block="c4-constituents" />
 {/* notebook-block notebook="02_pricing/instruments/credit_index_and_options.ipynb" cell="c4-option-risk" role="build" */}
 ```python exec id=c4-option-risk role=build
-option_risk=price_instrument(json.dumps(payer),market,AS_OF,model="bloomberg_cdso",
+quoted=deepcopy(payer)
+quoted["instrument"]["spec"].setdefault("instrument_pricing_overrides",{}).setdefault("market_quotes",{})["quoted_premium"]=nonko.value.amount
+option_risk=price_instrument(json.dumps(quoted),market,AS_OF,model="bloomberg_cdso",
     metrics=["implied_vol","vega","spread_dv01","par_spread"])
 receiver=deepcopy(payer);receiver["instrument"]["spec"]["option_type"]="put"
 receiver_price=price_instrument(json.dumps(receiver),market,AS_OF,model="bloomberg_cdso").value.amount
@@ -152,7 +154,7 @@ post_option["instrument"]["spec"].update({"index_factor":124/125,"realized_index
 post_option_price=price_instrument(json.dumps(post_option),market,AS_OF,model="bloomberg_cdso").value.amount
 print(pd.Series(option_risk.metrics))
 print({"payer_pv":nonko.value.amount,"receiver_pv":receiver_price,"post_default_payer_pv":post_option_price})
-print("Implied volatility here inverts the model PV; it is a consistency diagnostic, not an independent market calibration.")
+print("Implied volatility here inverts the model PV stamped as market_quotes.quoted_premium; it is a consistency diagnostic, not an independent market calibration.")
 ```
 {/* /notebook-block */}
 

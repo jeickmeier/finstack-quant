@@ -26,7 +26,9 @@ pub struct InterestRateFutureOption {
     pub id: InstrumentId,
     /// Complete listed or bilateral option-on-future terms.
     pub terms: FutureOptionTerms,
-    /// Instrument-owned pricing inputs, including optional tree-step overrides.
+    /// Instrument-owned pricing inputs: the flat option volatility in
+    /// `market_quotes.implied_volatility` (required while live) and optional
+    /// tree-step overrides.
     #[builder(default)]
     #[serde(
         default,
@@ -66,13 +68,17 @@ impl InterestRateFutureOption {
 
     /// Create a neutral schema and serialization example.
     pub fn example() -> finstack_quant_core::Result<Self> {
-        Self::new(
-            InstrumentId::new("INTEREST-RATE-FUTURE-OPTION-EXAMPLE"),
-            FutureOptionTerms {
-                underlying_price_change_per_bp: Some(-0.01),
-                ..FutureOptionTerms::example()?
-            },
-        )
+        Ok(Self {
+            instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default()
+                .with_implied_vol(0.20),
+            ..Self::new(
+                InstrumentId::new("INTEREST-RATE-FUTURE-OPTION-EXAMPLE"),
+                FutureOptionTerms {
+                    underlying_price_change_per_bp: Some(-0.01),
+                    ..FutureOptionTerms::example()?
+                },
+            )?
+        })
     }
 
     /// PV change for a one-basis-point increase in the mapped underlying rate.

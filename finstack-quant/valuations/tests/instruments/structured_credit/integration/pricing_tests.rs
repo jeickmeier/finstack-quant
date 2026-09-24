@@ -279,7 +279,7 @@ fn test_structured_credit_full_metric_suite() {
         .expect("dirty price should be returned");
     sc.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(model_price);
+        .quoted_clean_price_pct = Some(model_price);
 
     // Act: Request comprehensive metrics
     let result = sc.price_with_metrics(

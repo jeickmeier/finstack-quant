@@ -25,7 +25,7 @@ fn test_ytw_equals_ytm_for_non_callable_bond_from_price() {
     .unwrap();
     // Market-quoted clean price (percent of par)
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.5);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -86,7 +86,7 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
 
     // Two different quoted clean prices with the same curves
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
     let result_low = bond
         .price_with_metrics(
             &market,
@@ -98,7 +98,7 @@ fn test_ytw_tracks_quoted_price_not_model_pv() {
     let ytw_low = *result_low.measures.get("ytw").unwrap();
 
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(105.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(105.0);
     let result_high = bond
         .price_with_metrics(
             &market,
@@ -157,7 +157,7 @@ fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
         puts: vec![],
     });
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(105.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(105.0);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -269,7 +269,7 @@ fn test_ytw_floating_bond_matches_ytm_from_price() {
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
     let result = bond
         .price_with_metrics(
@@ -364,7 +364,7 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
     let result = bond
         .price_with_metrics(
@@ -410,7 +410,7 @@ fn test_ytw_characterization_example_callable() {
     let mut bond = Bond::example_callable().expect("example_callable should build");
     // Set a clean price quote at 102% of par (premium, triggers call analysis)
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(102.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(102.0);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)

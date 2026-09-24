@@ -142,7 +142,7 @@ fn curve_bump_dv01(
 }
 
 /// Bucketed DV01 calculator for bonds that handles the case where a market price
-/// quote (e.g. `quoted_clean_price`) is set.
+/// quote (e.g. `quoted_clean_price_pct`) is set.
 ///
 /// When no price driver is present the behaviour is identical to
 /// `UnifiedDv01Calculator` with `triangular_key_rate` config. When a price

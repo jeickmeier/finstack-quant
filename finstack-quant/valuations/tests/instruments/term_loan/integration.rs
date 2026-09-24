@@ -141,7 +141,7 @@ fn test_term_loan_yields_to_horizons() {
 }
 
 #[test]
-fn horizon_yields_use_quoted_clean_price() {
+fn horizon_yields_use_quoted_clean_price_pct() {
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
     let market = MarketContext::new().insert(build_flat_discount_curve(0.05, as_of, "USD-OIS"));
@@ -149,7 +149,7 @@ fn horizon_yields_use_quoted_clean_price() {
     let yield_at = |clean_price: f64| {
         let mut loan = build_simple_term_loan(as_of, maturity);
         loan.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_price);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_price);
         let result = loan
             .price_with_metrics(
                 &market,

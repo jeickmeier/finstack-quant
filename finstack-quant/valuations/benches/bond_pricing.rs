@@ -120,7 +120,7 @@ fn bench_bond_ytm(c: &mut Criterion) {
         let mut bond = create_test_bond(*tenor);
         // Set quoted price to require YTM solving
         bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
@@ -198,7 +198,7 @@ fn bench_bond_yield_dv01(c: &mut Criterion) {
     for tenor in [2, 5, 10, 30].iter() {
         let mut bond = create_test_bond(*tenor);
         bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(99.25);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.25);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             tenor,
@@ -255,7 +255,7 @@ fn create_callable_bond(maturity_years: i32) -> Bond {
     }
 
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(99.0)
+        .with_quoted_clean_price_pct(99.0)
         .with_hw1f_sigma(0.01)
         .with_hw1f_mean_reversion(0.03);
     bond
@@ -277,7 +277,7 @@ fn create_floating_note(maturity_years: i32) -> Bond {
     )
     .expect("Bond::floating should succeed with valid parameters");
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.25);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.25);
     bond
 }
 
@@ -294,7 +294,7 @@ fn bench_callable_bond_tree_pv(c: &mut Criterion) {
         // remove it here so `Bond::value` cannot return the pinned quote.
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = None;
+            .quoted_clean_price_pct = None;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}Y", tenor)),
             &tenor,
@@ -393,7 +393,7 @@ fn bench_spread_metrics(c: &mut Criterion) {
     let base_fixed = {
         let mut bond = create_test_bond(10);
         bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(99.25);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.25);
         bond
     };
 
@@ -536,7 +536,7 @@ fn create_call_window_bond() -> Bond {
         puts: Vec::new(),
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(99.0)
+        .with_quoted_clean_price_pct(99.0)
         .with_hw1f_sigma(0.01)
         .with_hw1f_mean_reversion(0.03);
     bond
@@ -553,7 +553,7 @@ fn bench_call_window(c: &mut Criterion) {
     unquoted
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = None;
+        .quoted_clean_price_pct = None;
 
     group.bench_function("tree_pv_5y_window", |b| {
         b.iter(|| {

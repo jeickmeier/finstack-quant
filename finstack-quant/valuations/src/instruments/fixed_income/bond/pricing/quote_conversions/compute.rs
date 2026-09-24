@@ -31,7 +31,7 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 /// The engine:
 /// - Normalizes the chosen `quote_input` into a **canonical dirty price in currency**.
 /// - Derives the corresponding clean price (% of par) and stamps it into
-///   `pricing_overrides.quoted_clean_price` on an internal bond clone.
+///   `pricing_overrides.quoted_clean_price_pct` on an internal bond clone.
 /// - Uses the selected pricing and metric registries to compute the remaining
 ///   metrics.
 ///
@@ -141,7 +141,7 @@ pub fn compute_quotes(
     {
         let quotes = &mut bond_for_metrics.instrument_pricing_overrides.market_quotes;
         match quote_input {
-            BondQuoteInput::CleanPricePct(v) => quotes.quoted_clean_price = Some(v),
+            BondQuoteInput::CleanPricePct(v) => quotes.quoted_clean_price_pct = Some(v),
             BondQuoteInput::DirtyPriceCurrency(v) => quotes.quoted_dirty_price_currency = Some(v),
             BondQuoteInput::Ytm(v) => quotes.quoted_ytm = Some(v),
             BondQuoteInput::Ytw(v) => quotes.quoted_ytw = Some(v),
@@ -178,7 +178,7 @@ pub fn compute_quotes(
     bond_for_metrics
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(clean_price_pct);
+        .quoted_clean_price_pct = Some(clean_price_pct);
 
     // 2) Build metric context with the same model and registries for the rest.
     let base_value = finstack_quant_core::money::Money::new(
@@ -207,7 +207,6 @@ pub fn compute_quotes(
     }
     ctx.set_recalibration_provider(options.recalibration_provider.clone());
     ctx.set_pricer_dispatch(pricing_dispatch);
-    ctx.set_instrument_overrides(bond_for_metrics.get_instrument_pricing_overrides().cloned());
     ctx.set_metric_overrides(bond_for_metrics.get_metric_pricing_overrides().cloned());
     bond_for_metrics.seed_metric_context(&mut ctx, curves, as_of);
     ctx.notional = Some(bond_for_metrics.notional);
@@ -316,7 +315,7 @@ pub(crate) fn settlement_dirty_from_quote_overrides(
     let notional = bond.notional.amount();
     let dirty = if let Some(dirty) = quotes.quoted_dirty_price_currency {
         dirty
-    } else if let Some(clean_pct) = quotes.quoted_clean_price {
+    } else if let Some(clean_pct) = quotes.quoted_clean_price_pct {
         quote_ctx.dirty_from_clean_pct(clean_pct, notional)
     } else if let Some(ytm) = quotes.quoted_ytm {
         let flows = quote_ctx.entitled_flows(bond, curves, as_of)?;

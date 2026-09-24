@@ -219,9 +219,13 @@ fn test_metrics_registry_implied_vol() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
     let target_vol = 0.30;
-    let option = CDSOptionBuilder::new().implied_vol(target_vol).build(as_of);
+    let mut option = CDSOptionBuilder::new().implied_vol(target_vol).build(as_of);
 
     let pv = option.value(&market, as_of).unwrap();
+    option
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(pv.amount());
     let mut ctx = MetricContext::new(
         std::sync::Arc::new(option),
         std::sync::Arc::new(market),

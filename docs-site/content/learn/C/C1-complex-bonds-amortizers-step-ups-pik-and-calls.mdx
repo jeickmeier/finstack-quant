@@ -134,7 +134,7 @@ The clean quote of 100 is a synthetic exercise input. It is deliberately supplie
 {/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="complex-bond-yield-oas" role="build" */}
 ```python exec id=complex-bond-yield-oas role=build
 quoted=deepcopy(complex_payload)
-quoted["instrument"]["spec"]["instrument_pricing_overrides"]["market_quotes"]={"quoted_clean_price":100.0}
+quoted["instrument"]["spec"]["instrument_pricing_overrides"]["market_quotes"]={"quoted_clean_price_pct":100.0}
 quoted_risk=price_instrument(json.dumps(quoted),credit_market,AS_OF,metrics=["ytm","ytw","oas","embedded_option_value"])
 print(pd.Series(quoted_risk.metrics))
 ```
@@ -249,7 +249,7 @@ a["instrument_pricing_overrides"]={"model_config":{"hw1f_mean_reversion":.03,"hw
 answer_json=validate_instrument_json(json.dumps(answer))
 answer_price=price_instrument(answer_json,credit_market,AS_OF).value.amount
 # Quote price and model value answer different questions.
-a["instrument_pricing_overrides"]["market_quotes"]={"quoted_clean_price":100.}
+a["instrument_pricing_overrides"]["market_quotes"]={"quoted_clean_price_pct":100.}
 answer_yields=price_instrument(json.dumps(answer),credit_market,AS_OF,metrics=["ytm","ytw","oas"])
 print({"model_value":answer_price,**answer_yields.metrics})
 ```

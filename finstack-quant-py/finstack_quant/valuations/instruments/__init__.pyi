@@ -14440,7 +14440,7 @@ class EquityOption:
         self,
         market: MarketContext | str,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-        market_price: float,
+        target_price: float,
     ) -> float:
         """
         Recover decimal volatility with the configured exercise engine,
@@ -14454,8 +14454,9 @@ class EquityOption:
             Market carrying the discount curve, spot and (optional) dividend yield.
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date strictly before expiry and observed exercise.
-        market_price : float
-            Finite non-negative total trade PV in the notional currency.
+        target_price : float
+            Observed option premium: finite non-negative total trade PV in the
+            notional currency, including the contract multiplier.
 
         Returns
         -------
@@ -24131,7 +24132,7 @@ def bond_from_cashflows_json(
     instrument_id: str,
     schedule_json: str,
     discount_curve_id: str,
-    quoted_clean: float | None = None,
+    quoted_clean_price_pct: float | None = None,
 ) -> str:
     """
     Construct tagged bond instrument JSON from a cashflow schedule.
@@ -24144,8 +24145,9 @@ def bond_from_cashflows_json(
         JSON-encoded ``CashFlowSchedule``.
     discount_curve_id : str
         Discount curve ID required for pricing.
-    quoted_clean : float, optional
-        Clean quoted price as a percent of par.
+    quoted_clean_price_pct : float, optional
+        Clean quoted price in percent of par (``99.5`` = 99.5%), stored as
+        ``instrument_pricing_overrides.market_quotes.quoted_clean_price_pct``.
 
     Returns
     -------

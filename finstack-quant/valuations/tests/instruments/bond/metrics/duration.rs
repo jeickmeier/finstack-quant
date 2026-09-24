@@ -25,7 +25,7 @@ fn test_duration_zero_coupon() {
     )
     .unwrap();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(70.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(70.0);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -76,7 +76,7 @@ fn test_yield_duration_convexity_act_act_isma() {
     }
     bond.settlement_convention = None;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
 
     let curve = DiscountCurve::builder("GBP-OIS")
         .base_date(as_of)
@@ -236,7 +236,7 @@ fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
         puts: vec![],
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(105.0)
+        .with_quoted_clean_price_pct(105.0)
         .with_hw1f_sigma(0.01)
         .with_hw1f_mean_reversion(0.03);
     bond
@@ -502,7 +502,7 @@ fn test_callable_workout_duration_uses_workout_yield_denominator() {
     let as_of = date!(2025 - 01 - 01);
     let mut callable = callable_risk_bond(as_of);
     callable.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(115.0)
+        .with_quoted_clean_price_pct(115.0)
         .with_hw1f_sigma(0.01)
         .with_hw1f_mean_reversion(0.03);
     let market = callable_risk_market(as_of);

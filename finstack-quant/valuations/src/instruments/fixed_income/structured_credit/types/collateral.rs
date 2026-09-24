@@ -184,17 +184,17 @@ impl<'a> CollateralInstrument<'a> {
     }
 
     /// Quoted clean price from the instrument's pricing overrides, if any.
-    pub fn quoted_clean_price(self) -> Option<f64> {
+    pub fn quoted_clean_price_pct(self) -> Option<f64> {
         match self {
             Self::Bond(bond) => {
                 bond.instrument_pricing_overrides
                     .market_quotes
-                    .quoted_clean_price
+                    .quoted_clean_price_pct
             }
             Self::TermLoan(loan) => {
                 loan.instrument_pricing_overrides
                     .market_quotes
-                    .quoted_clean_price
+                    .quoted_clean_price_pct
             }
             Self::Revolver(_) => None,
         }
@@ -294,11 +294,11 @@ impl InstrumentCollateral {
             let id = instrument.id();
             if instrument.has_calls()
                 && self.call_policy_for(id) == CallExercisePolicy::Worst
-                && instrument.quoted_clean_price().is_none()
+                && instrument.quoted_clean_price_pct().is_none()
             {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "call policy 'worst' requires a quoted clean price on instrument '{id}' \
-                     (set instrument_pricing_overrides.market_quotes.quoted_clean_price)"
+                     (set instrument_pricing_overrides.market_quotes.quoted_clean_price_pct)"
                 )));
             }
         }

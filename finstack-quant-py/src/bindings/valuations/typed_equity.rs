@@ -177,7 +177,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         Ok(Self { inner })
     }
 
-    /// Implied volatility that reproduces ``market_price``.
+    /// Implied volatility that reproduces ``target_price``.
     ///
     /// Uses the configured exercise engine, dividend schedule and model day count;
     /// trial volatility replaces the active surface or override.
@@ -188,8 +188,9 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     ///     Market carrying the discount curve, spot and (optional) dividend yield.
     /// as_of : datetime.date | str
     ///     Valuation date strictly before expiry and observed exercise.
-    /// market_price : float
-    ///     Finite non-negative total trade PV in the notional currency.
+    /// target_price : float
+    ///     Observed option premium: finite non-negative total trade PV in the
+    ///     notional currency, including the contract multiplier.
     ///
     /// Returns
     /// -------
@@ -204,18 +205,18 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     ///     If required market data is missing from ``market``.
     /// RuntimeError
     ///     If the root search does not converge.
-    #[pyo3(text_signature = "($self, market, as_of, market_price)")]
+    #[pyo3(text_signature = "($self, market, as_of, target_price)")]
     fn implied_vol(
         &self,
         py: Python<'_>,
         market: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
-        market_price: f64,
+        target_price: f64,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
         let as_of = extract_date(as_of)?;
         self.inner
-            .implied_vol(&market, as_of, market_price)
+            .implied_vol(&market, as_of, target_price)
             .map_err(core_to_py)
     }
 

@@ -181,7 +181,9 @@ fn tips_benchmark(id: &str, maturity: Date) -> InflationLinkedBond {
         .stub(StubKind::None)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .inflation_index_id(CurveId::new("US-CPI-U"))
-        .quoted_clean_opt(Some(100.0))
+        .instrument_pricing_overrides(
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0),
+        )
         .attributes(Attributes::new())
         .build()
         .expect("TIPS")

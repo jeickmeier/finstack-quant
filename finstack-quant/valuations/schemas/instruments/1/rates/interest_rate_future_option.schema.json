@@ -221,11 +221,6 @@
             "number",
             "null"
           ]
-        },
-        "volatility": {
-          "description": "Annualized volatility. Decimal lognormal units for Black-76; futures-price\npoints per square-root year for the normal model.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
@@ -239,7 +234,6 @@
         "exercise_style",
         "expiry",
         "settlement",
-        "volatility",
         "model",
         "premium_style",
         "day_count",
@@ -267,7 +261,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -346,6 +340,11 @@
         "spec": {
           "attributes": {},
           "id": "INTEREST-RATE-FUTURE-OPTION-EXAMPLE",
+          "instrument_pricing_overrides": {
+            "market_quotes": {
+              "implied_volatility": 0.2
+            }
+          },
           "terms": {
             "contracts": 1.0,
             "currency": "USD",
@@ -365,8 +364,7 @@
             },
             "strike": 100.0,
             "underlying": "UNDERLYING-FUTURE",
-            "underlying_price_change_per_bp": -0.01,
-            "volatility": 0.2
+            "underlying_price_change_per_bp": -0.01
           }
         },
         "type": "interest_rate_future_option"

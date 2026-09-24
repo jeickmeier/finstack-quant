@@ -512,6 +512,7 @@ fn test_quantlib_parity_implied_vol_recovery() {
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = create_flat_market(as_of, 0.05, input_vol);
 
+    let swaption = with_model_premium(swaption, &market, as_of);
     let result = swaption
         .price_with_metrics(
             &market,
@@ -546,6 +547,7 @@ fn test_quantlib_parity_implied_vol_stability() {
     for strike in [0.03, 0.04, 0.05, 0.06, 0.07] {
         let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
 
+        let swaption = with_model_premium(swaption, &market, as_of);
         let result = swaption
             .price_with_metrics(
                 &market,
@@ -827,6 +829,7 @@ fn test_quantlib_parity_full_greeks_suite() {
         MetricId::ImpliedVol,
     ];
 
+    let swaption = with_model_premium(swaption, &market, as_of);
     let result = swaption
         .price_with_metrics(
             &market,

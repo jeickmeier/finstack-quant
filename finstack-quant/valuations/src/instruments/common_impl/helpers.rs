@@ -562,7 +562,6 @@ pub(crate) fn compute_metrics_dyn(
     context.set_pricer_dispatch(pricing_dispatch);
 
     // Preserve only the subsets consumed by the metric layer.
-    context.set_instrument_overrides(instrument.get_instrument_pricing_overrides().cloned());
     context.set_metric_overrides(instrument.get_metric_pricing_overrides().cloned());
 
     // Allow instruments to pre-seed the metric context with cached data (e.g., pre-computed

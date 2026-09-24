@@ -392,7 +392,7 @@ fn exercise_policies_redeem_when_they_should() {
         );
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = price;
+            .quoted_clean_price_pct = price;
         let deal = deal_with(DealSpec {
             collateral: InstrumentCollateral {
                 bonds: vec![bond],

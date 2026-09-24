@@ -157,7 +157,7 @@ term_sofr_fixings = [(first_fixing + timedelta(days=offset), 0.05) for offset in
 market.insert_series(ScalarTimeSeries('FIXING:USD-SOFR-3M', term_sofr_fixings))
 corporate=instruments('foundations')['USD-CORP']
 corporate['instrument']['spec']['cashflow_spec']['fixed']['stub']='short_front'
-corporate['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':99.0}}
+corporate['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':99.0}}
 r=price_instrument(json.dumps(corporate),market,AS_OF,metrics=['ytm','i_spread','z_spread','asw_par'])
 # A same-currency synthetic government yield is an explicit benchmark, not a native g_spread metric.
 government_yield=0.04

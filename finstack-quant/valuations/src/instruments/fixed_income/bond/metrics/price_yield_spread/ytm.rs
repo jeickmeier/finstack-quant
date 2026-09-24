@@ -48,7 +48,7 @@ impl MetricCalculator for YtmCalculator {
         let maybe_clean_px = bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price;
+            .quoted_clean_price_pct;
         let notional = bond.notional;
         let day_count = bond.cashflow_spec.day_count();
         let discount_curve_id = bond.discount_curve_id.to_owned();

@@ -783,7 +783,6 @@ impl Pricer for BermudanSwaptionPricer {
             let expected = super::metrics::bermudan_greeks::expected_exercise_time(&valuator);
             context.computed.insert(exercise_metric, expected);
         }
-        context.set_instrument_overrides(Some(swaption.instrument_pricing_overrides.clone()));
         context.set_instrument(Arc::new(swaption));
         if let crate::pricer::PricingDispatch::Registered { model, registry } =
             context.clone_pricer_dispatch()

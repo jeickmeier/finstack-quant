@@ -96,7 +96,8 @@ fn test_yield_dv01_duration_price_relationship() {
     let maturity = date!(2029 - 01 - 01);
 
     // Use pricing override to ensure bond is at par (clean price = 100)
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    let pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let bond = Bond::builder()
         .id("DV01_REL".into())

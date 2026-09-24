@@ -19,6 +19,9 @@ macro_rules! impl_future_option_instrument {
 
             /// Return the contract's signed fair value in settlement currency.
             ///
+            /// A live option is priced with the flat volatility in
+            /// `instrument_pricing_overrides.market_quotes.implied_volatility`.
+            ///
             /// # Arguments
             ///
             /// * `market` - Market context containing the settlement discount curve.
@@ -31,6 +34,7 @@ macro_rules! impl_future_option_instrument {
                 self.terms.npv_raw(
                     &self.id,
                     self.instrument_pricing_overrides.model_config.tree_steps,
+                    self.instrument_pricing_overrides.market_quotes.implied_volatility,
                     market,
                     as_of,
                 )
@@ -49,6 +53,7 @@ macro_rules! impl_future_option_instrument {
             ) -> finstack_quant_core::Result<f64> {
                 self.terms.cash_delta(
                     self.instrument_pricing_overrides.model_config.tree_steps,
+                    self.instrument_pricing_overrides.market_quotes.implied_volatility,
                     market,
                     as_of,
                 )
@@ -67,12 +72,13 @@ macro_rules! impl_future_option_instrument {
             ) -> finstack_quant_core::Result<f64> {
                 self.terms.cash_gamma(
                     self.instrument_pricing_overrides.model_config.tree_steps,
+                    self.instrument_pricing_overrides.market_quotes.implied_volatility,
                     market,
                     as_of,
                 )
             }
 
-            /// Cash vega for a +0.01 absolute bump in the configured volatility units.
+            /// Cash vega for a +0.01 absolute bump in `market_quotes.implied_volatility` units.
             ///
             /// # Arguments
             ///
@@ -85,6 +91,7 @@ macro_rules! impl_future_option_instrument {
             ) -> finstack_quant_core::Result<f64> {
                 self.terms.cash_vega(
                     self.instrument_pricing_overrides.model_config.tree_steps,
+                    self.instrument_pricing_overrides.market_quotes.implied_volatility,
                     market,
                     as_of,
                 )
@@ -103,6 +110,7 @@ macro_rules! impl_future_option_instrument {
             ) -> finstack_quant_core::Result<f64> {
                 self.terms.cash_theta(
                     self.instrument_pricing_overrides.model_config.tree_steps,
+                    self.instrument_pricing_overrides.market_quotes.implied_volatility,
                     market,
                     as_of,
                 )

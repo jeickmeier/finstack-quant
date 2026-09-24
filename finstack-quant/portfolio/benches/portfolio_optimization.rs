@@ -63,7 +63,7 @@ fn bond_book(n_positions: usize, as_of: Date) -> finstack_quant_portfolio::Portf
         )
         .expect("bench: bond");
         bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
         let rating = match index % 3 {
             0 => "AAA",
             1 => "BBB",

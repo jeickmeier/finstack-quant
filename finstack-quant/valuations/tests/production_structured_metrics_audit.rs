@@ -148,7 +148,7 @@ fn production_structured_metrics_clean_quote_adds_accrued_once() {
     let as_of = date!(2024 - 02 - 15);
     deal.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(99.25);
+        .quoted_clean_price_pct = Some(99.25);
     let flows =
         generate_tranche_cashflows(&deal, deal.tranches.tranches[0].id.as_str(), &market, as_of)
             .expect("flows");

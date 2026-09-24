@@ -66,7 +66,7 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
     bond_with_price
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(clean_pct);
+        .quoted_clean_price_pct = Some(clean_pct);
     let res = bond_with_price
         .price_with_metrics(
             &market,
@@ -102,7 +102,7 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
     bond_with_price_z
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(clean_pct_z);
+        .quoted_clean_price_pct = Some(clean_pct_z);
     let res_z = bond_with_price_z
         .price_with_metrics(
             &market,
@@ -173,7 +173,7 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
 
     let mut frn_with_price = frn;
     frn_with_price.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct);
 
     let res = frn_with_price
         .price_with_metrics(
@@ -241,7 +241,7 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
 
     let mut bond_with_oas_price = bond.clone();
     bond_with_oas_price.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct_oas);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct_oas);
     let res_oas = bond_with_oas_price
         .price_with_metrics(
             &market,
@@ -275,7 +275,7 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
 
     let mut bond_with_asw_price = bond;
     bond_with_asw_price.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct_asw);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct_asw);
     let res_asw = bond_with_asw_price
         .price_with_metrics(
             &market,
@@ -328,7 +328,7 @@ fn test_quote_engine_roundtrip_i_spread_fixed_bond() {
 
     let mut bond_with_price = bond;
     bond_with_price.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct);
     let res = bond_with_price
         .price_with_metrics(
             &market,

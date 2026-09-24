@@ -778,7 +778,7 @@ mod tests {
         clean_price
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(100.0);
+            .quoted_clean_price_pct = Some(100.0);
         let clean_result = crate::pricer::standard_pricer_registry()
             .price_with_metrics(
                 &clean_price,

@@ -30,7 +30,7 @@ fn test_z_spread_discount_bond() {
     )
     .unwrap();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -110,7 +110,7 @@ fn test_z_spread_reports_bond_compounding_spread() {
         })
         .sum::<f64>();
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(100.0 * target_dirty / notional.amount());
+        .with_quoted_clean_price_pct(100.0 * target_dirty / notional.amount());
 
     let result = bond
         .price_with_metrics(
@@ -145,7 +145,7 @@ fn test_i_spread_uses_quote_date_for_settlement_based_curve() {
     )
     .unwrap();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(quote_date)
@@ -190,7 +190,7 @@ fn test_asw_market_price_adjustment_has_correct_economic_sign() {
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
 
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
     let discount_result = bond
         .price_with_metrics(
             &market,
@@ -207,7 +207,7 @@ fn test_asw_market_price_adjustment_has_correct_economic_sign() {
     );
 
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(102.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(102.0);
     let premium_result = bond
         .price_with_metrics(
             &market,
@@ -241,7 +241,7 @@ fn test_asw_market_uses_configured_forward_curve() {
     )
     .unwrap();
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(98.0)
+        .with_quoted_clean_price_pct(98.0)
         .with_asw_forward_curve_id("USD-SOFR-6M");
 
     let discount_curve = DiscountCurve::builder("USD-OIS")
@@ -308,7 +308,7 @@ fn test_asw_market_falls_back_to_bond_forward_curve_id() {
     .unwrap();
     bond.forward_curve_id = Some("USD-SOFR-6M".into());
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
 
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -404,13 +404,13 @@ fn test_oas_metric_uses_bond_tree_pricing_overrides() {
 
     let mut low_vol_bond = base_bond.clone();
     low_vol_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(99.0)
+        .with_quoted_clean_price_pct(99.0)
         .with_hw1f_sigma(0.001)
         .with_hw1f_mean_reversion(0.03);
 
     let mut high_vol_bond = base_bond;
     high_vol_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(99.0)
+        .with_quoted_clean_price_pct(99.0)
         .with_hw1f_sigma(0.05)
         .with_hw1f_mean_reversion(0.03);
 
@@ -470,7 +470,7 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
         puts: vec![],
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(99.0)
+        .with_quoted_clean_price_pct(99.0)
         .with_hw1f_sigma(0.01)
         .with_hw1f_mean_reversion(0.03)
         .with_tree_discount_curve_id("USD-TREE");
@@ -548,7 +548,7 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
         puts: vec![],
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(103.0)
+        .with_quoted_clean_price_pct(103.0)
         .with_hw1f_sigma(0.02)
         .with_hw1f_mean_reversion(0.03);
 
@@ -693,7 +693,7 @@ fn test_callable_bond_vega_is_registered_and_bumps_hw1f_sigma() {
         puts: vec![],
     });
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(103.0)
+        .with_quoted_clean_price_pct(103.0)
         .with_hw1f_sigma(0.02)
         .with_hw1f_mean_reversion(0.03);
 
@@ -754,7 +754,7 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
     });
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "market_quotes": {
-            "quoted_clean_price": 103.0
+            "quoted_clean_price_pct": 103.0
         },
         "model_config": {
             "tree_steps": 40,
@@ -838,7 +838,7 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
     });
     bond.instrument_pricing_overrides = serde_json::from_value(serde_json::json!({
         "market_quotes": {
-            "quoted_clean_price": 103.0
+            "quoted_clean_price_pct": 103.0
         },
         "model_config": {
             "tree_steps": 40,
@@ -927,10 +927,10 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         &bond.accrual_config(),
     )
     .expect("quote-date accrued");
-    let quoted_clean_price = (dirty_at_quote - accrued_at_quote) / notional.amount() * 100.0;
+    let quoted_clean_price_pct = (dirty_at_quote - accrued_at_quote) / notional.amount() * 100.0;
     bond.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(quoted_clean_price);
+        .quoted_clean_price_pct = Some(quoted_clean_price_pct);
 
     let result = bond
         .price_with_metrics(
@@ -944,7 +944,7 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
 
     assert!(
         (actual_oas - target_oas).abs() < 1e-6,
-        "OAS should recover quote-date target: actual={actual_oas}, target={target_oas}, clean={quoted_clean_price}"
+        "OAS should recover quote-date target: actual={actual_oas}, target={target_oas}, clean={quoted_clean_price_pct}"
     );
 }
 
@@ -1022,7 +1022,7 @@ fn test_z_spread_missing_discount_curve_returns_error() {
     )
     .unwrap();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
 
     // Market context with NO discount curves – any attempt to build a Z-spread PV should fail
     let market = finstack_quant_core::market_data::context::MarketContext::new();
@@ -1122,7 +1122,7 @@ fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
     // Quote the bond at a clean price that is off-par so the Z-spread is non-zero.
     let clean_pct = 98.5_f64;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct);
 
     // Forward path: solve Z-spread from the quoted clean price.
     let res = bond
@@ -1239,7 +1239,7 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
     // Feed the clean price back and re-solve YTM.
     let mut bond_with_price = bond;
     bond_with_price.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct);
     let res = bond_with_price
         .price_with_metrics(
             &market,
@@ -1355,7 +1355,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
 
         let mut bond = base_bond.clone();
         bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
         // Run Z-spread metric via the normal pipeline.
         let result = bond
@@ -1448,7 +1448,7 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
     // Quote the bond off-par so the Z-spread is non-zero.
     let clean_pct = 97.25_f64;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct);
 
     // Forward path: solve Z-spread and read the settlement-anchored dirty price
     // (the metric `DirtyPrice` is exactly the ZSpreadCalculator's solve target:
@@ -1579,7 +1579,7 @@ fn test_z_spread_solver_non_positive_base_df_returns_err() {
     // Quote an astronomically high price (10× par): no physically valid spread
     // can match this — the solver must fail rather than return a meaningless z.
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(10_000.0_f64);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(10_000.0_f64);
 
     let result = bond.price_with_metrics(
         &market,
@@ -1721,7 +1721,7 @@ fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
 
     let mut quoted = bond.clone();
     quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean);
     let result = quoted
         .price_with_metrics(
             &market,

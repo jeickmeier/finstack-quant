@@ -155,6 +155,68 @@ mod tests {
         serde_json::from_value(json).expect("parse fixture")
     }
 
+    /// `ImpliedVol` inverts `market_quotes.quoted_premium`. Each QuantLib fixture
+    /// prices on a flat vol surface; setting the premium to the QuantLib NPV must
+    /// recover that vol. Both engines share the closed form and agree on NPV to
+    /// the fixtures' 1e-7 abs tolerance; dividing by vega (>= 1e3 per unit vol
+    /// here) bounds the recovered-sigma error far below the 1e-9 asserted, which
+    /// is the Brent solver's residual scale rather than a model tolerance.
+    #[test]
+    fn implied_vol_recovers_quantlib_vol_from_quoted_premium() {
+        const SIGMA_TOLERANCE: f64 = 1e-9;
+        for path in [
+            "data/pricing/quantlib/equity_option/spx_atm_call_1y_quantlib.json",
+            "data/pricing/quantlib/fx_option/eurusd_atm_call_3m_quantlib.json",
+            "data/pricing/quantlib/cap_floor/usd_black_caplet_quantlib.json",
+            "data/pricing/quantlib/cap_floor/usd_bachelier_floorlet_quantlib.json",
+            "data/pricing/quantlib/swaption/usd_black_1y1y_payer_swaption_quantlib.json",
+            "data/pricing/quantlib/swaption/usd_bachelier_1y1y_payer_swaption_quantlib.json",
+        ] {
+            let full_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/golden")
+                .join(path);
+            let fixture: GoldenFixture = serde_json::from_str(
+                &std::fs::read_to_string(&full_path).expect("read QuantLib fixture"),
+            )
+            .expect("parse QuantLib fixture");
+            let pricing = fixture.pricing().expect("pricing body");
+            let Market::Snapshot { data } = &pricing.market else {
+                panic!("{path}: expected a market snapshot");
+            };
+            let vols: Vec<f64> = data["surfaces"][0]["vols_row_major"]
+                .as_array()
+                .expect("surface vols")
+                .iter()
+                .map(|vol| vol.as_f64().expect("numeric vol"))
+                .collect();
+            let flat_vol = vols[0];
+            assert!(
+                vols.iter().all(|vol| *vol == flat_vol),
+                "{path}: flat surface"
+            );
+            let market = resolve_market(&pricing.market).expect("market");
+
+            let mut instrument = pricing.instrument.clone();
+            instrument["instrument"]["spec"]["instrument_pricing_overrides"] =
+                serde_json::json!({"market_quotes": {"quoted_premium": fixture.expected["npv"]}});
+            let result = price_instrument_from_json(
+                &serde_json::to_string(&instrument).expect("instrument JSON"),
+                &market,
+                &fixture.metadata.valuation_date,
+                &pricing.model,
+                &["implied_vol".to_string()],
+                None,
+                None,
+            )
+            .unwrap_or_else(|err| panic!("{path}: {err}"));
+            let implied_vol = result.measures["implied_vol"];
+            assert!(
+                (implied_vol - flat_vol).abs() < SIGMA_TOLERANCE,
+                "{path}: implied vol {implied_vol} vs QuantLib input {flat_vol}"
+            );
+        }
+    }
+
     fn minimal_market() -> serde_json::Value {
         serde_json::json!({
             "schema_version": 1,

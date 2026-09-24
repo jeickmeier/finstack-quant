@@ -208,7 +208,7 @@ fn quoted_callable_dv01_freezes_solved_oas() {
 
     loan.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(90.0);
+        .quoted_clean_price_pct = Some(90.0);
     let quoted = loan
         .price_with_metrics(
             &market,
@@ -226,7 +226,7 @@ fn quoted_callable_dv01_freezes_solved_oas() {
     pinned
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = None;
+        .quoted_clean_price_pct = None;
     pinned.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
     let pinned_result = pinned
         .price_with_metrics(
@@ -246,7 +246,7 @@ fn quoted_callable_dv01_freezes_solved_oas() {
     unquoted
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = None;
+        .quoted_clean_price_pct = None;
     let dv01_zero_oas = *unquoted
         .price_with_metrics(
             &market,
@@ -303,7 +303,7 @@ fn quoted_callable_discounting_dv01_uses_quote_spread_not_tree_oas() {
 
     loan.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(90.0);
+        .quoted_clean_price_pct = Some(90.0);
     let quoted = loan
         .price_with_metrics(&market, as_of, &[MetricId::Dv01], options.clone())
         .expect("quoted discounting DV01");
@@ -311,7 +311,7 @@ fn quoted_callable_discounting_dv01_uses_quote_spread_not_tree_oas() {
 
     loan.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = None;
+        .quoted_clean_price_pct = None;
     let unquoted = loan
         .price_with_metrics(&market, as_of, &[MetricId::Dv01], options)
         .expect("unquoted discounting DV01");

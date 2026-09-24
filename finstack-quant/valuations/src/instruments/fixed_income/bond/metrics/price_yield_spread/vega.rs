@@ -259,7 +259,7 @@ mod tests {
             puts: vec![],
         });
         clean_bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-            .with_quoted_clean_price(100.0)
+            .with_quoted_clean_price_pct(100.0)
             .with_hw1f_sigma(0.01)
             .with_tree_steps(16);
         clean_bond
@@ -285,7 +285,7 @@ mod tests {
         dirty_bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = None;
+            .quoted_clean_price_pct = None;
         dirty_bond
             .instrument_pricing_overrides
             .market_quotes

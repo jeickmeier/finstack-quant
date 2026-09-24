@@ -220,7 +220,7 @@ impl MetricCalculator for ZSpreadCalculator {
         let target_value_currency: f64 = if let Some(clean_px) = bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
         {
             // Use accrued at quote_date for dirty price calculation
             quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())

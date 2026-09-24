@@ -22,7 +22,7 @@ fn test_clean_price_from_quoted() {
     )
     .unwrap();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")

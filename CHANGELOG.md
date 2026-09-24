@@ -2,6 +2,78 @@
 
 ## [Unreleased]
 
+### Market-quote overrides (2026-09-24)
+
+Numbers change for `ImpliedVol` on CapFloor, Swaption, FxOption, CDSOption
+and EquityOption, and for the five futures options under volatility bumps:
+
+- Every `ImpliedVol` calculator (EquityOption, FxOption, CapFloor, Swaption,
+  CDSOption) now inverts the observed premium in the new
+  `instrument_pricing_overrides.market_quotes.quoted_premium` (total trade PV
+  in the instrument currency; not a price driver). A missing premium is a
+  validation error naming that path. CapFloor used to read
+  `quoted_clean_price` (a percent-of-par bond quote) as a currency premium;
+  EquityOption read `attributes.meta["market_price"]`/`["market_price_id"]`;
+  Swaption, FxOption and CDSOption inverted their own model PV. Reference:
+  QuantLib 1.43 NPVs for `spx_atm_call_1y`, `eurusd_atm_call_3m`,
+  `usd_black_caplet`, `usd_bachelier_floorlet` and the Black and Bachelier
+  `1y1y` payer swaptions: with `quoted_premium` set to the QuantLib NPV,
+  `ImpliedVol` recovers the fixture's flat surface volatility within 1e-9.
+  ConvertibleBond `ImpliedVol` still inverts its clean bond price
+  (`quoted_clean_price_pct`).
+- The five futures options (commodity, equity, FX, interest-rate and
+  volatility-index) take their flat volatility from
+  `market_quotes.implied_volatility`, so generic vega and cross-factor
+  volatility bumps now move their PV; a live option without it is a
+  validation error naming the path. PV at an unchanged volatility does not
+  move (Black-76 and Bachelier closed forms, 1e-10 relative).
+
+#### Changed (BREAKING)
+
+- `MarketQuoteOverrides.quoted_clean_price` (now `quoted_clean_price_pct`)
+  and `InstrumentPricingOverrides::with_quoted_clean_price` (now
+  `with_quoted_clean_price_pct`); Rust and the
+  `instrument_pricing_overrides.market_quotes` JSON wire (Python/WASM/UI
+  payloads). The old key is rejected.
+- `Bond::from_cashflows(.., quoted_clean)` and
+  `bond_from_cashflows_json(.., quoted_clean)` (now `quoted_clean_price_pct`);
+  Rust, Python keyword and WASM `bondFromCashflowsJson(.., quotedCleanPricePct)`.
+- `EquityOption::implied_vol(.., market_price)` (now `target_price`); Rust and
+  the Python keyword.
+- `FutureOptionTerms::npv_raw`/`cash_delta`/`cash_gamma`/`cash_vega`/
+  `cash_theta` take the flat volatility as an `implied_volatility: Option<f64>`
+  argument (Rust).
+
+#### Added
+
+- `MarketQuoteOverrides.quoted_premium` and
+  `InstrumentPricingOverrides::with_quoted_premium` (Rust and the
+  `instrument_pricing_overrides.market_quotes` JSON wire).
+
+#### Removed
+
+- `FutureOptionTerms.volatility` (now
+  `instrument_pricing_overrides.market_quotes.implied_volatility` on
+  CommodityFutureOption, EquityFutureOption, FxFutureOption,
+  InterestRateFutureOption and VolatilityIndexFutureOption); Rust and the
+  `terms` JSON wire. The old key is rejected.
+- `InflationLinkedBond.quoted_clean` (now
+  `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`, read by
+  RealYield, RealDuration and BreakevenInflation); Rust and the JSON wire.
+  The old key is rejected.
+- `CDSOption::with_implied_vol` (set
+  `instrument_pricing_overrides.market_quotes.implied_volatility`; validation
+  still enforces the 500% ceiling).
+- EquityOption `attributes.meta["market_price"]`/`["market_price_id"]` as the
+  `ImpliedVol` target.
+- `MetricContext::set_instrument_overrides`, left without a reader once
+  CapFloor `ImpliedVol` reads the instrument's own `market_quotes` (Rust).
+
+#### Fixed
+
+- The `market_quotes.cds_quote_bp` doc now names CreditDefaultSwap only; no
+  other instrument (CDSIndex included) reads it.
+
 ### Short-rate and hazard model parameters (2026-09-24)
 
 Numbers change. The rates-only bond tree now reads only explicit short-rate

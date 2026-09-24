@@ -44,7 +44,7 @@ fn discounting_pinned_loan(
     } else {
         quoted_z_spread(loan, context)?.ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "TermLoan '{}' discounting quote risk requires quoted_clean_price or quoted_z_spread",
+                "TermLoan '{}' discounting quote risk requires quoted_clean_price_pct or quoted_z_spread",
                 loan.id
             ))
         })?

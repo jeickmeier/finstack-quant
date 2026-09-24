@@ -425,7 +425,7 @@ mod tests {
         });
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(98.0);
+            .quoted_clean_price_pct = Some(98.0);
 
         let pricer_calls = Arc::new(AtomicUsize::new(0));
         let mut pricers = PricerRegistry::new();

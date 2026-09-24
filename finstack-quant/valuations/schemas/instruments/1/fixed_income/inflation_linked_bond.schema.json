@@ -177,14 +177,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount (in real terms)"
         },
-        "quoted_clean": {
-          "description": "Quoted clean price (if available)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "real_coupon": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
           "description": "Real coupon rate (as decimal)"
@@ -303,7 +295,6 @@
             "amount": "1000000",
             "currency": "USD"
           },
-          "quoted_clean": null,
           "real_coupon": "0.025",
           "stub": "none"
         },

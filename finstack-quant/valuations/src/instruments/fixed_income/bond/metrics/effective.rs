@@ -345,7 +345,7 @@ mod tests {
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .instrument_pricing_overrides(
-                InstrumentPricingOverrides::default().with_quoted_clean_price(98.0),
+                InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0),
             )
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: 2,

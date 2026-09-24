@@ -493,7 +493,7 @@ def test_bermudan_swaption_json_validates() -> None:
     [
         {"unknown_override": 1},
         {"instrument": {"rate_bump_bp": 3.0}},
-        {"metrics": {"quoted_clean_price": 99.0}},
+        {"metrics": {"quoted_clean_price_pct": 99.0}},
         {"scenario": {"mc_seed_scenario": "seed"}},
     ],
 )

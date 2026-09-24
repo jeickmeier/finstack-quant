@@ -126,7 +126,7 @@ fn target_price(
     if let Some(px) = facility
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price
+        .quoted_clean_price_pct
     {
         let drawn = drawn_at(facility, as_of, settlement)?;
         return Ok(px / 100.0 * drawn + accrued_interest(facility, schedule, settlement)?);

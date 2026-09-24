@@ -22,7 +22,7 @@ pub(super) fn require_tree_model(
     }
 }
 
-/// Quoted OAS if present, otherwise the OAS inverted from `quoted_clean_price`.
+/// Quoted OAS if present, otherwise the OAS inverted from `quoted_clean_price_pct`.
 pub(crate) fn oas_decimal_from_quote_overrides(
     loan: &TermLoan,
     context: &MetricContext,
@@ -33,7 +33,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
     let Some(clean_price) = loan
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price
+        .quoted_clean_price_pct
     else {
         return Ok(None);
     };
@@ -58,7 +58,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
 ///
 /// # Dependencies
 ///
-/// Uses `quoted_oas` directly when supplied. Otherwise requires `quoted_clean_price`
+/// Uses `quoted_oas` directly when supplied. Otherwise requires `quoted_clean_price_pct`
 /// (percent of funded outstanding) so the tree can invert the market dirty price.
 pub(crate) struct OasCalculator;
 
@@ -68,7 +68,8 @@ impl MetricCalculator for OasCalculator {
         require_tree_model(loan, context)?;
         oas_decimal_from_quote_overrides(loan, context)?.ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                id: "term_loan.pricing_overrides.quoted_oas_or_quoted_clean_price".to_string(),
+                id: "term_loan.instrument_pricing_overrides.market_quotes.quoted_oas or quoted_clean_price_pct"
+                    .to_string(),
             })
         })
     }

@@ -123,7 +123,7 @@ fn check_finite_fields(fields: &[(Option<f64>, bool)]) -> finstack_quant_core::R
 /// Precedence (applied top-to-bottom inside `Bond::base_value`):
 ///
 /// 1. `quoted_dirty_price_currency` — currency units (bond native currency)
-/// 2. `quoted_clean_price` — percentage of par
+/// 2. `quoted_clean_price_pct` — percentage of par
 /// 3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)
 /// 4. `quoted_ytw` — decimal yield-to-worst
 /// 5. `quoted_z_spread` — decimal Z-spread
@@ -136,9 +136,11 @@ fn check_finite_fields(fields: &[(Option<f64>, bool)]) -> finstack_quant_core::R
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct MarketQuoteOverrides {
-    /// Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).
+    /// Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).
+    ///
+    /// Inflation-linked bonds quote this per 100 of real (unindexed) face.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub quoted_clean_price: Option<f64>,
+    pub quoted_clean_price_pct: Option<f64>,
 
     /// Quoted dirty price in the bond's currency units.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -180,12 +182,25 @@ pub struct MarketQuoteOverrides {
     pub quoted_japanese_simple_yield: Option<f64>,
 
     /// Implied volatility (overrides vol surface). When set on surface-driven
-    /// pricers, it is used as a flat σ across tenor and strike.
+    /// pricers, it is used as a flat σ across tenor and strike. Options on
+    /// futures read it as their only volatility input: decimal lognormal for
+    /// Black-76, futures-price points per √year for the normal model.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub implied_volatility: Option<f64>,
 
-    /// CDS par-spread quote in basis points (for CDS and CDS index pricers).
+    /// Observed option premium: the total trade PV in the instrument currency
+    /// (notional, contract multiplier and position included).
     ///
+    /// This is the target every `ImpliedVol` calculator inverts; it does not
+    /// drive PV and is not one of the mutually exclusive price-driving fields.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quoted_premium: Option<f64>,
+
+    /// CreditDefaultSwap clean par-spread quote in basis points.
+    ///
+    /// Used only by CreditDefaultSwap risk replay, where it replaces the
+    /// matching contractual hazard-curve pillar. It does not drive PV, and no
+    /// other instrument (CDSIndex included) reads it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cds_quote_bp: Option<f64>,
 
@@ -218,6 +233,28 @@ impl MarketQuoteOverrides {
         self == &Self::default()
     }
 
+    /// Return the observed option premium an `ImpliedVol` calculator inverts.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error naming
+    /// `instrument_pricing_overrides.market_quotes.quoted_premium` when it is
+    /// unset or not finite.
+    pub(crate) fn required_quoted_premium(&self) -> finstack_quant_core::Result<f64> {
+        match self.quoted_premium {
+            Some(premium) if premium.is_finite() => Ok(premium),
+            Some(premium) => Err(finstack_quant_core::Error::Validation(format!(
+                "instrument_pricing_overrides.market_quotes.quoted_premium must be finite, \
+                 got {premium}"
+            ))),
+            None => Err(finstack_quant_core::Error::Validation(
+                "implied volatility requires the observed option premium in \
+                 instrument_pricing_overrides.market_quotes.quoted_premium"
+                    .to_string(),
+            )),
+        }
+    }
+
     /// Return the number of price-driving fields that are currently set.
     ///
     /// The price-driving fields are mutually exclusive inside `Bond::base_value`
@@ -225,7 +262,7 @@ impl MarketQuoteOverrides {
     /// [`Self::validate`] enforces that at most one is set.
     fn price_driver_count(&self) -> usize {
         [
-            self.quoted_clean_price.is_some(),
+            self.quoted_clean_price_pct.is_some(),
             self.quoted_dirty_price_currency.is_some(),
             self.quoted_ytm.is_some(),
             self.quoted_ytw.is_some(),
@@ -262,7 +299,7 @@ impl MarketQuoteOverrides {
 
     /// Clear every quote field that can replace model value.
     pub(crate) fn clear_price_drivers(&mut self) {
-        self.quoted_clean_price = None;
+        self.quoted_clean_price_pct = None;
         self.quoted_dirty_price_currency = None;
         self.quoted_ytm = None;
         self.quoted_ytw = None;
@@ -283,7 +320,7 @@ impl MarketQuoteOverrides {
         // must be finite. Dirty bond prices are additionally positive below;
         // implied volatility and CDS spreads are non-negative.
         check_finite_fields(&[
-            (self.quoted_clean_price, false),
+            (self.quoted_clean_price_pct, false),
             (self.quoted_dirty_price_currency, false),
             (self.quoted_ytm, false),
             (self.quoted_ytw, false),
@@ -294,6 +331,7 @@ impl MarketQuoteOverrides {
             (self.quoted_asw_market, false),
             (self.quoted_japanese_simple_yield, false),
             (self.implied_volatility, true),
+            (self.quoted_premium, false),
             (self.cds_quote_bp, true),
         ])?;
 
@@ -696,9 +734,25 @@ impl InstrumentPricingOverrides {
         Self::default()
     }
 
-    /// Set quoted clean price as a percentage of par.
-    pub fn with_quoted_clean_price(mut self, price_pct: f64) -> Self {
-        self.market_quotes.quoted_clean_price = Some(price_pct);
+    /// Set the quoted clean price in percent of par.
+    ///
+    /// # Arguments
+    ///
+    /// * `price_pct` - clean price in percent of par (e.g. `99.5` = 99.5% of
+    ///   par); inflation-linked bonds quote it per 100 of real face
+    pub fn with_quoted_clean_price_pct(mut self, price_pct: f64) -> Self {
+        self.market_quotes.quoted_clean_price_pct = Some(price_pct);
+        self
+    }
+
+    /// Set the observed option premium that `ImpliedVol` inverts.
+    ///
+    /// # Arguments
+    ///
+    /// * `premium` - total trade PV in the instrument currency (notional,
+    ///   contract multiplier and position included); it does not drive PV
+    pub fn with_quoted_premium(mut self, premium: f64) -> Self {
+        self.market_quotes.quoted_premium = Some(premium);
         self
     }
 
@@ -1335,6 +1389,39 @@ mod tests {
     }
 
     #[test]
+    fn market_quotes_reject_retired_clean_price_key() {
+        // schema-rejection-test
+        let err = serde_json::from_str::<MarketQuoteOverrides>(r#"{"quoted_clean_price": 99.5}"#)
+            .expect_err("retired market_quotes key must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+        let quotes: MarketQuoteOverrides =
+            serde_json::from_str(r#"{"quoted_clean_price_pct": 99.5, "quoted_premium": 12.5}"#)
+                .expect("canonical market_quotes keys parse");
+        assert_eq!(quotes.quoted_clean_price_pct, Some(99.5));
+        assert_eq!(quotes.quoted_premium, Some(12.5));
+    }
+
+    #[test]
+    fn quoted_premium_is_an_iv_target_not_a_price_driver() {
+        let quotes = MarketQuoteOverrides {
+            quoted_clean_price_pct: Some(99.5),
+            quoted_premium: Some(12.5),
+            ..Default::default()
+        };
+        quotes
+            .validate()
+            .expect("a premium does not conflict with a price driver");
+        assert!(quotes.has_price_driver());
+        assert_eq!(quotes.required_quoted_premium().expect("premium"), 12.5);
+        let missing = MarketQuoteOverrides::default()
+            .required_quoted_premium()
+            .expect_err("missing premium");
+        assert!(missing
+            .to_string()
+            .contains("instrument_pricing_overrides.market_quotes.quoted_premium"));
+    }
+
+    #[test]
     fn model_config_rejects_retired_short_rate_keys() {
         // schema-rejection-test
         for (retired, replacement) in [
@@ -1400,7 +1487,7 @@ mod tests {
 
     #[test]
     fn focused_categories_validate_independently() {
-        let instrument = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        let instrument = InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
         let metrics = MetricPricingOverrides::default()
             .with_ytm_bump(1.0)
             .with_spot_bump(0.01)
@@ -1445,7 +1532,7 @@ mod tests {
         let fixture = FocusedWireFixture {
             id: "fixture".to_string(),
             instrument_pricing_overrides: InstrumentPricingOverrides::default()
-                .with_quoted_clean_price(99.5),
+                .with_quoted_clean_price_pct(99.5),
             metric_pricing_overrides: MetricPricingOverrides::default().with_theta_period("1W"),
             scenario_pricing_overrides: ScenarioPricingOverrides::default()
                 .with_price_shock_pct(-0.05),
@@ -1464,7 +1551,7 @@ mod tests {
             roundtrip
                 .instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price,
+                .quoted_clean_price_pct,
             Some(99.5)
         );
 

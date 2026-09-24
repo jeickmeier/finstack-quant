@@ -393,7 +393,7 @@ def _structured_credit_spec(iid: str, deal_type: str, idx: int) -> dict:
             "maturity": "2034-01-01",
             "frequency": {"count": 3, "unit": "months"},
             "discount_curve_id": "USD-OIS",
-            "instrument_pricing_overrides": {"market_quotes": {"quoted_clean_price": 98.5}},
+            "instrument_pricing_overrides": {"market_quotes": {"quoted_clean_price_pct": 98.5}},
             "payment_calendar_id": "nyse",
             "attributes": {"tags": [deal_type.lower()], "meta": {}},
             "prepayment_spec": {"cpr": 0.15, "curve": None},
@@ -620,9 +620,7 @@ def variance_swap(idx: int) -> tuple[str, dict]:
             "observation_calendar_id": "USNY",
             "realized_var_method": "close_to_close",
             "price_series_policy": "adjusted",
-            "instrument_pricing_overrides": {
-                "market_quotes": {"implied_volatility": 0.20}
-            },
+            "instrument_pricing_overrides": {"market_quotes": {"implied_volatility": 0.20}},
             "side": side,
             "discount_curve_id": "USD-OIS",
             "day_count": "act_365f",

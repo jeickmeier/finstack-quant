@@ -270,7 +270,9 @@ fn test_metrics_consistency_with_direct_calls() {
 fn test_metrics_real_yield_consistency() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.quoted_clean = Some(100.0); // Ensure quoted price is set
+    ilb.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0); // Ensure quoted price is set
     let (ctx, _) = market_context_with_index();
     let as_of = d(2025, 1, 2);
 
@@ -286,7 +288,11 @@ fn test_metrics_real_yield_consistency() {
     let yield_via_framework = result.measures[MetricId::RealYield.as_str()];
 
     // Calculate via direct method
-    let clean_price = ilb.quoted_clean.unwrap();
+    let clean_price = ilb
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct
+        .unwrap();
     let yield_direct = ilb.real_yield(clean_price, as_of).unwrap();
 
     // Assert - should be identical since both call the same real_yield method
@@ -525,7 +531,9 @@ fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
         .attributes(Attributes::new())
         .build()
         .unwrap();
-    bond.quoted_clean = Some(100.0); // par => real yield = 4% Street exactly
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0); // par => real yield = 4% Street exactly
 
     // Non-flat nominal curve: DF knots chosen so the annually-compounded zero
     // is 1% at 1y, 2% at 5y and exactly 3% at the bond's maturity.

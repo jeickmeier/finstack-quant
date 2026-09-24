@@ -147,8 +147,6 @@ pub struct MetricPricingInputs {
     pub as_of: Date,
     /// Base present value.
     pub base_value: Money,
-    /// Instrument-owned pricing overrides.
-    instrument_overrides: Option<crate::instruments::InstrumentPricingOverrides>,
     /// Metric-only risk overrides.
     metric_overrides: Option<crate::instruments::MetricPricingOverrides>,
     /// Shared numerical and reporting configuration.
@@ -285,7 +283,6 @@ impl MetricContext {
                 pricing_dispatch: PricingDispatch::InstrumentDefault,
                 as_of,
                 base_value,
-                instrument_overrides: None,
                 metric_overrides: None,
                 finstack_config,
             },
@@ -358,14 +355,6 @@ impl MetricContext {
         &self,
     ) -> Option<&crate::instruments::MetricPricingOverrides> {
         self.metric_overrides.as_ref()
-    }
-
-    /// Returns the instrument-owned pricing overrides, if any.
-    #[inline]
-    pub(crate) fn get_instrument_overrides(
-        &self,
-    ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
-        self.instrument_overrides.as_ref()
     }
 
     /// Returns a reference to the market history, if set.
@@ -510,14 +499,6 @@ impl MetricContext {
     /// Set the pricing path reused by every downstream repricing operation.
     pub fn set_pricer_dispatch(&mut self, dispatch: PricingDispatch) {
         self.inputs.pricing_dispatch = dispatch;
-    }
-
-    /// Set instrument-owned pricing inputs used by downstream calculators.
-    pub fn set_instrument_overrides(
-        &mut self,
-        overrides: Option<crate::instruments::InstrumentPricingOverrides>,
-    ) {
-        self.inputs.instrument_overrides = overrides;
     }
 
     /// Set metric-only overrides used by downstream calculators.

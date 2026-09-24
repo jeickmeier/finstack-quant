@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn test_bond_with_pricing_overrides() {
-        let overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
+        let overrides = InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5);
 
         let bond = Bond::builder()
             .id("BOND_OVERRIDE".into())
@@ -349,7 +349,7 @@ mod tests {
         assert_eq!(
             bond.instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price,
+                .quoted_clean_price_pct,
             Some(98.5)
         );
         assert_eq!(
@@ -728,7 +728,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .instrument_pricing_overrides(
-                InstrumentPricingOverrides::default().with_quoted_clean_price(105.0),
+                InstrumentPricingOverrides::default().with_quoted_clean_price_pct(105.0),
             )
             .attributes(Attributes::new())
             .build()
@@ -738,7 +738,7 @@ mod tests {
             premium
                 .instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price,
+                .quoted_clean_price_pct,
             Some(105.0)
         );
 
@@ -754,7 +754,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .instrument_pricing_overrides(
-                InstrumentPricingOverrides::default().with_quoted_clean_price(95.0),
+                InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0),
             )
             .attributes(Attributes::new())
             .build()
@@ -764,7 +764,7 @@ mod tests {
             discount
                 .instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price,
+                .quoted_clean_price_pct,
             Some(95.0)
         );
 
@@ -780,7 +780,7 @@ mod tests {
             )
             .discount_curve_id("USD-OIS".into())
             .instrument_pricing_overrides(
-                InstrumentPricingOverrides::default().with_quoted_clean_price(100.0),
+                InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0),
             )
             .attributes(Attributes::new())
             .build()
@@ -789,7 +789,7 @@ mod tests {
         assert_eq!(
             par.instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price,
+                .quoted_clean_price_pct,
             Some(100.0)
         );
     }
@@ -869,8 +869,8 @@ mod tests {
     }
 
     #[test]
-    fn bond_value_honors_quoted_clean_price_override() {
-        let overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(98.5);
+    fn bond_value_honors_quoted_clean_price_pct_override() {
+        let overrides = InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5);
         let bond = build_test_bond(overrides);
         let market = flat_discount_market(0.03);
         let pv = bond.value(&market, date!(2025 - 01 - 01)).expect("value");
@@ -1004,8 +1004,9 @@ mod tests {
     #[test]
     fn bond_scenario_spread_shock_rejects_price_pinning_quote() {
         let market = flat_discount_market(0.04);
-        let mut bond =
-            build_test_bond(InstrumentPricingOverrides::default().with_quoted_clean_price(98.5));
+        let mut bond = build_test_bond(
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5),
+        );
         bond.scenario_pricing_overrides =
             ScenarioPricingOverrides::default().with_spread_shock_bp(50.0);
         let err = bond
@@ -1034,7 +1035,7 @@ mod tests {
     #[test]
     fn market_quote_overrides_reject_mutually_exclusive_price_drivers() {
         let overrides = InstrumentPricingOverrides::default()
-            .with_quoted_clean_price(98.5)
+            .with_quoted_clean_price_pct(98.5)
             .with_quoted_ytm(0.05);
         assert!(
             overrides.validate().is_err(),
@@ -1045,7 +1046,7 @@ mod tests {
     #[test]
     fn market_quote_overrides_accept_single_price_driver() {
         for overrides in [
-            InstrumentPricingOverrides::default().with_quoted_clean_price(98.5),
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5),
             InstrumentPricingOverrides::default().with_quoted_dirty_price(987_654.32),
             InstrumentPricingOverrides::default().with_quoted_ytm(0.05),
             InstrumentPricingOverrides::default().with_quoted_ytw(0.05),
@@ -1095,7 +1096,7 @@ mod tests {
                 ScenarioPricingOverrides::default(),
             ),
             (
-                InstrumentPricingOverrides::default().with_quoted_clean_price(98.5),
+                InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5),
                 ScenarioPricingOverrides::default(),
             ),
             (

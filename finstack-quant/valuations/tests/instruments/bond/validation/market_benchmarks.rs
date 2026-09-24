@@ -48,7 +48,7 @@ fn test_bond_ytm_benchmark_1() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);
 
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
 
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     // Use 30/360 day count to match Fabozzi convention
@@ -132,7 +132,8 @@ fn test_bond_ytm_benchmark_2_par_bond() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    let pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let bond = Bond::builder()
         .id("BOND_PAR_TEST".into())
@@ -185,7 +186,8 @@ fn test_bond_macaulay_duration_benchmark() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    let pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let bond = Bond::builder()
         .id("BOND_DUR_TEST".into())
@@ -238,7 +240,8 @@ fn test_bond_modified_duration_benchmark() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    let pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let bond = Bond::builder()
         .id("BOND_MODDUR_TEST".into())
@@ -295,7 +298,8 @@ fn test_bond_yield_dv01_market_standard() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    let pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let bond = Bond::builder()
         .id("BOND_DV01_TEST".into())
@@ -413,7 +417,7 @@ fn test_bond_zero_coupon_duration() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01); // 5 years
 
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(70.0);
+    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price_pct(70.0);
 
     let bond = Bond::builder()
         .id("ZERO_COUPON_TEST".into())
@@ -462,7 +466,8 @@ fn test_bond_convexity_positive() {
     let as_of = date!(2024 - 01 - 01);
     let maturity = date!(2029 - 01 - 01);
 
-    let pricing_overrides = InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    let pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let bond = Bond::builder()
         .id("BOND_CVX_TEST".into())

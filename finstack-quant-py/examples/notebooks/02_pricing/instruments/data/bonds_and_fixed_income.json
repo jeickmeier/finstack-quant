@@ -94,7 +94,7 @@
       },
       "instrument_pricing_overrides": {
         "market_quotes": {
-          "quoted_clean_price": 99.0
+          "quoted_clean_price_pct": 99.0
         },
         "model_config": {
           "hw1f_mean_reversion": 0.03,
@@ -141,7 +141,7 @@
       },
       "instrument_pricing_overrides": {
         "market_quotes": {
-          "quoted_clean_price": 98.75
+          "quoted_clean_price_pct": 98.75
         }
       },
       "settlement_days": 1

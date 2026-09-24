@@ -17,8 +17,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::{
-    ExerciseStyle, FutureOptionTerms, Instrument, InstrumentPricingOverrides,
-    InterestRateFutureOption,
+    ExerciseStyle, FutureOptionTerms, Instrument, InterestRateFutureOption,
 };
 use std::hint::black_box;
 use time::macros::date;
@@ -45,7 +44,7 @@ fn american_option(steps: usize) -> InterestRateFutureOption {
     let mut option = InterestRateFutureOption::example().unwrap();
     option.terms.exercise_style = ExerciseStyle::American;
     option.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_tree_steps(steps);
+        option.instrument_pricing_overrides.with_tree_steps(steps);
     option
 }
 
@@ -93,7 +92,12 @@ fn bench_future_option_american_greeks(c: &mut Criterion) {
         b.iter(|| {
             option
                 .terms
-                .cash_delta(black_box(None), black_box(&market), black_box(as_of))
+                .cash_delta(
+                    black_box(None),
+                    black_box(Some(0.20)),
+                    black_box(&market),
+                    black_box(as_of),
+                )
                 .unwrap()
         });
     });
@@ -101,7 +105,12 @@ fn bench_future_option_american_greeks(c: &mut Criterion) {
         b.iter(|| {
             option
                 .terms
-                .cash_delta(black_box(Some(401)), black_box(&market), black_box(as_of))
+                .cash_delta(
+                    black_box(Some(401)),
+                    black_box(Some(0.20)),
+                    black_box(&market),
+                    black_box(as_of),
+                )
                 .unwrap()
         });
     });
@@ -122,6 +131,7 @@ fn bench_future_option_terms_lattice(c: &mut Criterion) {
                 .npv_raw(
                     black_box(&InstrumentId::new("FOP-BENCH")),
                     black_box(None),
+                    black_box(Some(0.20)),
                     black_box(&market),
                     black_box(as_of),
                 )

@@ -579,7 +579,7 @@
         "forward_curve_id": "EUR-EURIBOR-6M",
         "instrument_pricing_overrides": {
           "market_quotes": {
-            "quoted_clean_price": 97.484
+            "quoted_clean_price_pct": 97.484
           },
           "model_config": {
             "tree_steps": 200,

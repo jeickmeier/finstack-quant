@@ -44,7 +44,7 @@
         "id": "USD-FIXED-CALLABLE-8Y-OAS-QUANTLIB",
         "instrument_pricing_overrides": {
           "market_quotes": {
-            "quoted_clean_price": 98.72972501905866
+            "quoted_clean_price_pct": 98.72972501905866
           },
           "model_config": {
             "hw1f_mean_reversion": 0.03,

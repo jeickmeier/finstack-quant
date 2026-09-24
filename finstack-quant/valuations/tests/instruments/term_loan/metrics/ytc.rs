@@ -69,7 +69,7 @@ fn test_ytc_callable_loan() {
 }
 
 #[test]
-fn test_ytc_uses_quoted_clean_price_when_present() {
+fn test_ytc_uses_quoted_clean_price_pct_when_present() {
     let as_of = date!(2025 - 01 - 01);
     let mut loan = TermLoan::builder()
         .id("TL-YTC-QUOTE".into())
@@ -115,7 +115,7 @@ fn test_ytc_uses_quoted_clean_price_when_present() {
     let ytc_base = *base.measures.get("ytc").unwrap();
 
     loan.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
     let quoted = loan
         .price_with_metrics(
             &market,

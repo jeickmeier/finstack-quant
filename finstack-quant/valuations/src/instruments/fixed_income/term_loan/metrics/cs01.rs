@@ -50,7 +50,7 @@ impl ZSpreadCs01 for TermLoan {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        // Loan-market quote convention: `quoted_clean_price` is a percent of
+        // Loan-market quote convention: `quoted_clean_price_pct` is a percent of
         // the funded outstanding at settlement; the dirty anchor adds accrued.
         // Use the fixings-applied pricing schedule so settlement accrued on a
         // seasoned floater reflects the actual fixing, matching the flows in
@@ -58,7 +58,7 @@ impl ZSpreadCs01 for TermLoan {
         let Some(px) = self
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
         else {
             return Ok(None);
         };

@@ -1,7 +1,7 @@
 //! Risky-callable (callable + credit curve) quoted-bond risk coverage.
 //!
 //! A callable bond that also carries a `credit_curve_id`, priced against a
-//! `quoted_clean_price`, must produce non-zero, call-aware CS01/DV01: the OAS
+//! `quoted_clean_price_pct`, must produce non-zero, call-aware CS01/DV01: the OAS
 //! clone retains the credit tag and reprices on the two-factor `RatesCreditTree`,
 //! so CS01 bumps the hazard and DV01 bumps the discount curve, both at the
 //! constant calibrated OAS. This locks that (previously untested) path.
@@ -96,7 +96,7 @@ fn test_quoted_callable_credit_bond_risk_nonzero_and_call_aware() {
     // Quoted at the model price → OAS calibration ≈ reproduces the quote.
     let mut quoted = build_callable_credit_bond(as_of);
     quoted.instrument_pricing_overrides = InstrumentPricingOverrides::default()
-        .with_quoted_clean_price(model_clean)
+        .with_quoted_clean_price_pct(model_clean)
         .with_hw1f_sigma(0.0);
     let result = quoted
         .price_with_metrics(

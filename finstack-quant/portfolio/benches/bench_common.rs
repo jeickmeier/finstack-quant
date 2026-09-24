@@ -1037,7 +1037,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         // as its own Z-spread target would force a circular zero spread.
         sc.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(98.5);
+            .quoted_clean_price_pct = Some(98.5);
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

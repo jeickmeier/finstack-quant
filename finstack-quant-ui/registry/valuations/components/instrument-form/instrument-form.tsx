@@ -17,7 +17,7 @@ const marketQuotePath =
 /** Only inputs consumed by the corresponding native pricer are promoted. */
 const promotedTerms: Record<string, PromotedTerm> = {
   bond: {
-    path: `${marketQuotePath}.quoted_clean_price`,
+    path: `${marketQuotePath}.quoted_clean_price_pct`,
     label: "Bond clean price",
     unit: "% of par",
     hint: "99.5 = 99.5% of par; overrides model PV.",

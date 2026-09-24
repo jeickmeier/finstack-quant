@@ -25,7 +25,9 @@ pub struct VolatilityIndexFutureOption {
     pub id: InstrumentId,
     /// Caller-supplied option-on-future pricing and settlement terms.
     pub terms: FutureOptionTerms,
-    /// Instrument-owned pricing inputs, including optional tree-step overrides.
+    /// Instrument-owned pricing inputs: the flat option volatility in
+    /// `market_quotes.implied_volatility` (required while live) and optional
+    /// tree-step overrides.
     #[builder(default)]
     #[serde(
         default,
@@ -85,13 +87,16 @@ impl VolatilityIndexFutureOption {
                 underlying_settlement_date: expiry,
                 underlying_settlement_price: None,
             })
-            .volatility(0.50)
             .model(FutureOptionModel::Black76)
             .premium_style(FutureOptionPremiumStyle::FuturesStyle)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("EUR-OIS"))
             .build()?;
-        Self::new(InstrumentId::new("VSTOXX-FUTURE-OPTION-EXAMPLE"), terms)
+        Ok(Self {
+            instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default()
+                .with_implied_vol(0.50),
+            ..Self::new(InstrumentId::new("VSTOXX-FUTURE-OPTION-EXAMPLE"), terms)?
+        })
     }
 }
 

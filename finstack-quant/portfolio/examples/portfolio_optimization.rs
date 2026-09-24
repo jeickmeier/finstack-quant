@@ -91,11 +91,11 @@ fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {
 
     // Use explicit quoted clean prices so YTM is driven by market levels, not model PVs.
     bond_aaa.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
     bond_bbb.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
     bond_ccc.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let pos_aaa = Position::new(
         "POS_AAA",

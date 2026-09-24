@@ -6249,7 +6249,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -9642,7 +9642,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -11904,11 +11904,6 @@
             "number",
             "null"
           ]
-        },
-        "volatility": {
-          "description": "Annualized volatility. Decimal lognormal units for Black-76; futures-price\npoints per square-root year for the normal model.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
@@ -11922,7 +11917,6 @@
         "exercise_style",
         "expiry",
         "settlement",
-        "volatility",
         "model",
         "premium_style",
         "day_count",
@@ -12413,7 +12407,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -13560,14 +13554,6 @@
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount (in real terms)"
-        },
-        "quoted_clean": {
-          "description": "Quoted clean price (if available)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "real_coupon": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
@@ -15386,7 +15372,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -23617,7 +23603,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -24362,7 +24348,6 @@
             "amount": "1000000",
             "currency": "USD"
           },
-          "quoted_clean": null,
           "real_coupon": "0.025",
           "stub": "none"
         },
@@ -25149,6 +25134,11 @@
         "spec": {
           "attributes": {},
           "id": "INTEREST-RATE-FUTURE-OPTION-EXAMPLE",
+          "instrument_pricing_overrides": {
+            "market_quotes": {
+              "implied_volatility": 0.2
+            }
+          },
           "terms": {
             "contracts": 1.0,
             "currency": "USD",
@@ -25168,8 +25158,7 @@
             },
             "strike": 100.0,
             "underlying": "UNDERLYING-FUTURE",
-            "underlying_price_change_per_bp": -0.01,
-            "volatility": 0.2
+            "underlying_price_change_per_bp": -0.01
           }
         },
         "type": "interest_rate_future_option"
@@ -25714,6 +25703,11 @@
         "spec": {
           "attributes": {},
           "id": "VSTOXX-FUTURE-OPTION-EXAMPLE",
+          "instrument_pricing_overrides": {
+            "market_quotes": {
+              "implied_volatility": 0.5
+            }
+          },
           "terms": {
             "contracts": 1.0,
             "currency": "EUR",
@@ -25734,8 +25728,7 @@
               "underlying_settlement_date": "2026-12-16"
             },
             "strike": 20.0,
-            "underlying": "FVS",
-            "volatility": 0.5
+            "underlying": "FVS"
           }
         },
         "type": "volatility_index_future_option"
@@ -26241,6 +26234,11 @@
         "spec": {
           "attributes": {},
           "id": "COMMODITY-FUTURE-OPTION-EXAMPLE",
+          "instrument_pricing_overrides": {
+            "market_quotes": {
+              "implied_volatility": 0.2
+            }
+          },
           "terms": {
             "contracts": 1.0,
             "currency": "USD",
@@ -26259,8 +26257,7 @@
               "type": "cash"
             },
             "strike": 100.0,
-            "underlying": "UNDERLYING-FUTURE",
-            "volatility": 0.2
+            "underlying": "UNDERLYING-FUTURE"
           }
         },
         "type": "commodity_future_option"
@@ -26298,6 +26295,11 @@
         "spec": {
           "attributes": {},
           "id": "FX-FUTURE-OPTION-EXAMPLE",
+          "instrument_pricing_overrides": {
+            "market_quotes": {
+              "implied_volatility": 0.2
+            }
+          },
           "terms": {
             "contracts": 1.0,
             "currency": "USD",
@@ -26316,8 +26318,7 @@
               "type": "cash"
             },
             "strike": 100.0,
-            "underlying": "UNDERLYING-FUTURE",
-            "volatility": 0.2
+            "underlying": "UNDERLYING-FUTURE"
           }
         },
         "type": "fx_future_option"
@@ -26363,6 +26364,11 @@
         "spec": {
           "attributes": {},
           "id": "EQUITY-FUTURE-OPTION-EXAMPLE",
+          "instrument_pricing_overrides": {
+            "market_quotes": {
+              "implied_volatility": 0.2
+            }
+          },
           "terms": {
             "contracts": 1.0,
             "currency": "USD",
@@ -26381,8 +26387,7 @@
               "type": "cash"
             },
             "strike": 100.0,
-            "underlying": "UNDERLYING-FUTURE",
-            "volatility": 0.2
+            "underlying": "UNDERLYING-FUTURE"
           }
         },
         "type": "equity_future_option"

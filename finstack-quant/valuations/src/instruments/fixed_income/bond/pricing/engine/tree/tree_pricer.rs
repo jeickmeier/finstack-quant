@@ -825,7 +825,7 @@ mod tests {
         quoted
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(clean_pct);
+            .quoted_clean_price_pct = Some(clean_pct);
         let implied = crate::instruments::common_impl::traits::Instrument::price_with_metrics(
             &quoted,
             &market,

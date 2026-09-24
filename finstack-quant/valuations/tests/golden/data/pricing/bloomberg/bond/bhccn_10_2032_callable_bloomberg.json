@@ -1544,7 +1544,7 @@
         "forward_curve_id": "USD-SOFRRATE",
         "instrument_pricing_overrides": {
           "market_quotes": {
-            "quoted_clean_price": 103.3975
+            "quoted_clean_price_pct": 103.3975
           },
           "model_config": {
             "tree_steps": 200,

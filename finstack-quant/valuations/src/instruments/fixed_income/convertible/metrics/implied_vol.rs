@@ -6,7 +6,7 @@
 //!
 //! # Dependencies
 //!
-//! Requires `quoted_clean_price` in `bond.instrument_pricing_overrides.market_quotes`.
+//! Requires `quoted_clean_price_pct` in `bond.instrument_pricing_overrides.market_quotes`.
 //!
 //! # Units
 //!
@@ -31,17 +31,18 @@ impl MetricCalculator for ImpliedVolCalculator {
         if as_of >= bond.maturity {
             return Ok(0.0);
         }
-        let quoted_clean = bond
+        let quoted_clean_price_pct = bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
             .ok_or_else(|| {
                 Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "pricing_overrides.market_quotes.quoted_clean_price".to_string(),
+                    id: "instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
+                        .to_string(),
                 })
             })?;
         let accrued = calculate_accrued_interest(bond, &context.curves, as_of)?;
-        let target_dirty = quoted_clean * bond.notional.amount() / 100.0 + accrued;
+        let target_dirty = quoted_clean_price_pct * bond.notional.amount() / 100.0 + accrued;
         if !target_dirty.is_finite() || target_dirty <= 0.0 {
             return Err(Error::Validation(
                 "convertible implied volatility requires a finite positive dirty-price target"
@@ -201,7 +202,7 @@ mod tests {
         };
 
         let mut overrides = InstrumentPricingOverrides::default();
-        overrides.market_quotes.quoted_clean_price = Some(quoted_clean_pct);
+        overrides.market_quotes.quoted_clean_price_pct = Some(quoted_clean_pct);
 
         ConvertibleBond {
             id: "TEST_CB_IVOL".to_string().into(),
@@ -252,7 +253,7 @@ mod tests {
             .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(r_approx))
     }
 
-    /// Regression: quoted_clean_price is percentage-of-par, so it must be scaled
+    /// Regression: quoted_clean_price_pct is percentage-of-par, so it must be scaled
     /// by notional/100 before adding notional-scaled accrued interest to form the
     /// dirty price target.  Before the fix the solver compared a ~1500 model price
     /// against ~150 target (pct only, unscaled), couldn't bracket, and returned an
@@ -265,7 +266,7 @@ mod tests {
     /// lies within the bracketed range, so the solver converges to a finite implied
     /// vol after the fix.
     #[test]
-    fn implied_vol_quoted_clean_price_scaled_to_notional() {
+    fn implied_vol_quoted_clean_price_pct_scaled_to_notional() {
         // notional=1000 matches the standard test bond; 155% → target = 1550 USD,
         // which is between straight-bond and ITM-parity prices.
         let notional = 1_000.0;

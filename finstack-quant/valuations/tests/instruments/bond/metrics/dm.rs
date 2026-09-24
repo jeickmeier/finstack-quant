@@ -228,7 +228,7 @@ fn test_dm_solver_convergence_across_spread_regimes() {
 
         let mut bond = base_bond.clone();
         bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
         // Run DM metric via the normal metrics pipeline.
         let result = bond
@@ -320,7 +320,7 @@ fn solve_dm_at_clean_price(as_of: time::Date, margin_bp: i32, clean_px: f64) -> 
     use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
     let mut bond = flat_market_frn(as_of, date!(2027 - 01 - 01), margin_bp);
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
     let market = flat_frn_market(as_of, 0.03);
     let result = bond
         .price_with_metrics(
@@ -440,7 +440,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
 
     let mut priced_bond = bond;
     priced_bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
     let result = priced_bond
         .price_with_metrics(
@@ -493,7 +493,7 @@ fn test_dm_amortizing_frn_is_supported() {
         },
     };
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
 
     // Flat, self-consistent market: discount curve == projection curve.
     let rate = 0.03;

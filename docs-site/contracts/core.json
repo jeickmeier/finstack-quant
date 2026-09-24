@@ -440,7 +440,7 @@
     ],
     "expected_exceptions": [],
     "api_notes": [
-      "Metric names are accrued and duration_mod; clean_price, dirty_price and accrued are currency amounts, while quoted_clean_price is percent of par.",
+      "Metric names are accrued and duration_mod; clean_price, dirty_price and accrued are currency amounts, while quoted_clean_price_pct is percent of par.",
       "Fixed-quote settlement shift preserves clean price by construction. Fixed-curve settlement shift does not."
     ]
   },

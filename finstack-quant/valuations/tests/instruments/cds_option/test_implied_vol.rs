@@ -43,7 +43,12 @@ fn test_implied_vol_metric() {
     let market = standard_market(as_of);
     let target_vol = 0.28;
 
-    let option = CDSOptionBuilder::new().implied_vol(target_vol).build(as_of);
+    let mut option = CDSOptionBuilder::new().implied_vol(target_vol).build(as_of);
+    let premium = option.value(&market, as_of).unwrap().amount();
+    option
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(premium);
 
     let result = option
         .price_with_metrics(
@@ -181,10 +186,12 @@ fn test_max_implied_vol_hard_error() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
 
-    let err = CDSOption::example()
-        .unwrap()
-        .with_implied_vol(5.5)
-        .unwrap_err();
+    let mut over_max = CDSOption::example().unwrap();
+    over_max
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(5.5);
+    let err = over_max.validate_invariants().unwrap_err();
     assert!(err.to_string().contains("exceeds maximum"));
 
     let invalid_option = CDSOptionBuilder::new().implied_vol(5.5).build(as_of);

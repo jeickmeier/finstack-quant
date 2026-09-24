@@ -47,7 +47,7 @@ A bullet returns all principal at maturity. An amortizer returns principal earli
 
 The public workflow separates these responsibilities. `Bond.builder()` creates an instrument. `price_instrument(instrument, market, as_of, model=..., metrics=...)` selects a registered pricing model and requests registered measures. `list_models_grouped()` reports models by instrument family; `list_standard_metrics()` reports metric names. A model called `discounting` is a registry selection, not a Python class you construct. The returned `ValuationResult` contains a currency price and named metrics; inspect `metric_keys()` rather than assuming an unqualified risk factor name exists.
 
-For bonds, `clean_price`, `dirty_price` and `accrued` are **currency amounts** in this workflow. The quote override `quoted_clean_price`, however, is **percent of par**. A 99 quote on USD 2m principal means USD 1.98m clean value. Mixing those representations causes a hundredfold or notional-scale error. The invariant is
+For bonds, `clean_price`, `dirty_price` and `accrued` are **currency amounts** in this workflow. The quote override `quoted_clean_price_pct`, however, is **percent of par**. A 99 quote on USD 2m principal means USD 1.98m clean value. Mixing those representations causes a hundredfold or notional-scale error. The invariant is
 
 $$P_{\mathrm{dirty,settle}}=P_{\mathrm{clean,settle}}+AI_{\mathrm{settle}}.$$
 
@@ -108,7 +108,7 @@ for fixed_quote in (False, True):
         bond = copy.deepcopy(base)
         bond['instrument']['spec']['settlement_days'] = days
         if fixed_quote:
-            bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price': 99.0}}
+            bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price_pct': 99.0}}
         result = price_instrument(json.dumps(bond), market, AS_OF, metrics=metrics)
         rows.append({name: result.get_metric(name) for name in metrics})
     if fixed_quote:
@@ -142,7 +142,7 @@ built=(Bond.builder().id('TYPED-BOND').notional(Money(2_000_000,'USD'))
 market=build_market('foundations')
 callable_spec=instruments('foundations')['USD-CORP']
 callable_spec['instrument']['spec']['call_put']={'calls':[{'start_date':'2027-01-15','end_date':'2029-01-15','price_pct_of_par':101.0}],'puts':[]}
-callable_spec['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':102.0},'model_config':{'hw1f_sigma':0.01,'hw1f_mean_reversion':0.03}}
+callable_spec['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':102.0},'model_config':{'hw1f_sigma':0.01,'hw1f_mean_reversion':0.03}}
 workouts=price_instrument(json.dumps(callable_spec),market,AS_OF,metrics=['ytm','ytw'])
 print({'typed_price':price_instrument(built,market,AS_OF).price,'ytm_decimal':workouts.get_metric('ytm'),'ytw_decimal':workouts.get_metric('ytw')})
 ```
@@ -240,7 +240,7 @@ for fixed_quote in (False, True):
         bond = copy.deepcopy(base)
         bond['instrument']['spec']['settlement_days'] = days
         if fixed_quote:
-            bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price': 99.0}}
+            bond['instrument']['spec']['instrument_pricing_overrides'] = {'market_quotes': {'quoted_clean_price_pct': 99.0}}
         result = price_instrument(json.dumps(bond), market, AS_OF, metrics=metrics)
         rows.append({name: result.get_metric(name) for name in metrics})
     if fixed_quote:
@@ -271,7 +271,7 @@ AS_OF = date(2025, 1, 15)
 step=json.loads(step_bond);bullet=instruments('foundations')['USD-CORP']
 yields={}
 for name,contract in [('bullet',bullet),('stepup',step)]:
- contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':100.0}}
+ contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':100.0}}
  result=price_instrument(json.dumps(contract),build_market('foundations'),AS_OF,metrics=['ytm','clean_price'])
  yields[name]=result.get_metric('ytm')
 print({'same_clean_price_pct':100.0,'street_yields_decimal':yields})
@@ -296,7 +296,7 @@ from finstack_quant.valuations.instruments import price_instrument,instrument_ca
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 contract=instruments('foundations')['USD-CORP']
-contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price':99.0}}
+contract['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':99.0}}
 market=build_market('foundations')
 result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['ytm','dirty_price'])
 settle=add_business_days(AS_OF,1,'usny')

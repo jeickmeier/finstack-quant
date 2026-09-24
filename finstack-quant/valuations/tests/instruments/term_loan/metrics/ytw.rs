@@ -263,7 +263,7 @@ fn test_ytw_includes_standing_call_for_seasoned_callable_loan() {
         }],
     });
     loan.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(101.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(101.0);
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
     let market = MarketContext::new().insert(disc_curve);
@@ -295,7 +295,7 @@ fn test_ytw_includes_standing_call_for_seasoned_callable_loan() {
 }
 
 #[test]
-fn test_ytw_uses_quoted_clean_price_when_present() {
+fn test_ytw_uses_quoted_clean_price_pct_when_present() {
     let as_of = date!(2025 - 01 - 01);
     let mut loan = TermLoan::builder()
         .id("TL-YTW-QUOTE".into())
@@ -341,7 +341,7 @@ fn test_ytw_uses_quoted_clean_price_when_present() {
     let ytw_base = *base.measures.get("ytw").unwrap();
 
     loan.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
     let quoted = loan
         .price_with_metrics(
             &market,

@@ -1,6 +1,6 @@
 //! Quoted credit-bond risk regression.
 //!
-//! A bond with a replayably calibrated hazard curve and a `quoted_clean_price`
+//! A bond with a replayably calibrated hazard curve and a `quoted_clean_price_pct`
 //! must retain non-zero canonical CS01. The risk view pins the observed quote
 //! with OAS while par-spread shocks rebootstrap the source hazard calibration.
 
@@ -81,7 +81,7 @@ fn test_quoted_credit_bond_cs01_nonzero_and_matches_unquoted() {
     // Quoted at the model clean price → calibrated OAS ≈ 0 → risk ≈ unquoted.
     let mut quoted = build_credit_bond(as_of);
     quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(model_clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(model_clean_pct);
     let result = quoted
         .price_with_metrics(
             &market,
@@ -134,7 +134,7 @@ fn test_quoted_credit_bond_offmodel_changes_cs01() {
     let cs01_at = |clean_pct: f64| -> f64 {
         let mut q = build_credit_bond(as_of);
         q.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct);
         let r = q
             .price_with_metrics(
                 &market,
@@ -175,7 +175,7 @@ fn test_quoted_credit_bond_quote_space_cs01_preserves_hazard_replay() {
 
     let mut quoted = build_credit_bond(as_of);
     quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(model_clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(model_clean_pct);
     let result = quoted
         .price_with_metrics(
             &market,
@@ -223,7 +223,7 @@ fn test_quoted_credit_bond_callable_oas_dv01_matches_unquoted_model_risk() {
 
     let mut quoted = build_credit_bond(as_of);
     quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(model_clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(model_clean_pct);
     quoted.metric_pricing_overrides = quoted
         .metric_pricing_overrides
         .with_bond_risk_basis(BondRiskBasis::CallableOas);
@@ -258,7 +258,7 @@ fn test_explicit_discounting_with_attached_credit_uses_z_spread_cs01_fallback() 
     let market = build_market(as_of);
     let mut quoted = build_credit_bond(as_of);
     quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
 
     let result = quoted
         .price_with_metrics(

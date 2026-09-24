@@ -92,11 +92,11 @@ fn test_ytm_uses_bond_daycount() {
     // Price both bonds at par (same price)
     let mut bond_act365_quoted = bond_act365;
     bond_act365_quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let mut bond_30360_quoted = bond_30360;
     bond_30360_quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let result_act365 = bond_act365_quoted
         .price_with_metrics(
@@ -158,7 +158,7 @@ fn test_ytm_par_equals_coupon_for_matching_daycount() {
 
         let mut bond_at_par = bond.clone();
         bond_at_par.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
         let result = bond_at_par
             .price_with_metrics(
@@ -197,7 +197,7 @@ fn test_duration_consistent_with_ytm() {
 
     let mut bond_quoted = bond;
     bond_quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let result = bond_quoted
         .price_with_metrics(

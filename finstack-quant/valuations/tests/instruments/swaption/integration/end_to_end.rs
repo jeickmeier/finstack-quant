@@ -38,6 +38,7 @@ fn test_complete_pricing_workflow() {
         MetricId::Dv01,
         MetricId::ImpliedVol,
     ];
+    let swaption = with_model_premium(swaption, &market, as_of);
     let result_all = swaption
         .price_with_metrics(
             &market,

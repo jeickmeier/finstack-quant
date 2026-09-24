@@ -481,7 +481,7 @@ mod tests {
         clean_bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(100.0);
+            .quoted_clean_price_pct = Some(100.0);
         clean_bond
             .instrument_pricing_overrides
             .model_config
@@ -498,7 +498,7 @@ mod tests {
         dirty_bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = None;
+            .quoted_clean_price_pct = None;
         dirty_bond
             .instrument_pricing_overrides
             .market_quotes

@@ -1187,7 +1187,7 @@ fn build_schedule(
     let call_policy = collateral.call_policy_for(&id);
     let put_policy = collateral.put_policy_for(&id);
     let worst_period = if call_policy == CallExercisePolicy::Worst && !calls.is_empty() {
-        let price = held.quoted_clean_price().ok_or_else(|| {
+        let price = held.quoted_clean_price_pct().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "call policy 'worst' requires a quoted clean price on instrument '{id}'"
             ))

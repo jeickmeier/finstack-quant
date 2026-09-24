@@ -1034,7 +1034,7 @@
       "type": "commodity_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_future_option.json",
-        "sha256": "5ac90d78d879178da683bc4369dd1f8497c7ea372ead3ddf3a1ef07749eba0e4",
+        "sha256": "aea4f80bd0de55e43739edd0595b4cb08b93e7a4cada11d9b0a7c8e65cb1fb45",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1528,7 +1528,7 @@
       "type": "equity_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_future_option.json",
-        "sha256": "f1df6c9736f1740a1f13bec774f742ce27f99434772b7a328d267a777b07bccf",
+        "sha256": "6c967d92e874665e05a07bd191850ede2625749c3e1517e4d78a1f611762b8b2",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1832,7 +1832,7 @@
       "type": "fx_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_future_option.json",
-        "sha256": "c96b8bdfd021a206ccc34c46dfaabb4b68e7ac777fddbbe49bceae5c3bfd9387",
+        "sha256": "5103c5c842b51e1d631ad5f2dea6a1b2cc02206b79c901d3716cb1ff637e55d0",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2098,7 +2098,7 @@
       "type": "inflation_linked_bond",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/inflation_linked_bond.json",
-        "sha256": "e4d6607d51cb93c8bf9b4b76103958a164045dd9f7438641d59baa7d30bbf5de",
+        "sha256": "3cda0f29fbe01a3557e9064cdc29555e008e659bcc7b9d298e78425d8af3104a",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2217,7 +2217,7 @@
       "type": "interest_rate_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_future_option.json",
-        "sha256": "f6648ff35a61079c42f51baf5eaa68878ee09fc6bc20c8a8c8f6f53c7eae72b0",
+        "sha256": "ab1b73d2a285534f63e9ab8ccc8256546c57d50ef12f13ac82751e82cbd4ad5e",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -3020,7 +3020,7 @@
       "type": "volatility_index_future_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/volatility_index_future_option.json",
-        "sha256": "41a65bab8afd4a60cc2906b3a060c7f0e7fa090c675a25bf9135856eff801ce7",
+        "sha256": "1ee0292b6dd819ef7674fd8805b9a4e6fbe5f841a395538d21069936de74613b",
         "pointer": []
       },
       "instrumentPatches": [],

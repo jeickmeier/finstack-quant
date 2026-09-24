@@ -1,7 +1,8 @@
 //! Implied volatility metric for swaptions.
 //!
-//! Solves for the configured quoted volatility that reproduces the current PV
-//! (from `context.base_value`) using the `/math` solvers. Uses a robust
+//! Solves for the configured quoted volatility that reproduces the observed
+//! option premium in `instrument_pricing_overrides.market_quotes.quoted_premium`
+//! using the `/math` solvers. Uses a robust
 //! non-negative volatility bracket. If inversion is not possible (solver
 //! failure or non-converged residual) an error is returned rather than a
 //! fabricated bound value, so risk systems never receive a fake vol.
@@ -20,7 +21,10 @@ impl MetricCalculator for ImpliedVolCalculator {
         if context.as_of >= option.expiry {
             return Ok(0.0);
         }
-        let target = context.base_value.amount();
+        let target = option
+            .instrument_pricing_overrides
+            .market_quotes
+            .required_quoted_premium()?;
         let notional = option.notional.amount();
         if !target.is_finite() || target < 0.0 || notional <= 0.0 {
             return Err(Error::Validation(
@@ -129,7 +133,11 @@ mod tests {
     fn context_with_target(target_pv: f64, strike: f64) -> MetricContext {
         let as_of = date!(2024 - 01 - 01);
         let market = flat_market(as_of, 0.05, 0.20);
-        let swaption = payer_swaption(strike);
+        let mut swaption = payer_swaption(strike);
+        swaption.instrument_pricing_overrides = swaption
+            .instrument_pricing_overrides
+            .with_quoted_premium(target_pv);
+        // The calculator inverts quoted_premium; the context base value is unused.
         MetricContext::new(
             Arc::new(swaption),
             Arc::new(market),
@@ -159,10 +167,13 @@ mod tests {
     fn round_trip_recovers_vol() {
         let as_of = date!(2024 - 01 - 01);
         let market = flat_market(as_of, 0.05, 0.20);
-        let swaption = payer_swaption(0.05);
+        let mut swaption = payer_swaption(0.05);
         let target = swaption
             .price_black(&market, 0.25, as_of)
             .expect("black price");
+        swaption.instrument_pricing_overrides = swaption
+            .instrument_pricing_overrides
+            .with_quoted_premium(target.amount());
         let mut ctx = MetricContext::new(
             Arc::new(swaption),
             Arc::new(market),

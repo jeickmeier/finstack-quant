@@ -83,10 +83,10 @@ impl MetricCalculator for YtwCalculator {
         let clean_px = bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
             .ok_or_else(|| {
                 finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "bond.instrument_pricing_overrides.market_quotes.quoted_clean_price"
+                    id: "bond.instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"
                         .to_string(),
                 })
             })?;

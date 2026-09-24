@@ -82,7 +82,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let dirty_currency = if let Some(clean_px) = bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
         {
             quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount())
         } else {

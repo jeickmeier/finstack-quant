@@ -198,7 +198,11 @@
           ],
           "meta": {}
         },
-        "quoted_clean": 101.25,
+        "instrument_pricing_overrides": {
+          "market_quotes": {
+            "quoted_clean_price_pct": 101.25
+          }
+        },
         "day_count": "act_365f"
       }
     }

@@ -25,7 +25,7 @@
         "attributes": {},
         "settlement_days": 0,
         "instrument_pricing_overrides": {
-          "market_quotes": { "quoted_clean_price": 100.0 }
+          "market_quotes": { "quoted_clean_price_pct": 100.0 }
         }
       }
     }

@@ -352,7 +352,7 @@ fn cashflows_json_bridge_reports_overlapping_payment_windows() {
 }
 
 #[wasm_bindgen_test]
-fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean() {
+fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean_price_pct() {
     let schedule_json = cashflows::build_cashflow_schedule_json(&cashflow_spec_json(), None)
         .expect("schedule should build");
     let config_json = serde_json::json!({

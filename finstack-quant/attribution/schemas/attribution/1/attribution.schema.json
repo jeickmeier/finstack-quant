@@ -7176,7 +7176,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -12716,7 +12716,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -15468,11 +15468,6 @@
             "number",
             "null"
           ]
-        },
-        "volatility": {
-          "description": "Annualized volatility. Decimal lognormal units for Black-76; futures-price\npoints per square-root year for the normal model.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
@@ -15486,7 +15481,6 @@
         "exercise_style",
         "expiry",
         "settlement",
-        "volatility",
         "model",
         "premium_style",
         "day_count",
@@ -16073,7 +16067,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -17583,14 +17577,6 @@
         "notional": {
           "$ref": "#/$defs/Money",
           "description": "Notional amount (in real terms)"
-        },
-        "quoted_clean": {
-          "description": "Quoted clean price (if available)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "real_coupon": {
           "$ref": "#/$defs/DecimalWire",
@@ -19430,7 +19416,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -20971,10 +20957,10 @@
     },
     "MarketQuoteOverrides": {
       "additionalProperties": false,
-      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
+      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
       "properties": {
         "cds_quote_bp": {
-          "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).",
+          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
           "format": "double",
           "type": [
             "number",
@@ -20982,7 +20968,7 @@
           ]
         },
         "implied_volatility": {
-          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
+          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike. Options on\nfutures read it as their only volatility input: decimal lognormal for\nBlack-76, futures-price points per √year for the normal model.",
           "format": "double",
           "type": [
             "number",
@@ -20997,8 +20983,8 @@
             "null"
           ]
         },
-        "quoted_clean_price": {
-          "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
+        "quoted_clean_price_pct": {
+          "description": "Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).\n\nInflation-linked bonds quote this per 100 of real (unindexed) face.",
           "format": "double",
           "type": [
             "number",
@@ -21039,6 +21025,14 @@
         },
         "quoted_oas": {
           "description": "Quoted OAS (option-adjusted spread) in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_premium": {
+          "description": "Observed option premium: the total trade PV in the instrument currency\n(notional, contract multiplier and position included).\n\nThis is the target every `ImpliedVol` calculator inverts; it does not\ndrive PV and is not one of the mutually exclusive price-driving fields.",
           "format": "double",
           "type": [
             "number",
@@ -30909,7 +30903,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",

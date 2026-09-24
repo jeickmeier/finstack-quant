@@ -61,7 +61,9 @@ pub fn sample_tips() -> InflationLinkedBond {
         .build()
         .unwrap();
 
-    bond.quoted_clean = Some(100.0);
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
     bond
 }
 
@@ -88,7 +90,9 @@ pub fn sample_uk_linker() -> InflationLinkedBond {
         .build()
         .unwrap();
 
-    bond.quoted_clean = Some(100.0);
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
     bond
 }
 

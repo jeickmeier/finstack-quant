@@ -127,11 +127,11 @@ fn test_asw_market_tightens_when_price_rises() {
     let as_of = date!(2025 - 01 - 15);
     let mut rich_bond = simple_fixed_bond(as_of);
     rich_bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(101.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(101.0);
 
     let mut cheap_bond = simple_fixed_bond(as_of);
     cheap_bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
 
     let disc = simple_discount_curve("USD-OIS", as_of);
     let market = MarketContext::new().insert(disc);
@@ -197,7 +197,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     // accrued is zero (valuation on the issue date).
     bond.settlement_convention = None;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
     // Discount curve on Act/360 so the floating-leg proxy annuity differs
     // from the 30/360 fixed-leg annuity.
@@ -342,7 +342,7 @@ fn test_asw_market_metric_rejects_matured_schedule() {
     )
     .expect("bond");
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let disc = simple_discount_curve("USD-OIS", issue);
     let market = MarketContext::new().insert(disc);

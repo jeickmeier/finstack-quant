@@ -126,7 +126,9 @@ fn test_real_yield_price_relationship() {
 fn test_real_yield_uses_quoted_price_when_available() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.quoted_clean = Some(105.0);
+    ilb.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(105.0);
     ilb.real_coupon = Decimal::try_from(0.02).expect("valid decimal");
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2030, 1, 2);
@@ -136,7 +138,7 @@ fn test_real_yield_uses_quoted_price_when_available() {
     // Act - calculate yield using explicit price vs quoted price
     let y_explicit_street = ilb.real_yield(105.0, as_of).unwrap();
 
-    // Breakeven uses quoted_clean internally. `breakeven_inflation` now converts
+    // Breakeven uses market_quotes.quoted_clean_price_pct internally. `breakeven_inflation` now converts
     // the Street-compounded real yield to annual before applying the Fisher identity,
     // so the roundtrip must also compare in annual compounding.
     //
@@ -238,7 +240,9 @@ fn test_real_yield_extreme_prices_produce_valid_results() {
 fn test_breakeven_inflation_basic() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.quoted_clean = Some(100.0);
+    ilb.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
     ilb.real_coupon = Decimal::try_from(0.01).expect("valid decimal"); // 1% real yield at par
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2030, 1, 2);
@@ -259,7 +263,9 @@ fn test_breakeven_inflation_basic() {
 fn test_breakeven_inflation_fisher_equation() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.quoted_clean = Some(100.0);
+    ilb.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
     ilb.real_coupon = Decimal::try_from(0.015).expect("valid decimal");
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2030, 1, 2);
@@ -293,7 +299,9 @@ fn test_breakeven_inflation_fisher_equation() {
 fn test_breakeven_inflation_varies_with_nominal_yield() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.quoted_clean = Some(100.0);
+    ilb.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
     ilb.real_coupon = Decimal::try_from(0.01).expect("valid decimal");
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2030, 1, 2);
@@ -316,23 +324,28 @@ fn test_breakeven_inflation_uses_quoted_clean_default() {
     let mut ilb1 = sample_tips();
     let mut ilb2 = sample_tips();
 
-    ilb1.quoted_clean = Some(100.0);
-    ilb2.quoted_clean = None; // No quoted price → should error
+    ilb1.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
+    ilb2.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = None; // No quoted price → should error
 
     let as_of = d(2025, 1, 2);
     let nominal_yield = 0.03;
 
-    // Act - with quoted_clean set, breakeven should succeed
+    // Act - with quoted_clean_price_pct set, breakeven should succeed
     let be1 = ilb1.breakeven_inflation(nominal_yield, as_of).unwrap();
     assert!(be1.is_finite(), "breakeven should be a finite number");
 
-    // Act - without quoted_clean, breakeven should return a validation error
+    // Act - without quoted_clean_price_pct, breakeven should return a validation error
     let err = ilb2
         .breakeven_inflation(nominal_yield, as_of)
-        .expect_err("should require quoted_clean");
+        .expect_err("should require quoted_clean_price_pct");
     assert!(
-        err.to_string().contains("quoted clean price"),
-        "error should mention quoted clean price, got: {err}"
+        err.to_string()
+            .contains("instrument_pricing_overrides.market_quotes.quoted_clean_price_pct"),
+        "error should name the clean-price quote path, got: {err}"
     );
 }
 
@@ -340,7 +353,9 @@ fn test_breakeven_inflation_uses_quoted_clean_default() {
 fn test_breakeven_can_be_negative() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.quoted_clean = Some(100.0);
+    ilb.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
     ilb.real_coupon = Decimal::try_from(0.05).expect("valid decimal"); // High real coupon
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2030, 1, 2);
@@ -418,7 +433,9 @@ fn test_real_yield_different_day_counts() {
 fn test_real_yield_uk_gilt() {
     // Arrange
     let mut ilb = sample_uk_linker();
-    ilb.quoted_clean = Some(105.0);
+    ilb.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(105.0);
 
     let as_of = d(2025, 1, 2);
 

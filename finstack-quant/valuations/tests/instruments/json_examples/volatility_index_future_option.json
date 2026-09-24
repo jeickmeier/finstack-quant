@@ -3,6 +3,11 @@
     "spec": {
       "attributes": {},
       "id": "VSTOXX-FUTURE-OPTION-EXAMPLE",
+      "instrument_pricing_overrides": {
+        "market_quotes": {
+          "implied_volatility": 0.5
+        }
+      },
       "terms": {
         "contracts": 1.0,
         "currency": "EUR",
@@ -23,8 +28,7 @@
           "underlying_settlement_date": "2026-12-16"
         },
         "strike": 20.0,
-        "underlying": "FVS",
-        "volatility": 0.5
+        "underlying": "FVS"
       }
     },
     "type": "volatility_index_future_option"

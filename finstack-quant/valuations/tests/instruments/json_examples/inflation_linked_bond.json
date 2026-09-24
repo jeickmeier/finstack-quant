@@ -25,7 +25,6 @@
         "amount": "1000000",
         "currency": "USD"
       },
-      "quoted_clean": null,
       "real_coupon": "0.025",
       "stub": "none"
     },

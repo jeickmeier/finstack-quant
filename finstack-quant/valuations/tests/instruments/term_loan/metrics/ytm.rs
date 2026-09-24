@@ -125,7 +125,7 @@ fn test_ytm_discount_loan() {
 }
 
 #[test]
-fn test_ytm_uses_quoted_clean_price_when_present() {
+fn test_ytm_uses_quoted_clean_price_pct_when_present() {
     let as_of = date!(2025 - 01 - 01);
     let mut loan = TermLoan::builder()
         .id("TL-YTM-QUOTE".into())
@@ -163,7 +163,7 @@ fn test_ytm_uses_quoted_clean_price_when_present() {
     let ytm_base = *base.measures.get("ytm").unwrap();
 
     loan.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(95.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(95.0);
     let quoted = loan
         .price_with_metrics(
             &market,
@@ -219,7 +219,7 @@ fn test_ytm_quoted_price_applies_to_outstanding_not_commitment() {
         .build()
         .unwrap();
     loan.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
     let market = MarketContext::new().insert(disc_curve);
@@ -299,7 +299,7 @@ fn test_ytm_current_period_coupon_uses_fixing() {
             .build()
             .unwrap();
         loan.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
         loan
     };
 

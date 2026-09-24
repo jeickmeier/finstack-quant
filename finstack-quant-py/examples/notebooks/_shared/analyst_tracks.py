@@ -549,8 +549,8 @@ def futures_inputs() -> dict[str, dict[str, Any]]:
                 "settlement": {"payment_date": "2025-09-19", "type": "cash"},
                 "strike": 5300.0,
                 "underlying": "SPX-SEP25",
-                "volatility": 0.20,
             },
+            "instrument_pricing_overrides": {"market_quotes": {"implied_volatility": 0.20}},
         },
     }
     raw.update({"UST-FUTURE": instrument_envelope(future), "SPX-FUTURE-CALL": instrument_envelope(listed)})
@@ -621,10 +621,10 @@ def variance_inputs() -> dict[str, dict[str, Any]]:
         "underlying": "VIX-MAR25",
         "futures_price": 22.0,
         "strike": 22.0,
-        "volatility": 0.60,
         "expiry": "2025-03-19",
         "settlement": {"payment_date": "2025-03-19", "type": "cash"},
     })
+    option["instrument"]["spec"]["instrument_pricing_overrides"] = {"market_quotes": {"implied_volatility": 0.60}}
     return {"SPX-VARIANCE": instrument_envelope(swap), "VIX-FUTURE": instrument_envelope(future), "VIX-CALL": option}
 
 

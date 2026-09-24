@@ -199,9 +199,6 @@ pub struct FutureOptionTerms {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exercise: Option<FutureOptionExercise>,
-    /// Annualized volatility. Decimal lognormal units for Black-76; futures-price
-    /// points per square-root year for the normal model.
-    pub volatility: f64,
     /// Black-76 or normal quotation model.
     pub model: FutureOptionModel,
     /// Up-front premium or futures-style variation-margin convention.
@@ -235,11 +232,6 @@ impl FutureOptionTerms {
         if self.contracts <= 0.0 || self.multiplier <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "FutureOptionTerms contracts and multiplier must be positive".to_string(),
-            ));
-        }
-        if !self.volatility.is_finite() || self.volatility < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "FutureOptionTerms volatility must be finite and non-negative".to_string(),
             ));
         }
         if self
@@ -343,12 +335,32 @@ impl FutureOptionTerms {
             .settlement(FutureOptionSettlement::Cash {
                 payment_date: date!(2026 - 12 - 14),
             })
-            .volatility(0.20)
             .model(FutureOptionModel::Black76)
             .premium_style(FutureOptionPremiumStyle::PremiumPaid)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
+    }
+
+    /// Resolve the flat option volatility for a live (unexercised) option.
+    ///
+    /// The volatility is the trade-level
+    /// `instrument_pricing_overrides.market_quotes.implied_volatility` quote:
+    /// decimal lognormal for Black-76, futures-price points per square-root
+    /// year for the normal model.
+    fn live_volatility(implied_volatility: Option<f64>) -> finstack_quant_core::Result<f64> {
+        let volatility = implied_volatility.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "a live futures option requires instrument_pricing_overrides.market_quotes.implied_volatility"
+                    .to_string(),
+            )
+        })?;
+        if !volatility.is_finite() || volatility < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "instrument_pricing_overrides.market_quotes.implied_volatility must be finite and non-negative, got {volatility}"
+            )));
+        }
+        Ok(volatility)
     }
 
     fn intrinsic(&self, futures_price: f64) -> f64 {
@@ -614,12 +626,18 @@ impl FutureOptionTerms {
     ///
     /// * `instrument_id` - Concrete asset-class instrument identifier used in lifecycle errors.
     /// * `tree_steps` - Optional American lattice step count; defaults to 401.
+    /// * `implied_volatility` - Flat option volatility from
+    ///   `instrument_pricing_overrides.market_quotes.implied_volatility`: decimal
+    ///   lognormal for Black-76, futures-price points per square-root year for
+    ///   the normal model. Required while the option is live; ignored once it
+    ///   is exercised.
     /// * `market` - Market context containing the settlement discount curve.
     /// * `as_of` - Valuation date controlling live versus exercised lifecycle state.
     pub fn npv_raw(
         &self,
         instrument_id: &InstrumentId,
         tree_steps: Option<usize>,
+        implied_volatility: Option<f64>,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
@@ -638,13 +656,9 @@ impl FutureOptionTerms {
                 instrument_id, self.expiry
             )));
         }
-        let unit_quote = self.live_unit_price(
-            market,
-            as_of,
-            self.futures_price,
-            self.volatility,
-            tree_steps,
-        )?;
+        let volatility = Self::live_volatility(implied_volatility)?;
+        let unit_quote =
+            self.live_unit_price(market, as_of, self.futures_price, volatility, tree_steps)?;
         self.position_value_from_unit_quote(unit_quote)
     }
 
@@ -654,11 +668,15 @@ impl FutureOptionTerms {
     ///
     /// * `tree_steps` - Optional American lattice step count; defaults to 201
     ///   for greeks and 401 for official PV.
+    /// * `implied_volatility` - Flat option volatility from
+    ///   `instrument_pricing_overrides.market_quotes.implied_volatility`, in the
+    ///   model's units; required while the option is live.
     /// * `market` - Market context containing the settlement discount curve.
     /// * `as_of` - Valuation date.
     pub fn cash_delta(
         &self,
         tree_steps: Option<usize>,
+        implied_volatility: Option<f64>,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
@@ -680,22 +698,13 @@ impl FutureOptionTerms {
         if as_of >= self.expiry {
             return Ok(0.0);
         }
+        let volatility = Self::live_volatility(implied_volatility)?;
         let bump = self.finite_difference_bump(1e-4, 1e-4);
         let steps = Some(tree_steps.unwrap_or(RISK_TREE_STEPS));
-        let up = self.live_unit_price(
-            market,
-            as_of,
-            self.futures_price + bump,
-            self.volatility,
-            steps,
-        )?;
-        let down = self.live_unit_price(
-            market,
-            as_of,
-            self.futures_price - bump,
-            self.volatility,
-            steps,
-        )?;
+        let up =
+            self.live_unit_price(market, as_of, self.futures_price + bump, volatility, steps)?;
+        let down =
+            self.live_unit_price(market, as_of, self.futures_price - bump, volatility, steps)?;
         Ok(self.position_scale() * (up - down) / (2.0 * bump))
     }
 
@@ -705,11 +714,15 @@ impl FutureOptionTerms {
     ///
     /// * `tree_steps` - Optional American lattice step count; defaults to 201
     ///   for greeks and 401 for official PV.
+    /// * `implied_volatility` - Flat option volatility from
+    ///   `instrument_pricing_overrides.market_quotes.implied_volatility`, in the
+    ///   model's units; required while the option is live.
     /// * `market` - Market context containing the settlement discount curve.
     /// * `as_of` - Valuation date.
     pub fn cash_gamma(
         &self,
         tree_steps: Option<usize>,
+        implied_volatility: Option<f64>,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
@@ -717,28 +730,18 @@ impl FutureOptionTerms {
         if as_of >= self.expiry || self.exercise.is_some_and(|exercise| as_of >= exercise.date) {
             return Ok(0.0);
         }
+        let volatility = Self::live_volatility(implied_volatility)?;
         let bump = self.finite_difference_bump(1e-3, 1e-3);
         let steps = Some(tree_steps.unwrap_or(RISK_TREE_STEPS));
-        let base =
-            self.live_unit_price(market, as_of, self.futures_price, self.volatility, steps)?;
-        let up = self.live_unit_price(
-            market,
-            as_of,
-            self.futures_price + bump,
-            self.volatility,
-            steps,
-        )?;
-        let down = self.live_unit_price(
-            market,
-            as_of,
-            self.futures_price - bump,
-            self.volatility,
-            steps,
-        )?;
+        let base = self.live_unit_price(market, as_of, self.futures_price, volatility, steps)?;
+        let up =
+            self.live_unit_price(market, as_of, self.futures_price + bump, volatility, steps)?;
+        let down =
+            self.live_unit_price(market, as_of, self.futures_price - bump, volatility, steps)?;
         Ok(self.position_scale() * (up - 2.0 * base + down) / (bump * bump))
     }
 
-    /// Cash vega for a +0.01 absolute bump in the configured volatility units.
+    /// Cash vega for a +0.01 absolute bump in the `implied_volatility` units.
     ///
     /// For Black-76 this is one lognormal vol point. For the normal model it is
     /// 0.01 futures-price points per square-root year (one basis point when a
@@ -748,11 +751,15 @@ impl FutureOptionTerms {
     ///
     /// * `tree_steps` - Optional American lattice step count; defaults to 201
     ///   for greeks and 401 for official PV.
+    /// * `implied_volatility` - Flat option volatility from
+    ///   `instrument_pricing_overrides.market_quotes.implied_volatility`, in the
+    ///   model's units; required while the option is live.
     /// * `market` - Market context containing the settlement discount curve.
     /// * `as_of` - Valuation date.
     pub fn cash_vega(
         &self,
         tree_steps: Option<usize>,
+        implied_volatility: Option<f64>,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
@@ -760,16 +767,11 @@ impl FutureOptionTerms {
         if as_of >= self.expiry || self.exercise.is_some_and(|exercise| as_of >= exercise.date) {
             return Ok(0.0);
         }
+        let volatility = Self::live_volatility(implied_volatility)?;
         let steps = Some(tree_steps.unwrap_or(RISK_TREE_STEPS));
-        let base =
-            self.live_unit_price(market, as_of, self.futures_price, self.volatility, steps)?;
-        let up = self.live_unit_price(
-            market,
-            as_of,
-            self.futures_price,
-            self.volatility + 0.01,
-            steps,
-        )?;
+        let base = self.live_unit_price(market, as_of, self.futures_price, volatility, steps)?;
+        let up =
+            self.live_unit_price(market, as_of, self.futures_price, volatility + 0.01, steps)?;
         Ok(self.position_scale() * (up - base))
     }
 
@@ -779,11 +781,15 @@ impl FutureOptionTerms {
     ///
     /// * `tree_steps` - Optional American lattice step count; defaults to 201
     ///   for greeks and 401 for official PV.
+    /// * `implied_volatility` - Flat option volatility from
+    ///   `instrument_pricing_overrides.market_quotes.implied_volatility`, in the
+    ///   model's units; required while the option is live.
     /// * `market` - Market context containing the settlement discount curve.
     /// * `as_of` - Valuation date.
     pub fn cash_theta(
         &self,
         tree_steps: Option<usize>,
+        implied_volatility: Option<f64>,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
@@ -791,17 +797,12 @@ impl FutureOptionTerms {
         if as_of >= self.expiry || self.exercise.is_some_and(|exercise| as_of >= exercise.date) {
             return Ok(0.0);
         }
+        let volatility = Self::live_volatility(implied_volatility)?;
         let next_date = (as_of + time::Duration::days(1)).min(self.expiry);
         let steps = Some(tree_steps.unwrap_or(RISK_TREE_STEPS));
-        let base =
-            self.live_unit_price(market, as_of, self.futures_price, self.volatility, steps)?;
-        let next = self.live_unit_price(
-            market,
-            next_date,
-            self.futures_price,
-            self.volatility,
-            steps,
-        )?;
+        let base = self.live_unit_price(market, as_of, self.futures_price, volatility, steps)?;
+        let next =
+            self.live_unit_price(market, next_date, self.futures_price, volatility, steps)?;
         Ok(self.position_scale() * (next - base))
     }
 }
@@ -838,10 +839,6 @@ mod tests {
             .settlement(FutureOptionSettlement::Cash {
                 payment_date: date!(2027 - 01 - 01),
             })
-            .volatility(match model {
-                FutureOptionModel::Black76 => 0.20,
-                FutureOptionModel::Normal => 5.0,
-            })
             .model(model)
             .premium_style(FutureOptionPremiumStyle::PremiumPaid)
             .day_count(DayCount::Act365F)
@@ -850,16 +847,36 @@ mod tests {
             .expect("option")
     }
 
+    /// Test volatility in the model's units: 20% lognormal or 5 price points normal.
+    fn vol(model: FutureOptionModel) -> Option<f64> {
+        Some(match model {
+            FutureOptionModel::Black76 => 0.20,
+            FutureOptionModel::Normal => 5.0,
+        })
+    }
+
     #[test]
     fn put_call_parity_holds_for_black_and_normal() {
         let market = market(0.05);
         let as_of = date!(2026 - 01 - 01);
         for model in [FutureOptionModel::Black76, FutureOptionModel::Normal] {
             let call = option(model, OptionType::Call)
-                .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
+                .npv_raw(
+                    &InstrumentId::new("TEST-FOP"),
+                    None,
+                    vol(model),
+                    &market,
+                    as_of,
+                )
                 .expect("call");
             let put = option(model, OptionType::Put)
-                .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
+                .npv_raw(
+                    &InstrumentId::new("TEST-FOP"),
+                    None,
+                    vol(model),
+                    &market,
+                    as_of,
+                )
                 .expect("put");
             assert!((call - put).abs() < 1e-10);
         }
@@ -872,7 +889,13 @@ mod tests {
         let option = option(FutureOptionModel::Normal, OptionType::Call);
         let expected = 5.0 / (2.0 * std::f64::consts::PI).sqrt() * 10.0;
         let actual = option
-            .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
+            .npv_raw(
+                &InstrumentId::new("TEST-FOP"),
+                None,
+                vol(FutureOptionModel::Normal),
+                &market,
+                as_of,
+            )
             .expect("normal pv");
         assert!((actual - expected).abs() < 1e-10 * expected);
     }
@@ -885,16 +908,16 @@ mod tests {
         let mut futures_style = premium_paid.clone();
         futures_style.premium_style = FutureOptionPremiumStyle::FuturesStyle;
         let paid = premium_paid
-            .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
-            .expect("paid");
-        let undiscounted_quote = futures_style
-            .live_unit_price(
+            .npv_raw(
+                &InstrumentId::new("TEST-FOP"),
+                None,
+                vol(FutureOptionModel::Black76),
                 &market,
                 as_of,
-                futures_style.futures_price,
-                futures_style.volatility,
-                None,
             )
+            .expect("paid");
+        let undiscounted_quote = futures_style
+            .live_unit_price(&market, as_of, futures_style.futures_price, 0.20, None)
             .expect("undiscounted quote");
         assert!(
             (undiscounted_quote * futures_style.multiplier / paid - 0.05_f64.exp()).abs() < 1e-10
@@ -902,7 +925,13 @@ mod tests {
 
         futures_style.option_reference_price = Some(undiscounted_quote);
         let pnl = futures_style
-            .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
+            .npv_raw(
+                &InstrumentId::new("TEST-FOP"),
+                None,
+                vol(FutureOptionModel::Black76),
+                &market,
+                as_of,
+            )
             .expect("margined pnl");
         assert!(pnl.abs() < 1e-10);
     }
@@ -922,11 +951,11 @@ mod tests {
         terms.futures_price = 1.0e-8;
         terms.strike = 1.0e-8;
         assert!(terms
-            .cash_delta(None, &market, as_of)
+            .cash_delta(None, vol(FutureOptionModel::Black76), &market, as_of)
             .expect("delta")
             .is_finite());
         assert!(terms
-            .cash_gamma(None, &market, as_of)
+            .cash_gamma(None, vol(FutureOptionModel::Black76), &market, as_of)
             .expect("gamma")
             .is_finite());
     }
@@ -939,10 +968,22 @@ mod tests {
         let mut american = european.clone();
         american.exercise_style = ExerciseStyle::American;
         let european_pv = european
-            .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
+            .npv_raw(
+                &InstrumentId::new("TEST-FOP"),
+                None,
+                vol(FutureOptionModel::Normal),
+                &market,
+                as_of,
+            )
             .expect("european");
         let american_pv = american
-            .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
+            .npv_raw(
+                &InstrumentId::new("TEST-FOP"),
+                None,
+                vol(FutureOptionModel::Normal),
+                &market,
+                as_of,
+            )
             .expect("american");
         assert!(american_pv + 1e-10 >= european_pv);
     }
@@ -964,14 +1005,45 @@ mod tests {
         let as_of = date!(2026 - 06 - 02);
         assert_eq!(
             option
-                .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, as_of)
+                .npv_raw(&InstrumentId::new("TEST-FOP"), None, None, &market, as_of)
                 .expect("pnl"),
             40.0
         );
         assert_eq!(
-            option.cash_delta(None, &market, as_of).expect("delta"),
+            option
+                .cash_delta(None, None, &market, as_of)
+                .expect("delta"),
             10.0
         );
+    }
+
+    #[test]
+    fn live_option_requires_market_quote_implied_volatility() {
+        let market = market(0.0);
+        let option = option(FutureOptionModel::Black76, OptionType::Call);
+        let error = option
+            .npv_raw(
+                &InstrumentId::new("TEST-FOP"),
+                None,
+                None,
+                &market,
+                date!(2026 - 01 - 01),
+            )
+            .expect_err("live option without a volatility quote");
+        assert!(error
+            .to_string()
+            .contains("instrument_pricing_overrides.market_quotes.implied_volatility"));
+    }
+
+    #[test]
+    fn terms_reject_retired_volatility_key() {
+        let mut value = serde_json::to_value(FutureOptionTerms::example().expect("example"))
+            .expect("serialize terms");
+        // schema-rejection-test
+        value["volatility"] = serde_json::json!(0.2);
+        let error = serde_json::from_value::<FutureOptionTerms>(value)
+            .expect_err("retired terms.volatility must be rejected");
+        assert!(error.to_string().contains("unknown field"), "{error}");
     }
 
     #[test]
@@ -979,7 +1051,13 @@ mod tests {
         let market = market(0.0);
         let option = option(FutureOptionModel::Normal, OptionType::Call);
         let error = option
-            .npv_raw(&InstrumentId::new("TEST-FOP"), None, &market, option.expiry)
+            .npv_raw(
+                &InstrumentId::new("TEST-FOP"),
+                None,
+                vol(FutureOptionModel::Normal),
+                &market,
+                option.expiry,
+            )
             .expect_err("missing expiry observation");
         assert!(error
             .to_string()

@@ -66,7 +66,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-      "bytes": 84042,
+      "bytes": 84884,
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
@@ -138,7 +138,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/commodity/commodity_future_option.schema.json",
-      "bytes": 13117,
+      "bytes": 13043,
       "kind": "input",
       "path": "schemas/instruments/1/commodity/commodity_future_option.schema.json",
       "summary": "Exchange-listed option on a commodity future.",
@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1024952,
+      "bytes": 1024897,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -258,7 +258,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_future_option.schema.json",
-      "bytes": 13100,
+      "bytes": 13026,
       "kind": "input",
       "path": "schemas/instruments/1/equity/equity_future_option.schema.json",
       "summary": "Exchange-listed option on an equity future.",
@@ -330,7 +330,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future_option.schema.json",
-      "bytes": 13267,
+      "bytes": 13193,
       "kind": "input",
       "path": "schemas/instruments/1/equity/volatility_index_future_option.schema.json",
       "summary": "Exchange-listed option on a volatility-index future.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1023919,
+      "bytes": 1023864,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -466,7 +466,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
-      "bytes": 13512,
+      "bytes": 13278,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/inflation_linked_bond.schema.json",
       "summary": "Bond whose principal and coupons index to a price level.",
@@ -538,7 +538,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_future_option.schema.json",
-      "bytes": 13040,
+      "bytes": 12966,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_future_option.schema.json",
       "summary": "Exchange-listed option on an FX future.",
@@ -602,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1113971,
+      "bytes": 1114439,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -698,7 +698,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future_option.schema.json",
-      "bytes": 13356,
+      "bytes": 13282,
       "kind": "input",
       "path": "schemas/instruments/1/rates/interest_rate_future_option.schema.json",
       "summary": "Listed or bilateral option on an interest-rate futures price.",

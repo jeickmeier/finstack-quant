@@ -63,7 +63,7 @@ fn test_bond_with_custom_cashflows() {
     assert_eq!(
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price,
+            .quoted_clean_price_pct,
         Some(98.5)
     );
     assert_eq!(bond.issue_date, issue);
@@ -140,7 +140,7 @@ fn test_bond_builder_with_custom_cashflows() {
         .custom_cashflows_opt(Some(custom_schedule))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(
-            InstrumentPricingOverrides::default().with_quoted_clean_price(99.0),
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0),
         )
         .attributes(Attributes::new())
         .build()
@@ -151,7 +151,7 @@ fn test_bond_builder_with_custom_cashflows() {
     assert_eq!(
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price,
+            .quoted_clean_price_pct,
         Some(99.0)
     );
     assert!(bond.custom_cashflows.is_some());

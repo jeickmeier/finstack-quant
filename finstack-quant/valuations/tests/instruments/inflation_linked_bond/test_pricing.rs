@@ -317,8 +317,12 @@ fn test_npv_with_quoted_price_doesnt_affect_npv() {
     let mut ilb1 = sample_tips();
     let mut ilb2 = sample_tips();
 
-    ilb1.quoted_clean = Some(100.0);
-    ilb2.quoted_clean = Some(110.0);
+    ilb1.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(100.0);
+    ilb2.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(110.0);
 
     let (ctx, _) = market_context_with_index();
     let as_of = d(2025, 1, 2);

@@ -132,7 +132,7 @@ pub(super) fn target_price_from_quote_or_model(
     if let Some(px) = loan
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price
+        .quoted_clean_price_pct
     {
         quoted_dirty_from_clean_px(loan, schedule, as_of, px)
     } else {

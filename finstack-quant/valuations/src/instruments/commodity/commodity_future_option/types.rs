@@ -20,7 +20,9 @@ pub struct CommodityFutureOption {
     pub id: InstrumentId,
     /// Caller-supplied option-on-future pricing and settlement terms.
     pub terms: FutureOptionTerms,
-    /// Instrument-owned pricing inputs, including optional tree-step overrides.
+    /// Instrument-owned pricing inputs: the flat option volatility in
+    /// `market_quotes.implied_volatility` (required while live) and optional
+    /// tree-step overrides.
     #[builder(default)]
     #[serde(
         default,
@@ -60,10 +62,14 @@ impl CommodityFutureOption {
 
     /// Create a neutral schema and serialization example.
     pub fn example() -> finstack_quant_core::Result<Self> {
-        Self::new(
-            InstrumentId::new("COMMODITY-FUTURE-OPTION-EXAMPLE"),
-            FutureOptionTerms::example()?,
-        )
+        Ok(Self {
+            instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default()
+                .with_implied_vol(0.20),
+            ..Self::new(
+                InstrumentId::new("COMMODITY-FUTURE-OPTION-EXAMPLE"),
+                FutureOptionTerms::example()?,
+            )?
+        })
     }
 }
 

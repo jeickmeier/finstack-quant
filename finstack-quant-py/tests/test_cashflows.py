@@ -297,7 +297,7 @@ def test_cashflows_accrued_interest_rejects_unknown_config_json_fields() -> None
         accrued_interest(schedule_json, "2025-02-28", config_json)
 
 
-def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean() -> None:
+def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean_price_pct() -> None:
     schedule_json = build_cashflow_schedule_json(_cashflow_spec())
     instrument_json = bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", schedule_json, "USD-OIS")
     instrument = json.loads(instrument_json)

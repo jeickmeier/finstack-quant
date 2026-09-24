@@ -6249,7 +6249,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -9642,7 +9642,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -11904,11 +11904,6 @@
             "number",
             "null"
           ]
-        },
-        "volatility": {
-          "description": "Annualized volatility. Decimal lognormal units for Black-76; futures-price\npoints per square-root year for the normal model.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
@@ -11922,7 +11917,6 @@
         "exercise_style",
         "expiry",
         "settlement",
-        "volatility",
         "model",
         "premium_style",
         "day_count",
@@ -12413,7 +12407,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -13560,14 +13554,6 @@
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount (in real terms)"
-        },
-        "quoted_clean": {
-          "description": "Quoted clean price (if available)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "real_coupon": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
@@ -15386,7 +15372,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -23617,7 +23603,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",

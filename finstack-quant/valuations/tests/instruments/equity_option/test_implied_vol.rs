@@ -75,9 +75,9 @@ fn test_implied_vol_recovers_surface_vol() {
     );
 
     // Set market price in attributes
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     // Calculate implied vol
     let result = call
@@ -126,9 +126,9 @@ fn test_implied_vol_atm_option() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(
@@ -171,9 +171,9 @@ fn test_implied_vol_itm_option() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(
@@ -216,9 +216,9 @@ fn test_implied_vol_otm_option() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(
@@ -261,9 +261,9 @@ fn test_implied_vol_short_dated() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(
@@ -306,9 +306,9 @@ fn test_implied_vol_long_dated() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(
@@ -351,9 +351,9 @@ fn test_implied_vol_high_volatility() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(
@@ -397,9 +397,9 @@ fn test_implied_vol_low_volatility() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(
@@ -447,9 +447,9 @@ fn test_implied_vol_rejects_expired() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let error = call
         .price_with_metrics(
@@ -462,11 +462,12 @@ fn test_implied_vol_rejects_expired() {
     assert!(error.to_string().contains("live, unexercised"));
 }
 
-/// A malformed `market_price` attribute must surface as an error, not be
-/// silently parsed to 0.0 (which would solve implied volatility against a zero
-/// target price and return a meaningless degenerate IV).
+/// The observed premium comes only from
+/// `instrument_pricing_overrides.market_quotes.quoted_premium`; the retired
+/// `attributes.meta["market_price"]` channel is ignored, so a missing premium
+/// is an error naming the canonical wire path.
 #[test]
-fn test_implied_vol_malformed_market_price_errors() {
+fn test_implied_vol_requires_quoted_premium() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
     let strike = 100.0;
@@ -474,33 +475,24 @@ fn test_implied_vol_malformed_market_price_errors() {
 
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, 0.25, 0.05, 0.0);
-
-    // Not a number — previously `.parse().unwrap_or(0.0)` swallowed this.
     call.attributes
         .meta
-        .insert("market_price".to_string(), "not-a-price".to_string());
+        .insert("market_price".to_string(), "12.5".to_string());
 
-    let result = call.price_with_metrics(
-        &market,
-        as_of,
-        &[MetricId::ImpliedVol],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
+    let error = call
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ImpliedVol],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect_err("implied vol needs market_quotes.quoted_premium");
+    assert!(
+        error
+            .to_string()
+            .contains("instrument_pricing_overrides.market_quotes.quoted_premium"),
+        "{error}"
     );
-
-    match result {
-        Err(e) => {
-            let msg = e.to_string();
-            assert!(
-                msg.contains("market_price") && msg.contains("not a valid number"),
-                "error must name the malformed market_price attribute; got: {msg}"
-            );
-        }
-        Ok(r) => panic!(
-            "a malformed market_price must error, not silently solve IV against 0.0 \
-             (got implied_vol = {:?})",
-            r.measures.get("implied_vol")
-        ),
-    }
 }
 
 #[test]
@@ -525,9 +517,9 @@ fn test_implied_vol_with_dividends() {
         expiry,
         call.notional.amount(),
     );
-    call.attributes
-        .meta
-        .insert("market_price".to_string(), market_price.to_string());
+    call.instrument_pricing_overrides
+        .market_quotes
+        .quoted_premium = Some(market_price);
 
     let result = call
         .price_with_metrics(

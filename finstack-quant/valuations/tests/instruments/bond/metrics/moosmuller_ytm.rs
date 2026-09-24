@@ -62,7 +62,7 @@ fn moosmuller_differs_from_street_mid_coupon() {
     let as_of = date!(2025 - 07 - 01);
     let mut bond = bund_style_bond(issue, date!(2027 - 01 - 01));
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
     let market = flat_eur_market(as_of);
 
     let street = metric(&bond, &market, as_of, MetricId::Ytm);
@@ -82,7 +82,7 @@ fn moosmuller_equals_street_on_coupon_date() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = bund_style_bond(as_of, date!(2027 - 01 - 01));
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
     let market = flat_eur_market(as_of);
 
     let street = metric(&bond, &market, as_of, MetricId::Ytm);
@@ -102,7 +102,7 @@ fn german_bund_convention_still_uses_street_ytm() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = bund_style_bond(as_of, date!(2027 - 01 - 01));
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.0);
     let market = flat_eur_market(as_of);
 
     let street = metric(&bond, &market, as_of, MetricId::Ytm);
@@ -150,7 +150,7 @@ fn moosmuller_price_round_trip() {
 
     let mut quoted = bond;
     quoted.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_pct);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_pct);
 
     let solved = metric(&quoted, &market, as_of, MetricId::MoosmullerYtm);
     assert!(

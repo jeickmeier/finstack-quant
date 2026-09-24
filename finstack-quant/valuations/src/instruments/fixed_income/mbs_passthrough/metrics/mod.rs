@@ -104,10 +104,10 @@ impl MetricCalculator for OasCalculator {
         let market_price = mbs
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
             .ok_or_else(|| {
                 finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: "mbs.pricing_overrides.quoted_clean_price".to_string(),
+                    id: "mbs.pricing_overrides.quoted_clean_price_pct".to_string(),
                 })
             })?;
         // True option-adjusted spread from the Monte Carlo model.
@@ -205,7 +205,7 @@ mod tests {
             .expect("valid mbs");
         mbs.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(quote);
+            .quoted_clean_price_pct = Some(quote);
 
         // Reference values computed directly.
         let target = quote / 100.0 * mbs.current_face.amount();
@@ -265,7 +265,7 @@ mod tests {
         let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
         mbs.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(95.0);
+            .quoted_clean_price_pct = Some(95.0);
         let metric = |mbs: &AgencyMbsPassthrough| {
             let mut ctx = MetricContext::new(
                 Arc::new(mbs.clone()),

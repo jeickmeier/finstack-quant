@@ -8,7 +8,7 @@ const cases = [
     path: [
       "instrument_pricing_overrides",
       "market_quotes",
-      "quoted_clean_price",
+      "quoted_clean_price_pct",
     ],
   },
   {

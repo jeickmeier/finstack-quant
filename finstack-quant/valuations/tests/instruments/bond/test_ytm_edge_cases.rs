@@ -63,7 +63,7 @@ fn test_deep_discount_bond_ytm() {
 
     // Set quoted price at deep discount
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(50.0); // 50 cents on dollar
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(50.0); // 50 cents on dollar
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -109,7 +109,7 @@ fn test_zero_coupon_bond_ytm() {
 
     // Price at 80 cents on dollar
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(80.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(80.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -173,7 +173,7 @@ fn test_odd_first_coupon_ytm() {
 
     // Price at par
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -234,7 +234,7 @@ fn test_eom_february_maturity_ytm() {
 
     // Price slightly above par
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(102.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(102.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -292,7 +292,7 @@ fn test_long_first_coupon_ytm() {
     let market = create_test_market(issue);
 
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(98.0); // Slight discount
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0); // Slight discount
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -335,7 +335,7 @@ fn test_premium_bond_ytm_solver_convergence() {
 
     // Price at premium
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(115.0); // 115 cents on dollar
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(115.0); // 115 cents on dollar
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -384,7 +384,7 @@ fn test_very_long_maturity_bond() {
     let market = create_test_market(issue);
 
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(90.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(90.0);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -435,7 +435,7 @@ fn test_near_maturity_bond_ytm() {
     let market = create_test_market(as_of);
 
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.5);
     let bond_with_quote = bond;
 
     let result = bond_with_quote
@@ -484,7 +484,7 @@ fn test_negative_ytm_extreme_premium() {
 
     // Price at 103 (extreme premium for 0.5% coupon)
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(103.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(103.0);
 
     let result = bond
         .price_with_metrics(

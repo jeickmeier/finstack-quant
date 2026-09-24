@@ -51,18 +51,11 @@ impl MetricCalculator for ImpliedVolCalculator {
             ));
         }
 
-        // Need market price to solve for implied volatility.
-        // The quoted_clean_price is passed via the MetricContext pricing overrides,
-        // not stored on the instrument itself.
-        let market_price = context
-            .get_instrument_overrides()
-            .and_then(|po| po.market_quotes.quoted_clean_price)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: "Market price required for implied vol (set via pricing overrides)"
-                        .to_string(),
-                })
-            })?;
+        // Observed caplet/floorlet premium (total PV in the notional currency).
+        let market_price = option
+            .instrument_pricing_overrides
+            .market_quotes
+            .required_quoted_premium()?;
 
         // Use the same canonical schedule the pricer uses so fixing date,
         // payment date, forward period, and accrual all match pricing exactly.

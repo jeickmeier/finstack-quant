@@ -222,7 +222,7 @@ fn par_quarterly_note_yields_its_coupon() {
         Some(finstack_quant_core::dates::BusinessDayConvention::Unadjusted);
     deal.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(100.0);
+        .quoted_clean_price_pct = Some(100.0);
     let market = market(as_of);
     let senior = deal
         .value_tranche_with_metrics("A", &market, as_of, &[])

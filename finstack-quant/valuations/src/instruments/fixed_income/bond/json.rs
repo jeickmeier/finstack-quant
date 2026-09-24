@@ -15,8 +15,8 @@
 ///   principal and coupon schedule.
 /// * `discount_curve_id` - Market-context key of the discount curve used to
 ///   value the bond's cashflows.
-/// * `quoted_clean` - Optional clean market price expressed as a percentage of
-///   par. `None` leaves the bond without an explicit clean-price override.
+/// * `quoted_clean_price_pct` - Optional clean market price in percent of par
+///   (99.5 = 99.5%). `None` leaves the bond without an explicit clean-price override.
 ///
 /// # Errors
 ///
@@ -26,15 +26,19 @@ pub fn bond_from_cashflows_json(
     instrument_id: &str,
     schedule_json: &str,
     discount_curve_id: &str,
-    quoted_clean: Option<f64>,
+    quoted_clean_price_pct: Option<f64>,
 ) -> finstack_quant_core::Result<String> {
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(schedule_json).map_err(|err| {
             finstack_quant_core::Error::Validation(format!("invalid cashflow schedule JSON: {err}"))
         })?;
     schedule.validate()?;
-    let bond =
-        super::Bond::from_cashflows(instrument_id, schedule, discount_curve_id, quoted_clean)?;
+    let bond = super::Bond::from_cashflows(
+        instrument_id,
+        schedule,
+        discount_curve_id,
+        quoted_clean_price_pct,
+    )?;
     let instrument = crate::instruments::InstrumentJson::Bond(bond);
     let envelope = crate::instruments::InstrumentEnvelope::new(instrument);
     serde_json::to_string(&envelope).map_err(|err| {

@@ -5761,14 +5761,14 @@ export interface ValuationInstrumentsNamespace {
    * @param instrumentId - Stable instrument identifier used for pricing and metric keys.
    * @param scheduleJson - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
    * @param discountCurveId - Market-context discount-curve identifier for the instrument currency.
-   * @param quotedClean - Optional observed clean bond price in the schedule's documented price quotation convention.
+   * @param quotedCleanPricePct - Optional observed clean bond price in percent of par (99.5 = 99.5%), stored as `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
    * @throws Error - Throws a JavaScript exception if `scheduleJson` is malformed or violates cash-flow invariants, bond construction fails, or the canonical bond envelope cannot be serialized.
    */
   bondFromCashflowsJson(
     instrumentId: string,
     scheduleJson: string,
     discountCurveId: string,
-    quotedClean?: number | null
+    quotedCleanPricePct?: number | null
   ): string;
   /**
    * Validate a canonical v1 instrument envelope after optional metric-pricing

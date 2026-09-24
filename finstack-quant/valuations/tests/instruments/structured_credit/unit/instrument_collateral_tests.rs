@@ -223,12 +223,12 @@ fn worst_policy_requires_a_quoted_price() {
     for bond in collateral.bonds.iter_mut() {
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(99.5);
+            .quoted_clean_price_pct = Some(99.5);
     }
     for loan in collateral.term_loans.iter_mut() {
         loan.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(99.0);
+            .quoted_clean_price_pct = Some(99.0);
     }
     pool_with(collateral, Currency::USD)
         .normalized(CLOSING)

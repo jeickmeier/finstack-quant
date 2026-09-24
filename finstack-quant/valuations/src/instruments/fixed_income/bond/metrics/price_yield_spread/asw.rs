@@ -547,7 +547,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
             maturity,
             day_count,
             notional_amt,
-            quoted_clean,
+            quoted_clean_price_pct,
             is_custom,
             coupon,
             asw_forward_curve_id,
@@ -561,7 +561,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                 b.notional.amount(),
                 b.instrument_pricing_overrides
                     .market_quotes
-                    .quoted_clean_price,
+                    .quoted_clean_price_pct,
                 b.custom_cashflows.is_some(),
                 coupon_rate,
                 resolved_asw_forward_curve_id(b),
@@ -570,7 +570,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
         let disc = context.curves.get_discount(&discount_curve_id)?;
 
         // Dirty market value in currency
-        let dirty_currency = if let Some(clean_px) = quoted_clean {
+        let dirty_currency = if let Some(clean_px) = quoted_clean_price_pct {
             let accrued = context
                 .computed
                 .get(&MetricId::Accrued)
@@ -615,7 +615,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
         let params = schedule_params(&bond.cashflow_spec)?;
         let frequency = params.frequency;
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        if let Some(clean_px) = quoted_clean {
+        if let Some(clean_px) = quoted_clean_price_pct {
             if let Some((_, workout_flows, workout_quote_date)) = workout {
                 let workout_maturity = workout_flows
                     .last()

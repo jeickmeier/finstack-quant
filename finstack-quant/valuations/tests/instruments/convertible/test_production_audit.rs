@@ -466,7 +466,7 @@ fn production_convertible_implied_vol_uses_a_valid_lattice_bracket() {
         let target = bond.value(&ctx, as_of).expect("target PV").amount();
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(target / 10.0);
+            .quoted_clean_price_pct = Some(target / 10.0);
         let result = bond
             .price_with_metrics(
                 &ctx,
@@ -521,7 +521,7 @@ fn production_convertible_implied_vol_preserves_selected_engine() {
         .amount();
     bond.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(target / 10.0);
+        .quoted_clean_price_pct = Some(target / 10.0);
     let mut registry = PricerRegistry::new();
     registry
         .register(SelectedTree)
@@ -556,7 +556,7 @@ fn production_convertible_implied_vol_is_independent_of_trade_scale() {
         let target = bond.value(&ctx, as_of).expect("scaled PV").amount();
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(100.0 * target / notional);
+            .quoted_clean_price_pct = Some(100.0 * target / notional);
         let result = bond
             .price_with_metrics(
                 &ctx,

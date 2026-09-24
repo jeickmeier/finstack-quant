@@ -27,7 +27,7 @@ fn test_ytm_par_bond() {
     )
     .unwrap();
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(100.0);
 
     let curve =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
@@ -108,7 +108,7 @@ fn test_ytm_floating_bond_is_finite_from_price() {
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
     let result = bond
         .price_with_metrics(
@@ -191,7 +191,7 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
     let pv = bond.value(&market, as_of).unwrap().amount();
     let clean_px = pv / notional.amount() * 100.0;
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(clean_px);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
     let result = bond
         .price_with_metrics(

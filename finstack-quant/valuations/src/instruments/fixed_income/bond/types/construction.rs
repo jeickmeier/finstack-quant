@@ -544,7 +544,9 @@ impl Bond {
     /// * `id` - Unique identifier for the bond
     /// * `schedule` - Pre-built cashflow schedule
     /// * `discount_curve_id` - Discount curve identifier for pricing
-    /// * `quoted_clean` - Optional quoted clean price as percentage of par
+    /// * `quoted_clean_price_pct` - Optional quoted clean price in percent of par
+    ///   (99.5 = 99.5%), stored as
+    ///   `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`
     ///
     /// # Returns
     ///
@@ -599,7 +601,7 @@ impl Bond {
         id: impl Into<InstrumentId>,
         schedule: CashFlowSchedule,
         discount_curve_id: impl Into<CurveId>,
-        quoted_clean: Option<f64>,
+        quoted_clean_price_pct: Option<f64>,
     ) -> finstack_quant_core::Result<Self> {
         schedule.validate()?;
         let notional = schedule.get_notional().initial;
@@ -693,8 +695,8 @@ impl Bond {
         // YTM/YTW/duration/convexity use correct conventions for custom bonds.
         let cashflow_spec = CashflowSpec::fixed(0.0, inferred_frequency, schedule.get_day_count())?;
 
-        let pricing_overrides = if let Some(price) = quoted_clean {
-            InstrumentPricingOverrides::default().with_quoted_clean_price(price)
+        let pricing_overrides = if let Some(price) = quoted_clean_price_pct {
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(price)
         } else {
             InstrumentPricingOverrides::default()
         };

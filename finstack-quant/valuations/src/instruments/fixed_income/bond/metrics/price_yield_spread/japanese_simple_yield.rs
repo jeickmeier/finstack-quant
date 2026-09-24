@@ -32,7 +32,7 @@ impl MetricCalculator for JapaneseSimpleYieldCalculator {
         let clean_pct = if let Some(clean_px) = bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price
+            .quoted_clean_price_pct
         {
             clean_px
         } else {

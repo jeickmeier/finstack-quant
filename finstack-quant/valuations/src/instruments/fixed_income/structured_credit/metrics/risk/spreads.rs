@@ -25,9 +25,9 @@ const RELATIVE_BASE_PV_EPSILON: f64 = 1e-12;
 fn quoted_target_value(context: &mut MetricContext) -> Result<(f64, f64)> {
     let deal = context.instrument_as::<StructuredCredit>()?;
     let quotes = &deal.instrument_pricing_overrides.market_quotes;
-    if quotes.quoted_clean_price.is_none() && quotes.quoted_dirty_price_currency.is_none() {
+    if quotes.quoted_clean_price_pct.is_none() && quotes.quoted_dirty_price_currency.is_none() {
         return Err(finstack_quant_core::Error::Validation(
-            "structured-credit spread metrics require quoted_clean_price or quoted_dirty_price_currency".into(),
+            "structured-credit spread metrics require quoted_clean_price_pct or quoted_dirty_price_currency".into(),
         ));
     }
     let quote = super::super::quote::SettlementQuote::from_context(context)?;
@@ -728,7 +728,7 @@ mod zspread_quote_tests {
             .clone();
         deal.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(quoted_price_pct);
+            .quoted_clean_price_pct = Some(quoted_price_pct);
         context.set_instrument(Arc::new(deal));
         context
     }
@@ -747,7 +747,7 @@ mod zspread_quote_tests {
                 .expect_err("quote-dependent spread metrics must require an external quote");
             let message = err.to_string();
             assert!(
-                message.contains("quoted_clean_price"),
+                message.contains("quoted_clean_price_pct"),
                 "{requested} must identify the missing quote; got: {message}"
             );
         }
@@ -819,13 +819,13 @@ mod zspread_quote_tests {
     fn quoted_price_override_has_one_market_quote_owner() {
         let mut overrides = MarketQuoteOverrides::default();
         assert!(
-            overrides.quoted_clean_price.is_none(),
+            overrides.quoted_clean_price_pct.is_none(),
             "no quote by default, so existing behaviour is unchanged"
         );
 
-        overrides.quoted_clean_price = Some(98.5);
+        overrides.quoted_clean_price_pct = Some(98.5);
         assert_eq!(
-            overrides.quoted_clean_price,
+            overrides.quoted_clean_price_pct,
             Some(98.5),
             "a quoted price must survive on MarketQuoteOverrides so ZSpread \
              has a target that did not come from the model"
@@ -836,24 +836,24 @@ mod zspread_quote_tests {
     #[test]
     fn quoted_price_override_round_trips_through_json() {
         let overrides = MarketQuoteOverrides {
-            quoted_clean_price: Some(102.25),
+            quoted_clean_price_pct: Some(102.25),
             ..Default::default()
         };
 
         let json = serde_json::to_string(&overrides).expect("serialize");
         assert!(
-            json.contains("quoted_clean_price"),
+            json.contains("quoted_clean_price_pct"),
             "a set quote must serialize; got {json}"
         );
 
         let parsed: MarketQuoteOverrides = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.quoted_clean_price, Some(102.25));
+        assert_eq!(parsed.quoted_clean_price_pct, Some(102.25));
 
         // And an absent quote must not bloat the wire format.
         let empty = MarketQuoteOverrides::default();
         let empty_json = serde_json::to_string(&empty).expect("serialize");
         assert!(
-            !empty_json.contains("quoted_clean_price"),
+            !empty_json.contains("quoted_clean_price_pct"),
             "an unset quote must be skipped on the wire; got {empty_json}"
         );
     }

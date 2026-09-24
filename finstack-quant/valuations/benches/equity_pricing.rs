@@ -33,7 +33,9 @@ use finstack_quant_valuations::instruments::equity::vol_index_future::{
 use finstack_quant_valuations::instruments::equity::Equity;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::Position;
-use finstack_quant_valuations::instruments::{Attributes, ExerciseStyle, OptionType};
+use finstack_quant_valuations::instruments::{
+    Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType,
+};
 use finstack_quant_valuations::instruments::{
     EquityFuture, EquityFutureOption, FutureOptionModel, FutureOptionPremiumStyle,
     FutureOptionSettlement, FutureOptionTerms, ListedFutureTerms,
@@ -345,7 +347,6 @@ fn bench_equity_future_option_pv(c: &mut Criterion) {
             .settlement(FutureOptionSettlement::Cash {
                 payment_date: expiry,
             })
-            .volatility(0.80)
             .model(FutureOptionModel::Black76)
             .premium_style(FutureOptionPremiumStyle::PremiumPaid)
             .day_count(DayCount::Act365F)
@@ -355,6 +356,9 @@ fn bench_equity_future_option_pv(c: &mut Criterion) {
         let opt = EquityFutureOption::builder()
             .id(InstrumentId::new(format!("VIX-OPT-{label}")))
             .terms(terms)
+            .instrument_pricing_overrides(
+                InstrumentPricingOverrides::default().with_implied_vol(0.80),
+            )
             .attributes(Attributes::new())
             .build()
             .unwrap();

@@ -187,7 +187,7 @@
           "credit_curve_id": null,
           "instrument_pricing_overrides": {
             "market_quotes": {
-              "quoted_clean_price": 98.5
+              "quoted_clean_price_pct": 98.5
             }
           },
           "call_put": null,

@@ -154,7 +154,7 @@ test('clean and dirty targets share coupon-crossing settlement', () => {
   );
   assert.ok(Math.abs(oas.oas) < 1e-8);
   assert.ok(Math.abs(oas.model_price - clean) < 1e-8);
-  for (const quote of [{ quoted_clean_price: clean }, { quoted_dirty_price_currency: dirty }]) {
+  for (const quote of [{ quoted_clean_price_pct: clean }, { quoted_dirty_price_currency: dirty }]) {
     spec.instrument_pricing_overrides = { market_quotes: quote };
     const priced = valuations.instruments.priceInstrument(
       JSON.stringify(f.instrument),

@@ -90,7 +90,7 @@ impl SettlementQuote {
             self.dirty_target(dirty).map(Some)
         } else {
             quotes
-                .quoted_clean_price
+                .quoted_clean_price_pct
                 .map(|clean| self.clean_target(clean))
                 .transpose()
         }

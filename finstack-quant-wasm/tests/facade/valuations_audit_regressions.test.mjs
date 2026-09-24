@@ -347,14 +347,13 @@ test('equity LR prices and implied volatility match independent QuantLib cases',
   );
   const spec = fixture.instrument.instrument.spec;
   for (const row of oracle.cases.filter((row) => row.style !== 'european')) {
-    spec.attributes = { meta: { market_price: String(row.pv) } };
     spec.option_type = row.side;
     spec.exercise_style = row.style;
     spec.exercise_schedule = oracle.exercise_days.map((days) =>
       new Date(Date.parse(fixture.as_of) + days * 86400000).toISOString().slice(0, 10)
     );
     spec.instrument_pricing_overrides = {
-      market_quotes: { implied_volatility: row.volatility },
+      market_quotes: { implied_volatility: row.volatility, quoted_premium: row.pv },
       model_config: { tree_steps: row.steps },
     };
     const result = valuations.instruments.priceInstrument(

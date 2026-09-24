@@ -76,6 +76,10 @@ mod inflation_cap_floor;
 #[path = "instruments/irs/mod.rs"]
 mod irs;
 
+/// Futures-option tests - Shared option-on-future wrappers
+#[path = "instruments/future_option/mod.rs"]
+mod future_option;
+
 /// Swaption tests - Options on interest rate swaps
 #[path = "instruments/swaption/mod.rs"]
 mod swaption;

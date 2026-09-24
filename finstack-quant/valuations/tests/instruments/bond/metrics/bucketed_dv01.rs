@@ -1,6 +1,6 @@
 //! Bucketed DV01 tests for bond instruments.
 //!
-//! Covers the fix for plain (non-callable) bonds with a `quoted_clean_price`
+//! Covers the fix for plain (non-callable) bonds with a `quoted_clean_price_pct`
 //! override returning all-zero bucketed DV01 values. The engine must calibrate
 //! a Z-spread from the quoted price and reprice the spread-pinned clone through
 //! the curve-bump loop so that key-rate buckets are non-zero and reconcile with
@@ -61,7 +61,7 @@ fn test_plain_bond_quoted_price_bucketed_dv01_nonzero() {
     let as_of = date!(2024 - 03 - 15);
     let mut bond = build_plain_bond(as_of);
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(99.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(99.5);
 
     let market = MarketContext::new().insert(build_multi_tenor_curve(as_of));
 

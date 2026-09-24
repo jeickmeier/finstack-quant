@@ -1306,7 +1306,7 @@ mod tests {
         make_whole_bond
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(100.0);
+            .quoted_clean_price_pct = Some(100.0);
         make_whole_bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
                 start_date: exercise_date,

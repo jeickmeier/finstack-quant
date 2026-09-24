@@ -107,7 +107,7 @@ fn test_cs01_zspread_fallback_uses_settlement_anchored_basis() {
     bond.credit_curve_id = None;
     // Quote off-par so the Z-spread (and hence CS01) is non-trivial.
     bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price(96.5);
+        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(96.5);
 
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)

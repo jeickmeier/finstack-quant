@@ -225,7 +225,7 @@ fn tree_only_option_metrics_reject_discounting_model() {
     let mut loan = term_loan(None, true);
     loan.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(95.0);
+        .quoted_clean_price_pct = Some(95.0);
     let market = market();
     let options = PricingOptions::default().with_model(ModelKey::Discounting);
 

@@ -535,34 +535,6 @@ impl CDSOption {
         Ok(option)
     }
 
-    /// Set implied volatility override with validation.
-    ///
-    /// # Arguments
-    ///
-    /// * `vol` - Lognormal (Black) volatility in decimal form (e.g., 0.30 for 30%)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if volatility is not positive.
-    pub fn with_implied_vol(mut self, vol: f64) -> finstack_quant_core::Result<Self> {
-        if vol <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "implied_volatility must be positive, got {}",
-                vol
-            )));
-        }
-        if vol > MAX_IMPLIED_VOL {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "implied_volatility {} exceeds maximum {}",
-                vol, MAX_IMPLIED_VOL
-            )));
-        }
-        self.instrument_pricing_overrides
-            .market_quotes
-            .implied_volatility = Some(vol);
-        Ok(self)
-    }
-
     /// Actual/365F time from current valuation date to legal option expiry.
     /// Premium and exercise settlement dates govern cash payments, not the
     /// interval over which spread variance accumulates.

@@ -825,7 +825,6 @@ fn compute_taylor_sensitivities(
         base_value,
         MetricContext::default_config(),
     );
-    context.set_instrument_overrides(instrument.get_instrument_pricing_overrides().cloned());
     context.set_metric_overrides(instrument.get_metric_pricing_overrides().cloned());
     context.set_pricer_dispatch(dispatch.clone());
     context.set_recalibration_provider(provider);

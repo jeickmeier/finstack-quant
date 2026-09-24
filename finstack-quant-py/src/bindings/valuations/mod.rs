@@ -562,22 +562,22 @@ fn pretty_instrument_json(json: &str) -> PyResult<String> {
 /// Construct tagged bond instrument JSON from a cashflow schedule.
 #[pyfunction]
 #[pyo3(
-    signature = (instrument_id, schedule_json, discount_curve_id, quoted_clean = None),
-    text_signature = "(instrument_id, schedule_json, discount_curve_id, quoted_clean=None)"
+    signature = (instrument_id, schedule_json, discount_curve_id, quoted_clean_price_pct = None),
+    text_signature = "(instrument_id, schedule_json, discount_curve_id, quoted_clean_price_pct=None)"
 )]
 fn bond_from_cashflows_json(
     py: Python<'_>,
     instrument_id: &str,
     schedule_json: &str,
     discount_curve_id: &str,
-    quoted_clean: Option<f64>,
+    quoted_clean_price_pct: Option<f64>,
 ) -> PyResult<String> {
     py.detach(|| {
         finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
             instrument_id,
             schedule_json,
             discount_curve_id,
-            quoted_clean,
+            quoted_clean_price_pct,
         )
         .map_err(crate::errors::core_to_py)
     })

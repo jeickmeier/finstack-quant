@@ -206,7 +206,7 @@ fn bench_term_loan_discount_margin(c: &mut Criterion) {
     loan.frequency = Tenor::quarterly();
     loan.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(98.5);
+        .quoted_clean_price_pct = Some(98.5);
     let mut group = c.benchmark_group("term_loan_discount_margin");
     group.bench_function("5Y_quarterly", |b| {
         b.iter(|| {
@@ -316,7 +316,7 @@ fn bench_agency_mbs_metrics(c: &mut Criterion) {
     let mut mbs = AgencyMbsPassthrough::example().unwrap();
     mbs.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(95.0);
+        .quoted_clean_price_pct = Some(95.0);
 
     group.bench_function("oas", |b| {
         b.iter(|| {

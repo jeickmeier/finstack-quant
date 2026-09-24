@@ -232,7 +232,7 @@ fn b11_icma_bond_duration_and_convexity_use_yield_clock() {
     }
     bond.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(100.0);
+        .quoted_clean_price_pct = Some(100.0);
     let curve = DiscountCurve::builder("FLAT")
         .base_date(start)
         .knots([(0.0, 1.0), (2.0, 1.0)])
@@ -322,7 +322,7 @@ fn b12_dm_inversion_applies_settlement_once() {
     quoted
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(dirty / 10_000.0);
+        .quoted_clean_price_pct = Some(dirty / 10_000.0);
     let mut context = MetricContext::new(
         Arc::new(quoted),
         Arc::new(market),
@@ -460,7 +460,7 @@ fn m28_coupon_date_purchase_uses_balance_after_settled_amortization() {
     loan.settlement_days = 2;
     loan.instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(100.0);
+        .quoted_clean_price_pct = Some(100.0);
     let as_of = date!(2025 - 03 - 28);
     let settlement = loan.settlement_date(as_of).expect("settlement");
     assert_eq!(settlement, date!(2025 - 04 - 01));
@@ -679,7 +679,7 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
     option
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(expected);
+        .quoted_premium = Some(expected);
     let risk = option
         .price_with_metrics(
             &market,

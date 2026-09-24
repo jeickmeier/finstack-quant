@@ -559,7 +559,7 @@ impl EquityOption {
     ///
     /// * `curves` - Spot, dividend and discount inputs; trial volatility replaces any surface or scalar volatility override.
     /// * `as_of` - Valuation date, strictly before expiry and any observed exercise.
-    /// * `market_price` - Finite non-negative total trade PV in the notional currency, including the contract multiplier.
+    /// * `target_price` - Observed option premium: finite non-negative total trade PV in the notional currency, including the contract multiplier.
     ///
     /// # Errors
     /// Returns a validation error for non-positive notional, settled exercise, invalid prices or an unidentifiable deterministic limit; propagates market, pricing and convergence errors.
@@ -567,12 +567,12 @@ impl EquityOption {
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        market_price: f64,
+        target_price: f64,
     ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_core::{math::solver::BrentSolver, Error};
         let notional = self.notional.amount();
-        if !market_price.is_finite()
-            || market_price < 0.0
+        if !target_price.is_finite()
+            || target_price < 0.0
             || !notional.is_finite()
             || notional <= 0.0
         {
@@ -591,7 +591,7 @@ impl EquityOption {
                 trial.instrument_pricing_overrides.with_implied_vol(sigma);
             super::pricing::compute_pv(&trial, curves, as_of).map(|pv| pv.amount() / notional)
         };
-        let target = market_price / notional;
+        let target = target_price / notional;
         let lower = 1e-8;
         let low = price(lower)?;
         let tolerance = 1e-10 * target.abs().max(1.0);

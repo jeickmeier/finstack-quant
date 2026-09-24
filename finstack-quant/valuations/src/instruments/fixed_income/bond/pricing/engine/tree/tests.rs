@@ -37,7 +37,7 @@ fn create_test_bond() -> Bond {
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id_opt(None)
         .instrument_pricing_overrides(
-            InstrumentPricingOverrides::default().with_quoted_clean_price(98.5),
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.5),
         )
         .call_put_opt(None)
         .custom_cashflows_opt(None)
@@ -141,7 +141,7 @@ fn oas_metric_round_trip_bp(bond: &Bond, oas_bp: f64) -> f64 {
     quoted
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(clean_pct);
+        .quoted_clean_price_pct = Some(clean_pct);
     let result = quoted
         .price_with_metrics(
             &market,

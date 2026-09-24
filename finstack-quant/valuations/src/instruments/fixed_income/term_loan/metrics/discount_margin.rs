@@ -62,11 +62,11 @@ impl MetricCalculator for DiscountMarginCalculator {
             && loan
                 .instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price
+                .quoted_clean_price_pct
                 .is_none()
         {
             return Err(finstack_quant_core::Error::Validation(
-                "DiscountMargin requires quoted_clean_price for callable loans".to_string(),
+                "DiscountMargin requires quoted_clean_price_pct for callable loans".to_string(),
             ));
         }
 
@@ -75,7 +75,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let quoted_px = loan
             .instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price;
+            .quoted_clean_price_pct;
         let as_of = context.as_of;
         let schedule = super::irr_helpers::cached_full_schedule(context)?;
         let loan: &TermLoan = context.instrument_as()?;

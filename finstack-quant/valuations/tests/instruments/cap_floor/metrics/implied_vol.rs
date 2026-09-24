@@ -108,7 +108,7 @@ fn test_implied_vol_round_trips_pricing_vol() {
     caplet
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(pv.amount());
+        .quoted_premium = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -133,7 +133,7 @@ fn test_implied_vol_round_trips_pricing_vol() {
 /// passed through pricing overrides on the MetricContext. Since CapFloor
 /// does not carry pricing_overrides at the struct level, the implied vol metric
 /// needs overrides to be set externally (e.g., via the pricing engine).
-/// This test verifies that the metric fails gracefully when no market price is available.
+/// The metric fails with the canonical wire path when no observed premium is set.
 #[test]
 fn test_implied_vol_fails_without_market_price_override() {
     let as_of = date!(2024 - 01 - 01);
@@ -177,20 +177,28 @@ fn test_implied_vol_fails_without_market_price_override() {
         attributes: Default::default(),
     };
 
-    // CapFloor does not carry pricing_overrides, so implied vol
-    // requires the market price to be provided through the MetricContext.
-    // Without it, the metric should fail.
-    let result = caplet.price_with_metrics(
-        &market,
-        as_of,
-        &[MetricId::ImpliedVol],
-        finstack_quant_valuations::instruments::PricingOptions::default(),
-    );
-
-    // Should fail because no market price is available
+    // The premium comes only from market_quotes.quoted_premium. A clean price
+    // in percent of par is a bond quote and must not be read as a caplet
+    // premium, so the metric fails naming the canonical wire path.
+    let mut caplet = caplet;
+    let pv = caplet.value(&market, as_of).expect("caplet PV");
+    caplet
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price_pct = Some(pv.amount());
+    let error = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ImpliedVol],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect_err("ImpliedVol needs market_quotes.quoted_premium");
     assert!(
-        result.is_err(),
-        "ImpliedVol should fail without market price in pricing overrides"
+        error
+            .to_string()
+            .contains("instrument_pricing_overrides.market_quotes.quoted_premium"),
+        "{error}"
     );
 }
 
@@ -239,7 +247,7 @@ fn compounded_sofr_implied_vol_round_trip_uses_contractual_coupon_and_payment() 
     caplet
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(pv.amount());
+        .quoted_premium = Some(pv.amount());
     let result = caplet
         .price_with_metrics(
             &market,
@@ -286,7 +294,7 @@ fn normal_implied_vol_round_trips_non_positive_forward() {
     caplet
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(pv.amount());
+        .quoted_premium = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -331,7 +339,7 @@ fn shifted_lognormal_implied_vol_round_trips_shifted_domain() {
     caplet
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(pv.amount());
+        .quoted_premium = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -373,7 +381,7 @@ fn same_day_caplet_does_not_synthesize_option_time() {
     caplet
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(intrinsic.amount());
+        .quoted_premium = Some(intrinsic.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -417,7 +425,7 @@ fn auto_implied_vol_round_trips_negative_rate_normal_quote() {
     caplet
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price = Some(pv.amount());
+        .quoted_premium = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(

@@ -222,7 +222,7 @@ impl PoolAsset {
             purchase_price: bond
                 .instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price
+                .quoted_clean_price_pct
                 .map(|p| Money::new(p * bond.notional.amount() / 100.0, bond.notional.currency()))
                 .transpose()?,
             acquisition_date: None,

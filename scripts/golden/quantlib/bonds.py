@@ -476,7 +476,7 @@ def build_fixed_callable_oas_bond() -> dict[str, Any]:
     spec["cashflow_spec"]["fixed"]["rate"] = str(coupon)
     spec["instrument_pricing_overrides"] = {
         "market_quotes": {
-            "quoted_clean_price": clean_price,
+            "quoted_clean_price_pct": clean_price,
         },
         "model_config": {
             "tree_steps": 200,

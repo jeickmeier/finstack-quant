@@ -23,6 +23,7 @@ fn test_implied_vol_matches_surface() {
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = create_flat_market(as_of, 0.05, vol_input);
 
+    let swaption = with_model_premium(swaption, &market, as_of);
     let result = swaption
         .price_with_metrics(
             &market,
@@ -49,6 +50,7 @@ fn test_implied_vol_positive() {
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = create_flat_market(as_of, 0.05, 0.25);
 
+    let swaption = with_model_premium(swaption, &market, as_of);
     let result = swaption
         .price_with_metrics(
             &market,
@@ -77,6 +79,7 @@ fn test_implied_vol_inversion() {
     // The implied vol calculator solves: price_black(sigma) = target_pv
     // where target_pv is the base_value computed by the same pricing function.
     // Since both use identical pricing paths, inversion should be very precise.
+    let swaption = with_model_premium(swaption, &market, as_of);
     let result = swaption
         .price_with_metrics(
             &market,
@@ -106,6 +109,7 @@ fn test_implied_vol_consistency_across_strikes() {
     for strike in [0.03, 0.05, 0.07] {
         let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
 
+        let swaption = with_model_premium(swaption, &market, as_of);
         let result = swaption
             .price_with_metrics(
                 &market,

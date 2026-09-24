@@ -124,7 +124,7 @@ pub(crate) fn context_workout_path(
             && bond
                 .instrument_pricing_overrides
                 .market_quotes
-                .quoted_clean_price
+                .quoted_clean_price_pct
                 .is_some();
         if !may_have_workout {
             context.bond_workout_path = Some(None);
@@ -161,7 +161,7 @@ pub(crate) fn quoted_workout_path(
     let Some(clean_px) = bond
         .instrument_pricing_overrides
         .market_quotes
-        .quoted_clean_price
+        .quoted_clean_price_pct
     else {
         return Ok(None);
     };

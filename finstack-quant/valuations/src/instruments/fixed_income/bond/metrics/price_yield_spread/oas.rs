@@ -313,7 +313,7 @@ mod tests {
             (target_dirty - quote_context.accrued_at_quote_date) / bond.notional.amount() * 100.0;
         bond.instrument_pricing_overrides
             .market_quotes
-            .quoted_clean_price = Some(target_clean_pct);
+            .quoted_clean_price_pct = Some(target_clean_pct);
 
         let context = MetricContext::new(
             Arc::new(bond.clone()),
@@ -352,7 +352,7 @@ mod tests {
         .expect("valid bond");
         bond.settlement_convention = None;
         bond.instrument_pricing_overrides =
-            InstrumentPricingOverrides::default().with_quoted_clean_price(98.0);
+            InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
         assert_eq!(bond.default_pricing_model(), ModelKey::Discounting);
 
         let market = MarketContext::new()
