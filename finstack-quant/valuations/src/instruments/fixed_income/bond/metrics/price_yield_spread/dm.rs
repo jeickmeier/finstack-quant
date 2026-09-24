@@ -1,106 +1,27 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
+use super::z_spread::maturity_scaled_bracket;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_dm;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use std::cell::RefCell;
 
-/// Configuration for the discount margin solver.
+/// Discount-margin solver tolerance on the DM axis (decimal).
 ///
-/// # Tolerance Design Rationale
-///
-/// The DM (discount margin) tolerance is specified on the **spread axis** (decimal).
-/// The default `1e-10` (~0.01 bp) is chosen to ensure:
-///
-/// 1. **Price accuracy**: For typical FRNs, this yields price errors < $0.01 per $1M face.
-///
-/// 2. **Consistency**: Same precision as Z-spread and YTM solvers for coherent
-///    cross-metric analysis.
-///
-/// ## FRN-Specific Considerations
-///
-/// Discount margin for FRNs is inherently more stable than fixed-rate yields because:
-/// - Floating coupons reset to market rates, reducing duration
-/// - Price sensitivity to DM is lower (typically 0.01-0.05% per bp for short-dated)
-///
-/// This allows slightly tighter brackets than fixed-rate bond Z-spreads.
-///
-/// ## Recommended Tolerances
-///
-/// | Use Case | Tolerance | DM Precision |
-/// |----------|-----------|--------------|
-/// | Regulatory | `1e-12` | < 0.0001 bp |
-/// | Trading | `1e-10` | < 0.01 bp |
-/// | Screening | `1e-8` | < 1 bp |
-///
-/// # Maturity-Aware Bracketing
-///
-/// FRN spreads are typically tighter than fixed-rate credit spreads:
-/// - Investment grade FRNs: 20-100 bp
-/// - High yield FRNs: 200-500 bp
-/// - Distressed: 500+ bp
-///
-/// The bracket scales with maturity: `bracket = base × (1 + years/30)`
-///
-/// # Examples
-///
-/// ```text
-/// use finstack_quant_valuations::instruments::fixed_income::bond::metrics::price_yield_spread::DiscountMarginSolverConfig;
-///
-/// // Default for standard FRNs
-/// let default = DiscountMarginSolverConfig::default();
-///
-/// // Tighter for IG FRN trading
-/// let ig_config = DiscountMarginSolverConfig {
-///     tolerance: 1e-12,
-///     base_bracket_bp: 300.0,
-///     max_bracket_bp: 800.0,
-/// };
-///
-/// // Wider for leveraged loan / HY FRN screening
-/// let hy_config = DiscountMarginSolverConfig {
-///     tolerance: 1e-8,
-///     base_bracket_bp: 800.0,
-///     max_bracket_bp: 2000.0,
-/// };
-/// ```
-#[derive(Debug, Clone)]
-pub(crate) struct DiscountMarginSolverConfig {
-    /// Convergence tolerance for the DM root finder (on the DM axis, decimal).
-    ///
-    /// Default: `1e-10` (~0.01 bp precision). This is consistent with other
-    /// spread solvers (Z-spread, OAS) and yields sub-penny price accuracy.
-    pub tolerance: f64,
+/// `1e-10` (~0.01 bp) matches the Z-spread and YTM solvers and keeps FRN price
+/// errors below $0.01 per $1M face.
+const DM_TOLERANCE: f64 = 1e-10;
 
-    /// Base half-width of the initial search bracket, in basis points.
-    ///
-    /// FRNs typically have tighter spreads than fixed-rate bonds:
-    /// - IG: 20-100 bp
-    /// - HY: 200-500 bp
-    ///
-    /// Default of ±500 bp covers most FRN universe without excessive searching.
-    pub base_bracket_bp: f64,
+/// Base half-width of the DM initial bracket, in basis points.
+///
+/// FRN margins are tighter than fixed-rate credit spreads (IG 20-100 bp,
+/// HY 200-500 bp), so ±500 bp covers most of the universe.
+const DM_BASE_BRACKET_BP: f64 = 500.0;
 
-    /// Maximum half-width of the initial search bracket (in bp) after maturity scaling.
-    ///
-    /// Caps the bracket for long-dated FRNs (rare, but possible in structured products).
-    pub max_bracket_bp: f64,
-}
-
-impl Default for DiscountMarginSolverConfig {
-    fn default() -> Self {
-        Self {
-            tolerance: 1e-10,
-            // Short-dated FRNs: ±500 bp is ample, even in stressed markets
-            base_bracket_bp: 500.0,
-            // Allow widening for long-dated/distressed names without going extreme
-            max_bracket_bp: 1500.0,
-        }
-    }
-}
+/// Cap on the maturity-scaled DM bracket half-width, in basis points.
+const DM_MAX_BRACKET_BP: f64 = 1500.0;
 
 /// Discount Margin (DM) for floating-rate bonds.
 ///
@@ -147,54 +68,8 @@ impl Default for DiscountMarginSolverConfig {
 /// // Discount margin is computed automatically when requesting bond metrics for FRNs
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, Default)]
-pub struct DiscountMarginCalculator {
-    config: DiscountMarginSolverConfig,
-}
-
-impl DiscountMarginCalculator {
-    /// Create a DM calculator with default production-grade solver settings.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    fn pv_given_dm(
-        bond: &Bond,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: Date,
-        dm: f64,
-    ) -> finstack_quant_core::Result<f64> {
-        price_from_dm(bond, curves, as_of, dm)
-    }
-
-    /// Compute an initial bracket half-width (in decimal) based on maturity.
-    ///
-    /// Short-dated FRNs use the base bracket (e.g., ±500 bp). Longer maturities
-    /// widen the bracket smoothly up to `max_bracket_bp`, which improves
-    /// robustness for high-yield/distressed names without over-bracketing
-    /// short, high-grade bonds.
-    fn initial_bracket_decimal(
-        &self,
-        bond: &Bond,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        if as_of >= bond.maturity {
-            return Ok(self.config.base_bracket_bp / 10_000.0);
-        }
-        // Bracket sizing is a numerical heuristic, independent of coupon accrual.
-        let day_count = finstack_quant_core::dates::DayCount::Act365F;
-        let years = day_count
-            .year_fraction(as_of, bond.maturity, DayCountContext::default())?
-            .max(0.0);
-
-        // Scale bracket between 1x and 2x base over 0–30y, then clamp.
-        let maturity_scale = 1.0 + (years / 30.0).min(1.0);
-        let bracket_bp =
-            (self.config.base_bracket_bp * maturity_scale).min(self.config.max_bracket_bp);
-
-        Ok(bracket_bp / 10_000.0)
-    }
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DiscountMarginCalculator;
 
 impl MetricCalculator for DiscountMarginCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
@@ -238,7 +113,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let quote_date = quote_ctx.quote_date;
 
         let objective = |dm: f64| -> f64 {
-            match Self::pv_given_dm(bond, &context.curves, context.as_of, dm) {
+            match price_from_dm(bond, &context.curves, context.as_of, dm) {
                 Ok(pv) => pv - dirty_currency,
                 Err(e) => {
                     // Capture the first pricing error and map to a large non-zero residual
@@ -263,9 +138,10 @@ impl MetricCalculator for DiscountMarginCalculator {
         };
 
         // Use a maturity-aware initial bracket with production-grade tolerance.
-        let bracket = self.initial_bracket_decimal(bond, quote_date)?;
+        let bracket =
+            maturity_scaled_bracket(bond, quote_date, DM_BASE_BRACKET_BP, DM_MAX_BRACKET_BP)?;
         let solver = BrentSolver::new()
-            .tolerance(self.config.tolerance)
+            .tolerance(DM_TOLERANCE)
             .initial_bracket_size(Some(bracket));
         // Initial guess 0.0 (0 bp). DM returned in decimal (e.g., 0.01 = 100bp)
         let dm = solver.solve(objective, 0.0)?;
@@ -291,7 +167,7 @@ mod tests {
     use std::sync::Arc;
     use time::macros::date;
 
-    /// Issue B regression: when every `pv_given_dm` call fails (e.g. missing forward
+    /// Issue B regression: when every `price_from_dm` call fails (e.g. missing forward
     /// curve), the DM solver must surface an error rather than silently returning a
     /// near-zero DM.
     ///
@@ -302,7 +178,7 @@ mod tests {
     ///
     /// This test drives the real `DiscountMarginCalculator::calculate` path: a valid FRN
     /// is constructed with only the discount curve present; the forward/projection curve
-    /// is intentionally omitted so every internal `pv_given_dm` call returns a
+    /// is intentionally omitted so every internal `price_from_dm` call returns a
     /// missing-curve error.
     #[test]
     fn dm_failure_residual_must_not_change_sign_across_zero() {
@@ -323,7 +199,7 @@ mod tests {
         .expect("bond construction should succeed");
 
         // Market with only the discount curve — forward curve intentionally absent so
-        // every pv_given_dm call inside the objective fails with a missing-curve error.
+        // every price_from_dm call inside the objective fails with a missing-curve error.
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
@@ -339,7 +215,7 @@ mod tests {
             MetricContext::default_config(),
         );
 
-        let calc = DiscountMarginCalculator::default();
+        let calc = DiscountMarginCalculator;
         let result = calc.calculate(&mut mctx);
 
         // With the flat +1e12 residual, the bracket search finds no sign change and
@@ -349,7 +225,7 @@ mod tests {
         // unnecessary fake convergence; removing either guard would yield Ok(~0.0).
         assert!(
             result.is_err(),
-            "DM solver must return Err when every pv_given_dm call fails (missing forward \
+            "DM solver must return Err when every price_from_dm call fails (missing forward \
              curve), not Ok({:?})",
             result.ok()
         );

@@ -8,118 +8,49 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use std::cell::RefCell;
 
-/// Configuration for Z-spread solver with maturity-aware bracket sizing.
+/// Z-spread solver tolerance on the spread axis (decimal, not bp).
 ///
-/// Controls convergence tolerance and initial search bracket width for the
-/// Z-spread root-finding algorithm. The bracket width scales with bond maturity
-/// to handle both short-dated and long-dated bonds efficiently.
-///
-/// # Tolerance Design Rationale
-///
-/// The Z-spread tolerance is specified on the **spread axis** (in decimal, not bp).
-/// The default `1e-10` (0.001 bp) is chosen to ensure:
-///
-/// 1. **Price accuracy**: For a 10Y bond with duration ~8, a spread tolerance
-///    of `1e-10` translates to price error < `$0.00001` per $1000 face.
-///
-/// 2. **Consistency with YTM**: Same order of magnitude as YTM solver tolerance
-///    ensures consistent precision across all yield/spread metrics.
-///
-/// ## Tolerance-to-Price Sensitivity
-///
-/// The relationship between spread tolerance and price accuracy:
-///
-/// ```text
-/// Price Error ≈ Duration × Notional × Spread Tolerance
-///
-/// Example: Duration = 8, Notional = $1,000,000, Tolerance = 1e-10
-/// Price Error ≈ 8 × 1,000,000 × 1e-10 = $0.0008
-/// ```
-///
-/// ## Recommended Tolerances by Use Case
-///
-/// | Use Case | Tolerance | Spread Precision | Price Error ($1M) |
-/// |----------|-----------|------------------|-------------------|
-/// | Regulatory | `1e-12` | < 0.0001 bp | < $0.0001 |
-/// | Trading | `1e-10` | < 0.01 bp | < $0.01 |
-/// | Screening | `1e-8` | < 1 bp | < $1 |
-///
-/// # Maturity-Aware Bracketing
-///
-/// The initial bracket scales with maturity to handle both IG and HY:
-///
-/// ```text
-/// bracket = min(base_bracket × (1 + years/30), max_bracket)
-/// ```
-///
-/// This ensures:
-/// - Short-dated IG bonds: tight ±500-1000 bp bracket → fast convergence
-/// - Long-dated HY bonds: wider ±1500-3000 bp bracket → robust coverage
-///
-/// # Examples
-///
-/// ```text
-/// use finstack_quant_valuations::instruments::fixed_income::bond::metrics::price_yield_spread::ZSpreadSolverConfig;
-///
-/// // Default production configuration
-/// let default = ZSpreadSolverConfig::default();
-///
-/// // Tighter tolerance for regulatory reporting
-/// let regulatory = ZSpreadSolverConfig {
-///     tolerance: 1e-12,
-///     base_bracket_bp: 1000.0,
-///     max_bracket_bp: 3000.0,
-/// };
-///
-/// // Wider bracket for distressed debt screening
-/// let distressed = ZSpreadSolverConfig {
-///     tolerance: 1e-8,
-///     base_bracket_bp: 2000.0,
-///     max_bracket_bp: 5000.0,
-/// };
-/// ```
-#[derive(Debug, Clone)]
-pub(crate) struct ZSpreadSolverConfig {
-    /// Convergence tolerance for the Z-spread solver (on the spread axis, decimal).
-    ///
-    /// Default: `1e-10` (~0.01 bp precision), which typically achieves price
-    /// residuals well below `$0.01` per $1M face for all credit qualities.
-    ///
-    /// # Interpretation
-    ///
-    /// The solver stops when the price residual (model vs target) is less than
-    /// `tolerance × duration × notional`, ensuring proportional accuracy.
-    pub tolerance: f64,
+/// `1e-10` (0.001 bp) keeps the price residual below `$0.001` per $1M face for
+/// a duration-8 bond (`price error ≈ duration × notional × tolerance`), the
+/// same order as the YTM solver so yield and spread metrics share precision.
+const Z_SPREAD_TOLERANCE: f64 = 1e-10;
 
-    /// Base half-width of the initial search bracket, in basis points.
-    ///
-    /// Short-dated IG credit typically has spreads in 50-300 bp range, but
-    /// we default to ±1000 bp to comfortably cover HY (300-800 bp) and
-    /// distressed (800+ bp) names without manual configuration.
-    ///
-    /// # Maturity Scaling
-    ///
-    /// The actual bracket is scaled by maturity:
-    /// `actual_bracket = base_bracket × (1 + years/30)`
-    pub base_bracket_bp: f64,
+/// Base half-width of the Z-spread initial bracket, in basis points.
+///
+/// ±1000 bp covers IG, HY and most distressed names for short maturities.
+const Z_SPREAD_BASE_BRACKET_BP: f64 = 1000.0;
 
-    /// Maximum half-width of the initial search bracket after maturity scaling.
-    ///
-    /// Caps the bracket for very long-dated bonds (30Y+) to prevent excessive
-    /// search domains that could slow convergence.
-    pub max_bracket_bp: f64,
-}
+/// Cap on the maturity-scaled Z-spread bracket half-width, in basis points.
+const Z_SPREAD_MAX_BRACKET_BP: f64 = 3000.0;
 
-impl Default for ZSpreadSolverConfig {
-    fn default() -> Self {
-        Self {
-            tolerance: 1e-10,
-            // Short-dated bonds: ±1000 bp is generous and covers HY/distressed
-            base_bracket_bp: 1000.0,
-            // Allow widening for long maturities, but cap to a realistic range
-            max_bracket_bp: 3000.0,
-        }
+/// Maturity-aware initial Brent bracket half-width, in decimal units.
+///
+/// The bracket scales from `base_bracket_bp` at zero maturity to twice that
+/// at 30 years and beyond (`base × (1 + min(years/30, 1))`), capped at
+/// `max_bracket_bp`. Years are measured ACT/365F from `as_of` to maturity;
+/// this is a numerical heuristic, independent of the coupon day count.
+///
+/// # Arguments
+///
+/// * `bond` - Bond whose maturity sets the horizon.
+/// * `as_of` - Quote/settlement date the horizon starts from; on or after
+///   maturity the base bracket is returned.
+/// * `base_bracket_bp` - Half-width in basis points for a zero-length horizon.
+/// * `max_bracket_bp` - Maximum half-width in basis points after scaling.
+pub(crate) fn maturity_scaled_bracket(
+    bond: &Bond,
+    as_of: Date,
+    base_bracket_bp: f64,
+    max_bracket_bp: f64,
+) -> finstack_quant_core::Result<f64> {
+    if as_of >= bond.maturity {
+        return Ok(base_bracket_bp / 10_000.0);
     }
+    let years = finstack_quant_core::dates::DayCount::Act365F
+        .year_fraction(as_of, bond.maturity, DayCountContext::default())?
+        .max(0.0);
+    let maturity_scale = 1.0 + (years / 30.0).min(1.0);
+    Ok((base_bracket_bp * maturity_scale).min(max_bracket_bp) / 10_000.0)
 }
 
 /// Z-spread metric calculator for vanilla bonds.
@@ -132,11 +63,9 @@ impl Default for ZSpreadSolverConfig {
 /// flow is re-discounted at frequency `m` (see `z_spread_discount_factor`). It is
 /// not a continuous `exp(-z·t)` shift.
 ///
-/// Uses Brent's method with a maturity-aware initial bracket and a configurable
-/// tolerance. The default configuration is tuned for production use:
-/// - `tolerance = 1e-10`
-/// - short-dated bonds: ±1000 bp initial bracket
-/// - long-dated/distressed: widened up to ±3000 bp
+/// Uses Brent's method with tolerance `1e-10` and a maturity-aware initial
+/// bracket: ±1000 bp for short-dated bonds, widened up to ±3000 bp for
+/// long-dated bonds.
 ///
 /// # Dependencies
 ///
@@ -156,44 +85,8 @@ impl Default for ZSpreadSolverConfig {
 /// // Z-spread is computed automatically when requesting bond metrics
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-#[derive(Debug, Clone, Default)]
-pub struct ZSpreadCalculator {
-    config: ZSpreadSolverConfig,
-}
-
-impl ZSpreadCalculator {
-    /// Create a Z-spread calculator with default production-grade solver
-    /// settings.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Compute a maturity-aware initial bracket in decimal units.
-    ///
-    /// Short-dated bonds use the base bracket (e.g., ±1000 bp). Longer
-    /// maturities widen the bracket smoothly up to `max_bracket_bp`.
-    fn initial_bracket_decimal(
-        &self,
-        bond: &Bond,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<f64> {
-        if as_of >= bond.maturity {
-            return Ok(self.config.base_bracket_bp / 10_000.0);
-        }
-        // Bracket sizing is a numerical heuristic, independent of coupon accrual.
-        let day_count = finstack_quant_core::dates::DayCount::Act365F;
-        let years = day_count
-            .year_fraction(as_of, bond.maturity, DayCountContext::default())?
-            .max(0.0);
-
-        // Scale between 1x and 2x base over 0–30y, then clamp.
-        let maturity_scale = 1.0 + (years / 30.0).min(1.0);
-        let bracket_bp =
-            (self.config.base_bracket_bp * maturity_scale).min(self.config.max_bracket_bp);
-
-        Ok(bracket_bp / 10_000.0)
-    }
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ZSpreadCalculator;
 
 pub(crate) fn bond_z_spread_compounding_frequency(bond: &Bond) -> f64 {
     let years = bond.cashflow_spec.frequency().to_years();
@@ -383,9 +276,14 @@ impl MetricCalculator for ZSpreadCalculator {
 
         // Solve using Brent with a maturity-aware bracket and production-grade
         // tolerance. Initial guess is 0.0 (0 bp).
-        let bracket = self.initial_bracket_decimal(bond, quote_date)?;
+        let bracket = maturity_scaled_bracket(
+            bond,
+            quote_date,
+            Z_SPREAD_BASE_BRACKET_BP,
+            Z_SPREAD_MAX_BRACKET_BP,
+        )?;
         let solver = BrentSolver::new()
-            .tolerance(self.config.tolerance)
+            .tolerance(Z_SPREAD_TOLERANCE)
             .initial_bracket_size(Some(bracket));
         let z = solver.solve(objective, 0.0)?;
 

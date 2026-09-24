@@ -1,5 +1,6 @@
 use crate::instruments::common_impl::pricing::time::{rate_between_on_dates, rate_period_on_dates};
 use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 
 /// Convert payment frequency to approximate periods per year.
@@ -202,48 +203,6 @@ pub fn par_rate_and_annuity_from_discount(
     Ok((num / ann, ann))
 }
 
-/// Forward-projected par rate and fixed-leg annuity for an asset-swap schedule.
-///
-/// # Arguments
-///
-/// * `disc` - Discount curve supplying fixed-leg and projected floating-coupon
-///   present-value discount factors.
-/// * `fwd` - Forward curve supplying date-based floating reference rates.
-/// * `fixed_day_count` - Fixed-leg accrual day-count convention.
-/// * `fixed_frequency` - Optional fixed coupon frequency required by
-///   ACT/ACT-style accrual calculations.
-/// * `schedule` - Ordered swap coupon boundary/payment dates shared by both
-///   legs.
-/// * `float_spread_bp` - Contractual floating-leg spread in basis points,
-///   added to each forward rate.
-pub fn par_rate_and_annuity_from_forward(
-    disc: &DiscountCurve,
-    fwd: &ForwardCurve,
-    fixed_day_count: finstack_quant_core::dates::DayCount,
-    fixed_frequency: Option<finstack_quant_core::dates::Tenor>,
-    schedule: &[Date],
-    float_spread_bp: f64,
-) -> finstack_quant_core::Result<(f64, f64)> {
-    let ann = fixed_leg_annuity(disc, fixed_day_count, fixed_frequency, schedule)?;
-    if ann.abs() < 1e-12 {
-        return Ok((0.0, 0.0));
-    }
-
-    let f_day_count = fwd.day_count();
-    let spread = float_spread_bp * 1e-4;
-    let mut pv_float = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-    let mut prev = schedule[0];
-    for &d in &schedule[1..] {
-        let yf = f_day_count.year_fraction(prev, d, DayCountContext::default())?;
-        let rate = asset_swap_projection_rate(fwd, prev, d)? + spread;
-        let df = disc.df_on_date_curve(d)?;
-        pv_float.add(rate * yf * df);
-        prev = d;
-    }
-
-    Ok((pv_float.total() / ann, ann))
-}
-
 /// Asset-swap forward leg PV and fixed/floating annuities per unit notional.
 ///
 /// # Arguments
@@ -266,24 +225,73 @@ pub fn asset_swap_forward_components(
     float_spread_bp: f64,
 ) -> finstack_quant_core::Result<(f64, f64, f64)> {
     let fixed_ann = fixed_leg_annuity(disc, fixed_day_count, fixed_frequency, schedule)?;
-    if schedule.len() < 2 {
-        return Ok((0.0, fixed_ann, 0.0));
-    }
 
-    let f_day_count = fwd.day_count();
+    let (float_pv, float_ann) =
+        floating_leg_pv_and_annuity(disc, fwd, fwd.day_count(), schedule, float_spread_bp, None)?;
+    Ok((float_pv, fixed_ann, float_ann))
+}
+
+/// PV and annuity of an asset-swap floating leg per unit notional.
+///
+/// Each period `[prev, d]` pays `(forward + spread) · α · P(d)` with `α` under
+/// `day_count`; the annuity is `Σ α · P(d)`. Both sums use compensated
+/// (Neumaier) summation.
+///
+/// # Arguments
+///
+/// * `disc` - Discount curve supplying `P(d)` at each period end.
+/// * `fwd` - Forward curve projecting unstarted coupons (see
+///   [`asset_swap_projection_rate`]).
+/// * `day_count` - Floating-leg accrual day count.
+/// * `schedule` - Ordered period boundary dates; fewer than two dates give
+///   `(0, 0)`.
+/// * `float_spread_bp` - Spread over the index in basis points.
+/// * `seasoned` - `Some((market, as_of))` fixes periods that started before
+///   `as_of` from the forward curve's historical fixing series in `market`;
+///   `None` projects every period.
+///
+/// # Errors
+///
+/// Returns an error when a year fraction, discount factor or projection
+/// fails, or when a started period has no fixing on its reset date.
+pub(crate) fn floating_leg_pv_and_annuity(
+    disc: &DiscountCurve,
+    fwd: &ForwardCurve,
+    day_count: finstack_quant_core::dates::DayCount,
+    schedule: &[Date],
+    float_spread_bp: f64,
+    seasoned: Option<(&MarketContext, Date)>,
+) -> finstack_quant_core::Result<(f64, f64)> {
+    if schedule.len() < 2 {
+        return Ok((0.0, 0.0));
+    }
     let spread = float_spread_bp * 1e-4;
     let mut float_pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut float_ann = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut prev = schedule[0];
     for &d in &schedule[1..] {
-        let yf = f_day_count.year_fraction(prev, d, DayCountContext::default())?;
+        let yf = day_count.year_fraction(prev, d, DayCountContext::default())?;
         let df = disc.df_on_date_curve(d)?;
-        float_pv.add((asset_swap_projection_rate(fwd, prev, d)? + spread) * yf * df);
+        let forward = match seasoned {
+            Some((market, as_of)) if prev < as_of => {
+                let fixing_id =
+                    finstack_quant_core::market_data::fixings::fixing_series_id(fwd.id().as_str());
+                let fixings = market.get_series(&fixing_id).map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "Seasoned asset swap requires historical fixing series '{}' for reset date {}; \
+                         started term coupons must use observed fixings, not projection",
+                        fixing_id, prev
+                    ))
+                })?;
+                fixings.value_on_exact(prev)?
+            }
+            _ => asset_swap_projection_rate(fwd, prev, d)?,
+        };
+        float_pv.add((forward + spread) * yf * df);
         float_ann.add(yf * df);
         prev = d;
     }
-
-    Ok((float_pv.total(), fixed_ann, float_ann.total()))
+    Ok((float_pv.total(), float_ann.total()))
 }
 
 /// Project an asset-swap floating coupon from the curve's index convention.
@@ -291,7 +299,7 @@ pub fn asset_swap_forward_components(
 /// Overnight indices represent observation rates that are averaged over the
 /// coupon window. Term indices instead use the discount-factor-implied simple
 /// forward for the whole accrual period.
-pub(crate) fn asset_swap_projection_rate(
+fn asset_swap_projection_rate(
     fwd: &ForwardCurve,
     start: Date,
     end: Date,

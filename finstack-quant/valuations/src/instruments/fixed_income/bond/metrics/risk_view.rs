@@ -4,7 +4,7 @@
 //! short-circuits to the constant quoted price, so any metric that bumps a curve
 //! and reprices sees no change (DV01/CS01 collapse to zero). This module builds a
 //! single calibrated *risk view* — a clone whose price is pinned by a calibrated
-//! spread/shift (not the raw quote) plus the market it reprices on — so the bump
+//! spread (not the raw quote), repriced on the unchanged market — so the bump
 //! moves the PV. The view reproduces the quote by construction and the expensive
 //! hazard solve is cached in `context.computed` (one solve per metric pass).
 //!
@@ -26,11 +26,7 @@ use crate::instruments::fixed_income::bond::pricing::quote_conversions::clear_pr
 use crate::instruments::Bond;
 use crate::metrics::{MetricContext, MetricId};
 use crate::pricer::ModelKey;
-use finstack_quant_core::market_data::context::MarketContext;
 use std::sync::Arc;
-
-/// Quote-reproducing risk view: a calibrated `(instrument, market)` pair.
-type RiskView = (Arc<dyn Instrument>, Arc<MarketContext>);
 
 pub(super) fn active_model_consumes_credit(context: &MetricContext, bond: &Bond) -> bool {
     let model = context
@@ -49,9 +45,11 @@ pub(super) fn plain_rate_quote_requires_z_spread(context: &MetricContext, bond: 
         && !active_model_consumes_credit(context, bond)
 }
 
-fn bond_risk_view(context: &mut MetricContext) -> finstack_quant_core::Result<Option<RiskView>> {
+/// Quote-reproducing clone of the context bond, or `None` when the bond has
+/// no price-driving quote. The view always reprices on the original market.
+fn bond_risk_view(context: &mut MetricContext) -> finstack_quant_core::Result<Option<Bond>> {
     // Phase 1: read everything off the (immutable) bond, ending the borrow.
-    let (bond_clone, has_options, credit_id) = {
+    let (bond_clone, pin_with_oas) = {
         let bond: &Bond = context.instrument_as()?;
         if !bond
             .instrument_pricing_overrides
@@ -62,40 +60,22 @@ fn bond_risk_view(context: &mut MetricContext) -> finstack_quant_core::Result<Op
         }
         let has_options = bond.return_floor.is_some()
             || bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
-        let credit_id = if active_model_consumes_credit(context, bond) {
-            bond.market_dependencies()?
-                .curves
-                .credit_curves
-                .first()
-                .cloned()
-        } else {
-            None
-        };
-        (bond.clone(), has_options, credit_id)
+        let has_credit_curve = active_model_consumes_credit(context, bond)
+            && !bond.market_dependencies()?.curves.credit_curves.is_empty();
+        (bond.clone(), has_options || has_credit_curve)
     };
 
-    // Embedded option → OAS clone (needs the quote intact to solve OAS), base market.
-    if has_options {
+    // Embedded options need the quote intact to solve OAS. Rate and
+    // quote-space spread risk on a credit model must also start from a hazard
+    // curve that still carries its exact calibration recipe, so the quote is
+    // pinned with OAS and each market bump reprices under the same calibrated
+    // model.
+    if pin_with_oas {
         let (risk_bond, _) = option_risk_bond_and_base_price(&bond_clone, context)?;
-        return Ok(Some((
-            Arc::new(risk_bond) as Arc<dyn Instrument>,
-            Arc::clone(&context.curves),
-        )));
+        return Ok(Some(risk_bond));
     }
 
-    // Rate and quote-space spread risk must start from a hazard curve that
-    // still carries its exact calibration recipe. Pin the bond quote with OAS
-    // and leave the original market intact, so each market bump reprices under
-    // the same calibrated credit model.
-    if credit_id.is_some() {
-        let (risk_bond, _) = option_risk_bond_and_base_price(&bond_clone, context)?;
-        return Ok(Some((
-            Arc::new(risk_bond) as Arc<dyn Instrument>,
-            Arc::clone(&context.curves),
-        )));
-    }
-
-    // Plain rate → periodic quoted_z_spread clone (convention-correct), base market.
+    // Plain rate → periodic quoted_z_spread clone (convention-correct).
     let z = context
         .computed
         .get(&MetricId::ZSpread)
@@ -107,10 +87,7 @@ fn bond_risk_view(context: &mut MetricContext) -> finstack_quant_core::Result<Op
         .instrument_pricing_overrides
         .market_quotes
         .quoted_z_spread = Some(z);
-    Ok(Some((
-        Arc::new(cleared) as Arc<dyn Instrument>,
-        Arc::clone(&context.curves),
-    )))
+    Ok(Some(cleared))
 }
 
 /// Run rate or quote-space spread risk against the quote-reproducing view.
@@ -123,14 +100,11 @@ pub(crate) fn with_bond_risk_view<R>(
 ) -> finstack_quant_core::Result<R> {
     match bond_risk_view(context)? {
         None => f(context),
-        Some((instrument, curves)) => {
+        Some(risk_bond) => {
             let orig_instrument = Arc::clone(&context.instrument);
-            let orig_curves = Arc::clone(&context.curves);
-            context.set_instrument(instrument);
-            context.set_market(curves);
+            context.set_instrument(Arc::new(risk_bond) as Arc<dyn Instrument>);
             let result = f(context);
             context.set_instrument(orig_instrument);
-            context.set_market(orig_curves);
             result
         }
     }

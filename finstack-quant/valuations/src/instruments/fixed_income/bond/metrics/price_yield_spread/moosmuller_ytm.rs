@@ -1,11 +1,9 @@
 //! Moosmüller yield-to-maturity calculator.
 //!
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
-use crate::instruments::fixed_income::bond::CashflowSpec;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::money::Money;
-use rust_decimal::prelude::ToPrimitive;
 
 /// Calculates Moosmüller YTM by solving the schedule-aware compounding
 ///
@@ -31,10 +29,7 @@ impl MetricCalculator for MoosmullerYtmCalculator {
         let notional = bond.notional;
         let day_count = bond.cashflow_spec.day_count();
         let discount_curve_id = bond.discount_curve_id.to_owned();
-        let coupon = match &bond.cashflow_spec {
-            CashflowSpec::Fixed(spec) => spec.rate.to_f64().unwrap_or(0.0),
-            _ => 0.0,
-        };
+        let coupon = bond.cashflow_spec.plain_fixed_rate()?.unwrap_or(0.0);
         let frequency = bond.cashflow_spec.frequency();
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
 
