@@ -3,6 +3,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::structured_credit::metrics::{
     calculate_tranche_cs01, calculate_tranche_duration, calculate_tranche_z_spread,
 };
+use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::calibrations::{
     abs_auto_correlation_structure, clo_correlation_structure, cmbs_correlation_structure,
     rmbs_correlation_structure,
@@ -385,18 +386,6 @@ impl StructuredCredit {
         Ok(correlation.asset_correlation())
     }
 
-    /// Generate cashflows for a specific tranche after waterfall allocation.
-    pub fn get_tranche_cashflows(
-        &self,
-        tranche_id: &str,
-        context: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<TrancheCashflows> {
-        crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows(
-            self, tranche_id, context, as_of,
-        )
-    }
-
     /// Present value of one named tranche.
     ///
     /// Deal-level host pricing uses
@@ -410,7 +399,7 @@ impl StructuredCredit {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let cashflows = self.get_tranche_cashflows(tranche_id, context, as_of)?;
+        let cashflows = generate_tranche_cashflows(self, tranche_id, context, as_of)?;
         let effective_as_of = self.resolve_pricing_as_of(context, as_of);
         self.value_tranche_cashflows(&cashflows, context, effective_as_of)
     }
@@ -476,7 +465,7 @@ impl StructuredCredit {
                     id: format!("tranche:{tranche_id}"),
                 })
             })?;
-        let cashflow_result = self.get_tranche_cashflows(tranche_id, context, as_of)?;
+        let cashflow_result = generate_tranche_cashflows(self, tranche_id, context, as_of)?;
         let pv = self.value_tranche_cashflows(&cashflow_result, context, effective_as_of)?;
         // Prices are per CURRENT face (the factor-adjusted quote basis).
         let quote = super::super::metrics::quote::SettlementQuote::for_tranche(

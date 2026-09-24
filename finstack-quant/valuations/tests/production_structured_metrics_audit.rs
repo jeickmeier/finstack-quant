@@ -1,6 +1,7 @@
 //! Independent accrued-interest, quote, yield and effective-assumption checks.
 
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::DiscountCurve};
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
 use finstack_quant_valuations::{
     instruments::PricingOptions,
     instruments::{
@@ -72,9 +73,8 @@ fn quarterly_yield(
 ) -> f64 {
     use finstack_quant_core::dates::DayCountContext;
     let tranche = &deal.tranches.tranches[0];
-    let flows = deal
-        .get_tranche_cashflows(tranche.id.as_str(), market, as_of)
-        .expect("flows");
+    let flows =
+        generate_tranche_cashflows(deal, tranche.id.as_str(), market, as_of).expect("flows");
     let settlement = deal.quote_settlement_date.unwrap_or(as_of);
     let target = dirty_price_pct / 100.0 * tranche.current_balance.amount();
     let pv_at = |y: f64| -> f64 {
@@ -149,9 +149,9 @@ fn production_structured_metrics_clean_quote_adds_accrued_once() {
     deal.instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price = Some(99.25);
-    let flows = deal
-        .get_tranche_cashflows(deal.tranches.tranches[0].id.as_str(), &market, as_of)
-        .expect("flows");
+    let flows =
+        generate_tranche_cashflows(&deal, deal.tranches.tranches[0].id.as_str(), &market, as_of)
+            .expect("flows");
     let expected = calculate_tranche_z_spread(
         &flows.cashflows,
         &market.get_discount("USD-OIS").expect("curve"),
@@ -185,9 +185,7 @@ fn production_structured_metrics_settlement_crosses_coupon_once() {
     let settlement = date!(2024 - 05 - 15);
     deal.quote_settlement_date = Some(settlement);
     let tranche_id = deal.tranches.tranches[0].id.as_str();
-    let flows = deal
-        .get_tranche_cashflows(tranche_id, &market, as_of)
-        .expect("flows");
+    let flows = generate_tranche_cashflows(&deal, tranche_id, &market, as_of).expect("flows");
     let curve = market.get_discount("USD-OIS").expect("curve");
     let dirty: f64 = flows
         .cashflows
@@ -251,9 +249,9 @@ fn production_structured_metrics_opening_balance_and_unadjusted_boundary() {
             .expect("balance");
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.9);
     let as_of = date!(2024 - 05 - 15);
-    let details = deal
-        .get_tranche_cashflows(deal.tranches.tranches[0].id.as_str(), &market, as_of)
-        .expect("flows");
+    let details =
+        generate_tranche_cashflows(&deal, deal.tranches.tranches[0].id.as_str(), &market, as_of)
+            .expect("flows");
     let first = &details.accrual_periods[0];
     assert_eq!(first.start, deal.closing_date);
     assert_eq!(first.end, date!(2024 - 06 - 30));
@@ -380,9 +378,7 @@ fn production_structured_metrics_discount_margin_uses_dirty_settlement_target() 
                 .expect("fixing"),
         );
     let id = deal.tranches.tranches[0].id.as_str();
-    let flows = deal
-        .get_tranche_cashflows(id, &market, as_of)
-        .expect("floating flows");
+    let flows = generate_tranche_cashflows(&deal, id, &market, as_of).expect("floating flows");
     let curve = market.get_discount("USD-OIS").expect("curve");
     let dirty: f64 = flows
         .cashflows

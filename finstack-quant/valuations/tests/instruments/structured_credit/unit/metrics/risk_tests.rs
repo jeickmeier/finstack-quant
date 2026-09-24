@@ -359,22 +359,6 @@ mod discount_margin_tests {
         assert!(result.is_err(), "DM on a fixed-rate tranche must error");
     }
 
-    #[test]
-    fn discount_margin_boundary_matches_domain_calculator() {
-        // The host-facing boundary returns the same value as the Date/Money
-        // domain calculator.
-        use finstack_quant_valuations::instruments::fixed_income::structured_credit::structured_credit_tranche_discount_margin;
-
-        let sc = deal(true);
-        let mkt = market();
-        let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        let direct = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), pv).unwrap();
-
-        let from_boundary =
-            structured_credit_tranche_discount_margin(&sc, "SR", &mkt, "2024-01-01", pv.amount())
-                .unwrap();
-        assert!((direct - from_boundary).abs() < 1e-12);
-    }
     /// A floater's coupon resets with the curve, so re-projecting it under a
     /// ±1 bp parallel bump of every rate curve barely moves its value:
     /// effective duration is a fraction of a year while spread duration stays
@@ -432,6 +416,7 @@ mod breakeven_cdr_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
         TrancheCoupon, TrancheSeniority, TrancheStructure,
@@ -500,7 +485,7 @@ mod breakeven_cdr_tests {
     fn senior_writedown(sc: &StructuredCredit, mkt: &MarketContext, cdr: f64) -> f64 {
         let mut d = sc.clone();
         d.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
-        d.get_tranche_cashflows("SR", mkt, closing())
+        generate_tranche_cashflows(&d, "SR", mkt, closing())
             .unwrap()
             .total_writedown
             .amount()
@@ -673,6 +658,7 @@ mod oas_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_oas, calculate_tranche_z_spread, AssetPool, DealType, OasConfig,
         PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
@@ -770,7 +756,7 @@ mod oas_tests {
         let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
             .expect("valid money fixture");
 
-        let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
+        let cf = generate_tranche_cashflows(&sc, "SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
         let z_bp =
             calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap();
@@ -806,7 +792,7 @@ mod oas_tests {
         let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
             .expect("valid money fixture");
 
-        let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
+        let cf = generate_tranche_cashflows(&sc, "SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
         let z_bp =
             calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap();
@@ -866,7 +852,7 @@ mod oas_tests {
         let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
             .expect("valid money fixture");
 
-        let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
+        let cf = generate_tranche_cashflows(&sc, "SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
         let z = calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap()
             / 10_000.0;
@@ -906,54 +892,5 @@ mod oas_tests {
             "model price {} should reprice to the 99.0 quote",
             oas.model_price
         );
-    }
-
-    #[test]
-    fn tranche_analytics_boundaries_match_domain_calculators() {
-        // Host-facing tranche boundaries preserve the typed domain results.
-        use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-            calculate_tranche_breakeven_cdr, scenario_table,
-            structured_credit_tranche_breakeven_cdr, structured_credit_tranche_oas,
-            structured_credit_tranche_scenario_table, ScenarioGrid,
-        };
-
-        let sc = deal();
-        let mkt = market();
-        let as_of = closing();
-
-        // OAS (deterministic config so the comparison is exact).
-        let config = OasConfig {
-            stochastic_rates: false,
-            stochastic_credit: false,
-            ..Default::default()
-        };
-        let direct_oas = calculate_tranche_oas(&sc, "SR", 99.0, &mkt, as_of, &config).unwrap();
-        let config_json = serde_json::to_string(&config).unwrap();
-        let boundary_oas =
-            structured_credit_tranche_oas(&sc, "SR", 99.0, &mkt, "2024-01-01", Some(&config_json))
-                .unwrap();
-        assert!((direct_oas.oas - boundary_oas.oas).abs() < 1e-12);
-
-        // Break-even CDR.
-        let direct_be = calculate_tranche_breakeven_cdr(&sc, "SR", &mkt, as_of).unwrap();
-        let boundary_be =
-            structured_credit_tranche_breakeven_cdr(&sc, "SR", &mkt, "2024-01-01").unwrap();
-        assert!((direct_be - boundary_be).abs() < 1e-12);
-
-        // Scenario table.
-        let grid = ScenarioGrid {
-            cprs: vec![0.10, 0.20],
-            cdrs: vec![0.02],
-            severities: vec![0.40],
-            recovery_lag: None,
-        };
-        let direct_st = scenario_table(&sc, "SR", &mkt, as_of, &grid).unwrap();
-        let grid_json = serde_json::to_string(&grid).unwrap();
-        let boundary_st =
-            structured_credit_tranche_scenario_table(&sc, "SR", &mkt, "2024-01-01", &grid_json)
-                .unwrap();
-        assert_eq!(direct_st.cells.len(), boundary_st.cells.len());
-        assert!(!boundary_st.cells.is_empty());
-        assert!((direct_st.cells[0].price - boundary_st.cells[0].price).abs() < 1e-9);
     }
 }

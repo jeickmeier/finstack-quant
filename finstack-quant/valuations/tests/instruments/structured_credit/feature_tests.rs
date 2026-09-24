@@ -385,6 +385,7 @@ mod afc_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         AfcSpec, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon,
         TrancheSeniority, TrancheStructure, WaterfallRules,
@@ -471,12 +472,8 @@ mod afc_tests {
     #[test]
     fn afc_caps_senior_interest_at_collateral_wac() {
         let mkt = market();
-        let uncapped = deal(false)
-            .get_tranche_cashflows("SR", &mkt, closing())
-            .unwrap();
-        let capped = deal(true)
-            .get_tranche_cashflows("SR", &mkt, closing())
-            .unwrap();
+        let uncapped = generate_tranche_cashflows(&deal(false), "SR", &mkt, closing()).unwrap();
+        let capped = generate_tranche_cashflows(&deal(true), "SR", &mkt, closing()).unwrap();
 
         assert!(
             capped.total_interest.amount() > 0.0,
@@ -496,12 +493,8 @@ mod afc_tests {
     fn no_rules_is_identity() {
         // A deal with no waterfall_rules must price exactly as before the seam.
         let mkt = market();
-        let a = deal(false)
-            .get_tranche_cashflows("SR", &mkt, closing())
-            .unwrap();
-        let b = deal(false)
-            .get_tranche_cashflows("SR", &mkt, closing())
-            .unwrap();
+        let a = generate_tranche_cashflows(&deal(false), "SR", &mkt, closing()).unwrap();
+        let b = generate_tranche_cashflows(&deal(false), "SR", &mkt, closing()).unwrap();
         assert_eq!(a.total_interest.amount(), b.total_interest.amount());
         assert_eq!(a.total_principal.amount(), b.total_principal.amount());
     }
@@ -569,12 +562,9 @@ mod afc_tests {
         // net-WAC fee lowers the cap to 5.5%, which does — reducing senior
         // interest below the gross-cap case.
         let mkt = market();
-        let gross = net_wac_deal(None)
-            .get_tranche_cashflows("SR", &mkt, closing())
-            .unwrap();
-        let net = net_wac_deal(Some(50.0))
-            .get_tranche_cashflows("SR", &mkt, closing())
-            .unwrap();
+        let gross = generate_tranche_cashflows(&net_wac_deal(None), "SR", &mkt, closing()).unwrap();
+        let net =
+            generate_tranche_cashflows(&net_wac_deal(Some(50.0)), "SR", &mkt, closing()).unwrap();
         assert!(
             net.total_interest.amount() < 0.99 * gross.total_interest.amount(),
             "a net-WAC fee must lower the cap and reduce senior interest \

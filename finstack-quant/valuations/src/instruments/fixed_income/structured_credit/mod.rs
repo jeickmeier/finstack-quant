@@ -89,11 +89,6 @@ pub use metrics::{
     calculate_tranche_wal,
     calculate_tranche_z_spread,
     scenario_table,
-    structured_credit_tranche_breakeven_cdr,
-    structured_credit_tranche_discount_margin,
-    structured_credit_tranche_metrics,
-    structured_credit_tranche_oas,
-    structured_credit_tranche_scenario_table,
     // Deal-specific metrics
     AbsChargeOffCalculator,
     AbsCreditEnhancementCalculator,

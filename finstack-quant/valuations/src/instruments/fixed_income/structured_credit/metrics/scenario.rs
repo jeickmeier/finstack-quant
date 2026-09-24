@@ -6,6 +6,7 @@
 //! quoted and stress-analysed on a trading desk.
 
 use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
+use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
@@ -81,7 +82,8 @@ pub struct ScenarioTable {
 ///
 /// # Errors
 ///
-/// Returns an error if the tranche is missing or a cell fails to reprice.
+/// Returns an error if the tranche is missing, a cell fails to reprice, or a
+/// cell field is non-finite.
 pub fn scenario_table(
     deal: &StructuredCredit,
     tranche_id: &str,
@@ -151,7 +153,7 @@ pub fn scenario_table(
                 scenario.credit_model.recovery_spec =
                     RecoveryModelSpec::with_lag(1.0 - severity, lag);
 
-                let cashflows = scenario.get_tranche_cashflows(tranche_id, context, as_of)?;
+                let cashflows = generate_tranche_cashflows(&scenario, tranche_id, context, as_of)?;
                 let price = if current_balance > 0.0 {
                     let quote = super::quote::SettlementQuote::for_tranche(
                         &scenario,
@@ -177,10 +179,12 @@ pub fn scenario_table(
         }
     }
 
-    Ok(ScenarioTable {
+    let table = ScenarioTable {
         tranche_id: tranche_id.to_string(),
         cells,
-    })
+    };
+    super::finite::ensure_scenario_table_finite(&table)?;
+    Ok(table)
 }
 
 #[cfg(test)]
