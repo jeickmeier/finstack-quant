@@ -57,14 +57,12 @@ pub use collateral::{
 };
 pub use pool::AssetPool;
 pub use pool::{
-    calculate_pool_stats, ConcentrationCheckResult, ConcentrationViolation, PoolAsset, PoolStats,
-    ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
+    calculate_pool_stats, PoolAsset, PoolStats, ReinvestmentAssumptions, ReinvestmentCriteria,
+    ReinvestmentPeriod, RepLine,
 };
 pub(crate) use pool_state::PoolState;
 
-pub use tranches::{
-    CoverageTrigger, Tranche, TrancheBuilder, TrancheCoupon, TrancheStructure,
-};
+pub use tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheCoupon, TrancheStructure};
 
 pub use setup::{DealFees, IncentiveFeeSpec};
 
