@@ -31,12 +31,8 @@ impl ContractSpecRegistry {
             .ok_or_else(|| not_found("bond future contract spec", id))?;
         Ok(BondFutureSpecs {
             contract_size: record.contract_size,
-            tick_size: record.tick_size,
-            tick_value: record.tick_value,
             standard_coupon: record.standard_coupon,
             standard_maturity_years: record.standard_maturity_years,
-            settlement_days: record.settlement_days,
-            calendar_id: record.calendar_id.clone(),
             repo_day_count: record.repo_day_count,
         })
     }
@@ -120,12 +116,8 @@ struct BondFutureSpecRecord {
     source_version: String,
     effective_date: String,
     contract_size: f64,
-    tick_size: f64,
-    tick_value: f64,
     standard_coupon: f64,
     standard_maturity_years: f64,
-    settlement_days: u32,
-    calendar_id: String,
     repo_day_count: DayCount,
 }
 
@@ -144,14 +136,6 @@ impl BondFutureSpecRecord {
             self.contract_size,
             "bond future contract size",
         )?;
-        finstack_quant_core::validation::validate_f64_positive(
-            self.tick_size,
-            "bond future tick size",
-        )?;
-        finstack_quant_core::validation::validate_f64_positive(
-            self.tick_value,
-            "bond future tick value",
-        )?;
         finstack_quant_core::validation::validate_f64_unit_interval(
             self.standard_coupon,
             "bond future standard coupon",
@@ -160,21 +144,13 @@ impl BondFutureSpecRecord {
             self.standard_maturity_years,
             "bond future standard maturity years",
         )?;
-        if self.settlement_days == 0 {
-            return Err(Error::Validation(
-                "contract-spec registry bond future settlement days must be positive".to_string(),
-            ));
-        }
         if !matches!(self.repo_day_count, DayCount::Act360 | DayCount::Act365F) {
             return Err(Error::Validation(format!(
                 "bond future repo_day_count must be act_360 or act_365f, got {:?}",
                 self.repo_day_count
             )));
         }
-        finstack_quant_core::validation::validate_non_blank(
-            &self.calendar_id,
-            "bond future calendar id",
-        )
+        Ok(())
     }
 }
 
@@ -318,8 +294,6 @@ mod tests {
             .bond_future_specs("cme.ust_10y")
             .expect("UST 10Y spec");
         assert_eq!(ust_10y.contract_size, 100_000.0);
-        assert_eq!(ust_10y.tick_size, 1.0 / 64.0);
-        assert_eq!(ust_10y.tick_value, 15.625);
         assert_eq!(ust_10y.standard_coupon, 0.06);
 
         let gilt = registry.bond_future_specs("gilt").expect("gilt spec");

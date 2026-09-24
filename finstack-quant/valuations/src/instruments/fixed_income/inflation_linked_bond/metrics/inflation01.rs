@@ -68,7 +68,6 @@ impl MetricCalculator for Inflation01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &InflationLinkedBond = context.instrument_as()?;
         let as_of = context.as_of;
-        let _base_pv = context.base_value.amount();
 
         // Use MarketContext::bump() API to bump the inflation curve
         // Bump by 1bp using parallel shift

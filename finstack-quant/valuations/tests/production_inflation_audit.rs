@@ -110,9 +110,7 @@ fn m20_historical_inflation_requires_an_observation() {
 fn m19_real_duration_requires_the_same_clean_quote_as_real_yield() {
     let mut bond = InflationLinkedBond::example();
     bond.quoted_clean = None;
-    assert!(bond
-        .real_duration(&MarketContext::new(), date!(2025 - 01 - 15))
-        .is_err());
+    assert!(bond.real_duration(date!(2025 - 01 - 15)).is_err());
 }
 
 #[test]

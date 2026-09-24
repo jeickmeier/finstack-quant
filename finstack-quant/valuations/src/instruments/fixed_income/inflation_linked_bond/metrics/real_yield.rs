@@ -14,6 +14,6 @@ impl MetricCalculator for RealYieldCalculator {
                 id: "inflation_linked_bond_quote".to_string(),
             })
         })?;
-        ilb.real_yield(clean_price, &context.curves, context.as_of)
+        ilb.real_yield(clean_price, context.as_of)
     }
 }

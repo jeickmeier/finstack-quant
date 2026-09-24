@@ -142,9 +142,13 @@ pub struct DeliverableQuote {
 
 /// Contract specifications for bond futures.
 ///
-/// Defines the standard parameters for a bond future contract including
-/// contract size, tick size, and the notional bond parameters used for
-/// conversion factor calculations.
+/// Defines the standard parameters for a bond future contract: contract
+/// size, the notional bond parameters used for conversion factor
+/// calculations, and the implied-repo day count.
+///
+/// Delivery timing is carried by the future's explicit `delivery_start` /
+/// `delivery_end` and the caller-supplied invoice settlement date, so the
+/// spec holds no settlement lag or holiday calendar.
 ///
 /// # Examples
 ///
@@ -162,32 +166,16 @@ pub struct DeliverableQuote {
 pub struct BondFutureSpecs {
     /// Face value of a single contract (e.g., $100,000 for UST)
     pub contract_size: f64,
-    /// Minimum quoted-price increment, in the contract's quote units.
-    pub tick_size: f64,
-    /// Cash value of one tick for one contract, in the notional currency.
-    pub tick_value: f64,
     /// Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)
     pub standard_coupon: f64,
     /// Standard maturity in years for conversion factor calculation
     pub standard_maturity_years: f64,
-    /// Number of business days for settlement after expiry
-    pub settlement_days: u32,
-    /// Holiday calendar identifier for business day calculations.
-    ///
-    /// Defaults to "nyse" for US Treasury futures.
-    /// Use "target2" for European government bond futures.
-    #[serde(default = "default_calendar_id")]
-    pub calendar_id: String,
     /// Day-count convention for implied repo rate annualization.
     ///
     /// Bond-future repo supports `act_360` and `act_365f`.
     #[serde(default = "default_repo_day_count", with = "repo_day_count_wire")]
     #[cfg_attr(feature = "json-schema", schemars(with = "RepoDayCountWire"))]
     pub repo_day_count: DayCount,
-}
-
-fn default_calendar_id() -> String {
-    "nyse".to_string()
 }
 
 fn default_repo_day_count() -> DayCount {
@@ -231,12 +219,8 @@ impl Default for BondFutureSpecs {
     ///
     /// Standard parameters:
     /// - Contract size: $100,000
-    /// - Tick size: 1/2 of 1/32 (half-32nd, 0.015625)
-    /// - Tick value: $15.625
     /// - Standard coupon: 6% (0.06)
     /// - Standard maturity: 10 years
-    /// - Settlement: 2 business days
-    /// - Calendar: NYSE (New York Stock Exchange)
     fn default() -> Self {
         Self::ust_10y()
     }
@@ -252,11 +236,8 @@ impl BondFutureSpecs {
     /// # Specifications
     ///
     /// - Contract size: $100,000
-    /// - Tick size: 1/2 of 1/32 (half-32nd, 0.015625)
-    /// - Tick value: $15.625 per tick
     /// - Standard coupon: 6% annual
     /// - Standard maturity: 10 years
-    /// - Settlement: T+2 business days
     /// - Day count: Actual/Actual (ISDA)
     /// - Deliverable: U.S. Treasury notes with at least 6.5 years remaining maturity
     ///
@@ -282,11 +263,8 @@ impl BondFutureSpecs {
     /// # Specifications
     ///
     /// - Contract size: $100,000
-    /// - Tick size: 1/4 of 1/32 of a point (0.0078125)
-    /// - Tick value: $7.8125 per tick
     /// - Standard coupon: 6% annual
     /// - Standard maturity: 5 years
-    /// - Settlement: T+2 business days
     /// - Day count: Actual/Actual (ISDA)
     /// - Deliverable: U.S. Treasury notes with at least 4 years, 2 months remaining maturity
     ///
@@ -297,7 +275,6 @@ impl BondFutureSpecs {
     ///
     /// let specs = BondFutureSpecs::ust_5y();
     /// assert_eq!(specs.contract_size, 100_000.0);
-    /// assert_eq!(specs.tick_size, 1.0 / 128.0);
     /// assert_eq!(specs.standard_maturity_years, 5.0);
     /// ```
     pub fn ust_5y() -> Self {
@@ -313,11 +290,8 @@ impl BondFutureSpecs {
     /// # Specifications
     ///
     /// - Contract size: $200,000 (note: double the 5Y/10Y contracts)
-    /// - Tick size: 1/8 of 1/32 of a point (0.00390625)
-    /// - Tick value: $7.8125 per tick
     /// - Standard coupon: 6% annual
     /// - Standard maturity: 2 years
-    /// - Settlement: T+2 business days
     /// - Day count: Actual/Actual (ISDA)
     /// - Deliverable: U.S. Treasury notes with at least 1 year, 9 months remaining maturity
     ///
@@ -328,7 +302,6 @@ impl BondFutureSpecs {
     ///
     /// let specs = BondFutureSpecs::ust_2y();
     /// assert_eq!(specs.contract_size, 200_000.0);
-    /// assert_eq!(specs.tick_size, 1.0 / 256.0);
     /// assert_eq!(specs.standard_maturity_years, 2.0);
     /// ```
     pub fn ust_2y() -> Self {
@@ -344,19 +317,14 @@ impl BondFutureSpecs {
     /// # Specifications
     ///
     /// - Contract size: €100,000
-    /// - Tick size: 0.01 (1 basis point)
-    /// - Tick value: €10 per tick
     /// - Standard coupon: 6% annual
     /// - Standard maturity: 10 years
-    /// - Settlement: T+2 business days
     /// - Day count: Actual/Actual (ISDA)
     /// - Deliverable: German Federal bonds with 8.5 to 10.5 years remaining maturity
     ///
     /// # Notes
     ///
     /// - Quoted in percentage points (e.g., 125.50 = 125.50%)
-    /// - Different tick size from UST (decimal vs. 32nds)
-    /// - Settlement follows TARGET2 calendar
     ///
     /// # Examples
     ///
@@ -365,8 +333,6 @@ impl BondFutureSpecs {
     ///
     /// let specs = BondFutureSpecs::bund();
     /// assert_eq!(specs.contract_size, 100_000.0);
-    /// assert_eq!(specs.tick_size, 0.01);
-    /// assert_eq!(specs.tick_value, 10.0);
     /// ```
     pub fn bund() -> Self {
         bond_future_specs_from_registry("eurex.bund")
@@ -381,11 +347,8 @@ impl BondFutureSpecs {
     /// # Specifications
     ///
     /// - Contract size: £100,000
-    /// - Tick size: 0.01 (1 basis point)
-    /// - Tick value: £10 per tick
     /// - Standard coupon: 4% annual (note: different from UST/Bund 6%)
     /// - Standard maturity: 10 years
-    /// - Settlement: T+2 business days
     /// - Day count: Actual/Actual (ISDA)
     /// - Deliverable: UK Gilts with 8.75 to 13 years remaining maturity
     ///
@@ -393,7 +356,6 @@ impl BondFutureSpecs {
     ///
     /// - Quoted in percentage points (e.g., 125.50 = 125.50%)
     /// - Standard coupon is 4%, not 6% like other major markets
-    /// - Settlement follows UK bank holidays
     /// - Long Gilt contract covers 8.75-13 year maturity range
     ///
     /// # Examples
@@ -403,7 +365,6 @@ impl BondFutureSpecs {
     ///
     /// let specs = BondFutureSpecs::gilt();
     /// assert_eq!(specs.contract_size, 100_000.0);
-    /// assert_eq!(specs.tick_size, 0.01);
     /// assert_eq!(specs.standard_coupon, 0.04);  // 4%, not 6%
     /// ```
     pub fn gilt() -> Self {
@@ -520,7 +481,7 @@ pub struct BondFuture {
     /// Position side (Long or Short)
     pub position: Position,
 
-    /// Contract specifications (tick size, standard coupon, etc.)
+    /// Contract specifications (contract size, standard coupon, repo day count)
     pub contract_specs: BondFutureSpecs,
 
     /// Basket of deliverable bonds with conversion factors
@@ -1095,22 +1056,16 @@ mod tests {
     fn test_bond_future_specs_default() {
         let specs = BondFutureSpecs::default();
         assert_eq!(specs.contract_size, 100_000.0);
-        assert_eq!(specs.tick_size, 1.0 / 64.0);
-        assert_eq!(specs.tick_value, 15.625);
         assert_eq!(specs.standard_coupon, 0.06);
         assert_eq!(specs.standard_maturity_years, 10.0);
-        assert_eq!(specs.settlement_days, 2);
     }
 
     #[test]
     fn test_ust_10y_specs() {
         let specs = BondFutureSpecs::ust_10y();
         assert_eq!(specs.contract_size, 100_000.0);
-        assert_eq!(specs.tick_size, 1.0 / 64.0);
-        assert_eq!(specs.tick_value, 15.625);
         assert_eq!(specs.standard_coupon, 0.06);
         assert_eq!(specs.standard_maturity_years, 10.0);
-        assert_eq!(specs.settlement_days, 2);
         assert_eq!(specs.repo_day_count, DayCount::Act360);
     }
 
@@ -1118,44 +1073,32 @@ mod tests {
     fn test_ust_5y_specs() {
         let specs = BondFutureSpecs::ust_5y();
         assert_eq!(specs.contract_size, 100_000.0);
-        assert_eq!(specs.tick_size, 1.0 / 128.0);
-        assert_eq!(specs.tick_value, 7.8125);
         assert_eq!(specs.standard_coupon, 0.06);
         assert_eq!(specs.standard_maturity_years, 5.0);
-        assert_eq!(specs.settlement_days, 2);
     }
 
     #[test]
     fn test_ust_2y_specs() {
         let specs = BondFutureSpecs::ust_2y();
         assert_eq!(specs.contract_size, 200_000.0); // Note: 2Y is $200k
-        assert_eq!(specs.tick_size, 1.0 / 256.0);
-        assert_eq!(specs.tick_value, 7.8125);
         assert_eq!(specs.standard_coupon, 0.06);
         assert_eq!(specs.standard_maturity_years, 2.0);
-        assert_eq!(specs.settlement_days, 2);
     }
 
     #[test]
     fn test_bund_specs() {
         let specs = BondFutureSpecs::bund();
         assert_eq!(specs.contract_size, 100_000.0);
-        assert_eq!(specs.tick_size, 0.01);
-        assert_eq!(specs.tick_value, 10.0);
         assert_eq!(specs.standard_coupon, 0.06);
         assert_eq!(specs.standard_maturity_years, 10.0);
-        assert_eq!(specs.settlement_days, 2);
     }
 
     #[test]
     fn test_gilt_specs() {
         let specs = BondFutureSpecs::gilt();
         assert_eq!(specs.contract_size, 100_000.0);
-        assert_eq!(specs.tick_size, 0.01);
-        assert_eq!(specs.tick_value, 10.0);
         assert_eq!(specs.standard_coupon, 0.04); // Different from UST/Bund
         assert_eq!(specs.standard_maturity_years, 10.0);
-        assert_eq!(specs.settlement_days, 2);
         assert_eq!(specs.repo_day_count, DayCount::Act365F);
     }
 
@@ -1696,7 +1639,6 @@ mod tests {
         assert_eq!(future.contract_specs.standard_coupon, 0.06);
         assert_eq!(future.contract_specs.standard_maturity_years, 10.0);
         assert_eq!(future.contract_specs.contract_size, 100_000.0);
-        assert_eq!(future.contract_specs.tick_size, 1.0 / 64.0);
         assert_eq!(future.deliverable_basket.len(), 1);
     }
 
@@ -1729,7 +1671,6 @@ mod tests {
         assert_eq!(future.contract_specs.standard_coupon, 0.06);
         assert_eq!(future.contract_specs.standard_maturity_years, 5.0);
         assert_eq!(future.contract_specs.contract_size, 100_000.0);
-        assert_eq!(future.contract_specs.tick_size, 1.0 / 128.0);
         assert_eq!(future.deliverable_basket.len(), 1);
     }
 
@@ -1762,7 +1703,6 @@ mod tests {
         assert_eq!(future.contract_specs.standard_coupon, 0.06);
         assert_eq!(future.contract_specs.standard_maturity_years, 2.0);
         assert_eq!(future.contract_specs.contract_size, 200_000.0); // 2Y is $200k
-        assert_eq!(future.contract_specs.tick_size, 1.0 / 256.0);
         assert_eq!(future.deliverable_basket.len(), 1);
     }
 
@@ -1794,8 +1734,7 @@ mod tests {
         assert_eq!(future.position, Position::Long);
         assert_eq!(future.contract_specs.standard_coupon, 0.06);
         assert_eq!(future.contract_specs.standard_maturity_years, 10.0);
-        assert_eq!(future.contract_specs.contract_size, 100_000.0);
-        assert_eq!(future.contract_specs.tick_size, 0.01); // Decimal, not 32nds
+        assert_eq!(future.contract_specs.contract_size, 100_000.0); // Decimal, not 32nds
         assert_eq!(future.deliverable_basket.len(), 1);
     }
 
@@ -1828,7 +1767,6 @@ mod tests {
         assert_eq!(future.contract_specs.standard_coupon, 0.04); // 4%, not 6%
         assert_eq!(future.contract_specs.standard_maturity_years, 10.0);
         assert_eq!(future.contract_specs.contract_size, 100_000.0);
-        assert_eq!(future.contract_specs.tick_size, 0.01);
         assert_eq!(future.deliverable_basket.len(), 1);
     }
 

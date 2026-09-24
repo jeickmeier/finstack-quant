@@ -337,11 +337,10 @@ fn test_real_yield_with_empty_schedule() {
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2025, 1, 2); // Degenerate
 
-    let (ctx, _) = market_context_with_index();
     let as_of = d(2025, 1, 2);
 
     // Act & Assert - should error gracefully
-    let result = ilb.real_yield(100.0, &ctx, as_of);
+    let result = ilb.real_yield(100.0, as_of);
     assert!(result.is_err());
 }
 
