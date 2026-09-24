@@ -2,6 +2,7 @@
 
 // InterestSpec removed with loan; retain coupon for metadata only
 use crate::instruments::common_impl::traits::Attributes;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 #[cfg(test)]
@@ -13,21 +14,6 @@ use serde::{Deserialize, Serialize};
 
 use super::enums::{TrancheSeniority, TriggerConsequence};
 use finstack_quant_core::types::CreditRating;
-
-/// Tranche behavioral type used by the structured-credit waterfall.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[non_exhaustive]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "snake_case")]
-pub enum TrancheBehaviorType {
-    /// Standard debt tranche that receives interest and principal payments.
-    Standard,
-}
-
-fn default_behavior_type() -> TrancheBehaviorType {
-    TrancheBehaviorType::Standard
-}
 
 /// Coverage-test trigger specification for a tranche or deal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,10 +233,6 @@ pub struct Tranche {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detachment_point: Option<f64>,
 
-    /// Behavioral classification for specialized handling
-    #[serde(default = "default_behavior_type")]
-    pub behavior_type: TrancheBehaviorType,
-
     /// Tranche characteristics
     pub seniority: TrancheSeniority,
     /// Credit rating (if rated by agencies)
@@ -303,13 +285,13 @@ pub struct Tranche {
 
     /// Payment priority (1 = most senior, paid first).
     ///
-    /// On a standalone `Tranche` this is a *provisional* value derived from
-    /// `seniority` (see `Tranche::new`). It is **overwritten deterministically**
-    /// by [`TrancheStructure::new`] (and by deserialization of a
-    /// `TrancheStructure`), which ranks every tranche by structural seniority so
-    /// that multiple notes at one `TrancheSeniority` (e.g. Class A-1/A-2/A-3 all
-    /// `Senior`) receive distinct, strictly-increasing priorities. Do not rely
-    /// on this field outside of an assembled `TrancheStructure`.
+    /// Derived state, not a wire field: a standalone `Tranche` carries `0`
+    /// (unassigned). [`TrancheStructure::new`] (and deserialization of a
+    /// `TrancheStructure`) ranks every tranche by structural seniority, input
+    /// order breaking ties, so that multiple notes at one `TrancheSeniority`
+    /// (e.g. Class A-1/A-2/A-3 all `Senior`) receive distinct priorities
+    /// `1..=n`.
+    #[serde(skip)]
     pub payment_priority: u32,
 
     /// Attributes for scenario selection
@@ -346,7 +328,6 @@ impl Tranche {
             id: InstrumentId::new(id.into()),
             attachment_point: Some(attachment_point),
             detachment_point: Some(detachment_point),
-            behavior_type: TrancheBehaviorType::Standard,
             seniority,
             rating: None,
             original_balance,
@@ -360,15 +341,8 @@ impl Tranche {
             pik_enabled: false,
             non_deferrable: None,
             maturity,
-            // Provisional: overwritten by `TrancheStructure::new` /
-            // `TrancheStructure` deserialization, which assigns a structurally
-            // ranked, distinct priority per note. See the field doc comment.
-            payment_priority: match seniority {
-                TrancheSeniority::Senior => 1,
-                TrancheSeniority::Mezzanine => 2,
-                TrancheSeniority::Subordinated => 3,
-                TrancheSeniority::Equity => 4,
-            },
+            // Unassigned until `TrancheStructure::new` ranks the notes.
+            payment_priority: 0,
             attributes: Attributes::new(),
         })
     }
@@ -789,17 +763,16 @@ impl Default for TrancheBuilder {
 pub struct TrancheStructure {
     /// Ordered tranches (typically sorted by payment priority)
     pub tranches: Vec<Tranche>,
-    /// Total size of all tranches combined
-    pub total_size: Money,
+    /// Common currency of every tranche, fixed at assembly.
+    #[serde(skip)]
+    currency: Currency,
 }
 
 /// Deserialize a `TrancheStructure` through the same validation +
 /// `payment_priority` assignment path as [`TrancheStructure::new`].
 ///
-/// The per-`Tranche` `payment_priority` stored in a serialized structure is
-/// only provisional (see `Tranche::new`); re-running assembly here guarantees
-/// deserialized structures carry structurally ranked, distinct priorities and
-/// makes any fixture-stored `payment_priority` purely cosmetic.
+/// `payment_priority` is not a wire field: it is derived state, assigned
+/// here from structural seniority exactly as the builder path assigns it.
 impl<'de> Deserialize<'de> for TrancheStructure {
     fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
@@ -809,11 +782,6 @@ impl<'de> Deserialize<'de> for TrancheStructure {
         #[serde(deny_unknown_fields)]
         struct RawTrancheStructure {
             tranches: Vec<Tranche>,
-            // Deserialized but intentionally ignored: `TrancheStructure::new`
-            // recomputes `total_size` from tranche balances, which is the
-            // authoritative value, so any stored figure is discarded.
-            #[allow(dead_code)]
-            total_size: Money,
         }
         let raw = RawTrancheStructure::deserialize(deserializer)?;
         TrancheStructure::new(raw.tranches).map_err(serde::de::Error::custom)
@@ -845,15 +813,28 @@ impl TrancheStructure {
 
         Self::validate_structure(&tranches)?;
 
-        let total_size = tranches.iter().try_fold(
-            Money::from((0_i64, tranches[0].original_balance.currency())),
-            |acc, t| acc.checked_add(t.original_balance),
-        )?;
+        let currency = tranches[0].original_balance.currency();
+        Ok(Self { tranches, currency })
+    }
 
-        Ok(Self {
-            tranches,
-            total_size,
-        })
+    /// Currency shared by every tranche in the structure.
+    #[inline]
+    pub fn currency(&self) -> Currency {
+        self.currency
+    }
+
+    /// Total original balance of all tranches combined.
+    ///
+    /// # Errors
+    ///
+    /// Returns a currency-mismatch error if a tranche was mutated into a
+    /// different currency after assembly.
+    pub fn total_size(&self) -> finstack_quant_core::Result<Money> {
+        self.tranches
+            .iter()
+            .try_fold(Money::from((0_i64, self.currency)), |acc, t| {
+                acc.checked_add(t.original_balance)
+            })
     }
 
     /// Create a structure whose attachment and detachment points come from
@@ -1080,11 +1061,10 @@ impl TrancheStructure {
     pub fn senior_balance(&self, tranche_id: &str) -> Money {
         self.senior_to(tranche_id)
             .iter()
-            .try_fold(
-                Money::from((0_i64, self.total_size.currency())),
-                |acc, t| acc.checked_add(t.current_balance),
-            )
-            .unwrap_or_else(|_| Money::from((0_i64, self.total_size.currency())))
+            .try_fold(Money::from((0_i64, self.currency)), |acc, t| {
+                acc.checked_add(t.current_balance)
+            })
+            .unwrap_or_else(|_| Money::from((0_i64, self.currency)))
     }
 
     /// Calculate tranche subordination amount
@@ -1095,13 +1075,12 @@ impl TrancheStructure {
             self.tranches
                 .iter()
                 .filter(|t| t.payment_priority > target.payment_priority)
-                .try_fold(
-                    Money::from((0_i64, self.total_size.currency())),
-                    |acc, t| acc.checked_add(t.current_balance),
-                )
-                .unwrap_or_else(|_| Money::from((0_i64, self.total_size.currency())))
+                .try_fold(Money::from((0_i64, self.currency)), |acc, t| {
+                    acc.checked_add(t.current_balance)
+                })
+                .unwrap_or_else(|_| Money::from((0_i64, self.currency)))
         } else {
-            Money::from((0_i64, self.total_size.currency()))
+            Money::from((0_i64, self.currency))
         }
     }
 }
@@ -1205,7 +1184,10 @@ mod tests {
 
         let structure = TrancheStructure::new(vec![equity, senior]).expect("should succeed");
         assert_eq!(structure.tranches.len(), 2);
-        assert_eq!(structure.total_size.amount(), 1_000_000_000.0);
+        assert_eq!(
+            structure.total_size().expect("total").amount(),
+            1_000_000_000.0
+        );
     }
 
     #[test]

@@ -2690,7 +2690,7 @@
       "type": "structured_credit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-        "sha256": "cc1a176fcd909c465387054949c5a84c050fd1d4bdfd9295e934a9db4616985a",
+        "sha256": "4cfa2247f900a7c5dc4f21499ab4983b37b39cd1c7ae426e781a3c1ec63653f2",
         "pointer": []
       },
       "instrumentPatches": [],

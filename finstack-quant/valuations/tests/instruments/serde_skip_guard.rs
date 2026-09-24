@@ -5,6 +5,12 @@ const ALLOWED: &[(&str, usize)] = &[
     ("src/instruments/composite/types/instrument.rs", 1),
     ("src/instruments/composite/types/reporting.rs", 1),
     ("src/instruments/exotics/basket/types.rs", 1),
+    // `Tranche::payment_priority` and `TrancheStructure::currency` are
+    // derived when the structure is assembled, never read from the wire.
+    (
+        "src/instruments/fixed_income/structured_credit/types/tranches.rs",
+        2,
+    ),
 ];
 
 fn rust_sources(root: &Path, files: &mut Vec<PathBuf>) {

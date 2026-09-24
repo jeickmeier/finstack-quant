@@ -46,7 +46,7 @@ pub use types::{
     ReserveInterestDestination, ReserveTarget, RoundingConvention, ShiftMode, ShiftingInterestSpec,
     ShiftingInterestStep, SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit,
     StructuredCreditBuilder, SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche,
-    TrancheAccrualPeriod, TrancheBehaviorType, TrancheBuilder, TrancheCashflows, TrancheCoupon,
+    TrancheAccrualPeriod, TrancheBuilder, TrancheCashflows, TrancheCoupon,
     TrancheDraw, TrancheReadvance, TrancheSeniority, TrancheStructure, TrancheValuation,
     TriggerConsequence, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
     WaterfallTier,

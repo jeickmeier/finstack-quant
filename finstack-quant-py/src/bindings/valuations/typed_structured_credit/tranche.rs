@@ -121,12 +121,6 @@ impl PyTranche {
         enum_to_py_string(&self.inner.seniority)
     }
 
-    /// Behavior type (serde name).
-    #[getter]
-    fn behavior_type(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.behavior_type)
-    }
-
     /// Credit rating (serde name) or ``None``.
     #[getter]
     fn rating(&self) -> PyResult<Option<String>> {
@@ -221,7 +215,8 @@ impl PyTranche {
             .transpose()
     }
 
-    /// Payment priority rank (1 = most senior).
+    /// Payment priority rank (1 = most senior), assigned by
+    /// ``TrancheStructure``; ``0`` on a standalone tranche.
     #[getter]
     fn payment_priority(&self) -> u32 {
         self.inner.payment_priority

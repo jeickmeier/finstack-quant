@@ -3561,6 +3561,70 @@
       }
     },
     {
+      "name": "contract-financial-model-spec",
+      "type": "registry:lib",
+      "docs": "Installs contract-financial-model-spec under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/financial_model_spec.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/financial_model_spec.json"
+        },
+        {
+          "path": "src/generated/types/financial_model_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/financial_model_spec.ts"
+        },
+        {
+          "path": "src/generated/meta/financial_model_spec.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/financial_model_spec.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json"
+        ]
+      }
+    },
+    {
+      "name": "contract-statement-result",
+      "type": "registry:lib",
+      "docs": "Installs contract-statement-result under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",
+      "files": [
+        {
+          "path": "src/generated/schemas/statement_result.json",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/schemas/statement_result.json"
+        },
+        {
+          "path": "src/generated/types/statement_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/types/statement_result.ts"
+        },
+        {
+          "path": "src/generated/meta/statement_result.ts",
+          "type": "registry:file",
+          "target": "lib/finstack/generated/meta/statement_result.ts"
+        }
+      ],
+      "registryDependencies": [],
+      "dependencies": [],
+      "categories": [],
+      "meta": {
+        "version": "0.2.0",
+        "wasmVersion": "0.8.0",
+        "schemaIds": [
+          "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json"
+        ]
+      }
+    },
+    {
       "name": "instrument-catalogue",
       "type": "registry:lib",
       "docs": "Installs instrument-catalogue under lib/finstack with relative imports. Generated schemas preserve canonical Rust wire contracts; UI validation is structural and native validation remains required.",

@@ -221,11 +221,8 @@ DIRECT_CONSUMER_FORBIDDEN = (
         ),
     ),
     ForbiddenPattern(
-        "retired PascalCase tranche behavior",
-        re.compile(
-            r'(?:(?:"|\\")behavior_type(?:"|\\")\s*:\s*)'
-            r'(?:"|\\")[A-Z][A-Za-z0-9_]*(?:"|\\")'
-        ),
+        "retired tranche behavior_type field",
+        re.compile(r'(?:"|\\")behavior_type(?:"|\\")\s*:'),
     ),
     ForbiddenPattern(
         "retired PascalCase tranche seniority",

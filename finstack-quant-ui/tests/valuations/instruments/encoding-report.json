@@ -6992,7 +6992,6 @@
           "#/$defs/RepLine/properties/seasoning_months",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
-          "#/$defs/Tranche/properties/payment_priority",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
           "#/$defs/TermOutSpec/properties/months"
         ],
@@ -18733,7 +18732,6 @@
           "#/$defs/RepLine/properties/seasoning_months",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
-          "#/$defs/Tranche/properties/payment_priority",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
           "#/$defs/TermOutSpec/properties/months"
         ],
@@ -38572,7 +38570,6 @@
           "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
-          "#/$defs/Tranche/properties/payment_priority",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing"
         ],
         "uint64": ["#/$defs/StochasticUtilizationSpec/properties/seed"],

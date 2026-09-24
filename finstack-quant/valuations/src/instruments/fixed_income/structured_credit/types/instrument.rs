@@ -157,10 +157,10 @@ impl Instrument for StructuredCredit {
         // Deal-level prices are per CURRENT face: the sum of the current
         // tranche balances (debt and equity), the factor-adjusted quote basis.
         let current_face = self.tranches.tranches.iter().try_fold(
-            Money::from((0_i64, self.tranches.total_size.currency())),
+            Money::from((0_i64, self.tranches.currency())),
             |acc, tranche| acc.checked_add(tranche.current_balance),
         );
-        context.notional = current_face.ok().or(Some(self.tranches.total_size));
+        context.notional = current_face.ok().or(self.tranches.total_size().ok());
         if let Ok(results) =
             crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
                 self, market, as_of,

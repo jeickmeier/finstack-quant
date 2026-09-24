@@ -120,15 +120,10 @@ export default [
               "recovery_lag": 12
             },
             "tranches": {
-              "total_size": {
-                "amount": "100000000",
-                "currency": "USD"
-              },
               "tranches": [
                 {
                   "attachment_point": 0,
                   "attributes": {},
-                  "behavior_type": "standard",
                   "coupon": {
                     "fixed": {
                       "rate": 0.06
@@ -156,7 +151,6 @@ export default [
                     "amount": "100000000",
                     "currency": "USD"
                   },
-                  "payment_priority": 1,
                   "pik_enabled": false,
                   "rating": null,
                   "seniority": "senior"

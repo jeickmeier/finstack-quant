@@ -16817,22 +16817,6 @@ class Tranche:
         ...
 
     @property
-    def behavior_type(self) -> str:
-        """
-        Tranche behavior type (serde string).
-
-        Returns
-        -------
-        str
-            Wire spelling of the behavior type.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
     def rating(self) -> str | None:
         """
         Credit rating (serde string) or ``None``.
@@ -17018,10 +17002,14 @@ class Tranche:
         """
         Payment priority rank (1 = most senior).
 
+        Derived state rather than a wire field: ``TrancheStructure`` ranks
+        its tranches ``1..=n`` by seniority, input order breaking ties, and
+        a standalone ``Tranche`` reports ``0`` (unassigned).
+
         Returns
         -------
         int
-            Priority rank.
+            Priority rank, or ``0`` outside a ``TrancheStructure``.
 
         Notes
         -----

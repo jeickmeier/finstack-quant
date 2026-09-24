@@ -537,7 +537,6 @@
               "id": "EQUITY",
               "attachment_point": 0.0,
               "detachment_point": 10.0,
-              "behavior_type": "standard",
               "seniority": "equity",
               "rating": "BB",
               "original_balance": {
@@ -575,7 +574,6 @@
                 "currency": "USD"
               },
               "maturity": "2034-01-01",
-              "payment_priority": 2,
               "attributes": {
                 "tags": [
                   "equity"
@@ -589,7 +587,6 @@
               "id": "SENIOR",
               "attachment_point": 10.0,
               "detachment_point": 100.0,
-              "behavior_type": "standard",
               "seniority": "senior",
               "rating": "AAA",
               "original_balance": {
@@ -630,7 +627,6 @@
                 "currency": "USD"
               },
               "maturity": "2034-01-01",
-              "payment_priority": 1,
               "attributes": {
                 "tags": [
                   "senior"
@@ -638,11 +634,7 @@
                 "meta": {}
               }
             }
-          ],
-          "total_size": {
-            "amount": "50000000",
-            "currency": "USD"
-          }
+          ]
         },
         "closing_date": "2024-01-01",
         "first_payment_date": "2024-04-01",

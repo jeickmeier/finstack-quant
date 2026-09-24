@@ -40,9 +40,6 @@ RUST_ONLY_DEAL_FIELDS = {
     "metric_pricing_overrides",
     "scenario_pricing_overrides",
 }
-# Assigned by ``TrancheStructure`` (payment_priority) or fixed by the engine
-# (behavior_type); readable but not settable.
-STRUCTURE_ASSIGNED_TRANCHE_FIELDS = {"behavior_type", "payment_priority"}
 # ``AssetPool`` setters are ``with_*`` methods on the immutable pool.
 POOL_SETTERS = {
     "assets": "with_assets",
@@ -109,7 +106,7 @@ def test_every_deal_field_has_a_builder_setter() -> None:
 
 def test_every_tranche_field_has_a_builder_setter() -> None:
     """``TrancheBuilder`` carries one setter per settable Rust field."""
-    expected = _fields("Tranche") - STRUCTURE_ASSIGNED_TRANCHE_FIELDS
+    expected = _fields("Tranche")
     # ``coupon`` is set through the two typed variants.
     expected -= {"coupon"}
     missing = sorted(name for name in expected if not callable(getattr(TrancheBuilder, name, None)))
