@@ -388,7 +388,10 @@ fn standard_pricer_registry_has_exact_expected_coverage() {
             vec![M::Discounting, M::StructuredCreditStochastic],
         ),
         (I::PrivateMarketsFund, vec![M::Discounting]),
-        (I::RevolvingCredit, vec![M::Discounting, M::MonteCarloGBM]),
+        (
+            I::RevolvingCredit,
+            vec![M::Discounting, M::MonteCarloThreeFactor],
+        ),
         (
             I::AsianOption,
             vec![

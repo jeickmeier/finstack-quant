@@ -38,7 +38,6 @@ fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
 pub(crate) fn generate_cashflows(
     loan: &TermLoan,
     market: &MarketContext,
-    _as_of: Date,
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
     let mut principal_events: Vec<PrincipalEvent> = Vec::new();
     let mut fees: Vec<FeeSpec> = Vec::new();
@@ -504,10 +503,15 @@ pub(crate) fn generate_cashflows(
         let _ = builder.fee(fee);
     }
     if let Some(ddtl) = &loan.ddtl {
-        if ddtl.usage_fee_bp != 0 {
+        if ddtl.usage_fee_bp != 0.0 {
             let _ = builder.fee(FeeSpec::PeriodicBp {
                 base: FeeBase::Drawn,
-                bp: Decimal::from(ddtl.usage_fee_bp),
+                bp: Decimal::try_from(ddtl.usage_fee_bp).map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "TermLoan '{}' DDTL usage_fee_bp {} is not representable",
+                        loan.id, ddtl.usage_fee_bp
+                    ))
+                })?,
                 frequency: loan.frequency,
                 day_count: loan.day_count,
                 business_day_convention: loan.business_day_convention,
@@ -524,7 +528,7 @@ pub(crate) fn generate_cashflows(
     let mut schedule = builder.build(Some(market))?;
 
     if let Some(ddtl) = &loan.ddtl {
-        if ddtl.commitment_fee_bp != 0 {
+        if ddtl.commitment_fee_bp != 0.0 {
             let commitment_fees = build_commitment_fee_flows(loan, ddtl, draw_stop, &schedule)?;
             if !commitment_fees.is_empty() {
                 let notional = schedule.get_notional().clone();
@@ -635,7 +639,7 @@ fn build_commitment_fee_flows(
         last
     };
 
-    let fee_rate = f64::from(ddtl.commitment_fee_bp) * 1e-4;
+    let fee_rate = ddtl.commitment_fee_bp * 1e-4;
     let mut by_payment_date = std::collections::BTreeMap::<Date, f64>::new();
     let mut prev = dates[0];
     for &d in dates.iter().skip(1) {
@@ -644,7 +648,7 @@ fn build_commitment_fee_flows(
             .year_fraction(prev, d, DayCountContext::default())?;
         // The sub-period is [prev, d), so a step-down effective on `d` must not
         // reduce the commitment base for the interval that ends on `d`.
-        let limit = commitment_limit_at(ddtl, prev);
+        let limit = ddtl.limit_in_force_at(prev);
         if limit.currency() != loan.currency {
             return Err(finstack_quant_core::InputError::Invalid.into());
         }
@@ -693,16 +697,6 @@ fn build_commitment_fee_flows(
         .collect()
 }
 
-fn commitment_limit_at(ddtl: &super::spec::DdtlSpec, date: Date) -> Money {
-    let mut limit = ddtl.commitment_limit;
-    for sd in &ddtl.commitment_step_downs {
-        if sd.date <= date {
-            limit = sd.new_limit;
-        }
-    }
-    limit
-}
-
 fn cumulative_drawn_at(ddtl: &super::spec::DdtlSpec, draw_stop: Option<Date>, date: Date) -> f64 {
     let mut total = 0.0;
     for ev in &ddtl.draws {
@@ -727,9 +721,8 @@ pub(crate) use crate::instruments::fixed_income::loan_quotes::OidEirSchedule;
 pub(crate) fn build_oid_eir_schedule(
     loan: &TermLoan,
     market: &MarketContext,
-    as_of: Date,
 ) -> finstack_quant_core::Result<OidEirSchedule> {
-    let schedule = generate_cashflows(loan, market, as_of)?;
+    let schedule = generate_cashflows(loan, market)?;
     let spec = loan.oid_eir.clone().unwrap_or_default();
     crate::instruments::fixed_income::loan_quotes::oid_eir_schedule_from_flows(
         &schedule,

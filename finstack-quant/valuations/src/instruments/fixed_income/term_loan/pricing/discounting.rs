@@ -357,7 +357,7 @@ impl TermLoanDiscountingPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::schedule::CashFlowSchedule> {
-        let mut schedule = generate_cashflows(loan, market, as_of)?;
+        let mut schedule = generate_cashflows(loan, market)?;
         Self::apply_fixings(loan, market, as_of, &mut schedule)?;
         Ok(schedule)
     }
@@ -551,7 +551,7 @@ mod tests {
         loan.coupon_type = CouponType::Pik;
         loan.discount_curve_id = CurveId::new("USD-OIS");
 
-        let schedule = generate_cashflows(&loan, &market, as_of).expect("cashflows");
+        let schedule = generate_cashflows(&loan, &market).expect("cashflows");
         assert!(
             schedule.get_flows().iter().any(|cf| cf.kind == CFKind::Pik),
             "PIK loan should generate PIK cashflows"

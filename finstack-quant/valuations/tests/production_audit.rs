@@ -364,8 +364,8 @@ fn delayed_draw_loan() -> TermLoan {
             },
         ],
         commitment_step_downs: vec![],
-        usage_fee_bp: 50,
-        commitment_fee_bp: 0,
+        usage_fee_bp: 50.0,
+        commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });

@@ -20,7 +20,7 @@ Import path:
 |------|---------|
 | `RevolvingCredit` | The instrument. Build with `RevolvingCredit::builder()`; `RevolvingCredit::example()` for a canonical facility. |
 | `BaseRateSpec` | `Fixed { rate }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
-| `RevolvingCreditFees` | `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp`. Helpers: `flat(..)`, `flat_bp(..)`. |
+| `RevolvingCreditFees` | `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp`. Helper: `flat(..)`. |
 | `DrawRepaySpec`, `DrawRepayEvent` | `Deterministic(Vec<DrawRepayEvent>)` or `Stochastic(Box<StochasticUtilizationSpec>)`. |
 | `CommitmentStep`, `MarginStepUp`, `FeeStep` (from `loan_terms`) | Dated commitment, margin and fee changes; see "Dated terms". |
 | `LetterOfCreditSpec`, `LcEvent` (from `loan_terms`) | LC sublimit, outstanding face, issuances/expiries, LC and fronting fees, LC draw at default. |
@@ -30,7 +30,7 @@ Import path:
 | `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture; `expected_cashflows(..)` for the path-averaged schedule of a stochastic facility. |
 | `EnhancedMonteCarloResult`, `PathResult` | MC statistics plus per-path PV, cashflows and factor trajectories. |
 | `PathAwareCashflowSchedule`, `ThreeFactorPathData` | Cashflow schedule carrying the simulated factor path. |
-| `ZERO_TOLERANCE`, `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
+| `INTERPOLATION_TOLERANCE`, `MIN_CIR_SPREAD`, `MAX_RECOVERY_RATE`, `MC_CLOCK_DAY_COUNT` | Module numerical constants; the last is the ACT/365F Monte Carlo clock. |
 
 Note that `pricer` and `types` are `pub(crate)` submodules — import the names
 above from the module root, not from `revolving_credit::types::…`.
@@ -101,8 +101,7 @@ Notes that bite:
 - `BaseRateSpec::Floating` is a **tuple variant** wrapping the canonical
   `finstack_quant_cashflows::builder::FloatingRateSpec` — not a struct variant
   with `index_id` / `margin_bp` fields.
-- `RevolvingCreditFees::flat` returns `Result` (non-finite bp are rejected);
-  `flat_bp` takes typed `Bps` and does not.
+- `RevolvingCreditFees::flat` returns `Result` (non-finite bp are rejected).
 - `recovery_rate` is required and must be a finite decimal in `[0, 1]`.
 - Schedule conventions are typed fields: `business_day_convention` (default
   Modified Following, payment dates only), `calendar_id` (`None` = weekends
@@ -340,7 +339,7 @@ deterministic engine starts from.
 ## Pricing
 
 `RevolvingCreditPricer` is registered under both `ModelKey::Discounting` and
-`ModelKey::MonteCarloGBM` in
+`ModelKey::MonteCarloThreeFactor` (utilization, short rate, credit spread) in
 [`src/pricer/fixed_income.rs`](../../../pricer/fixed_income.rs):
 
 | Mode | Behavior |

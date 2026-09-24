@@ -38,7 +38,7 @@ pub(crate) fn register_fixed_income_pricers(
 
     registry.register(
         crate::instruments::fixed_income::revolving_credit::pricing::RevolvingCreditPricer::new(
-            ModelKey::MonteCarloGBM,
+            ModelKey::MonteCarloThreeFactor,
         ),
     )?;
 

@@ -178,8 +178,8 @@ def test_wrong_way_risk_keeps_marginal_utilization_fixed(tracks: ModuleType) -> 
     assert conditional[1] > conditional[0]
     payload = tracks.stochastic_revolver(num_paths=512)
     market = tracks.build_market("credit")
-    first = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_gbm").value.amount
-    second = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_gbm").value.amount
+    first = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount
+    second = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount
     assert first == second
     assert first > 0
 

@@ -1,69 +1,25 @@
 //! Serde-stable specification types for term loans and DDTL features.
 //!
-//! This module defines the serializable specification structures for term loans
-//! including delayed-draw term loans (DDTL), covenant events, amortization schedules,
-//! and call provisions.
+//! This module defines the serializable term-sheet components a
+//! [`TermLoan`](super::types::TermLoan) composes: delayed-draw term loan
+//! (DDTL) features, covenant events, amortization schedules and call
+//! provisions. The loan itself is built with `TermLoan::builder()` (or
+//! deserialized directly), which validates the complete contract.
 //!
 //! # Overview
 //!
-//! All types in this module are designed for stable serialization with:
-//! - `#[serde(deny_unknown_fields)]` to catch configuration errors
-//! - Explicit field naming for long-lived pipelines
-//! - Conversion to/from runtime [`TermLoan`](super::types::TermLoan) instances
+//! All types in this module are designed for stable serialization with
+//! `#[serde(deny_unknown_fields)]` to catch configuration errors and explicit
+//! field naming for long-lived pipelines.
 //!
 //! # Key Types
 //!
-//! - [`TermLoanSpec`]: Complete loan specification (serializable)
 //! - [`DdtlSpec`]: Delayed-draw term loan features
 //! - [`TermLoanCovenantEvents`]: Covenant-driven events
 //! - [`AmortizationSpec`]: Principal repayment schedules
 //! - [`LoanCallSchedule`]: Borrower prepayment options
 //! - [`OidPolicy`]: Original issue discount handling
 //! - [`OidEirSpec`]: Effective interest rate amortization settings
-//!
-//! # Quick Example
-//!
-//! ```text
-//! use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;
-//! use finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;
-//! use finstack_quant_cashflows::builder::specs::CouponType;
-//! use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-//! use finstack_quant_core::money::Money;
-//! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::dates::*;
-//! use finstack_quant_core::types::{InstrumentId, CurveId};
-//! use time::Month;
-//!
-//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let spec = TermLoanSpec {
-//!     id: InstrumentId::new("TL-001"),
-//!     discount_curve_id: CurveId::new("USD-CREDIT"),
-//!     currency: Currency::USD,
-//!     notional_limit: Some(Money::from((10_000_000_i64, Currency::USD))),
-//!     issue: create_date(2025, Month::January, 1)?,
-//!     maturity: create_date(2030, Month::January, 1)?,
-//!     rate: RateSpec::Fixed { rate_bp: 600 },
-//!     frequency: Tenor::quarterly(),
-//!     day_count: DayCount::Act360,
-//!     business_day_convention: BusinessDayConvention::ModifiedFollowing,
-//!     calendar_id: None,
-//!     stub: StubKind::None,
-//!     amortization: AmortizationSpec::None,
-//!     coupon_type: CouponType::Cash,
-//!     upfront_fee: None,
-//!     ddtl: None,
-//!     covenants: None,
-//!     credit_curve_id: None,
-//!     instrument_pricing_overrides: InstrumentPricingOverrides::default(),
-//!     metric_pricing_overrides: Default::default(),
-//!     scenario_pricing_overrides: Default::default(),
-//!     oid_eir: None,
-//!     call_schedule: None,
-//!     settlement_days: 2,
-//! };
-//! # Ok(())
-//! # }
-//! ```
 //!
 //! LSTA par-trade marks use T+7:
 //!
@@ -83,13 +39,10 @@
 //! - `super::cashflows` for cashflow generation (internal module)
 //! - term loan pricing module for valuation
 
-use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
 
-pub use super::super::loan_terms::{CommitmentStepDown, MarginStepUp, OidEirSpec};
-use super::types::RateSpec;
+pub use super::super::loan_terms::{CommitmentStep, MarginStepUp, OidEirSpec};
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///
@@ -151,8 +104,6 @@ pub enum OidPolicy {
     /// amortization, pro-rated across draws by draw size
     SeparateAmount(Money),
 }
-
-impl OidPolicy {}
 
 /// Draw event for delayed-draw term loans (DDTL).
 ///
@@ -229,8 +180,8 @@ pub enum CommitmentFeeBase {
 ///     availability_end: create_date(2026, Month::January, 1)?,
 ///     draws: vec![],
 ///     commitment_step_downs: vec![],
-///     usage_fee_bp: 50,        // 50 bp usage fee
-///     commitment_fee_bp: 25,   // 25 bp commitment fee
+///     usage_fee_bp: 50.0,        // 50 bp usage fee
+///     commitment_fee_bp: 25.0,   // 25 bp commitment fee
 ///     fee_base: CommitmentFeeBase::Undrawn,
 ///     oid_policy: None,
 /// };
@@ -259,19 +210,38 @@ pub struct DdtlSpec {
     pub availability_end: Date,
     /// Scheduled or actual draw events
     pub draws: Vec<DrawEvent>,
-    /// Commitment step-down schedule
-    pub commitment_step_downs: Vec<CommitmentStepDown>,
-    /// Usage fee in basis points (on drawn amounts)
-    pub usage_fee_bp: i32,
-    /// Commitment fee in basis points (on undrawn amounts)
-    pub commitment_fee_bp: i32,
+    /// Commitment step-down schedule: strictly increasing dates inside the
+    /// availability window, non-increasing `amount`s in the loan currency,
+    /// and `fee_bp == 0.0` (term loans carry no reduction fee).
+    pub commitment_step_downs: Vec<CommitmentStep>,
+    /// Usage fee on drawn amounts, in basis points per annum (non-negative,
+    /// finite; `25.0` = 0.25%).
+    pub usage_fee_bp: f64,
+    /// Commitment fee on the undrawn commitment, in basis points per annum
+    /// (non-negative, finite; `50.0` = 0.50%).
+    pub commitment_fee_bp: f64,
     /// Basis for commitment fee calculation
     pub fee_base: CommitmentFeeBase,
     /// Original issue discount policy, if applicable
     pub oid_policy: Option<OidPolicy>,
 }
 
-impl DdtlSpec {}
+impl DdtlSpec {
+    /// Commitment limit in force on `date`: the last step-down dated on or
+    /// before `date`, else `commitment_limit`.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Date the limit is wanted for; a step dated on it applies.
+    pub(crate) fn limit_in_force_at(&self, date: Date) -> Money {
+        self.commitment_step_downs
+            .iter()
+            .filter(|step| step.date <= date)
+            .map(|step| step.amount)
+            .next_back()
+            .unwrap_or(self.commitment_limit)
+    }
+}
 
 /// Payment-in-kind (PIK) toggle event.
 ///
@@ -407,185 +377,6 @@ pub enum AmortizationSpec {
         )]
         Vec<(Date, Money)>,
     ),
-}
-
-impl AmortizationSpec {}
-
-/// Complete term loan specification with covenant and DDTL features.
-///
-/// Comprehensive specification for institutional term loans including:
-/// - Amortization schedules (bullet, linear, custom)
-/// - Delayed-draw capabilities with commitment fees
-/// - Payment-in-kind (PIK) features
-/// - Covenant-driven events (margin step-ups, cash sweeps)
-/// - Original issue discount (OID) handling
-/// - Optional borrower callability
-///
-/// # Examples
-///
-/// ```text
-/// # // Convert to runtime instrument via `try_into()` when needed.
-/// use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;
-/// use finstack_quant_valuations::instruments::fixed_income::term_loan::types::RateSpec;
-/// use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-/// use finstack_quant_cashflows::builder::specs::CouponType;
-/// use finstack_quant_cashflows::builder::FloatingRateSpec;
-/// use finstack_quant_core::money::Money;
-/// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::dates::*;
-/// use finstack_quant_core::types::{InstrumentId, CurveId};
-/// use rust_decimal_macros::dec;
-/// use time::Month;
-///
-/// # fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// // Example: Floating-rate term loan with SOFR + 300 bp
-/// let floating_spec = FloatingRateSpec {
-///     index_id: CurveId::new("USD-SOFR-3M"),
-///     spread_bp: dec!(300),
-///     gearing: dec!(1),
-///     gearing_includes_spread: true,
-///     index_floor_bp: Some(dec!(0)),  // 0% floor
-///     all_in_floor_bp: None,
-///     all_in_cap_bp: None,
-///     index_cap_bp: None,
-///     overnight_index_constraints: Default::default(),
-///     reset_frequency: Tenor::quarterly(),
-///     index_tenor: None,
-///     reset_lag_days: 2,
-///     fixing_calendar_id: None,
-///     overnight_compounding: None,
-///     overnight_basis: None,
-///     fallback: Default::default(),
-/// };
-///
-/// let spec = TermLoanSpec {
-///     id: InstrumentId::new("TL-001"),
-///     discount_curve_id: CurveId::new("USD-CREDIT"),
-///     currency: Currency::USD,
-///     notional_limit: Some(Money::from((25_000_000_i64, Currency::USD))),
-///     issue: create_date(2025, Month::January, 15)?,
-///     maturity: create_date(2030, Month::January, 15)?,
-///     rate: RateSpec::Floating(floating_spec),
-///     frequency: Tenor::quarterly(),
-///     day_count: DayCount::Act360,
-///     business_day_convention: BusinessDayConvention::ModifiedFollowing,
-///     calendar_id: None,
-///     stub: StubKind::None,
-///     amortization: AmortizationSpec::None,  // Bullet loan
-///     coupon_type: CouponType::Cash,
-///     upfront_fee: None,
-///     ddtl: None,
-///     covenants: None,
-///     credit_curve_id: None,
-///     instrument_pricing_overrides: InstrumentPricingOverrides::default(),
-///     metric_pricing_overrides: Default::default(),
-///     scenario_pricing_overrides: Default::default(),
-///     oid_eir: None,
-///     call_schedule: None,
-///     settlement_days: 2,
-/// };
-/// # Ok(())
-/// # }
-/// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct TermLoanSpec {
-    /// Unique instrument identifier
-    pub id: InstrumentId,
-    /// Discount curve ID for present value calculations
-    pub discount_curve_id: CurveId,
-    /// Optional credit curve ID for hazard rate / credit risk calculations.
-    ///
-    /// If not provided, defaults to `discount_curve_id` (risky discounting).
-    pub credit_curve_id: Option<CurveId>,
-    /// Loan currency
-    pub currency: Currency,
-    /// Maximum commitment / notional limit.
-    ///
-    /// If omitted and `ddtl` is provided, the commitment limit is used.
-    /// Required for non-DDTL term loans.
-    pub notional_limit: Option<Money>,
-    /// Loan issue/origination date
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub issue: Date,
-    /// Final maturity date
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub maturity: Date,
-    /// Interest rate specification (fixed or floating)
-    pub rate: RateSpec,
-    /// Payment frequency for interest and principal
-    pub frequency: Tenor,
-    /// Day count convention for interest accrual
-    pub day_count: DayCount,
-    /// Business day convention for schedule adjustment
-    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
-    pub business_day_convention: BusinessDayConvention,
-    /// Optional holiday calendar ID (default: no holidays)
-    pub calendar_id: Option<String>,
-    /// Stub period treatment
-    #[serde(default = "crate::serde_defaults::stub_short_front")]
-    pub stub: StubKind,
-    /// Principal amortization schedule
-    pub amortization: AmortizationSpec,
-    /// Coupon characterization (Cash, PIK, or Split with optional toggles).
-    ///
-    /// This field controls whether interest is paid in cash, capitalized (PIK),
-    /// or split between the two. It does NOT control payment timing (which is
-    /// assumed to be in arrears). For dynamic PIK toggles, see `TermLoanCovenantEvents::pik_toggles`.
-    pub coupon_type: crate::cashflow::builder::specs::CouponType,
-    /// Optional upfront origination fee
-    pub upfront_fee: Option<Money>,
-    /// Optional delayed-draw term loan features
-    pub ddtl: Option<DdtlSpec>,
-    /// Optional covenant-driven events
-    pub covenants: Option<TermLoanCovenantEvents>,
-    /// Pricing overrides (yield, price, etc.)
-    /// Instrument-owned pricing inputs.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
-    )]
-    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
-    )]
-    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
-    )]
-    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
-    /// Optional EIR amortization settings for reporting schedules
-    #[serde(default)]
-    pub oid_eir: Option<OidEirSpec>,
-    /// Optional call schedule (borrower callability)
-    pub call_schedule: Option<LoanCallSchedule>,
-    /// Settlement days (T+n) used as the valuation/accrued anchor. Default is 2.
-    ///
-    /// Note: the LSTA target settlement for par/near-par secondary loan trades
-    /// is T+7 (with delayed compensation beyond T+7, and T+20 for distressed),
-    /// under which trade economics accrue to the buyer as if settlement
-    /// occurred at T+7. The T+2 default here is a pricing-anchor choice, not
-    /// an LSTA convention; set `settlement_days: 7` to anchor at the LSTA
-    /// par-trade target.
-    #[serde(default = "default_settlement_days")]
-    pub settlement_days: u32,
-}
-
-fn default_settlement_days() -> u32 {
-    2
 }
 
 /// Type of borrower call provision on a term loan.

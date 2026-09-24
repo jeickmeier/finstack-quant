@@ -112,7 +112,7 @@ fn drawn_amount_is_the_anchor_balance_in_both_modes() {
     let stochastic = seasoned(zero_vol_stochastic());
 
     let (pv_det, util_det, avail_det) = metrics(&deterministic, ModelKey::Discounting);
-    let (pv_sto, util_sto, avail_sto) = metrics(&stochastic, ModelKey::MonteCarloGBM);
+    let (pv_sto, util_sto, avail_sto) = metrics(&stochastic, ModelKey::MonteCarloThreeFactor);
 
     assert!(
         (util_det - 0.4).abs() < 1e-12,

@@ -123,7 +123,7 @@ impl RevolvingCreditPricer {
     /// # Arguments
     ///
     /// * `model` - `Discounting` for deterministic facilities or
-    ///   `MonteCarloGBM` for stochastic utilization paths.
+    ///   `MonteCarloThreeFactor` for stochastic utilization paths.
     pub fn new(model: ModelKey) -> Self {
         Self { model }
     }
@@ -186,7 +186,7 @@ impl Pricer for RevolvingCreditPricer {
                     .map_err(|e| PricingError::from_core(e, ctx.clone()))?
             }
 
-            ModelKey::MonteCarloGBM => {
+            ModelKey::MonteCarloThreeFactor => {
                 // For MC, we ensure we're using the MC path
                 let enhanced = Self::price_with_paths(facility, market, as_of)
                     .map_err(|e| PricingError::from_core(e, ctx.clone()))?;

@@ -174,8 +174,8 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
             },
         ],
         commitment_step_downs: vec![],
-        usage_fee_bp: 0,
-        commitment_fee_bp: 0,
+        usage_fee_bp: 0.0,
+        commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     };

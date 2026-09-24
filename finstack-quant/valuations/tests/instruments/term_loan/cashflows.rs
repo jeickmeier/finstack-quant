@@ -122,8 +122,8 @@ fn test_fixed_amount_oid_prorated_across_draws() {
             },
         ],
         commitment_step_downs: vec![],
-        usage_fee_bp: 0,
-        commitment_fee_bp: 0,
+        usage_fee_bp: 0.0,
+        commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: Some(OidPolicy::WithheldAmount(
             Money::new(oid, Currency::USD).expect("valid money fixture"),
@@ -542,8 +542,8 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
                 amount: Money::new(drawn, Currency::USD).expect("valid money fixture"),
             }],
             commitment_step_downs: vec![],
-            usage_fee_bp: 0,
-            commitment_fee_bp: 0,
+            usage_fee_bp: 0.0,
+            commitment_fee_bp: 0.0,
             fee_base: CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -613,8 +613,8 @@ fn test_commitment_fees_use_correct_kind() {
             availability_end: date!(2026 - 01 - 01),
             draws: vec![],
             commitment_step_downs: vec![],
-            usage_fee_bp: 0,
-            commitment_fee_bp: 50, // 50bp commitment fee on undrawn
+            usage_fee_bp: 0.0,
+            commitment_fee_bp: 50.0, // 50bp commitment fee on undrawn
             fee_base: CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -936,8 +936,8 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
                 amount: Money::new(5_000_000.0, Currency::USD).expect("money"),
             }],
             commitment_step_downs: vec![],
-            usage_fee_bp: 0,
-            commitment_fee_bp: 50,
+            usage_fee_bp: 0.0,
+            commitment_fee_bp: 50.0,
             fee_base: CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))

@@ -321,6 +321,8 @@ impl std::str::FromStr for InstrumentType {
 /// ## Monte Carlo Models
 /// - [`MonteCarloGBM`](Self::MonteCarloGBM): GBM simulation
 /// - [`MonteCarloHeston`](Self::MonteCarloHeston): Heston stochastic vol
+/// - [`MonteCarloThreeFactor`](Self::MonteCarloThreeFactor): revolver
+///   utilization, short-rate and credit-spread simulation
 ///
 /// ## Exotic Analytical
 /// - [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers
@@ -403,6 +405,13 @@ pub enum ModelKey {
     /// Used for: Bermudan swaptions, CMS options.
     #[serde(rename = "monte_carlo_hull_white_1f")]
     MonteCarloHullWhite1F = 12,
+    /// Monte Carlo with joint utilization, short-rate and credit-spread
+    /// factors.
+    ///
+    /// Used for: revolving credit facilities with a stochastic draw/repay
+    /// specification (mean-reverting utilization, a deterministic or
+    /// Hull-White short rate, and a market-anchored or CIR credit spread).
+    MonteCarloThreeFactor = 13,
     /// Reiner-Rubinstein continuous barrier formulas.
     ///
     /// Used for: equity/FX barrier options with continuous monitoring.
@@ -528,6 +537,7 @@ impl ModelKey {
             ModelKey::MonteCarloGBM => "monte_carlo_gbm",
             ModelKey::MonteCarloHeston => "monte_carlo_heston",
             ModelKey::MonteCarloHullWhite1F => "monte_carlo_hull_white_1f",
+            ModelKey::MonteCarloThreeFactor => "monte_carlo_three_factor",
             ModelKey::BarrierBSContinuous => "barrier_bs_continuous",
             ModelKey::AsianGeometricBS => "asian_geometric_bs",
             ModelKey::AsianTurnbullWakeman => "asian_turnbull_wakeman",

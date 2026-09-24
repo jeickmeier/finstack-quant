@@ -107,8 +107,8 @@ print(pd.DataFrame(wwr_rows))
 mc_rows=[]
 for rho in [0.0,.30]:
     payload=tracks.stochastic_revolver(correlation=rho,num_paths=1024)
-    first=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_gbm").value.amount
-    repeated=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_gbm").value.amount
+    first=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_three_factor").value.amount
+    repeated=price_instrument(json.dumps(payload),credit_market,AS_OF,model="monte_carlo_three_factor").value.amount
     mc_rows.append({"correlation":rho,"seeded_native_pv_usd":first})
 print(pd.DataFrame(mc_rows))
 ```

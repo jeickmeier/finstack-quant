@@ -25,55 +25,36 @@
 //! # Quick Example
 //!
 //! ```
-//! use finstack_quant_valuations::instruments::fixed_income::term_loan::{TermLoan, TermLoanSpec, RateSpec};
-//! use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::AmortizationSpec;
-//! use finstack_quant_cashflows::builder::specs::CouponType;
-//! use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
-//! use finstack_quant_core::money::Money;
-//! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::dates::*;
-//! use finstack_quant_core::types::{InstrumentId, CurveId};
-//! use time::Month;
-//! // Convert `TermLoanSpec` to `TermLoan` via `try_into()` when needed.
-//!
-//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Fixed-rate bullet term loan
-//! let spec = TermLoanSpec {
-//!     id: InstrumentId::new("TL-BULLET-5Y"),
-//!     discount_curve_id: CurveId::new("USD-CREDIT"),
-//!     currency: Currency::USD,
-//!     notional_limit: Some(Money::from((10_000_000_i64, Currency::USD))),
-//!     issue: create_date(2025, Month::January, 15)?,
-//!     maturity: create_date(2030, Month::January, 15)?,
-//!     rate: RateSpec::Fixed { rate_bp: 600 },  // 6% fixed
-//!     frequency: Tenor::quarterly(),
-//!     day_count: DayCount::Act360,
-//!     business_day_convention: BusinessDayConvention::ModifiedFollowing,
-//!     calendar_id: None,
-//!     stub: StubKind::None,
-//!     amortization: AmortizationSpec::None,  // Bullet
-//!     coupon_type: CouponType::Cash,
-//!     upfront_fee: None,
-//!     ddtl: None,
-//!     covenants: None,
-//!     credit_curve_id: None,
-//!     instrument_pricing_overrides: InstrumentPricingOverrides::default(),
-//!     metric_pricing_overrides: Default::default(),
-//!     scenario_pricing_overrides: Default::default(),
-//!     oid_eir: None,
-//!     call_schedule: None,
-//!     settlement_days: 2,
+//! use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+//!     AmortizationSpec, RateSpec, TermLoan,
 //! };
+//! use finstack_quant_core::currency::Currency;
+//! use finstack_quant_core::dates::{DayCount, Tenor};
+//! use finstack_quant_core::money::Money;
+//! use finstack_quant_core::types::{CurveId, InstrumentId};
+//! use time::macros::date;
 //!
-//! let loan: TermLoan = spec.try_into()?;
-//! # let _ = loan;
-//! # Ok(())
-//! # }
+//! // Fixed-rate 6% bullet term loan; `build()` validates the contract.
+//! let loan = TermLoan::builder()
+//!     .id(InstrumentId::new("TL-BULLET-5Y"))
+//!     .currency(Currency::USD)
+//!     .notional_limit(Money::new(10_000_000.0, Currency::USD)?)
+//!     .issue_date(date!(2025 - 01 - 15))
+//!     .maturity(date!(2030 - 01 - 15))
+//!     .rate(RateSpec::Fixed { rate_bp: 600 })
+//!     .frequency(Tenor::quarterly())
+//!     .day_count(DayCount::Act360)
+//!     .discount_curve_id(CurveId::new("USD-CREDIT"))
+//!     .amortization(AmortizationSpec::None)
+//!     .attributes(Default::default())
+//!     .build()?;
+//! assert_eq!(loan.currency, Currency::USD);
+//! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 //!
 //! # See Also
 //!
-//! - [`crate::instruments::fixed_income::term_loan::TermLoanSpec`] for complete specification structure
+//! - [`crate::instruments::fixed_income::term_loan::spec`] for the term-sheet component types (DDTL, covenants, amortization, calls)
 //! - [`TermLoan`] for the instrument type
 //! - term loan cashflows module for cashflow generation details
 //! - term loan pricing module for valuation methodology
@@ -86,11 +67,11 @@ pub(crate) mod pricing;
 pub mod spec;
 pub(crate) mod types;
 
-pub use super::loan_terms::{CommitmentStepDown, MarginStepUp, OidEirSpec};
+pub use super::loan_terms::{CommitmentStep, MarginStepUp, OidEirSpec};
 pub use overrides::TermLoanOverrides;
 pub use spec::{
     AmortizationSpec, CashSweepEvent, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall,
-    LoanCallSchedule, LoanCallType, OidPolicy, PikToggle, TermLoanCovenantEvents, TermLoanSpec,
+    LoanCallSchedule, LoanCallType, OidPolicy, PikToggle, TermLoanCovenantEvents,
 };
 pub use types::{RateSpec, TermLoan, TermLoanBuilder};
 

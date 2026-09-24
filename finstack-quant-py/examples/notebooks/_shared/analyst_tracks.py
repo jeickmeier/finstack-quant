@@ -296,7 +296,7 @@ def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 4096) -> d
 
     Returns:
         Fresh canonical facility with observed utilization 40 percent and
-        utilization target 55 percent. Price with ``monte_carlo_gbm``.
+        utilization target 55 percent. Price with ``monte_carlo_three_factor``.
 
     Raises:
         ValueError: If the correlation or path count is invalid.

@@ -57,31 +57,19 @@ pub(super) fn build_payment_periods(
 /// # Arguments
 ///
 /// * `facility` - The revolving credit facility
-/// * `include_sentinel` - If true, appends a date one day after the last payment
-///   to ensure terminal cashflows are included in period aggregation (exclusive end semantics)
 ///
 /// # Returns
 ///
-/// Vector of payment dates, optionally with a sentinel date appended.
+/// The commitment date followed by each period's payment date.
 ///
 /// # Errors
 ///
 /// Returns an error if the schedule builder fails or produces fewer than 2 dates.
-pub(super) fn build_payment_dates(
-    facility: &RevolvingCredit,
-    include_sentinel: bool,
-) -> Result<Vec<Date>> {
+pub(super) fn build_payment_dates(facility: &RevolvingCredit) -> Result<Vec<Date>> {
     let periods = build_payment_periods(facility)?;
-    let mut payment_dates: Vec<Date> = std::iter::once(facility.commitment_date)
+    let payment_dates: Vec<Date> = std::iter::once(facility.commitment_date)
         .chain(periods.into_iter().map(|period| period.payment_date))
         .collect();
-
-    // Add sentinel if requested (for period PV aggregation with exclusive end semantics)
-    if include_sentinel {
-        if let Some(&last) = payment_dates.last() {
-            payment_dates.push(last + time::Duration::days(1));
-        }
-    }
 
     if payment_dates.len() < 2 {
         return Err(finstack_quant_core::InputError::TooFewPoints.into());
@@ -556,7 +544,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_payment_dates_no_sentinel() {
+    fn test_build_payment_dates_ends_on_or_before_maturity() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
         let end = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
         let facility = create_test_facility(
@@ -567,39 +555,11 @@ mod tests {
             None,
         );
 
-        let dates = build_payment_dates(&facility, false)
-            .expect("Payment dates building should succeed in test");
+        let dates =
+            build_payment_dates(&facility).expect("Payment dates building should succeed in test");
         assert!(dates.len() >= 2);
         // Verify no sentinel: last date should be at or before maturity
         assert!(*dates.last().expect("Dates should not be empty") <= end);
-    }
-
-    #[test]
-    fn test_build_payment_dates_with_sentinel() {
-        let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-        let end = Date::from_calendar_date(2026, Month::January, 1).expect("Valid test date");
-        let facility = create_test_facility(
-            start,
-            end,
-            Tenor::quarterly(),
-            BaseRateSpec::Fixed { rate: 0.05 },
-            None,
-        );
-
-        let dates_no_sentinel = build_payment_dates(&facility, false)
-            .expect("Payment dates building should succeed in test");
-        let dates_with_sentinel = build_payment_dates(&facility, true)
-            .expect("Payment dates building should succeed in test");
-
-        // With sentinel should have one more date
-        assert_eq!(dates_with_sentinel.len(), dates_no_sentinel.len() + 1);
-
-        // Sentinel should be one day after the last payment date
-        let last_payment = dates_no_sentinel.last().expect("Dates should not be empty");
-        let sentinel = dates_with_sentinel
-            .last()
-            .expect("Dates should not be empty");
-        assert_eq!(*sentinel, *last_payment + time::Duration::days(1));
     }
 
     #[test]
@@ -913,7 +873,7 @@ mod tests {
             BaseRateSpec::Fixed { rate: 0.05 },
             None,
         );
-        let dates_no_cal = build_payment_dates(&facility_no_cal, false)
+        let dates_no_cal = build_payment_dates(&facility_no_cal)
             .expect("Payment dates building should succeed in test");
 
         // With NYSE calendar
@@ -924,7 +884,7 @@ mod tests {
             BaseRateSpec::Fixed { rate: 0.05 },
             Some("nyse"),
         );
-        let dates_with_cal = build_payment_dates(&facility_with_cal, false)
+        let dates_with_cal = build_payment_dates(&facility_with_cal)
             .expect("Payment dates building should succeed in test");
 
         // Both should have same length (quarterly over 1 year)

@@ -192,7 +192,7 @@
     "models": [
       "registry: default deterministic revolving-credit pricing",
       "registry: discounting",
-      "registry: monte_carlo_gbm"
+      "registry: monte_carlo_three_factor"
     ],
     "metrics": [
       "all_in_rate",

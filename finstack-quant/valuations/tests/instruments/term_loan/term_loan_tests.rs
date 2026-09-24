@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-    self, CommitmentStepDown, DdtlSpec, DrawEvent, OidEirSpec, OidPolicy, TermLoan,
+    self, CommitmentStep, DdtlSpec, DrawEvent, OidEirSpec, OidPolicy, TermLoan,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -65,8 +65,8 @@ fn term_loan_fixed_with_draws_and_fees() {
                 },
             ],
             commitment_step_downs: vec![],
-            usage_fee_bp: 10,
-            commitment_fee_bp: 25,
+            usage_fee_bp: 10.0,
+            commitment_fee_bp: 25.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
             oid_policy: Some(OidPolicy::WithheldPct(100)), // 1% withheld OID on draws
         }))
@@ -125,12 +125,13 @@ fn term_loan_commitment_fee_step_downs() {
             availability_start: issue,
             availability_end,
             draws: vec![],
-            commitment_step_downs: vec![CommitmentStepDown {
+            commitment_step_downs: vec![CommitmentStep {
                 date: step_down,
-                new_limit: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+                amount: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+                fee_bp: 0.0,
             }],
-            usage_fee_bp: 0,
-            commitment_fee_bp: 100,
+            usage_fee_bp: 0.0,
+            commitment_fee_bp: 100.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -206,8 +207,8 @@ fn term_loan_commitment_fee_windowed_to_availability() {
             availability_end,
             draws: vec![],
             commitment_step_downs: vec![],
-            usage_fee_bp: 0,
-            commitment_fee_bp: 50,
+            usage_fee_bp: 0.0,
+            commitment_fee_bp: 50.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -266,8 +267,8 @@ fn term_loan_oid_eir_amortization_schedule() {
                 amount: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             }],
             commitment_step_downs: vec![],
-            usage_fee_bp: 0,
-            commitment_fee_bp: 0,
+            usage_fee_bp: 0.0,
+            commitment_fee_bp: 0.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
             oid_policy: Some(OidPolicy::WithheldPct(200)),
         }))

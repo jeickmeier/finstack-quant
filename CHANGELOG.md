@@ -69,6 +69,26 @@
 - `tba_assumptions.v1.json` must carry `schema`
   `finstack_quant.tba_assumptions/1` and `version` 1; both are now checked.
 
+### Loans cleanup: one term-sheet vocabulary, one balance replay (2026-09-23)
+
+#### Changed (breaking)
+
+- **`TermLoanSpec` and its `TryFrom` are removed.** `TermLoan` is itself the
+  serde-stable shape; build it with `TermLoan::builder()` (which validates) or
+  deserialize it. The spec's `notional_limit: None` fallback to the DDTL
+  commitment is gone: `notional_limit` is always required.
+- **Term-loan DDTL step-downs use the shared `loan_terms::CommitmentStep`.**
+  `CommitmentStepDown` is deleted; step JSON `{date, new_limit}` becomes
+  `{date, amount, fee_bp}`. Term loans carry no reduction fee, so a non-zero
+  `fee_bp` is rejected. `DdtlSpec::usage_fee_bp` / `commitment_fee_bp` are now
+  `f64` basis points (finite, non-negative), matching the revolver.
+- **The revolver's Monte Carlo model key is `monte_carlo_three_factor`**
+  (`ModelKey::MonteCarloThreeFactor`), naming its utilization / short-rate /
+  credit-spread simulation. `monte_carlo_gbm` no longer prices a revolving
+  credit facility; it remains the GBM key for exotics.
+- Removed dead items: `RevolvingCreditFees::flat_bp`,
+  `revolving_credit::ZERO_TOLERANCE`.
+
 ### Component source registry 0.2.0 (2026-09-20)
 
 - Prepares 150 registry items for financial forms, views and a composed pricing
