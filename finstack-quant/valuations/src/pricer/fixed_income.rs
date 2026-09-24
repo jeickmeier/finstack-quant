@@ -54,9 +54,7 @@ pub(crate) fn register_fixed_income_pricers(
     registry.register(
         crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer,
     )?;
-    registry.register(
-        crate::instruments::fixed_income::term_loan::pricing::TermLoanTreePricer::default(),
-    )?;
+    registry.register(crate::instruments::fixed_income::term_loan::pricing::TermLoanTreePricer)?;
 
     // Agency MBS Passthrough — uses Instrument::base_value via GenericInstrumentPricer.
     // Per-instrument *DiscountingPricer wrappers were trivial pass-throughs with no

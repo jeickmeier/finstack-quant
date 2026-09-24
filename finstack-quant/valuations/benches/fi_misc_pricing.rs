@@ -176,6 +176,115 @@ fn bench_revolving_credit_pv(c: &mut Criterion) {
     group.finish();
 }
 
+/// Floating 5Y term loan: the discount-margin solve reprices its flows at
+/// every Brent iteration.
+fn bench_term_loan_discount_margin(c: &mut Criterion) {
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = as_of();
+    let market = revolving_credit_market(as_of);
+    let mut loan = term_loan(Date::from_calendar_date(2030, Month::January, 1).unwrap());
+    loan.rate = RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+        index_id: "USD-SOFR-3M".into(),
+        spread_bp: Decimal::from(350),
+        gearing: Decimal::ONE,
+        gearing_includes_spread: true,
+        index_floor_bp: Some(Decimal::ZERO),
+        all_in_floor_bp: None,
+        all_in_cap_bp: None,
+        index_cap_bp: None,
+        overnight_index_constraints: Default::default(),
+        reset_frequency: Tenor::quarterly(),
+        index_tenor: None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        overnight_compounding: None,
+        overnight_basis: None,
+        fallback: Default::default(),
+    });
+    loan.frequency = Tenor::quarterly();
+    loan.instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(98.5);
+    let mut group = c.benchmark_group("term_loan_discount_margin");
+    group.bench_function("5Y_quarterly", |b| {
+        b.iter(|| {
+            loan.price_with_metrics(
+                black_box(&market),
+                black_box(as_of),
+                &[MetricId::DiscountMargin],
+                PricingOptions::default(),
+            )
+            .unwrap()
+        });
+    });
+    group.finish();
+}
+
+/// Callable 5Y fixed term loan on the short-rate tree.
+fn bench_term_loan_tree(c: &mut Criterion) {
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::{
+        LoanCall, LoanCallSchedule, LoanCallType,
+    };
+
+    let as_of = as_of();
+    let disc = discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05);
+    let market = MarketContext::new().insert(disc);
+    let mut loan = term_loan(Date::from_calendar_date(2030, Month::January, 1).unwrap());
+    loan.call_schedule = Some(LoanCallSchedule {
+        calls: vec![LoanCall {
+            date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+            price_pct_of_par: 101.0,
+            call_type: LoanCallType::Hard,
+        }],
+    });
+    let mut group = c.benchmark_group("term_loan_tree");
+    group.bench_function("5Y_callable", |b| {
+        b.iter(|| loan.value(black_box(&market), black_box(as_of)).unwrap());
+    });
+    group.finish();
+}
+
+/// Stochastic 3Y floating revolver: 512 three-factor paths.
+fn bench_revolving_credit_mc(c: &mut Criterion) {
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+        StochasticUtilizationSpec, UtilizationProcess,
+    };
+
+    let as_of = as_of();
+    let market = revolving_credit_market(as_of);
+    let mut facility =
+        revolving_credit_floating(Date::from_calendar_date(2028, Month::January, 1).unwrap());
+    if let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec {
+        // Reset on the valuation date: no historical fixing is needed.
+        spec.reset_lag_days = 0;
+    }
+    facility.draw_repay_spec = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
+        utilization_process: UtilizationProcess::MeanReverting {
+            target_rate: 0.6,
+            speed: 1.0,
+            volatility: 0.2,
+            spread_sensitivity: 0.0,
+        },
+        num_paths: 512,
+        seed: Some(7),
+        antithetic: true,
+        use_sobol_qmc: false,
+        mc_config: None,
+    }));
+    let mut group = c.benchmark_group("revolving_credit_mc");
+    group.sample_size(20);
+    group.bench_function("3Y_512_paths", |b| {
+        b.iter(|| {
+            facility
+                .value(black_box(&market), black_box(as_of))
+                .unwrap()
+        });
+    });
+    group.finish();
+}
+
 fn bench_agency_mbs_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("agency_mbs_pv");
     let as_of = as_of();
@@ -378,6 +487,9 @@ criterion_group!(
     benches,
     bench_term_loan_pv,
     bench_revolving_credit_pv,
+    bench_term_loan_discount_margin,
+    bench_term_loan_tree,
+    bench_revolving_credit_mc,
     bench_agency_mbs_pv,
     bench_fi_trs_pv,
     bench_cmo_waterfall_pv,

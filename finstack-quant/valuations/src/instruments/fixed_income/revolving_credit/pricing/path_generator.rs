@@ -328,20 +328,79 @@ pub fn generate_three_factor_paths(
     // rejects the combination, and this guard covers direct callers.
     let use_antithetic = stoch_spec.antithetic && !use_sobol;
 
-    // Reusable scratch buffer (used by the serial Sobol path; the parallel
-    // Philox path allocates per-thread inside the rayon closure).
-    let mut work = vec![0.0; disc.work_size(&process)];
+    let work_size = disc.work_size(&process);
+
+    // Simulate one path from its flat `num_steps × num_factors` normal draws
+    // (step-major), negated when `sign` is -1 for the antithetic partner.
+    // Shared by the Sobol and Philox generators so both evolve identically.
+    let simulate_path = |z_path: &[f64], sign: f64, z_step: &mut [f64], work: &mut [f64]| {
+        let mut state = initial_state.to_vec();
+        // Only record states at observation dates, not intermediate steps.
+        let mut utilization_path = Vec::with_capacity(num_payment_dates);
+        let mut short_rate_path = Vec::with_capacity(num_payment_dates);
+        let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
+
+        // Record the t₀ state for every payment date at/before as_of (at
+        // least the first). Pre-anchor observations record the t₀ state,
+        // capped at the anchor's availability, not a commitment-date-era one.
+        for _ in 0..num_initial {
+            let idx = utilization_path.len();
+            state[0] = state[0].clamp(0.0, 1.0).min(caps[num_initial - 1]);
+            utilization_path.push(state[0]);
+            short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
+            credit_spread_path.push(state[2].max(0.0));
+        }
+
+        let mut next_payment_idx = 1;
+        for i in 0..num_steps {
+            let t = times_ref[i];
+            let dt = times_ref[i + 1] - t;
+            for (dst, src) in z_step
+                .iter_mut()
+                .zip(&z_path[i * num_factors..(i + 1) * num_factors])
+            {
+                *dst = sign * src;
+            }
+            // Zero utilization vol freezes ONLY the utilization factor;
+            // rate and credit-spread dynamics keep stepping.
+            let u_frozen = state[0];
+            disc.step(&process, t, dt, &mut state, z_step, work);
+            if is_zero_vol {
+                state[0] = u_frozen;
+            }
+
+            if next_payment_idx < refined.payment_indices.len()
+                && i + 1 == refined.payment_indices[next_payment_idx]
+                && utilization_path.len() < num_payment_dates
+            {
+                let idx = utilization_path.len();
+                state[0] = state[0].clamp(0.0, 1.0).min(caps[idx]);
+                utilization_path.push(state[0]);
+                short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
+                credit_spread_path.push(state[2].max(0.0));
+                next_payment_idx += 1;
+            }
+        }
+
+        ThreeFactorPathData {
+            utilization_path,
+            short_rate_path,
+            credit_spread_path,
+            time_points: raw_time_points.clone(),
+            payment_dates: payment_dates.to_vec(),
+            stochastic_rates,
+        }
+    };
 
     if use_sobol {
         // One Sobol point per PATH: each path consumes a
         // `num_steps × num_factors`-dimensional coordinate, per the Sobol
         // dimension contract (see `monte_carlo::rng::sobol`). Drawing a
-        // 3-dimensional point per time step (the previous behavior) feeds
-        // van-der-Corput anti-correlated consecutive coordinates into
-        // successive time steps — statistically invalid path dynamics, not
-        // just reduced efficiency. Schedules whose refined grid exceeds the
-        // supported Sobol dimension are rejected; use pseudorandom paths
-        // (`use_sobol_qmc = false`) instead.
+        // 3-dimensional point per time step feeds van-der-Corput
+        // anti-correlated consecutive coordinates into successive time steps
+        // — statistically invalid path dynamics. Schedules whose refined grid
+        // exceeds the supported Sobol dimension are rejected; use
+        // pseudorandom paths (`use_sobol_qmc = false`) instead.
         let sobol_dim = num_steps.saturating_mul(num_factors);
         let mut rng = SobolRng::try_new(sobol_dim, seed).map_err(|err| {
             finstack_quant_core::Error::Validation(format!(
@@ -351,85 +410,18 @@ pub fn generate_three_factor_paths(
             ))
         })?;
         let mut z_path = vec![0.0; sobol_dim];
-
-        for _path_idx in 0..num_paths {
-            // Draw the full path's coordinate vector up front.
+        let mut z_step = vec![0.0; num_factors];
+        let mut work = vec![0.0; work_size];
+        for _ in 0..num_paths {
             rng.fill_std_normals(&mut z_path);
-            let mut state = initial_state.to_vec();
-            // Only record states at payment dates, not at intermediate simulation steps
-            let mut utilization_path = Vec::with_capacity(num_payment_dates);
-            let mut short_rate_path = Vec::with_capacity(num_payment_dates);
-            let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
-
-            // Record the t₀ state for every payment date at/before as_of
-            // (at least the first).
-            for _ in 0..num_initial {
-                let idx = utilization_path.len();
-                // Pre-anchor observations record the t₀ state; cap it at the
-                // anchor's availability, not a commitment-date-era one.
-                state[0] = state[0].clamp(0.0, 1.0).min(caps[num_initial - 1]);
-                utilization_path.push(state[0]);
-                short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
-                credit_spread_path.push(state[2].max(0.0));
-            }
-
-            // Track which simulation anchor we're recording next
-            let mut next_payment_idx = 1;
-
-            // Evolve through time on the refined grid
-            for i in 0..num_steps {
-                let t_next = times_ref[i + 1];
-
-                {
-                    let t = times_ref[i];
-                    let dt = t_next - t;
-
-                    // Slice this step's factors out of the path's Sobol point
-                    let z = &z_path[i * num_factors..(i + 1) * num_factors];
-
-                    // Apply discretization scheme to evolve state. Zero
-                    // utilization vol freezes ONLY the utilization factor —
-                    // rate and credit-spread dynamics must keep stepping
-                    // (the previous behavior froze all three factors).
-                    let u_frozen = state[0];
-                    disc.step(&process, t, dt, &mut state, z, &mut work);
-                    if is_zero_vol {
-                        state[0] = u_frozen;
-                    }
-                }
-
-                // Only record state at observation dates (not intermediate steps)
-                if next_payment_idx < refined.payment_indices.len()
-                    && i + 1 == refined.payment_indices[next_payment_idx]
-                    && utilization_path.len() < num_payment_dates
-                {
-                    let idx = utilization_path.len();
-                    state[0] = state[0].clamp(0.0, 1.0).min(caps[idx]);
-                    utilization_path.push(state[0]);
-                    short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
-                    credit_spread_path.push(state[2].max(0.0));
-                    next_payment_idx += 1;
-                }
-            }
-
-            paths.push(ThreeFactorPathData {
-                utilization_path,
-                short_rate_path,
-                credit_spread_path,
-                time_points: raw_time_points.clone(),
-                payment_dates: payment_dates.to_vec(),
-                stochastic_rates,
-            });
+            paths.push(simulate_path(&z_path, 1.0, &mut z_step, &mut work));
         }
     } else {
-        // Parallel Philox path generation.
-        //
-        // Each iteration runs in its own rayon task with a unique Philox substream
-        // (`stream_id = iter_idx`), keeping results bit-identical across thread
-        // counts: substreams are deterministic and independent, so the path at
-        // index `i` does not depend on which thread generates it. Iterations are
-        // independent and CPU-bound; on multi-core machines this is the dominant
-        // wall-time win for the entire pricer.
+        // Parallel Philox path generation. Each iteration draws from its own
+        // Philox substream (`stream_id = iter_idx`), so the path at index `i`
+        // does not depend on which thread generates it and results are
+        // bit-identical across thread counts. An antithetic iteration yields
+        // the path and its negated partner.
         let paths_per_iteration = if use_antithetic { 2 } else { 1 };
         let num_iterations = if use_antithetic {
             num_paths.div_ceil(2)
@@ -437,99 +429,20 @@ pub fn generate_three_factor_paths(
             num_paths
         };
 
-        // Shared read-only handles (cheap to capture in parallel closure).
-        let work_size = disc.work_size(&process);
-        let raw_time_points_ref = &raw_time_points;
-        let payment_dates_ref = payment_dates;
-        let payment_indices_ref = &refined.payment_indices;
-
         let generate_iteration = |iter_idx: usize| {
-            // Each iteration has its own RNG substream and its own
-            // per-thread scratch buffers. PhiloxRng is counter-based, so
-            // (seed, stream_id) uniquely seeds an independent substream.
             let mut rng = PhiloxRng::with_stream(seed, iter_idx as u64);
-            let mut z = vec![0.0; num_factors];
-            let mut z_neg = if use_antithetic {
-                vec![0.0; num_factors]
-            } else {
-                Vec::new()
-            };
+            // Step-major, one factor block per step: the same draw order as
+            // filling one `num_factors` block per step.
+            let mut z_path = vec![0.0; num_steps * num_factors];
+            for block in z_path.chunks_mut(num_factors.max(1)) {
+                rng.fill_std_normals(block);
+            }
+            let mut z_step = vec![0.0; num_factors];
             let mut work = vec![0.0; work_size];
-
-            // Generate random variates for this iteration on the refined grid.
-            let mut z_sequences: Vec<Vec<f64>> = Vec::with_capacity(num_steps);
-            for _ in 0..num_steps {
-                rng.fill_std_normals(&mut z);
-                z_sequences.push(z.clone());
-            }
-
-            let mut local_paths = Vec::with_capacity(paths_per_iteration);
-            for sign_idx in 0..paths_per_iteration {
-                let mut state = initial_state.to_vec();
-                let mut utilization_path = Vec::with_capacity(num_payment_dates);
-                let mut short_rate_path = Vec::with_capacity(num_payment_dates);
-                let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
-
-                // Record the t₀ state for every payment date at/before
-                // as_of (at least the first).
-                for _ in 0..num_initial {
-                    let idx = utilization_path.len();
-                    // Pre-anchor observations record the t₀ state; cap it at the
-                    // anchor's availability, not a commitment-date-era one.
-                    state[0] = state[0].clamp(0.0, 1.0).min(caps[num_initial - 1]);
-                    utilization_path.push(state[0]);
-                    short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
-                    credit_spread_path.push(state[2].max(0.0));
-                }
-
-                let mut next_payment_idx = 1;
-
-                for (i, z_seq) in z_sequences.iter().enumerate().take(num_steps) {
-                    let t_next = times_ref[i + 1];
-
-                    {
-                        let t = times_ref[i];
-                        let dt = t_next - t;
-
-                        // Zero utilization vol freezes ONLY the
-                        // utilization factor; rate/spread keep stepping.
-                        let u_frozen = state[0];
-                        if sign_idx == 0 {
-                            disc.step(&process, t, dt, &mut state, z_seq, &mut work);
-                        } else {
-                            for (j, val) in z_seq.iter().enumerate() {
-                                z_neg[j] = -val;
-                            }
-                            disc.step(&process, t, dt, &mut state, &z_neg, &mut work);
-                        }
-                        if is_zero_vol {
-                            state[0] = u_frozen;
-                        }
-                    }
-
-                    if next_payment_idx < payment_indices_ref.len()
-                        && i + 1 == payment_indices_ref[next_payment_idx]
-                        && utilization_path.len() < num_payment_dates
-                    {
-                        let idx = utilization_path.len();
-                        state[0] = state[0].clamp(0.0, 1.0).min(caps[idx]);
-                        utilization_path.push(state[0]);
-                        short_rate_path.push(obs_rates.map_or(state[1], |rates| rates[idx]));
-                        credit_spread_path.push(state[2].max(0.0));
-                        next_payment_idx += 1;
-                    }
-                }
-
-                local_paths.push(ThreeFactorPathData {
-                    utilization_path,
-                    short_rate_path,
-                    credit_spread_path,
-                    time_points: raw_time_points_ref.clone(),
-                    payment_dates: payment_dates_ref.to_vec(),
-                    stochastic_rates,
-                });
-            }
-            local_paths
+            [1.0, -1.0][..paths_per_iteration]
+                .iter()
+                .map(|&sign| simulate_path(&z_path, sign, &mut z_step, &mut work))
+                .collect::<Vec<_>>()
         };
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -545,23 +458,11 @@ pub fn generate_three_factor_paths(
         let chunked: Vec<Vec<ThreeFactorPathData>> =
             (0..num_iterations).map(generate_iteration).collect();
 
-        // Flatten — iteration order is preserved by `collect()` so paths are
-        // in the same order as the original serial loop (modulo the antithetic
-        // pairing within an iteration).
-        for iter_paths in chunked {
-            for p in iter_paths {
-                if paths.len() >= num_paths {
-                    break;
-                }
-                paths.push(p);
-            }
-            if paths.len() >= num_paths {
-                break;
-            }
-        }
+        // Iteration order is preserved by `collect()`, so paths keep the
+        // serial order with each antithetic pair adjacent.
+        paths.extend(chunked.into_iter().flatten().take(num_paths));
     }
 
-    let _ = work; // suppress unused-mut warning for the Sobol-only scratch buffer
     Ok(paths)
 }
 

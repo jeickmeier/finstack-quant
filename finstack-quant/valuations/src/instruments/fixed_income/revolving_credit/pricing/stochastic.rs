@@ -42,21 +42,11 @@ fn path_estimate(values: &[f64], antithetic: bool) -> Estimate {
     } else {
         values.to_vec()
     };
-    let n = samples.len() as f64;
-    let mean = if samples.is_empty() {
-        0.0
-    } else {
-        samples.iter().sum::<f64>() / n
-    };
-    let variance = if samples.len() > 1 {
-        samples.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)
-    } else {
-        0.0
-    };
+    let (mean, variance) = finstack_quant_core::math::stats::mean_var(&samples);
     let stderr = if samples.is_empty() {
         0.0
     } else {
-        (variance / n).sqrt()
+        (variance / samples.len() as f64).sqrt()
     };
     let z_95 = 1.96;
     Estimate::new(
@@ -276,7 +266,7 @@ impl RevolvingCreditPricer {
         // to the serial implementation.
         let price_path = |path_data| {
             let schedule = engine.generate_stochastic_path(path_data)?;
-            Self::price_single_path(facility, market, as_of, &schedule)
+            Self::price_single_path(facility, market, as_of, schedule)
         };
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -314,7 +304,7 @@ impl RevolvingCreditPricer {
         let draw_option_cost =
             MoneyEstimate::from_estimate(path_estimate(&costs, use_antithetic), currency)?;
 
-        let result = EnhancedMonteCarloResult {
+        Ok(EnhancedMonteCarloResult {
             mc_result: MonteCarloResult {
                 estimate,
                 paths: None,
@@ -322,12 +312,6 @@ impl RevolvingCreditPricer {
             },
             path_results,
             draw_option_cost,
-        };
-
-        // Touch exported details so they are live under `-D dead-code`.
-        let _ = result.mc_result.estimate.num_paths;
-        let _ = result.path_results.len();
-
-        Ok(result)
+        })
     }
 }

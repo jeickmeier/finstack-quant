@@ -60,12 +60,12 @@ impl RevolvingCreditPricer {
     /// * `market` - Curves and optional hazard used for discounting and survival.
     /// * `as_of` - Valuation date; survival is conditioned on this date.
     /// * `path_schedule` - Contractual or path-generated cashflows plus optional
-    ///   3-factor path data.
+    ///   3-factor path data, moved into the returned [`PathResult`].
     pub fn price_single_path(
         facility: &RevolvingCredit,
         market: &MarketContext,
         as_of: Date,
-        path_schedule: &PathAwareCashflowSchedule,
+        path_schedule: PathAwareCashflowSchedule,
     ) -> Result<PathResult> {
         let disc_curve = market.get_discount(&facility.discount_curve_id)?;
 
@@ -211,7 +211,7 @@ impl RevolvingCreditPricer {
         // per unit. With `leq = 0` this is the plain recovery leg.
         let lc_leq = facility.lc.as_ref().map_or(0.0, |lc| lc.leq);
         if facility.recovery_rate > 0.0 || facility.leq > 0.0 || lc_leq > 0.0 {
-            let future_grid = Self::build_recovery_grid(facility, as_of, path_schedule)?;
+            let future_grid = Self::build_recovery_grid(facility, as_of, &path_schedule)?;
 
             if !future_grid.is_empty() {
                 let survival_at_grid = if let Some(ref path_data) = path_schedule.path_data {
@@ -231,7 +231,7 @@ impl RevolvingCreditPricer {
                 };
 
                 let exposure_at_grid =
-                    Self::exposure_at_grid(facility, as_of, &future_grid, path_schedule)?;
+                    Self::exposure_at_grid(facility, as_of, &future_grid, &path_schedule)?;
 
                 // Same source as `sp_as_of` above: integration starts at the
                 // valuation date with S(as_of).
@@ -290,19 +290,12 @@ impl RevolvingCreditPricer {
             _ => 0.0,
         };
 
-        let result = PathResult {
+        Ok(PathResult {
             pv: Money::new(total_pv, facility.commitment_amount.currency())?,
-            path_data: path_schedule.path_data.clone(),
-            cashflows: path_schedule.schedule.clone(),
+            path_data: path_schedule.path_data,
+            cashflows: path_schedule.schedule,
             draw_option_cost: Money::new(draw_option_cost, facility.commitment_amount.currency())?,
-        };
-
-        // Keep optional payloads live under `-D dead-code`:
-        // callers expect to inspect cashflows and paths, and we also touch them here.
-        let _ = result.cashflows.get_flows().len();
-        let _ = result.path_data.is_some();
-
-        Ok(result)
+        })
     }
 
     /// Option cost of the path's draws.
@@ -398,7 +391,7 @@ impl RevolvingCreditPricer {
         let fixings = resolve_fixings(facility, market);
         let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
         let schedule = engine.generate_deterministic()?;
-        let result = Self::price_single_path(facility, market, as_of, &schedule)?;
+        let result = Self::price_single_path(facility, market, as_of, schedule)?;
         Ok(result.pv)
     }
 

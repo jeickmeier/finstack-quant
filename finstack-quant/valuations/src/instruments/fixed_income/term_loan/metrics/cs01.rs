@@ -25,7 +25,8 @@ impl ZSpreadCs01 for TermLoan {
         // Quote-space flows: a settlement-date buyer's flows, matching the
         // settlement-date dirty quote the spread is solved against (same
         // PIK filter and seasoned-fixing handling as the pricer).
-        let (settlement, flows) = TermLoanDiscountingPricer::pricing_flows(self, curves, as_of)?;
+        let schedule = TermLoanDiscountingPricer::pricing_schedule(self, curves, as_of)?;
+        let (settlement, flows) = TermLoanDiscountingPricer::pricing_flows(self, &schedule, as_of)?;
 
         // Compounding frequency for the z-spread shift = coupon payments/year,
         // mirroring the bond z-spread convention.
