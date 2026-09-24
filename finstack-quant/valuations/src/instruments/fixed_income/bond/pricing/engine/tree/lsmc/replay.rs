@@ -970,12 +970,12 @@ impl ReplayTemplate {
 
     pub(super) fn replay(
         &self,
-        _tree: &RatesCreditTree,
         bond: &Bond,
         path: &[RatesCreditPathState],
         config: &BondLsmcConfig,
         exercise_provider: Option<&dyn BondLsmcExerciseProvider>,
         make_whole_policies: Option<&[RegressionPolicy]>,
+        buffers: &mut ReplayBuffers,
     ) -> Result<PathRecord> {
         if path.len() != self.times.len() {
             return Err(Error::Validation(format!(
@@ -986,8 +986,14 @@ impl ReplayTemplate {
         }
         let oas = config.oas_bp / 10_000.0;
         let mut cursor = ReplayCursor::new(self)?;
-        let mut step_cash = vec![0.0; self.times.len()];
-        let mut outstanding_after_events = vec![0.0; self.times.len()];
+        let ReplayBuffers {
+            step_cash,
+            outstanding_after_events,
+        } = buffers;
+        step_cash.clear();
+        step_cash.resize(self.times.len(), 0.0);
+        outstanding_after_events.clear();
+        outstanding_after_events.resize(self.times.len(), 0.0);
         let mut snapshots = Vec::with_capacity(self.decision_steps.len());
         let mut next_decision = 0_usize;
 

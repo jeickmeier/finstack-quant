@@ -293,7 +293,6 @@ pub(crate) fn price_bond_lsmc(
 
     let pricing_estimators = config.paths;
     let pricing_simulated_paths = simulated_path_count(pricing_estimators, config.antithetic)?;
-    let mut sampled = Vec::new();
     let needs_training = template.exercise.iter().any(|entries| !entries.is_empty());
     let training_estimators = usize::from(needs_training) * config.paths;
     let training_simulated_paths = if needs_training {
@@ -333,37 +332,63 @@ pub(crate) fn price_bond_lsmc(
         vec![None; template.decision_steps.len()]
     };
 
-    let mut stats = OnlineStats::new();
-    for path_index in 0..pricing_estimators {
-        tree.sample_path_into(pricing_seed, path_index as u64, false, &mut sampled)?;
+    // Pricing estimators are independent: each draws its own factor path
+    // stream. They run in parallel and are folded into the statistics in
+    // path order, so the estimate is bit-identical to a serial run.
+    let make_whole_policies = make_whole_policies.as_slice();
+    let policies = policies.as_slice();
+    let template = &template;
+    let price_estimator = |(sampled, buffers): &mut (Vec<RatesCreditPathState>, ReplayBuffers),
+                           path_index: usize|
+     -> Result<f64> {
+        tree.sample_path_into(pricing_seed, path_index as u64, false, sampled)?;
         let primary = value_with_policy(
             &template.replay(
-                tree,
                 bond,
-                &sampled,
+                sampled,
                 config,
                 exercise_provider,
-                Some(&make_whole_policies),
+                Some(make_whole_policies),
+                buffers,
             )?,
-            &policies,
+            policies,
         )?;
-        if config.antithetic {
-            tree.sample_path_into(pricing_seed, path_index as u64, true, &mut sampled)?;
-            let antithetic = value_with_policy(
-                &template.replay(
-                    tree,
-                    bond,
-                    &sampled,
-                    config,
-                    exercise_provider,
-                    Some(&make_whole_policies),
-                )?,
-                &policies,
-            )?;
-            stats.update(0.5 * (primary + antithetic));
-        } else {
-            stats.update(primary);
+        if !config.antithetic {
+            return Ok(primary);
         }
+        tree.sample_path_into(pricing_seed, path_index as u64, true, sampled)?;
+        let antithetic = value_with_policy(
+            &template.replay(
+                bond,
+                sampled,
+                config,
+                exercise_provider,
+                Some(make_whole_policies),
+                buffers,
+            )?,
+            policies,
+        )?;
+        Ok(0.5 * (primary + antithetic))
+    };
+    let init_buffers = || (Vec::new(), ReplayBuffers::default());
+    #[cfg(not(target_arch = "wasm32"))]
+    let estimators: Vec<Result<f64>> = {
+        use rayon::prelude::*;
+        (0..pricing_estimators)
+            .into_par_iter()
+            .map_init(init_buffers, price_estimator)
+            .collect()
+    };
+    #[cfg(target_arch = "wasm32")]
+    let estimators: Vec<Result<f64>> = {
+        let mut buffers = init_buffers();
+        (0..pricing_estimators)
+            .map(|path_index| price_estimator(&mut buffers, path_index))
+            .collect()
+    };
+    let mut stats = OnlineStats::new();
+    for estimator in estimators {
+        stats.update(estimator?);
     }
 
     if let Some(target) = config.target_ci_half_width {

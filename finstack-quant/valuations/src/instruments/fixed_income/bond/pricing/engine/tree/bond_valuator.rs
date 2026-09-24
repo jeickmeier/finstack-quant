@@ -638,6 +638,11 @@ impl BondValuator {
             let accrual_index =
                 crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &accrual_cfg)?;
             for call in &call_put.calls {
+                let make_whole_reference = call
+                    .make_whole
+                    .as_ref()
+                    .map(|spec| market_context.get_discount(&spec.reference_curve_id))
+                    .transpose()?;
                 for exercise_date in
                     Self::right_exercise_dates(call, as_of, bond.maturity, &event_dates)
                 {
@@ -650,9 +655,9 @@ impl BondValuator {
                     let outstanding = exercise_outstanding(exercise_date);
                     let floor_price = outstanding * (call.price_pct_of_par / 100.0);
                     let accrued_on_call = accrual_index.accrued_at(exercise_date)?;
-                    let clean_call_price = if let Some(spec) = &call.make_whole {
-                        let reference_curve =
-                            market_context.get_discount(&spec.reference_curve_id)?;
+                    let clean_call_price = if let (Some(spec), Some(reference_curve)) =
+                        (&call.make_whole, &make_whole_reference)
+                    {
                         Self::make_whole_call_price(
                             spec,
                             reference_curve.as_ref(),

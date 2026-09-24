@@ -469,3 +469,32 @@ fn test_accrued_interest_via_quote_context() {
         "Accrued mid-period should be positive"
     );
 }
+#[test]
+fn bdt_tree_accepts_more_than_one_thousand_steps() {
+    // The BDT step-alignment search used `clamp(tree_steps, 1000)`, which
+    // panics (min > max) once tree_steps exceeds 1000.
+    let mut bond = create_test_bond();
+    bond.call_put = Some(CallPutSchedule {
+        calls: vec![CallPut {
+            start_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+            end_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        }],
+        puts: Vec::new(),
+    });
+    bond.instrument_pricing_overrides = InstrumentPricingOverrides::default();
+    bond.instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.20);
+    bond.instrument_pricing_overrides.model_config.vol_model =
+        Some(crate::instruments::common_impl::parameters::VolatilityModel::Black);
+    let mut config = super::bond_tree_config(&bond).expect("config");
+    config.tree_steps = 1200;
+    let market = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let price = TreePricer::with_config(config)
+        .price_at_oas(&bond, &market, as_of, 0.0)
+        .expect("1,200-step BDT price");
+    assert!(price.is_finite() && price > 0.0);
+}

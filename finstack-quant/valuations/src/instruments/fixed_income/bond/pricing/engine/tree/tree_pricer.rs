@@ -297,8 +297,14 @@ impl TreePricer {
             return self.config.tree_steps;
         }
 
-        let max_steps =
-            (self.config.tree_steps.saturating_mul(4)).clamp(self.config.tree_steps, 1000);
+        // Search up to 4x the configured steps, capped at 1,000 but never
+        // below the configured count.
+        let max_steps = self
+            .config
+            .tree_steps
+            .saturating_mul(4)
+            .min(1000)
+            .max(self.config.tree_steps);
         (self.config.tree_steps..=max_steps)
             .min_by(|a, b| {
                 let score = |steps: usize| {

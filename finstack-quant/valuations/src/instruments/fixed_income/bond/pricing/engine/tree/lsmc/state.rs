@@ -249,6 +249,14 @@ impl MakeWholeBasis {
     }
 }
 
+/// Per-path scratch arrays of [`ReplayTemplate::replay`], reused across the
+/// paths one worker prices.
+#[derive(Debug, Default)]
+pub(super) struct ReplayBuffers {
+    pub(super) step_cash: Vec<f64>,
+    pub(super) outstanding_after_events: Vec<f64>,
+}
+
 #[derive(Clone)]
 pub(super) struct ReplayTemplate {
     pub(super) times: Vec<f64>,

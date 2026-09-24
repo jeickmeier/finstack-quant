@@ -397,7 +397,14 @@ fn issue_date_initial_exchange_does_not_double_replay_outstanding() {
     tree.sample_path_into(1, 0, false, &mut path)
         .expect("factor path");
     let replay = template
-        .replay(&tree, &bond, &path, &config, None, None)
+        .replay(
+            &bond,
+            &path,
+            &config,
+            None,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("product replay");
     assert_eq!(replay.snapshots[0].features[2], 100.0);
 }
@@ -599,10 +606,24 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
     tree.sample_path_into(41, 0, false, &mut sampled)
         .expect("factor path");
     let capped_path = capped_template
-        .replay(&tree, &capped, &sampled, &config, None, None)
+        .replay(
+            &capped,
+            &sampled,
+            &config,
+            None,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("capped overnight replay");
     let uncapped_path = uncapped_template
-        .replay(&tree, &uncapped, &sampled, &config, None, None)
+        .replay(
+            &uncapped,
+            &sampled,
+            &config,
+            None,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("uncapped overnight replay");
     assert!(
         capped_path
@@ -632,7 +653,14 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
     let callable_template =
         ReplayTemplate::new(&tree, &callable, &market, as_of).expect("callable template");
     let callable_path = callable_template
-        .replay(&tree, &callable, &sampled, &config, None, None)
+        .replay(
+            &callable,
+            &sampled,
+            &config,
+            None,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("callable overnight replay");
     let exercise_step =
         exact_grid_step(tree.time_grid().expect("times"), as_of, exercise).expect("exercise step");
@@ -863,7 +891,14 @@ fn two_time_blocks_match_full_replay_at_cash_amortization_exercise_boundary() {
     tree.sample_path_into(seed, 0, false, &mut full_path)
         .expect("full factor path");
     let full = template
-        .replay(&tree, &bond, &full_path, &config, None, None)
+        .replay(
+            &bond,
+            &full_path,
+            &config,
+            None,
+            None,
+            &mut ReplayBuffers::default(),
+        )
         .expect("full product replay");
 
     let initial_cursor = ReplayCursor::new(&template).expect("initial cursor");
