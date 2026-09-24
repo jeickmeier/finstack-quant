@@ -7,14 +7,85 @@ use super::AgencyTba;
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::{
     pricer::{price_mbs, quote_basis_pool},
-    AgencyMbsPassthrough, PoolType,
+    AgencyMbsPassthrough, AgencyProgram, PoolType,
 };
-use crate::instruments::fixed_income::tba::allocation::assumed_pool_assumptions;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
+use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::Result;
+use finstack_quant_core::{Error, Result};
+use serde::Deserialize;
+
+/// Schema tag the embedded TBA assumptions file must carry.
+const TBA_ASSUMPTIONS_SCHEMA: &str = "finstack_quant.tba_assumptions/1";
+
+static TBA_DEFAULTS: EmbeddedJsonRegistry<TbaAssumptions> = EmbeddedJsonRegistry::new(
+    include_str!("../../../../data/assumptions/tba_assumptions.v1.json"),
+    None,
+    "TBA assumptions",
+);
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TbaAssumptions {
+    schema: String,
+    version: u32,
+    assumed_pool: AssumedPoolAssumptions,
+}
+
+/// Generic-pool assumptions used when a TBA carries no explicit delivered pool.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AssumedPoolAssumptions {
+    pub(crate) default_pool_factor: f64,
+    pub(crate) servicing_fee_rate: f64,
+    pub(crate) agency_guarantee_fee_rate: f64,
+    pub(crate) gnma_guarantee_fee_rate: f64,
+    pub(crate) psa_multiplier: f64,
+}
+
+/// Load and validate the embedded generic-pool assumptions.
+pub(crate) fn assumed_pool_assumptions() -> Result<AssumedPoolAssumptions> {
+    TBA_DEFAULTS
+        .load(|defaults| {
+            if defaults.schema != TBA_ASSUMPTIONS_SCHEMA || defaults.version != 1 {
+                return Err(Error::Validation(format!(
+                    "TBA assumptions must be {TBA_ASSUMPTIONS_SCHEMA} version 1, got {} version {}",
+                    defaults.schema, defaults.version
+                )));
+            }
+            let assumed = defaults.assumed_pool;
+            for (label, value) in [
+                ("default_pool_factor", assumed.default_pool_factor),
+                ("servicing_fee_rate", assumed.servicing_fee_rate),
+                (
+                    "agency_guarantee_fee_rate",
+                    assumed.agency_guarantee_fee_rate,
+                ),
+                ("gnma_guarantee_fee_rate", assumed.gnma_guarantee_fee_rate),
+                ("psa_multiplier", assumed.psa_multiplier),
+            ] {
+                if !(value.is_finite() && value > 0.0) {
+                    return Err(Error::Validation(format!(
+                        "tba.assumed_pool.{label} must be positive"
+                    )));
+                }
+            }
+            Ok(defaults)
+        })
+        .map(|defaults| defaults.assumed_pool)
+}
+
+/// Whether a pool issued under `pool` is good delivery into a TBA on `tba`.
+///
+/// Fannie Mae and Freddie Mac pools are both UMBS since the Single Security
+/// Initiative (June 2019) and deliver interchangeably; GNMA I and GNMA II
+/// trade as separate TBA programs.
+fn delivers_into(pool: AgencyProgram, tba: AgencyProgram) -> bool {
+    let umbs = |agency| matches!(agency, AgencyProgram::Fnma | AgencyProgram::Fhlmc);
+    pool == tba || (umbs(pool) && umbs(tba))
+}
 
 /// Create the generic assumed pool for TBA valuation.
 ///
@@ -91,6 +162,18 @@ pub(crate) fn resolve_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthrou
                 "TBA pool_factor must agree with the explicitly supplied pool".into(),
             ));
         }
+        if (pool.pass_through_rate - tba.coupon).abs() > 1e-12 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "TBA delivered pool pass-through coupon {} must equal the TBA coupon {}",
+                pool.pass_through_rate, tba.coupon
+            )));
+        }
+        if !delivers_into(pool.agency, tba.agency) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "TBA delivered pool agency {:?} is not good delivery into a {:?} TBA",
+                pool.agency, tba.agency
+            )));
+        }
         let settlement = tba.get_settlement_date()?;
         if pool.issue_date > settlement {
             return Err(finstack_quant_core::Error::Validation(
@@ -164,7 +247,6 @@ pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::mbs_passthrough::AgencyProgram;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use time::Month;
@@ -320,6 +402,49 @@ mod production_mortgage_audit {
         let resolved = resolve_assumed_pool(&tba).expect("pool");
         let flows = generate_cashflows(&resolved, settle, Some(1)).expect("flows");
         assert_eq!(flows[0].period_start, date!(2026 - 03 - 01));
+    }
+
+    #[test]
+    fn delivered_pool_must_carry_the_tba_coupon() {
+        let mut tba = AgencyTba::example().expect("tba");
+        let mut pool = create_assumed_pool(&tba).expect("pool");
+        // A 4.5% pool is not good delivery into a 4.0% TBA. The pool itself
+        // stays internally consistent (WAC = coupon + servicing + g-fee).
+        pool.pass_through_rate = tba.coupon + 0.005;
+        pool.wac += 0.005;
+        crate::instruments::Instrument::validate_invariants(&pool).expect("pool is valid");
+        tba.assumed_pool = Some(Box::new(pool));
+        let err = resolve_assumed_pool(&tba).expect_err("coupon mismatch must be rejected");
+        assert!(err.to_string().contains("coupon"), "{err}");
+    }
+
+    #[test]
+    fn delivered_pool_must_match_the_tba_agency_family() {
+        let mut tba = AgencyTba::example().expect("tba");
+        assert_eq!(tba.agency, AgencyProgram::Fnma);
+        let base = create_assumed_pool(&tba).expect("pool");
+
+        // GNMA II pool into a UMBS (FNMA) TBA: rejected.
+        let mut gnma = base.clone();
+        gnma.agency = AgencyProgram::GnmaII;
+        tba.assumed_pool = Some(Box::new(gnma));
+        let err = resolve_assumed_pool(&tba).expect_err("agency mismatch must be rejected");
+        assert!(err.to_string().contains("agency"), "{err}");
+
+        // GNMA I pool into a GNMA II TBA: separate TBA programs, rejected.
+        tba.agency = AgencyProgram::GnmaII;
+        let mut gnma_i = base.clone();
+        gnma_i.agency = AgencyProgram::GnmaI;
+        tba.assumed_pool = Some(Box::new(gnma_i));
+        assert!(resolve_assumed_pool(&tba).is_err());
+
+        // FHLMC UMBS pool into a FNMA UMBS TBA: fungible since the Single
+        // Security Initiative, accepted.
+        tba.agency = AgencyProgram::Fnma;
+        let mut fhlmc = base;
+        fhlmc.agency = AgencyProgram::Fhlmc;
+        tba.assumed_pool = Some(Box::new(fhlmc));
+        resolve_assumed_pool(&tba).expect("UMBS pools are interchangeable");
     }
 
     #[test]

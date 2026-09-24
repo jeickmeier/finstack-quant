@@ -95,11 +95,6 @@ impl PacSchedule {
         }
     }
 
-    /// Check if current prepayment is within collar.
-    pub fn is_within_collar(&self, actual_psa: f64) -> bool {
-        actual_psa >= self.collar.lower_psa && actual_psa <= self.collar.upper_psa
-    }
-
     /// Get scheduled payment for a period.
     pub fn scheduled_at(&self, period: usize) -> f64 {
         self.scheduled_payments.get(period).cloned().unwrap_or(0.0)
@@ -197,7 +192,7 @@ pub fn allocate_pac_support(
 
     // Note: the allocation rule is the same in every collar regime — the
     // PSA-speed effect is already embedded in the size of the collateral
-    // principal stream. Collar diagnostics live in `is_within_collar`.
+    // principal stream.
     (pac_alloc, support_alloc)
 }
 
@@ -215,24 +210,6 @@ mod tests {
         assert!(schedule.total_scheduled() > 0.0);
         // Carved PAC schedule cannot exceed the PAC balance.
         assert!(schedule.total_scheduled() <= 60_000.0 + 1e-6);
-    }
-
-    #[test]
-    fn test_within_collar() {
-        let schedule =
-            PacSchedule::generate(100_000.0, 100_000.0, 360, 0.045, 0, PacCollar::standard());
-
-        // 100% PSA is within 100-300 collar
-        assert!(schedule.is_within_collar(1.0));
-
-        // 200% PSA is within collar
-        assert!(schedule.is_within_collar(2.0));
-
-        // 50% PSA is below collar
-        assert!(!schedule.is_within_collar(0.5));
-
-        // 400% PSA is above collar
-        assert!(!schedule.is_within_collar(4.0));
     }
 
     #[test]
