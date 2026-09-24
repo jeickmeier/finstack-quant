@@ -30693,7 +30693,7 @@ export default [
   {
     "path": "#/$defs/StructuredCredit/properties/waterfall_rules",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/waterfall_rules",
-    "description": "Declarative waterfall rules (available-funds caps, etc.) layered onto the\nbase waterfall by `resolve_waterfall`. `None` reproduces the base\nwaterfall exactly."
+    "description": "Declarative waterfall rules (available-funds caps, etc.) layered onto the\nbase waterfall each period by the simulation engine. `None` reproduces the base\nwaterfall exactly."
   },
   {
     "path": "#/$defs/StructuredCredit/properties/waterfall_rules/anyOf/0",
@@ -31639,14 +31639,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/Tranche/properties/behavior_type",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Tranche/properties/behavior_type",
-    "default": "standard",
-    "description": "Behavioral classification for specialized handling",
-    "ref": "#/$defs/TrancheBehaviorType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheBehaviorType"
-  },
-  {
     "path": "#/$defs/Tranche/properties/coupon",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Tranche/properties/coupon",
     "description": "Interest specification",
@@ -31744,13 +31736,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/Tranche/properties/payment_priority",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Tranche/properties/payment_priority",
-    "description": "Payment priority (1 = most senior, paid first).\n\nOn a standalone `Tranche` this is a *provisional* value derived from\n`seniority` (see `Tranche::new`). It is **overwritten deterministically**\nby [`TrancheStructure::new`] (and by deserialization of a\n`TrancheStructure`), which ranks every tranche by structural seniority so\nthat multiple notes at one `TrancheSeniority` (e.g. Class A-1/A-2/A-3 all\n`Senior`) receive distinct, strictly-increasing priorities. Do not rely\non this field outside of an assembled `TrancheStructure`.",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/Tranche/properties/pik_enabled",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Tranche/properties/pik_enabled",
     "default": false,
@@ -31777,12 +31762,6 @@ export default [
     "description": "Tranche characteristics",
     "ref": "#/$defs/TrancheSeniority",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheSeniority"
-  },
-  {
-    "path": "#/$defs/TrancheBehaviorType",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheBehaviorType",
-    "const": "standard",
-    "description": "Tranche behavioral type used by the structured-credit waterfall."
   },
   {
     "path": "#/$defs/TrancheCoupon",
@@ -31906,13 +31885,6 @@ export default [
     "path": "#/$defs/TrancheStructure",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheStructure",
     "description": "Collection of tranches forming the capital structure"
-  },
-  {
-    "path": "#/$defs/TrancheStructure/properties/total_size",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheStructure/properties/total_size",
-    "description": "Total size of all tranches combined",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
     "path": "#/$defs/TrancheStructure/properties/tranches",
@@ -32560,7 +32532,7 @@ export default [
   {
     "path": "#/$defs/WaterfallRules",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/WaterfallRules",
-    "description": "Declarative, additively-applied waterfall rules layered onto a deal's base\nwaterfall.\n\nEach sub-spec is optional; when none are present the resolved waterfall is\nidentical to the base waterfall. Applied by\n[`crate::instruments::fixed_income::structured_credit::resolve_waterfall`]."
+    "description": "Declarative, additively-applied waterfall rules layered onto a deal's base\nwaterfall.\n\nEach sub-spec is optional; when none are present the resolved waterfall is\nidentical to the base waterfall. The simulation engine applies them to\neach period's copy of the waterfall."
   },
   {
     "path": "#/$defs/WaterfallRules/properties/afc",
@@ -35426,12 +35398,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/Tranche",
     "ref": "#/$defs/Tranche",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Tranche"
-  },
-  {
-    "path": "#/properties/TrancheBehaviorType",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/TrancheBehaviorType",
-    "ref": "#/$defs/TrancheBehaviorType",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TrancheBehaviorType"
   },
   {
     "path": "#/properties/TrancheCoupon",

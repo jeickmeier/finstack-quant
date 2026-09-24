@@ -450,6 +450,11 @@
     "schema": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json"
   },
   {
+    "kind": "statement-model",
+    "source": "finstack-quant/statements/tests/data/canonical/financial_model.json",
+    "schema": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json"
+  },
+  {
     "kind": "market-input",
     "source": "finstack-quant/valuations/tests/fixtures/production_cds_option.json",
     "pointer": "/market",

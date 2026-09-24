@@ -362,7 +362,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         generate_tranche_cashflows(&sc, "missing", &market, closing_date())
             .expect_err("invalid tranche cashflows")
             .to_string(),
-        sc.get_tranche_cashflows("missing", &market, closing_date())
+        generate_tranche_cashflows(&sc, "missing", &market, closing_date())
             .expect_err("invalid tranche helper")
             .to_string(),
         sc.value_tranche("missing", &market, closing_date())

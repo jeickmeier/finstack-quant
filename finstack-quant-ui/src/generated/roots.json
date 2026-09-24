@@ -408,5 +408,15 @@
     "uri": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
     "source": "finstack-quant/valuations/schemas/results/1/valuation_result.schema.json",
     "schema": "schemas/valuation_result.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/financial_model_spec.schema.json",
+    "schema": "schemas/financial_model_spec.json"
+  },
+  {
+    "uri": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
+    "source": "finstack-quant/statements/schemas/statements/1/statement_result.schema.json",
+    "schema": "schemas/statement_result.json"
   }
 ]

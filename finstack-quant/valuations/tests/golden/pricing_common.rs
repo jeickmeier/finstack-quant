@@ -6,6 +6,7 @@ use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{parse_boxed_instrument_from_json, price_instrument};
 use std::collections::BTreeMap;
@@ -397,9 +398,13 @@ mod tests {
         for tranche in &mut deal.tranches.tranches {
             tranche.coupon = TrancheCoupon::Fixed { rate: 0.0 };
         }
-        let flows = deal
-            .get_tranche_cashflows("SENIOR", &MarketContext::new(), date!(2026 - 04 - 30))
-            .expect("the only future collateral receipt is the outstanding default claim");
+        let flows = generate_tranche_cashflows(
+            &deal,
+            "SENIOR",
+            &MarketContext::new(),
+            date!(2026 - 04 - 30),
+        )
+        .expect("the only future collateral receipt is the outstanding default claim");
         let principal: Vec<_> = flows
             .principal_flows
             .iter()
@@ -459,9 +464,8 @@ mod tests {
             let mut npv = 0.0;
             let mut cs01 = 0.0;
             for tranche in &deal.tranches.tranches {
-                let flows = deal
-                    .get_tranche_cashflows(tranche.id.as_str(), &market, as_of)
-                    .unwrap();
+                let flows =
+                    generate_tranche_cashflows(&deal, tranche.id.as_str(), &market, as_of).unwrap();
                 for (date, amount) in flows.cashflows.iter().filter(|(date, _)| *date > as_of) {
                     let t = DayCount::Act365F
                         .year_fraction(as_of, *date, DayCountContext::default())

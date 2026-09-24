@@ -419,11 +419,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
     ),
     *_runtime_exception(
         "valuations",
-        "src/instruments/fixed_income/structured_credit/types/pool.rs",
-        ("ConcentrationCheckResult",),
-    ),
-    *_runtime_exception(
-        "valuations",
         "src/instruments/rates/cms_swap/types.rs",
         ("FundingLegSpec",),
         "runtime-spec",

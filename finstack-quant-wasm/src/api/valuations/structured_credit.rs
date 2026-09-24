@@ -9,9 +9,11 @@
 //! JS surface lives under `valuations.instruments`.
 
 use super::pricing::parse_market_json;
-use crate::utils::{to_js_err, to_js_value};
+use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    self as rust_structured_credit, StructuredCredit,
+    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
+    calculate_tranche_oas, scenario_table, OasConfig, ScenarioGrid, StructuredCredit,
 };
 use finstack_quant_valuations::instruments::InstrumentJson;
 use wasm_bindgen::prelude::*;
@@ -26,6 +28,15 @@ fn parse_structured_credit(instrument_json: &str) -> Result<StructuredCredit, Js
             other.type_tag()
         )))),
     }
+}
+
+/// Decode a JSON host argument into its typed Rust input.
+fn parse_json_arg<T: serde::de::DeserializeOwned>(json: &str, label: &str) -> Result<T, JsValue> {
+    serde_json::from_str(json).map_err(|e| {
+        to_js_err(finstack_quant_core::Error::Validation(format!(
+            "invalid {label} JSON: {e}"
+        )))
+    })
 }
 
 /// Z-spread-equivalent discount margin for a floating-rate tranche, returned in
@@ -52,10 +63,10 @@ pub fn structured_credit_tranche_discount_margin(
 ) -> Result<f64, JsValue> {
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
-    rust_structured_credit::structured_credit_tranche_discount_margin(
-        &deal, tranche_id, &market, as_of, target_pv,
-    )
-    .map_err(to_js_err)
+    let as_of = parse_iso_date(as_of)?;
+    let target_pv = Money::new(target_pv, deal.tranches.currency()).map_err(to_js_err)?;
+    calculate_tranche_discount_margin(&deal, tranche_id, &market, as_of, target_pv)
+        .map_err(to_js_err)
 }
 
 /// Break-even constant default rate (CDR, decimal) for a tranche — the highest
@@ -80,10 +91,8 @@ pub fn structured_credit_tranche_breakeven_cdr(
 ) -> Result<f64, JsValue> {
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
-    rust_structured_credit::structured_credit_tranche_breakeven_cdr(
-        &deal, tranche_id, &market, as_of,
-    )
-    .map_err(to_js_err)
+    let as_of = parse_iso_date(as_of)?;
+    calculate_tranche_breakeven_cdr(&deal, tranche_id, &market, as_of).map_err(to_js_err)
 }
 
 /// Option-adjusted spread for a tranche; returns a typed `OasResult` object.
@@ -123,15 +132,14 @@ pub fn structured_credit_tranche_oas(
 ) -> Result<JsValue, JsValue> {
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
-    let result = rust_structured_credit::structured_credit_tranche_oas(
-        &deal,
-        tranche_id,
-        market_price_pct,
-        &market,
-        as_of,
-        config_json.as_deref(),
-    )
-    .map_err(to_js_err)?;
+    let as_of = parse_iso_date(as_of)?;
+    let config: OasConfig = match config_json.as_deref() {
+        Some(json) => parse_json_arg(json, "OAS config")?,
+        None => OasConfig::default(),
+    };
+    let result =
+        calculate_tranche_oas(&deal, tranche_id, market_price_pct, &market, as_of, &config)
+            .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -167,10 +175,9 @@ pub fn structured_credit_tranche_scenario_table(
 ) -> Result<JsValue, JsValue> {
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
-    let result = rust_structured_credit::structured_credit_tranche_scenario_table(
-        &deal, tranche_id, &market, as_of, grid_json,
-    )
-    .map_err(to_js_err)?;
+    let as_of = parse_iso_date(as_of)?;
+    let grid: ScenarioGrid = parse_json_arg(grid_json, "scenario grid")?;
+    let result = scenario_table(&deal, tranche_id, &market, as_of, &grid).map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -209,14 +216,9 @@ pub fn structured_credit_tranche_metrics(
 ) -> Result<JsValue, JsValue> {
     let deal = parse_structured_credit(instrument_json)?;
     let market = parse_market_json(market_json)?;
-    let result = rust_structured_credit::structured_credit_tranche_metrics(
-        &deal,
-        tranche_id,
-        &market,
-        as_of,
-        market_price_pct,
-    )
-    .map_err(to_js_err)?;
+    let as_of = parse_iso_date(as_of)?;
+    let result = calculate_tranche_metrics(&deal, tranche_id, &market, as_of, market_price_pct)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 

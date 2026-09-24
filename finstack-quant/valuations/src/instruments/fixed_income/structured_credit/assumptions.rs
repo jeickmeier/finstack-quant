@@ -625,6 +625,14 @@ pub(crate) fn embedded_registry_or_panic() -> &'static StructuredCreditAssumptio
     embedded_registry().expect("embedded structured-credit assumptions are compile-time assets")
 }
 
+/// Unwrap a lookup into the embedded, compile-time-validated assumptions
+/// registry. The registry ships with the crate, so a missing entry is a
+/// packaging defect rather than a caller error.
+#[allow(clippy::expect_used)]
+pub(crate) fn required_assumption<T>(result: Result<T>) -> T {
+    result.expect("embedded structured-credit assumptions registry value should exist")
+}
+
 fn validate_registry(
     registry: StructuredCreditAssumptionRegistry,
 ) -> Result<StructuredCreditAssumptionRegistry> {

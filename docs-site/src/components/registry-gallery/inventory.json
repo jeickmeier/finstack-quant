@@ -643,6 +643,14 @@
       "type": "registry:lib"
     },
     {
+      "name": "contract-financial-model-spec",
+      "type": "registry:lib"
+    },
+    {
+      "name": "contract-statement-result",
+      "type": "registry:lib"
+    },
+    {
       "name": "instrument-catalogue",
       "type": "registry:lib"
     },
@@ -678,15 +686,15 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "8096797c6fc150fd5527cef658b5b228ab7fb971fee3d93610ad6d863bc8a761"
+      "sha256": "d647ed062e7b6f7ffa0646a52f2651e8c0a0d040fcd7cc1a1ded293413667482"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "0e4c865acb125a3933d792dea6373f553af62420c271d50491a1fe55a33db22e"
+      "sha256": "a7574fcb2f6073a11fd226a58a045f90e7243cee117040e654fd3f9b6b9d60f2"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "abf0690b10713cc5072a617d64c2e01e1deb0bad406ce116d81db79eeaed8ad3"
+      "sha256": "a1eb3595551d976b59c1a37a2163dee3ce40b5bad1fd90a03833c1a09a0c13a4"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

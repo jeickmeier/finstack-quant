@@ -1001,6 +1001,24 @@ export const importHarnesses = {
       name: "contract-valuation-result",
       modules: modules.length,
     })),
+  "contract-financial-model-spec": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/financial_model_spec.json"),
+      import("@/lib/finstack/generated/types/financial_model_spec"),
+      import("@/lib/finstack/generated/meta/financial_model_spec"),
+    ]).then((modules) => ({
+      name: "contract-financial-model-spec",
+      modules: modules.length,
+    })),
+  "contract-statement-result": () =>
+    Promise.all([
+      import("@/lib/finstack/generated/schemas/statement_result.json"),
+      import("@/lib/finstack/generated/types/statement_result"),
+      import("@/lib/finstack/generated/meta/statement_result"),
+    ]).then((modules) => ({
+      name: "contract-statement-result",
+      modules: modules.length,
+    })),
   "instrument-catalogue": () =>
     Promise.all([
       import("@/lib/finstack/generated/instruments"),

@@ -14339,7 +14339,7 @@ export type PayReceive = "pay" | "receive";
 export type PaymentCalculation =
   | {
       fixed_amount: {
-        amount: Money99;
+        amount: Money98;
         /**
          * Rounding convention.
          */
@@ -14420,7 +14420,7 @@ export type PaymentCalculation =
   | "residual_cash"
   | {
       reserve_replenishment: {
-        target_balance: Money100;
+        target_balance: Money99;
       };
     }
   | {
@@ -14441,7 +14441,7 @@ export type PaymentCalculation =
     }
   | {
       net_wac_carryover: {
-        amount: Money101;
+        amount: Money100;
         /**
          * Tranche id.
          */
@@ -15029,13 +15029,6 @@ export type ThetaDayBasis = "calendar_365" | "trading_252";
  */
 export type TouchType = "one_touch" | "no_touch";
 /**
- * Tranche behavioral type used by the structured-credit waterfall.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "TrancheBehaviorType".
- */
-export type TrancheBehaviorType = "standard";
-/**
  * Tranche coupon specification
  *
  * Supports fixed and floating rate coupons used in standard structured credit instruments.
@@ -15162,7 +15155,7 @@ export type WeightingMethod =
       kind: "fixed_quantity";
     }
   | {
-      gross_notional: Money104;
+      gross_notional: Money103;
       kind: "notional_weighted";
     }
   | {
@@ -16635,7 +16628,6 @@ export interface SharedDefs {
   ThetaDayBasis?: ThetaDayBasis;
   TouchType?: TouchType;
   Tranche?: Tranche;
-  TrancheBehaviorType?: TrancheBehaviorType;
   TrancheCoupon?: TrancheCoupon;
   TrancheDraw?: TrancheDraw;
   TrancheReadvance?: TrancheReadvance;
@@ -30857,7 +30849,7 @@ export interface Basket {
   id: Id245;
   instrument_pricing_overrides?: InstrumentPricingOverrides76;
   metric_pricing_overrides?: MetricPricingOverrides76;
-  notional: Money105;
+  notional: Money104;
   pricing_config: BasketPricingConfig;
   scenario_pricing_overrides?: ScenarioPricingOverrides76;
 }
@@ -53117,7 +53109,7 @@ export interface StructuredCredit {
   waterfall?: Waterfall | null;
   /**
    * Declarative waterfall rules (available-funds caps, etc.) layered onto the
-   * base waterfall by `resolve_waterfall`. `None` reproduces the base
+   * base waterfall each period by the simulation engine. `None` reproduces the base
    * waterfall exactly.
    */
   waterfall_rules?: WaterfallRules | null;
@@ -54104,11 +54096,104 @@ export interface Money94 {
  * Tranche structure.
  */
 export interface TrancheStructure {
-  total_size: Money95;
   /**
    * Ordered tranches (typically sorted by payment priority)
    */
   tranches: Tranche[];
+}
+/**
+ * Structured credit tranche with attachment/detachment points
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "Tranche".
+ */
+export interface Tranche {
+  /**
+   * Lower structural boundary as a percent of the capital structure
+   * (`0.0` for the first-loss class). `None` until
+   * [`TrancheStructure::new`] derives it from the balance shares in
+   * payment-priority order; a declared value must match that share
+   * within the structure's thickness tolerance.
+   */
+  attachment_point?: number | null;
+  attributes: Attributes76;
+  /**
+   * Interest specification
+   */
+  coupon:
+    | {
+        fixed: {
+          /**
+           * Fixed interest rate as decimal (e.g., 0.05 for 5%)
+           */
+          rate: number;
+        };
+      }
+    | {
+        floating: FloatingRateSpec1;
+      };
+  current_balance: Money95;
+  day_count: DayCount58;
+  deferred_interest: Money96;
+  /**
+   * Upper structural boundary as a percent of the capital structure
+   * (`100.0` for the most senior class); derived like
+   * [`Self::attachment_point`] when `None`.
+   */
+  detachment_point?: number | null;
+  frequency: Tenor28;
+  /**
+   * Interest coverage trigger specification
+   */
+  ic_trigger?: CoverageTrigger | null;
+  id: Id236;
+  maturity: Date137;
+  /**
+   * Whether the coupon is a non-deferrable claim the template pays from
+   * principal proceeds when interest proceeds fall short (and the deal's
+   * `principal_covers_senior_interest` allows it). `None` follows the
+   * seniority convention: senior notes are non-deferrable, every other
+   * class defers.
+   */
+  non_deferrable?: boolean | null;
+  /**
+   * Coverage test triggers
+   */
+  oc_trigger?: CoverageTrigger | null;
+  original_balance: Money97;
+  /**
+   * Whether interest shortfalls capitalize into tranche balance (PIK accretion).
+   *
+   * When `true`, unpaid interest is added to the outstanding tranche balance
+   * and accrues interest in subsequent periods (payment-in-kind).
+   * When `false` (default for debt tranches), shortfalls are tracked but do
+   * NOT increase the balance, matching standard CLO/ABS indenture treatment
+   * where shortfalls are paid from future interest collections.
+   */
+  pik_enabled?: boolean;
+  /**
+   * Credit rating (if rated by agencies)
+   */
+  rating?: CreditRating | null;
+  /**
+   * Tranche characteristics
+   */
+  seniority: "senior" | "mezzanine" | "subordinated" | "equity";
+}
+/**
+ * Attributes for scenario selection
+ */
+export interface Attributes76 {
+  /**
+   * Structured metadata associated with the instrument.
+   */
+  meta?: {
+    [k: string]: string;
+  };
+  /**
+   * User-defined tags for categorization.
+   */
+  tags?: string[];
 }
 /**
  * Currency-tagged monetary amount.
@@ -54286,294 +54371,9 @@ export interface Money95 {
     | "ZWL";
 }
 /**
- * Structured credit tranche with attachment/detachment points
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "Tranche".
- */
-export interface Tranche {
-  /**
-   * Lower structural boundary as a percent of the capital structure
-   * (`0.0` for the first-loss class). `None` until
-   * [`TrancheStructure::new`] derives it from the balance shares in
-   * payment-priority order; a declared value must match that share
-   * within the structure's thickness tolerance.
-   */
-  attachment_point?: number | null;
-  attributes: Attributes76;
-  /**
-   * Behavioral classification for specialized handling
-   */
-  behavior_type?: "standard";
-  /**
-   * Interest specification
-   */
-  coupon:
-    | {
-        fixed: {
-          /**
-           * Fixed interest rate as decimal (e.g., 0.05 for 5%)
-           */
-          rate: number;
-        };
-      }
-    | {
-        floating: FloatingRateSpec1;
-      };
-  current_balance: Money96;
-  day_count: DayCount58;
-  deferred_interest: Money97;
-  /**
-   * Upper structural boundary as a percent of the capital structure
-   * (`100.0` for the most senior class); derived like
-   * [`Self::attachment_point`] when `None`.
-   */
-  detachment_point?: number | null;
-  frequency: Tenor28;
-  /**
-   * Interest coverage trigger specification
-   */
-  ic_trigger?: CoverageTrigger | null;
-  id: Id236;
-  maturity: Date137;
-  /**
-   * Whether the coupon is a non-deferrable claim the template pays from
-   * principal proceeds when interest proceeds fall short (and the deal's
-   * `principal_covers_senior_interest` allows it). `None` follows the
-   * seniority convention: senior notes are non-deferrable, every other
-   * class defers.
-   */
-  non_deferrable?: boolean | null;
-  /**
-   * Coverage test triggers
-   */
-  oc_trigger?: CoverageTrigger | null;
-  original_balance: Money98;
-  /**
-   * Payment priority (1 = most senior, paid first).
-   *
-   * On a standalone `Tranche` this is a *provisional* value derived from
-   * `seniority` (see `Tranche::new`). It is **overwritten deterministically**
-   * by [`TrancheStructure::new`] (and by deserialization of a
-   * `TrancheStructure`), which ranks every tranche by structural seniority so
-   * that multiple notes at one `TrancheSeniority` (e.g. Class A-1/A-2/A-3 all
-   * `Senior`) receive distinct, strictly-increasing priorities. Do not rely
-   * on this field outside of an assembled `TrancheStructure`.
-   */
-  payment_priority: number;
-  /**
-   * Whether interest shortfalls capitalize into tranche balance (PIK accretion).
-   *
-   * When `true`, unpaid interest is added to the outstanding tranche balance
-   * and accrues interest in subsequent periods (payment-in-kind).
-   * When `false` (default for debt tranches), shortfalls are tracked but do
-   * NOT increase the balance, matching standard CLO/ABS indenture treatment
-   * where shortfalls are paid from future interest collections.
-   */
-  pik_enabled?: boolean;
-  /**
-   * Credit rating (if rated by agencies)
-   */
-  rating?: CreditRating | null;
-  /**
-   * Tranche characteristics
-   */
-  seniority: "senior" | "mezzanine" | "subordinated" | "equity";
-}
-/**
- * Attributes for scenario selection
- */
-export interface Attributes76 {
-  /**
-   * Structured metadata associated with the instrument.
-   */
-  meta?: {
-    [k: string]: string;
-  };
-  /**
-   * User-defined tags for categorization.
-   */
-  tags?: string[];
-}
-/**
  * Currency-tagged monetary amount.
  */
 export interface Money96 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money97 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -54787,7 +54587,7 @@ export interface CoverageTrigger {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money98 {
+export interface Money97 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -55031,7 +54831,7 @@ export interface Recipient {
   calculation:
     | {
         fixed_amount: {
-          amount: Money99;
+          amount: Money98;
           /**
            * Rounding convention.
            */
@@ -55112,7 +54912,7 @@ export interface Recipient {
     | "residual_cash"
     | {
         reserve_replenishment: {
-          target_balance: Money100;
+          target_balance: Money99;
         };
       }
     | {
@@ -55133,7 +54933,7 @@ export interface Recipient {
       }
     | {
         net_wac_carryover: {
-          amount: Money101;
+          amount: Money100;
           /**
            * Tranche id.
            */
@@ -55177,6 +54977,181 @@ export interface Recipient {
    * Weight for pro-rata distribution (None = equal weight)
    */
   weight?: number | null;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money98 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
 }
 /**
  * Currency-tagged monetary amount.
@@ -55529,187 +55504,12 @@ export interface Money100 {
     | "ZWL";
 }
 /**
- * Currency-tagged monetary amount.
- */
-export interface Money101 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
  * Declarative, additively-applied waterfall rules layered onto a deal's base
  * waterfall.
  *
  * Each sub-spec is optional; when none are present the resolved waterfall is
- * identical to the base waterfall. Applied by
- * [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].
+ * identical to the base waterfall. The simulation engine applies them to
+ * each period's copy of the waterfall.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "WaterfallRules".
@@ -55825,7 +55625,7 @@ export interface EarlyAmortizationSpec {
  * via the `definition` "ExcessSpreadSpec".
  */
 export interface ExcessSpreadSpec {
-  target_balance: Money102;
+  target_balance: Money101;
   /**
    * Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the
    * original pool) at or above which terminal spread-account cash repays
@@ -55838,7 +55638,7 @@ export interface ExcessSpreadSpec {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money102 {
+export interface Money101 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -56407,7 +56207,7 @@ export interface CompositeInstrument {
  */
 export interface CompositeSpec {
   attributes: Attributes78;
-  capital: Money103;
+  capital: Money102;
   id: Id238;
   instrument_pricing_overrides?: InstrumentPricingOverrides75;
   /**
@@ -56456,7 +56256,7 @@ export interface CompositeSpec {
         kind: "fixed_quantity";
       }
     | {
-        gross_notional: Money104;
+        gross_notional: Money103;
         kind: "notional_weighted";
       }
     | {
@@ -56533,7 +56333,7 @@ export interface Attributes78 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money103 {
+export interface Money102 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -57104,7 +56904,7 @@ export interface ScenarioPricingOverrides75 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money104 {
+export interface Money103 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -57803,7 +57603,7 @@ export interface MetricPricingOverrides76 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money105 {
+export interface Money104 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -58215,7 +58015,7 @@ export interface CollateralSpec1 {
  */
 export interface CompositeSpec1 {
   attributes: Attributes78;
-  capital: Money103;
+  capital: Money102;
   id: Id238;
   instrument_pricing_overrides?: InstrumentPricingOverrides75;
   /**
@@ -58264,7 +58064,7 @@ export interface CompositeSpec1 {
         kind: "fixed_quantity";
       }
     | {
-        gross_notional: Money104;
+        gross_notional: Money103;
         kind: "notional_weighted";
       }
     | {
@@ -59300,7 +59100,6 @@ export interface RevolvingCreditFees1 {
  * via the `definition` "TrancheStructure".
  */
 export interface TrancheStructure1 {
-  total_size: Money95;
   /**
    * Ordered tranches (typically sorted by payment priority)
    */

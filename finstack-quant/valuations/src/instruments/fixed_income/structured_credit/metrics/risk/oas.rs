@@ -23,6 +23,7 @@
 //! - Templated on the agency-MBS Monte-Carlo OAS
 //!   ([`crate::instruments::fixed_income::mbs_passthrough`]).
 
+use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
     prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, OasPathFlowSource,
     PreparedInstrumentSchedules,
@@ -123,7 +124,8 @@ pub struct OasResult {
 /// # Errors
 ///
 /// Returns an error if the tranche is missing, the discount curve is
-/// unavailable, a scenario fails to simulate, or the solver fails to converge.
+/// unavailable, a scenario fails to simulate, the solver fails to converge, or
+/// a result field is non-finite.
 pub fn calculate_tranche_oas(
     deal: &StructuredCredit,
     tranche_id: &str,
@@ -146,7 +148,7 @@ pub fn calculate_tranche_oas(
         })?;
     // Prices are per CURRENT face (the factor-adjusted quote basis).
     let current_balance = tranche.current_balance.amount();
-    let base_cashflows = deal.get_tranche_cashflows(tranche_id, market, as_of)?;
+    let base_cashflows = generate_tranche_cashflows(deal, tranche_id, market, as_of)?;
     let quote = super::super::quote::SettlementQuote::for_tranche(
         deal,
         as_of,
@@ -378,13 +380,15 @@ pub fn calculate_tranche_oas(
         0.0
     };
 
-    Ok(OasResult {
+    let result = OasResult {
         oas,
         model_price,
         market_price: market_price_pct,
         num_paths,
         price_std_error,
-    })
+    };
+    super::super::finite::ensure_oas_finite(&result)?;
+    Ok(result)
 }
 
 /// Monthly continuously-compounded forward rates from the discount curve over

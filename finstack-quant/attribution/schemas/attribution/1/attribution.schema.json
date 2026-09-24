@@ -28832,7 +28832,7 @@
               "type": "null"
             }
           ],
-          "description": "Declarative waterfall rules (available-funds caps, etc.) layered onto the\nbase waterfall by `resolve_waterfall`. `None` reproduces the base\nwaterfall exactly."
+          "description": "Declarative waterfall rules (available-funds caps, etc.) layered onto the\nbase waterfall each period by the simulation engine. `None` reproduces the base\nwaterfall exactly."
         }
       },
       "required": [
@@ -29901,11 +29901,6 @@
           "$ref": "#/$defs/Attributes",
           "description": "Attributes for scenario selection"
         },
-        "behavior_type": {
-          "$ref": "#/$defs/TrancheBehaviorType",
-          "default": "standard",
-          "description": "Behavioral classification for specialized handling"
-        },
         "coupon": {
           "$ref": "#/$defs/TrancheCoupon",
           "description": "Interest specification"
@@ -29975,12 +29970,6 @@
           "$ref": "#/$defs/Money",
           "description": "Size and balances"
         },
-        "payment_priority": {
-          "description": "Payment priority (1 = most senior, paid first).\n\nOn a standalone `Tranche` this is a *provisional* value derived from\n`seniority` (see `Tranche::new`). It is **overwritten deterministically**\nby [`TrancheStructure::new`] (and by deserialization of a\n`TrancheStructure`), which ranks every tranche by structural seniority so\nthat multiple notes at one `TrancheSeniority` (e.g. Class A-1/A-2/A-3 all\n`Senior`) receive distinct, strictly-increasing priorities. Do not rely\non this field outside of an assembled `TrancheStructure`.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
         "pik_enabled": {
           "default": false,
           "description": "Whether interest shortfalls capitalize into tranche balance (PIK accretion).\n\nWhen `true`, unpaid interest is added to the outstanding tranche balance\nand accrues interest in subsequent periods (payment-in-kind).\nWhen `false` (default for debt tranches), shortfalls are tracked but do\nNOT increase the balance, matching standard CLO/ABS indenture treatment\nwhere shortfalls are paid from future interest collections.",
@@ -30012,15 +30001,9 @@
         "day_count",
         "deferred_interest",
         "maturity",
-        "payment_priority",
         "attributes"
       ],
       "type": "object"
-    },
-    "TrancheBehaviorType": {
-      "const": "standard",
-      "description": "Tranche behavioral type used by the structured-credit waterfall.",
-      "type": "string"
     },
     "TrancheCoupon": {
       "description": "Tranche coupon specification\n\nSupports fixed and floating rate coupons used in standard structured credit instruments.",
@@ -30151,10 +30134,6 @@
       "additionalProperties": false,
       "description": "Collection of tranches forming the capital structure",
       "properties": {
-        "total_size": {
-          "$ref": "#/$defs/Money",
-          "description": "Total size of all tranches combined"
-        },
         "tranches": {
           "description": "Ordered tranches (typically sorted by payment priority)",
           "items": {
@@ -30164,8 +30143,7 @@
         }
       },
       "required": [
-        "tranches",
-        "total_size"
+        "tranches"
       ],
       "type": "object"
     },
@@ -31021,7 +30999,7 @@
     },
     "WaterfallRules": {
       "additionalProperties": false,
-      "description": "Declarative, additively-applied waterfall rules layered onto a deal's base\nwaterfall.\n\nEach sub-spec is optional; when none are present the resolved waterfall is\nidentical to the base waterfall. Applied by\n[`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].",
+      "description": "Declarative, additively-applied waterfall rules layered onto a deal's base\nwaterfall.\n\nEach sub-spec is optional; when none are present the resolved waterfall is\nidentical to the base waterfall. The simulation engine applies them to\neach period's copy of the waterfall.",
       "properties": {
         "afc": {
           "anyOf": [

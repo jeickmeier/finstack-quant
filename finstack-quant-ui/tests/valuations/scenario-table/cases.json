@@ -1,6 +1,6 @@
 {
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-  "instrumentSha256": "cc1a176fcd909c465387054949c5a84c050fd1d4bdfd9295e934a9db4616985a",
+  "instrumentSha256": "4cfa2247f900a7c5dc4f21499ab4983b37b39cd1c7ae426e781a3c1ec63653f2",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
   "marketSha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474",
   "asOf": "2024-01-01",
@@ -93,7 +93,6 @@
                   "id": "CLONOTES-A",
                   "attachment_point": 0,
                   "detachment_point": 100,
-                  "behavior_type": "standard",
                   "seniority": "senior",
                   "rating": null,
                   "original_balance": {
@@ -122,14 +121,9 @@
                   },
                   "pik_enabled": false,
                   "maturity": "2034-01-01",
-                  "payment_priority": 1,
                   "attributes": {}
                 }
-              ],
-              "total_size": {
-                "amount": "100000000",
-                "currency": "USD"
-              }
+              ]
             },
             "closing_date": "2024-01-01",
             "first_payment_date": "2024-04-01",
@@ -360,7 +354,6 @@
                   "id": "CLONOTES-A",
                   "attachment_point": 0,
                   "detachment_point": 100,
-                  "behavior_type": "standard",
                   "seniority": "senior",
                   "rating": null,
                   "original_balance": {
@@ -389,14 +382,9 @@
                   },
                   "pik_enabled": false,
                   "maturity": "2034-01-01",
-                  "payment_priority": 1,
                   "attributes": {}
                 }
-              ],
-              "total_size": {
-                "amount": "100000000",
-                "currency": "USD"
-              }
+              ]
             },
             "closing_date": "2024-01-01",
             "first_payment_date": "2024-04-01",

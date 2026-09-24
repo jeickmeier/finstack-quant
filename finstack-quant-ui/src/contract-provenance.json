@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "0fa4933685929757b0ceafde28e887abf4ec611dd0ea9b5b41c4d662f40d2f63",
+          "sha256": "301c66fc82365474df5ef36af410ae4d926ba2475fb91a8631f689eb58c758c6",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "fb1941b7201dbcc4550bd67ccac22574bc4e395cd129f84d74a6e658831dd898",
+          "sha256": "c1909b0a4586f85dd26942c0a01d78e699e03125978c243fa155a1b8945317ce",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -334,7 +334,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "65e1b39155145ea00598177692b956403c82c37ceb2874931134e0ce7942c2b9",
+          "sha256": "1950c2ca3e79b931e1590057b0be08d37aa00ac46ac6b6029a4f0a1c4648621c",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -1326,7 +1326,7 @@
   ],
   "scenarioAuthority": {
     "source": "finstack-quant/valuations/src/instruments/fixed_income/structured_credit/metrics/scenario.rs",
-    "sha256": "07d7b4e32cf40d3c4e09b9f2c8f50a2443edcfea55f510e997c33f7ca2db978c"
+    "sha256": "d607e88189231e464f747c05c14cc6b0f06fecb0ef4d0785a8a8d24136a94123"
   },
   "deferred": {
     "machine-readable-units": "Generic values stay raw; do not infer units from names or decimal refs.",

@@ -184,16 +184,19 @@ impl PyTrancheStructure {
 
     /// Total original size of the capital structure.
     #[getter]
-    fn total_size(&self) -> PyMoney {
-        money_to_py(self.inner.total_size)
+    fn total_size(&self) -> PyResult<PyMoney> {
+        self.inner
+            .total_size()
+            .map(money_to_py)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Return ``repr(self)``.
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "TrancheStructure(tranches={}, total_size={})",
             self.inner.tranches.len(),
-            self.inner.total_size.amount()
-        )
+            self.total_size()?.inner.amount()
+        ))
     }
 }

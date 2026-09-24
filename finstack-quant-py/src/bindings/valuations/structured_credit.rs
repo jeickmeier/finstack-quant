@@ -13,9 +13,12 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
 };
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    self as rust_structured_credit, OasResult, ScenarioTable, StructuredCredit, TrancheMetrics,
+    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
+    calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
+    StructuredCredit, TrancheMetrics,
 };
 use finstack_quant_valuations::instruments::InstrumentJson;
 use pyo3::prelude::*;
@@ -107,17 +110,12 @@ fn structured_credit_tranche_discount_margin(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
     py.detach(move || {
-        rust_structured_credit::structured_credit_tranche_discount_margin(
-            &deal,
-            &tranche_id,
-            &market,
-            &as_of,
-            target_pv,
-        )
-        .map_err(core_to_py)
+        let target_pv = Money::new(target_pv, deal.tranches.currency())?;
+        calculate_tranche_discount_margin(&deal, &tranche_id, &market, as_of, target_pv)
     })
+    .map_err(core_to_py)
 }
 
 /// Solve the constant default rate at which a tranche first takes a writedown.
@@ -154,16 +152,9 @@ fn structured_credit_tranche_breakeven_cdr(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    py.detach(move || {
-        rust_structured_credit::structured_credit_tranche_breakeven_cdr(
-            &deal,
-            &tranche_id,
-            &market,
-            &as_of,
-        )
+    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    py.detach(move || calculate_tranche_breakeven_cdr(&deal, &tranche_id, &market, as_of))
         .map_err(core_to_py)
-    })
 }
 
 /// Compute the option-adjusted spread for a tranche at a market price.
@@ -210,20 +201,24 @@ fn structured_credit_tranche_oas(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let config_json = config
-        .filter(|value| !value.is_none())
-        .map(|value| crate::bindings::module_utils::py_to_json_string(py, value, "OasConfig"))
-        .transpose()?;
+    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let config: OasConfig = match config.filter(|value| !value.is_none()) {
+        Some(value) => {
+            let json = crate::bindings::module_utils::py_to_json_string(py, value, "OasConfig")?;
+            serde_json::from_str(&json)
+                .map_err(|e| serde_json_to_py(e, "invalid OAS config JSON"))?
+        }
+        None => OasConfig::default(),
+    };
     let inner = py
         .detach(move || {
-            rust_structured_credit::structured_credit_tranche_oas(
+            calculate_tranche_oas(
                 &deal,
                 &tranche_id,
                 market_price_pct,
                 &market,
-                &as_of,
-                config_json.as_deref(),
+                as_of,
+                &config,
             )
         })
         .map_err(core_to_py)?;
@@ -270,16 +265,10 @@ fn structured_credit_tranche_metrics(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
     let inner = py
         .detach(move || {
-            rust_structured_credit::structured_credit_tranche_metrics(
-                &deal,
-                &tranche_id,
-                &market,
-                &as_of,
-                market_price_pct,
-            )
+            calculate_tranche_metrics(&deal, &tranche_id, &market, as_of, market_price_pct)
         })
         .map_err(core_to_py)?;
     Ok(PyTrancheMetrics { inner })
@@ -323,18 +312,12 @@ fn structured_credit_tranche_scenario_table(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
+    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
     let grid_json = crate::bindings::module_utils::py_to_json_string(py, grid, "ScenarioGrid")?;
+    let grid: ScenarioGrid = serde_json::from_str(&grid_json)
+        .map_err(|e| serde_json_to_py(e, "invalid scenario grid JSON"))?;
     let inner = py
-        .detach(move || {
-            rust_structured_credit::structured_credit_tranche_scenario_table(
-                &deal,
-                &tranche_id,
-                &market,
-                &as_of,
-                &grid_json,
-            )
-        })
+        .detach(move || scenario_table(&deal, &tranche_id, &market, as_of, &grid))
         .map_err(core_to_py)?;
     Ok(PyScenarioTable { inner })
 }

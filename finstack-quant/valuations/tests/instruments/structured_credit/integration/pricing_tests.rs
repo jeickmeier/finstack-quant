@@ -8,6 +8,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure,
@@ -222,8 +223,7 @@ fn test_structured_credit_tranche_cashflows_generated() {
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
 
-    let cashflows = sc
-        .get_tranche_cashflows("SENIOR", &market, test_date())
+    let cashflows = generate_tranche_cashflows(&sc, "SENIOR", &market, test_date())
         .expect("tranche cashflows should be generated");
 
     assert!(!cashflows.cashflows.is_empty());
@@ -515,8 +515,7 @@ fn test_structured_credit_registry_wal_matches_cashflow_wal() {
     let mut weighted = 0.0;
     let mut principal = 0.0;
     for tranche in &sc.tranches.tranches {
-        let flows = sc
-            .get_tranche_cashflows(tranche.id.as_str(), &market, test_date())
+        let flows = generate_tranche_cashflows(&sc, tranche.id.as_str(), &market, test_date())
             .expect("principal ledger");
         for (date, amount) in flows.principal_flows {
             if date > test_date() && amount.amount() > 0.0 {

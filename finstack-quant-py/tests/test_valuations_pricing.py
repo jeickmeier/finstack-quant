@@ -37,13 +37,11 @@ def _tranche(
     seniority: str,
     balance: str,
     rate: float,
-    priority: int,
 ) -> dict[str, object]:
     return {
         "id": tranche_id,
         "attachment_point": attachment,
         "detachment_point": detachment,
-        "behavior_type": "standard",
         "seniority": seniority,
         "rating": None,
         "original_balance": _money(balance),
@@ -56,7 +54,6 @@ def _tranche(
         "deferred_interest": _money("0"),
         "pik_enabled": False,
         "maturity": "2026-01-01",
-        "payment_priority": priority,
         "attributes": {},
     }
 
@@ -103,10 +100,9 @@ def _structured_credit_json() -> str:
         "pool": pool,
         "tranches": {
             "tranches": [
-                _tranche("SR", 0.0, 80.0, "senior", "800000", 0.05, 1),
-                _tranche("EQ", 80.0, 100.0, "equity", "200000", 0.0, 4),
+                _tranche("SR", 0.0, 80.0, "senior", "800000", 0.05),
+                _tranche("EQ", 80.0, 100.0, "equity", "200000", 0.0),
             ],
-            "total_size": _money("1000000"),
         },
         "closing_date": "2024-01-01",
         "first_payment_date": "2025-02-01",

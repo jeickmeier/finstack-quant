@@ -1398,27 +1398,6 @@ pub fn calculate_pool_stats(
     })
 }
 
-/// Result of concentration limit checking
-/// Result of concentration limit check
-#[derive(Debug, Clone)]
-pub struct ConcentrationCheckResult {
-    /// List of concentration limit violations found
-    pub violations: Vec<ConcentrationViolation>,
-}
-
-/// Individual concentration limit violation
-#[derive(Debug, Clone)]
-pub struct ConcentrationViolation {
-    /// Type of violation (e.g., "Issuer", "Industry", "Rating")
-    pub violation_type: String,
-    /// Identifier of violating entity (e.g., issuer name)
-    pub identifier: String,
-    /// Current concentration level as percentage
-    pub current_level: f64,
-    /// Maximum allowed concentration level
-    pub limit: f64,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

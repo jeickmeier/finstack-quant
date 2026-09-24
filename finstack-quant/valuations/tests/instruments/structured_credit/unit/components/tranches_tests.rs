@@ -393,7 +393,10 @@ fn test_tranche_structure_creation() {
 
     // Assert
     assert_eq!(structure.tranches.len(), 2);
-    assert_eq!(structure.total_size.amount(), 100_000_000.0);
+    assert_eq!(
+        structure.total_size().expect("total").amount(),
+        100_000_000.0
+    );
 }
 
 #[test]
@@ -625,4 +628,57 @@ fn create_tranche_with_balance(
         maturity_date(),
     )
     .unwrap()
+}
+
+// Wire-format tests
+
+/// `total_size` and `payment_priority` are derived state: the wire carries
+/// neither, and a payload that still supplies one is rejected rather than
+/// silently overwritten. Priorities are assigned on assembly (senior first,
+/// input order breaking ties), and the total is 10m + 90m = 100m.
+#[test]
+fn tranche_structure_wire_omits_derived_fields() {
+    let equity = Tranche::builder()
+        .id("EQUITY")
+        .attachment_detachment(0.0, 10.0)
+        .seniority(TrancheSeniority::Equity)
+        .balance(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .coupon(TrancheCoupon::Fixed { rate: 0.12 })
+        .maturity(maturity_date())
+        .build()
+        .unwrap();
+    assert_eq!(equity.payment_priority, 0, "unassigned outside a structure");
+    let senior = Tranche::builder()
+        .id("SENIOR")
+        .attachment_detachment(10.0, 100.0)
+        .seniority(TrancheSeniority::Senior)
+        .balance(Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"))
+        .coupon(TrancheCoupon::Fixed { rate: 0.05 })
+        .maturity(maturity_date())
+        .build()
+        .unwrap();
+    let structure = TrancheStructure::new(vec![equity, senior]).unwrap();
+
+    let wire: serde_json::Value = serde_json::to_value(&structure).unwrap();
+    assert!(wire.get("total_size").is_none());
+    for tranche in wire["tranches"].as_array().unwrap() {
+        assert!(tranche.get("payment_priority").is_none());
+        assert!(tranche.get("behavior_type").is_none());
+    }
+
+    let decoded: TrancheStructure = serde_json::from_value(wire.clone()).unwrap();
+    let priorities: Vec<(&str, u32)> = decoded
+        .tranches
+        .iter()
+        .map(|t| (t.id.as_str(), t.payment_priority))
+        .collect();
+    assert_eq!(priorities, vec![("EQUITY", 2), ("SENIOR", 1)]);
+    assert_eq!(decoded.total_size().unwrap().amount(), 100_000_000.0);
+
+    let mut stale = wire.clone();
+    stale["total_size"] = serde_json::json!({"amount": "1", "currency": "USD"});
+    assert!(serde_json::from_value::<TrancheStructure>(stale).is_err());
+    let mut stale = wire;
+    stale["tranches"][0]["payment_priority"] = serde_json::json!(7);
+    assert!(serde_json::from_value::<TrancheStructure>(stale).is_err());
 }

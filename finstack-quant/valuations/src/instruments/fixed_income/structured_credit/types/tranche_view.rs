@@ -17,6 +17,7 @@
 use super::{DealType, StructuredCredit};
 use crate::cashflow::traits::{schedule_from_classified_flows, ScheduleBuildOpts};
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -66,9 +67,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        let flows = self
-            .deal
-            .get_tranche_cashflows(&self.tranche_id, context, as_of)?
+        let flows = generate_tranche_cashflows(&self.deal, &self.tranche_id, context, as_of)?
             .detailed_flows;
         let day_count = match self.deal.deal_type {
             DealType::Rmbs | DealType::Cmbs => finstack_quant_core::dates::DayCount::Thirty360,
