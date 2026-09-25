@@ -15,8 +15,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::types::{BarrierType, CurveId, InstrumentId, PriceId};
-use finstack_quant_models::closed_form::barrier::RebateTiming;
 use finstack_quant_valuations::instruments::equity::autocallable::{Autocallable, FinalPayoffType};
 use finstack_quant_valuations::instruments::equity::{CliquetOption, EquityPathModel};
 use finstack_quant_valuations::instruments::exotics::lookback_option::{
@@ -110,7 +110,15 @@ fn lookback_option(mc_paths: usize) -> LookbackOption {
         .spot_id("SPOT".into())
         .vol_surface_id(CurveId::new("SPOT_VOL"))
         .div_yield_id_opt(Some(PriceId::new("SPOT_DIV")))
-        .use_gobet_miri(true)
+        .monitoring(Monitoring::Discrete {
+            // Monthly contractual observations through expiry.
+            observation_dates: (2..=12)
+                .map(|month| {
+                    Date::from_calendar_date(2025, Month::try_from(month).unwrap(), 1).unwrap()
+                })
+                .chain(std::iter::once(expiry))
+                .collect(),
+        })
         .instrument_pricing_overrides(InstrumentPricingOverrides::default().with_mc_paths(mc_paths))
         .attributes(Attributes::new())
         .observed_max_opt(None)
@@ -137,8 +145,9 @@ fn autocallable_note(mc_paths: usize) -> Autocallable {
         coupon_barriers: vec![0.70; n],
         memory_coupons: false,
         final_barrier: 0.6,
-        final_payoff_type: FinalPayoffType::Participation { rate: 1.0 },
-        participation_rate: 1.0,
+        final_payoff_type: FinalPayoffType::Participation {
+            participation_rate: 1.0,
+        },
         cap_level: 1.5,
         notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
@@ -266,11 +275,11 @@ fn bench_barrier_monitoring(c: &mut Criterion) {
     let mut option = BarrierOption::example().unwrap();
     option.expiry = as_of + time::Duration::days(365);
     option.strike = 100.0;
-    option.barrier = Money::from((120_i64, Currency::USD));
+    option.barrier = 120.0;
     option.barrier_type = BarrierType::UpAndOut;
     option.notional = Money::from((1_000_i64, Currency::USD));
     option.rebate = Some(Money::from((25_i64, Currency::USD)));
-    option.rebate_timing = RebateTiming::AtHit;
+    option.rebate_timing = PayoutTiming::AtHit;
     option.spot_id = "SPOT".into();
     option.vol_surface_id = "SPOT_VOL".into();
     option.div_yield_id = Some("SPOT_DIV".into());

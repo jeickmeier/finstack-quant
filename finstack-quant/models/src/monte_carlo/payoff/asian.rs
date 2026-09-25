@@ -38,12 +38,41 @@ pub fn default_fixing_steps(num_steps: usize) -> Vec<usize> {
 }
 
 /// Asian averaging method.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Serialized as `"arithmetic"` / `"geometric"`; this is the single definition
+/// shared by the Monte Carlo payoffs and the `averaging_method` wire field of
+/// the Asian option instruments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
 pub enum AveragingMethod {
     /// Arithmetic average: (1/n) Σ S_i
     Arithmetic,
     /// Geometric average: (Π S_i)^(1/n)
     Geometric,
+}
+
+impl std::fmt::Display for AveragingMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Arithmetic => write!(f, "arithmetic"),
+            Self::Geometric => write!(f, "geometric"),
+        }
+    }
+}
+
+impl std::str::FromStr for AveragingMethod {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "arithmetic" => Ok(Self::Arithmetic),
+            "geometric" => Ok(Self::Geometric),
+            _ => Err(format!(
+                "Unknown averaging method: '{s}'. Valid: arithmetic, geometric"
+            )),
+        }
+    }
 }
 
 /// Asian call option.

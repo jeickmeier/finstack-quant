@@ -1,5 +1,6 @@
 //! Independent reciprocal-NDF and total-trade barrier rebate contracts.
 
+use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_core::{
     currency::Currency,
     dates::{Date, DayCount},
@@ -10,7 +11,6 @@ use finstack_quant_core::{
     money::Money,
     types::BarrierType,
 };
-use finstack_quant_models::closed_form::barrier::RebateTiming;
 use finstack_quant_valuations::instruments::{
     exotics::barrier_option::BarrierOption,
     fx::ndf::{Ndf, NdfQuoteConvention},
@@ -49,13 +49,13 @@ fn production_barrier_ndf_reciprocal_quotes_keep_long_base_payoff() {
     inverse.fixing_date = date!(2024 - 06 - 28);
     inverse.maturity = date!(2024 - 07 - 02);
     inverse.contract_rate = 7.0;
-    inverse.fixing_rate = Some(8.0);
+    inverse.observed_fixing = Some(8.0);
     inverse.domestic_discount_curve_id = "USD-OIS".into();
     inverse.quote_convention = NdfQuoteConvention::BasePerSettlement;
     let mut direct = inverse.clone();
     direct.quote_convention = NdfQuoteConvention::SettlementPerBase;
     direct.contract_rate = 1.0 / 7.0;
-    direct.fixing_rate = Some(1.0 / 8.0);
+    direct.observed_fixing = Some(1.0 / 8.0);
     // Long 7m CNY loses USD value when CNY weakens from 7 to 8 per USD:
     // 7m / 8 - 7m / 7 = -125,000 USD in either quotation convention.
     for contract in [&inverse, &direct] {
@@ -64,12 +64,12 @@ fn production_barrier_ndf_reciprocal_quotes_keep_long_base_payoff() {
         assert!((pv.amount() + 125_000.0).abs() < 1e-8, "{pv}");
     }
     for (contract, expected_sign) in [(inverse, -1.0), (direct, 1.0)] {
-        let fixing = contract.fixing_rate.expect("observed fixing");
+        let fixing = contract.observed_fixing.expect("observed fixing");
         let bump = fixing * 1e-4;
         let mut up = contract.clone();
         let mut down = contract;
-        up.fixing_rate = Some(fixing + bump);
-        down.fixing_rate = Some(fixing - bump);
+        up.observed_fixing = Some(fixing + bump);
+        down.observed_fixing = Some(fixing - bump);
         let change = up.value(&market, as_of).expect("up fixing").amount()
             - down.value(&market, as_of).expect("down fixing").amount();
         assert!(change * expected_sign > 0.0);
@@ -79,7 +79,7 @@ fn production_barrier_ndf_reciprocal_quotes_keep_long_base_payoff() {
 fn barrier() -> BarrierOption {
     let mut option = BarrierOption::example().expect("barrier option");
     option.strike = 100.0;
-    option.barrier = Money::from((120_i64, Currency::USD));
+    option.barrier = 120.0;
     option.barrier_type = BarrierType::UpAndOut;
     option.expiry = date!(2025 - 01 - 02);
     option.day_count = DayCount::Act365F;
@@ -96,7 +96,7 @@ fn production_barrier_ndf_known_expiry_rebate_is_total_trade_money() {
     let market = market(as_of);
     let mut option = barrier();
     option.observed_barrier_breached = Some(true);
-    option.rebate_timing = RebateTiming::AtExpiry;
+    option.rebate_timing = PayoutTiming::AtExpiry;
     for scale in [1.0, 1_000.0] {
         option.notional = Money::new(scale, Currency::USD).expect("notional");
         assert!(
@@ -109,8 +109,8 @@ fn production_barrier_ndf_known_expiry_rebate_is_total_trade_money() {
 fn production_barrier_ndf_expired_at_hit_rebate_has_already_been_paid() {
     let mut option = barrier();
     option.observed_barrier_breached = Some(true);
-    option.rebate_timing = RebateTiming::AtHit;
-    option.expiry_fixing = Some(Money::from((100_i64, Currency::USD)));
+    option.rebate_timing = PayoutTiming::AtHit;
+    option.expiry_fixing = Some(100.0);
     for as_of in [option.expiry, date!(2025 - 01 - 03)] {
         let value = option.value(&market(as_of), as_of).expect("expired value");
         assert_eq!(value.amount(), 0.0);
@@ -242,7 +242,7 @@ fn production_barrier_ndf_all_engines_keep_known_rebate_units_and_lifecycle() {
     use finstack_quant_valuations::pricer::ModelKey;
     let mut option = barrier();
     option.observed_barrier_breached = Some(true);
-    option.expiry_fixing = Some(Money::new(100.0, Currency::USD).expect("fixing"));
+    option.expiry_fixing = Some(100.0);
     for model in [
         ModelKey::BarrierBSContinuous,
         ModelKey::MonteCarloGBM,
@@ -250,12 +250,12 @@ fn production_barrier_ndf_all_engines_keep_known_rebate_units_and_lifecycle() {
         ModelKey::PdeCrankNicolson1D,
     ] {
         for as_of in [date!(2024 - 01 - 02), option.expiry, date!(2025 - 01 - 03)] {
-            option.rebate_timing = RebateTiming::AtExpiry;
+            option.rebate_timing = PayoutTiming::AtExpiry;
             assert!(
                 (barrier_model_value(&option, &market(as_of), as_of, model) - 25.0).abs() < 1e-10,
                 "{model:?}/{as_of}"
             );
-            option.rebate_timing = RebateTiming::AtHit;
+            option.rebate_timing = PayoutTiming::AtHit;
             assert_eq!(
                 barrier_model_value(&option, &market(as_of), as_of, model),
                 0.0,
@@ -294,9 +294,9 @@ fn production_barrier_ndf_discrete_gbm_and_heston_do_not_observe_between_dates()
     let mut option = barrier();
     option.option_type = OptionType::Put;
     option.notional = Money::new(1.0, Currency::USD).expect("notional");
-    option.barrier = Money::new(90.0, Currency::USD).expect("barrier");
+    option.barrier = 90.0;
     option.rebate = Some(Money::new(2.5, Currency::USD).expect("rebate"));
-    option.rebate_timing = RebateTiming::AtHit;
+    option.rebate_timing = PayoutTiming::AtHit;
     option.div_yield_id = Some("DIV".into());
     option.instrument_pricing_overrides.model_config.mc_paths = Some(128);
     for model in [ModelKey::MonteCarloGBM, ModelKey::MonteCarloHeston] {

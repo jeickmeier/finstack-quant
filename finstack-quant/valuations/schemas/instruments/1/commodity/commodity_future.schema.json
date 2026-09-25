@@ -92,7 +92,7 @@
               },
               "type": "array"
             },
-            "realized_fixings": {
+            "past_fixings": {
               "default": [],
               "description": "Official prices already fixed, keyed by observation date.",
               "items": {
@@ -291,7 +291,7 @@
               "2026-12-30",
               "2026-12-31"
             ],
-            "realized_fixings": [],
+            "past_fixings": [],
             "type": "arithmetic_average"
           },
           "id": "SGX-IRON-ORE-DEC26",

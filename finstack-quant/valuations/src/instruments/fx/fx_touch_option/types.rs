@@ -44,77 +44,7 @@ impl std::str::FromStr for TouchType {
     }
 }
 
-/// Barrier direction for touch options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum BarrierDirection {
-    /// Barrier is above current spot (spot must rise to touch).
-    Up,
-    /// Barrier is below current spot (spot must fall to touch).
-    Down,
-}
-
-impl std::fmt::Display for BarrierDirection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Up => write!(f, "up"),
-            Self::Down => write!(f, "down"),
-        }
-    }
-}
-
-impl std::str::FromStr for BarrierDirection {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "up" => Ok(Self::Up),
-            "down" => Ok(Self::Down),
-            _ => Err(format!(
-                "Unknown barrier direction: '{}'. Valid: up, down",
-                s
-            )),
-        }
-    }
-}
-
-/// Payout timing for touch options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum PayoutTiming {
-    /// Payout occurs immediately when barrier is hit (for one-touch).
-    AtHit,
-    /// Payout is deferred to expiry regardless of when barrier is hit.
-    AtExpiry,
-}
-
-impl std::fmt::Display for PayoutTiming {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::AtHit => write!(f, "at_hit"),
-            Self::AtExpiry => write!(f, "at_expiry"),
-        }
-    }
-}
-
-impl std::str::FromStr for PayoutTiming {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "at_hit" => Ok(Self::AtHit),
-            "at_expiry" => Ok(Self::AtExpiry),
-            _ => Err(format!(
-                "Unknown payout timing: '{}'. Valid: at_hit, at_expiry",
-                s
-            )),
-        }
-    }
-}
+pub use finstack_quant_core::types::{BarrierDirection, PayoutTiming};
 
 /// FX touch option (American binary option).
 ///
@@ -164,7 +94,7 @@ pub struct FxTouchOption {
     /// Quote currency (domestic currency)
     pub quote_currency: Currency,
     /// Barrier level (exchange rate that triggers the touch)
-    pub barrier_level: f64,
+    pub barrier: f64,
     /// Touch type (one-touch or no-touch)
     pub touch_type: TouchType,
     /// Barrier direction (up or down)
@@ -181,7 +111,7 @@ pub struct FxTouchOption {
     )]
     pub expiry: Date,
     /// First date on which barrier monitoring is active. When set, a live
-    /// valuation after this date requires `observed_touch`.
+    /// valuation after this date requires `observed_barrier_breached`.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
@@ -209,7 +139,7 @@ pub struct FxTouchOption {
     /// using the terminal spot alone.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub observed_touch: Option<bool>,
+    pub observed_barrier_breached: Option<bool>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -244,12 +174,12 @@ impl FxTouchOption {
             "FxTouchOption",
         )?;
         crate::instruments::common_impl::validation::validate_f64_positive(
-            self.barrier_level,
-            "FxTouchOption barrier_level",
+            self.barrier,
+            "FxTouchOption barrier",
         )?;
         crate::instruments::common_impl::validation::validate_f64_finite(
-            self.barrier_level,
-            "FxTouchOption barrier_level",
+            self.barrier,
+            "FxTouchOption barrier",
         )?;
         crate::instruments::common_impl::validation::validate_f64_non_negative(
             self.payout_amount.amount(),
@@ -295,7 +225,7 @@ impl FxTouchOption {
             .id(InstrumentId::new("FXTOUCH-EURUSD-OT"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .barrier_level(1.05)
+            .barrier(1.05)
             .touch_type(TouchType::OneTouch)
             .barrier_direction(BarrierDirection::Down)
             .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
@@ -334,7 +264,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 None,
-                Some(self.barrier_level),
+                Some(self.barrier),
             ),
         );
         deps.add_fx_pair(self.base_currency, self.quote_currency);
@@ -642,7 +572,7 @@ mod tests {
             .id(InstrumentId::new("FXTOUCH-VALID"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .barrier_level(1.05)
+            .barrier(1.05)
             .touch_type(TouchType::OneTouch)
             .barrier_direction(BarrierDirection::Down)
             .payout_amount(Money::from((1_000_000_i64, Currency::USD)))
@@ -688,33 +618,27 @@ mod tests {
 
     #[test]
     fn validation_rejects_non_positive_barrier_level() {
-        let result = base_touch_builder().barrier_level(0.0).build();
+        let result = base_touch_builder().barrier(0.0).build();
+        assert!(result.is_err(), "FxTouchOption must reject barrier = 0");
+        let result = base_touch_builder().barrier(-1.0).build();
         assert!(
             result.is_err(),
-            "FxTouchOption must reject barrier_level = 0"
-        );
-        let result = base_touch_builder().barrier_level(-1.0).build();
-        assert!(
-            result.is_err(),
-            "FxTouchOption must reject negative barrier_level"
+            "FxTouchOption must reject negative barrier"
         );
     }
 
     #[test]
     fn validation_rejects_nan_barrier_level() {
-        let result = base_touch_builder().barrier_level(f64::NAN).build();
-        assert!(
-            result.is_err(),
-            "FxTouchOption must reject NaN barrier_level"
-        );
+        let result = base_touch_builder().barrier(f64::NAN).build();
+        assert!(result.is_err(), "FxTouchOption must reject NaN barrier");
     }
 
     #[test]
     fn validation_rejects_inf_barrier_level() {
-        let result = base_touch_builder().barrier_level(f64::INFINITY).build();
+        let result = base_touch_builder().barrier(f64::INFINITY).build();
         assert!(
             result.is_err(),
-            "FxTouchOption must reject infinite barrier_level"
+            "FxTouchOption must reject infinite barrier"
         );
     }
 
@@ -797,7 +721,7 @@ mod tests {
             .id(InstrumentId::new("FXTOUCH-CORRUPT-CHECK"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .barrier_level(1.05)
+            .barrier(1.05)
             .touch_type(TouchType::OneTouch)
             .barrier_direction(BarrierDirection::Down)
             .payout_amount(Money::from((1_000_000_i64, Currency::USD)))

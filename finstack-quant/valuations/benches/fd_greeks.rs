@@ -87,7 +87,7 @@ fn create_barrier_option() -> BarrierOption {
         id: InstrumentId::new("GREEKS-BARRIER"),
         underlying_ticker: "SPX".into(),
         strike: 100.0,
-        barrier: Money::new(80.0, Currency::USD).expect("valid money fixture"),
+        barrier: 80.0,
         rebate: None,
         rebate_timing: Default::default(),
         option_type: OptionType::Call,

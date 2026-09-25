@@ -111,7 +111,7 @@ fn test_ndf_pricing_post_fixing_base_depreciates() {
         .maturity(maturity)
         .notional(Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"))
         .contract_rate(7.25)
-        .fixing_rate_opt(Some(7.30)) // CNY weakened, fixing rate > contract
+        .observed_fixing_opt(Some(7.30)) // CNY weakened, fixing rate > contract
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
         .attributes(Attributes::new())
@@ -145,7 +145,7 @@ fn test_ndf_pricing_post_fixing_base_appreciates() {
         .maturity(maturity)
         .notional(Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"))
         .contract_rate(7.25)
-        .fixing_rate_opt(Some(7.20)) // CNY strengthened, fixing rate < contract
+        .observed_fixing_opt(Some(7.20)) // CNY strengthened, fixing rate < contract
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
         .attributes(Attributes::new())
@@ -335,7 +335,9 @@ fn test_ndf_is_fixed() {
     let ndf_unfixed = Ndf::example();
     assert!(!ndf_unfixed.is_fixed());
 
-    let ndf_fixed = Ndf::example().with_fixing_rate(7.30).expect("valid rate");
+    let ndf_fixed = Ndf::example()
+        .with_observed_fixing(7.30)
+        .expect("valid rate");
     assert!(ndf_fixed.is_fixed());
 }
 

@@ -83,8 +83,8 @@ pub(crate) fn known_knock_out_value(
         return Ok(None);
     }
     let mut value = match inst.rebate_timing {
-        finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
-        finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => {
+        finstack_quant_core::types::PayoutTiming::AtHit => 0.0,
+        finstack_quant_core::types::PayoutTiming::AtExpiry => {
             inst.rebate.map_or(0.0, |money| money.amount())
         }
     };
@@ -103,10 +103,10 @@ pub(crate) fn known_knock_out_value(
 /// forward from the hit time τ at the flat rate and the engine's maturity
 /// discount factor nets to `DF(τ)` — exact at-hit discounting, matching the
 /// analytical [`finstack_quant_models::closed_form::barrier::barrier_rebate`] with
-/// [`RebateTiming::AtHit`](finstack_quant_models::closed_form::barrier::RebateTiming::AtHit).
+/// [`PayoutTiming::AtHit`](finstack_quant_core::types::PayoutTiming::AtHit).
 pub(crate) fn wants_at_hit_rebate(inst: &BarrierOption) -> bool {
-    use finstack_quant_models::closed_form::barrier::RebateTiming;
-    inst.rebate.is_some() && inst.rebate_timing == RebateTiming::AtHit
+    use finstack_quant_core::types::PayoutTiming;
+    inst.rebate.is_some() && inst.rebate_timing == PayoutTiming::AtHit
 }
 
 /// Barrier option Monte Carlo pricer.
@@ -193,7 +193,7 @@ impl BarrierOptionMcPricer {
         // Create payoff (using vol surface time for barrier adjustment calculations)
         let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
-            inst.barrier.amount(),
+            inst.barrier,
             inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
             inst.rebate.map(|m| m.amount() / inst.notional.amount()),
@@ -292,7 +292,7 @@ pub(crate) fn price_expired_barrier(
         return Ok(value);
     }
     let spot = if let Some(fixing) = inst.expiry_fixing {
-        fixing.amount()
+        fixing
     } else if as_of == inst.expiry {
         let spot_scalar = curves.get_price(&inst.spot_id)?;
         match spot_scalar {
@@ -326,8 +326,8 @@ pub(crate) fn price_expired_barrier(
     let pv = if is_knock_out {
         if barrier_breached {
             match inst.rebate_timing {
-                finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
-                finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => rebate,
+                finstack_quant_core::types::PayoutTiming::AtHit => 0.0,
+                finstack_quant_core::types::PayoutTiming::AtExpiry => rebate,
             }
         } else {
             intrinsic
@@ -455,7 +455,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
 
         let analytical_barrier_type = barrier_opt.barrier_type;
 
-        let effective_barrier = barrier_opt.barrier.amount();
+        let effective_barrier = barrier_opt.barrier;
 
         let params =
             BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma)
@@ -514,11 +514,11 @@ mod tests {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::types::BarrierType;
     use finstack_quant_core::types::BarrierType as AnalyticalBarrierType;
     use finstack_quant_core::types::InstrumentId;
+    use finstack_quant_core::types::{BarrierType, PayoutTiming};
     use finstack_quant_models::closed_form::barrier::{
-        barrier_put_continuous, barrier_rebate, down_out_call, BarrierParams, RebateTiming,
+        barrier_put_continuous, barrier_rebate, down_out_call, BarrierParams,
     };
     use time::Month;
 
@@ -559,7 +559,7 @@ mod tests {
             id: InstrumentId::new("BARRIER-BENCH"),
             underlying_ticker: "SPX".to_string(),
             strike,
-            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
+            barrier,
             rebate: None,
             rebate_timing: Default::default(),
             option_type: OptionType::Call,
@@ -621,7 +621,7 @@ mod tests {
         let base = BarrierOption {
             barrier_type: BarrierType::UpAndOut,
             option_type: OptionType::Call,
-            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
+            barrier,
             ..down_and_out_call(expiry, strike, barrier)
         };
         let with_rebate = BarrierOption {
@@ -629,7 +629,7 @@ mod tests {
             ..base.clone()
         };
         let with_rebate_at_expiry = BarrierOption {
-            rebate_timing: finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry,
+            rebate_timing: finstack_quant_core::types::PayoutTiming::AtExpiry,
             ..with_rebate.clone()
         };
 
@@ -654,7 +654,7 @@ mod tests {
             &p,
             rebate,
             AnalyticalBarrierType::UpAndOut,
-            finstack_quant_models::closed_form::barrier::RebateTiming::AtHit,
+            finstack_quant_core::types::PayoutTiming::AtHit,
         );
         assert!(((rebate_pv - base_pv) - expected_at_hit).abs() < 1e-12);
 
@@ -663,7 +663,7 @@ mod tests {
             &p,
             rebate,
             AnalyticalBarrierType::UpAndOut,
-            RebateTiming::AtExpiry,
+            PayoutTiming::AtExpiry,
         );
         assert!(((rebate_pv_at_expiry - base_pv) - expected_at_expiry).abs() < 1e-12);
 
@@ -678,7 +678,7 @@ mod tests {
 
         let knocked_out = BarrierOption {
             rebate: Some(Money::from((3_i64, Currency::USD))),
-            rebate_timing: RebateTiming::AtExpiry,
+            rebate_timing: PayoutTiming::AtExpiry,
             observed_barrier_breached: Some(true),
             ..base.clone()
         };
@@ -873,7 +873,7 @@ mod tests {
         let option = BarrierOption {
             barrier_type: BarrierType::UpAndOut,
             option_type: OptionType::Put,
-            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
+            barrier,
             ..down_and_out_call(expiry, strike, barrier)
         };
         let market = market(as_of, spot, vol, rate, div_yield);
@@ -1036,7 +1036,7 @@ mod tests {
             expiry_fixing: None,
             underlying_ticker: "SPX".to_string(),
             strike,
-            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
+            barrier,
             rebate: None,
             rebate_timing: Default::default(),
             option_type: OptionType::Call,

@@ -863,7 +863,7 @@ mod tests {
             .vol_surface_id(CurveId::new("SOFR-VOL"))
             .div_yield_id_opt(None)
             .payment_date_opt(None)
-            .past_fixings_in_range_opt(None)
+            .past_observations_in_range_opt(None)
             .total_past_observations_opt(None)
             .build()
             .expect("range accrual");
@@ -908,7 +908,7 @@ mod tests {
             short_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-2Y"),
             discount_curve_id: CurveId::new("USD-OIS"),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
-            spread_correlation: 0.5,
+            correlation: 0.5,
             day_count: DayCount::Act365F,
             swap_convention: None,
             swap_fixed_frequency: None,

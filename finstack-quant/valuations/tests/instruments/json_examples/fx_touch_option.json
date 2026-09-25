@@ -2,8 +2,8 @@
   "instrument": {
     "spec": {
       "attributes": {},
+      "barrier": 1.05,
       "barrier_direction": "down",
-      "barrier_level": 1.05,
       "base_currency": "EUR",
       "day_count": "act_365f",
       "domestic_discount_curve_id": "USD-OIS",

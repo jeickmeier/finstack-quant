@@ -103,7 +103,6 @@ def test_structured_note_redemption_profiles_through_supported_json_route() -> N
         coupon_barriers=[0.0, 0.0],
         coupons=[0.0, 0.0],
         final_barrier=0.7,
-        participation_rate=1.0,
         cap_level=1.5,
         notional={"amount": "1000", "currency": "USD"},
     )
@@ -111,8 +110,8 @@ def test_structured_note_redemption_profiles_through_supported_json_route() -> N
         spec["past_fixings"] = [["2025-12-30", 100.0], ["2025-12-31", terminal]]
         ratio = terminal / 100.0
         contracts = (
-            ({"capital_protection": {"floor": 1.0}}, max(1.0, min(ratio, 1.5))),
-            ({"participation": {"rate": 0.5}}, 1.0 + 0.5 * max(min(ratio, 1.5) - 1.0, 0.0)),
+            ({"capital_protection": {"floor": 1.0, "participation_rate": 1.0}}, max(1.0, min(ratio, 1.5))),
+            ({"participation": {"participation_rate": 0.5}}, 1.0 + 0.5 * max(min(ratio, 1.5) - 1.0, 0.0)),
             ({"knock_in_put": {"strike_ratio": 1.0}}, ratio if ratio <= 0.7 else 1.0),
         )
         for payoff_type, expected_redemption in contracts:

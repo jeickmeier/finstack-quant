@@ -223,7 +223,7 @@ impl CmsSpreadOptionPricer {
         short_vol: &VolSource,
     ) -> Result<f64> {
         let quadrature = GaussHermiteQuadrature::new(self.quadrature_order)?;
-        let rho = inst.spread_correlation.clamp(-0.999_999, 0.999_999);
+        let rho = inst.correlation.clamp(-0.999_999, 0.999_999);
         let rho_complement = (1.0 - rho * rho).sqrt();
 
         let expected = quadrature.integrate(|z_long| {
@@ -339,7 +339,7 @@ impl Pricer for CmsSpreadOptionPricer {
         );
         result.measures.insert(
             MetricId::custom("cms_spread_correlation"),
-            option.spread_correlation,
+            option.correlation,
         );
         Ok(result)
     }

@@ -131,7 +131,7 @@ impl CallableRangeAccrual {
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)
                 .payment_date_opt(None)
-                .past_fixings_in_range_opt(None)
+                .past_observations_in_range_opt(None)
                 .total_past_observations_opt(None)
                 .build()
                 .expect("example range accrual terms should build"),

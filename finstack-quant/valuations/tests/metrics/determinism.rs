@@ -274,7 +274,7 @@ mod tests {
             underlying_ticker: "SPOT".to_string(),
             spot_id: "SPOT".into(),
             strike: 100.0,
-            barrier: Money::new(120.0, Currency::USD).expect("valid money fixture"),
+            barrier: 120.0,
             barrier_type: BarrierType::UpAndOut,
             option_type: OptionType::Call,
             expiry,
@@ -331,7 +331,7 @@ mod tests {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
-            use_gobet_miri: false,
+            monitoring: Default::default(),
         };
 
         let market = create_mc_market(as_of, 100.0, 0.25, 0.05);
@@ -363,8 +363,10 @@ mod tests {
             coupons: vec![0.05, 0.05, 0.05, 0.05],
             memory_coupons: false,
             final_barrier: 0.8,
-            final_payoff_type: FinalPayoffType::CapitalProtection { floor: 0.9 },
-            participation_rate: 1.0,
+            final_payoff_type: FinalPayoffType::CapitalProtection {
+                floor: 0.9,
+                participation_rate: 1.0,
+            },
             cap_level: 1.3,
             notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
             day_count: DayCount::Act365F,

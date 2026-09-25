@@ -190,6 +190,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"settlement_fixing|delivery_end|"
             r"hazard_curve_id|upfront_payment|standard_imm_dates|use_imm_dates|accumulated_loss|realized_index_loss|"
             r"running_coupon_bp|running_spread_bp|fixed_coupon_bp|underlying_cds_coupon|attachment_point|detachment_point|"
+            r"fixing_rate|use_gobet_miri|spread_correlation|barrier_level|observed_touch|realized_fixings|past_fixings_in_range|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

@@ -43,21 +43,25 @@ impl FxTouchOptionCalculator {
                     .to_string(),
             ));
         }
-        if as_of > start && as_of <= inst.expiry && inst.observed_touch.is_none() {
+        if as_of > start && as_of <= inst.expiry && inst.observed_barrier_breached.is_none() {
             return Err(finstack_quant_core::Error::Validation(
-                "Seasoned FX touch option requires observed_touch after monitoring starts"
+                "Seasoned FX touch option requires observed_barrier_breached after monitoring starts"
                     .to_string(),
             ));
         }
         let (spot, r_d, r_f, sigma, t) = self.collect_inputs(inst, curves, as_of)?;
 
         if t <= 0.0 {
-            let observed_touch = inst.observed_touch.ok_or_else(|| {
+            let observed_barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "Expired FX touch option requires explicit observed touch state".to_string(),
                 )
             })?;
-            let pv = match (inst.touch_type, observed_touch, inst.payout_timing) {
+            let pv = match (
+                inst.touch_type,
+                observed_barrier_breached,
+                inst.payout_timing,
+            ) {
                 (TouchType::OneTouch, true, PayoutTiming::AtHit)
                 | (TouchType::OneTouch, false, _)
                 | (TouchType::NoTouch, true, _) => 0.0,
@@ -67,7 +71,7 @@ impl FxTouchOptionCalculator {
             return Money::new(pv, inst.quote_currency);
         }
 
-        if inst.observed_touch == Some(true) {
+        if inst.observed_barrier_breached == Some(true) {
             let pv = match (inst.touch_type, inst.payout_timing) {
                 (TouchType::OneTouch, PayoutTiming::AtHit) | (TouchType::NoTouch, _) => 0.0,
                 (TouchType::OneTouch, PayoutTiming::AtExpiry) => {
@@ -80,7 +84,7 @@ impl FxTouchOptionCalculator {
         let price = price_touch(
             inst,
             spot,
-            inst.barrier_level,
+            inst.barrier,
             r_d,
             r_f,
             sigma,
@@ -134,7 +138,7 @@ impl FxTouchOptionCalculator {
             curves,
             inst.vol_surface_id.as_str(),
             t_vol,
-            inst.barrier_level,
+            inst.barrier,
         )?;
 
         Ok((spot, r_d, r_f, sigma, t_vol))
@@ -316,7 +320,7 @@ mod tests {
             .id(InstrumentId::new("FX-TOUCH-TEST"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .barrier_level(1.10)
+            .barrier(1.10)
             .touch_type(crate::instruments::fx::fx_touch_option::TouchType::OneTouch)
             .barrier_direction(crate::instruments::fx::fx_touch_option::BarrierDirection::Down)
             .payout_amount(Money::from((100_000_i64, Currency::USD)))
@@ -354,7 +358,7 @@ mod tests {
             .id(InstrumentId::new("FX-NOTOUCH-TEST"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .barrier_level(1.10)
+            .barrier(1.10)
             .touch_type(crate::instruments::fx::fx_touch_option::TouchType::NoTouch)
             .barrier_direction(crate::instruments::fx::fx_touch_option::BarrierDirection::Down)
             .payout_amount(Money::from((100_000_i64, Currency::USD)))
@@ -386,7 +390,7 @@ mod tests {
         let mut option = build_option(date!(2025 - 01 - 01));
         option.monitoring_start_date = Some(option.expiry);
         for observed in [None, Some(false), Some(true)] {
-            option.observed_touch = observed;
+            option.observed_barrier_breached = observed;
             let error = option
                 .value(&MarketContext::new(), as_of)
                 .expect_err("future monitoring");
@@ -419,7 +423,7 @@ mod tests {
             .implied_volatility = Some(0.0);
         for (direction, barrier) in [(BarrierDirection::Down, 1.10), (BarrierDirection::Up, 1.30)] {
             option.barrier_direction = direction;
-            option.barrier_level = barrier;
+            option.barrier = barrier;
             option.touch_type = TouchType::NoTouch;
             let no_touch = option.value(&market, as_of).expect("no touch").amount();
             assert!((no_touch - 100_000.0 * df).abs() < 1e-8);
@@ -452,7 +456,7 @@ mod tests {
             }
             let mut option = build_option(expiry);
             option.barrier_direction = direction;
-            option.barrier_level = 1.20 * ((domestic - foreign) * 0.5).exp();
+            option.barrier = 1.20 * ((domestic - foreign) * 0.5).exp();
             option
                 .instrument_pricing_overrides
                 .market_quotes
@@ -480,7 +484,7 @@ mod tests {
 
             // Move the trigger beyond the expiry horizon: the payout flips
             // back to the no-touch while the two expiry payouts still sum to DF*Q.
-            option.barrier_level = 1.20 * ((domestic - foreign) * 2.0).exp();
+            option.barrier = 1.20 * ((domestic - foreign) * 2.0).exp();
             assert!(
                 (option.value(&market, as_of).expect("survival").amount() - 100_000.0 * df).abs()
                     < 1e-8

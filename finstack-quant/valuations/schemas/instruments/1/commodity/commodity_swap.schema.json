@@ -73,11 +73,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "quantity": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Notional quantity per period."
-        },
-        "realized_fixings": {
+        "past_fixings": {
           "default": [],
           "description": "Realized floating-index fixings as `(date, price)` pairs.\n\nFloating-leg observations with date strictly before the valuation date\nread from this store; a missing past fixing is an error — no silent\nsubstitution of today's spot . Observations on or\nafter the valuation date project from the price curve.",
           "items": {
@@ -95,6 +91,10 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Notional quantity per period."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -206,8 +206,8 @@
           },
           "id": "NG-SWAP-2025",
           "maturity": "2025-12-31",
+          "past_fixings": [],
           "quantity": 10000.0,
-          "realized_fixings": [],
           "side": "pay",
           "start_date": "2025-01-01",
           "ticker": "NG",

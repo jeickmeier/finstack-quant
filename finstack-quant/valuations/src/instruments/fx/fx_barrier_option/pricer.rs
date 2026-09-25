@@ -14,6 +14,7 @@ use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::PayoutTiming;
 
 // MC-specific imports
 use finstack_quant_models::monte_carlo::payoff::barrier::{
@@ -152,7 +153,7 @@ impl FxBarrierOptionMcPricer {
             inst.barrier,
             inst.barrier_type,
             mc_option_kind,
-            inst.rebate,
+            inst.rebate_per_unit(),
             inst.notional.amount(),
             time_grid.num_steps(),
             sigma,
@@ -161,11 +162,8 @@ impl FxBarrierOptionMcPricer {
         );
         // Exact at-hit rebate timing: compound the rebate forward from the
         // hit time at the domestic rate so DF(T) nets to DF(τ).
-        {
-            use finstack_quant_models::closed_form::barrier::RebateTiming;
-            if inst.rebate.is_some() && inst.rebate_timing == RebateTiming::AtHit {
-                payoff = payoff.with_rebate_at_hit(r_dom);
-            }
+        if inst.rebate.is_some() && inst.rebate_timing == PayoutTiming::AtHit {
+            payoff = payoff.with_rebate_at_hit(r_dom);
         }
 
         let time_grid_values = time_grid.times().to_vec();
@@ -317,7 +315,7 @@ fn expired_barrier_value_per_unit(
         barrier_hit
     };
     let rebate = if rebate_due {
-        inst.rebate.unwrap_or(0.0)
+        inst.rebate_per_unit().unwrap_or(0.0)
     } else {
         0.0
     };
@@ -347,10 +345,8 @@ fn seasoned_breached_value_per_unit(
         )
     } else {
         match inst.rebate_timing {
-            finstack_quant_models::closed_form::barrier::RebateTiming::AtHit => 0.0,
-            finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry => {
-                inst.rebate.unwrap_or(0.0) * discount_factor
-            }
+            PayoutTiming::AtHit => 0.0,
+            PayoutTiming::AtExpiry => inst.rebate_per_unit().unwrap_or(0.0) * discount_factor,
         }
     }
 }
@@ -475,7 +471,7 @@ fn bs_barrier_price_per_unit(
         }
     };
 
-    let rebate_val = if let Some(rebate) = fx_barrier.rebate {
+    let rebate_val = if let Some(rebate) = fx_barrier.rebate_per_unit() {
         barrier_rebate(
             &params,
             rebate,
@@ -633,7 +629,8 @@ mod tests {
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::BarrierType;
-    use finstack_quant_models::closed_form::barrier::{barrier_rebate, RebateTiming};
+    use finstack_quant_core::types::PayoutTiming;
+    use finstack_quant_models::closed_form::barrier::barrier_rebate;
     use std::sync::Arc;
     use time::Month;
 
@@ -770,7 +767,8 @@ mod tests {
         inst.barrier_type = BarrierType::UpAndOut;
         inst.strike = 1.10;
         inst.barrier = 1.20;
-        inst.rebate = Some(0.02);
+        // Total rebate = 0.02 USD per EUR on the 1m EUR example notional.
+        inst.rebate = Some(Money::from((20_000_i64, Currency::USD)));
         inst.observed_barrier_breached = Some(true);
 
         // Barrier hit at expiry => knocked out. With rebate, no intrinsic and rebate paid.
@@ -785,7 +783,8 @@ mod tests {
         inst.barrier_type = BarrierType::UpAndIn;
         inst.strike = 1.10;
         inst.barrier = 1.20;
-        inst.rebate = Some(0.02);
+        // Total rebate = 0.02 USD per EUR on the 1m EUR example notional.
+        inst.rebate = Some(Money::from((20_000_i64, Currency::USD)));
         inst.observed_barrier_breached = Some(false);
 
         let per_unit = expired_barrier_value_per_unit(&inst, 1.25).expect("expired value");
@@ -823,7 +822,7 @@ mod tests {
         option.monitoring = Monitoring::Continuous;
         option.option_type = OptionType::Call;
         option.barrier_type = BarrierType::UpAndIn;
-        option.rebate = Some(0.02);
+        option.rebate = Some(Money::from((20_000_i64, Currency::USD)));
         option.observed_barrier_breached = Some(false);
 
         let market = MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.25));
@@ -847,7 +846,7 @@ mod tests {
             .id("FXBAR-ZERO-VOL-UPIN".into())
             .strike(1.10)
             .barrier(1.20)
-            .rebate(0.02)
+            .rebate(Money::from((20_000_i64, Currency::USD)))
             .option_type(OptionType::Call)
             .barrier_type(BarrierType::UpAndIn)
             .monitoring_start_date(as_of)
@@ -913,8 +912,10 @@ mod tests {
                 .id(id.into())
                 .strike(1.10)
                 .barrier(1.20)
-                .rebate_opt(rebate)
-                .rebate_timing(RebateTiming::AtExpiry)
+                .rebate_opt(rebate.map(|per_unit| {
+                    Money::new(per_unit * notional, Currency::USD).expect("valid money fixture")
+                }))
+                .rebate_timing(PayoutTiming::AtExpiry)
                 .option_type(OptionType::Call)
                 .barrier_type(BarrierType::UpAndOut)
                 .monitoring_start_date(as_of)
@@ -996,13 +997,13 @@ mod tests {
             &params,
             rebate,
             BarrierType::UpAndOut,
-            RebateTiming::AtExpiry,
+            PayoutTiming::AtExpiry,
         );
         let continuous_per_unit = barrier_rebate(
             &params,
             rebate,
             BarrierType::UpAndOut,
-            RebateTiming::AtExpiry,
+            PayoutTiming::AtExpiry,
         );
         let actual_delta = rebate_pv.amount() - base_pv.amount();
         let expected_delta = expected_per_unit * notional;

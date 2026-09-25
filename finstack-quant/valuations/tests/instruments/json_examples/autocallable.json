@@ -28,7 +28,7 @@
       "final_barrier": 0.6,
       "final_payoff_type": {
         "participation": {
-          "rate": 1.0
+          "participation_rate": 1.0
         }
       },
       "id": "AUTO-SPX-QTR",
@@ -44,7 +44,6 @@
         "2024-09-30",
         "2024-12-31"
       ],
-      "participation_rate": 1.0,
       "past_fixings": [],
       "path_model": "atm_term_gbm",
       "payment_dates": [

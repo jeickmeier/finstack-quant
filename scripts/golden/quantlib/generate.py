@@ -19,7 +19,13 @@ from .common import require_supported_quantlib, write_or_check
 from .credit import build_single_name_cds
 from .deposits import build_deposit
 from .fx import build_fx_forward
-from .fx_exotics import build_fx_barrier_option, build_fx_digital_option, build_quanto_option
+from .fx_exotics import (
+    build_fx_barrier_option,
+    build_fx_barrier_option_rebate_at_expiry,
+    build_fx_barrier_option_rebate_at_hit,
+    build_fx_digital_option,
+    build_quanto_option,
+)
 from .options import (
     build_arithmetic_asian_option,
     build_barrier_option,
@@ -112,6 +118,14 @@ PRODUCTS: dict[str, tuple[str, Callable[[], dict[str, Any]]]] = {
     "fx_barrier_option": (
         "fx_barrier_option/eurusd_up_out_call_3m_quantlib.json",
         build_fx_barrier_option,
+    ),
+    "fx_barrier_option_rebate_at_hit": (
+        "fx_barrier_option/eurusd_up_out_call_rebate_at_hit_3m_quantlib.json",
+        build_fx_barrier_option_rebate_at_hit,
+    ),
+    "fx_barrier_option_rebate_at_expiry": (
+        "fx_barrier_option/eurusd_up_in_call_rebate_at_expiry_3m_quantlib.json",
+        build_fx_barrier_option_rebate_at_expiry,
     ),
     "quanto_option": (
         "quanto_option/nky_usd_quanto_call_1y_quantlib.json",

@@ -101,8 +101,9 @@ pub fn create_quarterly_autocallable(
         coupons,
         memory_coupons: false, // non-memory autocallable
         final_barrier: 0.6,    // 60% knock-in barrier
-        final_payoff_type: FinalPayoffType::Participation { rate: 1.0 },
-        participation_rate: 1.0,
+        final_payoff_type: FinalPayoffType::Participation {
+            participation_rate: 1.0,
+        },
         cap_level: 1.5, // 150% cap
         notional: Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
         day_count,

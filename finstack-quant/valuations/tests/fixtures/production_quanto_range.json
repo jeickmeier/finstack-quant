@@ -20,7 +20,7 @@
         "observation_dates": [
           "2026-01-02"
         ],
-        "past_fixings_in_range": null,
+        "past_observations_in_range": null,
         "payment_date": null,
         "spot_id": "SPX-SPOT",
         "total_past_observations": null,

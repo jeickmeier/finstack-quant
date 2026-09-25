@@ -1,16 +1,16 @@
 {
   "$defs": {
     "BarrierDirection": {
-      "description": "Barrier direction for touch options.",
+      "description": "Side of spot on which a barrier sits.",
       "oneOf": [
         {
           "const": "up",
-          "description": "Barrier is above current spot (spot must rise to touch).",
+          "description": "Barrier is above spot: hit when spot touches or rises above it.",
           "type": "string"
         },
         {
           "const": "down",
-          "description": "Barrier is below current spot (spot must fall to touch).",
+          "description": "Barrier is below spot: hit when spot touches or falls below it.",
           "type": "string"
         }
       ]
@@ -23,14 +23,14 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and grouping"
         },
-        "barrier_direction": {
-          "$ref": "#/$defs/BarrierDirection",
-          "description": "Barrier direction (up or down)"
-        },
-        "barrier_level": {
+        "barrier": {
           "description": "Barrier level (exchange rate that triggers the touch)",
           "format": "double",
           "type": "number"
+        },
+        "barrier_direction": {
+          "$ref": "#/$defs/BarrierDirection",
+          "description": "Barrier direction (up or down)"
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -73,9 +73,9 @@
               "type": "null"
             }
           ],
-          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_touch`."
+          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_barrier_breached`."
         },
-        "observed_touch": {
+        "observed_barrier_breached": {
           "description": "Observed barrier event state for expired valuations.\n\n`Some(true)` means the barrier was touched during the option life,\n`Some(false)` means it was observed not to have touched, and `None`\nmeans the historical touch state is unavailable.\n\nThis is only required once the option has expired. Without it, a\ntouched-and-reverted path cannot be distinguished from an untouched path\nusing the terminal spot alone.",
           "type": [
             "boolean",
@@ -111,7 +111,7 @@
         "id",
         "base_currency",
         "quote_currency",
-        "barrier_level",
+        "barrier",
         "touch_type",
         "barrier_direction",
         "payout_amount",
@@ -131,16 +131,16 @@
       "type": "string"
     },
     "PayoutTiming": {
-      "description": "Payout timing for touch options.",
+      "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them.",
       "oneOf": [
         {
           "const": "at_hit",
-          "description": "Payout occurs immediately when barrier is hit (for one-touch).",
+          "description": "Paid the moment the barrier is hit (market standard).",
           "type": "string"
         },
         {
           "const": "at_expiry",
-          "description": "Payout is deferred to expiry regardless of when barrier is hit.",
+          "description": "Paid at expiry regardless of when the barrier is hit.",
           "type": "string"
         }
       ]
@@ -187,8 +187,8 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "barrier": 1.05,
           "barrier_direction": "down",
-          "barrier_level": 1.05,
           "base_currency": "EUR",
           "day_count": "act_365f",
           "domestic_discount_curve_id": "USD-OIS",

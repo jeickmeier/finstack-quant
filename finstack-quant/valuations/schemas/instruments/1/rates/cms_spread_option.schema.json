@@ -8,6 +8,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes."
         },
+        "correlation": {
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Gaussian-copula correlation between the two CMS rates, a decimal in `[-1, 1]`."
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day count convention."
@@ -67,11 +71,6 @@
         "short_vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Swaption volatility surface for short tenor."
-        },
-        "spread_correlation": {
-          "description": "Rank correlation between the two CMS rates.",
-          "format": "double",
-          "type": "number"
         },
         "strike": {
           "description": "Strike spread (in decimal, e.g., 0.005 = 50bp).",
@@ -147,7 +146,7 @@
         "short_vol_surface_id",
         "discount_curve_id",
         "forward_curve_id",
-        "spread_correlation",
+        "correlation",
         "day_count",
         "attributes"
       ],
@@ -167,6 +166,13 @@
           "type": "string"
         }
       ]
+    },
+    "CorrelationWire": {
+      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "type": "number"
     },
     "IRSConvention": {
       "description": "Standard interest rate swap conventions by region.\n\n# Market Standards Reference (Post-IBOR Transition)\n\n| Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |\n|------------|-------|----------|----------|------------|------------|-----------|\n| USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |\n| EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |\n| EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |\n| GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |\n| JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |\n\n# OIS Compounding\n\nNote: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates\nwith observation shift (typically 2 days lookback). The float frequency\nindicates the payment/reset frequency, not the compounding frequency.\nSee compounding method guidance below for details.\n\n# Sources\n\n- ISDA 2021 IBOR Fallbacks Protocol\n- Bloomberg SWDF function\n- QuantLib OvernightIndexedSwap conventions",
@@ -230,6 +236,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "correlation": 0.85,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
           "expiry_date": "2027-03-29",
@@ -251,7 +258,6 @@
             "unit": "years"
           },
           "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
-          "spread_correlation": 0.85,
           "strike": 0.005,
           "swap_convention": "usd_sofr"
         },

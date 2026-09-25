@@ -297,9 +297,9 @@ impl CallableRangeAccrualPricer {
                     inst.id
                 ))
             })?;
-            let supplied_in_range = range.past_fixings_in_range.ok_or_else(|| {
+            let supplied_in_range = range.past_observations_in_range.ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
-                    "CallableRangeAccrual '{}' requires past_fixings_in_range for {historical_count} historical observations",
+                    "CallableRangeAccrual '{}' requires past_observations_in_range for {historical_count} historical observations",
                     inst.id
                 ))
             })?;
@@ -342,7 +342,7 @@ impl CallableRangeAccrualPricer {
             schedule.call_prices.clone(),
             schedule.final_payment_event_idx,
             schedule.final_payment_discount_factor,
-            inst.range_accrual.past_fixings_in_range.unwrap_or(0),
+            inst.range_accrual.past_observations_in_range.unwrap_or(0),
             inst.range_accrual.total_past_observations.unwrap_or(0),
             schedule.future_observations,
             config.basis_degree,
@@ -650,7 +650,7 @@ mod tests {
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)
                 .payment_date_opt(None)
-                .past_fixings_in_range_opt(None)
+                .past_observations_in_range_opt(None)
                 .total_past_observations_opt(None)
                 .build()
                 .expect("range accrual"),

@@ -7,40 +7,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
-/// Averaging method for Asian options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum AveragingMethod {
-    /// Arithmetic average: (1/n) Σ S_i
-    Arithmetic,
-    /// Geometric average: (Π S_i)^(1/n)
-    Geometric,
-}
-
-impl std::fmt::Display for AveragingMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Arithmetic => write!(f, "arithmetic"),
-            Self::Geometric => write!(f, "geometric"),
-        }
-    }
-}
-
-impl std::str::FromStr for AveragingMethod {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "arithmetic" => Ok(Self::Arithmetic),
-            "geometric" => Ok(Self::Geometric),
-            _ => Err(format!(
-                "Unknown averaging method: '{}'. Valid: arithmetic, geometric",
-                s
-            )),
-        }
-    }
-}
+pub use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
 
 /// Asian option instrument.
 ///
@@ -304,9 +271,9 @@ impl AsianOption {
         (sum, product_log, count)
     }
 
-    /// Validate that realized fixing history exactly covers every scheduled
+    /// Validate that past fixing history exactly covers every scheduled
     /// observation on or before the valuation date.
-    pub fn validate_realized_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
+    pub fn validate_past_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
         let mut scheduled = std::collections::BTreeSet::new();
         for date in &self.fixing_dates {
@@ -343,7 +310,7 @@ impl AsianOption {
         for date in &self.fixing_dates {
             if *date <= as_of && !observed.contains(date) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "AsianOption '{}' is missing a realized fixing for {} as of {}",
+                    "AsianOption '{}' is missing a past fixing for {} as of {}",
                     self.id, date, as_of
                 )));
             }
@@ -392,7 +359,7 @@ impl crate::instruments::common_impl::traits::Instrument for AsianOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        self.validate_realized_fixings(as_of)?;
+        self.validate_past_fixings(as_of)?;
         use crate::instruments::exotics::asian_option::pricer::{
             AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer,
         };

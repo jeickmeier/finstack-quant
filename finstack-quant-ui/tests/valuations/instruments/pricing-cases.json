@@ -220,7 +220,7 @@
       "type": "autocallable",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/autocallable.json",
-        "sha256": "b5efa57bba00b7c7c8bcf77fec0e8df4e529a78c84b58aaa72f78ab67fcf53a8",
+        "sha256": "c25a36e614fc8594c3425489b0e0c3f44a86fefe54b30e93355102c6c655aa66",
         "pointer": []
       },
       "instrumentPatches": [
@@ -270,7 +270,7 @@
       "type": "barrier_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/barrier_option.json",
-        "sha256": "805e7cd020070f8fa1c977639a067240d5248f2033cb3795d4ec545c98d5b484",
+        "sha256": "7c323302908b19b3f8bfa5107cba99b0ab4f27417745dc30f9c3cdc7e2b73af1",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -534,7 +534,7 @@
       "type": "callable_range_accrual",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/callable_range_accrual.json",
-        "sha256": "539dda3b4a291f7133046483b061faebef1cab2de20938d40d9da042f71b2063",
+        "sha256": "c8cd31a1888d26ff819648f8a220284ac8834e0bd0141221d0be7ff1fb79fa7e",
         "pointer": []
       },
       "instrumentPatches": [
@@ -824,7 +824,7 @@
       "type": "cms_spread_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/cms_spread_option.json",
-        "sha256": "4e0c1f79d64e3e2a58670e23cc4181604a994cbf9a539e4439a251cd3b7dbf95",
+        "sha256": "6c1852b127e6bed077d83dda355ac5ec6f039fcc9b91f198a404de867130b607",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -900,7 +900,7 @@
       "type": "commodity_asian_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_asian_option.json",
-        "sha256": "c6f058a2f627e8bcac561d88e4765151f838881cee3297dcf9979fba23239dd8",
+        "sha256": "4ab96828089c068cf3129b2ead8e7b9c17dbc21267a1c1520122b20bd04c238f",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -981,7 +981,7 @@
       "type": "commodity_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_future.json",
-        "sha256": "5b9c7c02466df1db17302e97b73633230211b54a95906330966ef748c320ca44",
+        "sha256": "04f5594186f20bb041f30de1a3ed0063db11e36e1b334213f34392367d9ff203",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1133,7 +1133,7 @@
       "type": "commodity_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_swap.json",
-        "sha256": "9a3326ede720783622750ef5fad028960854fb6606a40707cdc44f40d1e676c4",
+        "sha256": "a8bde7d669a0f7b1545e5927a29cefffcc588be5e464c2d39a8d7362e9487128",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1969,7 +1969,7 @@
       "type": "fx_touch_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_touch_option.json",
-        "sha256": "842513af4120ead8d2b35c6b5ad60544cc42264ecf16486960de57f72e0c2c5d",
+        "sha256": "5bbae200fb8ac80b06ebf213d1b1e143c4e95912949baf373661f2d348ff99fb",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2316,7 +2316,7 @@
       "type": "lookback_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/lookback_option.json",
-        "sha256": "81463990c36de773b47783cb53d3ee75c267f39228e02dc1d0660173042d0966",
+        "sha256": "973a45db7ad1b9ad788c4e306a9dd49dd19a771d4d63092d0609bf6a3ee766d1",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2468,7 +2468,7 @@
       "type": "range_accrual",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/range_accrual.json",
-        "sha256": "fbf9af009ee4d28f4d0d4cd9322bc2de03aa53e739905eedccf61b6cae47b69b",
+        "sha256": "6f18ccb14b1a4b9a1df26663162b07d6dd23bd2bd986e2cdbdbc4fb7e82d9c67",
         "pointer": []
       },
       "instrumentPatches": [],

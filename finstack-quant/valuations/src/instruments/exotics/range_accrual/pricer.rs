@@ -12,7 +12,7 @@
 //! Both methods support:
 //! - Absolute or relative bounds (via `BoundsType`)
 //! - Quanto asset financing and drift adjustment from the nested `QuantoSpec`
-//! - Historical fixings for mid-life valuations (via `past_fixings_in_range`)
+//! - Historical fixings for mid-life valuations (via `past_observations_in_range`)
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
@@ -143,9 +143,9 @@ fn validate_historical_observations(inst: &RangeAccrual, as_of: Date) -> Result<
     if expected == 0 {
         return Ok(());
     }
-    let in_range = inst.terms.past_fixings_in_range.ok_or_else(|| {
+    let in_range = inst.terms.past_observations_in_range.ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
-            "RangeAccrual '{}' requires past_fixings_in_range for {expected} historical observations",
+            "RangeAccrual '{}' requires past_observations_in_range for {expected} historical observations",
             inst.id
         ))
     })?;
@@ -163,7 +163,7 @@ fn validate_historical_observations(inst: &RangeAccrual, as_of: Date) -> Result<
     }
     if in_range > total {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "RangeAccrual '{}' past_fixings_in_range ({in_range}) exceeds total historical observations ({total})",
+            "RangeAccrual '{}' past_observations_in_range ({in_range}) exceeds total historical observations ({total})",
             inst.id
         )));
     }
@@ -279,7 +279,7 @@ impl RangeAccrualMcPricer {
             inst.terms.coupon_rate * inst.terms.accrual_year_fraction()?,
             inst.terms.notional.amount(),
             inst.terms.notional.currency(),
-            inst.terms.past_fixings_in_range.unwrap_or(0),
+            inst.terms.past_observations_in_range.unwrap_or(0),
             inst.terms.total_past_observations.unwrap_or(0),
         )?;
 
@@ -323,7 +323,7 @@ fn compute_known_value(
     as_of: Date,
     payment_date: Date,
 ) -> Result<Money> {
-    match (inst.terms.past_fixings_in_range, inst.terms.total_past_observations) {
+    match (inst.terms.past_observations_in_range, inst.terms.total_past_observations) {
         (Some(in_range), Some(total)) if total > 0 => {
             let accrual_fraction = in_range as f64 / total as f64;
             let fv = inst.terms.notional.amount()
@@ -483,7 +483,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
                 .signed_year_fraction(as_of, date, DayCountContext::default())?;
 
         if t_obs <= 0.0 {
-            // Past observation - skip (handled via past_fixings_in_range)
+            // Past observation - skip (handled via past_observations_in_range)
             continue;
         }
 
@@ -559,7 +559,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
 
     // Include historical fixings in the total
     // Total observations = past observations + future observations
-    let past_in_range = inst.terms.past_fixings_in_range.unwrap_or(0) as f64;
+    let past_in_range = inst.terms.past_observations_in_range.unwrap_or(0) as f64;
     let total_past_obs = inst.terms.total_past_observations.unwrap_or(0);
 
     // Total observations across full life of instrument
@@ -632,7 +632,7 @@ mod tests {
         inst.terms.accrual_start_date = date(2023, 12, 31);
         inst.terms.observation_dates = vec![as_of];
         inst.terms.payment_date = Some(as_of);
-        inst.terms.past_fixings_in_range = None;
+        inst.terms.past_observations_in_range = None;
         inst.terms.total_past_observations = None;
 
         let pv = npv_analytic(&inst, &market(as_of), as_of).expect("pv");
@@ -662,7 +662,7 @@ mod tests {
         let mut inst = RangeAccrual::example();
         inst.terms.observation_dates = vec![date(2024, 1, 31), date(2024, 2, 29)];
         inst.terms.payment_date = Some(payment_date);
-        inst.terms.past_fixings_in_range = Some(1);
+        inst.terms.past_observations_in_range = Some(1);
         inst.terms.total_past_observations = Some(2);
 
         let curves = market(as_of);
@@ -686,7 +686,7 @@ mod tests {
         let mut inst = RangeAccrual::example();
         inst.terms.observation_dates = vec![date(2024, 1, 31)];
         inst.terms.payment_date = Some(date(2025, 6, 30));
-        inst.terms.past_fixings_in_range = Some(1);
+        inst.terms.past_observations_in_range = Some(1);
         inst.terms.total_past_observations = Some(1);
 
         let pv = npv_analytic(&inst, &MarketContext::new(), as_of).expect("settled pv");

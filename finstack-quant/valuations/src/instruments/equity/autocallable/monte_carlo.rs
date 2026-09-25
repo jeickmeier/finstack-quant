@@ -35,8 +35,6 @@ pub struct AutocallablePayoff {
     pub final_barrier: f64,
     /// Final payoff structure
     pub final_payoff_type: FinalPayoffType,
-    /// Participation rate for final payoff
-    pub participation_rate: f64,
     /// Cap level for returns (e.g., 1.2 for 20% cap)
     pub cap_level: f64,
     /// Notional amount
@@ -91,7 +89,6 @@ impl AutocallablePayoff {
     /// * `memory_coupons` - Whether missed coupons accrue until a coupon barrier is met
     /// * `final_barrier` - Barrier for final payoff (knock-in/knock-out)
     /// * `final_payoff_type` - Type of final payoff
-    /// * `participation_rate` - Participation rate for final payoff
     /// * `cap_level` - Maximum return cap
     /// * `notional` - Notional amount
     /// * `initial_spot` - Initial spot price S_0
@@ -105,7 +102,6 @@ impl AutocallablePayoff {
         memory_coupons: bool,
         final_barrier: f64,
         final_payoff_type: FinalPayoffType,
-        participation_rate: f64,
         cap_level: f64,
         notional: f64,
         initial_spot: f64,
@@ -159,7 +155,6 @@ impl AutocallablePayoff {
             memory_coupons,
             final_barrier,
             final_payoff_type,
-            participation_rate,
             cap_level,
             notional,
             initial_spot,
@@ -210,15 +205,18 @@ impl AutocallablePayoff {
     /// all-observations-past branch of the pricer.
     pub fn final_payoff_ratio(&self, final_spot: f64, min_spot_observed: f64) -> f64 {
         match self.final_payoff_type {
-            FinalPayoffType::CapitalProtection { floor } => {
+            FinalPayoffType::CapitalProtection {
+                floor,
+                participation_rate,
+            } => {
                 // Use final_spot directly (defaults to 0.0 if never set, which will hit the floor)
                 let return_ratio = (final_spot / self.initial_spot).min(self.cap_level);
-                let participation_term = self.participation_rate * return_ratio;
+                let participation_term = participation_rate * return_ratio;
                 floor.max(participation_term)
             }
-            FinalPayoffType::Participation { rate } => {
+            FinalPayoffType::Participation { participation_rate } => {
                 let capped_ratio = (final_spot / self.initial_spot).min(self.cap_level);
-                1.0 + rate * ((capped_ratio - 1.0).max(0.0))
+                1.0 + participation_rate * ((capped_ratio - 1.0).max(0.0))
             }
             FinalPayoffType::KnockInPut { strike_ratio } => {
                 let barrier_level = self.initial_spot * self.final_barrier;
@@ -368,8 +366,10 @@ mod tests {
             coupons,
             false, // memory_coupons
             0.75,  // Final barrier
-            FinalPayoffType::CapitalProtection { floor: 0.9 },
-            1.0, // Participation rate
+            FinalPayoffType::CapitalProtection {
+                floor: 0.9,
+                participation_rate: 1.0,
+            },
             1.2, // Cap level
             100_000.0,
             100.0,                    // Initial spot
@@ -395,8 +395,10 @@ mod tests {
             coupons,
             false, // memory_coupons
             0.75,
-            FinalPayoffType::CapitalProtection { floor: 0.9 },
-            1.0,
+            FinalPayoffType::CapitalProtection {
+                floor: 0.9,
+                participation_rate: 1.0,
+            },
             1.2,
             100_000.0,
             100.0,
@@ -430,8 +432,10 @@ mod tests {
             coupons,
             false, // memory_coupons
             0.75,
-            FinalPayoffType::CapitalProtection { floor: 0.9 },
-            1.0,
+            FinalPayoffType::CapitalProtection {
+                floor: 0.9,
+                participation_rate: 1.0,
+            },
             1.2,
             100_000.0,
             100.0,
@@ -469,8 +473,9 @@ mod tests {
             vec![0.0],
             false, // memory_coupons
             0.75,
-            FinalPayoffType::Participation { rate: 1.0 },
-            1.0,
+            FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            },
             1.5,
             100_000.0,
             100.0,
@@ -498,8 +503,10 @@ mod tests {
             coupons,
             false, // memory_coupons
             0.75,
-            FinalPayoffType::CapitalProtection { floor: 0.9 },
-            1.0,
+            FinalPayoffType::CapitalProtection {
+                floor: 0.9,
+                participation_rate: 1.0,
+            },
             1.2,
             100_000.0,
             100.0,
@@ -528,7 +535,6 @@ mod tests {
             false, // memory_coupons
             0.6,
             FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
-            1.0,
             1.2,
             notional,
             100.0,
@@ -568,7 +574,6 @@ mod tests {
             false, // memory_coupons
             0.6,
             FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
-            1.0,
             1.2,
             notional,
             200.0,
@@ -606,8 +611,10 @@ mod tests {
             coupons,
             false, // memory_coupons
             0.75,
-            FinalPayoffType::CapitalProtection { floor: 0.9 },
-            1.0,
+            FinalPayoffType::CapitalProtection {
+                floor: 0.9,
+                participation_rate: 1.0,
+            },
             1.2,
             100_000.0,
             100.0,
@@ -646,8 +653,10 @@ mod tests {
             coupons,
             false, // memory_coupons
             0.75,
-            FinalPayoffType::CapitalProtection { floor: 0.9 },
-            1.0,
+            FinalPayoffType::CapitalProtection {
+                floor: 0.9,
+                participation_rate: 1.0,
+            },
             1.2,
             100_000.0,
             100.0,
@@ -675,8 +684,9 @@ mod tests {
             vec![0.0],
             false, // memory_coupons
             0.6,
-            FinalPayoffType::Participation { rate: 1.0 },
-            1.0,
+            FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            },
             1.2,
             100_000.0,
             100.0,
@@ -717,7 +727,6 @@ mod tests {
             false,
             0.6, // 60% knock-in barrier => barrier level = 60.0
             FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
-            1.0,
             1.5,
             100_000.0,
             100.0,
@@ -775,8 +784,9 @@ mod tests {
             coupons,
             true, // memory_coupons ENABLED
             0.6,
-            FinalPayoffType::Participation { rate: 1.0 },
-            1.0,
+            FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            },
             1.5,
             100_000.0,
             100.0,
@@ -819,8 +829,9 @@ mod tests {
             coupons,
             false, // memory_coupons DISABLED
             0.6,
-            FinalPayoffType::Participation { rate: 1.0 },
-            1.0,
+            FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            },
             1.5,
             100_000.0,
             100.0,
@@ -852,8 +863,9 @@ mod tests {
             vec![0.03, 0.04],
             true,
             0.6,
-            FinalPayoffType::Participation { rate: 1.0 },
-            1.0,
+            FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            },
             1.5,
             100_000.0,
             100.0,
@@ -885,8 +897,9 @@ mod tests {
             vec![0.0],
             false,
             0.6,
-            FinalPayoffType::Participation { rate: 1.0 },
-            1.0,
+            FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            },
             1.5,
             100_000.0,
             100.0,

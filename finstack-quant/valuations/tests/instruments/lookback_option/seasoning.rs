@@ -101,9 +101,7 @@ fn test_fixed_strike_call_seasoning() {
     // Current intrinsic = 120 - 100 = 20.
     // Should be much more valuable than unseasoned.
     let seasoned_high = get_base_builder(as_of)
-        .observed_max_opt(Some(
-            Money::new(120.0, Currency::USD).expect("valid money fixture"),
-        ))
+        .observed_max_opt(Some(120.0))
         .build()
         .unwrap();
 
@@ -120,9 +118,7 @@ fn test_fixed_strike_call_seasoning() {
     // Effective Max = max(80, 100) = 100.
     // Should be equal to unseasoned.
     let seasoned_low = get_base_builder(as_of)
-        .observed_max_opt(Some(
-            Money::new(80.0, Currency::USD).expect("valid money fixture"),
-        ))
+        .observed_max_opt(Some(80.0))
         .build()
         .unwrap();
 
@@ -160,9 +156,7 @@ fn test_floating_strike_put_seasoning() {
         .strike_opt(None) // Floating strike
         .option_type(finstack_quant_valuations::instruments::OptionType::Put)
         .lookback_type(LookbackType::FloatingStrike)
-        .observed_max_opt(Some(
-            Money::new(120.0, Currency::USD).expect("valid money fixture"),
-        ))
+        .observed_max_opt(Some(120.0))
         .build()
         .unwrap();
     let pv_seasoned_high = seasoned_high.value(&market, as_of).unwrap().amount();
@@ -194,9 +188,7 @@ fn test_fixed_strike_put_seasoning() {
     let seasoned_low = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FIXED-PUT"))
         .option_type(finstack_quant_valuations::instruments::OptionType::Put)
-        .observed_min_opt(Some(
-            Money::new(80.0, Currency::USD).expect("valid money fixture"),
-        ))
+        .observed_min_opt(Some(80.0))
         .build()
         .unwrap();
     let pv_seasoned_low = seasoned_low.value(&market, as_of).unwrap().amount();
@@ -212,9 +204,7 @@ fn test_fixed_strike_put_seasoning() {
     let seasoned_high = get_base_builder(as_of)
         .id(InstrumentId::new("TEST-LOOKBACK-FIXED-PUT"))
         .option_type(finstack_quant_valuations::instruments::OptionType::Put)
-        .observed_min_opt(Some(
-            Money::new(120.0, Currency::USD).expect("valid money fixture"),
-        ))
+        .observed_min_opt(Some(120.0))
         .build()
         .unwrap();
     let pv_seasoned_high = seasoned_high.value(&market, as_of).unwrap().amount();
@@ -252,9 +242,7 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
             finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
         )
         .observed_min_opt(None)
-        .observed_max_opt(Some(
-            Money::new(130.0, Currency::USD).expect("valid money fixture"),
-        ))
+        .observed_max_opt(Some(130.0))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
         .build()
         .unwrap();

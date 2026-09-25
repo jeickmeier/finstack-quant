@@ -139,7 +139,7 @@ let terms = RangeAccrualTerms::builder()
     .vol_surface_id(CurveId::new("SPX-VOL"))
     .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
     // Mid-life: 3 of 6 past observations were in range.
-    .past_fixings_in_range_opt(Some(3))
+    .past_observations_in_range_opt(Some(3))
     .total_past_observations_opt(Some(6))
     .build()?;
 
@@ -188,7 +188,7 @@ pricing; normal or displaced surface quotes produce a validation error.
 - at least one observation date, sorted strictly ascending;
 - `lower_bound`, `upper_bound`, `coupon_rate` and `notional` are finite, with
   `notional > 0`, `lower_bound < upper_bound`, `coupon_rate >= 0`;
-- `past_fixings_in_range` and `total_past_observations` are both set or both
+- `past_observations_in_range` and `total_past_observations` are both set or both
   unset, with `in_range <= total`;
 - `payment_date` (when set) is on or after the final observation date;
 - the accrual factor from `accrual_start_date` to the final observation is

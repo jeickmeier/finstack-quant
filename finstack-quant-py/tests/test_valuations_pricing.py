@@ -384,7 +384,7 @@ def _callable_range_accrual_json() -> str:
                 "div_yield_id": None,
                 "quanto": None,
                 "payment_date": None,
-                "past_fixings_in_range": None,
+                "past_observations_in_range": None,
                 "total_past_observations": None,
             },
             "call_provision": {
@@ -473,7 +473,7 @@ def _cms_spread_option_json() -> str:
             "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
             "discount_curve_id": "USD-OIS",
             "forward_curve_id": "USD-SOFR-3M",
-            "spread_correlation": 0.5,
+            "correlation": 0.5,
             "day_count": "act_365f",
             "attributes": {},
         },

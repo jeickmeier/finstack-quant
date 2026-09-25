@@ -2330,11 +2330,6 @@
           },
           "type": "array"
         },
-        "participation_rate": {
-          "description": "Participation rate in underlying performance",
-          "format": "double",
-          "type": "number"
-        },
         "past_fixings": {
           "default": [],
           "description": "Observed underlying fixings for seasoned trades (date, level pairs).\n\nFor a mid-life autocallable, every observation date on or before the\nvaluation date must have a matching fixing here; pricing errors\notherwise. Past fixings are evaluated deterministically (autocall,\nmissed memory coupons, discrete knock-in monitoring) and only the\nremaining future observation dates are simulated.",
@@ -2394,7 +2389,6 @@
         "coupons",
         "final_barrier",
         "final_payoff_type",
-        "participation_rate",
         "cap_level",
         "notional",
         "day_count",
@@ -2407,7 +2401,7 @@
       "type": "object"
     },
     "AveragingMethod": {
-      "description": "Averaging method for Asian options.",
+      "description": "Asian averaging method.\n\nSerialized as `\"arithmetic\"` / `\"geometric\"`; this is the single definition\nshared by the Monte Carlo payoffs and the `averaging_method` wire field of\nthe Asian option instruments.",
       "oneOf": [
         {
           "const": "arithmetic",
@@ -2486,16 +2480,16 @@
       ]
     },
     "BarrierDirection": {
-      "description": "Barrier direction for touch options.",
+      "description": "Side of spot on which a barrier sits.",
       "oneOf": [
         {
           "const": "up",
-          "description": "Barrier is above current spot (spot must rise to touch).",
+          "description": "Barrier is above spot: hit when spot touches or rises above it.",
           "type": "string"
         },
         {
           "const": "down",
-          "description": "Barrier is below current spot (spot must fall to touch).",
+          "description": "Barrier is below spot: hit when spot touches or falls below it.",
           "type": "string"
         }
       ]
@@ -2509,8 +2503,9 @@
           "description": "Attributes for scenario selection and grouping"
         },
         "barrier": {
-          "$ref": "#/$defs/Money",
-          "description": "Barrier level (price that triggers knock-in/out)"
+          "description": "Barrier level: the absolute underlying price that triggers the\nknock-in/out, in the same quote units as `strike`.",
+          "format": "double",
+          "type": "number"
         },
         "barrier_type": {
           "$ref": "#/$defs/BarrierType",
@@ -2540,15 +2535,12 @@
           "description": "Option expiry date"
         },
         "expiry_fixing": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Money"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent."
+          "description": "Terminal underlying fixing observed at expiry, in the same quote units\nas `strike`.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "id": {
           "$ref": "#/$defs/Id",
@@ -2596,7 +2588,7 @@
           "description": "Total contractual trade rebate in the payoff currency, independent of\nnotional. Knock-outs pay on a hit according to `rebate_timing`;\nknock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
-          "$ref": "#/$defs/RebateTiming",
+          "$ref": "#/$defs/PayoutTiming",
           "default": "at_hit",
           "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry (a no-hit is only known then),\nso this setting does not affect them. The analytical pricer values\nat-hit rebates via the discounted first-passage closed form. Monte\nCarlo applies at-hit when `rebate_timing == AtHit` via\n`with_rebate_at_hit`; the crate primitive defaults to at-expiry."
         },
@@ -6138,6 +6130,10 @@
           "$ref": "#/$defs/Attributes",
           "description": "Attributes."
         },
+        "correlation": {
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Gaussian-copula correlation between the two CMS rates, a decimal in `[-1, 1]`."
+        },
         "day_count": {
           "$ref": "#/$defs/DayCount",
           "description": "Day count convention."
@@ -6197,11 +6193,6 @@
         "short_vol_surface_id": {
           "$ref": "#/$defs/Id",
           "description": "Swaption volatility surface for short tenor."
-        },
-        "spread_correlation": {
-          "description": "Rank correlation between the two CMS rates.",
-          "format": "double",
-          "type": "number"
         },
         "strike": {
           "description": "Strike spread (in decimal, e.g., 0.005 = 50bp).",
@@ -6277,7 +6268,7 @@
         "short_vol_surface_id",
         "discount_curve_id",
         "forward_curve_id",
-        "spread_correlation",
+        "correlation",
         "day_count",
         "attributes"
       ],
@@ -6746,11 +6737,7 @@
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)."
         },
-        "quantity": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Contract quantity in commodity units."
-        },
-        "realized_fixings": {
+        "past_fixings": {
           "default": [],
           "description": "Already observed fixings for seasoned options (ex-date, price pairs).",
           "items": {
@@ -6768,6 +6755,10 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Contract quantity in commodity units."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -7106,7 +7097,7 @@
               },
               "type": "array"
             },
-            "realized_fixings": {
+            "past_fixings": {
               "default": [],
               "description": "Official prices already fixed, keyed by observation date.",
               "items": {
@@ -7490,11 +7481,7 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "quantity": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Notional quantity per period."
-        },
-        "realized_fixings": {
+        "past_fixings": {
           "default": [],
           "description": "Realized floating-index fixings as `(date, price)` pairs.\n\nFloating-leg observations with date strictly before the valuation date\nread from this store; a missing past fixing is an error — no silent\nsubstitution of today's spot . Observations on or\nafter the valuation date project from the price curve.",
           "items": {
@@ -7512,6 +7499,10 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Notional quantity per period."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -13830,7 +13821,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Capital protection: max(floor, participation * min(S_T/S_0, cap))",
+          "description": "Capital protection: max(floor, participation_rate * min(S_T/S_0, cap_level))",
           "properties": {
             "capital_protection": {
               "additionalProperties": false,
@@ -13839,10 +13830,16 @@
                   "description": "Minimum return floor (e.g., 1.0 for 100% protection)",
                   "format": "double",
                   "type": "number"
+                },
+                "participation_rate": {
+                  "description": "Decimal multiplier on the capped performance ratio (1.0 = 100%).",
+                  "format": "double",
+                  "type": "number"
                 }
               },
               "required": [
-                "floor"
+                "floor",
+                "participation_rate"
               ],
               "type": "object"
             }
@@ -13854,19 +13851,19 @@
         },
         {
           "additionalProperties": false,
-          "description": "Participation: 1 + participation_rate * max(0, S_T/S_0 - 1)",
+          "description": "Participation: 1 + participation_rate * max(0, min(S_T/S_0, cap_level) - 1)",
           "properties": {
             "participation": {
               "additionalProperties": false,
               "properties": {
-                "rate": {
-                  "description": "Participation rate in upside (e.g., 1.0 for 100% participation)",
+                "participation_rate": {
+                  "description": "Decimal multiplier on the capped upside (1.0 = 100% participation).",
                   "format": "double",
                   "type": "number"
                 }
               },
               "required": [
-                "rate"
+                "participation_rate"
               ],
               "type": "object"
             }
@@ -15453,15 +15450,18 @@
           "description": "Quote currency (the pricing/settlement currency, formerly domestic_currency)"
         },
         "rebate": {
-          "description": "Optional rebate amount (paid if the barrier condition is met, dimensionless;\nsee `rebate_timing` for when a knock-out rebate pays)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total contractual trade rebate, paid in the quote (settlement)\ncurrency and independent of notional. Knock-outs pay on a hit according\nto `rebate_timing`; knock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
-          "$ref": "#/$defs/RebateTiming",
+          "$ref": "#/$defs/PayoutTiming",
           "default": "at_hit",
           "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry, so this setting does not affect\nthem. The analytical pricer values at-hit rebates via the discounted\nfirst-passage closed form. Monte Carlo applies at-hit when\n`rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive\ndefaults to at-expiry."
         },
@@ -16345,14 +16345,14 @@
           "$ref": "#/$defs/Attributes",
           "description": "Attributes for scenario selection and grouping"
         },
-        "barrier_direction": {
-          "$ref": "#/$defs/BarrierDirection",
-          "description": "Barrier direction (up or down)"
-        },
-        "barrier_level": {
+        "barrier": {
           "description": "Barrier level (exchange rate that triggers the touch)",
           "format": "double",
           "type": "number"
+        },
+        "barrier_direction": {
+          "$ref": "#/$defs/BarrierDirection",
+          "description": "Barrier direction (up or down)"
         },
         "base_currency": {
           "$ref": "#/$defs/Currency",
@@ -16395,9 +16395,9 @@
               "type": "null"
             }
           ],
-          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_touch`."
+          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_barrier_breached`."
         },
-        "observed_touch": {
+        "observed_barrier_breached": {
           "description": "Observed barrier event state for expired valuations.\n\n`Some(true)` means the barrier was touched during the option life,\n`Some(false)` means it was observed not to have touched, and `None`\nmeans the historical touch state is unavailable.\n\nThis is only required once the option has expired. Without it, a\ntouched-and-reverted path cannot be distinguished from an untouched path\nusing the terminal spot alone.",
           "type": [
             "boolean",
@@ -16433,7 +16433,7 @@
         "id",
         "base_currency",
         "quote_currency",
-        "barrier_level",
+        "barrier",
         "touch_type",
         "barrier_direction",
         "payout_amount",
@@ -20177,15 +20177,12 @@
           "description": "Option expiry date"
         },
         "expiry_fixing": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Money"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent."
+          "description": "Terminal underlying fixing observed at expiry, in the same quote units\nas `strike`.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "id": {
           "$ref": "#/$defs/Id",
@@ -20203,31 +20200,32 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
+        "monitoring": {
+          "$ref": "#/$defs/Monitoring",
+          "default": {
+            "type": "continuous"
+          },
+          "description": "Contractual monitoring of the path extremum.\n\n`continuous` (default) prices with the Goldman-Sosin-Gatto closed form.\n`discrete` observes the extremum only on the strictly increasing\n`observation_dates` (no later than expiry) and prices by Monte Carlo."
+        },
         "notional": {
           "$ref": "#/$defs/Money",
           "description": "Notional amount"
         },
         "observed_max": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Money"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Observed maximum spot price since inception (required for Floating Put / Fixed Call)"
+          "description": "Observed maximum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Put / Fixed Call once seasoned).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "observed_min": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Money"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Observed minimum spot price since inception (required for Floating Call / Fixed Put)"
+          "description": "Observed minimum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Call / Fixed Put once seasoned).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
@@ -20252,11 +20250,6 @@
         "underlying_ticker": {
           "description": "Underlying asset ticker symbol",
           "type": "string"
-        },
-        "use_gobet_miri": {
-          "default": false,
-          "description": "Whether to use Monte Carlo with Gobet-Miri correction for discrete monitoring.\n\nWhen `true`, `value()` dispatches to `npv_mc()` for discrete-monitoring-corrected\npricing using Monte Carlo simulation.\n\n**Defaults to `false`** (analytical continuous pricing).\nSet to `true` for production pricing of discretely-monitored lookbacks.",
-          "type": "boolean"
         },
         "vol_surface_id": {
           "$ref": "#/$defs/Id",
@@ -21784,7 +21777,7 @@
     },
     "Ndf": {
       "additionalProperties": false,
-      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (fixing_rate = None)\nForward rate uses the explicit override or covered interest rate parity\nwith both currency curves.\n\n## Post-Fixing (fixing_rate = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
+      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (observed_fixing = None)\nForward rate uses the explicit override or covered interest rate parity\nwith both currency curves.\n\n## Post-Fixing (observed_fixing = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -21814,15 +21807,6 @@
         "fixing_date": {
           "$ref": "#/$defs/DateWire",
           "description": "Fixing date (rate observation date, typically T-2 before maturity)."
-        },
-        "fixing_rate": {
-          "default": null,
-          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "fixing_source_enum": {
           "anyOf": [
@@ -21881,6 +21865,15 @@
           "$ref": "#/$defs/Money",
           "description": "Notional amount in base currency."
         },
+        "observed_fixing": {
+          "default": null,
+          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "quote_calendar_id": {
           "default": null,
           "description": "Optional settlement currency calendar.",
@@ -21891,7 +21884,7 @@
         },
         "quote_convention": {
           "$ref": "#/$defs/NdfQuoteConvention",
-          "description": "Quote convention for contract_rate and fixing_rate."
+          "description": "Quote convention for contract_rate and observed_fixing."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -23010,16 +23003,16 @@
       ]
     },
     "PayoutTiming": {
-      "description": "Payout timing for touch options.",
+      "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them.",
       "oneOf": [
         {
           "const": "at_hit",
-          "description": "Payout occurs immediately when barrier is hit (for one-touch).",
+          "description": "Paid the moment the barrier is hit (market standard).",
           "type": "string"
         },
         {
           "const": "at_expiry",
-          "description": "Payout is deferred to expiry regardless of when barrier is hit.",
+          "description": "Paid at expiry regardless of when the barrier is hit.",
           "type": "string"
         }
       ]
@@ -24429,7 +24422,7 @@
     },
     "RangeAccrual": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
       "properties": {
         "accrual_start_date": {
           "$ref": "#/$defs/DateWire",
@@ -24496,7 +24489,7 @@
           },
           "type": "array"
         },
-        "past_fixings_in_range": {
+        "past_observations_in_range": {
           "description": "Number of past observations that were in range (for mid-life valuations).\nIf None, past observations are not included in the accrual calculation.",
           "format": "uint",
           "minimum": 0,
@@ -24570,7 +24563,7 @@
           "description": "Spot price identifier"
         },
         "total_past_observations": {
-          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_fixings_in_range` is set.",
+          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -24662,7 +24655,7 @@
           },
           "type": "array"
         },
-        "past_fixings_in_range": {
+        "past_observations_in_range": {
           "description": "Number of past observations that were in range (for mid-life valuations).\nIf None, past observations are not included in the accrual calculation.",
           "format": "uint",
           "minimum": 0,
@@ -24732,7 +24725,7 @@
           "description": "Spot price identifier"
         },
         "total_past_observations": {
-          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_fixings_in_range` is set.",
+          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -25801,21 +25794,6 @@
             "business_day_convention"
           ],
           "type": "object"
-        }
-      ]
-    },
-    "RebateTiming": {
-      "description": "Timing of a knock-out rebate payment.\n\nMarket-standard KO rebates pay **at hit** (the moment the barrier is\nbreached); paying at expiry is the less common variant. Knock-in rebates\nalways pay at expiry by definition (only at expiry is it known that the\noption failed to knock in), so this setting does not affect them.",
-      "oneOf": [
-        {
-          "const": "at_hit",
-          "description": "Rebate is paid at the barrier hit time (market standard for KO rebates).",
-          "type": "string"
-        },
-        {
-          "const": "at_expiry",
-          "description": "Rebate is paid at option expiry.",
-          "type": "string"
         }
       ]
     },

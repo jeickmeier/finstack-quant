@@ -121,7 +121,7 @@ impl BarrierOptionHestonMcPricer {
         // The Heston path variance supplies the local bridge volatility.
         let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
-            inst.barrier.amount(),
+            inst.barrier,
             inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
             inst.rebate.map(|m| m.amount() / inst.notional.amount()),

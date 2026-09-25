@@ -46,15 +46,17 @@ use time::macros::date;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum FinalPayoffType {
-    /// Capital protection: max(floor, participation * min(S_T/S_0, cap))
+    /// Capital protection: max(floor, participation_rate * min(S_T/S_0, cap_level))
     CapitalProtection {
         /// Minimum return floor (e.g., 1.0 for 100% protection)
         floor: f64,
+        /// Decimal multiplier on the capped performance ratio (1.0 = 100%).
+        participation_rate: f64,
     },
-    /// Participation: 1 + participation_rate * max(0, S_T/S_0 - 1)
+    /// Participation: 1 + participation_rate * max(0, min(S_T/S_0, cap_level) - 1)
     Participation {
-        /// Participation rate in upside (e.g., 1.0 for 100% participation)
-        rate: f64,
+        /// Decimal multiplier on the capped upside (1.0 = 100% participation).
+        participation_rate: f64,
     },
     /// Knock-in put: Put option if barrier breached, otherwise return principal
     KnockInPut {
@@ -132,8 +134,6 @@ pub struct Autocallable {
     pub final_barrier: f64,
     /// Type of final payoff (capital protection, participation, knock-in put)
     pub final_payoff_type: FinalPayoffType,
-    /// Participation rate in underlying performance
-    pub participation_rate: f64,
     /// Cap level for final payoff (maximum return)
     pub cap_level: f64,
     /// Notional amount
@@ -259,8 +259,6 @@ struct AutocallableUnchecked {
     final_barrier: f64,
     /// Type of final payoff (capital protection, participation, knock-in put)
     final_payoff_type: FinalPayoffType,
-    /// Participation rate in underlying performance
-    participation_rate: f64,
     /// Cap level for final payoff (maximum return)
     cap_level: f64,
     /// Notional amount
@@ -334,7 +332,6 @@ impl TryFrom<AutocallableUnchecked> for Autocallable {
             memory_coupons: value.memory_coupons,
             final_barrier: value.final_barrier,
             final_payoff_type: value.final_payoff_type,
-            participation_rate: value.participation_rate,
             cap_level: value.cap_level,
             notional: value.notional,
             day_count: value.day_count,
@@ -368,7 +365,7 @@ impl Autocallable {
     /// - a payment date precedes its observation date or follows `expiry`
     /// - any barrier is negative or non-finite
     /// - any coupon is non-finite
-    /// - `final_barrier`, `participation_rate`, or `cap_level` are non-finite
+    /// - `final_barrier`, a final-payoff `participation_rate`, or `cap_level` are non-finite
     /// - `cap_level <= 0`
     /// - `notional.amount()` is not finite
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -473,12 +470,6 @@ impl Autocallable {
                 self.final_barrier
             )));
         }
-        if !self.participation_rate.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Autocallable participation_rate = {} must be finite",
-                self.participation_rate
-            )));
-        }
         if !self.cap_level.is_finite() || self.cap_level <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Autocallable cap_level = {} must be finite and positive",
@@ -486,17 +477,25 @@ impl Autocallable {
             )));
         }
         match self.final_payoff_type {
-            FinalPayoffType::CapitalProtection { floor } => {
+            FinalPayoffType::CapitalProtection {
+                floor,
+                participation_rate,
+            } => {
                 if !floor.is_finite() || floor < 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "Autocallable capital-protection floor = {floor} must be finite and non-negative"
+                        "final_payoff_type.capital_protection.floor = {floor} must be finite and non-negative"
+                    )));
+                }
+                if !participation_rate.is_finite() {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "final_payoff_type.capital_protection.participation_rate = {participation_rate} must be finite"
                     )));
                 }
             }
-            FinalPayoffType::Participation { rate } => {
-                if !rate.is_finite() || rate < 0.0 {
+            FinalPayoffType::Participation { participation_rate } => {
+                if !participation_rate.is_finite() || participation_rate < 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "Autocallable final participation rate = {rate} must be finite and non-negative"
+                        "final_payoff_type.participation.participation_rate = {participation_rate} must be finite and non-negative"
                     )));
                 }
             }
@@ -564,8 +563,9 @@ impl Autocallable {
             .coupon_barriers(coupon_barriers)
             .coupons(coupons)
             .final_barrier(0.6) // 60% final KI barrier
-            .final_payoff_type(FinalPayoffType::Participation { rate: 1.0 })
-            .participation_rate(1.0)
+            .final_payoff_type(FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            })
             .cap_level(1.5) // 150% cap
             .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
@@ -656,8 +656,9 @@ mod validation_tests {
             .coupon_barriers(vec![0.7, 0.7])
             .coupons(vec![0.02, 0.02])
             .final_barrier(0.6)
-            .final_payoff_type(FinalPayoffType::Participation { rate: 1.0 })
-            .participation_rate(1.0)
+            .final_payoff_type(FinalPayoffType::Participation {
+                participation_rate: 1.0,
+            })
             .cap_level(1.5)
             .notional(Money::from((100_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
@@ -714,11 +715,23 @@ mod validation_tests {
     #[test]
     fn builder_rejects_invalid_nested_final_payoff_parameters() {
         assert!(base_builder()
-            .final_payoff_type(FinalPayoffType::CapitalProtection { floor: -0.1 })
+            .final_payoff_type(FinalPayoffType::CapitalProtection {
+                floor: -0.1,
+                participation_rate: 1.0,
+            })
             .build()
             .is_err());
         assert!(base_builder()
-            .final_payoff_type(FinalPayoffType::Participation { rate: -1.0 })
+            .final_payoff_type(FinalPayoffType::CapitalProtection {
+                floor: 1.0,
+                participation_rate: f64::NAN,
+            })
+            .build()
+            .is_err());
+        assert!(base_builder()
+            .final_payoff_type(FinalPayoffType::Participation {
+                participation_rate: -1.0,
+            })
             .build()
             .is_err());
         assert!(base_builder()

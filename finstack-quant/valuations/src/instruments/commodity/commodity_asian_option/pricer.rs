@@ -46,7 +46,7 @@ pub(crate) fn compute_pv(
     // Reject duplicate / date-mismatched / missing past fixings before they
     // can silently distort the average or the seasoned effective strike
     // .
-    inst.validate_realized_fixings(as_of)?;
+    inst.validate_past_fixings(as_of)?;
 
     let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
     let total_fixings = inst.fixing_dates.len();
@@ -310,7 +310,7 @@ fn price_geometric_kv_commodity(
 /// original strike `K`.
 ///
 /// Crucially the remaining geometric mean enters at power `m/n`, not `1`: a
-/// realized fixing both shrinks the remaining uncertainty
+/// past fixing both shrinks the remaining uncertainty
 /// (`Var[ln X] = (m/n)²·Var[ln G_fut]`) and reshapes the effective forward.
 /// Pricing a *fresh* geometric Asian on `G_fut` (power `1`) with an adjusted
 /// strike — as a naive strike transform does — overstates the remaining
@@ -738,7 +738,7 @@ mod tests {
 
         let mut option = base_option(fixing_dates, settlement);
         // Realized fixings at high prices (ITM)
-        option.realized_fixings = vec![
+        option.past_fixings = vec![
             (date(2025, 1, 31), 80.0),
             (date(2025, 2, 28), 82.0),
             (date(2025, 3, 31), 78.0),
@@ -773,7 +773,7 @@ mod tests {
 
         let mut option = base_option(fixing_dates, settlement);
         // 2025-02-28 is missing.
-        option.realized_fixings = vec![(date(2025, 1, 31), 80.0), (date(2025, 3, 31), 78.0)];
+        option.past_fixings = vec![(date(2025, 1, 31), 80.0), (date(2025, 3, 31), 78.0)];
 
         let market = build_commodity_market(as_of, 79.0, 0.25, 0.05);
         let err = option
@@ -794,7 +794,7 @@ mod tests {
         let settlement = date(2025, 5, 2);
 
         let mut option = base_option(fixing_dates, settlement);
-        option.realized_fixings = vec![
+        option.past_fixings = vec![
             (date(2025, 1, 31), 80.0),
             (date(2025, 1, 31), 81.0),
             (date(2025, 2, 28), 78.0),
@@ -810,7 +810,7 @@ mod tests {
         );
     }
 
-    /// a realized fixing whose date is not on the fixing
+    /// a past fixing whose date is not on the fixing
     /// schedule is a date mismatch, not silently-ignorable data.
     #[test]
     fn date_mismatched_realized_fixing_is_an_error() {
@@ -819,7 +819,7 @@ mod tests {
         let settlement = date(2025, 5, 2);
 
         let mut option = base_option(fixing_dates, settlement);
-        option.realized_fixings = vec![
+        option.past_fixings = vec![
             (date(2025, 1, 31), 80.0),
             // 2025-03-01 is not a scheduled fixing date.
             (date(2025, 3, 1), 79.5),
@@ -844,7 +844,7 @@ mod tests {
         let fixing_dates = vec![date(2025, 4, 30), date(2025, 5, 31), date(2025, 6, 30)];
 
         let mut option = base_option(fixing_dates, settlement);
-        option.realized_fixings = vec![
+        option.past_fixings = vec![
             (date(2025, 4, 30), 80.0),
             (date(2025, 5, 31), 82.0),
             (date(2025, 6, 30), 78.0),

@@ -16,7 +16,7 @@ use finstack_quant_core::money::Money;
 
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::asian::{AsianCall, AsianPut, AveragingMethod};
+use finstack_quant_models::monte_carlo::payoff::asian::{AsianCall, AsianPut};
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::seed;
@@ -129,15 +129,7 @@ impl AsianOptionHestonMcPricer {
         let num_steps = fixing_grid.num_steps;
         let fixing_steps = fixing_grid.fixing_steps;
 
-        // Map averaging method
-        let averaging = match inst.averaging_method {
-            crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic => {
-                AveragingMethod::Arithmetic
-            }
-            crate::instruments::exotics::asian_option::types::AveragingMethod::Geometric => {
-                AveragingMethod::Geometric
-            }
-        };
+        let averaging = inst.averaging_method;
 
         let time_grid = TimeGrid::uniform(t, num_steps)?;
 

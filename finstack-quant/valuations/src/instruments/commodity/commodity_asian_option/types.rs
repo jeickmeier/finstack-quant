@@ -96,7 +96,7 @@ pub struct CommodityAsianOption {
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
     )]
-    pub realized_fixings: Vec<(Date, f64)>,
+    pub past_fixings: Vec<(Date, f64)>,
     /// Contract quantity in commodity units.
     #[serde(
         serialize_with = "finstack_quant_core::wire::serialize_positive_f64",
@@ -185,16 +185,16 @@ impl CommodityAsianOption {
             ));
         }
         let mut seen = std::collections::BTreeSet::new();
-        for (date, value) in &self.realized_fixings {
+        for (date, value) in &self.past_fixings {
             if !seen.insert(*date) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has duplicate realized fixing for date {date}",
+                    "CommodityAsianOption '{}' has duplicate past fixing for date {date}",
                     self.id
                 )));
             }
             if !self.fixing_dates.contains(date) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has a realized fixing for {date}, which is \
+                    "CommodityAsianOption '{}' has a past fixing for {date}, which is \
                      not a scheduled fixing date",
                     self.id
                 )));
@@ -250,35 +250,35 @@ impl CommodityAsianOption {
     /// Validate the realized-fixing history against the fixing schedule.
     ///
     /// Errors  when:
-    /// - `realized_fixings` contains duplicate dates (each would be
+    /// - `past_fixings` contains duplicate dates (each would be
     ///   double-counted by [`accumulated_state`](Self::accumulated_state)), or
-    /// - any scheduled `fixing_date <= as_of` has no realized fixing — a
+    /// - any scheduled `fixing_date <= as_of` has no past fixing — a
     ///   missing past fixing silently deflates `hist_sum` and inflates the
     ///   seasoned effective strike.
     ///
     /// # Arguments
     ///
     /// * `as_of` - Valuation or observation date that anchors discounting and schedule logic
-    pub fn validate_realized_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
+    pub fn validate_past_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
         let mut seen: std::collections::BTreeSet<Date> = std::collections::BTreeSet::new();
-        for (d, value) in &self.realized_fixings {
+        for (d, value) in &self.past_fixings {
             if !seen.insert(*d) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has duplicate realized fixing for date {d}",
+                    "CommodityAsianOption '{}' has duplicate past fixing for date {d}",
                     self.id
                 )));
             }
             if !self.fixing_dates.contains(d) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' has a realized fixing for {d}, which is \
+                    "CommodityAsianOption '{}' has a past fixing for {d}, which is \
                      not a scheduled fixing date (date mismatch)",
                     self.id
                 )));
             }
             if !value.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' realized fixing for {d} must be finite, got {value}",
+                    "CommodityAsianOption '{}' past fixing for {d} must be finite, got {value}",
                     self.id
                 )));
             }
@@ -293,7 +293,7 @@ impl CommodityAsianOption {
         for fixing_date in &self.fixing_dates {
             if *fixing_date <= as_of && !seen.contains(fixing_date) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommodityAsianOption '{}' is missing a realized fixing for past \
+                    "CommodityAsianOption '{}' is missing a past fixing for past \
                      fixing date {fixing_date} (as_of {as_of}); every fixing date on or \
                      before the valuation date must have a realized value",
                     self.id
@@ -309,7 +309,7 @@ impl CommodityAsianOption {
     /// Only considers fixings that match dates in `fixing_dates` and are on or
     /// before `as_of`.
     ///
-    /// Call [`Self::validate_realized_fixings`] first. Geometric averaging
+    /// Call [`Self::validate_past_fixings`] first. Geometric averaging
     /// requires strictly positive values, so this function never needs to
     /// encode an invalid observation as a sentinel.
     ///
@@ -321,7 +321,7 @@ impl CommodityAsianOption {
         let mut product_log = 0.0;
         let mut count = 0;
 
-        for (d, v) in &self.realized_fixings {
+        for (d, v) in &self.past_fixings {
             if *d <= as_of && self.fixing_dates.contains(d) {
                 sum += v;
                 if *v > 0.0 {
@@ -437,7 +437,7 @@ mod tests {
         assert_eq!(count, 0);
 
         // Add history
-        asian.realized_fixings = vec![(fixings[0], 72.0), (fixings[1], 74.0)];
+        asian.past_fixings = vec![(fixings[0], 72.0), (fixings[1], 74.0)];
 
         // Check at date between Feb and Mar
         let as_of = Date::from_calendar_date(2025, Month::March, 15).expect("valid date");

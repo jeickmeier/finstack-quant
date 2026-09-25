@@ -43,7 +43,7 @@ pub enum CommodityFutureFixing {
             feature = "json-schema",
             schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
         )]
-        realized_fixings: Vec<(Date, f64)>,
+        past_fixings: Vec<(Date, f64)>,
     },
 }
 
@@ -127,7 +127,7 @@ impl CommodityFuture {
             }
             CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates,
-                realized_fixings,
+                past_fixings,
             } => {
                 if fixing_dates.is_empty() {
                     return Err(finstack_quant_core::Error::Validation(
@@ -150,19 +150,19 @@ impl CommodityFuture {
                             .to_string(),
                     ));
                 }
-                for (date, price) in realized_fixings {
+                for (date, price) in past_fixings {
                     if !fixing_dates.contains(date) || !price.is_finite() {
                         return Err(finstack_quant_core::Error::Validation(format!(
-                            "CommodityFuture realized fixing ({date}, {price}) must be finite and match a fixing date"
+                            "CommodityFuture past fixing ({date}, {price}) must be finite and match a fixing date"
                         )));
                     }
                 }
-                let mut realized_dates = realized_fixings
+                let mut past_dates = past_fixings
                     .iter()
                     .map(|(date, _)| *date)
                     .collect::<Vec<_>>();
-                realized_dates.sort_unstable();
-                if realized_dates.windows(2).any(|pair| pair[0] == pair[1]) {
+                past_dates.sort_unstable();
+                if past_dates.windows(2).any(|pair| pair[0] == pair[1]) {
                     return Err(finstack_quant_core::Error::Validation(
                         "CommodityFuture realized fixings must have unique dates".to_string(),
                     ));
@@ -197,7 +197,7 @@ impl CommodityFuture {
                     date!(2026 - 12 - 30),
                     date!(2026 - 12 - 31),
                 ],
-                realized_fixings: Vec::new(),
+                past_fixings: Vec::new(),
             })
             .attributes(Attributes::new())
             .build()
@@ -235,7 +235,7 @@ impl CommodityFuture {
             }
             CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates,
-                realized_fixings,
+                past_fixings,
             } => {
                 let curve = if fixing_dates.iter().any(|date| *date >= as_of) {
                     Some(market.get_price_curve(self.price_curve_id.as_str())?)
@@ -245,12 +245,12 @@ impl CommodityFuture {
                 let mut sum = finstack_quant_core::math::NeumaierAccumulator::new();
                 for fixing_date in fixing_dates {
                     let price = if *fixing_date < as_of {
-                        realized_fixings
+                        past_fixings
                             .iter()
                             .find_map(|(date, price)| (date == fixing_date).then_some(*price))
                             .ok_or_else(|| {
                                 finstack_quant_core::Error::Validation(format!(
-                                    "CommodityFuture '{}' requires realized fixing for {} before as_of {}",
+                                    "CommodityFuture '{}' requires past fixing for {} before as_of {}",
                                     self.id, fixing_date, as_of
                                 ))
                             })?
@@ -368,7 +368,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::PriceCurve;
     use time::macros::date;
 
-    fn average_future(realized_fixings: Vec<(Date, f64)>) -> CommodityFuture {
+    fn average_future(past_fixings: Vec<(Date, f64)>) -> CommodityFuture {
         CommodityFuture::builder()
             .id(InstrumentId::new("AVG"))
             .underlying("INDEX".to_string())
@@ -391,7 +391,7 @@ mod tests {
                     date!(2026 - 01 - 05),
                     date!(2026 - 01 - 06),
                 ],
-                realized_fixings,
+                past_fixings,
             })
             .attributes(Attributes::new())
             .build()

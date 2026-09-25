@@ -10,7 +10,7 @@ use crate::instruments::{Monitoring, OptionType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::BarrierType;
+use finstack_quant_core::types::{BarrierType, PayoutTiming};
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 /// FX barrier option instrument.
 #[derive(
@@ -30,9 +30,10 @@ pub struct FxBarrierOption {
     pub strike: f64,
     /// Barrier level (exchange rate that triggers knock-in/out, dimensionless)
     pub barrier: f64,
-    /// Optional rebate amount (paid if the barrier condition is met, dimensionless;
-    /// see `rebate_timing` for when a knock-out rebate pays)
-    pub rebate: Option<f64>,
+    /// Total contractual trade rebate, paid in the quote (settlement)
+    /// currency and independent of notional. Knock-outs pay on a hit according
+    /// to `rebate_timing`; knock-ins pay at expiry only if no hit occurred.
+    pub rebate: Option<Money>,
     /// Timing of the knock-out rebate payment.
     ///
     /// `at_hit` (default, market standard) pays the rebate the moment a
@@ -44,7 +45,7 @@ pub struct FxBarrierOption {
     /// defaults to at-expiry.
     #[builder(default)]
     #[serde(default)]
-    pub rebate_timing: finstack_quant_models::closed_form::barrier::RebateTiming,
+    pub rebate_timing: PayoutTiming,
     /// Option type (call or put on foreign currency)
     pub option_type: OptionType,
     /// Barrier type (up/down, in/out)
@@ -130,6 +131,13 @@ pub struct FxBarrierOption {
 // Declare canonical market dependencies for the DV01 calculator.
 // FxBarrierOption uses both domestic and foreign curves for FX carry calculation
 impl FxBarrierOption {
+    /// Rebate per unit of base notional (quote currency per base unit), the
+    /// scale the per-unit closed form and Monte Carlo payoff work in.
+    pub(crate) fn rebate_per_unit(&self) -> Option<f64> {
+        self.rebate
+            .map(|rebate| rebate.amount() / self.notional.amount())
+    }
+
     /// Validate FX barrier option currency invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         crate::instruments::common_impl::validation::validate_distinct_currencies(
@@ -159,6 +167,20 @@ impl FxBarrierOption {
                 expected: self.base_currency,
                 actual: self.notional.currency(),
             });
+        }
+        if let Some(rebate) = self.rebate {
+            if rebate.currency() != self.quote_currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.quote_currency,
+                    actual: rebate.currency(),
+                });
+            }
+            // A zero rebate is economically identical to `None` and stays
+            // accepted; only negative or non-finite amounts are rejected.
+            crate::instruments::common_impl::validation::validate_f64_non_negative(
+                rebate.amount(),
+                "FxBarrierOption rebate",
+            )?;
         }
         let start = self.monitoring_start_date.ok_or_else(|| {
             finstack_quant_core::Error::Validation(

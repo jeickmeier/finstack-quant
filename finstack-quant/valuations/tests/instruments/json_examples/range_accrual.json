@@ -28,7 +28,7 @@
         "2024-11-30",
         "2024-12-31"
       ],
-      "past_fixings_in_range": null,
+      "past_observations_in_range": null,
       "payment_date": null,
       "spot_id": "SPX-SPOT",
       "total_past_observations": null,

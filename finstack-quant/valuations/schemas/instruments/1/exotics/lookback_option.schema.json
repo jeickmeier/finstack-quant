@@ -37,15 +37,12 @@
           "description": "Option expiry date"
         },
         "expiry_fixing": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent."
+          "description": "Terminal underlying fixing observed at expiry, in the same quote units\nas `strike`.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -63,31 +60,32 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
+        "monitoring": {
+          "$ref": "#/$defs/Monitoring",
+          "default": {
+            "type": "continuous"
+          },
+          "description": "Contractual monitoring of the path extremum.\n\n`continuous` (default) prices with the Goldman-Sosin-Gatto closed form.\n`discrete` observes the extremum only on the strictly increasing\n`observation_dates` (no later than expiry) and prices by Monte Carlo."
+        },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount"
         },
         "observed_max": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Observed maximum spot price since inception (required for Floating Put / Fixed Call)"
+          "description": "Observed maximum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Put / Fixed Call once seasoned).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "observed_min": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Observed minimum spot price since inception (required for Floating Call / Fixed Put)"
+          "description": "Observed minimum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Call / Fixed Put once seasoned).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
@@ -112,11 +110,6 @@
         "underlying_ticker": {
           "description": "Underlying asset ticker symbol",
           "type": "string"
-        },
-        "use_gobet_miri": {
-          "default": false,
-          "description": "Whether to use Monte Carlo with Gobet-Miri correction for discrete monitoring.\n\nWhen `true`, `value()` dispatches to `npv_mc()` for discrete-monitoring-corrected\npricing using Monte Carlo simulation.\n\n**Defaults to `false`** (analytical continuous pricing).\nSet to `true` for production pricing of discretely-monitored lookbacks.",
-          "type": "boolean"
         },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -150,6 +143,47 @@
           "const": "floating_strike",
           "description": "Floating strike lookback: strike is determined by path extremum",
           "type": "string"
+        }
+      ]
+    },
+    "Monitoring": {
+      "description": "Contractual barrier-monitoring convention.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Monitor continuously through the contractual monitoring interval.",
+          "properties": {
+            "type": {
+              "const": "continuous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Monitor only at the stated contractual observation dates.",
+          "properties": {
+            "observation_dates": {
+              "description": "Strictly increasing dates on which the barrier level is observed.",
+              "items": {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "discrete",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "observation_dates"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -201,6 +235,9 @@
           "expiry": "2024-12-20",
           "id": "LOOKBACK-SPX-FIXED-CALL",
           "lookback_type": "fixed_strike",
+          "monitoring": {
+            "type": "continuous"
+          },
           "notional": {
             "amount": "100000",
             "currency": "USD"
@@ -211,7 +248,6 @@
           "spot_id": "SPX-SPOT",
           "strike": 4500.0,
           "underlying_ticker": "SPX",
-          "use_gobet_miri": false,
           "vol_surface_id": "SPX-VOL"
         },
         "type": "lookback_option"

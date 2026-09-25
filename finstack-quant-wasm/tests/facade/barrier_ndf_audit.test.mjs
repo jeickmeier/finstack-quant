@@ -45,7 +45,7 @@ function pdeFixture() {
   f.market.prices['SPX-SPOT'] = { unitless: 100 };
   Object.assign(f.instrument.instrument.spec, {
     strike: 100,
-    barrier: { amount: '120', currency: 'USD' },
+    barrier: 120,
     notional: { amount: '1', currency: 'USD' },
     rebate: null,
     div_yield_id: null,
@@ -83,7 +83,7 @@ test('PDE total rebates follow continuous closed forms and payment timing', () =
   s.monitoring = { type: 'continuous' };
   for (const barrierType of ['up_and_out', 'down_and_in']) {
     s.barrier_type = barrierType;
-    s.barrier.amount = barrierType === 'up_and_out' ? '120' : '80';
+    s.barrier = barrierType === 'up_and_out' ? 120 : 80;
     for (const timing of ['at_hit', 'at_expiry']) {
       s.rebate_timing = timing;
       const analytical = value(f, f.as_of, 'barrier_bs_continuous');
@@ -100,7 +100,7 @@ test('GBM and Heston observe discrete barriers only on contractual dates', () =>
   const f = pdeFixture();
   const s = f.instrument.instrument.spec;
   s.option_type = 'put';
-  s.barrier.amount = '90';
+  s.barrier = 90;
   s.rebate = { amount: '2.5', currency: 'USD' };
   s.rebate_timing = 'at_hit';
   s.div_yield_id = 'DIV';
@@ -131,12 +131,12 @@ test('reciprocal NDF quotes preserve the long-base loss', () => {
   const f = fixture('ndf');
   const s = f.instrument.instrument.spec;
   s.contract_rate = 7;
-  s.fixing_rate = 8;
+  s.observed_fixing = 8;
   s.notional.amount = '7000000';
   assert.ok(Math.abs(value(f) + 125000) < 1e-8);
   s.quote_convention = 'settlement_per_base';
   s.contract_rate = 1 / 7;
-  s.fixing_rate = 1 / 8;
+  s.observed_fixing = 1 / 8;
   assert.ok(Math.abs(value(f) + 125000) < 1e-8);
 });
 
@@ -145,7 +145,7 @@ test('known expiry rebate is a total trade amount', () => {
   const s = f.instrument.instrument.spec;
   s.div_yield_id = null;
   s.strike = 100;
-  s.barrier.amount = '120';
+  s.barrier = 120;
   s.notional.amount = '1000';
   s.rebate.amount = '25';
   s.rebate_timing = 'at_expiry';
@@ -158,7 +158,7 @@ test('expired at-hit rebate has already been paid', () => {
   const f = fixture('barrier_option');
   const s = f.instrument.instrument.spec;
   s.div_yield_id = null;
-  s.expiry_fixing = { amount: '100', currency: 'USD' };
+  s.expiry_fixing = 100;
   s.observed_barrier_breached = true;
   s.rebate.amount = '25';
   s.monitoring = { type: 'continuous' };

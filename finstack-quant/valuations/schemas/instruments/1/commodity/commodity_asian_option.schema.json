@@ -1,7 +1,7 @@
 {
   "$defs": {
     "AveragingMethod": {
-      "description": "Averaging method for Asian options.",
+      "description": "Asian averaging method.\n\nSerialized as `\"arithmetic\"` / `\"geometric\"`; this is the single definition\nshared by the Monte Carlo payoffs and the `averaging_method` wire field of\nthe Asian option instruments.",
       "oneOf": [
         {
           "const": "arithmetic",
@@ -76,11 +76,7 @@
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)."
         },
-        "quantity": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Contract quantity in commodity units."
-        },
-        "realized_fixings": {
+        "past_fixings": {
           "default": [],
           "description": "Already observed fixings for seasoned options (ex-date, price pairs).",
           "items": {
@@ -98,6 +94,10 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Contract quantity in commodity units."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -208,8 +208,8 @@
           "forward_curve_id": "CL-FORWARD",
           "id": "WTI-ASIAN-6M",
           "option_type": "call",
+          "past_fixings": [],
           "quantity": 1000.0,
-          "realized_fixings": [],
           "strike": 75.0,
           "ticker": "CL",
           "unit": "BBL",

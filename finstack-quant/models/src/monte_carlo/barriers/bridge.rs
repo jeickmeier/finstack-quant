@@ -24,6 +24,8 @@
 //! those cases prefer finer monitoring or a model-specific exit
 //! distribution.
 
+use finstack_quant_core::types::BarrierDirection;
+
 /// Compute probability of hitting a barrier between two observations.
 ///
 /// For a Brownian bridge from `S(t)` to `S(t+Δt)`, compute the probability
@@ -141,15 +143,6 @@ pub fn check_barrier_hit(
             uniform_random < p_hit
         }
     }
-}
-
-/// Barrier direction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BarrierDirection {
-    /// Up barrier (knocked out/in when S >= B)
-    Up,
-    /// Down barrier (knocked out/in when S <= B)
-    Down,
 }
 
 #[cfg(test)]

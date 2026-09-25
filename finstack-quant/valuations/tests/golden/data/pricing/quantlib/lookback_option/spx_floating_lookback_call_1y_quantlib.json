@@ -18,20 +18,19 @@
         "expiry": "2027-04-30",
         "id": "SPX-FLOATING-LOOKBACK-CALL-1Y-QUANTLIB",
         "lookback_type": "floating_strike",
+        "monitoring": {
+          "type": "continuous"
+        },
         "notional": {
           "amount": "1",
           "currency": "USD"
         },
         "observed_max": null,
-        "observed_min": {
-          "amount": "100.0",
-          "currency": "USD"
-        },
+        "observed_min": 100.0,
         "option_type": "call",
         "spot_id": "SPX-SPOT",
         "strike": null,
         "underlying_ticker": "SPX",
-        "use_gobet_miri": false,
         "vol_surface_id": "SPX-LOOKBACK-VOL-QL"
       },
       "type": "lookback_option"

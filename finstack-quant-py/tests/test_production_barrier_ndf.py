@@ -29,7 +29,7 @@ def test_ndf_quote_orientation_preserves_long_base_payoff(reciprocal: bool) -> N
     spec = instrument["instrument"]["spec"]
     spec["notional"]["amount"] = "7000000"
     spec["contract_rate"] = 1.0 / 7.0 if reciprocal else 7.0
-    spec["fixing_rate"] = 1.0 / 8.0 if reciprocal else 8.0
+    spec["observed_fixing"] = 1.0 / 8.0 if reciprocal else 8.0
     spec["quote_convention"] = "settlement_per_base" if reciprocal else "base_per_settlement"
     result = price_instrument(json.dumps(instrument), json.dumps(market), "2024-01-02", "discounting", [])
     assert result.value.amount == pytest.approx(-125_000.0, abs=1e-8)
@@ -40,11 +40,11 @@ def test_total_trade_rebate_and_paid_at_hit_state(expired: bool) -> None:
     instrument, market = fixture("barrier_option")
     spec = instrument["instrument"]["spec"]
     spec.update(div_yield_id=None, strike=100.0, observed_barrier_breached=True, monitoring={"type": "continuous"})
-    spec["barrier"]["amount"] = "120"
+    spec["barrier"] = 120.0
     spec["notional"]["amount"] = "1000"
     spec["rebate"]["amount"] = "25"
     spec["rebate_timing"] = "at_hit" if expired else "at_expiry"
-    spec["expiry_fixing"] = {"amount": "100", "currency": "USD"}
+    spec["expiry_fixing"] = 100.0
     result = price_instrument(
         json.dumps(instrument),
         json.dumps(market),

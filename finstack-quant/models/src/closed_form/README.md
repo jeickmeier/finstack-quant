@@ -137,7 +137,7 @@ with `λ = (r - q + σ²/2) / σ²`.
 | `up_out_put`, `up_in_put`, `down_out_put`, `down_in_put` | same shape (module-level only; not re-exported at `closed_form` root) |
 | `barrier_call_continuous`, `barrier_put_continuous` | `(&BarrierParams, BarrierType) -> f64` |
 | `barrier_touch_probability` | `(spot, barrier, time, rate, div_yield, vol, is_up) -> f64` |
-| `barrier_rebate` | explicit `RebateTiming::{AtHit, AtExpiry}` |
+| `barrier_rebate` | explicit `PayoutTiming::{AtHit, AtExpiry}` |
 
 `BarrierType` is `finstack_quant_core::types::BarrierType`, not a type defined
 here. `BarrierParams` groups `spot`/`strike`/`barrier`/`time`/`rate`/
@@ -146,7 +146,7 @@ constructor and returns `Result` — it rejects a non-positive or non-finite `df
 rather than coercing it to `rate = 0.0`. There are no `*_df` function variants
 for barriers.
 
-`RebateTiming::AtHit` is the market standard for knock-out rebates and prices
+`PayoutTiming::AtHit` is the market standard for knock-out rebates and prices
 `rebate · E[e^{-r·τ} 1{τ≤T}]` via the Rubinstein-Reiner discounted
 first-passage value; it returns a `NaN` sentinel when that closed form is
 undefined (`μ² + 2r/σ² < 0`). Knock-in no-hit rebates always settle at expiry,

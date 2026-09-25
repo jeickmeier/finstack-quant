@@ -31,7 +31,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
-use finstack_quant_models::closed_form::barrier::RebateTiming;
+use finstack_quant_core::types::PayoutTiming;
 use finstack_quant_models::pde::{
     BoundaryCondition, Grid1D, PdeProblem1D, RannacherStepper, Solver1D, TimeStepper,
 };
@@ -56,7 +56,7 @@ struct BarrierPde {
     barrier_is_upper: bool,
     maturity: f64,
     rebate: f64,
-    rebate_timing: RebateTiming,
+    rebate_timing: PayoutTiming,
     terminal_cash: Option<f64>,
     continuous: bool,
     observation_times: Vec<f64>,
@@ -65,8 +65,8 @@ struct BarrierPde {
 impl BarrierPde {
     fn rebate_at(&self, time: f64) -> f64 {
         match self.rebate_timing {
-            RebateTiming::AtHit => self.rebate,
-            RebateTiming::AtExpiry => self.rebate * (-self.rate * (self.maturity - time)).exp(),
+            PayoutTiming::AtHit => self.rebate,
+            PayoutTiming::AtExpiry => self.rebate * (-self.rate * (self.maturity - time)).exp(),
         }
     }
 
@@ -172,7 +172,7 @@ struct KnockOutPdeInputs {
     is_call: bool,
     barrier_is_upper: bool,
     rebate: f64,
-    rebate_timing: RebateTiming,
+    rebate_timing: PayoutTiming,
     terminal_cash: Option<f64>,
     observation_times: Option<Vec<f64>>,
 }
@@ -253,7 +253,7 @@ impl BarrierOptionPdePricer {
             });
         }
 
-        let barrier_level = inst.barrier.amount();
+        let barrier_level = inst.barrier;
         let is_call = matches!(inst.option_type, crate::instruments::OptionType::Call);
         let is_knock_out = inst.barrier_type.is_knock_out();
         let barrier_is_upper = inst.barrier_type.is_up();
@@ -714,7 +714,7 @@ mod tests {
             id: InstrumentId::new("BARRIER-PDE-TEST"),
             underlying_ticker: "SPX".to_string(),
             strike,
-            barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
+            barrier,
             rebate: None,
             rebate_timing: Default::default(),
             option_type,
@@ -967,8 +967,8 @@ mod tests {
         let mkt = market(as_of, 100.0, 0.25, 0.05);
         for barrier_type in [BarrierType::UpAndOut, BarrierType::DownAndIn] {
             for timing in [
-                finstack_quant_models::closed_form::barrier::RebateTiming::AtHit,
-                finstack_quant_models::closed_form::barrier::RebateTiming::AtExpiry,
+                finstack_quant_core::types::PayoutTiming::AtHit,
+                finstack_quant_core::types::PayoutTiming::AtExpiry,
             ] {
                 let level = if barrier_type.is_up() { 120.0 } else { 80.0 };
                 let mut option =

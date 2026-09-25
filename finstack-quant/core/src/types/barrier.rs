@@ -1,4 +1,4 @@
-//! Canonical barrier direction and activation classification.
+//! Canonical barrier classification, direction and hit-payment timing.
 
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +33,15 @@ impl BarrierType {
     pub fn is_up(self) -> bool {
         matches!(self, Self::UpAndOut | Self::UpAndIn)
     }
+
+    /// Return the side of spot on which the barrier sits.
+    pub fn direction(self) -> BarrierDirection {
+        if self.is_up() {
+            BarrierDirection::Up
+        } else {
+            BarrierDirection::Down
+        }
+    }
 }
 
 impl std::fmt::Display for BarrierType {
@@ -57,6 +66,81 @@ impl std::str::FromStr for BarrierType {
             "down_and_in" => Ok(Self::DownAndIn),
             other => Err(format!(
                 "Unknown barrier type: '{other}'. Valid: up_and_in, up_and_out, down_and_in, down_and_out"
+            )),
+        }
+    }
+}
+
+/// Side of spot on which a barrier sits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum BarrierDirection {
+    /// Barrier is above spot: hit when spot touches or rises above it.
+    Up,
+    /// Barrier is below spot: hit when spot touches or falls below it.
+    Down,
+}
+
+impl std::fmt::Display for BarrierDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Up => write!(f, "up"),
+            Self::Down => write!(f, "down"),
+        }
+    }
+}
+
+impl std::str::FromStr for BarrierDirection {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "up" => Ok(Self::Up),
+            "down" => Ok(Self::Down),
+            other => Err(format!(
+                "Unknown barrier direction: '{other}'. Valid: up, down"
+            )),
+        }
+    }
+}
+
+/// When a barrier-triggered cash amount is paid.
+///
+/// Used for a knock-out rebate (`rebate_timing`) and for a one-touch payout
+/// (`payout_timing`). At-expiry payments are discounted from expiry; at-hit
+/// payments are discounted from the first-passage time. Knock-in rebates
+/// always pay at expiry (only then is it known that no hit occurred), so this
+/// setting does not affect them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum PayoutTiming {
+    /// Paid the moment the barrier is hit (market standard).
+    #[default]
+    AtHit,
+    /// Paid at expiry regardless of when the barrier is hit.
+    AtExpiry,
+}
+
+impl std::fmt::Display for PayoutTiming {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AtHit => write!(f, "at_hit"),
+            Self::AtExpiry => write!(f, "at_expiry"),
+        }
+    }
+}
+
+impl std::str::FromStr for PayoutTiming {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "at_hit" => Ok(Self::AtHit),
+            "at_expiry" => Ok(Self::AtExpiry),
+            other => Err(format!(
+                "Unknown payout timing: '{other}'. Valid: at_hit, at_expiry"
             )),
         }
     }

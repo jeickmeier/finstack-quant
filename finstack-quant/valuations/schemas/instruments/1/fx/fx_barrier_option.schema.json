@@ -124,15 +124,18 @@
           "description": "Quote currency (the pricing/settlement currency, formerly domestic_currency)"
         },
         "rebate": {
-          "description": "Optional rebate amount (paid if the barrier condition is met, dimensionless;\nsee `rebate_timing` for when a knock-out rebate pays)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total contractual trade rebate, paid in the quote (settlement)\ncurrency and independent of notional. Knock-outs pay on a hit according\nto `rebate_timing`; knock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
-          "$ref": "#/$defs/RebateTiming",
+          "$ref": "#/$defs/PayoutTiming",
           "default": "at_hit",
           "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry, so this setting does not affect\nthem. The analytical pricer values at-hit rebates via the discounted\nfirst-passage closed form. Monte Carlo applies at-hit when\n`rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive\ndefaults to at-expiry."
         },
@@ -228,17 +231,17 @@
         }
       ]
     },
-    "RebateTiming": {
-      "description": "Timing of a knock-out rebate payment.\n\nMarket-standard KO rebates pay **at hit** (the moment the barrier is\nbreached); paying at expiry is the less common variant. Knock-in rebates\nalways pay at expiry by definition (only at expiry is it known that the\noption failed to knock in), so this setting does not affect them.",
+    "PayoutTiming": {
+      "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them.",
       "oneOf": [
         {
           "const": "at_hit",
-          "description": "Rebate is paid at the barrier hit time (market standard for KO rebates).",
+          "description": "Paid the moment the barrier is hit (market standard).",
           "type": "string"
         },
         {
           "const": "at_expiry",
-          "description": "Rebate is paid at option expiry.",
+          "description": "Paid at expiry regardless of when the barrier is hit.",
           "type": "string"
         }
       ]

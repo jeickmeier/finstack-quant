@@ -709,7 +709,7 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # is_call` (Rust parameter names == Python kwargs; WASM camelCase). `bs_greeks`
 # returns the typed `BsGreeks` (`rho_r`, not `rho`). Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
-# the `*_df` Asian variants, `barrier_rebate` / `RebateTiming` /
+# the `*_df` Asian variants, `barrier_rebate` / `PayoutTiming` /
 # `BarrierParams` / `barrier_touch_probability`, `quanto_call` / `quanto_put` /
 # `quanto_drift_adjustment` (use `quanto_option_price`), the implied-vol
 # approximations (`brenner_subrahmanyam_approx`, `manaster_koehler_approx`,

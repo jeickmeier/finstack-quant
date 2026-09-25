@@ -305,7 +305,7 @@ impl AsianOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        inst.validate_realized_fixings(as_of)?;
+        inst.validate_past_fixings(as_of)?;
         let t = inst
             .day_count
             .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
@@ -414,14 +414,7 @@ impl AsianOptionMcPricer {
         let future_fixing_times = fixing_grid.future_times(t);
         let fixing_steps = fixing_grid.fixing_steps;
 
-        let averaging = match inst.averaging_method {
-            crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic => {
-                finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic
-            }
-            crate::instruments::exotics::asian_option::types::AveragingMethod::Geometric => {
-                finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric
-            }
-        };
+        let averaging = inst.averaging_method;
 
         // Derive deterministic seed from instrument ID and scenario
         use finstack_quant_models::monte_carlo::seed;
@@ -820,7 +813,7 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        asian.validate_realized_fixings(as_of).map_err(|e| {
+        asian.validate_past_fixings(as_of).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
         let (sum, log_prod, count) = asian.accumulated_state(as_of);
@@ -984,7 +977,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
 
-        asian.validate_realized_fixings(as_of).map_err(|e| {
+        asian.validate_past_fixings(as_of).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
         let (sum, _, count) = asian.accumulated_state(as_of);
@@ -1547,7 +1540,7 @@ mod tests {
         let err = AsianOptionMcPricer::new()
             .price_internal(&option, &market(as_of, 80.0, 0.20, 0.05, 0.0), as_of)
             .expect_err("expired Asian option must require realized fixings");
-        assert!(err.to_string().contains("missing a realized fixing"));
+        assert!(err.to_string().contains("missing a past fixing"));
     }
 
     #[test]
@@ -1618,7 +1611,7 @@ mod tests {
         let err = AsianOptionAnalyticalGeometricPricer::new()
             .price_dyn(&option, &market(as_of, 125.0, 0.20, 0.05, 0.0), as_of)
             .expect_err("expired Asian option must require realized fixings");
-        assert!(err.to_string().contains("missing a realized fixing"));
+        assert!(err.to_string().contains("missing a past fixing"));
     }
 
     #[test]
@@ -1847,8 +1840,8 @@ mod tests {
 
         let err = AsianOptionMcPricer::new()
             .price_internal(&option, &market, as_of)
-            .expect_err("price scalar must not replace realized fixing history");
-        assert!(err.to_string().contains("missing a realized fixing"));
+            .expect_err("price scalar must not replace past fixing history");
+        assert!(err.to_string().contains("missing a past fixing"));
     }
 
     #[test]

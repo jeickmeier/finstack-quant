@@ -32,9 +32,10 @@
 //!
 //! ## Production Recommendation
 //!
-//! For production pricing of discretely-monitored lookbacks, use Monte Carlo
-//! simulation (`npv_mc`) with the actual monitoring dates rather than the
-//! continuous analytical formulas.
+//! Discretely-monitored lookbacks set `monitoring` to
+//! `Monitoring::Discrete { observation_dates }`. They are priced by Monte
+//! Carlo, which observes the extremum only on those contractual dates, rather
+//! than by the continuous analytical formulas.
 //!
 //! # References
 //!
@@ -44,7 +45,7 @@
 
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::OptionType;
+use crate::instruments::{Monitoring, OptionType};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -129,14 +130,15 @@ pub struct LookbackOption {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
-    /// Terminal underlying fixing observed at expiry.
+    /// Terminal underlying fixing observed at expiry, in the same quote units
+    /// as `strike`.
     ///
     /// Required when valuing after expiry so the realized payoff cannot move
     /// with a later market spot snapshot. At expiry itself, the current market
     /// spot is treated as the terminal fixing when this field is absent.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expiry_fixing: Option<Money>,
+    pub expiry_fixing: Option<f64>,
     /// Notional amount
     pub notional: Money,
     /// Day count convention
@@ -149,16 +151,14 @@ pub struct LookbackOption {
     pub vol_surface_id: CurveId,
     /// Optional dividend-yield scalar ID
     pub div_yield_id: Option<PriceId>,
-    /// Whether to use Monte Carlo with Gobet-Miri correction for discrete monitoring.
+    /// Contractual monitoring of the path extremum.
     ///
-    /// When `true`, `value()` dispatches to `npv_mc()` for discrete-monitoring-corrected
-    /// pricing using Monte Carlo simulation.
-    ///
-    /// **Defaults to `false`** (analytical continuous pricing).
-    /// Set to `true` for production pricing of discretely-monitored lookbacks.
+    /// `continuous` (default) prices with the Goldman-Sosin-Gatto closed form.
+    /// `discrete` observes the extremum only on the strictly increasing
+    /// `observation_dates` (no later than expiry) and prices by Monte Carlo.
     #[builder(default)]
     #[serde(default)]
-    pub use_gobet_miri: bool,
+    pub monitoring: Monitoring,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -180,10 +180,12 @@ pub struct LookbackOption {
         skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
-    /// Observed minimum spot price since inception (required for Floating Call / Fixed Put)
-    pub observed_min: Option<Money>,
-    /// Observed maximum spot price since inception (required for Floating Put / Fixed Call)
-    pub observed_max: Option<Money>,
+    /// Observed minimum underlying level since inception, in the same quote
+    /// units as `strike` (required for Floating Call / Fixed Put once seasoned).
+    pub observed_min: Option<f64>,
+    /// Observed maximum underlying level since inception, in the same quote
+    /// units as `strike` (required for Floating Put / Fixed Call once seasoned).
+    pub observed_max: Option<f64>,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
 }
@@ -237,29 +239,35 @@ impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
             validation::validate_f64_positive(strike, "LookbackOption strike")?;
         }
         if let Some(observed_min) = self.observed_min {
-            validation::validate_money_gt(observed_min, 0.0, "LookbackOption observed_min")?;
+            validation::validate_f64_positive(observed_min, "LookbackOption observed_min")?;
         }
         if let Some(observed_max) = self.observed_max {
-            validation::validate_money_gt(observed_max, 0.0, "LookbackOption observed_max")?;
+            validation::validate_f64_positive(observed_max, "LookbackOption observed_max")?;
+        }
+        if let Monitoring::Discrete { observation_dates } = &self.monitoring {
+            validation::require_with(!observation_dates.is_empty(), || {
+                "LookbackOption monitoring.observation_dates must not be empty".to_string()
+            })?;
+            validation::validate_sorted_strict(
+                observation_dates,
+                "LookbackOption monitoring.observation_dates",
+            )?;
+            validation::require_with(
+                observation_dates.iter().all(|date| *date <= self.expiry),
+                || {
+                    "LookbackOption monitoring.observation_dates must not be after expiry"
+                        .to_string()
+                },
+            )?;
         }
         if let Some(fixing) = self.expiry_fixing {
-            if fixing.currency() != self.notional.currency() {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.notional.currency(),
-                    actual: fixing.currency(),
-                });
-            }
-            if fixing.amount() <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "LookbackOption expiry_fixing must be positive".to_string(),
-                ));
-            }
+            validation::validate_f64_positive(fixing, "LookbackOption expiry_fixing")?;
         }
         Ok(())
     }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
-        if self.use_gobet_miri {
+        if matches!(self.monitoring, Monitoring::Discrete { .. }) {
             crate::pricer::ModelKey::MonteCarloGBM
         } else {
             crate::pricer::ModelKey::LookbackBSContinuous
@@ -290,17 +298,14 @@ impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
     /// Compute the present value with explicit monitoring semantics.
     ///
     /// Dispatch rules:
-    /// - `use_gobet_miri = false` -> analytical continuous-monitoring pricer
-    /// - `use_gobet_miri = true` -> MC discrete-monitoring pricer
-    ///
-    /// If `use_gobet_miri = true` but no compatible Monte Carlo pricer is registered,
-    /// this returns an error instead of silently falling back to continuous pricing.
+    /// - `monitoring = continuous` -> analytical continuous-monitoring pricer
+    /// - `monitoring = discrete` -> MC pricer observing only the contractual dates
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        if self.use_gobet_miri {
+        if matches!(self.monitoring, Monitoring::Discrete { .. }) {
             return self.npv_mc(market, as_of);
         }
 

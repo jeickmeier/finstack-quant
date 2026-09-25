@@ -137,8 +137,22 @@ def build_fx_digital_option() -> dict[str, Any]:
     }
 
 
-def build_fx_barrier_option() -> dict[str, Any]:
-    """Build a native QuantLib continuous EUR/USD up-and-out call fixture."""
+def _fx_barrier_option(
+    *,
+    name: str,
+    instrument_id: str,
+    description: str,
+    ql_barrier_type: int,
+    barrier_type: str,
+    rebate_per_unit: float,
+    rebate_timing: str | None,
+    reason: str,
+) -> dict[str, Any]:
+    """Build a continuous EUR/USD barrier call fixture priced by QuantLib.
+
+    QuantLib quotes the rebate per unit of base notional; Finstack takes the
+    total trade rebate as quote-currency ``Money`` (``rebate_per_unit * notional``).
+    """
     evaluation_date = ql_date(VALUATION_DATE)
     expiry = ql.Date(30, 7, 2026)
     spot = 1.10
@@ -151,9 +165,9 @@ def build_fx_barrier_option() -> dict[str, Any]:
     ql.Settings.instance().evaluationDate = evaluation_date
 
     option = ql.BarrierOption(
-        ql.Barrier.UpOut,
+        ql_barrier_type,
         barrier,
-        0.0,
+        rebate_per_unit,
         ql.PlainVanillaPayoff(ql.Option.Call, strike),
         ql.EuropeanExercise(expiry),
     )
@@ -167,16 +181,36 @@ def build_fx_barrier_option() -> dict[str, Any]:
             )
         )
     )
-    reason = (
-        "QuantLib AnalyticBarrierEngine and Finstack use the continuous-monitoring "
-        "Reiner-Rubinstein Garman-Kohlhagen closed form with zero rebate."
-    )
+    rebate = None if rebate_per_unit == 0.0 else {"amount": str(int(rebate_per_unit * notional)), "currency": "USD"}
+    spec: dict[str, Any] = {
+        "id": instrument_id,
+        "strike": strike,
+        "barrier": barrier,
+        "rebate": rebate,
+    }
+    if rebate_timing is not None:
+        spec["rebate_timing"] = rebate_timing
+    spec.update({
+        "option_type": "call",
+        "barrier_type": barrier_type,
+        "expiry": "2026-07-30",
+        "monitoring_start_date": "2026-04-30",
+        "notional": {"amount": str(int(notional)), "currency": "EUR"},
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "day_count": "act_365f",
+        "monitoring": {"type": "continuous"},
+        "domestic_discount_curve_id": "USD-OIS",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "vol_surface_id": "EURUSD-BARRIER-VOL-QL",
+        "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
+    })
     return {
         "schema": SCHEMA,
         "metadata": metadata(
-            name="eurusd_up_out_call_3m_quantlib",
+            name=name,
             domain="fx.fx_barrier_option",
-            description="QuantLib native three-month continuous EUR/USD up-and-out call.",
+            description=description,
             product="fx_barrier_option",
         ),
         "kind": "pricing",
@@ -191,32 +225,69 @@ def build_fx_barrier_option() -> dict[str, Any]:
         ),
         "instrument": {
             "schema": "finstack_quant.instrument/1",
-            "instrument": {
-                "type": "fx_barrier_option",
-                "spec": {
-                    "id": "EURUSD-UP-OUT-CALL-3M-QUANTLIB",
-                    "strike": strike,
-                    "barrier": barrier,
-                    "rebate": None,
-                    "option_type": "call",
-                    "barrier_type": "up_and_out",
-                    "expiry": "2026-07-30",
-                    "monitoring_start_date": "2026-04-30",
-                    "notional": {"amount": str(int(notional)), "currency": "EUR"},
-                    "base_currency": "EUR",
-                    "quote_currency": "USD",
-                    "day_count": "act_365f",
-                    "monitoring": {"type": "continuous"},
-                    "domestic_discount_curve_id": "USD-OIS",
-                    "foreign_discount_curve_id": "EUR-OIS",
-                    "vol_surface_id": "EURUSD-BARRIER-VOL-QL",
-                    "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
-                },
-            },
+            "instrument": {"type": "fx_barrier_option", "spec": spec},
         },
         "expected": {"npv": option.NPV() * notional},
         "tolerances": {"npv": tolerance(1e-7, reason)},
     }
+
+
+def build_fx_barrier_option() -> dict[str, Any]:
+    """Build a native QuantLib continuous EUR/USD up-and-out call fixture."""
+    return _fx_barrier_option(
+        name="eurusd_up_out_call_3m_quantlib",
+        instrument_id="EURUSD-UP-OUT-CALL-3M-QUANTLIB",
+        description="QuantLib native three-month continuous EUR/USD up-and-out call.",
+        ql_barrier_type=ql.Barrier.UpOut,
+        barrier_type="up_and_out",
+        rebate_per_unit=0.0,
+        rebate_timing=None,
+        reason=(
+            "QuantLib AnalyticBarrierEngine and Finstack use the continuous-monitoring "
+            "Reiner-Rubinstein Garman-Kohlhagen closed form with zero rebate."
+        ),
+    )
+
+
+def build_fx_barrier_option_rebate_at_hit() -> dict[str, Any]:
+    """Build a continuous EUR/USD up-and-out call whose rebate pays at the hit."""
+    return _fx_barrier_option(
+        name="eurusd_up_out_call_rebate_at_hit_3m_quantlib",
+        instrument_id="EURUSD-UP-OUT-CALL-REBATE-HIT-3M-QUANTLIB",
+        description=(
+            "QuantLib native three-month continuous EUR/USD up-and-out call with a "
+            "10,000 USD knock-out rebate paid at the barrier hit."
+        ),
+        ql_barrier_type=ql.Barrier.UpOut,
+        barrier_type="up_and_out",
+        rebate_per_unit=0.01,
+        rebate_timing="at_hit",
+        reason=(
+            "QuantLib AnalyticBarrierEngine pays a knock-out rebate at the hit (Reiner-"
+            "Rubinstein discounted first-passage term); Finstack prices the same "
+            "closed form with rebate_timing=at_hit."
+        ),
+    )
+
+
+def build_fx_barrier_option_rebate_at_expiry() -> dict[str, Any]:
+    """Build a continuous EUR/USD up-and-in call whose no-hit rebate pays at expiry."""
+    return _fx_barrier_option(
+        name="eurusd_up_in_call_rebate_at_expiry_3m_quantlib",
+        instrument_id="EURUSD-UP-IN-CALL-REBATE-EXPIRY-3M-QUANTLIB",
+        description=(
+            "QuantLib native three-month continuous EUR/USD up-and-in call with a "
+            "10,000 USD rebate paid at expiry if the barrier is never hit."
+        ),
+        ql_barrier_type=ql.Barrier.UpIn,
+        barrier_type="up_and_in",
+        rebate_per_unit=0.01,
+        rebate_timing="at_expiry",
+        reason=(
+            "QuantLib AnalyticBarrierEngine pays a knock-in rebate at expiry on no hit "
+            "(Reiner-Rubinstein term); Finstack prices the same closed form."
+        ),
+    )
 
 
 def build_quanto_option() -> dict[str, Any]:

@@ -269,7 +269,6 @@ fn strip_default_instrument_inputs(value: &mut serde_json::Value) {
     remove_default_string(object, "vol_surface_extrapolation", "error");
     remove_default_string(object, "bond_risk_basis", "bullet_discountable");
     remove_default_bool(object, "adaptive_bumps", false);
-    remove_default_bool(object, "use_gobet_miri", false);
     remove_default_bool(object, "end_of_month", false);
     remove_default_i64(object, "payment_lag_days", 0);
     remove_default_f64(object, "vol_shift", 0.0);

@@ -2,6 +2,63 @@
 
 ## [Unreleased]
 
+### Exotic payoff terms (2026-09-24)
+
+Barrier and fixing levels are bare quotes in the underlying's price units; a
+rebate is a total `Money` amount; historical fixings are `past_fixings`; a
+single realized fixing is `observed_fixing`; a recorded barrier hit is
+`observed_barrier_breached`; lookback monitoring is the contractual
+`monitoring` convention; and barrier timing, direction and Asian averaging
+each have one enum.
+
+#### Changed (BREAKING)
+
+- `FxBarrierOption.rebate` is now `Option<Money>`: the total trade rebate in
+  the quote (settlement) currency, independent of notional. It was a per-unit
+  `f64` (quote currency per base unit); migrate as
+  `rebate = per_unit × notional.amount` in the quote currency. Validation now
+  rejects a rebate in another currency or a negative rebate. Rust, JSON.
+- `BarrierOption.barrier` and `.expiry_fixing` (now `f64` / `Option<f64>`
+  quotes in `strike` units, were `Money`); `LookbackOption.expiry_fixing`,
+  `.observed_min`, `.observed_max` (now `Option<f64>`, were `Option<Money>`).
+  Rust, JSON.
+- `FxTouchOption.barrier_level` (now `barrier`) and `.observed_touch` (now
+  `observed_barrier_breached`). Rust, JSON.
+- `Ndf.fixing_rate` (now `observed_fixing`) and `Ndf::with_fixing_rate` (now
+  `with_observed_fixing`). Rust, JSON.
+- `CommodityAsianOption.realized_fixings`, `CommoditySwap.realized_fixings` and
+  `CommodityFutureFixing::ArithmeticAverage.realized_fixings` (now
+  `past_fixings`); `AsianOption::validate_realized_fixings` and
+  `CommodityAsianOption::validate_realized_fixings` (now
+  `validate_past_fixings`). Rust, JSON.
+- `RangeAccrual.past_fixings_in_range` (now `past_observations_in_range`,
+  matching `total_past_observations`; also on `CallableRangeAccrual.range_accrual`).
+  Rust, JSON.
+- `LookbackOption.use_gobet_miri` (now `monitoring: Monitoring`, default
+  `continuous`). `discrete` carries the contractual `observation_dates`, prices
+  by Monte Carlo and observes the extremum only on those dates; the analytical
+  engine rejects it. Rust, JSON.
+- `Autocallable.participation_rate` removed; the rate lives once in the payoff
+  variant: `FinalPayoffType::CapitalProtection { floor, participation_rate }`
+  and `FinalPayoffType::Participation { participation_rate }` (was `rate`).
+  Rust, JSON.
+- `CmsSpreadOption.spread_correlation` (now `correlation`, a bounded
+  `CorrelationWire` on the wire). Rust, JSON.
+- `finstack_quant_models::closed_form::barrier::RebateTiming` (now
+  `finstack_quant_core::types::PayoutTiming`, shared by `rebate_timing` and
+  `FxTouchOption.payout_timing`); `BarrierDirection` now lives once in
+  `finstack_quant_core::types` (the models bridge copy is removed) and
+  `BarrierType::direction()` returns it; `AveragingMethod` now lives once in
+  `finstack_quant_models::monte_carlo::payoff::asian` (serde + JsonSchema) and
+  is re-exported by valuations. Wire strings are unchanged; the schema
+  `$defs/RebateTiming` becomes `PayoutTiming`. Rust.
+
+#### Added
+
+- QuantLib goldens `eurusd_up_out_call_rebate_at_hit_3m_quantlib` and
+  `eurusd_up_in_call_rebate_at_expiry_3m_quantlib` for the FX barrier rebate
+  (Reiner-Rubinstein, abs 1e-7).
+
 ### Credit family (2026-09-24)
 
 `credit_curve_id` always names a `HazardCurve`, including on

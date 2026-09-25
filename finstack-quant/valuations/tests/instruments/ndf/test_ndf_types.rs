@@ -44,7 +44,7 @@ fn test_ndf_builder_with_optional_fields() {
         .contract_rate(7.25)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id_opt(Some(CurveId::new("CNY-OIS")))
-        .fixing_rate_opt(Some(7.30))
+        .observed_fixing_opt(Some(7.30))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
         .fixing_source_enum_opt(Some(NdfFixingSource::Cnhfix))
         .spot_rate_override_opt(Some(7.25))
@@ -54,7 +54,7 @@ fn test_ndf_builder_with_optional_fields() {
         .build()
         .expect("should build");
 
-    assert_eq!(ndf.fixing_rate, Some(7.30));
+    assert_eq!(ndf.observed_fixing, Some(7.30));
     assert_eq!(ndf.fixing_source_enum, Some(NdfFixingSource::Cnhfix));
     assert!(ndf.foreign_discount_curve_id.is_some());
     assert!(ndf.is_fixed());
@@ -108,9 +108,9 @@ fn test_ndf_with_fixing_rate() {
     let ndf = Ndf::example();
     assert!(!ndf.is_fixed());
 
-    let fixed_ndf = ndf.with_fixing_rate(7.30).expect("valid rate");
+    let fixed_ndf = ndf.with_observed_fixing(7.30).expect("valid rate");
     assert!(fixed_ndf.is_fixed());
-    assert_eq!(fixed_ndf.fixing_rate, Some(7.30));
+    assert_eq!(fixed_ndf.observed_fixing, Some(7.30));
 }
 
 #[test]

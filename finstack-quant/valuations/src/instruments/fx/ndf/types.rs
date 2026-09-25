@@ -251,11 +251,11 @@ impl std::str::FromStr for NdfFixingSource {
 ///
 /// # Pricing
 ///
-/// ## Pre-Fixing (fixing_rate = None)
+/// ## Pre-Fixing (observed_fixing = None)
 /// Forward rate uses the explicit override or covered interest rate parity
 /// with both currency curves.
 ///
-/// ## Post-Fixing (fixing_rate = Some)
+/// ## Post-Fixing (observed_fixing = Some)
 /// Uses the observed fixing rate for settlement calculation.
 ///
 /// The settlement formula depends on `quote_convention`:
@@ -334,7 +334,7 @@ pub struct Ndf {
     pub contract_rate: f64,
     /// Settlement currency discount curve ID.
     pub domestic_discount_curve_id: CurveId,
-    /// Quote convention for contract_rate and fixing_rate.
+    /// Quote convention for contract_rate and observed_fixing.
     pub quote_convention: NdfQuoteConvention,
     /// Optional foreign (base) currency discount curve ID.
     /// Required for pre-fixing forward estimation unless `forward_rate_override`
@@ -346,7 +346,7 @@ pub struct Ndf {
     /// If Some, NDF is post-fixing.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fixing_rate: Option<f64>,
+    pub observed_fixing: Option<f64>,
     /// Official fixing source/benchmark enum for type-safe specification.
     ///
     /// Use this field for validated fixing sources.
@@ -430,14 +430,14 @@ struct NdfUnchecked {
     contract_rate: f64,
     /// Settlement currency discount curve ID.
     domestic_discount_curve_id: CurveId,
-    /// Quote convention for contract_rate and fixing_rate.
+    /// Quote convention for contract_rate and observed_fixing.
     quote_convention: NdfQuoteConvention,
     /// Optional foreign (base) currency discount curve ID.
     #[serde(default)]
     foreign_discount_curve_id: Option<CurveId>,
     /// Observed fixing rate. Interpretation depends on `quote_convention`.
     #[serde(default)]
-    fixing_rate: Option<f64>,
+    observed_fixing: Option<f64>,
     /// Official fixing source/benchmark enum for type-safe specification.
     #[serde(default)]
     fixing_source_enum: Option<NdfFixingSource>,
@@ -481,7 +481,7 @@ impl TryFrom<NdfUnchecked> for Ndf {
             domestic_discount_curve_id: value.domestic_discount_curve_id,
             quote_convention: value.quote_convention,
             foreign_discount_curve_id: value.foreign_discount_curve_id,
-            fixing_rate: value.fixing_rate,
+            observed_fixing: value.observed_fixing,
             fixing_source_enum: value.fixing_source_enum,
             spot_rate_override: value.spot_rate_override,
             forward_rate_override: value.forward_rate_override,
@@ -608,8 +608,8 @@ impl Ndf {
         }
 
         Self::validate_rate("contract_rate", self.contract_rate)?;
-        if let Some(rate) = self.fixing_rate {
-            Self::validate_rate("fixing_rate", rate)?;
+        if let Some(rate) = self.observed_fixing {
+            Self::validate_rate("observed_fixing", rate)?;
         }
         if let Some(rate) = self.spot_rate_override {
             Self::validate_rate("spot_rate_override", rate)?;
@@ -779,17 +779,17 @@ impl Ndf {
     /// # Errors
     ///
     /// Returns a `Validation` error if the fixing rate is non-finite or
-    /// non-positive. Direct field assignment to `fixing_rate` bypasses this
+    /// non-positive. Direct field assignment to `observed_fixing` bypasses this
     /// guard; prefer this constructor.
-    pub fn with_fixing_rate(mut self, fixing_rate: f64) -> Result<Self> {
-        Self::validate_rate("fixing_rate", fixing_rate)?;
-        self.fixing_rate = Some(fixing_rate);
+    pub fn with_observed_fixing(mut self, observed_fixing: f64) -> Result<Self> {
+        Self::validate_rate("observed_fixing", observed_fixing)?;
+        self.observed_fixing = Some(observed_fixing);
         Ok(self)
     }
 
     /// Check if NDF is in post-fixing mode.
     pub fn is_fixed(&self) -> bool {
-        self.fixing_rate.is_some()
+        self.observed_fixing.is_some()
     }
 
     /// Estimate the forward rate when in pre-fixing mode.
@@ -885,19 +885,19 @@ impl Ndf {
     }
 
     fn settlement_amount(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
-        let fixing_rate = if let Some(fixed_rate) = self.fixing_rate {
+        let observed_fixing = if let Some(fixed_rate) = self.observed_fixing {
             fixed_rate
         } else if crate::instruments::fx::shared::event_has_occurred(self.fixing_date, as_of) {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "NDF {} is past fixing date ({}) but no fixing_rate is set. \
-                 Use with_fixing_rate() to set the observed rate.",
+                "NDF {} is past fixing date ({}) but no observed_fixing is set. \
+                 Use with_observed_fixing() to set the observed rate.",
                 self.id, self.fixing_date
             )));
         } else {
             self.estimate_forward_rate(market, as_of)?
         };
         Self::validate_rate("contract_rate", self.contract_rate)?;
-        Self::validate_rate("fixing_rate", fixing_rate)?;
+        Self::validate_rate("observed_fixing", observed_fixing)?;
 
         // Express both rates in settlement currency per unit of base, then
         // value the same long-base position under either quotation convention.
@@ -906,7 +906,7 @@ impl Ndf {
             NdfQuoteConvention::SettlementPerBase => rate,
         };
         Ok(self.notional.amount()
-            * (settlement_per_base(fixing_rate) - settlement_per_base(self.contract_rate)))
+            * (settlement_per_base(observed_fixing) - settlement_per_base(self.contract_rate)))
     }
 }
 
@@ -1007,14 +1007,14 @@ mod tests {
     #[test]
     fn test_ndf_with_fixing_rate_rejects_non_positive() {
         let err = Ndf::example()
-            .with_fixing_rate(0.0)
+            .with_observed_fixing(0.0)
             .expect_err("zero rate should fail");
-        assert!(err.to_string().contains("fixing_rate"));
+        assert!(err.to_string().contains("observed_fixing"));
 
         let err = Ndf::example()
-            .with_fixing_rate(f64::NAN)
+            .with_observed_fixing(f64::NAN)
             .expect_err("NaN rate should fail");
-        assert!(err.to_string().contains("fixing_rate"));
+        assert!(err.to_string().contains("observed_fixing"));
     }
 
     #[test]
@@ -1085,7 +1085,7 @@ mod tests {
     fn test_ndf_base_per_settlement_settlement_formula() {
         let mut ndf = Ndf::example();
         ndf.contract_rate = 7.25;
-        ndf.fixing_rate = Some(7.30);
+        ndf.observed_fixing = Some(7.30);
         // Long 10m CNY loses USD value on the five-cent depreciation.
         let expected = -500_000.0 / 52.925;
         let settlement = ndf
@@ -1099,7 +1099,7 @@ mod tests {
         let mut ndf = Ndf::example();
         ndf.quote_convention = NdfQuoteConvention::SettlementPerBase;
         ndf.contract_rate = 0.138;
-        ndf.fixing_rate = Some(0.140);
+        ndf.observed_fixing = Some(0.140);
         let settlement = ndf
             .settlement_amount(&MarketContext::new(), ndf.fixing_date)
             .expect("settlement");
@@ -1121,7 +1121,7 @@ mod tests {
             .expect("should build");
         let market = MarketContext::new().insert(curve);
 
-        // Create an NDF that's past fixing date but without fixing_rate
+        // Create an NDF that's past fixing date but without observed_fixing
         let ndf = Ndf::builder()
             .id(InstrumentId::new("TEST-NDF"))
             .base_currency(Currency::CNY)
@@ -1310,15 +1310,15 @@ mod tests {
             .maturity(Date::from_calendar_date(2025, Month::March, 15).expect("valid date"))
             .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
-            .fixing_rate_opt(Some(f64::INFINITY))
+            .observed_fixing_opt(Some(f64::INFINITY))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
             .attributes(Attributes::new())
             .build()
             .expect_err("builder should reject invalid fixing rate");
         assert!(
-            err.to_string().contains("fixing_rate"),
-            "error should mention fixing_rate: {err}"
+            err.to_string().contains("observed_fixing"),
+            "error should mention observed_fixing: {err}"
         );
     }
 
@@ -1344,7 +1344,7 @@ mod tests {
             .maturity(maturity)
             .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
-            .fixing_rate_opt(Some(7.30))
+            .observed_fixing_opt(Some(7.30))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
             .attributes(Attributes::new())

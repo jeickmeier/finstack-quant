@@ -111,11 +111,6 @@
           },
           "type": "array"
         },
-        "participation_rate": {
-          "description": "Participation rate in underlying performance",
-          "format": "double",
-          "type": "number"
-        },
         "past_fixings": {
           "default": [],
           "description": "Observed underlying fixings for seasoned trades (date, level pairs).\n\nFor a mid-life autocallable, every observation date on or before the\nvaluation date must have a matching fixing here; pricing errors\notherwise. Past fixings are evaluated deterministically (autocall,\nmissed memory coupons, discrete knock-in monitoring) and only the\nremaining future observation dates are simulated.",
@@ -175,7 +170,6 @@
         "coupons",
         "final_barrier",
         "final_payoff_type",
-        "participation_rate",
         "cap_level",
         "notional",
         "day_count",
@@ -197,7 +191,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Capital protection: max(floor, participation * min(S_T/S_0, cap))",
+          "description": "Capital protection: max(floor, participation_rate * min(S_T/S_0, cap_level))",
           "properties": {
             "capital_protection": {
               "additionalProperties": false,
@@ -206,10 +200,16 @@
                   "description": "Minimum return floor (e.g., 1.0 for 100% protection)",
                   "format": "double",
                   "type": "number"
+                },
+                "participation_rate": {
+                  "description": "Decimal multiplier on the capped performance ratio (1.0 = 100%).",
+                  "format": "double",
+                  "type": "number"
                 }
               },
               "required": [
-                "floor"
+                "floor",
+                "participation_rate"
               ],
               "type": "object"
             }
@@ -221,19 +221,19 @@
         },
         {
           "additionalProperties": false,
-          "description": "Participation: 1 + participation_rate * max(0, S_T/S_0 - 1)",
+          "description": "Participation: 1 + participation_rate * max(0, min(S_T/S_0, cap_level) - 1)",
           "properties": {
             "participation": {
               "additionalProperties": false,
               "properties": {
-                "rate": {
-                  "description": "Participation rate in upside (e.g., 1.0 for 100% participation)",
+                "participation_rate": {
+                  "description": "Decimal multiplier on the capped upside (1.0 = 100% participation).",
                   "format": "double",
                   "type": "number"
                 }
               },
               "required": [
-                "rate"
+                "participation_rate"
               ],
               "type": "object"
             }
@@ -327,7 +327,7 @@
           "final_barrier": 0.6,
           "final_payoff_type": {
             "participation": {
-              "rate": 1.0
+              "participation_rate": 1.0
             }
           },
           "id": "AUTO-SPX-QTR",
@@ -343,7 +343,6 @@
             "2024-09-30",
             "2024-12-31"
           ],
-          "participation_rate": 1.0,
           "past_fixings": [],
           "path_model": "atm_term_gbm",
           "payment_dates": [

@@ -7,7 +7,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
-use finstack_quant_core::types::BarrierType;
+use finstack_quant_core::types::{BarrierType, PayoutTiming};
 
 /// Barrier option with a total trade rebate and explicit contractual monitoring.
 /// Continuous monitoring uses closed-form pricing by default. Discrete monitoring
@@ -29,8 +29,9 @@ pub struct BarrierOption {
     pub underlying_ticker: String,
     /// Strike price
     pub strike: f64,
-    /// Barrier level (price that triggers knock-in/out)
-    pub barrier: Money,
+    /// Barrier level: the absolute underlying price that triggers the
+    /// knock-in/out, in the same quote units as `strike`.
+    pub barrier: f64,
     /// Total contractual trade rebate in the payoff currency, independent of
     /// notional. Knock-outs pay on a hit according to `rebate_timing`;
     /// knock-ins pay at expiry only if no hit occurred.
@@ -46,7 +47,7 @@ pub struct BarrierOption {
     /// `with_rebate_at_hit`; the crate primitive defaults to at-expiry.
     #[builder(default)]
     #[serde(default)]
-    pub rebate_timing: finstack_quant_models::closed_form::barrier::RebateTiming,
+    pub rebate_timing: PayoutTiming,
     /// Option type (call or put)
     pub option_type: OptionType,
     /// Barrier type (up/down, in/out)
@@ -58,14 +59,15 @@ pub struct BarrierOption {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
-    /// Terminal underlying fixing observed at expiry.
+    /// Terminal underlying fixing observed at expiry, in the same quote units
+    /// as `strike`.
     ///
     /// Required when valuing after expiry so the realized intrinsic value is
     /// invariant to later market spot updates. At expiry, the current market
     /// spot is used when this field is absent.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expiry_fixing: Option<Money>,
+    pub expiry_fixing: Option<f64>,
     /// Observed barrier state for expired options.
     ///
     /// Historical barrier monitoring must be supplied explicitly for expired
@@ -129,7 +131,7 @@ impl BarrierOption {
             .id(InstrumentId::new("BAR-SPX-UO-CALL"))
             .underlying_ticker("SPX".to_string())
             .strike(4500.0)
-            .barrier(Money::from((5000_i64, Currency::USD)))
+            .barrier(5000.0)
             .rebate(Money::from((50_i64, Currency::USD)))
             .option_type(crate::instruments::OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
@@ -202,16 +204,14 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
         // instrument boundary instead of panicking inside `Money::new`.
         validation::validate_f64_positive(self.strike, "BarrierOption strike")?;
         validation::validate_money_gt(self.notional, 0.0, "BarrierOption notional")?;
-        for money in [Some(self.barrier), self.rebate].into_iter().flatten() {
-            if money.currency() != self.notional.currency() {
+        validation::validate_f64_positive(self.barrier, "BarrierOption barrier")?;
+        if let Some(rebate) = self.rebate {
+            if rebate.currency() != self.notional.currency() {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
                     expected: self.notional.currency(),
-                    actual: money.currency(),
+                    actual: rebate.currency(),
                 });
             }
-        }
-        validation::validate_money_gt(self.barrier, 0.0, "BarrierOption barrier")?;
-        if let Some(rebate) = self.rebate {
             // A zero rebate is economically identical to `None` and stays
             // accepted; only negative or non-finite amounts are rejected.
             validation::validate_f64_non_negative(rebate.amount(), "BarrierOption rebate")?;
@@ -230,17 +230,7 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
             )?;
         }
         if let Some(fixing) = self.expiry_fixing {
-            if fixing.currency() != self.notional.currency() {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.notional.currency(),
-                    actual: fixing.currency(),
-                });
-            }
-            if !fixing.amount().is_finite() || fixing.amount() <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "BarrierOption expiry_fixing must be positive".to_string(),
-                ));
-            }
+            validation::validate_f64_positive(fixing, "BarrierOption expiry_fixing")?;
         }
         Ok(())
     }

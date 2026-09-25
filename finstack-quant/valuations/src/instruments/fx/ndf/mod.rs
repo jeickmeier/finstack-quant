@@ -55,7 +55,7 @@
 //! Uses the observed fixing rate for settlement calculation.
 //!
 //! **Note:** If valuation is past the fixing date but no fixing rate is set,
-//! the pricer returns an error. Use `with_fixing_rate()` to set the observed rate.
+//! the pricer returns an error. Use `with_observed_fixing()` to set the observed rate.
 //!
 //! # Fixing Conventions
 //!

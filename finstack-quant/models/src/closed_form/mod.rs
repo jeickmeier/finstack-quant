@@ -153,7 +153,7 @@ pub use asian::{
 };
 pub use barrier::{
     barrier_call_continuous, barrier_put_continuous, barrier_rebate, down_in_call, down_out_call,
-    up_in_call, up_out_call, RebateTiming,
+    up_in_call, up_out_call,
 };
 pub use dispatch::{
     asian_option_price_str, barrier_call_str, barrier_put_str, lookback_option_price_str,

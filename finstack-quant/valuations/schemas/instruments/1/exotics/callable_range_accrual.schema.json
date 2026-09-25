@@ -185,7 +185,7 @@
           },
           "type": "array"
         },
-        "past_fixings_in_range": {
+        "past_observations_in_range": {
           "description": "Number of past observations that were in range (for mid-life valuations).\nIf None, past observations are not included in the accrual calculation.",
           "format": "uint",
           "minimum": 0,
@@ -255,7 +255,7 @@
           "description": "Spot price identifier"
         },
         "total_past_observations": {
-          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_fixings_in_range` is set.",
+          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -355,7 +355,7 @@
               "2026-11-30",
               "2026-12-31"
             ],
-            "past_fixings_in_range": null,
+            "past_observations_in_range": null,
             "payment_date": null,
             "projection_curve_id": "USD-OIS",
             "rate_index_id": "SOFR",

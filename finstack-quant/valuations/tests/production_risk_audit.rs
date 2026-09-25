@@ -83,7 +83,7 @@ fn fx01_follows_active_spot_and_forward_overrides() {
         );
     }
     let mut fixed = ndf;
-    fixed.fixing_rate = Some(1.1);
+    fixed.observed_fixing = Some(1.1);
     let result = fixed
         .price_with_metrics(&market, as_of, &[MetricId::Fx01], PricingOptions::default())
         .expect("observed fixing risk");
@@ -209,7 +209,7 @@ fn analytical_barrier_price_and_risk_use_the_active_quote() {
     let mut option = BarrierOption::example().expect("barrier");
     option.expiry = date!(2026 - 01 - 01);
     option.strike = 100.0;
-    option.barrier = Money::from((80_i64, Currency::USD));
+    option.barrier = 80.0;
     option.barrier_type = BarrierType::DownAndIn;
     option.observed_barrier_breached = Some(true);
     option.spot_id = "SPOT".into();

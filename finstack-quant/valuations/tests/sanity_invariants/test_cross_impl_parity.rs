@@ -168,7 +168,7 @@ mod gbm_barrier {
             id: InstrumentId::new("BARRIER-GBM-HESTON-PARITY"),
             underlying_ticker: "SPX".to_string(),
             strike: STRIKE,
-            barrier: Money::new(85.0, Currency::USD).expect("valid money fixture"),
+            barrier: 85.0,
             rebate: None,
             rebate_timing: Default::default(),
             option_type: OptionType::Call,

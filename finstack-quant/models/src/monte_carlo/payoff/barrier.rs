@@ -17,12 +17,13 @@
 //! under stochastic-vol models; for deterministic-vol processes the state
 //! carries no variance entry and the configured sigma is used unchanged.
 
-use super::super::barriers::bridge::{check_barrier_hit, BarrierDirection};
+use super::super::barriers::bridge::check_barrier_hit;
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
 use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::BarrierDirection;
 pub use finstack_quant_core::types::BarrierType;
 
 /// Vanilla option kind for barrier payoff evaluation.
@@ -35,13 +36,6 @@ pub enum OptionKind {
     Put,
 }
 
-fn barrier_direction(barrier_type: BarrierType) -> BarrierDirection {
-    if barrier_type.is_up() {
-        BarrierDirection::Up
-    } else {
-        BarrierDirection::Down
-    }
-}
 /// Simulation-step representation of a barrier's monitoring contract.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BarrierMonitoring {
@@ -55,6 +49,22 @@ pub enum BarrierMonitoring {
         /// Strictly increasing simulation steps corresponding to contractual dates.
         observation_steps: Vec<usize>,
     },
+}
+
+impl BarrierMonitoring {
+    /// Return whether the path is observed at simulation step `step`.
+    ///
+    /// # Arguments
+    ///
+    /// * `step` - Zero-based simulation event step. Continuous monitoring
+    ///   observes every step from `start_step` on; discrete monitoring observes
+    ///   only the listed steps.
+    pub fn observes(&self, step: usize) -> bool {
+        match self {
+            Self::Continuous { start_step } => step >= *start_step,
+            Self::Discrete { observation_steps } => observation_steps.binary_search(&step).is_ok(),
+        }
+    }
 }
 
 /// Barrier option payoff with bridge correction.
@@ -227,7 +237,7 @@ impl Payoff for BarrierOptionPayoff {
         }
 
         let current_spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
-        let breached = |spot: f64| match barrier_direction(self.barrier_type) {
+        let breached = |spot: f64| match self.barrier_type.direction() {
             BarrierDirection::Up => spot >= self.barrier,
             BarrierDirection::Down => spot <= self.barrier,
         };
@@ -274,7 +284,7 @@ impl Payoff for BarrierOptionPayoff {
                             self.previous_spot,
                             current_spot,
                             self.barrier,
-                            barrier_direction(self.barrier_type),
+                            self.barrier_type.direction(),
                             local_sigma,
                             dt,
                             state.uniform_random(),
@@ -697,7 +707,7 @@ mod tests {
         //
         // Construct a down-and-out path whose closing spot is strictly
         // *below* the true barrier — that is an unconditional discrete
-        // knockout. With `use_gobet_miri = true` the buggy code shifts the
+        // knockout. A BGK-shifted barrier would move the
         // barrier DOWN (away from spot) so the close lands *above* the
         // shifted barrier, turning a definite hit into a mere bridge
         // probability that a high uniform draw rejects.

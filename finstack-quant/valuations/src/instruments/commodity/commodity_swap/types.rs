@@ -145,7 +145,7 @@ pub struct CommoditySwap {
         feature = "json-schema",
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
     )]
-    pub realized_fixings: Vec<(Date, f64)>,
+    pub past_fixings: Vec<(Date, f64)>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -203,10 +203,10 @@ impl CommoditySwap {
             })?;
         }
         let mut seen = std::collections::BTreeSet::new();
-        for (date, value) in &self.realized_fixings {
+        for (date, value) in &self.past_fixings {
             if !seen.insert(*date) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommoditySwap '{}' has duplicate realized fixing for date {date}",
+                    "CommoditySwap '{}' has duplicate past fixing for date {date}",
                     self.id
                 )));
             }
@@ -342,7 +342,7 @@ impl CommoditySwap {
     /// # Past vs future observations
     ///
     /// Observation dates strictly before `as_of` read from
-    /// [`realized_fixings`](Self::realized_fixings); a missing past fixing is
+    /// [`past_fixings`](Self::past_fixings); a missing past fixing is
     /// an `Error::Validation` naming the date — silently substituting today's
     /// spot would mis-mark every seasoned averaging period. Observation dates
     /// on or after `as_of` project from the curve via `price_on_date(date)`
@@ -394,10 +394,10 @@ impl CommoditySwap {
         // Realized-fixing lookup for past observation dates, with duplicate
         // rejection (a duplicate would silently skew the average).
         let mut fixings: std::collections::BTreeMap<Date, f64> = std::collections::BTreeMap::new();
-        for (d, v) in &self.realized_fixings {
+        for (d, v) in &self.past_fixings {
             if fixings.insert(*d, *v).is_some() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommoditySwap '{}' has duplicate realized fixing for date {d}",
+                    "CommoditySwap '{}' has duplicate past fixing for date {d}",
                     self.id.as_str()
                 )));
             }
@@ -407,9 +407,9 @@ impl CommoditySwap {
             if date < as_of {
                 fixings.get(&date).copied().ok_or_else(|| {
                     finstack_quant_core::Error::Validation(format!(
-                        "CommoditySwap '{}' is missing a realized fixing for past \
+                        "CommoditySwap '{}' is missing a past fixing for past \
                          observation date {date} (as_of {as_of}); past floating-leg \
-                         observations must be supplied via realized_fixings",
+                         observations must be supplied via past_fixings",
                         self.id.as_str()
                     ))
                 })
@@ -718,7 +718,7 @@ mod tests {
         assert!(swap.validate_for_pricing().is_err());
 
         swap.start_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        swap.realized_fixings = vec![
+        swap.past_fixings = vec![
             (
                 Date::from_calendar_date(2025, Month::February, 3).expect("date"),
                 3.5,
@@ -1076,9 +1076,7 @@ mod tests {
         days
     }
 
-    fn seasoned_swap(
-        realized_fixings: Vec<(Date, f64)>,
-    ) -> finstack_quant_core::Result<CommoditySwap> {
+    fn seasoned_swap(past_fixings: Vec<(Date, f64)>) -> finstack_quant_core::Result<CommoditySwap> {
         CommoditySwap::builder()
             .id(InstrumentId::new("SEASONED-SWAP"))
             .underlying(CommodityUnderlyingParams::new(
@@ -1098,7 +1096,7 @@ mod tests {
                     .expect("valid tenor fixture"),
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .realized_fixings(realized_fixings)
+            .past_fixings(past_fixings)
             .build()
     }
 
@@ -1176,7 +1174,7 @@ mod tests {
         );
     }
 
-    /// duplicate realized fixing dates are rejected.
+    /// duplicate past fixing dates are rejected.
     #[test]
     fn m15_duplicate_fixing_errors() {
         let as_of = Date::from_calendar_date(2025, Month::February, 14).expect("date");
@@ -1192,7 +1190,7 @@ mod tests {
         ));
         let err = seasoned_swap(fixings).expect_err("duplicate fixing must fail construction");
         assert!(
-            err.to_string().contains("duplicate realized fixing"),
+            err.to_string().contains("duplicate past fixing"),
             "error should mention the duplicate, got: {err}"
         );
     }

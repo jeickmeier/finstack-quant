@@ -121,7 +121,7 @@
       "type": "object"
     },
     "AveragingMethod": {
-      "description": "Averaging method for Asian options.",
+      "description": "Asian averaging method.\n\nSerialized as `\"arithmetic\"` / `\"geometric\"`; this is the single definition\nshared by the Monte Carlo payoffs and the `averaging_method` wire field of\nthe Asian option instruments.",
       "oneOf": [
         {
           "const": "arithmetic",

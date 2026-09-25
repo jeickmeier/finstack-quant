@@ -12,6 +12,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 // MC-specific imports
+use finstack_quant_models::monte_carlo::payoff::barrier::BarrierMonitoring as McBarrierMonitoring;
 use finstack_quant_models::monte_carlo::payoff::lookback::{
     FloatingStrikeLookbackCall, FloatingStrikeLookbackPut, Lookback, LookbackDirection,
 };
@@ -100,8 +101,23 @@ impl LookbackOptionMcPricer {
             &inst.instrument_pricing_overrides,
         )?;
 
-        let steps_per_year = base_cfg.steps_per_year;
-        let num_steps = ((t * steps_per_year).round() as usize).max(base_cfg.min_steps);
+        // Continuous monitoring observes every step of a uniform grid.
+        // Discrete monitoring puts each remaining contractual observation date
+        // on the grid and observes the extremum only there.
+        let (time_grid, monitoring) = match &inst.monitoring {
+            crate::instruments::Monitoring::Continuous => {
+                let num_steps =
+                    ((t * base_cfg.steps_per_year).round() as usize).max(base_cfg.min_steps);
+                (
+                    finstack_quant_models::monte_carlo::TimeGrid::uniform(t, num_steps)?,
+                    McBarrierMonitoring::Continuous { start_step: 0 },
+                )
+            }
+            discrete @ crate::instruments::Monitoring::Discrete { .. } => {
+                discrete.time_grid(as_of, inst.day_count, None, t, &base_cfg)?
+            }
+        };
+        let num_steps = time_grid.num_steps();
 
         // Time-varying drift: project each MC step with the curve-implied
         // forward drift, so the running extremum is sampled from unbiased
@@ -148,21 +164,17 @@ impl LookbackOptionMcPricer {
             (LookbackType::FloatingStrike, crate::instruments::OptionType::Call) => {
                 // Floating Strike Call: Payoff = S_T - S_min
                 // Seed initial minimum from observed_min if seasoned
-                let initial_min = inst
-                    .observed_min
-                    .as_ref()
-                    .map(|m| m.amount())
-                    .unwrap_or(f64::INFINITY);
+                let initial_min = inst.observed_min.unwrap_or(f64::INFINITY);
                 let payoff = FloatingStrikeLookbackCall::with_initial_min(
                     inst.notional.amount(),
                     maturity_step,
                     initial_min,
-                );
-                pricer.price(
+                )
+                .with_monitoring(monitoring);
+                pricer.price_with_grid(
                     &process,
                     spot,
-                    t,
-                    num_steps,
+                    time_grid,
                     &payoff,
                     currency,
                     discount_factor,
@@ -171,21 +183,17 @@ impl LookbackOptionMcPricer {
             (LookbackType::FloatingStrike, crate::instruments::OptionType::Put) => {
                 // Floating Strike Put: Payoff = S_max - S_T
                 // Seed initial maximum from observed_max if seasoned
-                let initial_max = inst
-                    .observed_max
-                    .as_ref()
-                    .map(|m| m.amount())
-                    .unwrap_or(f64::NEG_INFINITY);
+                let initial_max = inst.observed_max.unwrap_or(f64::NEG_INFINITY);
                 let payoff = FloatingStrikeLookbackPut::with_initial_max(
                     inst.notional.amount(),
                     maturity_step,
                     initial_max,
-                );
-                pricer.price(
+                )
+                .with_monitoring(monitoring);
+                pricer.price_with_grid(
                     &process,
                     spot,
-                    t,
-                    num_steps,
+                    time_grid,
                     &payoff,
                     currency,
                     discount_factor,
@@ -194,11 +202,7 @@ impl LookbackOptionMcPricer {
             (LookbackType::FixedStrike, crate::instruments::OptionType::Call) => {
                 // Fixed Strike Call: Payoff = max(S_max - K, 0)
                 // Seed initial maximum from observed_max if seasoned
-                let initial_max = inst
-                    .observed_max
-                    .as_ref()
-                    .map(|m| m.amount())
-                    .unwrap_or(f64::NEG_INFINITY);
+                let initial_max = inst.observed_max.unwrap_or(f64::NEG_INFINITY);
                 let strike = inst.strike.as_ref().ok_or_else(|| {
                     finstack_quant_core::Error::Validation(
                         "FixedStrike lookback requires a strike".into(),
@@ -210,12 +214,12 @@ impl LookbackOptionMcPricer {
                     inst.notional.amount(),
                     maturity_step,
                     initial_max,
-                );
-                pricer.price(
+                )
+                .with_monitoring(monitoring);
+                pricer.price_with_grid(
                     &process,
                     spot,
-                    t,
-                    num_steps,
+                    time_grid,
                     &payoff,
                     currency,
                     discount_factor,
@@ -224,11 +228,7 @@ impl LookbackOptionMcPricer {
             (LookbackType::FixedStrike, crate::instruments::OptionType::Put) => {
                 // Fixed Strike Put: Payoff = max(K - S_min, 0)
                 // Seed initial minimum from observed_min if seasoned
-                let initial_min = inst
-                    .observed_min
-                    .as_ref()
-                    .map(|m| m.amount())
-                    .unwrap_or(f64::INFINITY);
+                let initial_min = inst.observed_min.unwrap_or(f64::INFINITY);
                 let strike = inst.strike.as_ref().ok_or_else(|| {
                     finstack_quant_core::Error::Validation(
                         "FixedStrike lookback requires a strike".into(),
@@ -240,12 +240,12 @@ impl LookbackOptionMcPricer {
                     inst.notional.amount(),
                     maturity_step,
                     initial_min,
-                );
-                pricer.price(
+                )
+                .with_monitoring(monitoring);
+                pricer.price_with_grid(
                     &process,
                     spot,
-                    t,
-                    num_steps,
+                    time_grid,
                     &payoff,
                     currency,
                     discount_factor,
@@ -316,7 +316,7 @@ fn terminal_lookback_spot(
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
     if let Some(fixing) = inst.expiry_fixing {
-        return Ok(fixing.amount());
+        return Ok(fixing);
     }
     if as_of == inst.expiry {
         return lookback_spot(curves, &inst.spot_id);
@@ -337,38 +337,22 @@ fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_c
             })?;
             match inst.option_type {
                 crate::instruments::OptionType::Call => {
-                    let observed_max = inst
-                        .observed_max
-                        .as_ref()
-                        .map(|m| m.amount())
-                        .unwrap_or(spot);
+                    let observed_max = inst.observed_max.unwrap_or(spot);
                     (observed_max.max(spot) - strike).max(0.0)
                 }
                 crate::instruments::OptionType::Put => {
-                    let observed_min = inst
-                        .observed_min
-                        .as_ref()
-                        .map(|m| m.amount())
-                        .unwrap_or(spot);
+                    let observed_min = inst.observed_min.unwrap_or(spot);
                     (strike - observed_min.min(spot)).max(0.0)
                 }
             }
         }
         LookbackType::FloatingStrike => match inst.option_type {
             crate::instruments::OptionType::Call => {
-                let observed_min = inst
-                    .observed_min
-                    .as_ref()
-                    .map(|m| m.amount())
-                    .unwrap_or(spot);
+                let observed_min = inst.observed_min.unwrap_or(spot);
                 spot - observed_min.min(spot)
             }
             crate::instruments::OptionType::Put => {
-                let observed_max = inst
-                    .observed_max
-                    .as_ref()
-                    .map(|m| m.amount())
-                    .unwrap_or(spot);
+                let observed_max = inst.observed_max.unwrap_or(spot);
                 observed_max.max(spot) - spot
             }
         },
@@ -450,6 +434,16 @@ impl Pricer for LookbackOptionAnalyticalPricer {
     ) -> std::result::Result<ValuationResult, PricingError> {
         let lookback = expect_inst::<LookbackOption>(instrument, InstrumentType::LookbackOption)?;
 
+        if matches!(
+            lookback.monitoring,
+            crate::instruments::Monitoring::Discrete { .. }
+        ) {
+            return Err(PricingError::model_failure_with_context(
+                "Analytical lookback pricing requires continuous monitoring; use Monte Carlo for discrete observation dates".to_string(),
+                PricingErrorContext::from_instrument(lookback),
+            ));
+        }
+
         if as_of >= lookback.expiry {
             let spot = terminal_lookback_spot(lookback, market, as_of).map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -516,21 +510,13 @@ impl Pricer for LookbackOptionAnalyticalPricer {
                 crate::instruments::OptionType::Call => {
                     // Fixed Strike Call: Payoff = max(S_max - K, 0)
                     // Need max(observed_max, current_spot)
-                    let obs_max = lookback
-                        .observed_max
-                        .as_ref()
-                        .map(|m| m.amount())
-                        .unwrap_or(spot);
+                    let obs_max = lookback.observed_max.unwrap_or(spot);
                     obs_max.max(spot)
                 }
                 crate::instruments::OptionType::Put => {
                     // Fixed Strike Put: Payoff = max(K - S_min, 0)
                     // Need min(observed_min, current_spot)
-                    let obs_min = lookback
-                        .observed_min
-                        .as_ref()
-                        .map(|m| m.amount())
-                        .unwrap_or(spot);
+                    let obs_min = lookback.observed_min.unwrap_or(spot);
                     obs_min.min(spot)
                 }
             },
@@ -538,21 +524,13 @@ impl Pricer for LookbackOptionAnalyticalPricer {
                 crate::instruments::OptionType::Call => {
                     // Floating Strike Call: Payoff = S_T - S_min
                     // Need min(observed_min, current_spot)
-                    let obs_min = lookback
-                        .observed_min
-                        .as_ref()
-                        .map(|m| m.amount())
-                        .unwrap_or(spot);
+                    let obs_min = lookback.observed_min.unwrap_or(spot);
                     obs_min.min(spot)
                 }
                 crate::instruments::OptionType::Put => {
                     // Floating Strike Put: Payoff = S_max - S_T
                     // Need max(observed_max, current_spot)
-                    let obs_max = lookback
-                        .observed_max
-                        .as_ref()
-                        .map(|m| m.amount())
-                        .unwrap_or(spot);
+                    let obs_max = lookback.observed_max.unwrap_or(spot);
                     obs_max.max(spot)
                 }
             },
@@ -668,10 +646,7 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_max_opt(
-                observed_max
-                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
-            )
+            .observed_max_opt(observed_max)
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")
@@ -691,10 +666,7 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_min_opt(
-                observed_min
-                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
-            )
+            .observed_min_opt(observed_min)
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")
@@ -714,10 +686,7 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_min_opt(
-                observed_min
-                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
-            )
+            .observed_min_opt(observed_min)
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")
@@ -737,10 +706,7 @@ mod tests {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-            .observed_max_opt(
-                observed_max
-                    .map(|value| Money::new(value, Currency::USD).expect("valid money fixture")),
-            )
+            .observed_max_opt(observed_max)
             .attributes(Attributes::new())
             .build()
             .expect("lookback option")

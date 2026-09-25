@@ -5,13 +5,16 @@
 //!
 //! This payoff tracks extrema on **engine event dates only** (discrete /
 //! daily-close monitoring). It is not a continuous-monitoring lookback:
-//! intra-step Brownian-bridge extrema are not computed.
+//! intra-step Brownian-bridge extrema are not computed. By default every
+//! event step is observed; `with_monitoring` restricts the extremum to the
+//! contractual observation steps of a discretely monitored lookback.
 //!
 //! # Unified Implementation
 //!
 //! This module provides a unified [`Lookback`] struct that handles both call and put
 //! lookback options via the [`LookbackDirection`] enum.
 
+use super::barrier::BarrierMonitoring;
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
 use finstack_quant_core::currency::Currency;
@@ -69,6 +72,8 @@ pub struct Lookback {
     /// Time step index for maturity
     pub maturity_step: usize,
 
+    /// Steps at which the extremum is observed (every step by default).
+    monitoring: BarrierMonitoring,
     /// Extreme spot price observed (max for Call, min for Put)
     extreme_spot: f64,
     /// Initial extremum for reset (preserves seasoning across MC paths)
@@ -97,6 +102,7 @@ impl Lookback {
             strike,
             notional,
             maturity_step,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
             extreme_spot,
             initial_extreme: extreme_spot,
         }
@@ -129,9 +135,23 @@ impl Lookback {
             strike,
             notional,
             maturity_step,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
             extreme_spot: initial_extremum,
             initial_extreme: initial_extremum,
         }
+    }
+
+    /// Restrict extremum tracking to the given monitoring steps.
+    ///
+    /// # Arguments
+    ///
+    /// * `monitoring` - `Continuous { start_step }` observes every event step
+    ///   from `start_step`; `Discrete { observation_steps }` observes only the
+    ///   listed (strictly increasing) contractual observation steps.
+    #[must_use]
+    pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
+        self.monitoring = monitoring;
+        self
     }
 }
 
@@ -147,7 +167,7 @@ impl Payoff for Lookback {
     ///
     /// Returns an error if `SPOT` is missing or non-finite at an in-window event.
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
-        if state.step <= self.maturity_step {
+        if state.step <= self.maturity_step && self.monitoring.observes(state.step) {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
             self.extreme_spot = match self.direction {
                 LookbackDirection::Call => self.extreme_spot.max(spot),
@@ -189,6 +209,8 @@ pub struct FloatingStrikeLookbackCall {
     /// Time step index for maturity
     pub maturity_step: usize,
 
+    /// Steps at which the extremum is observed (every step by default).
+    monitoring: BarrierMonitoring,
     terminal_spot: f64,
     min_spot: f64,
     /// Initial minimum for reset (preserves seasoning across MC paths)
@@ -201,6 +223,7 @@ impl FloatingStrikeLookbackCall {
         Self {
             notional,
             maturity_step,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
             terminal_spot: 0.0,
             min_spot: f64::INFINITY,
             initial_min: f64::INFINITY,
@@ -221,10 +244,24 @@ impl FloatingStrikeLookbackCall {
         Self {
             notional,
             maturity_step,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
             terminal_spot: 0.0,
             min_spot: initial_min,
             initial_min,
         }
+    }
+
+    /// Restrict extremum tracking to the given monitoring steps.
+    ///
+    /// # Arguments
+    ///
+    /// * `monitoring` - `Continuous { start_step }` observes every event step
+    ///   from `start_step`; `Discrete { observation_steps }` observes only the
+    ///   listed (strictly increasing) contractual observation steps.
+    #[must_use]
+    pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
+        self.monitoring = monitoring;
+        self
     }
 }
 
@@ -242,7 +279,9 @@ impl Payoff for FloatingStrikeLookbackCall {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
         if state.step <= self.maturity_step {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
-            self.min_spot = self.min_spot.min(spot);
+            if self.monitoring.observes(state.step) {
+                self.min_spot = self.min_spot.min(spot);
+            }
             if state.step == self.maturity_step {
                 self.terminal_spot = spot;
             }
@@ -283,6 +322,8 @@ pub struct FloatingStrikeLookbackPut {
     /// Time step index for maturity
     pub maturity_step: usize,
 
+    /// Steps at which the extremum is observed (every step by default).
+    monitoring: BarrierMonitoring,
     terminal_spot: f64,
     max_spot: f64,
     /// Initial maximum for reset (preserves seasoning across MC paths)
@@ -295,6 +336,7 @@ impl FloatingStrikeLookbackPut {
         Self {
             notional,
             maturity_step,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
             terminal_spot: 0.0,
             max_spot: f64::NEG_INFINITY,
             initial_max: f64::NEG_INFINITY,
@@ -315,10 +357,24 @@ impl FloatingStrikeLookbackPut {
         Self {
             notional,
             maturity_step,
+            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
             terminal_spot: 0.0,
             max_spot: initial_max,
             initial_max,
         }
+    }
+
+    /// Restrict extremum tracking to the given monitoring steps.
+    ///
+    /// # Arguments
+    ///
+    /// * `monitoring` - `Continuous { start_step }` observes every event step
+    ///   from `start_step`; `Discrete { observation_steps }` observes only the
+    ///   listed (strictly increasing) contractual observation steps.
+    #[must_use]
+    pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
+        self.monitoring = monitoring;
+        self
     }
 }
 
@@ -336,7 +392,9 @@ impl Payoff for FloatingStrikeLookbackPut {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
         if state.step <= self.maturity_step {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
-            self.max_spot = self.max_spot.max(spot);
+            if self.monitoring.observes(state.step) {
+                self.max_spot = self.max_spot.max(spot);
+            }
             if state.step == self.maturity_step {
                 self.terminal_spot = spot;
             }
@@ -684,5 +742,50 @@ mod tests {
 
         put.reset();
         assert_eq!(put.extreme_spot, 70.0);
+    }
+
+    #[test]
+    fn discrete_monitoring_ignores_unobserved_steps() {
+        // Path 100 -> 150 (step 1, unobserved) -> 110 (step 2, observed).
+        let path = [(0, 100.0), (1, 150.0), (2, 110.0)];
+        let monitoring = BarrierMonitoring::Discrete {
+            observation_steps: vec![2],
+        };
+
+        let mut fixed = Lookback::new(LookbackDirection::Call, 100.0, 1.0, 2)
+            .with_monitoring(monitoring.clone());
+        let mut floating_put =
+            FloatingStrikeLookbackPut::new(1.0, 2).with_monitoring(monitoring.clone());
+        let mut floating_call = FloatingStrikeLookbackCall::new(1.0, 2).with_monitoring(monitoring);
+        for (step, spot) in path {
+            let mut state = create_state(step, spot);
+            fixed.on_event(&mut state).expect("valid payoff event");
+            floating_put
+                .on_event(&mut state)
+                .expect("valid payoff event");
+            floating_call
+                .on_event(&mut state)
+                .expect("valid payoff event");
+        }
+
+        // Only step 2 is observed: max = min = 110 and S_T = 110.
+        assert_eq!(
+            fixed.value(Currency::USD).expect("valid payoff").amount(),
+            10.0
+        );
+        assert_eq!(
+            floating_put
+                .value(Currency::USD)
+                .expect("valid payoff")
+                .amount(),
+            0.0
+        );
+        assert_eq!(
+            floating_call
+                .value(Currency::USD)
+                .expect("valid payoff")
+                .amount(),
+            0.0
+        );
     }
 }

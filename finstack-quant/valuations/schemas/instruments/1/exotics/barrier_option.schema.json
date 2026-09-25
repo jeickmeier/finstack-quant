@@ -9,8 +9,9 @@
           "description": "Attributes for scenario selection and grouping"
         },
         "barrier": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Barrier level (price that triggers knock-in/out)"
+          "description": "Barrier level: the absolute underlying price that triggers the\nknock-in/out, in the same quote units as `strike`.",
+          "format": "double",
+          "type": "number"
         },
         "barrier_type": {
           "$ref": "#/$defs/BarrierType",
@@ -40,15 +41,12 @@
           "description": "Option expiry date"
         },
         "expiry_fixing": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent."
+          "description": "Terminal underlying fixing observed at expiry, in the same quote units\nas `strike`.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -96,7 +94,7 @@
           "description": "Total contractual trade rebate in the payoff currency, independent of\nnotional. Knock-outs pay on a hit according to `rebate_timing`;\nknock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
-          "$ref": "#/$defs/RebateTiming",
+          "$ref": "#/$defs/PayoutTiming",
           "default": "at_hit",
           "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry (a no-hit is only known then),\nso this setting does not affect them. The analytical pricer values\nat-hit rebates via the discounted first-passage closed form. Monte\nCarlo applies at-hit when `rebate_timing == AtHit` via\n`with_rebate_at_hit`; the crate primitive defaults to at-expiry."
         },
@@ -225,17 +223,17 @@
         }
       ]
     },
-    "RebateTiming": {
-      "description": "Timing of a knock-out rebate payment.\n\nMarket-standard KO rebates pay **at hit** (the moment the barrier is\nbreached); paying at expiry is the less common variant. Knock-in rebates\nalways pay at expiry by definition (only at expiry is it known that the\noption failed to knock in), so this setting does not affect them.",
+    "PayoutTiming": {
+      "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them.",
       "oneOf": [
         {
           "const": "at_hit",
-          "description": "Rebate is paid at the barrier hit time (market standard for KO rebates).",
+          "description": "Paid the moment the barrier is hit (market standard).",
           "type": "string"
         },
         {
           "const": "at_expiry",
-          "description": "Rebate is paid at option expiry.",
+          "description": "Paid at expiry regardless of when the barrier is hit.",
           "type": "string"
         }
       ]
@@ -267,10 +265,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "barrier": {
-            "amount": "5000",
-            "currency": "USD"
-          },
+          "barrier": 5000.0,
           "barrier_type": "up_and_out",
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",

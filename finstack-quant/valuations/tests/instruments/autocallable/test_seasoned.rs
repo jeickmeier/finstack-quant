@@ -194,7 +194,9 @@ fn all_past_observations_give_deterministic_payoff() {
     );
     // Settlement strictly after the last observation so the note is still alive.
     inst.expiry = date!(2025 - 01 - 31);
-    inst.final_payoff_type = FinalPayoffType::Participation { rate: 1.0 };
+    inst.final_payoff_type = FinalPayoffType::Participation {
+        participation_rate: 1.0,
+    };
 
     let pv = inst.value(&market, as_of).expect("pv");
 

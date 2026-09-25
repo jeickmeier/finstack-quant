@@ -88,8 +88,16 @@ pub struct CmsSpreadOption {
     pub discount_curve_id: CurveId,
     /// Forward curve ID (for swap rate projection).
     pub forward_curve_id: CurveId,
-    /// Rank correlation between the two CMS rates.
-    pub spread_correlation: f64,
+    /// Gaussian-copula correlation between the two CMS rates, a decimal in `[-1, 1]`.
+    #[serde(
+        serialize_with = "finstack_quant_core::wire::serialize_correlation",
+        deserialize_with = "finstack_quant_core::wire::deserialize_correlation"
+    )]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::CorrelationWire")
+    )]
+    pub correlation: f64,
     /// Day count convention.
     pub day_count: DayCount,
 
@@ -170,10 +178,10 @@ impl CmsSpreadOption {
             )
         })?;
 
-        validation::require_with((-1.0..=1.0).contains(&self.spread_correlation), || {
+        validation::require_with((-1.0..=1.0).contains(&self.correlation), || {
             format!(
-                "CmsSpreadOption spread_correlation ({}) must be in [-1, 1]",
-                self.spread_correlation
+                "CmsSpreadOption correlation ({}) must be in [-1, 1]",
+                self.correlation
             )
         })?;
 
@@ -216,7 +224,7 @@ impl CmsSpreadOption {
             short_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-2Y"),
             discount_curve_id: CurveId::new("USD-OIS"),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
-            spread_correlation: 0.85,
+            correlation: 0.85,
             day_count: DayCount::Act360,
             swap_convention: Some(IRSConvention::UsdSofr),
             swap_fixed_frequency: None,
@@ -403,7 +411,7 @@ mod tests {
     #[test]
     fn correlation_out_of_range_fails() {
         let mut opt = CmsSpreadOption::example();
-        opt.spread_correlation = 1.5;
+        opt.correlation = 1.5;
         assert!(opt.validate().is_err());
     }
 
@@ -440,7 +448,7 @@ mod tests {
         opt.expiry_date = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
         opt.strike = 0.005;
-        opt.spread_correlation = 0.50;
+        opt.correlation = 0.50;
 
         let amount = price_amount(&opt, &market, as_of);
         let via_value = opt.value(&market, as_of).expect("direct value");
@@ -457,10 +465,10 @@ mod tests {
         low_corr.expiry_date = date(2026, Month::January, 1);
         low_corr.payment_date = date(2026, Month::January, 5);
         low_corr.strike = 0.010;
-        low_corr.spread_correlation = 0.0;
+        low_corr.correlation = 0.0;
 
         let mut high_corr = low_corr.clone();
-        high_corr.spread_correlation = 0.95;
+        high_corr.correlation = 0.95;
 
         let low_corr_value = price_amount(&low_corr, &market, as_of);
         let high_corr_value = price_amount(&high_corr, &market, as_of);
@@ -475,7 +483,7 @@ mod tests {
         opt.expiry_date = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
         opt.strike = 0.010;
-        opt.spread_correlation = 0.50;
+        opt.correlation = 0.50;
 
         let low_vol = price_amount(&opt, &market(as_of, 0.015), as_of);
         let high_vol = price_amount(&opt, &market(as_of, 0.060), as_of);
@@ -558,7 +566,7 @@ mod tests {
         usd.expiry_date = date(2026, Month::January, 1);
         usd.payment_date = date(2026, Month::January, 5);
         usd.strike = 0.0;
-        usd.spread_correlation = 0.50;
+        usd.correlation = 0.50;
         usd.swap_convention = Some(IRSConvention::UsdSofr);
 
         let mut eur = usd.clone();

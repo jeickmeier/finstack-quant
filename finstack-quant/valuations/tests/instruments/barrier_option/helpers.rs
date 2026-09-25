@@ -88,7 +88,7 @@ pub fn create_down_and_out_call(
         id: "BARRIER_DOC_TEST".into(),
         underlying_ticker: SPOT_ID.into(),
         strike,
-        barrier: Money::new(barrier, Currency::USD).expect("valid money fixture"),
+        barrier,
         rebate: None,
         rebate_timing: Default::default(),
         option_type: OptionType::Call,

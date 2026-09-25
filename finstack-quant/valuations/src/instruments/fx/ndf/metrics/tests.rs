@@ -208,7 +208,7 @@ fn ndf_fx01_post_fixing_is_zero() {
         .maturity(maturity)
         .notional(Money::from((10000000_i64, Currency::CNY)))
         .contract_rate(1.0 / 7.30)
-        .fixing_rate_opt(Some(1.0 / 7.28))
+        .observed_fixing_opt(Some(1.0 / 7.28))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id_opt(Some(CurveId::new("CNY-OIS")))
         .quote_convention(NdfQuoteConvention::SettlementPerBase)

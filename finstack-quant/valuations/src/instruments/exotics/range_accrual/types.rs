@@ -62,7 +62,7 @@ impl std::str::FromStr for BoundsType {
 ///
 /// # Historical Fixings
 ///
-/// For mid-life valuations, use `past_fixings_in_range` to specify how many past
+/// For mid-life valuations, use `past_observations_in_range` to specify how many past
 /// observations were in range. The pricer will add this to expected future fixings.
 ///
 /// # Rate-Linked Underlyings: Pricing Routing
@@ -198,9 +198,9 @@ pub struct RangeAccrualTerms {
     pub payment_date: Option<Date>,
     /// Number of past observations that were in range (for mid-life valuations).
     /// If None, past observations are not included in the accrual calculation.
-    pub past_fixings_in_range: Option<usize>,
+    pub past_observations_in_range: Option<usize>,
     /// Total number of past observations (for mid-life valuations).
-    /// Must be provided if `past_fixings_in_range` is set.
+    /// Must be provided if `past_observations_in_range` is set.
     pub total_past_observations: Option<usize>,
     /// Rejects unknown JSON fields (restores `deny_unknown_fields` despite the
     /// `#[serde(flatten)]` of these terms into [`RangeAccrual`]).
@@ -255,7 +255,7 @@ impl RangeAccrual {
                     .vol_surface_id(CurveId::new("SPX-VOL"))
                     .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
                     .payment_date_opt(None)
-                    .past_fixings_in_range_opt(None)
+                    .past_observations_in_range_opt(None)
                     .total_past_observations_opt(None)
                     .build()
                     .expect("Example RangeAccrual terms should build"),
@@ -297,7 +297,7 @@ impl RangeAccrual {
                     .vol_surface_id(CurveId::new("SOFR-VOL"))
                     .div_yield_id_opt(None)
                     .payment_date_opt(None)
-                    .past_fixings_in_range_opt(None)
+                    .past_observations_in_range_opt(None)
                     .total_past_observations_opt(None)
                     .build()
                     .expect("Example RangeAccrual terms should build"),
@@ -389,24 +389,27 @@ impl RangeAccrualTerms {
             )?;
         }
 
-        match (self.past_fixings_in_range, self.total_past_observations) {
+        match (
+            self.past_observations_in_range,
+            self.total_past_observations,
+        ) {
             (Some(in_range), Some(total)) => {
                 if in_range > total {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "RangeAccrual past_fixings_in_range ({}) cannot exceed total_past_observations ({})",
+                        "RangeAccrual past_observations_in_range ({}) cannot exceed total_past_observations ({})",
                         in_range, total
                     )));
                 }
             }
             (Some(_), None) => {
                 return Err(finstack_quant_core::Error::Validation(
-                    "RangeAccrual past_fixings_in_range requires total_past_observations to be set"
+                    "RangeAccrual past_observations_in_range requires total_past_observations to be set"
                         .to_string(),
                 ));
             }
             (None, Some(_)) => {
                 return Err(finstack_quant_core::Error::Validation(
-                    "RangeAccrual total_past_observations requires past_fixings_in_range to be set"
+                    "RangeAccrual total_past_observations requires past_observations_in_range to be set"
                         .to_string(),
                 ));
             }

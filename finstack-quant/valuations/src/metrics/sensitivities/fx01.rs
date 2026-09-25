@@ -42,7 +42,7 @@ fn bumped_instrument_quote(
     } else if let Some(spot) = bumped.as_any_mut().downcast_mut::<FxSpot>() {
         *spot.spot_rate.as_mut()? *= 1.0 + relative;
     } else if let Some(ndf) = bumped.as_any_mut().downcast_mut::<Ndf>() {
-        if ndf.fixing_rate.is_none() {
+        if ndf.observed_fixing.is_none() {
             let quote = if ndf.forward_rate_override.is_some() {
                 ndf.forward_rate_override.as_mut()?
             } else {
