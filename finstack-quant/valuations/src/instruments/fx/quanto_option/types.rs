@@ -92,9 +92,8 @@ pub struct QuantoOption {
     /// the correct smile. `validate()` rejects ids whose embedded pair name
     /// contradicts this direction.
     pub fx_vol_id: Option<CurveId>,
-    /// Pricing overrides (manual price, yield, spread)
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
@@ -170,7 +169,7 @@ struct QuantoOptionUnchecked {
     /// Optional FX volatility surface ID.
     #[serde(default)]
     fx_vol_id: Option<CurveId>,
-    /// Pricing overrides (manual price, yield, spread).
+    /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.

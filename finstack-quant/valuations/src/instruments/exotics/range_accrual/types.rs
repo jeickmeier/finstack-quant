@@ -73,8 +73,9 @@ impl std::str::FromStr for BoundsType {
 /// underlyings only and return a validation error when these fields are set.
 /// Price rate-linked range accrual notes through
 /// [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)
-/// (with an empty call schedule for a non-callable note), which models the
-/// reference rate under HW1F and reconstructs the term rate per observation.
+/// (whose `range_accrual` field carries these [`RangeAccrualTerms`]), which
+/// models the reference rate under HW1F and reconstructs the term rate per
+/// observation.
 #[derive(
     Clone,
     Debug,
@@ -83,10 +84,55 @@ impl std::str::FromStr for BoundsType {
     serde::Deserialize,
 )]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
 pub struct RangeAccrual {
     /// Unique instrument identifier
     pub id: InstrumentId,
+    /// Contract terms of the range accrual, serialized flat at this level.
+    #[serde(flatten)]
+    pub terms: RangeAccrualTerms,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
+    /// Attributes for scenario selection and grouping
+    pub attributes: Attributes,
+}
+
+/// Contract terms of a range accrual note, without identity or pricing overrides.
+///
+/// [`RangeAccrual`] flattens these terms into its own payload, and
+/// [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)
+/// nests them under `range_accrual`, so the callable note has exactly one
+/// `id`, one `attributes` map and one set of pricing overrides.
+#[derive(
+    Clone,
+    Debug,
+    finstack_quant_valuations_macros::FinancialBuilder,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
+#[builder(validate = RangeAccrualTerms::validate)]
+pub struct RangeAccrualTerms {
     /// Underlying asset ticker symbol
     pub underlying_ticker: String,
     /// Observation dates for range checking (must be sorted ascending)
@@ -137,30 +183,6 @@ pub struct RangeAccrual {
     pub vol_surface_id: CurveId,
     /// Optional dividend-yield scalar ID
     pub div_yield_id: Option<PriceId>,
-    /// Pricing overrides (manual price, yield, spread)
-    #[builder(default)]
-    /// Instrument-owned pricing inputs.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
-    )]
-    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-time pricing configuration.
-    #[builder(default)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
-    )]
-    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only pricing adjustments.
-    #[builder(default)]
-    #[serde(
-        default,
-        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
-    )]
-    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
-    /// Attributes for scenario selection and grouping
-    pub attributes: Attributes,
     /// Optional quanto adjustment parameters. When provided, applies a drift
     /// correction for instruments whose payoff currency differs from the
     /// underlying asset currency.
@@ -180,29 +202,15 @@ pub struct RangeAccrual {
     /// Total number of past observations (for mid-life valuations).
     /// Must be provided if `past_fixings_in_range` is set.
     pub total_past_observations: Option<usize>,
+    /// Rejects unknown JSON fields (restores `deny_unknown_fields` despite the
+    /// `#[serde(flatten)]` of these terms into [`RangeAccrual`]).
+    #[serde(flatten)]
+    #[cfg_attr(feature = "json-schema", schemars(skip))]
+    #[builder(default)]
+    pub(crate) unknown_fields: finstack_quant_core::serde_guard::UnknownFieldGuard,
 }
 
 impl RangeAccrual {
-    /// Return the contractual accrual factor applied to the annual coupon.
-    pub fn accrual_year_fraction(&self) -> finstack_quant_core::Result<f64> {
-        let accrual_end = self.observation_dates.last().copied().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "RangeAccrual requires at least one observation date".to_string(),
-            )
-        })?;
-        let accrual_start = self.accrual_start_date;
-        if accrual_start >= accrual_end {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "RangeAccrual accrual_start_date ({accrual_start}) must precede final observation ({accrual_end})"
-            )));
-        }
-        self.day_count.year_fraction(
-            accrual_start,
-            accrual_end,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )
-    }
-
     /// Create a canonical example range accrual (monthly observations).
     ///
     /// This example uses relative bounds (95%-105% of initial spot) which is
@@ -228,25 +236,31 @@ impl RangeAccrual {
         ];
         RangeAccrual::builder()
             .id(InstrumentId::new("RANGE-SPX-1Y"))
-            .underlying_ticker("SPX".to_string())
-            .observation_dates(observation_dates)
-            .accrual_start_date(
-                Date::from_calendar_date(2023, Month::December, 31).expect("Valid example date"),
+            .terms(
+                RangeAccrualTerms::builder()
+                    .underlying_ticker("SPX".to_string())
+                    .observation_dates(observation_dates)
+                    .accrual_start_date(
+                        Date::from_calendar_date(2023, Month::December, 31)
+                            .expect("Valid example date"),
+                    )
+                    .lower_bound(0.95) // 95% of initial spot
+                    .upper_bound(1.05) // 105% of initial spot
+                    .bounds_type(BoundsType::RelativeToInitialSpot)
+                    .coupon_rate(0.08) // 8% annual if inside range
+                    .notional(Money::from((100_000_i64, Currency::USD)))
+                    .day_count(DayCount::Act365F)
+                    .discount_curve_id(CurveId::new("USD-OIS"))
+                    .spot_id("SPX-SPOT".into())
+                    .vol_surface_id(CurveId::new("SPX-VOL"))
+                    .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
+                    .payment_date_opt(None)
+                    .past_fixings_in_range_opt(None)
+                    .total_past_observations_opt(None)
+                    .build()
+                    .expect("Example RangeAccrual terms should build"),
             )
-            .lower_bound(0.95) // 95% of initial spot
-            .upper_bound(1.05) // 105% of initial spot
-            .bounds_type(BoundsType::RelativeToInitialSpot)
-            .coupon_rate(0.08) // 8% annual if inside range
-            .notional(Money::from((100_000_i64, Currency::USD)))
-            .day_count(DayCount::Act365F)
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .spot_id("SPX-SPOT".into())
-            .vol_surface_id(CurveId::new("SPX-VOL"))
-            .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
             .attributes(Attributes::new())
-            .payment_date_opt(None)
-            .past_fixings_in_range_opt(None)
-            .total_past_observations_opt(None)
             .build()
             .expect("Example RangeAccrual construction should not fail")
     }
@@ -264,27 +278,62 @@ impl RangeAccrual {
         ];
         RangeAccrual::builder()
             .id(InstrumentId::new("RANGE-SOFR-3M"))
-            .underlying_ticker("SOFR".to_string())
-            .observation_dates(observation_dates)
-            .accrual_start_date(
-                Date::from_calendar_date(2023, Month::December, 31).expect("Valid example date"),
+            .terms(
+                RangeAccrualTerms::builder()
+                    .underlying_ticker("SOFR".to_string())
+                    .observation_dates(observation_dates)
+                    .accrual_start_date(
+                        Date::from_calendar_date(2023, Month::December, 31)
+                            .expect("Valid example date"),
+                    )
+                    .lower_bound(0.04) // 4% lower bound
+                    .upper_bound(0.06) // 6% upper bound
+                    .bounds_type(BoundsType::Absolute)
+                    .coupon_rate(0.05) // 5% annual if inside range
+                    .notional(Money::from((1_000_000_i64, Currency::USD)))
+                    .day_count(DayCount::Act360)
+                    .discount_curve_id(CurveId::new("USD-OIS"))
+                    .spot_id("SOFR-RATE".into())
+                    .vol_surface_id(CurveId::new("SOFR-VOL"))
+                    .div_yield_id_opt(None)
+                    .payment_date_opt(None)
+                    .past_fixings_in_range_opt(None)
+                    .total_past_observations_opt(None)
+                    .build()
+                    .expect("Example RangeAccrual terms should build"),
             )
-            .lower_bound(0.04) // 4% lower bound
-            .upper_bound(0.06) // 6% upper bound
-            .bounds_type(BoundsType::Absolute)
-            .coupon_rate(0.05) // 5% annual if inside range
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .day_count(DayCount::Act360)
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .spot_id("SOFR-RATE".into())
-            .vol_surface_id(CurveId::new("SOFR-VOL"))
-            .div_yield_id_opt(None)
             .attributes(Attributes::new())
-            .payment_date_opt(None)
-            .past_fixings_in_range_opt(None)
-            .total_past_observations_opt(None)
             .build()
             .expect("Example RangeAccrual construction should not fail")
+    }
+
+    /// Validate the range accrual parameters.
+    ///
+    /// Delegates to [`RangeAccrualTerms::validate`].
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.terms.validate()
+    }
+}
+
+impl RangeAccrualTerms {
+    /// Return the contractual accrual factor applied to the annual coupon.
+    pub fn accrual_year_fraction(&self) -> finstack_quant_core::Result<f64> {
+        let accrual_end = self.observation_dates.last().copied().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "RangeAccrual requires at least one observation date".to_string(),
+            )
+        })?;
+        let accrual_start = self.accrual_start_date;
+        if accrual_start >= accrual_end {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RangeAccrual accrual_start_date ({accrual_start}) must precede final observation ({accrual_end})"
+            )));
+        }
+        self.day_count.year_fraction(
+            accrual_start,
+            accrual_end,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )
     }
 
     /// Validate the range accrual parameters.
@@ -388,49 +437,17 @@ impl RangeAccrual {
         Ok(())
     }
 
-    /// Get the effective lower bound for a given initial spot.
+    /// Market data required to price these terms.
     ///
-    /// For `Absolute` bounds, returns the bound as-is.
-    /// For `RelativeToInitialSpot`, returns `initial_spot * lower_bound`.
-    pub fn effective_lower_bound(&self, initial_spot: f64) -> f64 {
-        match self.bounds_type {
-            BoundsType::Absolute => self.lower_bound,
-            BoundsType::RelativeToInitialSpot => initial_spot * self.lower_bound,
-        }
-    }
-
-    /// Get the effective upper bound for a given initial spot.
+    /// Lists the discount curve, the optional projection curve, the spot and
+    /// dividend-yield scalars, one volatility dependency per range bound, and
+    /// the quanto FX inputs when present.
     ///
-    /// For `Absolute` bounds, returns the bound as-is.
-    /// For `RelativeToInitialSpot`, returns `initial_spot * upper_bound`.
-    pub fn effective_upper_bound(&self, initial_spot: f64) -> f64 {
-        match self.bounds_type {
-            BoundsType::Absolute => self.upper_bound,
-            BoundsType::RelativeToInitialSpot => initial_spot * self.upper_bound,
-        }
-    }
-}
-
-impl RangeAccrualBuilder {
-    /// Set the coupon rate using a typed rate.
-    pub fn coupon_rate_rate(mut self, rate: Rate) -> Self {
-        self.coupon_rate = Some(rate.as_decimal());
-        self
-    }
-}
-
-impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
-    impl_instrument_base!(crate::pricer::InstrumentType::RangeAccrual);
-
-    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        RangeAccrual::validate(self)
-    }
-
-    fn default_model(&self) -> crate::pricer::ModelKey {
-        crate::pricer::ModelKey::StaticReplication
-    }
-
-    fn market_dependencies(
+    /// # Errors
+    ///
+    /// Currently infallible; returns `Result` to match
+    /// [`Instrument::market_dependencies`](crate::instruments::common_impl::traits::Instrument::market_dependencies).
+    pub fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
@@ -467,6 +484,71 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
         Ok(deps)
     }
 
+    /// Get the effective lower bound for a given initial spot.
+    ///
+    /// For `Absolute` bounds, returns the bound as-is.
+    /// For `RelativeToInitialSpot`, returns `initial_spot * lower_bound`.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_spot` - Underlying level at trade inception (price units, or
+    ///   a decimal rate for rate-linked notes) that scales relative bounds.
+    pub fn effective_lower_bound(&self, initial_spot: f64) -> f64 {
+        match self.bounds_type {
+            BoundsType::Absolute => self.lower_bound,
+            BoundsType::RelativeToInitialSpot => initial_spot * self.lower_bound,
+        }
+    }
+
+    /// Get the effective upper bound for a given initial spot.
+    ///
+    /// For `Absolute` bounds, returns the bound as-is.
+    /// For `RelativeToInitialSpot`, returns `initial_spot * upper_bound`.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_spot` - Underlying level at trade inception (price units, or
+    ///   a decimal rate for rate-linked notes) that scales relative bounds.
+    pub fn effective_upper_bound(&self, initial_spot: f64) -> f64 {
+        match self.bounds_type {
+            BoundsType::Absolute => self.upper_bound,
+            BoundsType::RelativeToInitialSpot => initial_spot * self.upper_bound,
+        }
+    }
+}
+
+impl RangeAccrualTermsBuilder {
+    /// Set the coupon rate using a typed rate.
+    ///
+    /// # Arguments
+    ///
+    /// * `rate` - Annual coupon earned while in range; stored as a decimal
+    ///   (0.05 = 5%).
+    pub fn coupon_rate_rate(mut self, rate: Rate) -> Self {
+        self.coupon_rate = Some(rate.as_decimal());
+        self
+    }
+}
+
+impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
+    impl_instrument_base!(crate::pricer::InstrumentType::RangeAccrual);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        RangeAccrual::validate(self)
+    }
+
+    fn default_model(&self) -> crate::pricer::ModelKey {
+        crate::pricer::ModelKey::StaticReplication
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        self.terms.market_dependencies()
+    }
+
     fn base_value(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -477,7 +559,7 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
     }
 
     fn effective_start_date(&self) -> Option<Date> {
-        self.observation_dates.first().copied()
+        self.terms.observation_dates.first().copied()
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -485,15 +567,16 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
 
 impl crate::metrics::HasExpiry for RangeAccrual {
     fn expiry(&self) -> finstack_quant_core::dates::Date {
-        self.payment_date
-            .or_else(|| self.observation_dates.last().copied())
+        self.terms
+            .payment_date
+            .or_else(|| self.terms.observation_dates.last().copied())
             .unwrap_or(Date::MIN)
     }
 }
 
 impl crate::metrics::HasDayCount for RangeAccrual {
     fn day_count(&self) -> finstack_quant_core::dates::DayCount {
-        self.day_count
+        self.terms.day_count
     }
 }
 
@@ -509,7 +592,7 @@ mod audit_regression_tests {
 
     #[test]
     fn accrual_factor_uses_explicit_contractual_period() {
-        let mut range = RangeAccrual::example();
+        let mut range = RangeAccrual::example().terms;
         range.day_count = finstack_quant_core::dates::DayCount::Act360;
         range.accrual_start_date = date!(2024 - 01 - 01);
         range.observation_dates = vec![date!(2024 - 01 - 31), date!(2024 - 04 - 01)];
@@ -521,7 +604,7 @@ mod audit_regression_tests {
 
     #[test]
     fn rate_contract_fields_are_all_or_none() {
-        let mut range = RangeAccrual::example();
+        let mut range = RangeAccrual::example().terms;
         range.rate_index_id = Some(IndexId::new("SOFR"));
         let err = range.validate().expect_err("partial rate spec must fail");
         assert!(err.to_string().contains("must be supplied together"));
@@ -529,7 +612,7 @@ mod audit_regression_tests {
 
     #[test]
     fn payment_cannot_precede_final_observation() {
-        let mut range = RangeAccrual::example();
+        let mut range = RangeAccrual::example().terms;
         range.payment_date = Some(date!(2024 - 06 - 01));
         let err = range.validate().expect_err("early payment must fail");
         assert!(err.to_string().contains("final observation"));
@@ -547,12 +630,41 @@ mod audit_regression_tests {
                 .iter()
                 .map(|dependency| dependency.reference_strike)
                 .collect::<Vec<_>>(),
-            vec![Some(range.lower_bound), Some(range.upper_bound)]
+            vec![Some(range.terms.lower_bound), Some(range.terms.upper_bound)]
         );
-        assert_eq!(deps.unique_vol_surface_ids(), vec![range.vol_surface_id]);
-        let mut expected_spots = vec![range.spot_id.as_str().to_string()];
-        expected_spots.extend(range.div_yield_id.iter().map(|id| id.as_str().to_string()));
+        assert_eq!(
+            deps.unique_vol_surface_ids(),
+            vec![range.terms.vol_surface_id]
+        );
+        let mut expected_spots = vec![range.terms.spot_id.as_str().to_string()];
+        expected_spots.extend(
+            range
+                .terms
+                .div_yield_id
+                .iter()
+                .map(|id| id.as_str().to_string()),
+        );
         assert_eq!(deps.market_scalar_ids, expected_spots);
         assert!(deps.series_ids.is_empty());
+    }
+
+    #[test]
+    fn flattened_terms_keep_flat_wire_shape_and_reject_unknown_keys() {
+        let range = RangeAccrual::example();
+        let value = serde_json::to_value(&range).expect("serialize");
+        assert_eq!(value["id"], "RANGE-SPX-1Y");
+        assert_eq!(value["underlying_ticker"], "SPX");
+        assert!(value.get("terms").is_none(), "terms must serialize flat");
+        let back: RangeAccrual = serde_json::from_value(value.clone()).expect("roundtrip");
+        assert_eq!(back.terms.observation_dates, range.terms.observation_dates);
+
+        let mut unknown = value;
+        unknown["not_a_field"] = serde_json::json!(1);
+        let error = serde_json::from_value::<RangeAccrual>(unknown)
+            .expect_err("unknown key must be rejected");
+        assert!(
+            error.to_string().contains("unknown field `not_a_field`"),
+            "{error}"
+        );
     }
 }

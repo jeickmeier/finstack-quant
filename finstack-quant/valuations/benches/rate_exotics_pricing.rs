@@ -136,7 +136,7 @@ fn bench_quanto_range_accrual(c: &mut Criterion) {
                 .unwrap(),
         );
     let mut inst = RangeAccrual::example();
-    inst.quanto = Some(QuantoSpec {
+    inst.terms.quanto = Some(QuantoSpec {
         asset_currency: Currency::EUR,
         asset_discount_curve_id: "EUR-OIS".into(),
         correlation: 0.5,

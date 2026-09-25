@@ -402,4 +402,183 @@ mod tests {
         assert_eq!(loaded.key(), crate::pricer::InstrumentType::Composite);
         Ok(())
     }
+
+    fn deposit_pair_composite(
+        own_theta: &str,
+    ) -> Result<(
+        CompositeInstrument,
+        crate::instruments::Deposit,
+        MarketContext,
+    )> {
+        let as_of = date!(2024 - 01 - 02);
+        let curve =
+            finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+                .build()?;
+        let market = MarketContext::new().insert(curve);
+        let mut own = crate::instruments::Deposit::example()?;
+        own.id = InstrumentId::new("DEP-OWN");
+        own.metric_pricing_overrides.theta_period = Some(own_theta.to_string());
+        let mut inherit = crate::instruments::Deposit::example()?;
+        inherit.id = InstrumentId::new("DEP-INHERIT");
+        let spec = CompositeSpec::new(
+            "DEP-PAIR",
+            Currency::USD,
+            Money::from((100_000_i64, Currency::USD)),
+            vec![
+                CompositeLegSpec::new("DEP-OWN", InstrumentJson::Deposit(own), 1.0),
+                CompositeLegSpec::new("DEP-INHERIT", InstrumentJson::Deposit(inherit.clone()), 1.0),
+            ],
+            WeightingMethod::FixedQuantity,
+            RebalanceRule::Manual,
+        );
+        Ok((spec.initialize_fixed(as_of)?.instrument, inherit, market))
+    }
+
+    fn theta_of(instrument: &dyn Instrument, market: &MarketContext) -> Result<f64> {
+        let result = instrument.price_with_metrics(
+            market,
+            date!(2024 - 01 - 02),
+            &[MetricId::Theta],
+            PricingOptions::default(),
+        )?;
+        result
+            .measures
+            .get(&MetricId::Theta)
+            .copied()
+            .ok_or_else(|| Error::Internal("theta missing".to_string()))
+    }
+
+    #[test]
+    fn composite_metric_overrides_are_leg_defaults_and_leg_settings_win() -> Result<()> {
+        let (mut composite, inherit, market) = deposit_pair_composite("1D")?;
+        composite.metric_pricing_overrides.theta_period = Some("1M".to_string());
+
+        let result = composite.price_with_metrics(
+            &market,
+            date!(2024 - 01 - 02),
+            &[MetricId::Theta],
+            PricingOptions::default(),
+        )?;
+        let Some(crate::results::ValuationDetails::Composite(details)) = result.details else {
+            return Err(Error::Internal("composite details missing".to_string()));
+        };
+        let leg_theta = |index: usize| -> Result<f64> {
+            details.leg_results[index]
+                .valuation
+                .measures
+                .get(&MetricId::Theta)
+                .copied()
+                .ok_or_else(|| Error::Internal("leg theta missing".to_string()))
+        };
+
+        // Reference: each leg priced standalone with the overrides it should see.
+        // Same code path and inputs, so the values must agree exactly.
+        let own = match composite.spec.legs[0].instrument.as_ref() {
+            InstrumentJson::Deposit(deposit) => deposit.clone(),
+            _ => return Err(Error::Internal("expected deposit leg".to_string())),
+        };
+        let mut inherit_with_default = inherit.clone();
+        inherit_with_default.metric_pricing_overrides.theta_period = Some("1M".to_string());
+        let own_expected = theta_of(&own, &market)?;
+        let inherit_expected = theta_of(&inherit_with_default, &market)?;
+        assert_eq!(
+            leg_theta(0)?,
+            own_expected,
+            "leg's own 1D theta period wins"
+        );
+        assert_eq!(
+            leg_theta(1)?,
+            inherit_expected,
+            "leg inherits the 1M default"
+        );
+        assert!(
+            (inherit_expected - theta_of(&inherit, &market)?).abs() > 1.0e-6,
+            "the 1M default must differ from the leg's unset (1D) theta"
+        );
+
+        let total = result
+            .measures
+            .get(&MetricId::Theta)
+            .copied()
+            .ok_or_else(|| Error::Internal("composite theta missing".to_string()))?;
+        assert!(
+            (total - (own_expected + inherit_expected)).abs() <= 1.0e-9 * total.abs().max(1.0),
+            "primitive paths use the same defaults: {total}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn composite_rejects_instrument_pricing_overrides() -> Result<()> {
+        let mut composite = CompositeInstrument::example()?;
+        composite
+            .instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct = Some(99.0);
+        let error = composite
+            .validate_invariants()
+            .expect_err("composite instrument overrides must be empty");
+        assert!(
+            error
+                .to_string()
+                .contains("instrument.spec.instrument_pricing_overrides"),
+            "{error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn composite_overrides_live_at_payload_root_and_survive_rebalance() -> Result<()> {
+        let mut composite = CompositeInstrument::example()?;
+        composite.metric_pricing_overrides.theta_period = Some("1W".to_string());
+        composite
+            .scenario_pricing_overrides
+            .scenario_price_shock_pct = Some(-0.1);
+        let value =
+            serde_json::to_value(&composite).map_err(|error| Error::Internal(error.to_string()))?;
+        assert_eq!(value["metric_pricing_overrides"]["theta_period"], "1W");
+        assert!(value["spec"].get("metric_pricing_overrides").is_none());
+
+        let rebalanced = composite.rebalance(&MarketContext::new(), date!(2025 - 01 - 03), &[])?;
+        assert_eq!(
+            rebalanced.instrument.metric_pricing_overrides,
+            composite.metric_pricing_overrides
+        );
+        assert_eq!(
+            rebalanced.instrument.scenario_pricing_overrides,
+            composite.scenario_pricing_overrides
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn composite_spec_rejects_retired_override_keys() -> Result<()> {
+        // The three override containers moved from `spec.spec.*` to the payload root.
+        for (key, retired) in [
+            // schema-rejection-test
+            ("instrument_pricing_overrides", serde_json::json!({})),
+            // schema-rejection-test
+            (
+                "metric_pricing_overrides",
+                serde_json::json!({"theta_period": "1W"}),
+            ),
+            // schema-rejection-test
+            ("scenario_pricing_overrides", serde_json::json!({})),
+        ] {
+            let mut value = serde_json::to_value(CompositeInstrument::example()?)
+                .map_err(|error| Error::Internal(error.to_string()))?;
+            value["spec"][key] = retired;
+            let error = serde_json::from_value::<CompositeInstrument>(value)
+                .expect_err("retired spec.spec override key must be rejected");
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("unknown field `{key}`")),
+                "spec.{key}: {error}"
+            );
+        }
+        Ok(())
+    }
 }

@@ -106,7 +106,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "leverage": {
           "description": "Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).",

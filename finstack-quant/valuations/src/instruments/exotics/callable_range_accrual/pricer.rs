@@ -3,7 +3,6 @@
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
-use crate::instruments::exotics::range_accrual::BoundsType;
 use crate::instruments::rates::hw1f::{
     basis_for_degree, initial_short_rate_from_curve, prepare_hw1f_params, resolve_hw1f_params,
     ExerciseBoundaryPayoff, Hw1fParamFamily, Hw1fTermForward, PeriodForwardCoeffs,
@@ -326,8 +325,8 @@ impl CallableRangeAccrualPricer {
         // `RelativeToInitialSpot` accrual bounds — a *contractual* spot, distinct
         // from the HW1F simulation's initial short rate `r0` below.
         let initial_rate = initial_short_rate(inst, market)?;
-        let lower_bound = effective_lower_bound(inst, initial_rate);
-        let upper_bound = effective_upper_bound(inst, initial_rate);
+        let lower_bound = inst.range_accrual.effective_lower_bound(initial_rate);
+        let upper_bound = inst.range_accrual.effective_upper_bound(initial_rate);
         // Initial short rate = discount-curve instantaneous forward f(0,0).
         // HW1F reprices the discount curve only when r(0) = f(0,0); seeding it
         // from the spot fixing would offset the simulated short rate from the
@@ -579,20 +578,6 @@ fn initial_short_rate(inst: &CallableRangeAccrual, market: &MarketContext) -> Re
     Ok(rate)
 }
 
-fn effective_lower_bound(inst: &CallableRangeAccrual, initial_rate: f64) -> f64 {
-    match inst.range_accrual.bounds_type {
-        BoundsType::Absolute => inst.range_accrual.lower_bound,
-        BoundsType::RelativeToInitialSpot => inst.range_accrual.lower_bound * initial_rate,
-    }
-}
-
-fn effective_upper_bound(inst: &CallableRangeAccrual, initial_rate: f64) -> f64 {
-    match inst.range_accrual.bounds_type {
-        BoundsType::Absolute => inst.range_accrual.upper_bound,
-        BoundsType::RelativeToInitialSpot => inst.range_accrual.upper_bound * initial_rate,
-    }
-}
-
 fn zero_estimate(currency: finstack_quant_core::currency::Currency) -> MoneyEstimate {
     let zero = Money::from((0_i64, currency));
     MoneyEstimate {
@@ -613,7 +598,7 @@ fn zero_estimate(currency: finstack_quant_core::currency::Currency) -> MoneyEsti
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::exotics::range_accrual::RangeAccrual;
+    use crate::instruments::exotics::range_accrual::{BoundsType, RangeAccrualTerms};
     use crate::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
@@ -640,8 +625,7 @@ mod tests {
         ];
         CallableRangeAccrual {
             id: InstrumentId::new("CALLABLE-RA-TEST"),
-            range_accrual: RangeAccrual::builder()
-                .id(InstrumentId::new("RA-TEST"))
+            range_accrual: RangeAccrualTerms::builder()
                 .underlying_ticker("SOFR".to_string())
                 .observation_dates(observation_dates)
                 .lower_bound(0.02)
@@ -664,7 +648,6 @@ mod tests {
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)
-                .attributes(Default::default())
                 .payment_date_opt(None)
                 .past_fixings_in_range_opt(None)
                 .total_past_observations_opt(None)

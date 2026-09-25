@@ -92,21 +92,21 @@ pub struct CliquetOption {
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
     )]
     pub past_fixings: Vec<(Date, f64)>,
-    /// Pricing overrides (manual price, yield, spread)
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-only pricing controls.
+    /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only valuation adjustments.
+    /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
@@ -207,13 +207,13 @@ struct CliquetOptionUnchecked {
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
     )]
     past_fixings: Vec<(Date, f64)>,
-    /// Pricing overrides (manual price, yield, spread)
+    /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-only pricing controls.
+    /// Metric-time pricing configuration.
     #[serde(default)]
     metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only valuation adjustments.
+    /// Scenario-only pricing adjustments.
     #[serde(default)]
     scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping

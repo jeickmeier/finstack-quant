@@ -362,7 +362,6 @@ def _callable_range_accrual_json() -> str:
         "spec": {
             "id": "CALLABLE-RA-PY-E2E",
             "range_accrual": {
-                "id": "RA-PY-E2E",
                 "underlying_ticker": "SOFR",
                 "observation_dates": [
                     "2025-07-01",
@@ -383,7 +382,6 @@ def _callable_range_accrual_json() -> str:
                 "spot_id": "SOFR-RATE",
                 "vol_surface_id": "SOFR-VOL",
                 "div_yield_id": None,
-                "attributes": {},
                 "quanto": None,
                 "payment_date": None,
                 "past_fixings_in_range": None,

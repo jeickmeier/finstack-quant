@@ -357,9 +357,8 @@ pub struct AgencyMbsPassthrough {
     pub discount_curve_id: CurveId,
     /// Day count convention for accrual.
     pub day_count: DayCount,
-    /// Pricing overrides (including quoted price for OAS).
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

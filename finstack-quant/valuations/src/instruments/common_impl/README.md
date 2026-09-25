@@ -102,7 +102,7 @@ everything in `helpers.rs`, `validation.rs`, `numeric.rs`,
 
 Three of those appear in the type of a `pub` field on a public item and are
 therefore visible in rustdoc and in the JSON schema but not nameable by a
-downstream crate: `exotics::RangeAccrual::quanto: Option<QuantoSpec>`,
+downstream crate: `exotics::RangeAccrualTerms::quanto: Option<QuantoSpec>`,
 `commodity::{CommodityForward, CommodityOption}::convention:
 Option<CommodityConvention>`, and
 `instruments::pricing_overrides::ModelConfig::vol_model:

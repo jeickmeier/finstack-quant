@@ -68,7 +68,6 @@ pub struct Tarn {
     pub vol_surface_id: Option<CurveId>,
     /// Day count convention for coupon accrual.
     pub day_count: DayCount,
-    /// Pricing overrides.
     /// Instrument-owned pricing inputs.
     #[serde(
         default,

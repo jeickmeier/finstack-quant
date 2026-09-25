@@ -205,9 +205,8 @@ pub struct InflationLinkedBond {
     pub discount_curve_id: CurveId,
     /// Inflation index identifier
     pub inflation_index_id: CurveId,
-    /// Additional attributes
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

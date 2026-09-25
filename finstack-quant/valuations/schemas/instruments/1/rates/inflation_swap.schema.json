@@ -111,7 +111,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [

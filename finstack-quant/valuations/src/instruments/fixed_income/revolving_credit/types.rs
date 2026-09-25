@@ -203,9 +203,8 @@ pub struct RevolvingCredit {
     #[serde(default)]
     pub settlement_days: u32,
 
-    /// Attributes for scenario selection and tagging.
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

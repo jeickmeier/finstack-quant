@@ -374,10 +374,9 @@ pub struct Ndf {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quote_calendar_id: Option<String>,
-    /// Attributes for tagging and selection.
-    #[builder(default)]
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
@@ -454,7 +453,7 @@ struct NdfUnchecked {
     /// Optional settlement currency calendar.
     #[serde(default)]
     quote_calendar_id: Option<String>,
-    /// Per-instrument pricing/sensitivity override knobs.
+    /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
     /// Metric-time pricing configuration.

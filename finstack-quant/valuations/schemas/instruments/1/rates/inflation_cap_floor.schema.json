@@ -50,7 +50,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Pricing overrides (implied volatility, surface extrapolation).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [

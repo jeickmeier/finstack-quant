@@ -44,7 +44,7 @@
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

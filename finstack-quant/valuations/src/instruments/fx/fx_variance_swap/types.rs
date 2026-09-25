@@ -116,9 +116,8 @@ pub struct FxVarianceSwap {
     pub vol_surface_id: CurveId,
     /// Day count convention for time calculations
     pub day_count: DayCount,
-    /// Attributes for scenario selection
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

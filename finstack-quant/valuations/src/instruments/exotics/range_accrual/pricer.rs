@@ -33,11 +33,12 @@ use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 
 /// Resolve the asset spot in its financing currency.
 fn asset_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
-    let scalar = curves.get_price(&inst.spot_id)?;
+    let scalar = curves.get_price(&inst.terms.spot_id)?;
     let expected = inst
+        .terms
         .quanto
         .as_ref()
-        .map_or(inst.notional.currency(), |q| q.asset_currency);
+        .map_or(inst.terms.notional.currency(), |q| q.asset_currency);
     let spot = match scalar {
         finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
         finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
@@ -66,16 +67,17 @@ fn asset_growth(
     sigma: f64,
 ) -> Result<f64> {
     let t = inst
+        .terms
         .day_count
         .year_fraction(as_of, date, DayCountContext::default())?;
     let q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
         curves,
-        inst.div_yield_id.as_ref(),
+        inst.terms.div_yield_id.as_ref(),
     )?;
     let payoff_df = curves
-        .get_discount(inst.discount_curve_id.as_str())?
+        .get_discount(inst.terms.discount_curve_id.as_str())?
         .df_between_dates(as_of, date)?;
-    let Some(quanto) = &inst.quanto else {
+    let Some(quanto) = &inst.terms.quanto else {
         return Ok((-q * t).exp() / payoff_df);
     };
     quanto.validate()?;
@@ -85,9 +87,9 @@ fn asset_growth(
     let fx_spot = match curves.get_price(quanto.fx_spot_id.as_str())? {
         finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
         finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-            if money.currency() != inst.notional.currency() {
+            if money.currency() != inst.terms.notional.currency() {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: inst.notional.currency(),
+                    expected: inst.terms.notional.currency(),
                     actual: money.currency(),
                 });
             }
@@ -133,6 +135,7 @@ pub struct RangeAccrualMcPricer {
 
 fn validate_historical_observations(inst: &RangeAccrual, as_of: Date) -> Result<()> {
     let expected = inst
+        .terms
         .observation_dates
         .iter()
         .filter(|&&date| date <= as_of)
@@ -140,13 +143,13 @@ fn validate_historical_observations(inst: &RangeAccrual, as_of: Date) -> Result<
     if expected == 0 {
         return Ok(());
     }
-    let in_range = inst.past_fixings_in_range.ok_or_else(|| {
+    let in_range = inst.terms.past_fixings_in_range.ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "RangeAccrual '{}' requires past_fixings_in_range for {expected} historical observations",
             inst.id
         ))
     })?;
-    let total = inst.total_past_observations.ok_or_else(|| {
+    let total = inst.terms.total_past_observations.ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "RangeAccrual '{}' requires total_past_observations for {expected} historical observations",
             inst.id
@@ -182,14 +185,18 @@ impl RangeAccrualMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<finstack_quant_core::money::Money> {
-        let final_date = inst
-            .payment_date
-            .unwrap_or(inst.observation_dates.last().copied().unwrap_or(as_of));
+        let final_date = inst.terms.payment_date.unwrap_or(
+            inst.terms
+                .observation_dates
+                .last()
+                .copied()
+                .unwrap_or(as_of),
+        );
         if final_date <= as_of {
-            return Ok(Money::from((0_i64, inst.notional.currency())));
+            return Ok(Money::from((0_i64, inst.terms.notional.currency())));
         }
         inst.validate()?;
-        if inst.rate_index_id.is_some() {
+        if inst.terms.rate_index_id.is_some() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Rate-linked RangeAccrual '{}' cannot use the equity GBM Monte Carlo pricer",
                 inst.id
@@ -198,10 +205,12 @@ impl RangeAccrualMcPricer {
         validate_historical_observations(inst, as_of)?;
 
         let observation_times = inst
+            .terms
             .observation_dates
             .iter()
             .map(|&date| {
-                inst.day_count
+                inst.terms
+                    .day_count
                     .signed_year_fraction(as_of, date, DayCountContext::default())
             })
             .collect::<Result<Vec<_>>>()?;
@@ -216,14 +225,15 @@ impl RangeAccrualMcPricer {
         let initial_spot = asset_spot(inst, curves)?;
 
         // Compute effective bounds based on BoundsType
-        let effective_lower = inst.effective_lower_bound(initial_spot);
-        let effective_upper = inst.effective_upper_bound(initial_spot);
+        let effective_lower = inst.terms.effective_lower_bound(initial_spot);
+        let effective_upper = inst.terms.effective_upper_bound(initial_spot);
 
-        let t = inst
-            .day_count
-            .year_fraction(as_of, final_date, DayCountContext::default())?;
+        let t =
+            inst.terms
+                .day_count
+                .year_fraction(as_of, final_date, DayCountContext::default())?;
 
-        let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
+        let disc_curve = curves.get_discount(inst.terms.discount_curve_id.as_str())?;
         let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
         let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
             discount_factor,
@@ -240,7 +250,7 @@ impl RangeAccrualMcPricer {
         let sigma = resolve_sigma_at(
             &inst.instrument_pricing_overrides.market_quotes,
             curves,
-            inst.vol_surface_id.as_str(),
+            inst.terms.vol_surface_id.as_str(),
             t,
             initial_spot,
         )?;
@@ -266,11 +276,11 @@ impl RangeAccrualMcPricer {
             observation_times,
             effective_lower,
             effective_upper,
-            inst.coupon_rate * inst.accrual_year_fraction()?,
-            inst.notional.amount(),
-            inst.notional.currency(),
-            inst.past_fixings_in_range.unwrap_or(0),
-            inst.total_past_observations.unwrap_or(0),
+            inst.terms.coupon_rate * inst.terms.accrual_year_fraction()?,
+            inst.terms.notional.amount(),
+            inst.terms.notional.currency(),
+            inst.terms.past_fixings_in_range.unwrap_or(0),
+            inst.terms.total_past_observations.unwrap_or(0),
         )?;
 
         // Derive deterministic seed from instrument ID and scenario
@@ -298,7 +308,7 @@ impl RangeAccrualMcPricer {
             t,
             num_steps,
             &payoff,
-            inst.notional.currency(),
+            inst.terms.notional.currency(),
             discount_factor,
         )?;
 
@@ -313,17 +323,17 @@ fn compute_known_value(
     as_of: Date,
     payment_date: Date,
 ) -> Result<Money> {
-    match (inst.past_fixings_in_range, inst.total_past_observations) {
+    match (inst.terms.past_fixings_in_range, inst.terms.total_past_observations) {
         (Some(in_range), Some(total)) if total > 0 => {
             let accrual_fraction = in_range as f64 / total as f64;
-            let fv = inst.notional.amount()
-                * inst.coupon_rate
-                * inst.accrual_year_fraction()?
+            let fv = inst.terms.notional.amount()
+                * inst.terms.coupon_rate
+                * inst.terms.accrual_year_fraction()?
                 * accrual_fraction;
             let discount_factor = curves
-                .get_discount(inst.discount_curve_id.as_str())?
+                .get_discount(inst.terms.discount_curve_id.as_str())?
                 .df_between_dates(as_of, payment_date)?;
-            Ok(Money::new(fv * discount_factor, inst.notional.currency())?)
+            Ok(Money::new(fv * discount_factor, inst.terms.notional.currency())?)
         }
         _ => Err(finstack_quant_core::Error::Validation(format!(
             "RangeAccrual '{}' is fully observed but historical fixing counts are missing or invalid",
@@ -394,7 +404,7 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    if inst.rate_index_id.is_some() {
+    if inst.terms.rate_index_id.is_some() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Rate-linked RangeAccrual '{}' cannot use equity static replication",
             inst.id
@@ -416,22 +426,27 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     use finstack_quant_core::math::special_functions::norm_cdf;
     use finstack_quant_models::volatility::black::d1_d2_black76;
 
-    let final_date = inst
-        .payment_date
-        .unwrap_or(inst.observation_dates.last().copied().unwrap_or(as_of));
+    let final_date = inst.terms.payment_date.unwrap_or(
+        inst.terms
+            .observation_dates
+            .last()
+            .copied()
+            .unwrap_or(as_of),
+    );
     if final_date <= as_of {
-        return Ok(Money::from((0_i64, inst.notional.currency())));
+        return Ok(Money::from((0_i64, inst.terms.notional.currency())));
     }
     inst.validate()?;
     validate_historical_observations(inst, as_of)?;
 
     let has_future_observations =
-        inst.observation_dates
+        inst.terms
+            .observation_dates
             .iter()
             .try_fold(false, |has_future, &date| {
                 Ok::<_, finstack_quant_core::Error>(
                     has_future
-                        || inst.day_count.signed_year_fraction(
+                        || inst.terms.day_count.signed_year_fraction(
                             as_of,
                             date,
                             DayCountContext::default(),
@@ -445,26 +460,27 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     let initial_spot = asset_spot(inst, curves)?;
 
     // Compute effective bounds based on BoundsType
-    let effective_lower = inst.effective_lower_bound(initial_spot);
-    let effective_upper = inst.effective_upper_bound(initial_spot);
+    let effective_lower = inst.terms.effective_lower_bound(initial_spot);
+    let effective_upper = inst.terms.effective_upper_bound(initial_spot);
 
-    let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
+    let disc_curve = curves.get_discount(inst.terms.discount_curve_id.as_str())?;
     let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
     // Count observations and track past/future split
-    let n_total_obs = inst.observation_dates.len();
+    let n_total_obs = inst.terms.observation_dates.len();
     if n_total_obs == 0 {
-        return Ok(Money::from((0_i64, inst.notional.currency())));
+        return Ok(Money::from((0_i64, inst.terms.notional.currency())));
     }
 
     // Count future observations
     let mut future_obs_count = 0usize;
     let mut total_expected_in_range = 0.0;
 
-    for &date in &inst.observation_dates {
-        let t_obs = inst
-            .day_count
-            .signed_year_fraction(as_of, date, DayCountContext::default())?;
+    for &date in &inst.terms.observation_dates {
+        let t_obs =
+            inst.terms
+                .day_count
+                .signed_year_fraction(as_of, date, DayCountContext::default())?;
 
         if t_obs <= 0.0 {
             // Past observation - skip (handled via past_fixings_in_range)
@@ -475,7 +491,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         let sigma = resolve_sigma_at(
             &inst.instrument_pricing_overrides.market_quotes,
             curves,
-            inst.vol_surface_id.as_str(),
+            inst.terms.vol_surface_id.as_str(),
             t_obs,
             initial_spot,
         )?;
@@ -505,7 +521,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
             let vol = resolve_sigma_at(
                 &inst.instrument_pricing_overrides.market_quotes,
                 curves,
-                inst.vol_surface_id.as_str(),
+                inst.terms.vol_surface_id.as_str(),
                 t_obs,
                 k,
             )?;
@@ -543,13 +559,13 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
 
     // Include historical fixings in the total
     // Total observations = past observations + future observations
-    let past_in_range = inst.past_fixings_in_range.unwrap_or(0) as f64;
-    let total_past_obs = inst.total_past_observations.unwrap_or(0);
+    let past_in_range = inst.terms.past_fixings_in_range.unwrap_or(0) as f64;
+    let total_past_obs = inst.terms.total_past_observations.unwrap_or(0);
 
     // Total observations across full life of instrument
     let total_obs_count = total_past_obs + future_obs_count;
     if total_obs_count == 0 {
-        return Ok(Money::from((0_i64, inst.notional.currency())));
+        return Ok(Money::from((0_i64, inst.terms.notional.currency())));
     }
 
     // Expected total days in range = known past + expected future
@@ -559,13 +575,13 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     let expected_fraction = expected_total_in_range / (total_obs_count as f64);
 
     // Future value and present value
-    let fv = inst.notional.amount()
-        * inst.coupon_rate
-        * inst.accrual_year_fraction()?
+    let fv = inst.terms.notional.amount()
+        * inst.terms.coupon_rate
+        * inst.terms.accrual_year_fraction()?
         * expected_fraction;
     let pv = fv * discount_factor;
 
-    Money::new(pv, inst.notional.currency())
+    Money::new(pv, inst.terms.notional.currency())
 }
 
 #[cfg(test)]
@@ -613,11 +629,11 @@ mod tests {
     ) {
         let as_of = date(2024, 4, 30);
         let mut inst = RangeAccrual::example();
-        inst.accrual_start_date = date(2023, 12, 31);
-        inst.observation_dates = vec![as_of];
-        inst.payment_date = Some(as_of);
-        inst.past_fixings_in_range = None;
-        inst.total_past_observations = None;
+        inst.terms.accrual_start_date = date(2023, 12, 31);
+        inst.terms.observation_dates = vec![as_of];
+        inst.terms.payment_date = Some(as_of);
+        inst.terms.past_fixings_in_range = None;
+        inst.terms.total_past_observations = None;
 
         let pv = npv_analytic(&inst, &market(as_of), as_of).expect("pv");
         assert_eq!(pv.amount(), 0.0);
@@ -628,7 +644,7 @@ mod tests {
         let as_of = date(2024, 1, 1);
         let base = RangeAccrual::example();
         let mut delayed = base.clone();
-        delayed.payment_date = Some(date(2025, 12, 31));
+        delayed.terms.payment_date = Some(date(2025, 12, 31));
 
         let curves = market(as_of);
         let base_pv = npv_analytic(&base, &curves, as_of).expect("base pv");
@@ -644,21 +660,21 @@ mod tests {
         let as_of = date(2024, 6, 30);
         let payment_date = date(2025, 6, 30);
         let mut inst = RangeAccrual::example();
-        inst.observation_dates = vec![date(2024, 1, 31), date(2024, 2, 29)];
-        inst.payment_date = Some(payment_date);
-        inst.past_fixings_in_range = Some(1);
-        inst.total_past_observations = Some(2);
+        inst.terms.observation_dates = vec![date(2024, 1, 31), date(2024, 2, 29)];
+        inst.terms.payment_date = Some(payment_date);
+        inst.terms.past_fixings_in_range = Some(1);
+        inst.terms.total_past_observations = Some(2);
 
         let curves = market(as_of);
         let pv = npv_analytic(&inst, &curves, as_of).expect("known unpaid pv");
         let df = curves
-            .get_discount(&inst.discount_curve_id)
+            .get_discount(&inst.terms.discount_curve_id)
             .expect("curve")
             .df_between_dates(as_of, payment_date)
             .expect("df");
-        let expected = inst.notional.amount()
-            * inst.coupon_rate
-            * inst.accrual_year_fraction().expect("accrual factor")
+        let expected = inst.terms.notional.amount()
+            * inst.terms.coupon_rate
+            * inst.terms.accrual_year_fraction().expect("accrual factor")
             * 0.5
             * df;
         assert!((pv.amount() - expected).abs() < 1e-10);
@@ -668,10 +684,10 @@ mod tests {
     fn paid_range_accrual_has_zero_value_without_live_market_inputs() {
         let as_of = date(2025, 7, 1);
         let mut inst = RangeAccrual::example();
-        inst.observation_dates = vec![date(2024, 1, 31)];
-        inst.payment_date = Some(date(2025, 6, 30));
-        inst.past_fixings_in_range = Some(1);
-        inst.total_past_observations = Some(1);
+        inst.terms.observation_dates = vec![date(2024, 1, 31)];
+        inst.terms.payment_date = Some(date(2025, 6, 30));
+        inst.terms.past_fixings_in_range = Some(1);
+        inst.terms.total_past_observations = Some(1);
 
         let pv = npv_analytic(&inst, &MarketContext::new(), as_of).expect("settled pv");
         assert_eq!(pv.amount(), 0.0);
@@ -711,7 +727,7 @@ mod tests {
         assert!(npv_analytic(&inst, &no_div_market, as_of).is_err());
         assert!(npv_analytic(&inst, &price_div_market, as_of).is_err());
         let mut no_div_inst = inst;
-        no_div_inst.div_yield_id = None;
+        no_div_inst.terms.div_yield_id = None;
         let pv_explicit_none = npv_analytic(&no_div_inst, &base_market, as_of)
             .expect("explicitly absent dividend yield is zero carry");
         assert!(pv_explicit_none.amount().is_finite());
@@ -722,8 +738,8 @@ mod tests {
         let as_of = date(2024, 1, 1);
         let curves = market(as_of);
         let mut without_seed = RangeAccrual::example();
-        without_seed.observation_dates = vec![date(2024, 6, 30), date(2024, 12, 31)];
-        without_seed.payment_date = Some(date(2025, 1, 2));
+        without_seed.terms.observation_dates = vec![date(2024, 6, 30), date(2024, 12, 31)];
+        without_seed.terms.payment_date = Some(date(2025, 1, 2));
         let mut with_seed = without_seed.clone();
         with_seed
             .instrument_pricing_overrides
@@ -802,9 +818,10 @@ mod tests {
     fn default_registry_and_direct_paths_share_static_kernel() {
         let as_of = date(2024, 1, 1);
         let mut rate_linked = RangeAccrual::example();
-        rate_linked.rate_index_id = Some(finstack_quant_core::types::IndexId::new("SOFR"));
-        rate_linked.projection_curve_id = Some(finstack_quant_core::types::CurveId::new("SOFR-3M"));
-        rate_linked.reference_tenor = Some(
+        rate_linked.terms.rate_index_id = Some(finstack_quant_core::types::IndexId::new("SOFR"));
+        rate_linked.terms.projection_curve_id =
+            Some(finstack_quant_core::types::CurveId::new("SOFR-3M"));
+        rate_linked.terms.reference_tenor = Some(
             finstack_quant_core::dates::Tenor::new(
                 3,
                 finstack_quant_core::dates::TenorUnit::Months,

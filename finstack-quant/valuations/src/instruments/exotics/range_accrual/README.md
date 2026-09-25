@@ -15,12 +15,15 @@ Import path: `finstack_quant_valuations::instruments::exotics::range_accrual`
 
 | Item | Purpose |
 |------|---------|
-| `RangeAccrual` | The instrument. `RangeAccrual::builder()`, `example()` (relative bounds), `example_absolute_bounds()`. |
+| `RangeAccrual` | The instrument: `id`, `terms`, the three pricing-override containers and `attributes`. `RangeAccrual::builder()`, `example()` (relative bounds), `example_absolute_bounds()`. |
+| `RangeAccrualTerms` | The contract terms (underlying, observation dates, bounds, coupon, notional, market ids, past fixings). `RangeAccrual.terms` holds them and serializes them flat into the `RangeAccrual` payload; `CallableRangeAccrual.range_accrual` holds the same type nested under the `range_accrual` key. Built with `RangeAccrualTerms::builder()`. |
 | `BoundsType` | `Absolute` (default) or `RelativeToInitialSpot`. |
 | `monte_carlo::RangeAccrualPayoff` | The MC payoff, for direct use with the Monte Carlo engine. |
 
-Useful methods: `validate()`, `accrual_year_fraction()`,
-`effective_lower_bound(initial_spot)`, `effective_upper_bound(initial_spot)`.
+Useful methods: `RangeAccrual::validate()` (delegates to
+`RangeAccrualTerms::validate()`), and on the terms
+`accrual_year_fraction()`, `effective_lower_bound(initial_spot)` and
+`effective_upper_bound(initial_spot)` (call them as `note.terms.<method>`).
 
 The `pricer` submodule is `pub(crate)`: `npv_analytic`,
 `RangeAccrualStaticReplicationPricer` and `RangeAccrualMcPricer` are named below
@@ -33,7 +36,7 @@ registry with an explicit `ModelKey`.
 ```
 range_accrual/
 ├── mod.rs          # re-exports and module overview
-├── types.rs        # RangeAccrual, BoundsType, builder, examples, validate
+├── types.rs        # RangeAccrual, RangeAccrualTerms, BoundsType, builders, examples, validate
 ├── pricer.rs       # RangeAccrualStaticReplicationPricer, RangeAccrualMcPricer, npv_analytic
 ├── monte_carlo.rs  # RangeAccrualPayoff for the shared MC path-dependent pricer
 └── metrics/        # rho.rs plus generic FD greeks registered in mod.rs
@@ -99,13 +102,17 @@ let equity_range = RangeAccrual::example();
 let rate_range = RangeAccrual::example_absolute_bounds();
 ```
 
-Building one explicitly — the entry point is `RangeAccrual::builder()`. The
-derived `RangeAccrualBuilder` type is not re-exported from the module, so
-`RangeAccrualBuilder::new()` cannot be named from outside the crate even though
-the derive generates it:
+Building one explicitly — the entry points are `RangeAccrual::builder()` for the
+instrument and `RangeAccrualTerms::builder()` for its contract terms. The
+instrument builder takes only `id`, `terms`, the optional pricing-override
+containers and `attributes`; every term setter lives on the terms builder. The
+derived builder types are not re-exported from the module, so they cannot be
+named (or constructed with `::new()`) from outside the crate:
 
 ```rust
-use finstack_quant_valuations::instruments::exotics::range_accrual::{BoundsType, RangeAccrual};
+use finstack_quant_valuations::instruments::exotics::range_accrual::{
+    BoundsType, RangeAccrual, RangeAccrualTerms,
+};
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
@@ -113,8 +120,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use time::macros::date;
 
-let note = RangeAccrual::builder()
-    .id(InstrumentId::new("RANGE-SPX-1Y"))
+let terms = RangeAccrualTerms::builder()
     .underlying_ticker("SPX".to_string())
     .observation_dates(vec![
         date!(2024 - 01 - 31),
@@ -132,16 +138,27 @@ let note = RangeAccrual::builder()
     .spot_id("SPX-SPOT".into())
     .vol_surface_id(CurveId::new("SPX-VOL"))
     .div_yield_id_opt(Some(PriceId::new("SPX-DIV")))
-    .attributes(Attributes::new())
     // Mid-life: 3 of 6 past observations were in range.
     .past_fixings_in_range_opt(Some(3))
     .total_past_observations_opt(Some(6))
     .build()?;
+
+let note = RangeAccrual::builder()
+    .id(InstrumentId::new("RANGE-SPX-1Y"))
+    .terms(terms)
+    .attributes(Attributes::new())
+    .build()?;
 ```
+
+`RangeAccrualTerms::builder().build()` runs `RangeAccrualTerms::validate()`, so
+invalid terms fail before the instrument is assembled. In JSON the term fields
+stay flat at the `RangeAccrual` level (there is no `terms` key); under
+`CallableRangeAccrual` they sit inside the `range_accrual` object.
 
 ## Quanto
 
-Quanto configuration is a single nested `quanto: Option<QuantoSpec>` field, not
+Quanto configuration is a single nested `RangeAccrualTerms::quanto: Option<QuantoSpec>`
+field (set with `RangeAccrualTerms::builder().quanto(..)`), not
 loose `quanto_correlation` / `fx_vol_surface_id` fields. `QuantoSpec` is defined
 at `instruments::QuantoSpec`:
 
@@ -166,7 +183,7 @@ pricing; normal or displaced surface quotes produce a validation error.
 
 ## Validation
 
-`RangeAccrual::validate()` checks:
+`RangeAccrual::validate()` delegates to `RangeAccrualTerms::validate()`, which checks:
 
 - at least one observation date, sorted strictly ascending;
 - `lower_bound`, `upper_bound`, `coupon_rate` and `notional` are finite, with

@@ -56,7 +56,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -68,7 +68,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "strike": {
           "description": "Spread strike price K in the payoff max(S1 - S2 - K, 0).",

@@ -50,7 +50,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Attributes for scenario selection\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "low_series_id": {
           "default": null,

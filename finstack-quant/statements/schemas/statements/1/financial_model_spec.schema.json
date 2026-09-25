@@ -1056,7 +1056,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Additional attributes\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/DateWire",
@@ -2053,7 +2053,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/DateWire",
@@ -4584,7 +4584,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -7004,7 +7004,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lc": {
           "anyOf": [
@@ -7610,7 +7610,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -7867,7 +7867,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/DateWire",

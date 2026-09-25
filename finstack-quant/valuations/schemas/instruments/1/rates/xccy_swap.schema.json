@@ -204,6 +204,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique identifier for this instrument."
         },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Instrument-owned pricing inputs."
+        },
         "leg1": {
           "$ref": "#/$defs/XccySwapLeg",
           "description": "First leg."
@@ -211,6 +215,10 @@
         "leg2": {
           "$ref": "#/$defs/XccySwapLeg",
           "description": "Second leg."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
         },
         "notional_exchange": {
           "$ref": "#/$defs/NotionalExchange",
@@ -220,6 +228,10 @@
         "reporting_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "PV reporting currency (output currency of `value`/`npv`)."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [

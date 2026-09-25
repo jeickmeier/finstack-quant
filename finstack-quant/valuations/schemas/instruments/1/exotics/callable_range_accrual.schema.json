@@ -63,15 +63,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
         "range_accrual": {
-          "$ref": "#/$defs/RangeAccrual",
-          "description": "Underlying range accrual leg."
+          "$ref": "#/$defs/RangeAccrualTerms",
+          "description": "Range accrual contract terms (no identity, attributes or overrides of their own)."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -132,17 +132,13 @@
       ],
       "type": "object"
     },
-    "RangeAccrual": {
+    "RangeAccrualTerms": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(with an empty call schedule for a non-callable note), which models the\nreference rate under HW1F and reconstructs the term rate per observation.",
+      "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
       "properties": {
         "accrual_start_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Contractual accrual-period start date."
-        },
-        "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and grouping"
         },
         "bounds_type": {
           "$ref": "#/$defs/BoundsType",
@@ -173,22 +169,10 @@
           ],
           "description": "Optional dividend-yield scalar ID"
         },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier"
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
-        },
         "lower_bound": {
           "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
           "format": "double",
           "type": "number"
-        },
-        "metric_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -266,10 +250,6 @@
           ],
           "description": "Contractual tenor of the observed reference rate."
         },
-        "scenario_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only pricing adjustments."
-        },
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Spot price identifier"
@@ -298,7 +278,6 @@
         }
       },
       "required": [
-        "id",
         "underlying_ticker",
         "observation_dates",
         "lower_bound",
@@ -309,8 +288,7 @@
         "accrual_start_date",
         "discount_curve_id",
         "spot_id",
-        "vol_surface_id",
-        "attributes"
+        "vol_surface_id"
       ],
       "type": "object"
     },
@@ -353,13 +331,11 @@
           "id": "CALLABLE-RA-SOFR-1Y",
           "range_accrual": {
             "accrual_start_date": "2025-12-31",
-            "attributes": {},
             "bounds_type": "absolute",
             "coupon_rate": 0.065,
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "div_yield_id": null,
-            "id": "CALLABLE-RA-SOFR-1Y-RANGE",
             "lower_bound": 0.04,
             "notional": {
               "amount": "1000000",

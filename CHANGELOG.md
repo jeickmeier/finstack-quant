@@ -2,6 +2,56 @@
 
 ## [Unreleased]
 
+### Override containers (2026-09-24)
+
+Numbers do not change by default. They change only for a composite whose
+`metric_pricing_overrides` is set: those settings now reach its legs as
+defaults (reference: each leg priced standalone with the merged overrides,
+exact match in `composite_metric_overrides_are_leg_defaults_and_leg_settings_win`).
+Before this change they were never read.
+
+#### Changed (BREAKING)
+
+- `CallableRangeAccrual.range_accrual` (now `RangeAccrualTerms`): the nested
+  range accrual carries contract terms only. The callable note has one `id`,
+  one `attributes` map and one set of pricing overrides, all at its top level.
+  Rust, Python/WASM JSON.
+- `RangeAccrual` (now `RangeAccrual.terms: RangeAccrualTerms`, serialized flat):
+  the RangeAccrual wire shape is unchanged. In Rust, term fields move to
+  `.terms`, `RangeAccrual::builder().terms(RangeAccrualTerms::builder()...build()?)`
+  replaces the flat term setters, and `accrual_year_fraction`,
+  `effective_lower_bound`, `effective_upper_bound` and `coupon_rate_rate`
+  (on `RangeAccrualTermsBuilder`) move to the terms.
+- `CompositeSpec.instrument_pricing_overrides` / `metric_pricing_overrides` /
+  `scenario_pricing_overrides` (now on `CompositeInstrument`, wire path
+  `instrument.spec.*_pricing_overrides` like every other instrument). Rust,
+  JSON. The `pricing_options` merge, `validate_instrument_json` and the WASM
+  `pricing_options` path now reach composites. Rebalancing keeps the prior
+  instrument's overrides.
+- A composite's `metric_pricing_overrides` apply to every leg (and nested
+  composite) as defaults. A leg's own setting wins, and
+  `bump_config.adaptive_bumps` is on for a leg when either side enables it.
+  This also carries attribution's theta window to composite legs.
+- A non-empty composite `instrument_pricing_overrides` is now a validation
+  error. A composite has no pricing model of its own, so set quotes and model
+  inputs on the legs.
+- The override fields share one description on every instrument:
+  "Instrument-owned pricing inputs.", "Metric-time pricing configuration." and
+  "Scenario-only pricing adjustments." (JSON-schema descriptions). The future
+  options keep their tree-step wording, and the composite adds its leg-default
+  and must-be-empty notes.
+
+#### Fixed
+
+- `XccySwap` gains `instrument_pricing_overrides`, `metric_pricing_overrides`
+  and `scenario_pricing_overrides` (Rust, JSON). Scenario price shocks,
+  bump sizes, theta period and VaR settings now apply to cross-currency swaps.
+  Empty containers are omitted, so existing XccySwap JSON is unchanged.
+- `AssetBackedFacility` omits empty override containers when serialized, like
+  every other instrument (JSON).
+- The `RangeAccrual` docs no longer suggest an empty call schedule for a
+  non-callable rate-linked note, which `BermudanCallProvision` rejects.
+
 ### Structured-credit input channels (2026-09-24)
 
 Numbers change only where a deal relied on a retired channel:

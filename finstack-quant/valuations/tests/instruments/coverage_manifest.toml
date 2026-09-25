@@ -543,10 +543,10 @@ rationale = "The complete persisted cliquet_option spec implements PartialEq; re
 tag = "range_accrual"
 fixture = "json_examples/range_accrual.json"
 lossless = false
-partial_eq_blocker = "RangeAccrual.quanto: Option<QuantoSpec>"
+partial_eq_blocker = "RangeAccrual.terms: RangeAccrualTerms"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "RangeAccrual.quanto: Option<QuantoSpec> lacks PartialEq across optional FX conversion terms."
+rationale = "RangeAccrual.terms: RangeAccrualTerms lacks PartialEq across optional FX conversion terms."
 
 [[instrument]]
 tag = "tarn"
@@ -576,10 +576,10 @@ rationale = "The complete persisted cms_spread_option spec implements PartialEq;
 tag = "callable_range_accrual"
 fixture = "json_examples/callable_range_accrual.json"
 lossless = false
-partial_eq_blocker = "CallableRangeAccrual.range_accrual: RangeAccrual"
+partial_eq_blocker = "CallableRangeAccrual.range_accrual: RangeAccrualTerms"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "CallableRangeAccrual.range_accrual: RangeAccrual lacks PartialEq because its optional QuantoSpec has no equality contract."
+rationale = "CallableRangeAccrual.range_accrual: RangeAccrualTerms lacks PartialEq because its optional QuantoSpec has no equality contract."
 
 [[instrument]]
 tag = "trs_equity"

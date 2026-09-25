@@ -2,7 +2,7 @@
 
 use super::instrument::CompositeInstrument;
 use super::spec_support::ResolvedCompositeLeg;
-use crate::instruments::{InstrumentEnvelope, InstrumentJson};
+use crate::instruments::{InstrumentEnvelope, InstrumentJson, MetricPricingOverrides};
 use crate::metrics::MetricId;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -57,6 +57,11 @@ pub struct PrimitiveExposure {
     #[serde(skip)]
     #[cfg_attr(feature = "json-schema", schemars(skip))]
     pub(crate) instrument: Option<InstrumentJson>,
+    /// Metric overrides inherited from the enclosing composites (innermost wins),
+    /// applied to the primitive as defaults when it is priced.
+    #[serde(skip)]
+    #[cfg_attr(feature = "json-schema", schemars(skip))]
+    pub(crate) metric_defaults: MetricPricingOverrides,
 }
 
 impl PrimitiveExposure {
@@ -155,9 +160,12 @@ pub struct CompositeLegValuation {
 pub(super) fn flatten_composite(
     composite: &CompositeInstrument,
     multiplier: f64,
+    inherited_metric_defaults: &MetricPricingOverrides,
     path: &mut Vec<String>,
     out: &mut Vec<PrimitiveExposure>,
 ) -> Result<()> {
+    let mut metric_defaults = composite.metric_pricing_overrides.clone();
+    metric_defaults.apply_defaults(inherited_metric_defaults);
     for (leg, state) in composite
         .spec
         .legs
@@ -168,7 +176,7 @@ pub(super) fn flatten_composite(
         let quantity = multiplier * state.quantity;
         match leg.instrument.as_ref() {
             InstrumentJson::Composite(nested) => {
-                flatten_composite(nested, quantity, path, out)?;
+                flatten_composite(nested, quantity, &metric_defaults, path, out)?;
             }
             primitive => out.push(PrimitiveExposure {
                 path: path.clone(),
@@ -178,6 +186,7 @@ pub(super) fn flatten_composite(
                 value: Money::from((0_i64, composite.spec.reporting_currency)),
                 measures: IndexMap::new(),
                 instrument: Some(primitive.clone()),
+                metric_defaults: metric_defaults.clone(),
             }),
         }
         let _ = path.pop();

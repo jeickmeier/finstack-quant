@@ -103,7 +103,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Attributes for scenario selection"
+          "description": "Instrument-owned pricing inputs."
         },
         "low_series_id": {
           "default": null,
@@ -119,7 +119,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -162,7 +162,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
           "anyOf": [

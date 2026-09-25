@@ -200,17 +200,26 @@ pub struct AssetBackedFacility {
     #[builder(default)]
     #[serde(default)]
     pub attributes: Attributes,
-    /// Instrument-level pricing overrides.
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
+    )]
     pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-level pricing overrides.
+    /// Metric-time pricing configuration.
     #[builder(default)]
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
+    )]
     pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-level pricing overrides.
+    /// Scenario-only pricing adjustments.
     #[builder(default)]
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
+    )]
     pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
 }
 

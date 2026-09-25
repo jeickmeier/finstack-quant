@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 const ALLOWED: &[(&str, usize)] = &[
     ("src/instruments/composite/types/instrument.rs", 1),
-    ("src/instruments/composite/types/reporting.rs", 1),
+    // `PrimitiveExposure::instrument` and `::metric_defaults` are runtime-only
+    // decomposition state (the leg definition and inherited metric defaults).
+    ("src/instruments/composite/types/reporting.rs", 2),
     ("src/instruments/exotics/basket/types.rs", 1),
     // `Tranche::payment_priority` and `TrancheStructure::currency` are
     // derived when the structure is assembled, never read from the wire.

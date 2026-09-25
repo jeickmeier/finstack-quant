@@ -152,7 +152,7 @@ pub(crate) struct FxOptionInputRequest<'a> {
     pub(crate) vol_surface_id: &'a str,
     /// Strike used for volatility lookup.
     pub(crate) strike: f64,
-    /// Instrument-owned inputs used for implied-vol overrides.
+    /// Instrument-owned pricing inputs.
     pub(crate) instrument_pricing_overrides: &'a InstrumentPricingOverrides,
     /// Spot source.
     pub(crate) spot_source: FxSpotSource<'a>,

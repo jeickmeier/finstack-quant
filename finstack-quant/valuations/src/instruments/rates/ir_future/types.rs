@@ -155,9 +155,8 @@ pub struct InterestRateFuture {
     pub fixing_calendar_id: Option<String>,
     /// Optional volatility surface identifier for convexity adjustment
     pub vol_surface_id: Option<CurveId>,
-    /// Attributes
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

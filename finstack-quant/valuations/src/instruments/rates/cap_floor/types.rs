@@ -333,9 +333,8 @@ pub struct CapFloor {
         schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")
     )]
     pub premium: Option<(Date, Money)>,
-    /// Additional attributes
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

@@ -194,9 +194,8 @@ pub struct ConvertibleBond {
     /// Floating coupon specification (if applicable).
     #[builder(optional)]
     pub floating_coupon: Option<FloatingCouponSpec>,
-    /// Attributes for selection and tagging.
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

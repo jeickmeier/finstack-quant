@@ -87,7 +87,6 @@ const promotedTerms: Record<string, PromotedTerm> = {
     unit: "bp",
     hint: "Contract spread on the second leg.",
     kind: "contract-term",
-    morePricingOverrides: false,
   },
   structured_credit: {
     path: "instrument.spec.tranches.tranches[0].coupon.fixed.rate",

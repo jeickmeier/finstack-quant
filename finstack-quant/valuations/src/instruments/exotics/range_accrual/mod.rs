@@ -38,4 +38,4 @@ pub mod monte_carlo;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use types::{BoundsType, RangeAccrual};
+pub use types::{BoundsType, RangeAccrual, RangeAccrualTerms};

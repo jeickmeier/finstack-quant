@@ -134,9 +134,8 @@ pub struct BasisSwap {
     #[builder(default)]
     #[serde(default)]
     pub allow_same_curve: bool,
-    /// Pricing overrides for scenario analysis and model configuration.
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

@@ -94,9 +94,8 @@ pub struct Deposit {
     pub quote_rate: Option<Decimal>,
     /// Discount curve id used for valuation and par extraction.
     pub discount_curve_id: CurveId,
-    /// Attributes for scenario selection and tagging.
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

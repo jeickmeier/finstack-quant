@@ -139,14 +139,14 @@ pub struct CommoditySpreadOption {
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-only pricing controls.
+    /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only valuation adjustments.
+    /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,

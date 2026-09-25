@@ -2,7 +2,7 @@
 
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::exotics::range_accrual::{BoundsType, RangeAccrual};
+use crate::instruments::exotics::range_accrual::{BoundsType, RangeAccrualTerms};
 use crate::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
@@ -32,11 +32,10 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 pub struct CallableRangeAccrual {
     /// Unique instrument identifier.
     pub id: InstrumentId,
-    /// Underlying range accrual leg.
-    pub range_accrual: RangeAccrual,
+    /// Range accrual contract terms (no identity, attributes or overrides of their own).
+    pub range_accrual: RangeAccrualTerms,
     /// Bermudan call provision.
     pub call_provision: BermudanCallProvision,
-    /// Pricing overrides.
     /// Instrument-owned pricing inputs.
     #[serde(
         default,
@@ -113,8 +112,7 @@ impl CallableRangeAccrual {
 
         CallableRangeAccrual {
             id: InstrumentId::new("CALLABLE-RA-SOFR-1Y"),
-            range_accrual: RangeAccrual::builder()
-                .id(InstrumentId::new("CALLABLE-RA-SOFR-1Y-RANGE"))
+            range_accrual: RangeAccrualTerms::builder()
                 .underlying_ticker("SOFR".to_string())
                 .observation_dates(observation_dates)
                 .lower_bound(0.04)
@@ -131,12 +129,11 @@ impl CallableRangeAccrual {
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)
-                .attributes(Attributes::new())
                 .payment_date_opt(None)
                 .past_fixings_in_range_opt(None)
                 .total_past_observations_opt(None)
                 .build()
-                .expect("example range accrual leg should build"),
+                .expect("example range accrual terms should build"),
             call_provision: BermudanCallProvision::new(call_dates, 1.0, 1),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -233,6 +230,43 @@ mod tests {
         let deser: CallableRangeAccrual = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deser.id, cra.id);
         assert!((deser.range_accrual.coupon_rate - cra.range_accrual.coupon_rate).abs() < 1e-12);
+    }
+
+    #[test]
+    fn nested_range_accrual_rejects_retired_envelope_keys() {
+        // `range_accrual` now carries RangeAccrualTerms only: the callable note has
+        // one id, one attributes map and one override set, all at its top level.
+        for (key, retired) in [
+            ("id", serde_json::json!("CALLABLE-RA-SOFR-1Y-RANGE")),
+            ("attributes", serde_json::json!({})),
+            (
+                // schema-rejection-test
+                "instrument_pricing_overrides",
+                serde_json::json!({"model_config": {"mc_paths": 8}}),
+            ),
+            (
+                // schema-rejection-test
+                "metric_pricing_overrides",
+                serde_json::json!({"theta_period": "1W"}),
+            ),
+            (
+                // schema-rejection-test
+                "scenario_pricing_overrides",
+                serde_json::json!({"scenario_price_shock_pct": 0.01}),
+            ),
+        ] {
+            let mut value =
+                serde_json::to_value(CallableRangeAccrual::example()).expect("serialize");
+            value["range_accrual"][key] = retired;
+            let error = serde_json::from_value::<CallableRangeAccrual>(value)
+                .expect_err("retired range_accrual envelope key must be rejected");
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("unknown field `{key}`")),
+                "range_accrual.{key}: {error}"
+            );
+        }
     }
 
     #[test]

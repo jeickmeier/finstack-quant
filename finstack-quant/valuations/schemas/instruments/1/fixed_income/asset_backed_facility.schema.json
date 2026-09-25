@@ -406,8 +406,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "default": {},
-          "description": "Instrument-level pricing overrides."
+          "description": "Instrument-owned pricing inputs."
         },
         "liquidation_price_pct": {
           "description": "Price the collateral realizes when the term-out ends and the\nremaining collateral is liquidated to repay the facility, as a percent\nof par (`None` = par).",
@@ -428,10 +427,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "default": {
-            "theta_period": null
-          },
-          "description": "Metric-level pricing overrides."
+          "description": "Metric-time pricing configuration."
         },
         "payment_calendar_id": {
           "description": "Holiday calendar for the payment schedule (e.g. `\"nyse\"`); required\nfor pricing.",
@@ -467,8 +463,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "default": {},
-          "description": "Scenario-level pricing overrides."
+          "description": "Scenario-only pricing adjustments."
         },
         "stochastic_default_spec": {
           "anyOf": [
@@ -5339,7 +5334,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lc": {
           "anyOf": [
@@ -6093,7 +6088,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -6542,12 +6537,8 @@
             "unit": "months"
           },
           "id": "ABF-EXAMPLE",
-          "instrument_pricing_overrides": {},
           "margin_bp": 600.0,
           "maturity": "2030-01-15",
-          "metric_pricing_overrides": {
-            "theta_period": null
-          },
           "payment_calendar_id": "nyse",
           "prepayment_spec": {
             "cpr": 0.2,
@@ -6559,7 +6550,6 @@
             "recovery_lag": 12
           },
           "revolving_end": "2026-01-15",
-          "scenario_pricing_overrides": {},
           "term_out": {
             "months": 24
           },

@@ -96,6 +96,23 @@ pub struct CompositeInstrument {
     pub spec: CompositeSpec,
     /// Frozen quantities used for every valuation until explicit rebalance.
     pub state: CompositeState,
+    /// Instrument-owned pricing inputs.
+    ///
+    /// A composite has no pricing model of its own, so this must stay empty;
+    /// set quotes and model inputs on each leg instead.
+    #[serde(default, skip_serializing_if = "InstrumentPricingOverrides::is_empty")]
+    pub instrument_pricing_overrides: InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    ///
+    /// Also applied to every leg as defaults: a leg's own setting wins, and
+    /// `bump_config.adaptive_bumps` is enabled on a leg when either sets it.
+    #[serde(default, skip_serializing_if = "MetricPricingOverrides::is_empty")]
+    pub metric_pricing_overrides: MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    ///
+    /// Applied to the composite value after leg aggregation.
+    #[serde(default, skip_serializing_if = "ScenarioPricingOverrides::is_empty")]
+    pub scenario_pricing_overrides: ScenarioPricingOverrides,
     /// Boxed legs materialized once per instance.
     #[serde(skip)]
     #[cfg_attr(feature = "json-schema", schemars(skip))]
@@ -119,6 +136,9 @@ impl CompositeInstrument {
         let instrument = Self {
             spec,
             state,
+            instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+            metric_pricing_overrides: MetricPricingOverrides::default(),
+            scenario_pricing_overrides: ScenarioPricingOverrides::default(),
             boxed_legs: BoxedLegCache::default(),
         };
         instrument.validate_invariants()?;
@@ -297,7 +317,13 @@ impl CompositeInstrument {
         self.validate_invariants()?;
         let mut out = Vec::new();
         let mut path = vec![self.spec.id.to_string()];
-        flatten_composite(self, 1.0, &mut path, &mut out)?;
+        flatten_composite(
+            self,
+            1.0,
+            &MetricPricingOverrides::default(),
+            &mut path,
+            &mut out,
+        )?;
         Ok(out)
     }
 
@@ -355,11 +381,17 @@ impl CompositeInstrument {
             let instrument_json = exposure.instrument.as_ref().ok_or_else(|| {
                 Error::Internal("primitive exposure lost its runtime instrument".to_string())
             })?;
-            let cache_key = InstrumentEnvelope::new(instrument_json.clone()).content_hash()?;
+            let mut cache_key = InstrumentEnvelope::new(instrument_json.clone()).content_hash()?;
+            if !exposure.metric_defaults.is_empty() {
+                cache_key.push_str(&format!("{:?}", exposure.metric_defaults));
+            }
             let result = match price_cache.get(&cache_key) {
                 Some(cached) => cached.clone(),
                 None => {
-                    let instrument = instrument_json.clone().into_boxed()?;
+                    let mut instrument = instrument_json.clone().into_boxed()?;
+                    if let Some(overrides) = instrument.get_metric_pricing_overrides_mut() {
+                        overrides.apply_defaults(&exposure.metric_defaults);
+                    }
                     let leg_metrics =
                         metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
                     let priced = instrument.price_with_metrics(
@@ -456,7 +488,9 @@ impl CompositeInstrument {
             .iter()
             .zip(&self.spec.legs)
             .zip(&self.state.resolved_legs)
-            .map(|((instrument, leg), resolved)| {
+            .map(|((leg_instrument, leg), resolved)| {
+                let defaulted = self.leg_with_metric_defaults(leg_instrument.as_ref());
+                let instrument = defaulted.as_ref().unwrap_or(leg_instrument);
                 let leg_metrics = metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
                 let valuation =
                     instrument.price_with_metrics(market, as_of, &leg_metrics, options.clone())?;
@@ -483,6 +517,20 @@ impl CompositeInstrument {
                 })
             })
             .collect()
+    }
+
+    /// Clone `leg` with this composite's metric overrides applied as defaults.
+    ///
+    /// Returns `None` when there is nothing to apply, so callers keep using
+    /// the cached leg.
+    fn leg_with_metric_defaults(&self, leg: &dyn Instrument) -> Option<Box<dyn Instrument>> {
+        if self.metric_pricing_overrides.is_empty() {
+            return None;
+        }
+        let mut leg = leg.clone_box();
+        leg.get_metric_pricing_overrides_mut()?
+            .apply_defaults(&self.metric_pricing_overrides);
+        Some(leg)
     }
 
     fn base_value_raw_impl(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
@@ -537,6 +585,13 @@ impl Instrument for CompositeInstrument {
 
     fn validate_invariants(&self) -> Result<()> {
         self.spec.validate()?;
+        if !self.instrument_pricing_overrides.is_empty() {
+            return Err(Error::Validation(format!(
+                "composite '{}' instrument.spec.instrument_pricing_overrides must be empty; \
+                 set quotes and model inputs on each leg's instrument_pricing_overrides",
+                self.spec.id
+            )));
+        }
         self.validate_state()
     }
 
@@ -601,29 +656,7 @@ impl Instrument for CompositeInstrument {
             })
     }
 
-    fn get_instrument_pricing_overrides(&self) -> Option<&InstrumentPricingOverrides> {
-        Some(&self.spec.instrument_pricing_overrides)
-    }
-
-    fn get_instrument_pricing_overrides_mut(&mut self) -> Option<&mut InstrumentPricingOverrides> {
-        Some(&mut self.spec.instrument_pricing_overrides)
-    }
-
-    fn get_metric_pricing_overrides(&self) -> Option<&MetricPricingOverrides> {
-        Some(&self.spec.metric_pricing_overrides)
-    }
-
-    fn get_metric_pricing_overrides_mut(&mut self) -> Option<&mut MetricPricingOverrides> {
-        Some(&mut self.spec.metric_pricing_overrides)
-    }
-
-    fn get_scenario_pricing_overrides(&self) -> Option<&ScenarioPricingOverrides> {
-        Some(&self.spec.scenario_pricing_overrides)
-    }
-
-    fn get_scenario_pricing_overrides_mut(&mut self) -> Option<&mut ScenarioPricingOverrides> {
-        Some(&mut self.spec.scenario_pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

@@ -19,7 +19,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "price_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",

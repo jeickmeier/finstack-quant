@@ -28,10 +28,11 @@ impl MetricCalculator for RhoCalculator {
 
         // Use payment_date if provided, otherwise fall back to last observation date
         let final_date = instrument
+            .terms
             .payment_date
-            .or_else(|| instrument.observation_dates.last().copied())
+            .or_else(|| instrument.terms.observation_dates.last().copied())
             .unwrap_or(as_of);
-        let t = instrument.day_count.year_fraction(
+        let t = instrument.terms.day_count.year_fraction(
             as_of,
             final_date,
             finstack_quant_core::dates::DayCountContext::default(),
@@ -40,8 +41,11 @@ impl MetricCalculator for RhoCalculator {
             return Ok(0.0);
         }
 
-        let curves_bumped =
-            bump_discount_curve_parallel(&context.curves, &instrument.discount_curve_id, bump_bp)?;
+        let curves_bumped = bump_discount_curve_parallel(
+            &context.curves,
+            &instrument.terms.discount_curve_id,
+            bump_bp,
+        )?;
 
         // Reprice with bumped curve
         let pv_bumped = instrument.value(&curves_bumped, as_of)?.amount();

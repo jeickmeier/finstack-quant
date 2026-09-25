@@ -302,9 +302,8 @@ pub struct AgencyCmo {
     pub collateral_wam: Option<u32>,
     /// Discount curve identifier.
     pub discount_curve_id: CurveId,
-    /// Pricing overrides.
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

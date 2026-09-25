@@ -29,7 +29,7 @@ pub struct CommodityFutureOption {
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-only pricing controls.
+    /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,

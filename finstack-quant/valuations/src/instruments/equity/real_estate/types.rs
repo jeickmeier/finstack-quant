@@ -172,21 +172,21 @@ pub struct RealEstateAsset {
     pub appraisal_value: Option<Money>,
     /// Day count convention for year fractions.
     pub day_count: DayCount,
-    /// Attributes for tagging and scenarios.
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-only pricing controls.
+    /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only valuation adjustments.
+    /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,
@@ -297,18 +297,13 @@ struct RealEstateAssetUnchecked {
     appraisal_value: Option<Money>,
     /// Day count convention for year fractions.
     day_count: DayCount,
-    /// Discount curve identifier, used for risk attribution only.
-    ///
-    /// DCF valuation always discounts at [`discount_rate`](Self::discount_rate)
-    /// regardless of whether this curve is loaded. Property discount-rate
-    /// sensitivity is exposed as `real_estate::discount_rate01`.
-    /// Attributes for tagging and scenarios.
+    /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-only pricing controls.
+    /// Metric-time pricing configuration.
     #[serde(default)]
     metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only valuation adjustments.
+    /// Scenario-only pricing adjustments.
     #[serde(default)]
     scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging

@@ -146,14 +146,14 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
                 .expect("FX volatility"),
         );
     let mut note = RangeAccrual::example();
-    note.observation_dates = vec![expiry];
-    note.accrual_start_date = as_of;
-    note.day_count = DayCount::Act365F;
-    note.lower_bound = 80.0;
-    note.upper_bound = 120.0;
-    note.bounds_type = BoundsType::Absolute;
-    note.div_yield_id = None;
-    note.quanto = Some(
+    note.terms.observation_dates = vec![expiry];
+    note.terms.accrual_start_date = as_of;
+    note.terms.day_count = DayCount::Act365F;
+    note.terms.lower_bound = 80.0;
+    note.terms.upper_bound = 120.0;
+    note.terms.bounds_type = BoundsType::Absolute;
+    note.terms.div_yield_id = None;
+    note.terms.quanto = Some(
         serde_json::from_value(serde_json::json!({
             "asset_currency": "EUR",
             "asset_discount_curve_id": "EUR-OIS",

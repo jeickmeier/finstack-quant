@@ -119,9 +119,8 @@ pub struct FIIndexTotalReturnSwap {
     /// Fixed income index TRS use duration-based margin calculations.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub margin_spec: Option<OtcMarginSpec>,
-    /// Attributes for scenario selection and tagging.
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

@@ -532,8 +532,8 @@ pub struct BondFuture {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repo_curve_id: Option<CurveId>,
 
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

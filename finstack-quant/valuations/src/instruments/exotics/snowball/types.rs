@@ -91,7 +91,6 @@ pub struct Snowball {
     pub callable: Option<BermudanCallProvision>,
     /// Day count convention.
     pub day_count: DayCount,
-    /// Pricing overrides.
     /// Instrument-owned pricing inputs.
     #[serde(
         default,

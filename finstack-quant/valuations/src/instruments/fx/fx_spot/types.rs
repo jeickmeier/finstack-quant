@@ -130,9 +130,8 @@ pub struct FxSpot {
     pub discount_curve_id: Option<finstack_quant_core::types::CurveId>,
     /// Notional amount in base currency.
     pub notional: Money,
-    /// Per-instrument pricing/sensitivity override knobs.
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
@@ -221,7 +220,6 @@ struct FxSpotUnchecked {
     /// Per market convention, FX settlement uses the joint calendar of both currencies.
     /// A date is a good business day only if it's valid in both calendars.
     quote_calendar_id: Option<String>,
-    /// Per-instrument pricing/sensitivity override knobs.
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,

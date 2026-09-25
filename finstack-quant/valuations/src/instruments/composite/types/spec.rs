@@ -8,10 +8,7 @@ use super::spec_support::{
     validate_history, CompositeLegSpec, CompositeMarketObservation, CompositeState, RebalanceRule,
     ResolvedCompositeLeg, WeightingMethod, MAX_COMPOSITE_DEPTH, MAX_COMPOSITE_LEGS, MIN_ABS_INPUT,
 };
-use crate::instruments::{
-    Attributes, InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
-    MetricPricingOverrides, PricingOptions, ScenarioPricingOverrides,
-};
+use crate::instruments::{Attributes, InstrumentEnvelope, InstrumentJson, PricingOptions};
 use crate::metrics::{is_additive_metric, MetricId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -51,15 +48,6 @@ pub struct CompositeSpec {
     pub rebalance_rule: RebalanceRule,
     /// Scenario-selection and reporting metadata.
     pub attributes: Attributes,
-    /// Instrument-level pricing inputs shared with the normal valuation lifecycle.
-    #[serde(default, skip_serializing_if = "InstrumentPricingOverrides::is_empty")]
-    pub instrument_pricing_overrides: InstrumentPricingOverrides,
-    /// Metric bump and calculation controls.
-    #[serde(default, skip_serializing_if = "MetricPricingOverrides::is_empty")]
-    pub metric_pricing_overrides: MetricPricingOverrides,
-    /// Scenario-only price adjustments applied to the composite after leg aggregation.
-    #[serde(default, skip_serializing_if = "ScenarioPricingOverrides::is_empty")]
-    pub scenario_pricing_overrides: ScenarioPricingOverrides,
 }
 
 impl CompositeSpec {
@@ -99,9 +87,6 @@ impl CompositeSpec {
             weighting_method,
             rebalance_rule,
             attributes: Attributes::new(),
-            instrument_pricing_overrides: InstrumentPricingOverrides::default(),
-            metric_pricing_overrides: MetricPricingOverrides::default(),
-            scenario_pricing_overrides: ScenarioPricingOverrides::default(),
         }
     }
 
@@ -399,6 +384,15 @@ impl CompositeSpec {
                 resolved_legs,
                 weighting_inputs,
             },
+            instrument_pricing_overrides: previous
+                .map(|prior| prior.instrument_pricing_overrides.clone())
+                .unwrap_or_default(),
+            metric_pricing_overrides: previous
+                .map(|prior| prior.metric_pricing_overrides.clone())
+                .unwrap_or_default(),
+            scenario_pricing_overrides: previous
+                .map(|prior| prior.scenario_pricing_overrides.clone())
+                .unwrap_or_default(),
             boxed_legs: BoxedLegCache::default(),
         };
         instrument.validate_state()?;

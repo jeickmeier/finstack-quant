@@ -42,7 +42,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Pricing overrides (including quoted price for OAS).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

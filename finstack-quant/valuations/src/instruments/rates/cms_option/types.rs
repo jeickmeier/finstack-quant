@@ -88,9 +88,8 @@ pub struct CmsOption {
     pub forward_curve_id: CurveId,
     /// Volatility surface ID for CMS rates
     pub vol_surface_id: CurveId,
-    /// Pricing overrides (manual price, yield, spread)
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

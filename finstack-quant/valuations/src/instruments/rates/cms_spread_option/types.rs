@@ -117,7 +117,6 @@ pub struct CmsSpreadOption {
     /// Floating leg day count of the underlying CMS swaps (overrides convention).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_float_day_count: Option<DayCount>,
-    /// Pricing overrides.
     /// Instrument-owned pricing inputs.
     #[serde(
         default,

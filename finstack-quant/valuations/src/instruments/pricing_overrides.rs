@@ -1162,6 +1162,52 @@ impl MetricPricingOverrides {
         Ok(())
     }
 
+    /// Fill every unset field from `defaults`, keeping the fields already set.
+    ///
+    /// Used to apply a composite's metric overrides to its legs. `Option`
+    /// fields take the default only when `None`; `bump_config.adaptive_bumps`
+    /// has no unset state, so it is enabled when either side enables it.
+    ///
+    /// # Arguments
+    ///
+    /// * `defaults` - Lower-precedence overrides (for example the enclosing
+    ///   composite's) whose values fill the fields this set leaves unset.
+    pub(crate) fn apply_defaults(&mut self, defaults: &Self) {
+        // Exhaustive destructuring: a new field must decide its precedence here.
+        let Self {
+            bump_config:
+                BumpConfig {
+                    ytm_bump_bp,
+                    spot_bump_pct,
+                    vol_bump_pct,
+                    rate_bump_bp,
+                    credit_spread_bump_bp,
+                    adaptive_bumps,
+                },
+            theta_period,
+            breakeven_config,
+            bond_risk_basis,
+            var_config,
+        } = defaults;
+        let bump = &mut self.bump_config;
+        bump.ytm_bump_bp = bump.ytm_bump_bp.or(*ytm_bump_bp);
+        bump.spot_bump_pct = bump.spot_bump_pct.or(*spot_bump_pct);
+        bump.vol_bump_pct = bump.vol_bump_pct.or(*vol_bump_pct);
+        bump.rate_bump_bp = bump.rate_bump_bp.or(*rate_bump_bp);
+        bump.credit_spread_bump_bp = bump.credit_spread_bump_bp.or(*credit_spread_bump_bp);
+        bump.adaptive_bumps |= *adaptive_bumps;
+        if self.theta_period.is_none() {
+            self.theta_period.clone_from(theta_period);
+        }
+        if self.breakeven_config.is_none() {
+            self.breakeven_config.clone_from(breakeven_config);
+        }
+        self.bond_risk_basis = self.bond_risk_basis.or(*bond_risk_basis);
+        if self.var_config.is_none() {
+            self.var_config.clone_from(var_config);
+        }
+    }
+
     /// Bond risk basis, defaulting to Bloomberg-style workout/bullet risk.
     pub fn bond_risk_basis_or_default(&self) -> BondRiskBasis {
         self.bond_risk_basis.unwrap_or_default()

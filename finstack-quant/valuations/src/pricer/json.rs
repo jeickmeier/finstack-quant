@@ -959,6 +959,24 @@ mod tests {
     }
 
     #[test]
+    fn composite_pricing_options_merge_into_root_metric_overrides() {
+        let composite =
+            crate::instruments::CompositeInstrument::example().expect("composite example");
+        let json = envelope_json(InstrumentJson::Composite(Box::new(composite)));
+        let merged =
+            instrument_json_for_pricing(&json, Some(r#"{"theta_period":"1M"}"#)).expect("merge");
+        let envelope: crate::instruments::InstrumentEnvelope =
+            serde_json::from_str(merged.as_ref()).expect("merged composite must still parse");
+        let InstrumentJson::Composite(parsed) = envelope.instrument else {
+            panic!("expected composite");
+        };
+        assert_eq!(
+            parsed.metric_pricing_overrides.theta_period.as_deref(),
+            Some("1M")
+        );
+    }
+
+    #[test]
     fn validate_instrument_json_rejects_invalid_pricing_overrides() {
         let err = validate_instrument_json(&equity_option_json_with_negative_vol_override(), None)
             .expect_err("negative implied volatility override must be rejected");

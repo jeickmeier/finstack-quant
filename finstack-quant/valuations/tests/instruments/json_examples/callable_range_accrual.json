@@ -14,13 +14,11 @@
       "id": "CALLABLE-RA-SOFR-1Y",
       "range_accrual": {
         "accrual_start_date": "2025-12-31",
-        "attributes": {},
         "bounds_type": "absolute",
         "coupon_rate": 0.065,
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
         "div_yield_id": null,
-        "id": "CALLABLE-RA-SOFR-1Y-RANGE",
         "lower_bound": 0.04,
         "notional": {
           "amount": "1000000",

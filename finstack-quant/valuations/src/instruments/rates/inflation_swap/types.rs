@@ -100,9 +100,8 @@ pub struct InflationSwap {
     /// If not specified, payment dates are used unadjusted.
     #[builder(optional)]
     pub calendar_id: Option<CalendarId>,
-    /// Attributes for scenario selection and tagging
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
@@ -653,9 +652,8 @@ pub struct YoYInflationSwap {
     /// Holiday calendar identifier for payment date adjustment.
     #[builder(optional)]
     pub calendar_id: Option<CalendarId>,
-    /// Attributes for scenario selection and tagging
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

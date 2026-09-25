@@ -1892,15 +1892,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Attributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -2578,14 +2578,14 @@
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "default": {},
-          "description": "Discount curve identifier, used for risk attribution only.\n\nDCF valuation always discounts at [`discount_rate`](Self::discount_rate)\nregardless of whether this curve is loaded. Property discount-rate\nsensitivity is exposed as `real_estate::discount_rate01`.\nAttributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "default": {
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "noi_schedule": {
           "description": "Net operating income schedule (date, amount).",
@@ -2656,7 +2656,7 @@
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "stabilized_noi": {
           "default": null,
@@ -2887,7 +2887,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -3208,7 +3208,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lc": {
           "anyOf": [
@@ -3636,7 +3636,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

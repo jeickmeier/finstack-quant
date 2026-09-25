@@ -165,10 +165,6 @@ it.each([
     const accepted = await show(type);
     const input = await screen.findByRole("textbox", { name: label });
     expect(screen.getAllByRole("textbox", { name: label })).toHaveLength(1);
-    if (type === "xccy_swap")
-      expect(
-        screen.queryByRole("button", { name: "More pricing overrides" }),
-      ).toBeNull();
     fireEvent.change(input, { target: { value: text } });
     await canonicalAfter(
       accepted,

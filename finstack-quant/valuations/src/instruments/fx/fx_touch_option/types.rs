@@ -210,9 +210,8 @@ pub struct FxTouchOption {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_touch: Option<bool>,
-    /// Pricing overrides (manual price, yield, spread)
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

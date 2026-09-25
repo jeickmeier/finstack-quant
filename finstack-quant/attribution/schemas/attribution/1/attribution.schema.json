@@ -215,7 +215,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/DateWire",
@@ -291,7 +291,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (including quoted price for OAS).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/DateWire",
@@ -451,7 +451,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -828,11 +828,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -863,7 +863,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/Id",
@@ -1025,8 +1025,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "default": {},
-          "description": "Instrument-level pricing overrides."
+          "description": "Instrument-owned pricing inputs."
         },
         "liquidation_price_pct": {
           "description": "Price the collateral realizes when the term-out ends and the\nremaining collateral is liquidated to repay the facility, as a percent\nof par (`None` = par).",
@@ -1047,10 +1046,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "default": {
-            "theta_period": null
-          },
-          "description": "Metric-level pricing overrides."
+          "description": "Metric-time pricing configuration."
         },
         "payment_calendar_id": {
           "description": "Holiday calendar for the payment schedule (e.g. `\"nyse\"`); required\nfor pricing.",
@@ -1086,8 +1082,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "default": {},
-          "description": "Scenario-level pricing overrides."
+          "description": "Scenario-only pricing adjustments."
         },
         "stochastic_default_spec": {
           "anyOf": [
@@ -2316,7 +2311,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "memory_coupons": {
           "default": false,
@@ -2328,7 +2323,7 @@
           "default": {
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -2379,7 +2374,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/Id",
@@ -2567,11 +2562,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "monitoring": {
           "$ref": "#/$defs/Monitoring",
@@ -2613,7 +2608,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/Id",
@@ -2740,7 +2735,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides for scenario analysis and model configuration.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -2884,11 +2879,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -2900,7 +2895,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -4002,7 +3997,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing overrides (including upfront payment)."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -4017,7 +4012,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -4047,7 +4042,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "series": {
           "description": "Series number (e.g., 42)",
@@ -4174,7 +4169,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing overrides (including implied volatility)."
+          "description": "Instrument-owned pricing inputs."
         },
         "knockout": {
           "default": false,
@@ -4183,7 +4178,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -4213,7 +4208,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -4389,7 +4384,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing overrides."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/DateWire",
@@ -4397,7 +4392,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -4410,7 +4405,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "series": {
           "description": "Series number (e.g., 37)",
@@ -4882,15 +4877,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
         "range_accrual": {
-          "$ref": "#/$defs/RangeAccrual",
-          "description": "Underlying range accrual leg."
+          "$ref": "#/$defs/RangeAccrualTerms",
+          "description": "Range accrual contract terms (no identity, attributes or overrides of their own)."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -4956,7 +4951,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Additional attributes\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/DateWire",
@@ -5781,7 +5776,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "local_cap": {
           "description": "Local cap on individual period returns",
@@ -5798,7 +5793,7 @@
           "default": {
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -5842,7 +5837,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/Id",
@@ -6055,7 +6050,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -6190,7 +6185,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "long_cms_tenor": {
           "$ref": "#/$defs/Tenor",
@@ -6408,7 +6403,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -6770,7 +6765,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
@@ -6801,7 +6796,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "strike": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -6955,7 +6950,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "multiplier": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -6981,7 +6976,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -7063,7 +7058,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "price_curve_id": {
           "$ref": "#/$defs/Id",
@@ -7114,7 +7109,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -7274,7 +7269,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "multiplier": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7307,7 +7302,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -7411,7 +7406,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7423,7 +7418,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "strike": {
           "description": "Spread strike price K in the payoff max(S1 - S2 - K, 0).",
@@ -7518,7 +7513,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "quantity": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7545,7 +7540,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -7645,7 +7640,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7657,7 +7652,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "swap_end": {
           "$ref": "#/$defs/DateWire",
@@ -7707,6 +7702,18 @@
       "additionalProperties": false,
       "description": "Priceable composite instrument containing an unresolved policy and immutable state.\n\nValuation and risk use `state` exactly as stored. Call [`Self::rebalance`]\nto obtain a distinct instrument; this type does not mutate in place.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};\n\nlet composite = CompositeInstrument::example()?;\nassert_eq!(composite.id(), \"COMPOSITE-EXAMPLE\");\nassert_eq!(composite.state.resolved_legs.len(), 2);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
+        "instrument_pricing_overrides": {
+          "$ref": "#/$defs/InstrumentPricingOverrides",
+          "description": "Instrument-owned pricing inputs.\n\nA composite has no pricing model of its own, so this must stay empty;\nset quotes and model inputs on each leg instead."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "#/$defs/MetricPricingOverrides",
+          "description": "Metric-time pricing configuration.\n\nAlso applied to every leg as defaults: a leg's own setting wins, and\n`bump_config.adaptive_bumps` is enabled on a leg when either sets it."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/ScenarioPricingOverrides",
+          "description": "Scenario-only pricing adjustments.\n\nApplied to the composite value after leg aggregation."
+        },
         "spec": {
           "$ref": "#/$defs/CompositeSpec",
           "description": "Economic definition and future rebalance policy."
@@ -7763,20 +7770,12 @@
           "$ref": "#/$defs/Id",
           "description": "Stable composite instrument identifier."
         },
-        "instrument_pricing_overrides": {
-          "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-level pricing inputs shared with the normal valuation lifecycle."
-        },
         "legs": {
           "description": "Self-contained underlying instrument definitions.",
           "items": {
             "$ref": "#/$defs/CompositeLegSpec"
           },
           "type": "array"
-        },
-        "metric_pricing_overrides": {
-          "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric bump and calculation controls."
         },
         "rebalance_rule": {
           "$ref": "#/$defs/RebalanceRule",
@@ -7785,10 +7784,6 @@
         "reporting_currency": {
           "$ref": "#/$defs/Currency",
           "description": "Currency in which value, P&L, additive risk, and capital are reported."
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only price adjustments applied to the composite after leg aggregation."
         },
         "weighting_method": {
           "$ref": "#/$defs/WeightingMethod",
@@ -8208,7 +8203,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/DateWire",
@@ -8735,7 +8730,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Instrument-owned pricing overrides (including upfront payment)."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -8750,7 +8745,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -8777,7 +8772,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -11554,7 +11549,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/DateWire",
@@ -11753,14 +11748,14 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Attributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "mid_year_convention": {
           "default": false,
@@ -11775,7 +11770,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "shares_outstanding": {
           "default": null,
@@ -12050,7 +12045,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -12403,11 +12398,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "price_id": {
           "anyOf": [
@@ -12430,7 +12425,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "shares": {
           "description": "Optional number of shares (defaults to 1 if not specified)",
@@ -12561,7 +12556,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "quanto": {
           "anyOf": [
@@ -12624,7 +12619,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -12759,11 +12754,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -12775,7 +12770,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -12896,7 +12891,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -12991,7 +12986,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -13010,7 +13005,7 @@
           "default": {
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -13038,7 +13033,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "schedule": {
           "$ref": "#/$defs/TrsScheduleSpec",
@@ -13412,7 +13407,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -15446,7 +15441,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -15732,7 +15727,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -15834,7 +15829,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/DateWire",
@@ -15921,7 +15916,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "quote_currency": {
           "$ref": "#/$defs/Currency",
@@ -15973,7 +15968,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -16115,7 +16110,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -16206,7 +16201,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -16325,7 +16320,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -16421,7 +16416,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -16538,7 +16533,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "low_series_id": {
           "default": null,
@@ -17164,7 +17159,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (implied volatility, surface extrapolation).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [
@@ -17456,7 +17451,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Additional attributes\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/DateWire",
@@ -17565,7 +17560,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [
@@ -19206,7 +19201,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -19309,7 +19304,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -19389,7 +19384,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -19948,15 +19943,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -20252,7 +20247,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "lookback_type": {
           "$ref": "#/$defs/LookbackType",
@@ -20260,7 +20255,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -20294,7 +20289,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/Id",
@@ -21929,7 +21924,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/DateWire",
@@ -24099,15 +24094,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides for scenario analysis and model configuration."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "unrealized_nav": {
           "anyOf": [
@@ -24382,7 +24377,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Pricing overrides (manual price, yield, spread)."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -24494,7 +24489,7 @@
     },
     "RangeAccrual": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(with an empty call schedule for a non-callable note), which models the\nreference rate under HW1F and reconstructs the term rate per observation.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
       "properties": {
         "accrual_start_date": {
           "$ref": "#/$defs/DateWire",
@@ -24539,7 +24534,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lower_bound": {
           "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
@@ -24671,6 +24666,166 @@
         "spot_id",
         "vol_surface_id",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "RangeAccrualTerms": {
+      "additionalProperties": false,
+      "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
+      "properties": {
+        "accrual_start_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual accrual-period start date."
+        },
+        "bounds_type": {
+          "$ref": "#/$defs/BoundsType",
+          "default": "absolute",
+          "description": "How to interpret the range bounds (default: Absolute)"
+        },
+        "coupon_rate": {
+          "description": "Coupon rate earned when in range (must be >= 0)",
+          "format": "double",
+          "type": "number"
+        },
+        "day_count": {
+          "$ref": "#/$defs/DayCount",
+          "description": "Day count convention"
+        },
+        "discount_curve_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Discount curve ID for present value calculations"
+        },
+        "div_yield_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional dividend-yield scalar ID"
+        },
+        "lower_bound": {
+          "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
+          "format": "double",
+          "type": "number"
+        },
+        "notional": {
+          "$ref": "#/$defs/Money",
+          "description": "Notional amount"
+        },
+        "observation_dates": {
+          "description": "Observation dates for range checking (must be sorted ascending)",
+          "items": {
+            "$ref": "#/$defs/DateWire"
+          },
+          "type": "array"
+        },
+        "past_fixings_in_range": {
+          "description": "Number of past observations that were in range (for mid-life valuations).\nIf None, past observations are not included in the accrual calculation.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "payment_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DateWire"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional payment date (defaults to last observation date)"
+        },
+        "projection_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Projection curve for a rate-linked range accrual."
+        },
+        "quanto": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QuantoSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
+        },
+        "rate_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit rate index for rate-linked range accruals."
+        },
+        "reference_tenor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tenor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual tenor of the observed reference rate."
+        },
+        "spot_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Spot price identifier"
+        },
+        "total_past_observations": {
+          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_fixings_in_range` is set.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "underlying_ticker": {
+          "description": "Underlying asset ticker symbol",
+          "type": "string"
+        },
+        "upper_bound": {
+          "description": "Upper bound of accrual range (must be > lower_bound)",
+          "format": "double",
+          "type": "number"
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Volatility surface ID"
+        }
+      },
+      "required": [
+        "underlying_ticker",
+        "observation_dates",
+        "lower_bound",
+        "upper_bound",
+        "coupon_rate",
+        "notional",
+        "day_count",
+        "accrual_start_date",
+        "discount_curve_id",
+        "spot_id",
+        "vol_surface_id"
       ],
       "type": "object"
     },
@@ -25309,14 +25464,14 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
           "default": {},
-          "description": "Discount curve identifier, used for risk attribution only.\n\nDCF valuation always discounts at [`discount_rate`](Self::discount_rate)\nregardless of whether this curve is loaded. Property discount-rate\nsensitivity is exposed as `real_estate::discount_rate01`.\nAttributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "noi_schedule": {
           "description": "Net operating income schedule (date, amount).",
@@ -25387,7 +25542,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "stabilized_noi": {
           "default": null,
@@ -26280,7 +26435,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -26793,7 +26948,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lc": {
           "anyOf": [
@@ -27609,7 +27764,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "leverage": {
           "description": "Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).",
@@ -28392,7 +28547,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "liquidation_price_pct": {
           "description": "Price at which the collateral is realized when the deal is called or\ncleaned up, as a percent of par (`None` = par). The clean-up call is\nonly exercised when the liquidation proceeds, pending recoveries and\nevery cash account together cover the notes' claims.",
@@ -28688,7 +28843,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -28872,7 +29027,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
@@ -29109,7 +29264,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/DateWire",
@@ -30109,7 +30264,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection"
+          "description": "Instrument-owned pricing inputs."
         },
         "low_series_id": {
           "default": null,
@@ -30125,7 +30280,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -30168,7 +30323,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
           "anyOf": [
@@ -30521,11 +30676,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for tagging and selection."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/Money",
@@ -30542,7 +30697,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
           "$ref": "#/$defs/DateWire",
@@ -30594,7 +30749,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -30986,6 +31141,10 @@
           "$ref": "#/$defs/Id",
           "description": "Unique identifier for this instrument."
         },
+        "instrument_pricing_overrides": {
+          "$ref": "#/$defs/InstrumentPricingOverrides",
+          "description": "Instrument-owned pricing inputs."
+        },
         "leg1": {
           "$ref": "#/$defs/XccySwapLeg",
           "description": "First leg."
@@ -30993,6 +31152,10 @@
         "leg2": {
           "$ref": "#/$defs/XccySwapLeg",
           "description": "Second leg."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "#/$defs/MetricPricingOverrides",
+          "description": "Metric-time pricing configuration."
         },
         "notional_exchange": {
           "$ref": "#/$defs/NotionalExchange",
@@ -31002,6 +31165,10 @@
         "reporting_currency": {
           "$ref": "#/$defs/Currency",
           "description": "PV reporting currency (output currency of `value`/`npv`)."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/ScenarioPricingOverrides",
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -31171,7 +31338,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/InstrumentPricingOverrides",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [

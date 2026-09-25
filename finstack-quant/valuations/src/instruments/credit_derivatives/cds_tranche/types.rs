@@ -119,21 +119,21 @@ pub struct CDSTranche {
         schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")
     )]
     pub upfront: Option<(Date, Money)>,
-    /// Instrument-owned pricing overrides.
+    /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
     )]
     pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
-    /// Metric-only pricing controls.
+    /// Metric-time pricing configuration.
     #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
     )]
     pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
-    /// Scenario-only valuation adjustments.
+    /// Scenario-only pricing adjustments.
     #[builder(default)]
     #[serde(
         default,

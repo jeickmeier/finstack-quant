@@ -814,7 +814,7 @@ mod tests {
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations::instruments::exotics::callable_range_accrual::CallableRangeAccrual;
         use finstack_quant_valuations::instruments::exotics::range_accrual::{
-            BoundsType, RangeAccrual,
+            BoundsType, RangeAccrualTerms,
         };
         use finstack_quant_valuations::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
         use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
@@ -827,8 +827,7 @@ mod tests {
             .hw1f_mean_reversion = Some(0.05);
         instrument_pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
 
-        let range_accrual = RangeAccrual::builder()
-            .id(InstrumentId::new("RA-WASM-E2E"))
+        let range_accrual = RangeAccrualTerms::builder()
             .underlying_ticker("SOFR".to_string())
             .observation_dates(vec![
                 Date::from_calendar_date(2025, Month::July, 1).expect("date"),
@@ -858,8 +857,6 @@ mod tests {
             .spot_id("SOFR-RATE".into())
             .vol_surface_id(CurveId::new("SOFR-VOL"))
             .div_yield_id_opt(None)
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Default::default())
             .payment_date_opt(None)
             .past_fixings_in_range_opt(None)
             .total_past_observations_opt(None)

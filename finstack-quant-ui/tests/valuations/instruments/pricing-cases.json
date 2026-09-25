@@ -182,7 +182,7 @@
       "type": "asset_backed_facility",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json",
-        "sha256": "47e4619640243abf5935bee77c58cfd23938d12e3609b2e510f2e3b26a540703",
+        "sha256": "54897c2d4f0d9a4decbe17012b9b3667921912e0096e49930f63ed039f52193d",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -534,7 +534,7 @@
       "type": "callable_range_accrual",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/callable_range_accrual.json",
-        "sha256": "1895f643a4026df1a0d8bb212ff005102cad04bc233cab80ade327d943dc9a8d",
+        "sha256": "7553faf1a355821fe310ecded704a5a25b82f21d19b40c773f9fc70589aa51ba",
         "pointer": []
       },
       "instrumentPatches": [

@@ -194,9 +194,8 @@ pub struct FxOption {
     pub foreign_discount_curve_id: CurveId,
     /// FX volatility surface ID
     pub vol_surface_id: CurveId,
-    /// Pricing overrides (manual price, yield, spread)
-    #[builder(default)]
     /// Instrument-owned pricing inputs.
+    #[builder(default)]
     #[serde(
         default,
         skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"

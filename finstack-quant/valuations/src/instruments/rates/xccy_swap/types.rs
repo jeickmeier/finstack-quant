@@ -325,6 +325,27 @@ pub struct XccySwap {
     pub notional_exchange: NotionalExchange,
     /// PV reporting currency (output currency of `value`/`npv`).
     pub reporting_currency: Currency,
+    /// Instrument-owned pricing inputs.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::InstrumentPricingOverrides::is_empty"
+    )]
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::MetricPricingOverrides::is_empty"
+    )]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[builder(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
+    )]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for instrument selection and tagging.
     pub attributes: crate::instruments::common_impl::traits::Attributes,
 }
@@ -345,6 +366,9 @@ impl XccySwap {
             leg2,
             notional_exchange: NotionalExchange::InitialAndFinal,
             reporting_currency,
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: crate::instruments::common_impl::traits::Attributes::default(),
         }
     }
@@ -1078,6 +1102,8 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.leg1.start)
     }
+
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
@@ -1514,6 +1540,68 @@ mod tests {
         });
         swap.validate()
             .expect("well-formed MtmResetting swap should pass validate");
+    }
+
+    #[test]
+    fn scenario_price_shock_applies_through_the_override_channel() {
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+        use std::sync::Arc;
+
+        let base = Date::from_calendar_date(2024, Month::January, 3).expect("base date");
+        let curve = |id: &str, rate: f64| {
+            DiscountCurve::builder(CurveId::new(id))
+                .base_date(base)
+                .knots(vec![(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
+                .build()
+                .expect("discount curve")
+        };
+        let forward = |id: &str, rate: f64| {
+            ForwardCurve::builder(CurveId::new(id), 0.25)
+                .base_date(base)
+                .knots(vec![(0.0, rate), (5.0, rate)])
+                .build()
+                .expect("forward curve")
+        };
+        let provider = Arc::new(SimpleFxProvider::new());
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .expect("set EUR/USD rate");
+        let market = MarketContext::new()
+            .insert(curve("USD-OIS", 0.02))
+            .insert(curve("EUR-OIS", 0.01))
+            .insert(forward("USD-SOFR-3M", 0.02))
+            .insert(forward("EUR-EURIBOR-3M", 0.01))
+            .insert_fx(FxMatrix::new(provider));
+
+        let swap = XccySwap::example();
+        let unshocked = swap.value(&market, base).expect("unshocked value");
+        let mut shocked_swap = swap.clone();
+        shocked_swap
+            .get_scenario_pricing_overrides_mut()
+            .expect("XccySwap exposes scenario overrides")
+            .scenario_price_shock_pct = Some(-0.05);
+        let shocked = shocked_swap.value(&market, base).expect("shocked value");
+        // Reference: ScenarioPricingOverrides scales the PV by (1 + shock). The
+        // shock is applied to the raw PV before Money's decimal storage, so the
+        // two sides can differ in the last ulp (1e-12 relative).
+        let expected = unshocked.amount() * (1.0 + -0.05);
+        assert!(
+            (shocked.amount() - expected).abs() <= 1.0e-12 * expected.abs(),
+            "shocked {} vs expected {expected}",
+            shocked.amount()
+        );
+        assert!(unshocked.amount().abs() > 1.0, "non-trivial base PV");
+
+        let json = serde_json::to_value(&shocked_swap).expect("serialize");
+        assert_eq!(
+            json["scenario_pricing_overrides"]["scenario_price_shock_pct"],
+            -0.05
+        );
+        let unshocked_json = serde_json::to_value(&swap).expect("serialize");
+        assert!(unshocked_json.get("instrument_pricing_overrides").is_none());
+        assert!(unshocked_json.get("metric_pricing_overrides").is_none());
+        assert!(unshocked_json.get("scenario_pricing_overrides").is_none());
     }
 
     #[test]

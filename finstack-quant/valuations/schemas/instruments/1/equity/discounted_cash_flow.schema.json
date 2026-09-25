@@ -83,14 +83,14 @@
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "default": {},
-          "description": "Attributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "default": {
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "mid_year_convention": {
           "default": false,
@@ -105,7 +105,7 @@
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "shares_outstanding": {
           "default": null,
