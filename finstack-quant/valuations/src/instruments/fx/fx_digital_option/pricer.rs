@@ -12,19 +12,8 @@ use finstack_quant_core::Result;
 use finstack_quant_models::volatility::black::d1_d2;
 
 /// FX digital option calculator.
-#[derive(Debug, Clone)]
-pub(crate) struct FxDigitalOptionCalculator {
-    /// Days per year for theta scaling.
-    pub(crate) theta_days_per_year: f64,
-}
-
-impl Default for FxDigitalOptionCalculator {
-    fn default() -> Self {
-        Self {
-            theta_days_per_year: 365.0,
-        }
-    }
-}
+#[derive(Debug, Clone, Default)]
+pub(crate) struct FxDigitalOptionCalculator;
 
 pub(crate) fn compute_pv(
     inst: &FxDigitalOption,
@@ -35,7 +24,7 @@ pub(crate) fn compute_pv(
     if as_of > inst.expiry {
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
-    FxDigitalOptionCalculator::default().npv(inst, curves, as_of)
+    FxDigitalOptionCalculator.npv(inst, curves, as_of)
 }
 
 pub(crate) fn compute_greeks(
@@ -46,7 +35,7 @@ pub(crate) fn compute_greeks(
     if as_of > inst.expiry {
         return Ok(FxDigitalOptionGreeks::default());
     }
-    FxDigitalOptionCalculator::default().compute_greeks(inst, curves, as_of)
+    FxDigitalOptionCalculator.compute_greeks(inst, curves, as_of)
 }
 
 impl FxDigitalOptionCalculator {
@@ -115,7 +104,7 @@ impl FxDigitalOptionCalculator {
             inst.payout_type,
             inst.payout_amount.amount(),
             inst.notional.amount(),
-            self.theta_days_per_year,
+            inst.metric_pricing_overrides.theta_days_per_year(),
         )
     }
 
@@ -536,6 +525,26 @@ mod tests {
     }
 
     #[test]
+    fn theta_day_basis_scales_analytic_theta() {
+        // Annual theta / 365 (default) vs / 252: exact 365/252 ratio.
+        let as_of = date!(2025 - 01 - 02);
+        let market = build_market(as_of);
+        let calendar = build_option(date!(2025 - 07 - 02));
+        let mut trading = calendar.clone();
+        trading.metric_pricing_overrides.theta_day_basis =
+            Some(crate::instruments::ThetaDayBasis::Trading252);
+
+        let calendar_theta = compute_greeks(&calendar, &market, as_of)
+            .expect("calendar greeks")
+            .theta;
+        let trading_theta = compute_greeks(&trading, &market, as_of)
+            .expect("trading greeks")
+            .theta;
+        assert!(calendar_theta != 0.0);
+        assert!((trading_theta / calendar_theta - 365.0 / 252.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn zero_vol_digital_greeks_match_price_sensitivities() {
         let spot = 1.20_f64;
         let t = 1.0;
@@ -670,7 +679,7 @@ mod tests {
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.0);
-        let (spot, r_d, r_f, _, t) = FxDigitalOptionCalculator::default()
+        let (spot, r_d, r_f, _, t) = FxDigitalOptionCalculator
             .collect_inputs(&option, &market, as_of)
             .expect("inputs");
         option.strike = spot * ((r_d - r_f) * t).exp();

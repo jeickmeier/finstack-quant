@@ -260,6 +260,27 @@ fn test_theta_negative_for_long_option() {
 }
 
 #[test]
+fn test_theta_day_basis_scales_analytic_theta() {
+    // The analytic theta is annual theta / days-per-year, so switching
+    // `metric_pricing_overrides.theta_day_basis` from calendar_365 (default) to
+    // trading_252 scales it by exactly 365/252 (1e-12 relative: two divisions
+    // of the same annual theta).
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let calendar = build_call_option(as_of, expiry, 1.20, 1_000_000.0);
+    let mut trading = calendar.clone();
+    trading.metric_pricing_overrides.theta_day_basis =
+        Some(finstack_quant_valuations::instruments::ThetaDayBasis::Trading252);
+    let market = build_market_context(as_of, MarketParams::atm());
+
+    let calendar_theta = compute_greeks(&calendar, &market, as_of).theta;
+    let trading_theta = compute_greeks(&trading, &market, as_of).theta;
+
+    assert!(calendar_theta != 0.0);
+    assert!((trading_theta / calendar_theta - 365.0 / 252.0).abs() < 1e-12);
+}
+
+#[test]
 fn test_rho_has_expected_sign() {
     // Arrange: Call rho should be positive (benefits from higher domestic rates)
     let as_of = date!(2024 - 01 - 01);

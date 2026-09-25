@@ -426,7 +426,6 @@ class TestEquityOption:
         assert option.strike == 4500.0
         assert option.expiry == datetime.date(2024, 6, 21)
         assert option.day_count == "act_365f"
-        assert option.theta_day_basis == "calendar_365"
         assert option.settlement == "cash"
         assert option.exercise is None
         assert option.div_yield_id == "EQUITY-DIVYIELD"

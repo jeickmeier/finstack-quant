@@ -359,9 +359,6 @@ def test_bond_constructors_and_examples() -> None:
         currency="USD",
     )
     assert frn.has_floating_coupons
-    # The index lives in the floating cashflow spec; ``forward_curve_id`` is an
-    # explicit instrument-level override that these constructors leave unset.
-    assert frn.forward_curve_id is None
     assert frn.cashflow_spec["floating"]["rate_spec"]["index_id"] == "USD-SOFR-3M"
     frn_eur = Bond.floating_with_convention(
         "FRN-EUR",
@@ -493,7 +490,9 @@ def test_bond_getters_and_pricing_helpers() -> None:
     assert isinstance(bond.attributes, Attributes)
     assert bond.default_model == "discounting"
     assert "curves" in bond.market_dependencies()
-    result = bond.price(_market(), AS_OF, metrics=["ytm", "dv01"], pricing_options={"theta_period": "1D"})
+    result = bond.price(
+        _market(), AS_OF, metrics=["ytm", "dv01"], pricing_options={"theta_period": {"count": 1, "unit": "days"}}
+    )
     assert result.get_metric("ytm") is not None
     assert bond.metric(_market(), AS_OF, "ytm") == pytest.approx(result.get_metric("ytm"))
     assert bond.id in repr(bond)

@@ -101,10 +101,10 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         // below (built from the t=0 short rate) only supply the constant
         // factors; their probabilities are replaced by the per-step set.
         let params = match tree_type {
-            ConvertibleTreeType::Binomial(_) => {
+            ConvertibleTreeType::Binomial => {
                 EvolutionParams::equity_crr(volatility, risk_free_rate, dividend_yield, dt)?
             }
-            ConvertibleTreeType::Trinomial(_) => {
+            ConvertibleTreeType::Trinomial => {
                 EvolutionParams::equity_trinomial(volatility, risk_free_rate, dividend_yield, dt)?
             }
         };
@@ -137,12 +137,12 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         let trinomial_middle = params.middle_factor.unwrap_or(1.0);
         let get_spot = |step: usize, node: usize| -> f64 {
             match tree_type {
-                ConvertibleTreeType::Binomial(_) => {
+                ConvertibleTreeType::Binomial => {
                     let ups = node as i32;
                     let downs = step as i32 - node as i32;
                     spot * params.up_factor.powi(ups) * params.down_factor.powi(downs)
                 }
-                ConvertibleTreeType::Trinomial(_) => {
+                ConvertibleTreeType::Trinomial => {
                     let net_moves = node as i32 - step as i32;
                     // `powi` accepts negative exponents (u^(-k) = 1/u^k), so
                     // this is correct for both up and down net moves.
@@ -154,8 +154,8 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
         // 1. Terminal Step
         let num_nodes = match tree_type {
-            ConvertibleTreeType::Binomial(n) => n + 1,
-            ConvertibleTreeType::Trinomial(n) => 2 * n + 1,
+            ConvertibleTreeType::Binomial => self.steps + 1,
+            ConvertibleTreeType::Trinomial => 2 * self.steps + 1,
         };
 
         let mandatory = self.valuator.conversion_is_mandatory();
@@ -217,8 +217,8 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         let mut next_values: Vec<(f64, f64)> = Vec::with_capacity(values.len());
         for step in (0..self.steps).rev() {
             let current_num_nodes = match tree_type {
-                ConvertibleTreeType::Binomial(_) => step + 1,
-                ConvertibleTreeType::Trinomial(_) => 2 * step + 1,
+                ConvertibleTreeType::Binomial => step + 1,
+                ConvertibleTreeType::Trinomial => 2 * step + 1,
             };
 
             // Per-step discount factors from full term structure, and the
@@ -237,7 +237,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
             for i in 0..current_num_nodes {
                 let (exp_total, exp_cash) = match tree_type {
-                    ConvertibleTreeType::Binomial(_) => {
+                    ConvertibleTreeType::Binomial => {
                         let (v_up, c_up) = values[i + 1];
                         let (v_down, c_down) = values[i];
 
@@ -246,7 +246,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                             sp.prob_up * c_up + sp.prob_down * c_down,
                         )
                     }
-                    ConvertibleTreeType::Trinomial(_) => {
+                    ConvertibleTreeType::Trinomial => {
                         let (v_up, c_up) = values[i + 2];
                         let (v_mid, c_mid) = values[i + 1];
                         let (v_down, c_down) = values[i];

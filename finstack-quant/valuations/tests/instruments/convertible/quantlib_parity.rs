@@ -16,6 +16,7 @@
 //! Note: QuantLib uses tree-based pricing engines (Binomial or Trinomial) for convertibles
 //! to properly capture the embedded equity option and early exercise features.
 
+use super::fixtures::with_tree_steps;
 use crate::parity::ParityConfig;
 use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec};
 use finstack_quant_core::currency::Currency;
@@ -156,8 +157,13 @@ fn quantlib_parity_basic_convertible() {
 
     let market = create_convertible_market(base, spot, volatility, 0.02, risk_free_rate);
 
-    let price =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(100), base).unwrap();
+    let price = price_convertible_bond(
+        &with_tree_steps(&bond, 100),
+        &market,
+        ConvertibleTreeType::Binomial,
+        base,
+    )
+    .unwrap();
 
     // QuantLib expectation:
     // Conversion value = 100 * 10 = $1,000
@@ -289,9 +295,9 @@ fn quantlib_parity_delta_in_the_money() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         base,
     )
@@ -335,9 +341,9 @@ fn quantlib_parity_delta_out_of_the_money() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         base,
     )
@@ -374,9 +380,9 @@ fn quantlib_parity_gamma() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         base,
     )
@@ -408,9 +414,9 @@ fn quantlib_parity_vega() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         base,
     )
@@ -441,9 +447,9 @@ fn quantlib_parity_theta() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         base,
     )
@@ -480,9 +486,9 @@ fn quantlib_parity_rho() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         base,
     )
@@ -529,16 +535,16 @@ fn quantlib_parity_callable_convertible() {
     let market = create_convertible_market(base, 150.0, 0.25, 0.02, 0.03);
 
     let plain_price = price_convertible_bond(
-        &plain_bond,
+        &with_tree_steps(&plain_bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
     let callable_price = price_convertible_bond(
-        &callable_bond,
+        &with_tree_steps(&callable_bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
@@ -585,16 +591,16 @@ fn quantlib_parity_puttable_convertible() {
     let market = create_convertible_market(base, 50.0, 0.25, 0.02, 0.03);
 
     let plain_price = price_convertible_bond(
-        &plain_bond,
+        &with_tree_steps(&plain_bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
     let puttable_price = price_convertible_bond(
-        &puttable_bond,
+        &with_tree_steps(&puttable_bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
@@ -653,9 +659,9 @@ fn quantlib_parity_zero_coupon_convertible() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let price = price_convertible_bond(
-        &zero_coupon,
+        &with_tree_steps(&zero_coupon, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
@@ -689,9 +695,9 @@ fn quantlib_parity_volatility_sensitivity() {
     // Low volatility
     let market_low_vol = create_convertible_market(base, spot, 0.10, 0.02, 0.03);
     let price_low_vol = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market_low_vol,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
@@ -699,9 +705,9 @@ fn quantlib_parity_volatility_sensitivity() {
     // High volatility
     let market_high_vol = create_convertible_market(base, spot, 0.40, 0.02, 0.03);
     let price_high_vol = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market_high_vol,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
@@ -729,9 +735,9 @@ fn quantlib_parity_tree_convergence() {
     let market = create_convertible_market(base, 100.0, 0.25, 0.02, 0.03);
 
     let binomial_price =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(200), base).unwrap();
+        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, base).unwrap();
     let trinomial_price =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial(200), base).unwrap();
+        price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial, base).unwrap();
 
     // QuantLib expectation: With enough steps, both methods converge
     let diff_pct =
@@ -805,8 +811,13 @@ fn quantlib_parity_deep_itm() {
     );
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
-    let price =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(100), base).unwrap();
+    let price = price_convertible_bond(
+        &with_tree_steps(&bond, 100),
+        &market,
+        ConvertibleTreeType::Binomial,
+        base,
+    )
+    .unwrap();
     let conversion_value = spot * conversion_ratio;
 
     // QuantLib expectation: Deep ITM should price close to conversion value
@@ -843,8 +854,13 @@ fn quantlib_parity_deep_otm() {
     );
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
-    let price =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(100), base).unwrap();
+    let price = price_convertible_bond(
+        &with_tree_steps(&bond, 100),
+        &market,
+        ConvertibleTreeType::Binomial,
+        base,
+    )
+    .unwrap();
 
     // QuantLib expectation: Deep OTM should trade closer to bond floor
     // Bond floor (approx): PV of 5% coupons + principal at 3% discount ≈ $1,090
@@ -932,9 +948,9 @@ fn quantlib_parity_mandatory_conversion() {
     let market = create_convertible_market(base, spot, 0.25, 0.02, 0.03);
 
     let price = price_convertible_bond(
-        &mandatory_bond,
+        &with_tree_steps(&mandatory_bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();
@@ -1022,9 +1038,9 @@ fn quantlib_parity_window_conversion() {
     let market = create_convertible_market(base, 150.0, 0.25, 0.02, 0.03);
 
     let price = price_convertible_bond(
-        &window_bond,
+        &with_tree_steps(&window_bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         base,
     )
     .unwrap();

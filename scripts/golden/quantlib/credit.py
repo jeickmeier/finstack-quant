@@ -163,12 +163,6 @@ def build_single_name_cds() -> dict[str, Any]:
                     "recovery_rate": RECOVERY,
                     "settlement_delay": 0,
                 },
-                "instrument_pricing_overrides": {
-                    "model_config": {
-                        "cds_aod_half_day_bias": True,
-                        "cds_act360_include_last_day": True,
-                    },
-                },
                 "valuation_convention": "quant_lib_isda_parity",
                 "doc_clause": "xr14",
                 "protection_effective_date": CDS_VALUATION_DATE,

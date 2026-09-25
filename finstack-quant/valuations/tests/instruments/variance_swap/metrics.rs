@@ -216,7 +216,7 @@ fn test_realized_variance_matches_series_calculation() {
         .unwrap();
 
     // Assert - RealizedVarianceCalculator uses swap's annualization (252 trading days for equity)
-    let annualization_factor = swap.annualization_factor_with_policy(&ctx);
+    let annualization_factor = swap.annualization_factor();
 
     let used_prices: Vec<f64> = prices
         .iter()

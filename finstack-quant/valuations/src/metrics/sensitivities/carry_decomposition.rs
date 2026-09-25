@@ -31,12 +31,9 @@ pub(crate) struct CarryDecompositionCalculator;
 impl MetricCalculator for CarryDecompositionCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let expiry_date = theta_termination_date(context)?;
-        let period_str = context
-            .get_metric_overrides()
-            .and_then(|po| po.theta_period.as_deref())
-            .unwrap_or("1D");
+        let period = crate::metrics::theta_period(context);
 
-        let rolled_date = calculate_theta_date(context.as_of, period_str, expiry_date)?;
+        let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
         if rolled_date <= context.as_of {
             context.computed.insert(MetricId::CouponIncome, 0.0);
@@ -271,7 +268,7 @@ mod tests {
         bond: Bond,
         market: MarketContext,
         as_of: finstack_quant_core::dates::Date,
-        theta_period: &str,
+        theta_period: Tenor,
         ytm: Option<f64>,
     ) -> MetricContext {
         let instrument: Arc<dyn Instrument> = Arc::new(bond);
@@ -283,8 +280,8 @@ mod tests {
             base_value,
             Arc::new(FinstackConfig::default()),
         );
-        let overrides = crate::instruments::MetricPricingOverrides::default()
-            .with_theta_period(theta_period.to_string());
+        let overrides =
+            crate::instruments::MetricPricingOverrides::default().with_theta_period(theta_period);
         context.set_metric_overrides(Some(overrides));
         if let Some(ytm) = ytm {
             context.computed.insert(MetricId::Ytm, ytm);
@@ -294,10 +291,12 @@ mod tests {
 
     #[test]
     fn test_zero_horizon_sets_all_components_to_zero() {
-        let as_of = date!(2025 - 01 - 15);
+        // Valued on its maturity date, the horizon is capped at expiry and
+        // no time elapses.
+        let as_of = date!(2026 - 01 - 15);
         let bond = zero_coupon_bond();
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
-        let mut context = context_for(bond, market, as_of, "0D", Some(0.05));
+        let mut context = context_for(bond, market, as_of, Tenor::daily(), Some(0.05));
 
         let total = CarryDecompositionCalculator
             .calculate(&mut context)
@@ -325,7 +324,7 @@ mod tests {
         let bond = act365_semi_bond("ZERO365", 0.0, as_of, date!(2026 - 01 - 15));
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
         let ytm = street_equivalent_yield(0.05);
-        let mut context = context_for(bond, market, as_of, "1M", Some(ytm));
+        let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(ytm));
         let base_pv = context.base_value.amount();
 
         let total = CarryDecompositionCalculator
@@ -383,7 +382,7 @@ mod tests {
         let bond = act365_semi_bond("CPN5", 0.05, date!(2025 - 01 - 15), date!(2030 - 01 - 15));
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
         let ytm = street_equivalent_yield(0.05);
-        let mut context = context_for(bond, market, as_of, "6M", Some(ytm));
+        let mut context = context_for(bond, market, as_of, Tenor::semi_annual(), Some(ytm));
 
         let total = CarryDecompositionCalculator
             .calculate(&mut context)
@@ -428,7 +427,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let bond = zero_coupon_bond();
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
-        let mut context = context_for(bond, market, as_of, "1M", None);
+        let mut context = context_for(bond, market, as_of, Tenor::monthly(), None);
 
         CarryDecompositionCalculator
             .calculate(&mut context)
@@ -446,7 +445,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let bond = zero_coupon_bond();
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
-        let mut context = context_for(bond, market, as_of, "1M", None);
+        let mut context = context_for(bond, market, as_of, Tenor::monthly(), None);
 
         CarryDecompositionCalculator
             .calculate(&mut context)
@@ -478,7 +477,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let bond = zero_coupon_bond();
         let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
-        let mut context = context_for(bond, market, as_of, "1M", Some(0.05));
+        let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
 
         CarryDecompositionCalculator
             .calculate(&mut context)
@@ -501,15 +500,19 @@ mod tests {
         let market = MarketContext::new()
             .insert(flat_discount_curve("USD-OIS", 0.05, as_of))
             .insert(flat_discount_curve("USD-REPO", 0.02, as_of));
-        let mut context = context_for(bond, market, as_of, "1M", Some(0.05));
+        let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
         context.day_count = Some(DayCount::Thirty360);
 
         CarryDecompositionCalculator
             .calculate(&mut context)
             .expect("carry decomposition should calculate");
 
-        let rolled = crate::metrics::calculate_theta_date(as_of, "1M", Some(date!(2026 - 01 - 15)))
-            .expect("rolled date");
+        let rolled = crate::metrics::calculate_theta_date(
+            as_of,
+            Tenor::monthly(),
+            Some(date!(2026 - 01 - 15)),
+        )
+        .expect("rolled date");
         let expected_dcf = DayCount::Thirty360
             .year_fraction(as_of, rolled, DayCountContext::default())
             .expect("year fraction");
@@ -536,7 +539,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(flat_discount_curve("USD-OIS", 0.05, as_of))
             .insert(flat_discount_curve("USD-REPO", 0.02, as_of));
-        let mut context = context_for(bond, market, as_of, "1M", Some(0.05));
+        let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
 
         let err = CarryDecompositionCalculator
             .calculate(&mut context)

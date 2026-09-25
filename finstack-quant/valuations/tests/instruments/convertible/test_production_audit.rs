@@ -1,6 +1,6 @@
 //! Independent convertible exercise, source-resolution and metric contracts.
 
-use super::fixtures::{create_floating_convertible, create_standard_convertible};
+use super::fixtures::{create_floating_convertible, create_standard_convertible, with_tree_steps};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -48,10 +48,11 @@ fn production_convertible_clean_call_includes_accrued() {
         }],
         puts: vec![],
     });
+    bond.instrument_pricing_overrides.model_config.tree_steps = Some(100);
     let expected = 1000.0 + 50.0 * 90.0 / 365.0;
     for tree in [
-        ConvertibleTreeType::Binomial(100),
-        ConvertibleTreeType::Trinomial(100),
+        ConvertibleTreeType::Binomial,
+        ConvertibleTreeType::Trinomial,
     ] {
         let actual = price_convertible_bond(&bond, &market(as_of, 0.0, 1.0, 0.2), tree, as_of)
             .expect("callable value")
@@ -78,10 +79,11 @@ fn production_convertible_clean_put_includes_accrued() {
             make_whole: None,
         }],
     });
+    bond.instrument_pricing_overrides.model_config.tree_steps = Some(100);
     let expected = 1200.0 + 50.0 * 90.0 / 365.0;
     for tree in [
-        ConvertibleTreeType::Binomial(100),
-        ConvertibleTreeType::Trinomial(100),
+        ConvertibleTreeType::Binomial,
+        ConvertibleTreeType::Trinomial,
     ] {
         let actual = price_convertible_bond(&bond, &market(as_of, 0.0, 1.0, 0.2), tree, as_of)
             .expect("puttable value")
@@ -140,9 +142,9 @@ fn production_convertible_coupon_date_call_does_not_duplicate_coupon() {
             .schedule
             .day_count = day_count;
         let actual = price_convertible_bond(
-            &bond,
+            &with_tree_steps(&bond, 365),
             &market(as_of, 0.0, 1.0, 0.2),
-            ConvertibleTreeType::Binomial(365),
+            ConvertibleTreeType::Binomial,
             as_of,
         )
         .expect("coupon-date exercise")
@@ -501,14 +503,18 @@ fn production_convertible_implied_vol_preserves_selected_engine() {
                 instrument,
                 InstrumentType::Convertible,
             )?;
-            let value =
-                price_convertible_bond(bond, market, ConvertibleTreeType::Trinomial(17), as_of)
-                    .map_err(|error| {
-                        PricingError::model_failure_with_context(
-                            error.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?;
+            let value = price_convertible_bond(
+                &with_tree_steps(bond, 17),
+                market,
+                ConvertibleTreeType::Trinomial,
+                as_of,
+            )
+            .map_err(|error| {
+                PricingError::model_failure_with_context(
+                    error.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
             Ok(ValuationResult::stamped(bond.id(), as_of, value))
         }
     }
@@ -516,9 +522,14 @@ fn production_convertible_implied_vol_preserves_selected_engine() {
     let mut bond = create_standard_convertible();
     bond.fixed_coupon = None;
     let ctx = market(as_of, 0.0, 90.0, 0.4);
-    let target = price_convertible_bond(&bond, &ctx, ConvertibleTreeType::Trinomial(17), as_of)
-        .expect("selected target")
-        .amount();
+    let target = price_convertible_bond(
+        &with_tree_steps(&bond, 17),
+        &ctx,
+        ConvertibleTreeType::Trinomial,
+        as_of,
+    )
+    .expect("selected target")
+    .amount();
     bond.instrument_pricing_overrides
         .market_quotes
         .quoted_clean_price_pct = Some(target / 10.0);

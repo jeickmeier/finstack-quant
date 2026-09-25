@@ -282,7 +282,7 @@ pub use common_impl::parameters::trs_common::{TrsScheduleSpec, TrsSide};
 pub mod pricing_overrides;
 pub use pricing_overrides::{
     BondRiskBasis, BumpConfig, InstrumentPricingOverrides, MarketQuoteOverrides,
-    MetricPricingOverrides, ModelConfig, ScenarioPricingOverrides,
+    MetricPricingOverrides, ModelConfig, ScenarioPricingOverrides, ThetaDayBasis,
 };
 
 pub mod json_loader;

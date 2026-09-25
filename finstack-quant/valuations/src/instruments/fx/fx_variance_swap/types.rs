@@ -19,6 +19,10 @@ fn default_observation_business_day_convention() -> BusinessDayConvention {
     BusinessDayConvention::Following
 }
 
+fn default_trading_days_per_year() -> f64 {
+    crate::constants::TRADING_DAYS_PER_YEAR
+}
+
 /// FX variance swap instrument.
 ///
 /// Payoff: Notional * (Realized Variance - Strike Variance)
@@ -87,6 +91,15 @@ pub struct FxVarianceSwap {
     #[serde(default)]
     #[builder(default)]
     pub realized_var_method: RealizedVarMethod,
+    /// Trading days per year used to annualise daily realized variance.
+    ///
+    /// A contract term of the variance-swap confirmation: daily observations
+    /// are annualised by `trading_days_per_year / observation_frequency.count()`.
+    /// Must be finite and positive. Defaults to
+    /// [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+    #[serde(default = "default_trading_days_per_year")]
+    #[builder(default = crate::constants::TRADING_DAYS_PER_YEAR)]
+    pub trading_days_per_year: f64,
     /// Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
     /// Defaults to `spot_id` (or currency-pair string) when absent.
     #[serde(default)]
@@ -173,6 +186,12 @@ impl FxVarianceSwap {
             return Err(finstack_quant_core::Error::Validation(
                 "FxVarianceSwap observation frequency must be positive".to_string(),
             ));
+        }
+        if !self.trading_days_per_year.is_finite() || self.trading_days_per_year <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxVarianceSwap trading_days_per_year must be finite and positive, got {}",
+                self.trading_days_per_year
+            )));
         }
         Ok(())
     }

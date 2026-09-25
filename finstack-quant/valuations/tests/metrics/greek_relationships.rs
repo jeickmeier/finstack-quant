@@ -35,7 +35,6 @@ fn create_test_option(expiry: Date, strike: f64, option_type: OptionType) -> Equ
         expiry,
         notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
-        theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
         exercise: None,
         discount_curve_id: "USD-OIS".into(),

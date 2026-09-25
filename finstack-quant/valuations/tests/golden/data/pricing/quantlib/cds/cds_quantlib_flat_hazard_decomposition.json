@@ -31,12 +31,6 @@
         "convention": "isda_na",
         "doc_clause": "xr14",
         "id": "QL-FLAT-HAZARD-CDS-5Y-20260105",
-        "instrument_pricing_overrides": {
-          "model_config": {
-            "cds_act360_include_last_day": true,
-            "cds_aod_half_day_bias": true
-          }
-        },
         "notional": {
           "amount": "10000000",
           "currency": "USD"

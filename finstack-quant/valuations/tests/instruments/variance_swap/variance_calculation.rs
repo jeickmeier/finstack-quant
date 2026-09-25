@@ -162,14 +162,12 @@ fn test_partial_realized_variance_matches_manual_calculation() {
 }
 
 #[test]
-fn test_partial_realized_variance_uses_policy_annualization() {
+fn test_partial_realized_variance_uses_contract_annualization() {
     // Arrange
-    let swap = sample_swap(PayReceive::Receive);
+    let mut swap = sample_swap(PayReceive::Receive);
+    swap.trading_days_per_year = 260.0;
     let prices = price_series(&swap, 5_000.0, 3.0);
-    let ctx = add_series(
-        add_unitless(base_context(), "TRADING_DAYS_PER_YEAR", 260.0),
-        &prices,
-    );
+    let ctx = add_series(base_context(), &prices);
     let as_of = date(2025, 2, 1);
 
     // Act
@@ -185,7 +183,7 @@ fn test_partial_realized_variance_uses_policy_annualization() {
     let manual_260 = realized_variance(&used_prices, RealizedVarMethod::CloseToClose, 260.0)
         .expect("CloseToClose should succeed");
 
-    // The policy override should be applied
+    // The contract annualisation factor should be applied
     assert!((realized - manual_260).abs() < EPSILON);
 }
 

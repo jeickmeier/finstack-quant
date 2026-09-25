@@ -21,15 +21,14 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::types::CurveId;
 use rust_decimal::prelude::ToPrimitive;
 
-/// Forward curve for the asset-swap floating leg: the explicit
-/// `model_config.asw_forward_curve_id` override, else the bond's own
-/// `forward_curve_id`. `None` selects the discount-ratio fallback.
+/// Forward curve for the asset-swap floating leg:
+/// `instrument_pricing_overrides.model_config.asw_forward_curve_id`. `None`
+/// selects the discount-ratio fallback.
 pub(crate) fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
     bond.instrument_pricing_overrides
         .model_config
         .asw_forward_curve_id
         .clone()
-        .or_else(|| bond.forward_curve_id.clone())
 }
 
 /// Asset swap par spread calculator using discount-curve annuity approximation.

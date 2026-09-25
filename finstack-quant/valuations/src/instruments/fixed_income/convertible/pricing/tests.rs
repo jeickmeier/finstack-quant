@@ -1,7 +1,7 @@
 use super::{
     calculate_accrued_interest, calculate_convertible_greeks, calculate_parity,
     compute_conversion_value, prepare_for_pricing, price_convertible_bond, settlement_date,
-    ConvertibleBondValuator, ConvertibleTreeType,
+    ConvertibleBondValuator, ConvertibleTreeType, DEFAULT_CONVERTIBLE_TREE_STEPS,
 };
 use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
@@ -16,6 +16,13 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use time::Month;
+
+/// Clone `bond` with `instrument_pricing_overrides.model_config.tree_steps` set.
+fn with_tree_steps(bond: &ConvertibleBond, steps: usize) -> ConvertibleBond {
+    let mut bond = bond.clone();
+    bond.instrument_pricing_overrides.model_config.tree_steps = Some(steps);
+    bond
+}
 
 fn create_test_bond() -> ConvertibleBond {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -161,8 +168,8 @@ fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
 
     let expected = 10.0 * 5000.0;
     for tree in [
-        ConvertibleTreeType::Binomial(200),
-        ConvertibleTreeType::Trinomial(200),
+        ConvertibleTreeType::Binomial,
+        ConvertibleTreeType::Trinomial,
     ] {
         let price = price_convertible_bond(&bond, &market, tree, issue)
             .expect("should price")
@@ -229,8 +236,8 @@ fn dividend_protection_restores_parity_independent_of_yield() {
             bond.conversion.dividend_adjustment = adjustment.clone();
             let market = market_with_yield(q);
             for tree in [
-                ConvertibleTreeType::Binomial(200),
-                ConvertibleTreeType::Trinomial(200),
+                ConvertibleTreeType::Binomial,
+                ConvertibleTreeType::Trinomial,
             ] {
                 let price = price_convertible_bond(&bond, &market, tree, issue)
                     .expect("should price")
@@ -250,10 +257,9 @@ fn dividend_protection_restores_parity_independent_of_yield() {
     // price must fall to ~parity * e^{-qT} (materially below parity).
     bond.conversion.dividend_adjustment = DividendAdjustment::None;
     let market = market_with_yield(0.06);
-    let unprotected =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(200), issue)
-            .expect("should price")
-            .amount();
+    let unprotected = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, issue)
+        .expect("should price")
+        .amount();
     let ttm = DayCount::Act365F
         .year_fraction(issue, bond.maturity, Default::default())
         .expect("year fraction");
@@ -285,9 +291,9 @@ fn test_convertible_bond_pricing() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market_context,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         as_of,
     );
 
@@ -306,9 +312,9 @@ fn test_convertible_pricing_at_maturity_uses_payoff() {
     let as_of = bond.maturity;
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 10),
         &market_context,
-        ConvertibleTreeType::Binomial(10),
+        ConvertibleTreeType::Binomial,
         as_of,
     )
     .expect("should price");
@@ -324,9 +330,9 @@ fn test_convertible_greeks_calculation() {
 
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market_context,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         as_of,
     );
@@ -371,7 +377,8 @@ fn theta_rolls_the_discount_curve() {
         .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
-    let tree = ConvertibleTreeType::Binomial(80);
+    let bond = with_tree_steps(&bond, 80);
+    let tree = ConvertibleTreeType::Binomial;
     let greeks = calculate_convertible_greeks(&bond, &market, tree, GreekBumps::default(), as_of)
         .expect("greeks");
     assert!(greeks.theta.is_finite(), "theta must be finite");
@@ -454,9 +461,13 @@ fn test_mandatory_conversion_forced_at_loss() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     // At maturity: forced conversion at loss
-    let price_at_mat =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(10), maturity)
-            .expect("should price");
+    let price_at_mat = price_convertible_bond(
+        &with_tree_steps(&bond, 10),
+        &market,
+        ConvertibleTreeType::Binomial,
+        maturity,
+    )
+    .expect("should price");
 
     // conversion_value = 50 * 10 = 500 (must convert, can't choose 1000 redemption)
     assert!(
@@ -466,9 +477,13 @@ fn test_mandatory_conversion_forced_at_loss() {
     );
 
     // Before maturity: should be below straight bond floor due to forced conversion risk
-    let price_before =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(50), issue)
-            .expect("should price");
+    let price_before = price_convertible_bond(
+        &with_tree_steps(&bond, 50),
+        &market,
+        ConvertibleTreeType::Binomial,
+        issue,
+    )
+    .expect("should price");
 
     assert!(
         price_before.amount() < 1000.0,
@@ -535,8 +550,13 @@ fn call_branch_does_not_force_disallowed_conversion() {
         .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
-    let price = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(60), as_of)
-        .expect("should price");
+    let price = price_convertible_bond(
+        &with_tree_steps(&bond, 60),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("should price");
 
     let conversion_value = 10.0 * 5000.0; // ratio × spot = 50,000
     let call_price = 1000.0 * 1.02; // 102% of par = 1,020
@@ -616,8 +636,13 @@ fn test_thirty_360_day_count_corporate_convention() {
     let market = create_test_market_context();
     let as_of = issue;
 
-    let price = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(50), as_of)
-        .expect("30/360 should price successfully");
+    let price = price_convertible_bond(
+        &with_tree_steps(&bond, 50),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("30/360 should price successfully");
 
     // Same economics as Act365F, should be in similar range
     let conversion_value = 150.0 * 10.0;
@@ -654,14 +679,22 @@ fn trinomial_spot_grid_well_formed_matches_binomial() {
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-    let binomial =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(400), as_of)
-            .expect("binomial price")
-            .amount();
-    let trinomial =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial(400), as_of)
-            .expect("trinomial price")
-            .amount();
+    let binomial = price_convertible_bond(
+        &with_tree_steps(&bond, 400),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("binomial price")
+    .amount();
+    let trinomial = price_convertible_bond(
+        &with_tree_steps(&bond, 400),
+        &market,
+        ConvertibleTreeType::Trinomial,
+        as_of,
+    )
+    .expect("trinomial price")
+    .amount();
 
     // Both lattices discretize the same process; with 400 steps they must
     // agree closely. A malformed trinomial grid would diverge sharply.
@@ -690,8 +723,13 @@ fn mandatory_variable_inverted_bounds_rejected_at_pricing() {
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-    let err = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(50), as_of)
-        .expect_err("inverted bounds must be rejected");
+    let err = price_convertible_bond(
+        &with_tree_steps(&bond, 50),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect_err("inverted bounds must be rejected");
     let msg = format!("{err}");
     assert!(
         msg.contains("inverted") && msg.contains("120") && msg.contains("80"),
@@ -723,7 +761,7 @@ fn convertible_recovery_rate_out_of_bounds_errors() {
     let mut bond = create_test_bond();
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::June, 1).expect("valid date");
-    let tree_type = ConvertibleTreeType::Binomial(50);
+    let tree_type = ConvertibleTreeType::Binomial;
 
     // Above 1.0 — previously clamped to 1.0, now rejected.
     bond.recovery_rate = Some(1.5);
@@ -767,7 +805,7 @@ fn put_at_maturity_floors_terminal_payoff() {
 
     let as_of = Date::from_calendar_date(2025, Month::June, 1).expect("valid date");
     let market = create_test_market_context();
-    let tree_type = ConvertibleTreeType::Binomial(200);
+    let tree_type = ConvertibleTreeType::Binomial;
 
     // Deep OTM equity so conversion never binds: conversion value = 5 * 10 = 50
     // against a 1000 face. The bond is a pure debt instrument here.
@@ -821,9 +859,9 @@ fn theta_propagates_market_roll_failure() {
     assert!(market.roll_forward(1).is_err(), "fixture must fail to roll");
 
     let result = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         as_of,
     );
@@ -862,4 +900,48 @@ fn registry_greeks_match_single_greeks_run() {
     ] {
         assert_eq!(result.measures.get(key).copied(), Some(expected), "{key}");
     }
+}
+
+/// `model_config.tree_steps` sets the lattice size for every convertible
+/// pricing path; unset it is the 200-step default.
+#[test]
+fn tree_steps_come_from_model_config() {
+    use crate::instruments::Instrument;
+
+    let bond = create_test_bond();
+    let market = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::June, 1).expect("valid date");
+
+    let default_pv = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, as_of)
+        .expect("default tree prices")
+        .amount();
+    let explicit_200 = price_convertible_bond(
+        &with_tree_steps(&bond, DEFAULT_CONVERTIBLE_TREE_STEPS),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("200-step tree prices")
+    .amount();
+    assert_eq!(default_pv.to_bits(), explicit_200.to_bits());
+
+    let coarse = with_tree_steps(&bond, 25);
+    let coarse_pv = price_convertible_bond(&coarse, &market, ConvertibleTreeType::Binomial, as_of)
+        .expect("25-step tree prices")
+        .amount();
+    assert_ne!(coarse_pv.to_bits(), default_pv.to_bits());
+    // The registry pricer (Instrument::value) reads the same override.
+    let registry_pv = coarse
+        .value(&market, as_of)
+        .expect("registry value")
+        .amount();
+    assert_eq!(registry_pv.to_bits(), coarse_pv.to_bits());
+
+    assert!(price_convertible_bond(
+        &with_tree_steps(&bond, 0),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .is_err());
 }

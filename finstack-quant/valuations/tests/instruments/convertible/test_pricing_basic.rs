@@ -19,9 +19,9 @@ fn test_conversion_value_itm() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -44,9 +44,9 @@ fn test_pricing_exceeds_bond_floor() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -74,9 +74,9 @@ fn test_pricing_respects_max_value() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -101,17 +101,17 @@ fn test_conversion_ratio_vs_price_equivalence() {
     let market = create_market_context();
 
     let price_ratio = price_convertible_bond(
-        &bond_ratio,
+        &with_tree_steps(&bond_ratio, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
 
     let price_price = price_convertible_bond(
-        &bond_price,
+        &with_tree_steps(&bond_price, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -133,9 +133,9 @@ fn test_zero_coupon_convertible_pricing() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -154,9 +154,9 @@ fn test_zero_coupon_convertible_pricing() {
     // Should be less than coupon-bearing convertible (all else equal)
     let coupon_bond = create_standard_convertible();
     let coupon_price = price_convertible_bond(
-        &coupon_bond,
+        &with_tree_steps(&coupon_bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -179,9 +179,9 @@ fn test_deep_itm_convertible() {
     );
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -208,9 +208,9 @@ fn test_deep_otm_convertible() {
     );
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -240,9 +240,9 @@ fn test_currency_consistency() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -260,9 +260,9 @@ fn test_reasonable_price_range() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();

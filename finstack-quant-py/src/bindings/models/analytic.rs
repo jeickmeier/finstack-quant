@@ -12,7 +12,7 @@
 //!   absolute (Bachelier) volatility in the units of the forward.
 //! - `expiry` is time to expiry in years.
 //! - Greeks use the canonical Rust scaling: `vega` and `rho_*` are per-1% move,
-//!   `theta` is per day under ACT/365 (use 252 day-count via `theta_days` if you
+//!   `theta` is per day under ACT/365 (use 252 day-count via `theta_days_per_year` if you
 //!   want a business-day convention).
 
 use crate::bindings::pandas_utils::{
@@ -43,7 +43,7 @@ const BS_GREEK_LABELS: [&str; 6] = ["delta", "gamma", "vega", "theta", "rho_r", 
 /// Black-Scholes / Garman-Kohlhagen Greeks for one European option (per unit).
 ///
 /// Returned by ``bs_greeks``. ``vega``, ``rho_r`` and ``rho_q`` are per 1%
-/// move; ``theta`` is per day under the ``theta_days`` basis passed to
+/// move; ``theta`` is per day under the ``theta_days_per_year`` basis passed to
 /// ``bs_greeks``; ``delta`` and ``gamma`` are per unit of spot.
 ///
 /// The object is immutable, compares by value, is picklable, and exposes
@@ -96,7 +96,7 @@ impl PyBsGreeks {
         self.inner.vega
     }
 
-    /// Theta per day under the ``theta_days`` basis (negative = decay).
+    /// Theta per day under the ``theta_days_per_year`` basis (negative = decay).
     #[getter]
     fn theta(&self) -> f64 {
         self.inner.theta
@@ -283,7 +283,7 @@ fn vanilla_expiry_payoff_wrapper(spot: f64, strike: f64, is_call: bool) -> PyRes
 ///
 /// Returns a ``BsGreeks`` value with ``delta``, ``gamma``, ``vega``, ``theta``,
 /// ``rho_r`` and ``rho_q``. ``vega`` and both rho values are per 1% move;
-/// ``theta`` is per day using the ``theta_days`` day-count (ACT/365 by default).
+/// ``theta`` is per day using the ``theta_days_per_year`` day-count (ACT/365 by default).
 ///
 /// Parameters
 /// ----------
@@ -301,7 +301,7 @@ fn vanilla_expiry_payoff_wrapper(spot: f64, strike: f64, is_call: bool) -> PyRes
 ///     Time to expiry in years; must be positive.
 /// is_call : bool
 ///     ``True`` for a call, ``False`` for a put.
-/// theta_days : float, optional
+/// theta_days_per_year : float, optional
 ///     Day-count denominator for per-day theta (default ``365.0``). Pass
 ///     ``252.0`` for business-day-scaled theta, ``360.0`` for ACT/360.
 ///
@@ -314,7 +314,7 @@ fn vanilla_expiry_payoff_wrapper(spot: f64, strike: f64, is_call: bool) -> PyRes
 /// ------
 /// ValueError
 ///     If any input is non-finite; ``spot`` or ``strike`` is non-positive;
-///     ``vol``, ``expiry`` or ``theta_days`` is non-positive; or a Greek is
+///     ``vol``, ``expiry`` or ``theta_days_per_year`` is non-positive; or a Greek is
 ///     non-finite.
 ///
 /// Examples
@@ -331,8 +331,8 @@ fn vanilla_expiry_payoff_wrapper(spot: f64, strike: f64, is_call: bool) -> PyRes
 /// - Garman-Kohlhagen (1983): see docs/REFERENCES.md#garman-kohlhagen-1983
 #[pyfunction(name = "bs_greeks")]
 #[pyo3(
-    signature = (spot, strike, rate, div_yield, vol, expiry, is_call, theta_days=DEFAULT_THETA_DAYS_PER_YEAR),
-    text_signature = "(spot, strike, rate, div_yield, vol, expiry, is_call, theta_days=365.0)"
+    signature = (spot, strike, rate, div_yield, vol, expiry, is_call, theta_days_per_year=DEFAULT_THETA_DAYS_PER_YEAR),
+    text_signature = "(spot, strike, rate, div_yield, vol, expiry, is_call, theta_days_per_year=365.0)"
 )]
 #[allow(clippy::too_many_arguments)]
 fn bs_greeks_wrapper(
@@ -343,9 +343,9 @@ fn bs_greeks_wrapper(
     vol: f64,
     expiry: f64,
     is_call: bool,
-    theta_days: f64,
+    theta_days_per_year: f64,
 ) -> PyResult<PyBsGreeks> {
-    // theta_days validation (finite, > 0) lives in `bs_greeks`.
+    // theta_days_per_year validation (finite, > 0) lives in `bs_greeks`.
     bs_greeks(
         spot,
         strike,
@@ -354,7 +354,7 @@ fn bs_greeks_wrapper(
         vol,
         expiry,
         OptionType::from(is_call),
-        theta_days,
+        theta_days_per_year,
     )
     .map(PyBsGreeks::from_inner)
     .map_err(core_to_py)

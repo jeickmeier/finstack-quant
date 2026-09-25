@@ -14,7 +14,6 @@ use finstack_quant_core::Result;
 use finstack_quant_models::closed_form::vanilla::{bs_greeks_unchecked, bs_price_unchecked};
 
 const STRIKE_ZERO_TOL: f64 = 1e-12;
-const THETA_DAYS_PER_YEAR: f64 = 365.0;
 
 pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
     inst.validate()?;
@@ -209,7 +208,7 @@ pub(crate) fn compute_greeks(
         sigma,
         t,
         inst.option_type,
-        THETA_DAYS_PER_YEAR,
+        inst.metric_pricing_overrides.theta_days_per_year(),
     );
     let d1 = finstack_quant_models::d1(spot, inst.strike, r_d, sigma, t, r_f);
     let d2 = d1 - sigma * t.sqrt();

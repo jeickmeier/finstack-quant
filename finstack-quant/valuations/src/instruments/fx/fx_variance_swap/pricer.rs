@@ -106,9 +106,9 @@ pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
         return 52.0 / f64::from(inst.observation_frequency.count());
     }
     if inst.observation_frequency.unit() == TenorUnit::Days {
-        return 252.0 / f64::from(inst.observation_frequency.count());
+        return inst.trading_days_per_year / f64::from(inst.observation_frequency.count());
     }
-    252.0
+    inst.trading_days_per_year
 }
 
 pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {

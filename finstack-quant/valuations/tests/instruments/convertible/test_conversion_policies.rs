@@ -23,9 +23,9 @@ fn test_voluntary_conversion_policy() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -45,9 +45,9 @@ fn test_mandatory_conversion_policy() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -72,9 +72,9 @@ fn test_window_conversion_policy() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 40),
         &market,
-        ConvertibleTreeType::Trinomial(40),
+        ConvertibleTreeType::Trinomial,
         dates::base_date(),
     )
     .unwrap();
@@ -101,17 +101,17 @@ fn test_window_vs_voluntary_pricing() {
     let market = create_market_context();
 
     let price_voluntary = price_convertible_bond(
-        &bond_voluntary,
+        &with_tree_steps(&bond_voluntary, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
 
     let price_window = price_convertible_bond(
-        &bond_window,
+        &with_tree_steps(&bond_window, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -132,9 +132,9 @@ fn test_event_triggered_conversion_qualified_ipo() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 30),
         &market,
-        ConvertibleTreeType::Binomial(30),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -156,9 +156,9 @@ fn test_event_triggered_conversion_change_of_control() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 30),
         &market,
-        ConvertibleTreeType::Binomial(30),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -181,9 +181,9 @@ fn test_event_triggered_conversion_price_trigger() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 30),
         &market,
-        ConvertibleTreeType::Binomial(30),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -202,9 +202,9 @@ fn test_mandatory_conversion_at_maturity() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -236,9 +236,9 @@ fn test_early_conversion_window() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 40),
         &market,
-        ConvertibleTreeType::Binomial(40),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -263,9 +263,9 @@ fn test_late_conversion_window() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 40),
         &market,
-        ConvertibleTreeType::Binomial(40),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -290,9 +290,9 @@ fn test_narrow_conversion_window() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -300,9 +300,9 @@ fn test_narrow_conversion_window() {
     // Narrow window should be worth less than voluntary
     let bond_voluntary = create_convertible_with_policy(ConversionPolicy::Voluntary);
     let price_voluntary = price_convertible_bond(
-        &bond_voluntary,
+        &with_tree_steps(&bond_voluntary, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -337,9 +337,9 @@ fn test_conversion_policy_with_itm_bond() {
     for (name, policy) in policies {
         let bond = create_convertible_with_policy(policy);
         let price = price_convertible_bond(
-            &bond,
+            &with_tree_steps(&bond, 50),
             &market,
-            ConvertibleTreeType::Binomial(50),
+            ConvertibleTreeType::Binomial,
             dates::base_date(),
         )
         .unwrap();
@@ -385,9 +385,9 @@ fn test_conversion_policy_with_otm_bond() {
     for (name, policy) in optional_policies {
         let bond = create_convertible_with_policy(policy);
         let price = price_convertible_bond(
-            &bond,
+            &with_tree_steps(&bond, 50),
             &market,
-            ConvertibleTreeType::Binomial(50),
+            ConvertibleTreeType::Binomial,
             dates::base_date(),
         )
         .unwrap();
@@ -408,9 +408,9 @@ fn test_conversion_policy_with_otm_bond() {
     let mandatory_bond =
         create_convertible_with_policy(ConversionPolicy::MandatoryOn(dates::mid_date()));
     let mandatory_price = price_convertible_bond(
-        &mandatory_bond,
+        &with_tree_steps(&mandatory_bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -450,9 +450,9 @@ fn test_all_conversion_policies_price_successfully() {
     for policy in policies {
         let bond = create_convertible_with_policy(policy);
         let result = price_convertible_bond(
-            &bond,
+            &with_tree_steps(&bond, 30),
             &market,
-            ConvertibleTreeType::Binomial(30),
+            ConvertibleTreeType::Binomial,
             dates::base_date(),
         );
 

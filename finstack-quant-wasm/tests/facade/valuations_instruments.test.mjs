@@ -262,8 +262,14 @@ test('validateInstrumentJson merges metric-pricing overrides before validation',
     () => valuations.instruments.validateInstrumentJson(json),
     (error) => error.name === 'FinstackError' && error.kind === 'validation'
   );
-  const prepared = valuations.instruments.validateInstrumentJson(json, '{"theta_period":"1W"}');
-  assert.equal(JSON.parse(prepared).instrument.spec.metric_pricing_overrides.theta_period, '1W');
+  const prepared = valuations.instruments.validateInstrumentJson(
+    json,
+    '{"theta_period":{"count":1,"unit":"weeks"}}',
+  );
+  assert.deepEqual(JSON.parse(prepared).instrument.spec.metric_pricing_overrides.theta_period, {
+    count: 1,
+    unit: 'weeks',
+  });
   assert.equal(valuations.instruments.validateInstrumentJson(prepared), prepared);
   assert.throws(
     () => valuations.instruments.validateInstrumentJson(json, '{'),

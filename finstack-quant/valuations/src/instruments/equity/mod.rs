@@ -121,9 +121,7 @@ pub use cliquet_option::CliquetOption;
 pub use dcf_equity::{DiscountedCashFlow, TerminalValueSpec};
 pub use equity_future::{EquityFuture, EquityFutureQuantoSpec};
 pub use equity_future_option::EquityFutureOption;
-pub use equity_option::{
-    EquityOption, EquityOptionExercise, EquityOptionMarketData, ThetaDayBasis,
-};
+pub use equity_option::{EquityOption, EquityOptionExercise, EquityOptionMarketData};
 pub use equity_total_return_future::EquityTotalReturnFuture;
 pub use equity_trs::{EquityTotalReturnSwap, TrsDividendSettlement};
 pub use pe_fund::PrivateMarketsFund;

@@ -37,16 +37,6 @@ pub enum IndexPricing {
     Constituents,
 }
 
-/// Par spread denominator method for indices in constituents mode.
-/// Method for computing par spread of a CDS index.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParSpreadMethod {
-    /// Par spread computed using risky annuity (RPV01) method
-    RiskyAnnuity,
-    /// Par spread with full premium and accrual-on-default
-    FullPremiumAoD,
-}
-
 /// Constituent in a CDS index with weight and credit parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -124,8 +114,6 @@ pub struct IndexParSpreadResult {
     pub total_spread_bp: f64,
     /// Per-constituent par spreads in basis points (informational).
     pub constituents_spread_bp: Vec<ConstituentResult<f64>>,
-    /// Par spread denominator methodology.
-    pub method: ParSpreadMethod,
     /// Aggregated protection PV used in the total calculation.
     pub numerator_protection_pv: Money,
     /// Aggregated denominator used in the total calculation.

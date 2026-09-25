@@ -7,7 +7,7 @@
 //! is annualized lognormal vol (decimal); `normalVol` is an absolute
 //! Bachelier vol in the forward's units; `expiry` is time to expiry in years.
 //! Greeks scale matches the Rust crate: `vega` and both rho values are per 1%
-//! move, `theta` is per-day under the `thetaDays` day-count (ACT/365 by
+//! move, `theta` is per-day under the `thetaDaysPerYear` day-count (ACT/365 by
 //! default).
 //!
 //! Named-model sources: `docs/REFERENCES.md#black-scholes-1973`,
@@ -128,12 +128,12 @@ pub fn vanilla_expiry_payoff(spot: f64, strike: f64, is_call: bool) -> Result<f6
 /// @param vol - Annualized volatility, **decimal**; must be positive.
 /// @param expiry - Time to expiry in **years**; must be positive.
 /// @param isCall - `true` for a call, `false` for a put.
-/// @param thetaDays - Day-count denominator for theta. Default `365`.
+/// @param thetaDaysPerYear - Day-count denominator for theta. Default `365`.
 /// Pass `252` for trading-day theta.
 /// @returns Object `{ delta, gamma, vega, theta, rho_r, rho_q }` (snake_case keys
 /// matching the Rust/Python canonical `BsGreeks` fields). `vega` and
 /// both rho values are **per 1% move**; `theta` is **per day** under
-/// `thetaDays`.
+/// `thetaDaysPerYear`.
 /// @throws If serialization to JS fails (should not happen on valid inputs).
 ///
 /// @example
@@ -151,10 +151,10 @@ pub fn bs_greeks(
     vol: f64,
     expiry: f64,
     is_call: bool,
-    theta_days: Option<f64>,
+    theta_days_per_year: Option<f64>,
 ) -> Result<JsValue, JsValue> {
-    // theta_days validation (finite, > 0) lives in canonical `bs_greeks`.
-    let theta_days = theta_days.unwrap_or(DEFAULT_THETA_DAYS_PER_YEAR);
+    // theta_days_per_year validation (finite, > 0) lives in canonical `bs_greeks`.
+    let theta_days_per_year = theta_days_per_year.unwrap_or(DEFAULT_THETA_DAYS_PER_YEAR);
     let g = bs_greeks_core(
         spot,
         strike,
@@ -163,7 +163,7 @@ pub fn bs_greeks(
         vol,
         expiry,
         OptionType::from(is_call),
-        theta_days,
+        theta_days_per_year,
     )
     .map_err(to_js_err)?;
     // Serialize the canonical `BsGreeks` struct so the keys are exactly the

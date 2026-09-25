@@ -170,9 +170,8 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
 mod tests {
     use super::inputs::adjust_spot_for_discrete_dividends;
     use super::*;
-    use crate::instruments::equity::equity_option::types::{
-        EquityOption, EquityOptionExercise, ThetaDayBasis,
-    };
+    use crate::instruments::equity::equity_option::types::{EquityOption, EquityOptionExercise};
+    use crate::instruments::ThetaDayBasis;
     use crate::instruments::{Attributes, ExerciseStyle, SettlementType};
     use crate::pricer::{ModelKey, Pricer};
     use finstack_quant_core::currency::Currency;
@@ -364,7 +363,7 @@ mod tests {
         let expiry = date(2026, 1, 2);
         let calendar = option(expiry, OptionType::Call, ExerciseStyle::European);
         let mut trading = calendar.clone();
-        trading.theta_day_basis = ThetaDayBasis::Trading252;
+        trading.metric_pricing_overrides.theta_day_basis = Some(ThetaDayBasis::Trading252);
         let market = market(as_of, 100.0, 0.2, 0.05, 0.01);
 
         let calendar_theta = compute_greeks(&calendar, &market, as_of)
@@ -468,7 +467,7 @@ mod tests {
             inputs.sigma,
             inputs.t_vol,
             opt.option_type,
-            opt.theta_day_basis.days_per_year(),
+            opt.metric_pricing_overrides.theta_days_per_year(),
         )
         .rho_r
             * opt.notional.amount();
@@ -545,7 +544,7 @@ mod tests {
             inputs.sigma,
             inputs.t_vol,
             american.option_type,
-            american.theta_day_basis.days_per_year(),
+            american.metric_pricing_overrides.theta_days_per_year(),
         )
         .gamma
             * american.notional.amount();

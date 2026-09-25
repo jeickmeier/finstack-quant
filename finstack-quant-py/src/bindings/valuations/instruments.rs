@@ -1135,15 +1135,6 @@ impl PyBond {
         self.inner.discount_curve_id.to_string()
     }
 
-    /// Forward curve identifier for floating coupons, or ``None``.
-    #[getter]
-    fn forward_curve_id(&self) -> Option<String> {
-        self.inner
-            .forward_curve_id
-            .as_ref()
-            .map(ToString::to_string)
-    }
-
     /// Hazard curve identifier for credit-risky pricing, or ``None``.
     #[getter]
     fn credit_curve_id(&self) -> Option<String> {
@@ -1476,28 +1467,6 @@ impl PyBondBuilder {
         let b = take_bond(&mut slf)?;
         slf.inner = Some(b.discount_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("discount_curve_id", format!("{value:?}")));
-        Ok(slf)
-    }
-
-    /// Set the forward curve identifier used by floating coupons.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : str
-    ///     Forward curve identifier.
-    ///
-    /// Returns
-    /// -------
-    /// BondBuilder
-    ///     ``self``, for chaining.
-    #[pyo3(text_signature = "($self, value)")]
-    fn forward_curve_id<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &str,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_bond(&mut slf)?;
-        slf.inner = Some(b.forward_curve_id(CurveId::new(value.to_string())));
-        slf.fields.push(("forward_curve_id", format!("{value:?}")));
         Ok(slf)
     }
 

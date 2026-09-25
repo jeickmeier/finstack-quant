@@ -71,9 +71,10 @@ pub use crate::instruments::common_impl::parameters::legs::PayReceive;
 /// Valuation presentation and pricing policy for CDS marks.
 ///
 /// Each variant bundles a coherent set of choices (premium-leg accrual schedule,
-/// clean/dirty NPV, par-spread denominator). Mixing those choices via separate
-/// boolean overrides is intentionally not supported — the variants here are the
-/// only conventions traded in practice.
+/// Act/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,
+/// par-spread denominator). Mixing those choices via separate boolean
+/// overrides is intentionally not supported — the variants here are the only
+/// conventions traded in practice.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -118,10 +119,10 @@ pub enum CdsValuationConvention {
     /// QuantLib `IsdaCdsEngine` parity convention.
     ///
     /// Reproduces QuantLib's CDS output: dirty PV (no clean add-back),
-    /// business-day-adjusted premium accrual periods, and full premium leg in
-    /// the par-spread denominator. Combine with the QuantLib day-count
-    /// pricing overrides (`cds_aod_half_day_bias`,
-    /// `cds_act360_include_last_day`) for full bit-level reproduction.
+    /// business-day-adjusted premium accrual periods, full premium leg in
+    /// the par-spread denominator, QuantLib `Actual360(true)` accrual (every
+    /// Act/360 premium period includes its end date) and the `IsdaCdsEngine`
+    /// `HalfDayBias` accrual-on-default adjustment.
     QuantLibIsdaParity,
 }
 
@@ -153,6 +154,25 @@ impl CdsValuationConvention {
             self,
             Self::BloombergCdswCleanFullPremium | Self::QuantLibIsdaParity
         )
+    }
+
+    /// Whether every Act/360 premium accrual period includes its end date.
+    ///
+    /// Matches QuantLib's `Actual360(true)` day count, used only by
+    /// [`Self::QuantLibIsdaParity`]. The Bloomberg CDSW conventions include
+    /// the maturity day in the final period only.
+    #[must_use]
+    pub fn act360_includes_last_day(self) -> bool {
+        matches!(self, Self::QuantLibIsdaParity)
+    }
+
+    /// Whether the accrual-on-default integral adds QuantLib's half-day bias.
+    ///
+    /// Matches `IsdaCdsEngine::HalfDayBias`, used only by
+    /// [`Self::QuantLibIsdaParity`].
+    #[must_use]
+    pub fn aod_half_day_bias(self) -> bool {
+        matches!(self, Self::QuantLibIsdaParity)
     }
 
     /// Calendar days between `as_of` and the protection step-in (effective)

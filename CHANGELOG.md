@@ -2,6 +2,62 @@
 
 ## [Unreleased]
 
+### Instrument fields that duplicate overrides (2026-09-24)
+
+Numbers do not change for inputs that were already canonical. They change
+only where a previously ignored or hidden setting is now honoured, as noted
+below.
+
+#### Changed (BREAKING)
+
+- `Bond.forward_curve_id` (now `instrument_pricing_overrides.model_config.asw_forward_curve_id`
+  only): the asset-swap forward curve has one channel. Rust, Python
+  (`Bond.forward_curve_id` getter and `BondBuilder.forward_curve_id` removed),
+  JSON (the key is rejected).
+- `ConvertibleTreeType::Binomial(steps)` / `Trinomial(steps)` (now payload-free
+  `Binomial` / `Trinomial`; the step count is
+  `instrument_pricing_overrides.model_config.tree_steps`, default
+  `DEFAULT_CONVERTIBLE_TREE_STEPS` = 200). Rust. `model_config.tree_steps` on a
+  ConvertibleBond now sets the lattice for pricing, the bond floor, greeks,
+  implied vol and OAS; before, it was validated and ignored.
+- `EquityOption.theta_day_basis` (now `metric_pricing_overrides.theta_day_basis:
+  Option<ThetaDayBasis>`, default calendar-365). `ThetaDayBasis` moves to
+  `instruments::ThetaDayBasis`. Rust, Python (`EquityOption.theta_day_basis`
+  getter and builder setter removed; `MetricPricingOverrides(theta_day_basis=...)`
+  and its getter added), JSON.
+- `metric_pricing_overrides.theta_period` (now `Option<Tenor>`): the wire form
+  is `{"count": 1, "unit": "weeks"}`, not `"1W"`; a zero-length horizon is
+  rejected. Rust (`with_theta_period(Tenor)`), Python
+  (`MetricPricingOverrides(theta_period=Tenor | str)`, getter returns `Tenor`),
+  WASM/JSON `pricing_options`. Metrics-based attribution no longer sets a
+  horizon for a zero-day window (carry is zero there).
+- `model_config.cds_aod_half_day_bias` / `model_config.cds_act360_include_last_day`
+  (now implied by `CreditDefaultSwap.valuation_convention = "quant_lib_isda_parity"`,
+  via `CdsValuationConvention::aod_half_day_bias` / `act360_includes_last_day`).
+  Rust, JSON (the keys are rejected).
+- `bs_greeks(theta_days=...)` (now `theta_days_per_year`, matching Rust).
+  Python kwarg, WASM `thetaDays` (now `thetaDaysPerYear`).
+
+#### Removed
+
+- `VarianceSwap::annualization_factor_with_policy` and the
+  `"{underlying_ticker}_TRADING_DAYS_PER_YEAR"` / `"TRADING_DAYS_PER_YEAR"`
+  market scalars. The annualisation factor is now the contract field
+  `trading_days_per_year` (below). Rust.
+- `ParSpreadMethod` and `IndexParSpreadResult.method`: the CDS index par spread
+  always uses the risky-annuity denominator, reported through
+  `IndexParSpreadResult.denominator`. Rust.
+
+#### Fixed
+
+- `VarianceSwap.trading_days_per_year` and `FxVarianceSwap.trading_days_per_year`
+  (new f64 contract field, default 252, schema-visible): daily realized
+  variance annualises by it. `annualization_factor()` and PV now agree; the FX
+  swap was hard-coded to 252. Rust, JSON.
+- FxOption and FxDigitalOption analytic theta honour
+  `metric_pricing_overrides.theta_day_basis` instead of a hard-coded 365
+  (default unchanged).
+
 ### Override containers (2026-09-24)
 
 Numbers do not change by default. They change only for a composite whose

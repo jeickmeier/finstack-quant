@@ -18,14 +18,11 @@ impl MetricCalculator for ThetaCalculator {
         let option: &CapFloor = context.instrument_as()?;
 
         // Get theta period from pricing overrides, default to "1D"
-        let period_str = context
-            .get_metric_overrides()
-            .and_then(|po| po.theta_period.as_deref())
-            .unwrap_or("1D");
+        let period = crate::metrics::theta_period(context);
 
         let expiry_date = next_option_theta_expiry(option, context.curves.as_ref(), context.as_of)?;
 
-        let rolled_date = calculate_theta_date(context.as_of, period_str, expiry_date)?;
+        let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
         // If already expired or rolling to same date, theta is zero
         if rolled_date <= context.as_of {

@@ -83,7 +83,6 @@ fn create_option(expiry: Date, option_type: OptionType) -> EquityOption {
         expiry,
         notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
-        theta_day_basis: Default::default(),
         settlement: SettlementType::Cash,
         exercise: None,
         discount_curve_id: "USD-OIS".into(),

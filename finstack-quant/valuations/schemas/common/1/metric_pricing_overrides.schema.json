@@ -943,6 +943,67 @@
       "format": "double",
       "type": "number"
     },
+    "Tenor": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/TenorUnit",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
+    "TenorUnit": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    },
+    "ThetaDayBasis": {
+      "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.",
+      "oneOf": [
+        {
+          "const": "calendar_365",
+          "description": "Calendar-day theta: annual theta divided by\n[`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365).",
+          "type": "string"
+        },
+        {
+          "const": "trading_252",
+          "description": "Trading-day theta: annual theta divided by\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
+          "type": "string"
+        }
+      ]
+    },
     "VarConfig": {
       "additionalProperties": false,
       "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
@@ -1022,13 +1083,28 @@
       "$ref": "#/$defs/BumpConfig",
       "description": "Bump sizes for finite-difference sensitivities."
     },
+    "theta_day_basis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ThetaDayBasis"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Day basis for the per-day analytic option theta (`calendar_365` or\n`trading_252`). `None` uses calendar-day theta (annual theta / 365)."
+    },
     "theta_period": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Tenor"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": null,
-      "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",
-      "type": [
-        "string",
-        "null"
-      ]
+      "description": "Theta / carry horizon over which time decay is measured (for example\n1D, 1W, 1M, 3M; wire form `{\"count\": 1, \"unit\": \"weeks\"}`). Day and\nweek tenors roll a fixed number of days, month and year tenors roll\ncalendar months (EOM-aware). `None` uses one day."
     },
     "var_config": {
       "anyOf": [

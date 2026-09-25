@@ -115,11 +115,6 @@
           "format": "double",
           "type": "number"
         },
-        "theta_day_basis": {
-          "$ref": "#/$defs/ThetaDayBasis",
-          "default": "calendar_365",
-          "description": "Basis used for the reported per-day theta.\n\nDefaults to calendar-day theta (`annual theta / 365`). Select\n`Trading252` explicitly for a trading-day risk convention."
-        },
         "underlying_ticker": {
           "description": "Underlying equity ticker symbol",
           "type": "string"
@@ -228,21 +223,6 @@
         }
       ]
     },
-    "ThetaDayBasis": {
-      "description": "Day basis used to convert annual option theta into a per-day amount.",
-      "oneOf": [
-        {
-          "const": "calendar_365",
-          "description": "Calendar-day theta, annual theta divided by 365.",
-          "type": "string"
-        },
-        {
-          "const": "trading_252",
-          "description": "Trading-day theta, annual theta divided by 252.",
-          "type": "string"
-        }
-      ]
-    },
     "equity_option": {
       "additionalProperties": false,
       "properties": {
@@ -285,7 +265,6 @@
           "settlement": "cash",
           "spot_id": "EQUITY-SPOT",
           "strike": 4500.0,
-          "theta_day_basis": "calendar_365",
           "underlying_ticker": "SPX",
           "vol_surface_id": "EQUITY-VOL"
         },

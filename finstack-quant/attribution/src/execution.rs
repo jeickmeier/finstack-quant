@@ -187,9 +187,21 @@ impl AttributionSpec {
                     None => Arc::clone(&instrument_arc),
                 };
                 let mut metrics_instrument = instrument_t0.clone_box();
-                if let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut() {
-                    overrides.theta_period =
-                        Some(format!("{}D", (self.as_of_t1 - self.as_of_t0).whole_days()));
+                // A zero-day window has no carry (the metrics-based carry step
+                // zeroes it), so the theta horizon is only set for a real window.
+                let window_days = (self.as_of_t1 - self.as_of_t0).whole_days();
+                if window_days > 0 {
+                    if let Some(overrides) = metrics_instrument.get_metric_pricing_overrides_mut() {
+                        let days = u32::try_from(window_days).map_err(|_| {
+                            Error::Validation(format!(
+                                "attribution window of {window_days} days exceeds the theta horizon range"
+                            ))
+                        })?;
+                        overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
+                            days,
+                            finstack_quant_core::dates::TenorUnit::Days,
+                        )?);
+                    }
                 }
                 let metrics_instrument: Arc<dyn Instrument> = Arc::from(metrics_instrument);
                 let metrics = match self.config.as_ref().and_then(|cfg| cfg.metrics.as_ref()) {

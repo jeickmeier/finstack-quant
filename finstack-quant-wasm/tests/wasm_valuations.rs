@@ -214,7 +214,7 @@ fn price_instrument_accepts_pricing_options() {
         "2024-01-01",
         Some("discounting".to_string()),
         Some(metrics),
-        Some(r#"{"theta_period":"1D"}"#.to_string()),
+        Some(r#"{"theta_period":{"count":1,"unit":"days"}}"#.to_string()),
         None,
     )
     .unwrap();

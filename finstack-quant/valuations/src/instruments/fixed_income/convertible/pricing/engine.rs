@@ -80,19 +80,40 @@ pub(crate) fn compute_conversion_value(bond: &ConvertibleBond, spot: f64) -> Res
     }
 }
 
-/// Tree model type selection for convertible bond pricing
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Lattice kind for convertible bond pricing.
+///
+/// The number of time steps is not part of the lattice kind: every pricer
+/// reads it from `instrument_pricing_overrides.model_config.tree_steps`
+/// (default [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ConvertibleTreeType {
-    /// Use binomial tree (CRR)
-    Binomial(usize), // number of steps
-    /// Use trinomial tree
-    Trinomial(usize), // number of steps
+    /// Cox-Ross-Rubinstein binomial tree.
+    #[default]
+    Binomial,
+    /// Recombining trinomial tree.
+    Trinomial,
 }
 
-impl Default for ConvertibleTreeType {
-    fn default() -> Self {
-        Self::Binomial(200)
+/// Default lattice step count when
+/// `instrument_pricing_overrides.model_config.tree_steps` is unset.
+pub const DEFAULT_CONVERTIBLE_TREE_STEPS: usize = 200;
+
+/// Lattice step count for `bond`: `model_config.tree_steps`, else
+/// [`DEFAULT_CONVERTIBLE_TREE_STEPS`].
+fn tree_steps(bond: &ConvertibleBond) -> Result<usize> {
+    let steps = bond
+        .instrument_pricing_overrides
+        .model_config
+        .tree_steps
+        .unwrap_or(DEFAULT_CONVERTIBLE_TREE_STEPS);
+    if steps == 0 {
+        return Err(Error::Validation(
+            "instrument_pricing_overrides.model_config.tree_steps must be at least 1 for a \
+             convertible tree"
+                .to_string(),
+        ));
     }
+    Ok(steps)
 }
 
 /// Resolved market data identifiers for Greek bumping.
@@ -354,9 +375,7 @@ fn price_convertible_bond_with_inputs(
         return Money::new(payoff, bond.notional.currency());
     }
 
-    let steps = match tree_type {
-        ConvertibleTreeType::Binomial(n) | ConvertibleTreeType::Trinomial(n) => n,
-    };
+    let steps = tree_steps(bond)?;
 
     let valuator = ConvertibleBondValuator::new(
         bond,
@@ -395,8 +414,9 @@ fn price_convertible_bond_with_inputs(
 ///   required market-data identifiers.
 /// * `market_context` - Market context supplying discount curve, equity spot,
 ///   volatility, credit, and other pricing inputs.
-/// * `tree_type` - Recombining tree specification controlling the convertible
-///   equity/credit valuation discretization.
+/// * `tree_type` - Lattice kind (binomial or trinomial); the step count is
+///   `bond.instrument_pricing_overrides.model_config.tree_steps` (default
+///   [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
 /// * `as_of` - Valuation date; dates after maturity return zero in the bond's
 ///   notional currency.
 pub fn price_convertible_bond(
@@ -406,7 +426,7 @@ pub fn price_convertible_bond(
     as_of: Date,
 ) -> Result<Money> {
     bond.validate_for_pricing()?;
-    validate_tree_type(tree_type)?;
+    tree_steps(bond)?;
     if as_of > bond.maturity {
         return Ok(Money::from((0_i64, bond.notional.currency())));
     }
@@ -426,9 +446,7 @@ pub(crate) fn price_bond_floor(
         return Ok(0.0);
     }
     let inputs = prepare_for_pricing(bond, market_context, as_of)?;
-    let steps = match ConvertibleTreeType::default() {
-        ConvertibleTreeType::Binomial(steps) | ConvertibleTreeType::Trinomial(steps) => steps,
-    };
+    let steps = tree_steps(bond)?;
     let valuator = ConvertibleBondValuator::new(
         bond,
         &inputs.cashflow_schedule,
@@ -478,8 +496,9 @@ pub(crate) fn price_bond_floor(
 ///   required market-data identifiers.
 /// * `market_context` - Market context supplying baseline curves, equity spot,
 ///   volatility, and credit data for full repricing.
-/// * `tree_type` - Recombining tree specification used consistently for every
-///   bumped valuation.
+/// * `tree_type` - Lattice kind used consistently for every bumped valuation;
+///   the step count is `model_config.tree_steps` (default
+///   [`DEFAULT_CONVERTIBLE_TREE_STEPS`]).
 /// * `bumps` - Finite-difference bump sizes: relative equity-spot bump for
 ///   delta and gamma, absolute volatility bump for vega and parallel
 ///   risk-free rate bump in bp for rho. Each must be finite and positive;
@@ -493,7 +512,7 @@ pub fn calculate_convertible_greeks(
     as_of: Date,
 ) -> Result<TreeGreeks> {
     bond.validate_for_pricing()?;
-    validate_tree_type(tree_type)?;
+    tree_steps(bond)?;
     for (name, value) in [
         ("spot_bump_pct", bumps.spot_bump_pct),
         ("vol_bump_pct", bumps.vol_bump_pct),
@@ -781,16 +800,4 @@ pub(super) fn accrual_index(
             frequency,
         },
     )
-}
-
-fn validate_tree_type(tree_type: ConvertibleTreeType) -> Result<()> {
-    let steps = match tree_type {
-        ConvertibleTreeType::Binomial(steps) | ConvertibleTreeType::Trinomial(steps) => steps,
-    };
-    if steps == 0 {
-        return Err(Error::Validation(
-            "convertible tree must contain at least one time step".to_string(),
-        ));
-    }
-    Ok(())
 }

@@ -112,7 +112,7 @@ try {
       .locator("pre")
       .textContent(),
   );
-  assert.equal(submitted.pricingOptions, '{"theta_period":"1W"}');
+  assert.equal(submitted.pricingOptions, '{"theta_period":{"count":1,"unit":"weeks"}}');
   assert.equal(submitted.marketHistory, history);
   assert.equal(
     JSON.parse(submitted.instrumentJson).instrument.spec.notional.amount,

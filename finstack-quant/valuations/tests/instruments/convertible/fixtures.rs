@@ -525,3 +525,11 @@ pub const TOLERANCE: f64 = 1e-9;
 
 /// Relative tolerance for price comparisons (1%)
 pub const PRICE_TOLERANCE_PCT: f64 = 0.01;
+
+/// Clone `bond` with `instrument_pricing_overrides.model_config.tree_steps`
+/// set to `steps` (the convertible lattice size).
+pub fn with_tree_steps(bond: &ConvertibleBond, steps: usize) -> ConvertibleBond {
+    let mut bond = bond.clone();
+    bond.instrument_pricing_overrides.model_config.tree_steps = Some(steps);
+    bond
+}

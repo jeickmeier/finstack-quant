@@ -943,14 +943,14 @@ mod tests {
         let merged = instrument_json_for_pricing(
             &json,
             Some(
-                r#"{"theta_period":"1D","breakeven_config":{"target":"z_spread","mode":"linear"}}"#,
+                r#"{"theta_period":{"count":1,"unit":"days"},"breakeven_config":{"target":"z_spread","mode":"linear"}}"#,
             ),
         )
         .expect("merge");
         let parsed: Value = serde_json::from_str(merged.as_ref()).expect("json");
         assert_eq!(
             parsed["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"],
-            "1D"
+            serde_json::json!({"count": 1, "unit": "days"})
         );
         assert_eq!(
             parsed["instrument"]["spec"]["metric_pricing_overrides"]["breakeven_config"]["target"],
@@ -963,16 +963,19 @@ mod tests {
         let composite =
             crate::instruments::CompositeInstrument::example().expect("composite example");
         let json = envelope_json(InstrumentJson::Composite(Box::new(composite)));
-        let merged =
-            instrument_json_for_pricing(&json, Some(r#"{"theta_period":"1M"}"#)).expect("merge");
+        let merged = instrument_json_for_pricing(
+            &json,
+            Some(r#"{"theta_period":{"count":1,"unit":"months"}}"#),
+        )
+        .expect("merge");
         let envelope: crate::instruments::InstrumentEnvelope =
             serde_json::from_str(merged.as_ref()).expect("merged composite must still parse");
         let InstrumentJson::Composite(parsed) = envelope.instrument else {
             panic!("expected composite");
         };
         assert_eq!(
-            parsed.metric_pricing_overrides.theta_period.as_deref(),
-            Some("1M")
+            parsed.metric_pricing_overrides.theta_period,
+            Some(finstack_quant_core::dates::Tenor::monthly())
         );
     }
 
@@ -1131,12 +1134,15 @@ mod tests {
         let json = document.to_string();
 
         assert!(validate_instrument_json(&json, None).is_err());
-        let prepared = validate_instrument_json(&json, Some(r#"{"theta_period":"1W"}"#))
-            .expect("merged before validation");
+        let prepared = validate_instrument_json(
+            &json,
+            Some(r#"{"theta_period":{"count":1,"unit":"weeks"}}"#),
+        )
+        .expect("merged before validation");
         let value: Value = serde_json::from_str(&prepared).expect("canonical");
         assert_eq!(
             value["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"],
-            "1W"
+            serde_json::json!({"count": 1, "unit": "weeks"})
         );
         assert_eq!(
             validate_instrument_json(&prepared, None).expect("valid"),
@@ -1314,7 +1320,7 @@ mod tests {
             "2024-01-01",
             "discounting",
             &["dirty_price".to_string()],
-            Some(r#"{"theta_period":"1D"}"#),
+            Some(r#"{"theta_period":{"count":1,"unit":"days"}}"#),
             None,
         )
         .expect("price");

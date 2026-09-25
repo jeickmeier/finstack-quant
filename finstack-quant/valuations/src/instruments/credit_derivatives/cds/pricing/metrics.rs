@@ -107,15 +107,11 @@ impl CDSPricer {
         cds: &CreditDefaultSwap,
         period: &CouponPeriod,
     ) -> Result<f64> {
-        // QuantLib `Actual360(true)` parity: when explicitly requested,
-        // every Act/360 accrual period is inclusive of its end date. This
-        // is opt-in via `cds_act360_include_last_day` for QuantLib parity
-        // tests; production CDS pricing uses the standard Bloomberg CDSW
-        // rule below.
-        if cds
-            .instrument_pricing_overrides
-            .model_config
-            .cds_act360_include_last_day
+        // QuantLib `Actual360(true)` parity: under the `quant_lib_isda_parity`
+        // valuation convention every Act/360 accrual period is inclusive of
+        // its end date. Production CDS pricing uses the standard Bloomberg
+        // CDSW rule below.
+        if cds.valuation_convention.act360_includes_last_day()
             && cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
             && period.accrual_end > period.accrual_start
         {

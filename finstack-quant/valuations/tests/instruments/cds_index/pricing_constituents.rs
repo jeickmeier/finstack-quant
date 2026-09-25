@@ -16,7 +16,7 @@ use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_quant_valuations::constants::BASIS_POINTS_PER_UNIT;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::{
-    CDSIndex, CDSIndexConstituent, IndexPricing, ParSpreadMethod,
+    CDSIndex, CDSIndexConstituent, IndexPricing,
 };
 use finstack_quant_valuations::instruments::CreditParams;
 use finstack_quant_valuations::instruments::Instrument;
@@ -534,14 +534,8 @@ fn test_constituents_par_spread_detailed_non_additive() {
         "Sum of constituent par spreads equals N * total",
     );
 
-    let expected_total = match detailed.method {
-        ParSpreadMethod::RiskyAnnuity => {
-            detailed.numerator_protection_pv.amount() / detailed.denominator * BASIS_POINTS_PER_UNIT
-        }
-        ParSpreadMethod::FullPremiumAoD => {
-            detailed.numerator_protection_pv.amount() / detailed.denominator
-        }
-    };
+    let expected_total =
+        detailed.numerator_protection_pv.amount() / detailed.denominator * BASIS_POINTS_PER_UNIT;
     relative_eq(
         detailed.total_spread_bp,
         expected_total,

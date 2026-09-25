@@ -253,17 +253,6 @@
           "minimum": 0,
           "type": "integer"
         },
-        "forward_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional forward curve identifier for projected floating or asset-swap legs."
-        },
         "funding_curve_id": {
           "anyOf": [
             {

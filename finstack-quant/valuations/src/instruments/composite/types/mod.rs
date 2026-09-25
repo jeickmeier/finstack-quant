@@ -24,6 +24,7 @@ mod tests {
     use crate::instruments::{Instrument, InstrumentEnvelope, InstrumentJson, PricingOptions};
     use crate::metrics::MetricId;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::expr::Expr;
     use finstack_quant_core::expr::UnaryOp;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -419,7 +420,7 @@ mod tests {
         let market = MarketContext::new().insert(curve);
         let mut own = crate::instruments::Deposit::example()?;
         own.id = InstrumentId::new("DEP-OWN");
-        own.metric_pricing_overrides.theta_period = Some(own_theta.to_string());
+        own.metric_pricing_overrides.theta_period = Some(Tenor::parse(own_theta)?);
         let mut inherit = crate::instruments::Deposit::example()?;
         inherit.id = InstrumentId::new("DEP-INHERIT");
         let spec = CompositeSpec::new(
@@ -453,7 +454,7 @@ mod tests {
     #[test]
     fn composite_metric_overrides_are_leg_defaults_and_leg_settings_win() -> Result<()> {
         let (mut composite, inherit, market) = deposit_pair_composite("1D")?;
-        composite.metric_pricing_overrides.theta_period = Some("1M".to_string());
+        composite.metric_pricing_overrides.theta_period = Some(Tenor::monthly());
 
         let result = composite.price_with_metrics(
             &market,
@@ -480,7 +481,7 @@ mod tests {
             _ => return Err(Error::Internal("expected deposit leg".to_string())),
         };
         let mut inherit_with_default = inherit.clone();
-        inherit_with_default.metric_pricing_overrides.theta_period = Some("1M".to_string());
+        inherit_with_default.metric_pricing_overrides.theta_period = Some(Tenor::monthly());
         let own_expected = theta_of(&own, &market)?;
         let inherit_expected = theta_of(&inherit_with_default, &market)?;
         assert_eq!(
@@ -532,13 +533,16 @@ mod tests {
     #[test]
     fn composite_overrides_live_at_payload_root_and_survive_rebalance() -> Result<()> {
         let mut composite = CompositeInstrument::example()?;
-        composite.metric_pricing_overrides.theta_period = Some("1W".to_string());
+        composite.metric_pricing_overrides.theta_period = Some(Tenor::weekly());
         composite
             .scenario_pricing_overrides
             .scenario_price_shock_pct = Some(-0.1);
         let value =
             serde_json::to_value(&composite).map_err(|error| Error::Internal(error.to_string()))?;
-        assert_eq!(value["metric_pricing_overrides"]["theta_period"], "1W");
+        assert_eq!(
+            value["metric_pricing_overrides"]["theta_period"],
+            serde_json::json!({"count": 1, "unit": "weeks"})
+        );
         assert!(value["spec"].get("metric_pricing_overrides").is_none());
 
         let rebalanced = composite.rebalance(&MarketContext::new(), date!(2025 - 01 - 03), &[])?;
@@ -562,7 +566,7 @@ mod tests {
             // schema-rejection-test
             (
                 "metric_pricing_overrides",
-                serde_json::json!({"theta_period": "1W"}),
+                serde_json::json!({"theta_period": {"count": 1, "unit": "weeks"}}),
             ),
             // schema-rejection-test
             ("scenario_pricing_overrides", serde_json::json!({})),

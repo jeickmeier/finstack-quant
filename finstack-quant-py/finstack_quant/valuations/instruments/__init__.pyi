@@ -723,7 +723,7 @@ class Bond:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -929,21 +929,6 @@ class Bond:
         -------
         str
             Curve id used for discounting.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def forward_curve_id(self) -> str | None:
-        """
-        Forward curve identifier for floating coupons.
-
-        Returns
-        -------
-        str | None
-            Curve id, or ``None`` for fixed coupons.
 
         Notes
         -----
@@ -1351,26 +1336,6 @@ class BondBuilder:
         ----------
         value : str
             Discount curve identifier.
-
-        Returns
-        -------
-        BondBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If the builder was already consumed by ``build()``.
-        """
-        ...
-    def forward_curve_id(self, value: str) -> BondBuilder:
-        """
-        Set the forward curve identifier used by floating coupons.
-
-        Parameters
-        ----------
-        value : str
-            Forward curve identifier used by floating coupons.
 
         Returns
         -------
@@ -2821,7 +2786,7 @@ class TermLoan:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -5336,7 +5301,7 @@ class InterestRateSwap:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -5948,7 +5913,7 @@ class Swaption:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -6830,7 +6795,7 @@ class CapFloor:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -7930,7 +7895,7 @@ class CreditDefaultSwap:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -8787,7 +8752,7 @@ class CDSIndex:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -9845,7 +9810,7 @@ class CDSTranche:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -11011,7 +10976,7 @@ class ConvertibleBond:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -12035,7 +12000,7 @@ class FxForward:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -12988,7 +12953,7 @@ class FxOption:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -14173,7 +14138,7 @@ class EquityOption:
             Metric identifiers to compute (see :func:`list_standard_metrics`).
         pricing_options : dict[str, object] | str, optional
             ``MetricPricingOverrides`` merged into the instrument's own overrides
-            (e.g. ``{"theta_period": "1D"}``).
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
         market_history : str, optional
             JSON ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
@@ -14512,7 +14477,7 @@ class EquityOption:
         model: str = "default",
     ) -> float:
         """
-        Theta (per day on ``theta_day_basis``) of the option under the selected model.
+        Theta (per day on ``metric_pricing_overrides.theta_day_basis``, calendar days by default) of the option under the selected model.
 
         Parameters
         ----------
@@ -14526,7 +14491,7 @@ class EquityOption:
         Returns
         -------
         float
-            Theta (per day on ``theta_day_basis``) produced by the selected model.
+            Theta (per day on ``metric_pricing_overrides.theta_day_basis``, calendar days by default) produced by the selected model.
 
         Raises
         ------
@@ -14707,21 +14672,6 @@ class EquityOption:
         -------
         str
             ``"act_365f"`` unless set otherwise.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def theta_day_basis(self) -> str:
-        """
-        Per-day theta basis.
-
-        Returns
-        -------
-        str
-            ``"calendar_365"`` or ``"trading_252"``.
 
         Notes
         -----
@@ -14995,26 +14945,6 @@ class EquityOptionBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized exercise style.
-        """
-        ...
-    def theta_day_basis(self, value: Literal["calendar_365", "trading_252"]) -> EquityOptionBuilder:
-        """
-        Set the day basis for per-day theta.
-
-        Parameters
-        ----------
-        value : Literal["calendar_365", "trading_252"]
-            Calendar-day theta is the default; trading-day theta must be selected explicitly.
-
-        Returns
-        -------
-        EquityOptionBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If the builder was already consumed by ``build()`` or ``value`` is not a recognized theta day basis.
         """
         ...
     def expiry(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> EquityOptionBuilder:
@@ -24200,10 +24130,10 @@ def price_instrument(
         financing is an ACT/360 decimal rate.
     pricing_options : MetricPricingOverrides or dict or str, optional
         Metric-time overrides merged into the instrument's own
-        ``pricing_overrides`` before pricing: ``theta_period`` (``"1D"``,
-        ``"1W"``, ``"1M"``), ``breakeven_config``
+        ``pricing_overrides`` before pricing: ``theta_period`` (a tenor; in
+        dict/JSON form ``{"count": 1, "unit": "weeks"}``), ``breakeven_config``
         (``{"target": "z_spread", "mode": "linear"}``), ``bump_config``,
-        ``bond_risk_basis``, ``var_config``. A dict or
+        ``bond_risk_basis``, ``theta_day_basis``, ``var_config``. A dict or
         JSON string is accepted in place of the typed object.
     market_history : MarketHistory or dict or str, optional
         Historical scenarios required by the ``"hvar"`` and
@@ -31065,7 +30995,7 @@ class MetricPricingOverrides:
     --------
     >>> from finstack_quant.valuations.instruments import MetricPricingOverrides
     >>> opts = MetricPricingOverrides(theta_period="1W", bond_risk_basis="callable_oas")
-    >>> (opts.theta_period, opts.bond_risk_basis)
+    >>> (str(opts.theta_period), opts.bond_risk_basis)
     ('1W', 'callable_oas')
     >>> MetricPricingOverrides.from_json(opts.to_json()) == opts
     True
@@ -31075,9 +31005,10 @@ class MetricPricingOverrides:
         self,
         *,
         bump_config: dict[str, Any] | None = None,
-        theta_period: str | None = None,
+        theta_period: Tenor | str | None = None,
         breakeven_config: dict[str, Any] | None = None,
         bond_risk_basis: Literal["bullet_discountable", "callable_oas"] | None = None,
+        theta_day_basis: Literal["calendar_365", "trading_252"] | None = None,
         var_config: dict[str, Any] | None = None,
     ) -> None:
         """
@@ -31090,15 +31021,20 @@ class MetricPricingOverrides:
             ``vol_bump_pct`` (absolute vol, ``0.01`` = 1 vol point),
             ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp`` (basis
             points) and ``adaptive_bumps`` (bool). ``None`` keeps the defaults.
-        theta_period : str, optional
-            Theta / carry horizon as ``<digits><D|W|M|Y>`` (``"1D"``, ``"1W"``,
-            ``"1M"``, ``"3M"``); the default horizon is one day.
+        theta_period : Tenor | str, optional
+            Theta / carry horizon as a ``Tenor`` or tenor string (``"1D"``,
+            ``"1W"``, ``"1M"``, ``"3M"``); day and week tenors roll fixed days,
+            month and year tenors roll calendar months. The default horizon is
+            one day. The JSON form is ``{"count": 1, "unit": "weeks"}``.
         breakeven_config : dict[str, Any], optional
             Breakeven solve configuration such as
             ``{"target": "z_spread", "mode": "linear"}``.
         bond_risk_basis : {"bullet_discountable", "callable_oas"}, optional
             Basis for bond duration/convexity/DV01: Bloomberg-style workout
             risk (default) or callable OAS repricing.
+        theta_day_basis : {"calendar_365", "trading_252"}, optional
+            Day basis for per-day analytic option theta (EquityOption,
+            FxOption, FxDigitalOption): annual theta / 365 (default) or / 252.
         var_config : dict[str, Any], optional
             Historical VaR / expected-shortfall configuration override
             (confidence level, horizon, decay).
@@ -31106,14 +31042,16 @@ class MetricPricingOverrides:
         Raises
         ------
         ValueError
-            If a sub-document is malformed, ``bond_risk_basis`` is not one of
-            the accepted names, or ``theta_period`` is not
-            ``<digits><D|W|M|Y>``.
+            If a sub-document is malformed, ``bond_risk_basis`` or
+            ``theta_day_basis`` is not one of the accepted names, or
+            ``theta_period`` is not a valid positive tenor.
+        TypeError
+            If ``theta_period`` is neither a ``Tenor`` nor a string.
 
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import MetricPricingOverrides
-        >>> MetricPricingOverrides(theta_period="1M").theta_period
+        >>> str(MetricPricingOverrides(theta_period="1M").theta_period)
         '1M'
         """
         ...
@@ -31136,14 +31074,14 @@ class MetricPricingOverrides:
         ...
 
     @property
-    def theta_period(self) -> str | None:
+    def theta_period(self) -> Tenor | None:
         """
         Theta / carry horizon.
 
         Returns
         -------
-        str or None
-            Horizon such as ``"1D"`` or ``"1W"``, or ``None`` for the default.
+        Tenor or None
+            Horizon such as ``Tenor("1W")``, or ``None`` for the one-day default.
 
         Notes
         -----
@@ -31178,6 +31116,23 @@ class MetricPricingOverrides:
         {"bullet_discountable", "callable_oas"} or None
             Serde name of the basis, or ``None`` for the default
             (``"bullet_discountable"``).
+
+        Raises
+        ------
+        ValueError
+            If the basis cannot be rendered as its serde name.
+        """
+        ...
+
+    @property
+    def theta_day_basis(self) -> Literal["calendar_365", "trading_252"] | None:
+        """
+        Day basis for per-day analytic option theta.
+
+        Returns
+        -------
+        {"calendar_365", "trading_252"} or None
+            Serde name of the basis, or ``None`` for the calendar-day default.
 
         Raises
         ------
@@ -31227,7 +31182,7 @@ class MetricPricingOverrides:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import MetricPricingOverrides
-        >>> MetricPricingOverrides.from_json('{"theta_period": "1W"}').theta_period
+        >>> str(MetricPricingOverrides.from_json('{"theta_period": {"count": 1, "unit": "weeks"}}').theta_period)
         '1W'
         """
         ...

@@ -1,6 +1,6 @@
 //! Shared utilities for theta (time decay) calculations.
 //!
-//! Provides period parsing, date rolling, and a generic theta calculator that
+//! Provides date rolling, and a generic theta calculator that
 //! works for any instrument implementing the `Instrument` trait.
 //!
 //! When an instrument expires before the theta period ends, theta is automatically
@@ -39,66 +39,16 @@
 use crate::instruments::{Bond, Deposit};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DateExt};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::Result;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ThetaPeriod {
-    Days(i64),
-    Months(i32),
-    Years(i32),
-}
-
-fn parse_theta_period(period: &str) -> Result<ThetaPeriod> {
-    let input = period.trim();
-    let period = input.to_uppercase();
-    if input.is_empty() {
-        return Err(finstack_quant_core::Error::Validation(
-            "Theta period must not be empty".to_string(),
-        ));
-    }
-
-    let (num_str, unit) = if let Some(pos) = period.find(|c: char| c.is_alphabetic()) {
-        (&period[..pos], &period[pos..])
-    } else {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Theta period '{input}' must include a unit suffix (D, W, M, or Y)"
-        )));
-    };
-
-    let num_i64: i64 = num_str.parse().map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "Theta period '{input}' has invalid numeric value '{num_str}'"
-        ))
-    })?;
-
-    if num_i64 < 0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Theta period must be non-negative, got '{period}'"
-        )));
-    }
-
-    match unit {
-        "D" => Ok(ThetaPeriod::Days(num_i64)),
-        "W" => Ok(ThetaPeriod::Days(num_i64 * 7)),
-        "M" => Ok(ThetaPeriod::Months(i32::try_from(num_i64).map_err(
-            |_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Theta period '{input}' month value is too large"
-                ))
-            },
-        )?)),
-        "Y" => Ok(ThetaPeriod::Years(i32::try_from(num_i64).map_err(
-            |_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Theta period '{input}' year value is too large"
-                ))
-            },
-        )?)),
-        _ => Err(finstack_quant_core::Error::Validation(format!(
-            "Theta period '{input}' has unsupported unit '{unit}' (expected D, W, M, or Y)"
-        ))),
-    }
+/// Theta horizon for a metric context: `metric_pricing_overrides.theta_period`,
+/// else one day.
+pub(crate) fn theta_period(context: &crate::metrics::MetricContext) -> Tenor {
+    context
+        .get_metric_overrides()
+        .and_then(|po| po.theta_period)
+        .unwrap_or_else(Tenor::daily)
 }
 
 /// Calculate the rolled forward date for theta calculation.
@@ -107,12 +57,12 @@ fn parse_theta_period(period: &str) -> Result<ThetaPeriod> {
 /// instrument expires before the period ends.
 ///
 /// Notes:
-/// - `"D"` and `"W"` are treated as fixed day increments.
-/// - `"M"` and `"Y"` are treated as **calendar** month/year rolls (EOM-aware).
+/// - Day and week tenors are fixed day increments.
+/// - Month and year tenors are **calendar** month/year rolls (EOM-aware).
 ///
 /// # Arguments
 /// * `base_date` - Starting valuation date
-/// * `period_str` - Period string (e.g., "1D", "1W", "1M")
+/// * `period` - Theta horizon (`metric_pricing_overrides.theta_period`), e.g. 1D, 1W, 1M
 /// * `expiry_date` - Optional instrument expiry date
 ///
 /// # Returns
@@ -120,26 +70,23 @@ fn parse_theta_period(period: &str) -> Result<ThetaPeriod> {
 ///
 /// # Calendar vs. Day Rolling
 ///
-/// `Months(n)` and `Years(n)` use **EOM-aware calendar arithmetic** via
-/// `add_months`; `Days(n)` uses a fixed 24-hour duration. These differ at
+/// Month and year tenors use **EOM-aware calendar arithmetic** via
+/// `add_months`; day tenors add a fixed number of days. These differ at
 /// month boundaries:
 ///
-/// - From `2025-01-31`, `Months(1)` rolls to `2025-02-28` (EOM clamped).
-/// - From `2025-01-31`, `Days(30)` rolls to `2025-03-02`.
+/// - From `2025-01-31`, `1M` rolls to `2025-02-28` (EOM clamped).
+/// - From `2025-01-31`, `30D` rolls to `2025-03-02`.
 ///
-/// Theta computed over a "one month" period therefore depends on which
-/// `ThetaPeriod` variant the caller selects. Use `Months` for theta that
-/// reflects calendar-month carry; use `Days` for fixed-duration theta.
+/// # Errors
+///
+/// Returns an error when a month or year count cannot be represented for
+/// date arithmetic.
 pub(crate) fn calculate_theta_date(
     base_date: Date,
-    period_str: &str,
+    period: Tenor,
     expiry_date: Option<Date>,
 ) -> Result<Date> {
-    let rolled_date = match parse_theta_period(period_str)? {
-        ThetaPeriod::Days(n) => base_date + time::Duration::days(n),
-        ThetaPeriod::Months(n) => base_date.add_months(n),
-        ThetaPeriod::Years(n) => base_date.add_months(n * 12),
-    };
+    let rolled_date = period.add_to_date(base_date, None, BusinessDayConvention::Unadjusted)?;
 
     // Cap at expiry if instrument expires before the rolled date
     if let Some(expiry) = expiry_date {
@@ -333,12 +280,9 @@ struct ThetaBreakdown {
 
 fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Result<ThetaBreakdown> {
     let expiry_date = theta_termination_date(context)?;
-    let period_str = context
-        .get_metric_overrides()
-        .and_then(|po| po.theta_period.as_deref())
-        .unwrap_or("1D");
+    let period = theta_period(context);
 
-    let rolled_date = calculate_theta_date(context.as_of, period_str, expiry_date)?;
+    let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
     if rolled_date <= context.as_of {
         tracing::warn!(
@@ -424,12 +368,16 @@ mod tests {
         date!(2025 - 01 - 01)
     }
 
+    fn tenor(period: &str) -> Tenor {
+        Tenor::parse(period).expect("valid theta period fixture")
+    }
+
     // Theta date calculation
 
     #[test]
     fn calculate_theta_date_no_expiry() {
         let base = test_date();
-        let rolled = calculate_theta_date(base, "1D", None).expect("roll 1D");
+        let rolled = calculate_theta_date(base, tenor("1D"), None).expect("roll 1D");
         let expected = Date::from_calendar_date(2025, Month::January, 2).expect("expected date");
         assert_eq!(rolled, expected);
     }
@@ -437,7 +385,7 @@ mod tests {
     #[test]
     fn calculate_theta_date_one_week() {
         let base = test_date();
-        let rolled = calculate_theta_date(base, "1W", None).expect("roll 1W");
+        let rolled = calculate_theta_date(base, tenor("1W"), None).expect("roll 1W");
         let expected = Date::from_calendar_date(2025, Month::January, 8).expect("expected date");
         assert_eq!(rolled, expected);
     }
@@ -445,7 +393,7 @@ mod tests {
     #[test]
     fn calculate_theta_date_one_month() {
         let base = test_date();
-        let rolled = calculate_theta_date(base, "1M", None).expect("roll 1M");
+        let rolled = calculate_theta_date(base, tenor("1M"), None).expect("roll 1M");
         let expected = Date::from_calendar_date(2025, Month::February, 1).expect("expected date");
         assert_eq!(rolled, expected);
     }
@@ -455,7 +403,7 @@ mod tests {
         let base = test_date();
         let expiry = Date::from_calendar_date(2025, Month::January, 5).expect("expiry date");
 
-        let rolled = calculate_theta_date(base, "1W", Some(expiry)).expect("roll 1W");
+        let rolled = calculate_theta_date(base, tenor("1W"), Some(expiry)).expect("roll 1W");
         assert_eq!(rolled, expiry);
     }
 
@@ -464,7 +412,7 @@ mod tests {
         let base = test_date();
         let expiry = Date::from_calendar_date(2025, Month::February, 1).expect("expiry date");
 
-        let rolled = calculate_theta_date(base, "1D", Some(expiry)).expect("roll 1D");
+        let rolled = calculate_theta_date(base, tenor("1D"), Some(expiry)).expect("roll 1D");
         let expected = Date::from_calendar_date(2025, Month::January, 2).expect("expected date");
         assert_eq!(rolled, expected);
     }
@@ -474,7 +422,7 @@ mod tests {
         let base = test_date();
         let expiry = Date::from_calendar_date(2025, Month::January, 31).expect("expiry date");
 
-        let rolled = calculate_theta_date(base, "30D", Some(expiry)).expect("roll 30D");
+        let rolled = calculate_theta_date(base, tenor("30D"), Some(expiry)).expect("roll 30D");
         assert_eq!(rolled, expiry);
     }
 
@@ -483,7 +431,7 @@ mod tests {
         let base = Date::from_calendar_date(2025, Month::February, 1).expect("base date");
         let expiry = test_date();
 
-        let rolled = calculate_theta_date(base, "1D", Some(expiry)).expect("roll 1D");
+        let rolled = calculate_theta_date(base, tenor("1D"), Some(expiry)).expect("roll 1D");
         assert_eq!(rolled, expiry);
     }
 
@@ -491,26 +439,16 @@ mod tests {
     fn calculate_theta_date_various_periods() {
         let base = test_date();
 
-        let rolled_3m = calculate_theta_date(base, "3M", None).expect("roll 3M");
+        let rolled_3m = calculate_theta_date(base, tenor("3M"), None).expect("roll 3M");
         assert_eq!(
             rolled_3m,
             Date::from_calendar_date(2025, Month::April, 1).expect("expected date")
         );
 
-        let rolled_1y = calculate_theta_date(base, "1Y", None).expect("roll 1Y");
+        let rolled_1y = calculate_theta_date(base, tenor("1Y"), None).expect("roll 1Y");
         assert_eq!(
             rolled_1y,
             Date::from_calendar_date(2026, Month::January, 1).expect("expected date")
-        );
-    }
-
-    #[test]
-    fn invalid_theta_period_error_includes_input() {
-        let err = calculate_theta_date(test_date(), "12Q", None).expect_err("bad unit should fail");
-
-        assert!(
-            err.to_string().contains("12Q"),
-            "theta period error should include the offending input, got: {err}"
         );
     }
 
@@ -519,13 +457,13 @@ mod tests {
         let base = test_date();
         let expiry = Date::from_calendar_date(2025, Month::January, 6).expect("expiry date");
 
-        let theta_date_1d = calculate_theta_date(base, "1D", Some(expiry)).expect("roll 1D");
+        let theta_date_1d = calculate_theta_date(base, tenor("1D"), Some(expiry)).expect("roll 1D");
         assert_eq!(
             theta_date_1d,
             Date::from_calendar_date(2025, Month::January, 2).expect("expected date")
         );
 
-        let theta_date_1w = calculate_theta_date(base, "1W", Some(expiry)).expect("roll 1W");
+        let theta_date_1w = calculate_theta_date(base, tenor("1W"), Some(expiry)).expect("roll 1W");
         assert_eq!(theta_date_1w, expiry);
     }
 

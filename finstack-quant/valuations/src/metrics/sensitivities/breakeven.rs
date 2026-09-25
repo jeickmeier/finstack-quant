@@ -216,12 +216,9 @@ fn iterative_breakeven(
     config: &BreakevenConfig,
 ) -> Result<f64> {
     // Determine the horizon date (same convention as carry decomposition).
-    let period_str = context
-        .get_metric_overrides()
-        .and_then(|o| o.theta_period.as_deref())
-        .unwrap_or("1D");
+    let period = crate::metrics::theta_period(context);
     let expiry_date = context.instrument.expiry();
-    let rolled_date = calculate_theta_date(context.as_of, period_str, expiry_date)?;
+    let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
     // Base PV at the horizon with current (un-bumped) curves.
     let base_pv_at_horizon = context
@@ -281,7 +278,7 @@ mod tests {
     use crate::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget};
     use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
@@ -516,7 +513,7 @@ mod tests {
         .expect("bond");
 
         bond.metric_pricing_overrides = MetricPricingOverrides::default()
-            .with_theta_period("6M")
+            .with_theta_period(Tenor::semi_annual())
             .with_breakeven_config(BreakevenConfig {
                 target: BreakevenTarget::ZSpread,
                 mode: BreakevenMode::Linear,
@@ -572,7 +569,7 @@ mod tests {
         )
         .expect("bond");
         bond.metric_pricing_overrides = MetricPricingOverrides::default()
-            .with_theta_period("6M")
+            .with_theta_period(Tenor::semi_annual())
             .with_breakeven_config(BreakevenConfig { target, mode });
         bond
     }
@@ -728,7 +725,8 @@ mod tests {
         // The solved shift must actually zero the objective:
         //   carry + PV(bumped, horizon) - PV(base, horizon) ~= 0
         let bond = breakeven_bond("BE-CHK", BreakevenTarget::ZSpread, BreakevenMode::Iterative);
-        let rolled = calculate_theta_date(as_of, "6M", bond.expiry()).expect("horizon date");
+        let rolled =
+            calculate_theta_date(as_of, Tenor::semi_annual(), bond.expiry()).expect("horizon date");
         let base_pv = bond.value(&market, rolled).expect("base pv").amount();
         let bumped = crate::metrics::bump_discount_curve_parallel(
             &market,
@@ -770,7 +768,7 @@ mod tests {
         .expect("bond");
         bond.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
         bond.metric_pricing_overrides = MetricPricingOverrides::default()
-            .with_theta_period("6M")
+            .with_theta_period(Tenor::semi_annual())
             .with_breakeven_config(BreakevenConfig {
                 target: BreakevenTarget::ZSpread,
                 mode: BreakevenMode::Iterative,
@@ -842,7 +840,7 @@ mod tests {
         .expect("bond");
 
         bond_1m.metric_pricing_overrides = MetricPricingOverrides::default()
-            .with_theta_period("1M")
+            .with_theta_period(Tenor::monthly())
             .with_breakeven_config(BreakevenConfig {
                 target: BreakevenTarget::ZSpread,
                 mode: BreakevenMode::Linear,
@@ -872,7 +870,7 @@ mod tests {
         .expect("bond");
 
         bond_6m.metric_pricing_overrides = MetricPricingOverrides::default()
-            .with_theta_period("6M")
+            .with_theta_period(Tenor::semi_annual())
             .with_breakeven_config(BreakevenConfig {
                 target: BreakevenTarget::ZSpread,
                 mode: BreakevenMode::Linear,

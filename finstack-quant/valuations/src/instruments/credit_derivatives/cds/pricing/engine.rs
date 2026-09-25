@@ -316,14 +316,10 @@ impl CDSPricer {
 
         // QuantLib parity: with `Actual360(true)` the within-period
         // accrual fraction is inclusive of the upper boundary. Mirror that
-        // behaviour for the AoD integral when the override is requested
+        // behaviour for the AoD integral under the QuantLib parity convention
         // so the linear `tau` interpolation matches QuantLib's
         // `IsdaCdsEngine`.
-        let tau_remaining = if inp
-            .cds
-            .instrument_pricing_overrides
-            .model_config
-            .cds_act360_include_last_day
+        let tau_remaining = if inp.cds.valuation_convention.act360_includes_last_day()
             && inp.cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360
             && inp.end_date > inp.accrual_start_date
         {
@@ -405,20 +401,10 @@ impl CDSPricer {
             // by one full day.
             let mut bias_days = 0.0;
             if inp.cds.premium.day_count == finstack_quant_core::dates::DayCount::Act360 {
-                if inp
-                    .cds
-                    .instrument_pricing_overrides
-                    .model_config
-                    .cds_act360_include_last_day
-                {
+                if inp.cds.valuation_convention.act360_includes_last_day() {
                     bias_days += 0.5;
                 }
-                if inp
-                    .cds
-                    .instrument_pricing_overrides
-                    .model_config
-                    .cds_aod_half_day_bias
-                {
+                if inp.cds.valuation_convention.aod_half_day_bias() {
                     bias_days += 0.5;
                 }
             }

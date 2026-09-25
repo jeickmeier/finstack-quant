@@ -17,7 +17,6 @@
       "settlement": "cash",
       "spot_id": "EQUITY-SPOT",
       "strike": 4500.0,
-      "theta_day_basis": "calendar_365",
       "underlying_ticker": "SPX",
       "vol_surface_id": "EQUITY-VOL"
     },

@@ -7924,7 +7924,7 @@ export interface BsGreeks {
    */
   vega: number;
   /**
-   * Theta per day under the `thetaDays` basis.
+   * Theta per day under the `thetaDaysPerYear` basis.
    */
   theta: number;
   /**
@@ -8073,8 +8073,8 @@ export interface ModelsNamespace {
    * @param vol - Annualized volatility, **decimal**; must be positive.
    * @param expiry - Time to expiry in **years**; must be positive.
    * @param isCall - `true` for a call, `false` for a put.
-   * @param thetaDays - Day-count denominator for theta. Default `365`. Pass `252` for trading-day theta.
-   * @returns Object `{ delta, gamma, vega, theta, rho_r, rho_q }` (snake_case keys matching the Rust/Python canonical `BsGreeks` fields). `vega` and both rho values are **per 1% move**; `theta` is **per day** under `thetaDays`.
+   * @param thetaDaysPerYear - Day-count denominator for theta. Default `365`. Pass `252` for trading-day theta.
+   * @returns Object `{ delta, gamma, vega, theta, rho_r, rho_q }` (snake_case keys matching the Rust/Python canonical `BsGreeks` fields). `vega` and both rho values are **per 1% move**; `theta` is **per day** under `thetaDaysPerYear`.
    * @throws If serialization to JS fails (should not happen on valid inputs).
    */
   bsGreeks(
@@ -8085,7 +8085,7 @@ export interface ModelsNamespace {
     vol: number,
     expiry: number,
     isCall: boolean,
-    thetaDays?: number
+    thetaDaysPerYear?: number
   ): BsGreeks;
   /**
    * Solve for Black-Scholes / Garman-Kohlhagen implied volatility.

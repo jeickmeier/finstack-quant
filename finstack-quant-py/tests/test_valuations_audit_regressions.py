@@ -39,7 +39,7 @@ def test_metric_fixing_requirement_preserves_value_error() -> None:
     instrument["instrument"]["spec"].update(
         fixing_dates=["2025-01-03"],
         payment_dates=["2025-04-03"],
-        metric_pricing_overrides={"theta_period": "2D"},
+        metric_pricing_overrides={"theta_period": {"count": 2, "unit": "days"}},
     )
     with pytest.raises(ValueError, match=r"(?i)fixing"):
         price_instrument(

@@ -291,73 +291,24 @@ fn test_asw_market_uses_configured_forward_curve() {
 }
 
 #[test]
-fn test_asw_market_falls_back_to_bond_forward_curve_id() {
-    use finstack_quant_core::dates::DayCount;
-    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-
-    let as_of = date!(2025 - 01 - 01);
-    let mut bond = Bond::fixed(
-        "ASW-BOND-FORWARD-FALLBACK",
+fn test_bond_rejects_retired_forward_curve_id_field() {
+    let bond = Bond::fixed(
+        "ASW-BOND-RETIRED-FIELD",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-        as_of,
+        date!(2025 - 01 - 01),
         date!(2030 - 01 - 01),
         finstack_quant_core::dates::StubKind::ShortFront,
         "USD-OIS",
     )
     .unwrap();
-    bond.forward_curve_id = Some("USD-SOFR-6M".into());
-    bond.instrument_pricing_overrides =
-        InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
-
-    let discount_curve = DiscountCurve::builder("USD-OIS")
-        .base_date(as_of)
-        .knots([(0.0, 1.0), (5.0, 0.85)])
-        .build()
-        .unwrap();
-    let low_forward_curve = ForwardCurve::builder("USD-SOFR-6M", 0.5)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.01), (5.0, 0.01)])
-        .build()
-        .unwrap();
-    let high_forward_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.04), (5.0, 0.04)])
-        .build()
-        .unwrap();
-    let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert(discount_curve)
-        .insert(low_forward_curve)
-        .insert(high_forward_curve);
-
-    let fallback = bond
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::ASWMarket],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .expect("ASW with bond forward curve fallback should compute")
-        .measures["asw_market"];
-
-    bond.instrument_pricing_overrides
-        .model_config
-        .asw_forward_curve_id = Some("USD-SOFR-3M".into());
-    let explicit_override = bond
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::ASWMarket],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .expect("ASW explicit forward override should compute")
-        .measures["asw_market"];
-
+    let mut value = serde_json::to_value(&bond).expect("serialize bond");
+    // schema-rejection-test
+    value["forward_curve_id"] = serde_json::json!("USD-SOFR-6M");
+    let err = serde_json::from_value::<Bond>(value).expect_err("retired key must be rejected");
     assert!(
-        (fallback - explicit_override).abs() > 1e-3,
-        "ASW should use bond.forward_curve_id only when asw_forward_curve_id is absent: fallback={fallback}, explicit_override={explicit_override}"
+        err.to_string().contains("forward_curve_id"),
+        "error should name the retired key: {err}"
     );
 }
 

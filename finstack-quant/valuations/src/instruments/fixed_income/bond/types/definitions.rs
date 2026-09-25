@@ -69,10 +69,6 @@ pub struct Bond {
     pub cashflow_spec: CashflowSpec,
     /// Discount curve identifier for pricing.
     pub discount_curve_id: CurveId,
-    /// Optional forward curve identifier for projected floating or asset-swap legs.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[builder(default)]
-    pub forward_curve_id: Option<CurveId>,
     /// Optional credit curve identifier (default intensity). When present,
     /// credit-rate pricing is enabled.
     pub credit_curve_id: Option<CurveId>,
@@ -150,8 +146,6 @@ impl<'de> serde::Deserialize<'de> for Bond {
             maturity: Date,
             cashflow_spec: CashflowSpec,
             discount_curve_id: CurveId,
-            #[serde(default)]
-            forward_curve_id: Option<CurveId>,
             credit_curve_id: Option<CurveId>,
             #[serde(default)]
             funding_curve_id: Option<CurveId>,
@@ -212,7 +206,6 @@ impl<'de> serde::Deserialize<'de> for Bond {
             maturity: helper.maturity,
             cashflow_spec: helper.cashflow_spec,
             discount_curve_id: helper.discount_curve_id,
-            forward_curve_id: helper.forward_curve_id,
             credit_curve_id: helper.credit_curve_id,
             funding_curve_id: helper.funding_curve_id,
             instrument_pricing_overrides: helper.instrument_pricing_overrides,

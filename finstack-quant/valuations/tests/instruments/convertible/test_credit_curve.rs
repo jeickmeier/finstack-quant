@@ -14,7 +14,8 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 
-const TREE: ConvertibleTreeType = ConvertibleTreeType::Binomial(100);
+const TREE: ConvertibleTreeType = ConvertibleTreeType::Binomial;
+const TREE_STEPS: usize = 100;
 
 #[test]
 fn test_credit_spread_reduces_price() {
@@ -25,12 +26,20 @@ fn test_credit_spread_reduces_price() {
     let market_with_credit = create_market_context_with_credit(200.0); // 200bp spread
     let market_no_credit = create_market_context();
 
-    let price_with_credit =
-        price_convertible_bond(&bond, &market_with_credit, TREE, dates::base_date())
-            .expect("should price with credit curve");
-    let price_no_credit =
-        price_convertible_bond(&bond_no_credit, &market_no_credit, TREE, dates::base_date())
-            .expect("should price without credit curve");
+    let price_with_credit = price_convertible_bond(
+        &with_tree_steps(&bond, TREE_STEPS),
+        &market_with_credit,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price with credit curve");
+    let price_no_credit = price_convertible_bond(
+        &with_tree_steps(&bond_no_credit, TREE_STEPS),
+        &market_no_credit,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price without credit curve");
 
     // With credit spread, the cash component is discounted more aggressively,
     // so total price should be lower (OTM convertibles affected most).
@@ -51,10 +60,20 @@ fn test_wider_credit_spread_reduces_price_further() {
     let market_100bp = create_market_context_with_credit(100.0);
     let market_300bp = create_market_context_with_credit(300.0);
 
-    let price_100bp = price_convertible_bond(&bond, &market_100bp, TREE, dates::base_date())
-        .expect("should price at 100bp spread");
-    let price_300bp = price_convertible_bond(&bond, &market_300bp, TREE, dates::base_date())
-        .expect("should price at 300bp spread");
+    let price_100bp = price_convertible_bond(
+        &with_tree_steps(&bond, TREE_STEPS),
+        &market_100bp,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price at 100bp spread");
+    let price_300bp = price_convertible_bond(
+        &with_tree_steps(&bond, TREE_STEPS),
+        &market_300bp,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price at 300bp spread");
 
     assert!(
         price_300bp.amount() < price_100bp.amount(),
@@ -113,12 +132,20 @@ fn test_credit_spread_effect_larger_for_otm() {
     let mut bond_no_credit = create_standard_convertible();
     bond_no_credit.credit_curve_id = None;
 
-    let otm_price_no_credit =
-        price_convertible_bond(&bond_no_credit, &otm_no_spread, TREE, dates::base_date())
-            .expect("should price OTM no credit");
-    let otm_price_with_credit =
-        price_convertible_bond(&bond, &otm_with_spread, TREE, dates::base_date())
-            .expect("should price OTM with credit");
+    let otm_price_no_credit = price_convertible_bond(
+        &with_tree_steps(&bond_no_credit, TREE_STEPS),
+        &otm_no_spread,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price OTM no credit");
+    let otm_price_with_credit = price_convertible_bond(
+        &with_tree_steps(&bond, TREE_STEPS),
+        &otm_with_spread,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price OTM with credit");
 
     let otm_impact_pct = (otm_price_no_credit.amount() - otm_price_with_credit.amount())
         / otm_price_no_credit.amount();
@@ -127,12 +154,20 @@ fn test_credit_spread_effect_larger_for_otm() {
     let itm_no_spread = create_market_context();
     let itm_with_spread = create_market_context_with_credit(200.0);
 
-    let itm_price_no_credit =
-        price_convertible_bond(&bond_no_credit, &itm_no_spread, TREE, dates::base_date())
-            .expect("should price ITM no credit");
-    let itm_price_with_credit =
-        price_convertible_bond(&bond, &itm_with_spread, TREE, dates::base_date())
-            .expect("should price ITM with credit");
+    let itm_price_no_credit = price_convertible_bond(
+        &with_tree_steps(&bond_no_credit, TREE_STEPS),
+        &itm_no_spread,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price ITM no credit");
+    let itm_price_with_credit = price_convertible_bond(
+        &with_tree_steps(&bond, TREE_STEPS),
+        &itm_with_spread,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price ITM with credit");
 
     let itm_impact_pct = (itm_price_no_credit.amount() - itm_price_with_credit.amount())
         / itm_price_no_credit.amount();
@@ -306,11 +341,21 @@ fn test_recovery_rate_increases_price() {
 
     let market = create_market_context_with_credit(200.0);
 
-    let price_zero = price_convertible_bond(&bond_zero_recovery, &market, TREE, dates::base_date())
-        .expect("should price zero recovery");
+    let price_zero = price_convertible_bond(
+        &with_tree_steps(&bond_zero_recovery, TREE_STEPS),
+        &market,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price zero recovery");
 
-    let price_40 = price_convertible_bond(&bond_40pct_recovery, &market, TREE, dates::base_date())
-        .expect("should price 40% recovery");
+    let price_40 = price_convertible_bond(
+        &with_tree_steps(&bond_40pct_recovery, TREE_STEPS),
+        &market,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price 40% recovery");
 
     assert!(
         price_40.amount() > price_zero.amount(),
@@ -339,9 +384,13 @@ fn test_recovery_rate_100_pct_equals_no_credit() {
     )
     .expect("should price full recovery");
 
-    let price_no_credit =
-        price_convertible_bond(&bond_no_credit, &market_no_credit, TREE, dates::base_date())
-            .expect("should price no credit");
+    let price_no_credit = price_convertible_bond(
+        &with_tree_steps(&bond_no_credit, TREE_STEPS),
+        &market_no_credit,
+        TREE,
+        dates::base_date(),
+    )
+    .expect("should price no credit");
 
     // Should be very close since 100% recovery = risk-free discounting on cash
     let diff_pct =
@@ -367,9 +416,14 @@ fn test_recovery_rate_monotonic() {
         let mut bond = create_convertible_with_credit();
         bond.recovery_rate = Some(r);
 
-        let price = price_convertible_bond(&bond, &market, TREE, dates::base_date())
-            .expect("should price")
-            .amount();
+        let price = price_convertible_bond(
+            &with_tree_steps(&bond, TREE_STEPS),
+            &market,
+            TREE,
+            dates::base_date(),
+        )
+        .expect("should price")
+        .amount();
 
         if r > 0.0 {
             assert!(

@@ -20,6 +20,10 @@ fn default_observation_business_day_convention() -> BusinessDayConvention {
     BusinessDayConvention::Following
 }
 
+fn default_trading_days_per_year() -> f64 {
+    crate::constants::TRADING_DAYS_PER_YEAR
+}
+
 /// Corporate-action treatment of historical equity price observations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -132,6 +136,15 @@ pub struct VarianceSwap {
     #[serde(default)]
     #[builder(default)]
     pub realized_var_method: RealizedVarMethod,
+    /// Trading days per year used to annualise daily realized variance.
+    ///
+    /// A contract term of the variance-swap confirmation: daily observations
+    /// are annualised by `trading_days_per_year / observation_frequency.count()`.
+    /// Must be finite and positive. Defaults to
+    /// [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+    #[serde(default = "default_trading_days_per_year")]
+    #[builder(default = crate::constants::TRADING_DAYS_PER_YEAR)]
+    pub trading_days_per_year: f64,
     /// Corporate-action policy applied to all historical price series.
     ///
     /// The selected policy is declarative: input series must already conform to
@@ -211,6 +224,12 @@ impl VarianceSwap {
             self.maturity,
             "variance swap observation period",
         )?;
+        if !self.trading_days_per_year.is_finite() || self.trading_days_per_year <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VarianceSwap trading_days_per_year must be finite and positive, got {}",
+                self.trading_days_per_year
+            )));
+        }
         if self.observation_frequency.count() == 0 {
             return Err(finstack_quant_core::Error::Validation(
                 "VarianceSwap observation_frequency must contain at least one tenor unit"
@@ -419,16 +438,12 @@ impl VarianceSwap {
 
     /// Calculate annualization factor based on observation frequency.
     ///
-    /// Equity variance swaps use **252 trading days per year** as the market standard
-    /// (Demeterfi et al., 1999). This converts sample variance to annualized variance:
-    /// σ²_annual = (252/N) × Σ [ln(S_i/S_{i-1})]² for N observations.
+    /// Daily observations annualise with the contract's
+    /// `trading_days_per_year` (252 by default, Demeterfi et al., 1999):
+    /// σ²_annual = (trading_days_per_year/N) × Σ [ln(S_i/S_{i-1})]² for N
+    /// observations. Weekly and month-based frequencies use 52 and 12.
     pub fn annualization_factor(&self) -> f64 {
         pricer::annualization_factor(self)
-    }
-
-    /// Sampling policy aware annualization factor (uses market overrides when available).
-    pub fn annualization_factor_with_policy(&self, context: &MarketContext) -> f64 {
-        pricer::annualization_factor_with_policy(self, context)
     }
 
     /// Calculate the fraction of time elapsed in the observation period.

@@ -7,7 +7,7 @@
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_equity.json",
-      "sha256": "4c268f958f934ba1f06762b95ba6392b084f94eb90a106b2ed290c1efa712dd1"
+      "sha256": "82784b51064e2aa24635e8eb98385a3a2054f575dbc1f4a16ba8b472b0bdc5a6"
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_cds_option.json",
@@ -436,7 +436,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": ["theta", "hvar"],
-        "pricingOptions": "{\"theta_period\":\"1W\"}",
+        "pricingOptions": "{\"theta_period\":{\"count\":1,\"unit\":\"weeks\"}}",
         "marketHistory": "{\"base_date\":\"2023-12-28\",\"window_days\":2,\"scenarios\":[{\"date\":\"2023-12-26\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1},\"shift\":0.001}]},{\"date\":\"2023-12-27\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1},\"shift\":-0.0005}]}]}"
       },
       "edit": {
@@ -1551,7 +1551,7 @@
       "type": "equity_option",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",
-        "sha256": "9485cbaad3ea0c121625d0309c53676f60a5f9ffc64f3d4a679fc5a16f73bf3c",
+        "sha256": "1b5b8b9085c8e419dc7b505dc7a7f550fb5f6713b44b165d9c82395645dd8847",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2007,7 +2007,7 @@
       "type": "fx_variance_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_variance_swap.json",
-        "sha256": "faa86cb34290a6783bfb39065c99e2b390429db7974d408e378c0746e50b841b",
+        "sha256": "9a550304a0265be18c3f769614b69e06740bb95c3e7c2a86ba31fed2d4481625",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2919,7 +2919,7 @@
       "type": "variance_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/variance_swap.json",
-        "sha256": "5e1d9be447d78b664add4848fcf3356a40bc048bbfc10e42a35ab7c46e9bd52e",
+        "sha256": "1a3efb8fae24121b98dfc25430e8c161c79de7cd22136da6575b5b9a8a1efa27",
         "pointer": []
       },
       "instrumentPatches": [],

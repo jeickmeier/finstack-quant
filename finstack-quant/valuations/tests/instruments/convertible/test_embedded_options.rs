@@ -22,9 +22,9 @@ fn test_callable_convertible_bond() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -45,17 +45,17 @@ fn test_callable_caps_upside() {
     let market = create_market_context();
 
     let price_callable = price_convertible_bond(
-        &bond_callable,
+        &with_tree_steps(&bond_callable, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
 
     let price_plain = price_convertible_bond(
-        &bond_plain,
+        &with_tree_steps(&bond_plain, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -76,9 +76,9 @@ fn test_puttable_convertible_bond() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -105,9 +105,9 @@ fn test_puttable_provides_floor() {
     );
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -136,17 +136,17 @@ fn test_puttable_increases_value() {
     );
 
     let price_puttable = price_convertible_bond(
-        &bond_puttable,
+        &with_tree_steps(&bond_puttable, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
 
     let price_plain = price_convertible_bond(
-        &bond_plain,
+        &with_tree_steps(&bond_plain, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -169,9 +169,9 @@ fn test_combined_call_put_convertible() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 60),
         &market,
-        ConvertibleTreeType::Binomial(60),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -193,9 +193,9 @@ fn test_combined_call_put_bounded() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 60),
         &market,
-        ConvertibleTreeType::Binomial(60),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -243,9 +243,9 @@ fn test_multiple_call_dates() {
 
     let market = create_market_context();
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 60),
         &market,
-        ConvertibleTreeType::Binomial(60),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -315,16 +315,16 @@ fn test_overlapping_call_windows_order_invariant() {
     );
 
     let price_a = price_convertible_bond(
-        &bond_a,
+        &with_tree_steps(&bond_a, 80),
         &market,
-        ConvertibleTreeType::Binomial(80),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
     let price_b = price_convertible_bond(
-        &bond_b,
+        &with_tree_steps(&bond_b, 80),
         &market,
-        ConvertibleTreeType::Binomial(80),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -368,9 +368,9 @@ fn test_multiple_put_dates() {
 
     let market = create_market_context();
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 60),
         &market,
-        ConvertibleTreeType::Binomial(60),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -390,9 +390,9 @@ fn test_call_price_at_par() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -411,9 +411,9 @@ fn test_call_price_at_premium() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -432,9 +432,9 @@ fn test_put_price_at_discount() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -473,9 +473,9 @@ fn test_call_before_conversion_window() {
 
     let market = create_market_context();
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -515,9 +515,9 @@ fn test_call_during_conversion_window() {
 
     let market = create_market_context();
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -537,9 +537,9 @@ fn test_early_call_date() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -547,9 +547,9 @@ fn test_early_call_date() {
     // Early call should have more impact
     let bond_plain = create_standard_convertible();
     let price_plain = price_convertible_bond(
-        &bond_plain,
+        &with_tree_steps(&bond_plain, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();
@@ -569,9 +569,9 @@ fn test_late_put_date() {
     let market = create_market_context();
 
     let price = price_convertible_bond(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         dates::base_date(),
     )
     .unwrap();

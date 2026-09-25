@@ -90,7 +90,6 @@ class TestEquityOptionTyped:
             .strike(200.0)
             .option_type("call")
             .exercise_style("european")
-            .theta_day_basis("trading_252")
             .expiry(expiry)
             .settlement("physical")
             .exercise(expiry, 215.0, settlement, True)
@@ -103,7 +102,8 @@ class TestEquityOptionTyped:
 
         payload = json.loads(option.to_json())["instrument"]["spec"]
         assert payload["settlement"] == "physical"
-        assert payload["theta_day_basis"] == "trading_252"
+        # `theta_day_basis` is a metric pricing override, not an EquityOption field.
+        assert "theta_day_basis" not in payload
         assert payload["exercise"] == {
             "date": "2025-06-20",
             "spot": 215.0,

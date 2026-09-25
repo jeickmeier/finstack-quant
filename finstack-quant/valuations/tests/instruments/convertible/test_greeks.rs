@@ -21,9 +21,9 @@ fn test_delta_positive_for_itm() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -43,9 +43,9 @@ fn test_delta_bounded_by_conversion_ratio() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -71,9 +71,9 @@ fn test_delta_increases_with_moneyness() {
         market_params::DIV_YIELD,
     );
     let greeks_otm = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market_otm,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -86,9 +86,9 @@ fn test_delta_increases_with_moneyness() {
         market_params::DIV_YIELD,
     );
     let greeks_atm = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market_atm,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -97,9 +97,9 @@ fn test_delta_increases_with_moneyness() {
     // ITM
     let market_itm = create_market_context();
     let greeks_itm = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market_itm,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -127,9 +127,9 @@ fn test_gamma_non_negative() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -148,7 +148,8 @@ fn test_gamma_peaks_near_atm() {
     let bond = create_standard_convertible();
 
     // Use enough tree steps for stable gamma (second derivative is noisy with few steps).
-    let tree = ConvertibleTreeType::Binomial(100);
+    let bond = with_tree_steps(&bond, 100);
+    let tree = ConvertibleTreeType::Binomial;
 
     // OTM
     let market_otm = create_market_context_with_params(
@@ -212,9 +213,9 @@ fn test_vega_non_negative() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -238,9 +239,9 @@ fn test_vega_positive_for_atm() {
     );
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -260,9 +261,9 @@ fn test_theta_reasonable() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -290,9 +291,9 @@ fn test_rho_finite() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -319,9 +320,9 @@ fn test_greeks_price_consistency() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -352,9 +353,9 @@ fn test_greeks_with_different_bump_sizes() {
 
     for bump in bump_sizes {
         let greeks = calculate_convertible_greeks(
-            &bond,
+            &with_tree_steps(&bond, 50),
             &market,
-            ConvertibleTreeType::Binomial(50),
+            ConvertibleTreeType::Binomial,
             GreekBumps {
                 spot_bump_pct: bump,
                 ..GreekBumps::default()
@@ -393,9 +394,9 @@ fn test_greeks_with_trinomial_tree() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Trinomial(50),
+        ConvertibleTreeType::Trinomial,
         GreekBumps::default(),
         dates::base_date(),
     );
@@ -414,18 +415,18 @@ fn test_greeks_binomial_vs_trinomial() {
     let market = create_market_context();
 
     let greeks_bin = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Binomial(100),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
     .unwrap();
 
     let greeks_tri = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 100),
         &market,
-        ConvertibleTreeType::Trinomial(100),
+        ConvertibleTreeType::Trinomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -452,9 +453,9 @@ fn test_delta_for_deep_itm() {
     );
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -479,9 +480,9 @@ fn test_delta_for_deep_otm() {
     );
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -506,9 +507,9 @@ fn test_vega_decreases_deep_itm() {
         market_params::DIV_YIELD,
     );
     let greeks_atm = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market_atm,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -521,9 +522,9 @@ fn test_vega_decreases_deep_itm() {
         market_params::DIV_YIELD,
     );
     let greeks_itm = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market_itm,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -545,9 +546,9 @@ fn test_greeks_all_finite() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )
@@ -567,9 +568,9 @@ fn test_zero_coupon_greeks() {
     let market = create_market_context();
 
     let greeks = calculate_convertible_greeks(
-        &bond,
+        &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial(50),
+        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         dates::base_date(),
     )

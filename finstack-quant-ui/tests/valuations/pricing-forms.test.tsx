@@ -140,7 +140,7 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
   });
   await waitFor(() =>
     expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBe(
-      '{"theta_period":"1W"}',
+      '{"theta_period":{"count":1,"unit":"weeks"}}',
     ),
   );
   await userEvent.click(screen.getByRole("button", { name: "Metrics" }));
@@ -159,7 +159,7 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
   expect(changes.mock.calls.at(-1)?.[0].metrics).toEqual([]);
   expect(changes.mock.calls.at(-1)?.[0].marketHistory).toBe(history);
   expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBe(
-    '{"theta_period":"1W"}',
+    '{"theta_period":{"count":1,"unit":"weeks"}}',
   );
   const historyField = screen.getByRole("textbox", { name: "Market history" });
   fireEvent.change(historyField, { target: { value: "{" } });

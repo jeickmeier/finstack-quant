@@ -44,7 +44,7 @@ pub(crate) fn compute_pv(
                 &low,
                 &close,
                 inst.realized_var_method,
-                annualization_factor_with_policy(inst, curves),
+                annualization_factor(inst),
             )?
         } else {
             let prices = get_historical_prices(inst, curves, as_of)?;
@@ -54,7 +54,7 @@ pub(crate) fn compute_pv(
             realized_variance(
                 &prices,
                 inst.realized_var_method,
-                annualization_factor_with_policy(inst, curves),
+                annualization_factor(inst),
             )?
         };
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
@@ -122,53 +122,15 @@ pub(crate) fn observation_dates(inst: &VarianceSwap) -> Result<Vec<Date>> {
 
 pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
     use finstack_quant_core::dates::TenorUnit;
-    const TRADING_DAYS_PER_YEAR: f64 = 252.0;
-
     if let Some(months) = inst.observation_frequency.months() {
         12.0 / months as f64
     } else if inst.observation_frequency.unit() == TenorUnit::Weeks {
         52.0 / f64::from(inst.observation_frequency.count())
     } else if inst.observation_frequency.unit() == TenorUnit::Days {
-        TRADING_DAYS_PER_YEAR / f64::from(inst.observation_frequency.count())
+        inst.trading_days_per_year / f64::from(inst.observation_frequency.count())
     } else {
-        TRADING_DAYS_PER_YEAR
+        inst.trading_days_per_year
     }
-}
-
-pub(crate) fn annualization_factor_with_policy(
-    inst: &VarianceSwap,
-    context: &MarketContext,
-) -> f64 {
-    let tdy_override = context
-        .get_price(format!("{}_TRADING_DAYS_PER_YEAR", inst.underlying_ticker))
-        .ok()
-        .and_then(|s| match s {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => Some(*v),
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => None,
-        })
-        .or_else(|| {
-            context
-                .get_price("TRADING_DAYS_PER_YEAR")
-                .ok()
-                .and_then(|s| match s {
-                    finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
-                        Some(*v)
-                    }
-                    finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => None,
-                })
-        })
-        .unwrap_or(252.0);
-
-    if let Some(months) = inst.observation_frequency.months() {
-        return 12.0 / months as f64;
-    }
-    if inst.observation_frequency.unit() == finstack_quant_core::dates::TenorUnit::Weeks {
-        return 52.0 / f64::from(inst.observation_frequency.count());
-    }
-    if inst.observation_frequency.unit() == finstack_quant_core::dates::TenorUnit::Days {
-        return tdy_override / f64::from(inst.observation_frequency.count());
-    }
-    tdy_override
 }
 
 pub(crate) fn realized_fraction_by_observations(inst: &VarianceSwap, as_of: Date) -> Result<f64> {
@@ -344,12 +306,7 @@ pub(crate) fn partial_realized_variance(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    realized_variance_with_factor(
-        inst,
-        context,
-        as_of,
-        annualization_factor_with_policy(inst, context),
-    )
+    realized_variance_with_factor(inst, context, as_of, annualization_factor(inst))
 }
 
 /// Minimum year-fraction below which the forward-start subtraction is skipped
@@ -884,13 +841,18 @@ mod tests {
         swap.observation_frequency = Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture");
         assert_eq!(annualization_factor(&swap), 252.0);
 
-        // The policy-aware variant must agree (no TRADING_DAYS_PER_YEAR
-        // override in this market context).
-        let market = MarketContext::new();
         swap.observation_frequency = Tenor::new(7, TenorUnit::Days).expect("valid tenor fixture");
-        assert_eq!(annualization_factor_with_policy(&swap, &market), 36.0);
+        assert_eq!(annualization_factor(&swap), 36.0);
         swap.observation_frequency = Tenor::new(14, TenorUnit::Days).expect("valid tenor fixture");
-        assert_eq!(annualization_factor_with_policy(&swap, &market), 18.0);
+        assert_eq!(annualization_factor(&swap), 18.0);
+
+        // The contract's trading_days_per_year replaces the 252 default.
+        swap.trading_days_per_year = 260.0;
+        swap.observation_frequency = Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture");
+        assert_eq!(annualization_factor(&swap), 260.0);
+        swap.observation_frequency = Tenor::new(2, TenorUnit::Days).expect("valid tenor fixture");
+        assert_eq!(annualization_factor(&swap), 130.0);
+        swap.trading_days_per_year = 252.0;
 
         swap.start_date = date!(2025 - 01 - 03); // Friday
         swap.maturity = date!(2025 - 01 - 15);

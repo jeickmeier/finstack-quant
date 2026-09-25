@@ -37,28 +37,35 @@ pub(super) fn binding_pricing_options() -> PricingOptions {
 ///     Finite-difference bump sizes (``spot_bump_pct``, ``vol_bump_pct``,
 ///     ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp``,
 ///     ``adaptive_bumps``). ``None`` keeps defaults.
-/// theta_period : str | None
-///     Theta / carry horizon such as ``"1D"``, ``"1W"``, ``"1M"``, ``"3M"``.
+/// theta_period : Tenor | str | None
+///     Theta / carry horizon such as ``"1D"``, ``"1W"``, ``"1M"``, ``"3M"``
+///     (a ``finstack_quant.core.dates.Tenor`` or tenor string). ``None`` uses
+///     one day.
 /// breakeven_config : dict | None
 ///     Breakeven solve configuration, e.g.
 ///     ``{"target": "z_spread", "mode": "linear"}``.
 /// bond_risk_basis : str | None
 ///     ``"bullet_discountable"`` (Bloomberg workout risk, default) or
 ///     ``"callable_oas"``.
+/// theta_day_basis : str | None
+///     Day basis for per-day analytic option theta: ``"calendar_365"``
+///     (default, annual theta / 365) or ``"trading_252"`` (annual theta / 252).
 /// var_config : dict | None
 ///     Historical VaR / expected-shortfall configuration override.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If a sub-document is malformed or ``theta_period`` is not
-///     ``<digits><D|W|M|Y>``.
+///     If a sub-document is malformed, ``theta_period`` is not a valid
+///     positive tenor, or ``theta_day_basis`` is not a recognized basis.
+/// TypeError
+///     If ``theta_period`` is neither a ``Tenor`` nor a string.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.valuations.instruments import MetricPricingOverrides
 /// >>> opts = MetricPricingOverrides(theta_period="1W")
-/// >>> opts.theta_period
+/// >>> str(opts.theta_period)
 /// '1W'
 #[pyclass(
     name = "MetricPricingOverrides",
@@ -87,18 +94,25 @@ fn opt_serde_from_py<T: serde::de::DeserializeOwned + Send>(
 #[pymethods]
 impl PyMetricPricingOverrides {
     #[new]
-    #[pyo3(signature = (*, bump_config=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None))]
+    #[pyo3(signature = (*, bump_config=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, theta_day_basis=None, var_config=None))]
     #[pyo3(
-        text_signature = "(*, bump_config=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None)"
+        text_signature = "(*, bump_config=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, theta_day_basis=None, var_config=None)"
     )]
     fn new(
         py: Python<'_>,
         bump_config: Option<&Bound<'_, PyAny>>,
-        theta_period: Option<String>,
+        theta_period: Option<&Bound<'_, PyAny>>,
         breakeven_config: Option<&Bound<'_, PyAny>>,
         bond_risk_basis: Option<&str>,
+        theta_day_basis: Option<&str>,
         var_config: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        let theta_period = match theta_period {
+            Some(value) if !value.is_none() => {
+                Some(super::convert::tenor_from_py(value, "theta_period")?)
+            }
+            _ => None,
+        };
         let inner = MetricPricingOverrides {
             bump_config: opt_serde_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
             theta_period,
@@ -109,6 +123,17 @@ impl PyMetricPricingOverrides {
                         |_| {
                             value_error(format!(
                                 "bond_risk_basis: expected 'bullet_discountable' or 'callable_oas', got '{name}'"
+                            ))
+                        },
+                    )
+                })
+                .transpose()?,
+            theta_day_basis: theta_day_basis
+                .map(|name| {
+                    serde_json::from_value(serde_json::Value::String(name.to_string())).map_err(
+                        |_| {
+                            value_error(format!(
+                                "theta_day_basis: expected 'calendar_365' or 'trading_252', got '{name}'"
                             ))
                         },
                     )
@@ -126,10 +151,12 @@ impl PyMetricPricingOverrides {
         serde_to_py(py, &self.inner.bump_config)
     }
 
-    /// Theta / carry horizon (``"1D"``, ``"1W"``, ...), or ``None``.
+    /// Theta / carry horizon as a ``Tenor``, or ``None`` for the one-day default.
     #[getter]
-    fn theta_period(&self) -> Option<String> {
-        self.inner.theta_period.clone()
+    fn theta_period(&self) -> Option<crate::bindings::core::dates::tenor::PyTenor> {
+        self.inner
+            .theta_period
+            .map(crate::bindings::core::dates::tenor::PyTenor::from_inner)
     }
 
     /// Breakeven configuration dict, or ``None``.
@@ -147,6 +174,16 @@ impl PyMetricPricingOverrides {
     fn bond_risk_basis(&self) -> PyResult<Option<String>> {
         self.inner
             .bond_risk_basis
+            .as_ref()
+            .map(super::convert::enum_to_py_string)
+            .transpose()
+    }
+
+    /// Per-day theta basis serde name (``"calendar_365"`` / ``"trading_252"``), or ``None``.
+    #[getter]
+    fn theta_day_basis(&self) -> PyResult<Option<String>> {
+        self.inner
+            .theta_day_basis
             .as_ref()
             .map(super::convert::enum_to_py_string)
             .transpose()
@@ -212,9 +249,9 @@ impl PyMetricPricingOverrides {
                 .to_string()
         };
         Ok(format!(
-            "MetricPricingOverrides(bump_config={}, theta_period={}, breakeven_config={}, bond_risk_basis={}, var_config={})",
+            "MetricPricingOverrides(bump_config={}, theta_period={}, breakeven_config={}, bond_risk_basis={}, theta_day_basis={}, var_config={})",
             bump,
-            quoted(&self.inner.theta_period),
+            quoted(&self.inner.theta_period.map(|period| period.to_string())),
             json_or_none(
                 self.inner
                     .breakeven_config
@@ -224,6 +261,7 @@ impl PyMetricPricingOverrides {
                     .map_err(display_to_py)?
             ),
             quoted(&self.bond_risk_basis()?),
+            quoted(&self.theta_day_basis()?),
             json_or_none(
                 self.inner
                     .var_config
@@ -505,9 +543,10 @@ pub(crate) fn market_history_json(
 ///     discount curve when absent; implied financing is an ACT/360 decimal.
 /// pricing_options : MetricPricingOverrides | dict | str | None
 ///     Metric-time overrides merged into the instrument's ``pricing_overrides``
-///     before pricing: ``theta_period`` (``"1D"``, ``"1W"``, ``"1M"``),
+///     before pricing: ``theta_period`` (a tenor; in dict/JSON form
+///     ``{"count": 1, "unit": "weeks"}``, or ``MetricPricingOverrides(theta_period="1W")``),
 ///     ``breakeven_config`` (``{"target": "z_spread", "mode": "linear"}``),
-///     ``bump_config``, ``bond_risk_basis``, ``var_config``,
+///     ``bump_config``, ``bond_risk_basis``, ``theta_day_basis``, ``var_config``,
 ///     ``None`` keeps the instrument's own overrides.
 /// market_history : MarketHistory | dict | str | None
 ///     Historical scenarios required by the ``hvar`` and

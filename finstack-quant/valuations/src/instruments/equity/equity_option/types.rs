@@ -76,29 +76,6 @@ use super::parameters::{EquityOptionMarketData, EquityOptionParams};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::validation;
 
-/// Day basis used to convert annual option theta into a per-day amount.
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum ThetaDayBasis {
-    /// Calendar-day theta, annual theta divided by 365.
-    #[default]
-    #[serde(rename = "calendar_365")]
-    Calendar365,
-    /// Trading-day theta, annual theta divided by 252.
-    #[serde(rename = "trading_252")]
-    Trading252,
-}
-
-impl ThetaDayBasis {
-    pub(crate) const fn days_per_year(self) -> f64 {
-        match self {
-            Self::Calendar365 => 365.0,
-            Self::Trading252 => 252.0,
-        }
-    }
-}
-
 /// Observed exercise or expiry state for an equity option.
 ///
 /// From `date` onward the option pricer uses this fixed lifecycle state rather
@@ -186,13 +163,6 @@ pub struct EquityOption {
     #[serde(default = "crate::serde_defaults::day_count_act365f")]
     #[builder(default = finstack_quant_core::dates::DayCount::Act365F)]
     pub day_count: finstack_quant_core::dates::DayCount,
-    /// Basis used for the reported per-day theta.
-    ///
-    /// Defaults to calendar-day theta (`annual theta / 365`). Select
-    /// `Trading252` explicitly for a trading-day risk convention.
-    #[serde(default)]
-    #[builder(default)]
-    pub theta_day_basis: ThetaDayBasis,
     /// Settlement type (physical or cash)
     #[serde(default = "crate::serde_defaults::settlement_cash")]
     #[builder(default = SettlementType::Cash)]
@@ -475,7 +445,6 @@ impl EquityOption {
             expiry: option_params.expiry,
             notional: option_params.notional,
             day_count: finstack_quant_core::dates::DayCount::Act365F,
-            theta_day_basis: ThetaDayBasis::Calendar365,
             settlement: option_params.settlement,
             exercise: None,
             discount_curve_id,
@@ -1682,5 +1651,16 @@ mod tests {
             greeks.is_err(),
             "Expected Bermudan greeks to fail without exercise schedule"
         );
+    }
+
+    #[test]
+    fn equity_option_rejects_retired_theta_day_basis_field() {
+        let option = super::EquityOption::example().expect("example option");
+        let mut value = serde_json::to_value(&option).expect("serialize");
+        // schema-rejection-test: `EquityOption.theta_day_basis` (now `metric_pricing_overrides.theta_day_basis`)
+        value["theta_day_basis"] = serde_json::json!("trading_252");
+        let err = serde_json::from_value::<super::EquityOption>(value)
+            .expect_err("retired instrument field must be rejected");
+        assert!(err.to_string().contains("theta_day_basis"), "{err}");
     }
 }

@@ -1000,8 +1000,9 @@ impl ConvertibleBond {
     ///   volatility, plus forward curves and realized fixings for floating
     ///   coupons. An instrument volatility override takes precedence; surface
     ///   lookup otherwise uses the contractual conversion strike.
-    /// * `tree_type` - Optional binomial/trinomial grid and step count; `None`
-    ///   uses the canonical 200-step binomial tree for every repricing.
+    /// * `tree_type` - Optional binomial/trinomial lattice kind; `None` uses the
+    ///   binomial tree. The step count is always
+    ///   `instrument_pricing_overrides.model_config.tree_steps` (default 200).
     /// * `as_of` - Valuation date and origin of the ACT/365F equity model clock.
     ///
     /// Bump sizes come from `metric_pricing_overrides.bump_config`

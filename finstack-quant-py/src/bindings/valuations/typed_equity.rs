@@ -289,7 +289,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "vega")
     }
 
-    /// Theta of the option (per day on ``theta_day_basis``).
+    /// Theta of the option (per day on ``metric_pricing_overrides.theta_day_basis``, calendar days by default).
     ///
     /// Returns
     /// -------
@@ -402,12 +402,6 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     #[getter]
     fn day_count(&self) -> PyResult<String> {
         enum_to_py_string(&self.inner.day_count)
-    }
-
-    /// Per-day theta basis: ``"calendar_365"`` or ``"trading_252"``.
-    #[getter]
-    fn theta_day_basis(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.theta_day_basis)
     }
 
     /// ``"physical"`` or ``"cash"`` settlement.
@@ -639,37 +633,6 @@ impl PyEquityOptionBuilder {
             exercise_style,
             format!("{value:?}"),
             |b: EquityOptionBuilderInner| b.exercise_style(exercise_style)
-        )
-    }
-
-    /// Set the day basis for per-day theta.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"calendar_365", "trading_252"}
-    ///     Calendar-day theta is the default; trading-day theta must be
-    ///     selected explicitly.
-    ///
-    /// Returns
-    /// -------
-    /// EquityOptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized theta day basis.
-    #[pyo3(text_signature = "($self, value)")]
-    fn theta_day_basis<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &str,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let basis = enum_from_str(value, "theta_day_basis")?;
-        eq_set!(
-            slf,
-            theta_day_basis,
-            format!("{value:?}"),
-            |b: EquityOptionBuilderInner| b.theta_day_basis(basis)
         )
     }
 

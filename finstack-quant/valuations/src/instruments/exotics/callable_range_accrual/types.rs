@@ -247,7 +247,7 @@ mod tests {
             (
                 // schema-rejection-test
                 "metric_pricing_overrides",
-                serde_json::json!({"theta_period": "1W"}),
+                serde_json::json!({"theta_period": {"count": 1, "unit": "weeks"}}),
             ),
             (
                 // schema-rejection-test

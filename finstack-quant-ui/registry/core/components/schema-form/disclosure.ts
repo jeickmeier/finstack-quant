@@ -29,7 +29,6 @@ const SCHEDULE = new Set([
   "index_lag_days",
   "compounding_simple",
   "accrual_method",
-  "theta_day_basis",
   "standard_imm_dates",
   "protection_start_convention",
   "delta_convention",

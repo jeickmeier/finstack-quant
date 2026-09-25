@@ -212,6 +212,6 @@ pub const TRADING_DAYS_PER_YEAR: f64 = time::BUSINESS_DAYS_PER_YEAR_US;
 ///
 /// ACT/365 calendar-day theta is the market default for equity and FX options;
 /// pass [`TRADING_DAYS_PER_YEAR`] (252) instead for business-day-scaled theta.
-/// Both host bindings' `theta_days` parameters default to this constant, so
+/// Both host bindings' `theta_days_per_year` parameters default to this constant, so
 /// the value has a single home in Rust.
 pub const DEFAULT_THETA_DAYS_PER_YEAR: f64 = 365.0;

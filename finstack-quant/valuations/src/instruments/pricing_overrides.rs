@@ -632,22 +632,6 @@ pub struct ModelConfig {
     /// and validates this target against the final 95% confidence interval.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mc_target_ci_half_width: Option<f64>,
-    /// Apply ISDA half-day accrual-on-default bias.
-    ///
-    /// Adds half a day of premium accrual in the default-accrual integral.
-    /// Used by the CDS option pricer to model the Bloomberg CDSO underlying
-    /// convention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).
-    #[serde(default)]
-    pub cds_aod_half_day_bias: bool,
-    /// Add one calendar day to *every* Act/360 premium accrual period.
-    ///
-    /// Used by the CDS option pricer to model the ISDA pre-Big-Bang
-    /// option underlying convention (and matches QuantLib's
-    /// `Actual360(true)` day-count). The Bloomberg CDSW convention only
-    /// treats the *final* coupon period as inclusive of the maturity date,
-    /// so this is not the default for production single-name CDS pricing.
-    #[serde(default)]
-    pub cds_act360_include_last_day: bool,
     /// Pool-granularity policy for structured-credit copula default models.
     ///
     /// When set, overrides the default
@@ -1110,6 +1094,36 @@ pub enum BondRiskBasis {
     CallableOas,
 }
 
+/// Day basis used to convert annual analytic option theta into a per-day amount.
+///
+/// Applied by the analytic-theta pricers (EquityOption, FxOption,
+/// FxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ThetaDayBasis {
+    /// Calendar-day theta: annual theta divided by
+    /// [`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365).
+    #[default]
+    #[serde(rename = "calendar_365")]
+    Calendar365,
+    /// Trading-day theta: annual theta divided by
+    /// [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+    #[serde(rename = "trading_252")]
+    Trading252,
+}
+
+impl ThetaDayBasis {
+    /// Days per year that divide the annual analytic theta.
+    #[must_use]
+    pub const fn days_per_year(self) -> f64 {
+        match self {
+            Self::Calendar365 => crate::constants::DEFAULT_THETA_DAYS_PER_YEAR,
+            Self::Trading252 => crate::constants::TRADING_DAYS_PER_YEAR,
+        }
+    }
+}
+
 /// Metric-time overrides derived from an instrument's pricing metadata.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1118,14 +1132,21 @@ pub struct MetricPricingOverrides {
     /// Bump sizes for finite-difference sensitivities.
     #[serde(default, skip_serializing_if = "BumpConfig::is_empty")]
     pub bump_config: BumpConfig,
-    /// Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-    pub theta_period: Option<String>,
+    /// Theta / carry horizon over which time decay is measured (for example
+    /// 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+    /// week tenors roll a fixed number of days, month and year tenors roll
+    /// calendar months (EOM-aware). `None` uses one day.
+    pub theta_period: Option<finstack_quant_core::dates::Tenor>,
     /// Breakeven configuration: which parameter to solve for and solve mode.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub breakeven_config: Option<BreakevenConfig>,
     /// Basis used for bond duration, convexity, and DV01-style risk metrics.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bond_risk_basis: Option<BondRiskBasis>,
+    /// Day basis for the per-day analytic option theta (`calendar_365` or
+    /// `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub theta_day_basis: Option<ThetaDayBasis>,
     /// Historical VaR / Expected Shortfall configuration override.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub var_config: Option<crate::metrics::risk::VarConfig>,
@@ -1139,23 +1160,7 @@ impl MetricPricingOverrides {
 
     /// Validate metric override fields.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        use finstack_quant_core::InputError;
         self.bump_config.validate()?;
-        if let Some(ref s) = self.theta_period {
-            // The downstream consumer (`parse_theta_period`) uppercases the unit
-            // suffix before matching, so a lowercase form such as "1d" prices
-            // correctly at runtime. Normalize case here too so this JSON-boundary
-            // validation does not reject an input the pricer would accept.
-            let ok = s.len() >= 2
-                && s[..s.len() - 1].chars().all(|c| c.is_ascii_digit())
-                && matches!(
-                    s.chars().last().map(|c| c.to_ascii_uppercase()),
-                    Some('D' | 'W' | 'M' | 'Y')
-                );
-            if !ok {
-                return Err(InputError::Invalid.into());
-            }
-        }
         if let Some(var_config) = &self.var_config {
             var_config.validate()?;
         }
@@ -1187,6 +1192,7 @@ impl MetricPricingOverrides {
             theta_period,
             breakeven_config,
             bond_risk_basis,
+            theta_day_basis,
             var_config,
         } = defaults;
         let bump = &mut self.bump_config;
@@ -1196,16 +1202,21 @@ impl MetricPricingOverrides {
         bump.rate_bump_bp = bump.rate_bump_bp.or(*rate_bump_bp);
         bump.credit_spread_bump_bp = bump.credit_spread_bump_bp.or(*credit_spread_bump_bp);
         bump.adaptive_bumps |= *adaptive_bumps;
-        if self.theta_period.is_none() {
-            self.theta_period.clone_from(theta_period);
-        }
+        self.theta_period = self.theta_period.or(*theta_period);
         if self.breakeven_config.is_none() {
             self.breakeven_config.clone_from(breakeven_config);
         }
         self.bond_risk_basis = self.bond_risk_basis.or(*bond_risk_basis);
+        self.theta_day_basis = self.theta_day_basis.or(*theta_day_basis);
         if self.var_config.is_none() {
             self.var_config.clone_from(var_config);
         }
+    }
+
+    /// Days per year dividing annual analytic theta: the configured
+    /// `theta_day_basis`, else calendar-day theta (365).
+    pub fn theta_days_per_year(&self) -> f64 {
+        self.theta_day_basis.unwrap_or_default().days_per_year()
     }
 
     /// Bond risk basis, defaulting to Bloomberg-style workout/bullet risk.
@@ -1254,9 +1265,14 @@ impl MetricPricingOverrides {
         self
     }
 
-    /// Set theta period for time decay calculations.
-    pub fn with_theta_period(mut self, period: impl Into<String>) -> Self {
-        self.theta_period = Some(period.into());
+    /// Set the theta / carry horizon.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Horizon over which theta and carry are measured, e.g.
+    ///   `Tenor::weekly()`; month and year tenors roll calendar months.
+    pub fn with_theta_period(mut self, period: finstack_quant_core::dates::Tenor) -> Self {
+        self.theta_period = Some(period);
         self
     }
 
@@ -1269,6 +1285,16 @@ impl MetricPricingOverrides {
     /// Set bond risk basis for duration, convexity, and DV01-style metrics.
     pub fn with_bond_risk_basis(mut self, basis: BondRiskBasis) -> Self {
         self.bond_risk_basis = Some(basis);
+        self
+    }
+
+    /// Set the day basis for per-day analytic option theta.
+    ///
+    /// # Arguments
+    ///
+    /// * `basis` - `Calendar365` divides annual theta by 365, `Trading252` by 252.
+    pub fn with_theta_day_basis(mut self, basis: ThetaDayBasis) -> Self {
+        self.theta_day_basis = Some(basis);
         self
     }
 
@@ -1586,7 +1612,8 @@ mod tests {
             id: "fixture".to_string(),
             instrument_pricing_overrides: InstrumentPricingOverrides::default()
                 .with_quoted_clean_price_pct(99.5),
-            metric_pricing_overrides: MetricPricingOverrides::default().with_theta_period("1W"),
+            metric_pricing_overrides: MetricPricingOverrides::default()
+                .with_theta_period(finstack_quant_core::dates::Tenor::weekly()),
             scenario_pricing_overrides: ScenarioPricingOverrides::default()
                 .with_price_shock_pct(-0.05),
         };
@@ -1635,22 +1662,6 @@ mod tests {
     }
 
     #[test]
-    fn theta_period_validation_is_case_insensitive_but_strict() {
-        for period in ["1d", "1D", "2w", "3M", "1y", "10Y", "12m"] {
-            assert!(MetricPricingOverrides::default()
-                .with_theta_period(period)
-                .validate()
-                .is_ok());
-        }
-        for period in ["1x", "D", "abc", "1", "1.5d", "-1d", ""] {
-            assert!(MetricPricingOverrides::default()
-                .with_theta_period(period)
-                .validate()
-                .is_err());
-        }
-    }
-
-    #[test]
     fn monte_carlo_accuracy_controls_validate() {
         let controls = InstrumentPricingOverrides::default()
             .with_mc_paths(10_000)
@@ -1680,5 +1691,54 @@ mod tests {
         assert_eq!(config.mc_seed_scenario.as_deref(), Some("stress"));
         let overrides = InstrumentPricingOverrides::default().with_mc_seed_scenario("stress");
         assert_eq!(overrides.model_config, config);
+    }
+
+    #[test]
+    fn cds_quantlib_day_count_flags_are_not_model_config_keys() {
+        for retired in ["cds_aod_half_day_bias", "cds_act360_include_last_day"] {
+            // schema-rejection-test: `model_config.cds_aod_half_day_bias` / `model_config.cds_act360_include_last_day`
+            let json = format!(r#"{{"{retired}": true}}"#);
+            let err = serde_json::from_str::<ModelConfig>(&json)
+                .expect_err("retired CDS model_config flag must be rejected");
+            assert!(err.to_string().contains("unknown field"), "{err}");
+        }
+    }
+
+    #[test]
+    fn theta_period_is_a_tenor() {
+        use finstack_quant_core::dates::Tenor;
+
+        let overrides: MetricPricingOverrides =
+            serde_json::from_str(r#"{"theta_period": {"count": 2, "unit": "weeks"}}"#)
+                .expect("tenor theta_period parses");
+        assert_eq!(
+            overrides.theta_period,
+            Some(Tenor::parse("2W").expect("tenor"))
+        );
+        // schema-rejection-test: the retired string form `"theta_period": "1W"`
+        assert!(
+            serde_json::from_str::<MetricPricingOverrides>(r#"{"theta_period": "1W"}"#).is_err()
+        );
+        // A zero-length horizon is not a tenor.
+        assert!(serde_json::from_str::<MetricPricingOverrides>(
+            r#"{"theta_period": {"count": 0, "unit": "days"}}"#
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn theta_day_basis_is_a_metric_override() {
+        let overrides: MetricPricingOverrides =
+            serde_json::from_str(r#"{"theta_day_basis": "trading_252"}"#).expect("parses");
+        assert_eq!(overrides.theta_day_basis, Some(ThetaDayBasis::Trading252));
+        assert_eq!(overrides.theta_days_per_year(), 252.0);
+        assert_eq!(
+            MetricPricingOverrides::default().theta_days_per_year(),
+            365.0
+        );
+
+        let mut leg = MetricPricingOverrides::default();
+        leg.apply_defaults(&overrides);
+        assert_eq!(leg.theta_day_basis, Some(ThetaDayBasis::Trading252));
     }
 }

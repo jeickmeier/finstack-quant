@@ -51,9 +51,6 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        if let Some(forward_curve_id) = &self.forward_curve_id {
-            deps.add_forward_curve(forward_curve_id.clone());
-        }
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
         }

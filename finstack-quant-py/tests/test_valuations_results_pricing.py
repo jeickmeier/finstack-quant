@@ -273,22 +273,37 @@ def test_price_instrument_keyword_and_typed_options() -> None:
     by_keyword = price_instrument(instrument=_bond(), market=market, as_of=AS_OF, metrics=["theta"])
     assert "theta" in by_keyword
 
-    opts = MetricPricingOverrides(theta_period="1W")
-    assert opts.theta_period == "1W"
+    opts = MetricPricingOverrides(theta_period="1W", theta_day_basis="trading_252")
+    assert str(opts.theta_period) == "1W"
+    assert opts.theta_day_basis == "trading_252"
     assert opts == MetricPricingOverrides.from_json(opts.to_json())
     assert pickle.loads(pickle.dumps(opts)) == opts  # noqa: S301
     assert "theta_period='1W'" in repr(opts)
 
     typed = price_instrument(_bond(), market, AS_OF, metrics=["theta"], pricing_options=opts)
-    as_dict = price_instrument(_bond(), market, AS_OF, metrics=["theta"], pricing_options={"theta_period": "1W"})
+    as_dict = price_instrument(
+        _bond(),
+        market,
+        AS_OF,
+        metrics=["theta"],
+        pricing_options={"theta_period": {"count": 1, "unit": "weeks"}, "theta_day_basis": "trading_252"},
+    )
     as_str = price_instrument(
-        _bond(), market, AS_OF, metrics=["theta"], pricing_options=json.dumps({"theta_period": "1W"})
+        _bond(),
+        market,
+        AS_OF,
+        metrics=["theta"],
+        pricing_options=json.dumps({"theta_period": {"count": 1, "unit": "weeks"}, "theta_day_basis": "trading_252"}),
     )
     assert typed["theta"] == as_dict["theta"] == as_str["theta"]
     assert typed["theta"] != by_keyword["theta"]
 
-    with pytest.raises(ValueError, match=r"Invalid input data"):
+    with pytest.raises(ValueError, match=r"Invalid tenor"):
         MetricPricingOverrides(theta_period="soon")
+    with pytest.raises(ValueError, match=r"theta_day_basis: expected"):
+        MetricPricingOverrides(theta_day_basis="nope")
+    with pytest.raises(ValueError, match=r"MetricPricingOverrides"):
+        MetricPricingOverrides.from_json('{"theta_period": "1W"}')  # schema-rejection-test: retired string form
     with pytest.raises(ValueError, match=r"bond_risk_basis: expected"):
         MetricPricingOverrides(bond_risk_basis="nope")
 
@@ -384,11 +399,11 @@ def test_validate_instrument_json_merges_overrides_before_validation() -> None:
 
     with pytest.raises(ValueError):
         validate_instrument_json(raw)
-    prepared = validate_instrument_json(raw, pricing_options='{"theta_period":"1W"}')
-    assert (
-        json.loads(prepared)["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"]
-        == "1W"
-    )
+    prepared = validate_instrument_json(raw, pricing_options='{"theta_period":{"count":1,"unit":"weeks"}}')
+    assert json.loads(prepared)["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == {
+        "count": 1,
+        "unit": "weeks",
+    }
     assert validate_instrument_json(prepared) == prepared
     with pytest.raises(ValueError, match="invalid pricing options JSON"):
         validate_instrument_json(raw, pricing_options="{")

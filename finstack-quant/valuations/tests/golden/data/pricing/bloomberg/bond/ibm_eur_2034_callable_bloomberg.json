@@ -576,12 +576,12 @@
           }
         },
         "discount_curve_id": "EUR-SWAP-514",
-        "forward_curve_id": "EUR-EURIBOR-6M",
         "instrument_pricing_overrides": {
           "market_quotes": {
             "quoted_clean_price_pct": 97.484
           },
           "model_config": {
+            "asw_forward_curve_id": "EUR-EURIBOR-6M",
             "tree_steps": 200,
             "vol_model": "black",
             "bdt_sigma": 0.2321,

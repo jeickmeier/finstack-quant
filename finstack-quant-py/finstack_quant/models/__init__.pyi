@@ -58,7 +58,7 @@ class BsGreeks:
     Black-Scholes / Garman-Kohlhagen Greeks for one European option (per unit).
 
     ``vega``, ``rho_r`` and ``rho_q`` are per 1% (0.01) move; ``theta`` is per
-    day under the ``theta_days`` basis passed to :func:`bs_greeks`; ``delta``
+    day under the ``theta_days_per_year`` basis passed to :func:`bs_greeks`; ``delta``
     and ``gamma`` are per unit of spot. Immutable, compares by value, picklable.
 
     Examples
@@ -122,12 +122,12 @@ class BsGreeks:
     @property
     def theta(self) -> float:
         """
-        Theta per day under the ``theta_days`` basis (negative = decay).
+        Theta per day under the ``theta_days_per_year`` basis (negative = decay).
 
         Returns
         -------
         float
-            Change in option value per calendar or business day, using the ``theta_days`` year basis supplied to :func:`bs_greeks`; negative values indicate time decay.
+            Change in option value per calendar or business day, using the ``theta_days_per_year`` year basis supplied to :func:`bs_greeks`; negative values indicate time decay.
 
         Notes
         -----
@@ -343,13 +343,13 @@ def bs_greeks(
     vol: float,
     expiry: float,
     is_call: bool,
-    theta_days: float = 365.0,
+    theta_days_per_year: float = 365.0,
 ) -> BsGreeks:
     """
     Black-Scholes / Garman-Kohlhagen Greeks as a typed :class:`BsGreeks`.
 
     ``vega``, ``rho_r`` and ``rho_q`` are per 1% move; ``theta`` is per-day
-    using the ``theta_days`` day-count denominator (ACT/365 by default).
+    using the ``theta_days_per_year`` day-count denominator (ACT/365 by default).
 
     Parameters
     ----------
@@ -367,7 +367,7 @@ def bs_greeks(
         Time to expiry in years; must be positive.
     is_call : bool
         ``True`` for a call, ``False`` for a put.
-    theta_days : float, default 365.0
+    theta_days_per_year : float, default 365.0
         Day-count denominator for theta scaling.
 
     Returns
@@ -379,7 +379,7 @@ def bs_greeks(
     ------
     ValueError
         If any numeric input is non-finite; ``spot`` or ``strike`` is
-        non-positive; ``vol``, ``expiry``, or ``theta_days`` is non-positive;
+        non-positive; ``vol``, ``expiry``, or ``theta_days_per_year`` is non-positive;
         or a computed Greek is non-finite.
 
     Examples

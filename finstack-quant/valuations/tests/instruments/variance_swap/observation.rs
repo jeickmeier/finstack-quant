@@ -2,7 +2,7 @@
 
 use super::common::*;
 use finstack_quant_core::dates::Tenor;
-use finstack_quant_valuations::instruments::equity::variance_swap::PayReceive;
+use finstack_quant_valuations::instruments::equity::variance_swap::{PayReceive, VarianceSwap};
 
 // Observation Dates Tests
 
@@ -178,50 +178,64 @@ fn test_annualization_factor_semi_annual_equals_2() {
 }
 
 #[test]
-fn test_annualization_factor_with_market_policy_override() {
+fn test_annualization_factor_uses_contract_trading_days_per_year() {
     // Arrange
-    let swap = sample_swap(PayReceive::Receive);
-    let ctx = add_unitless(
-        base_context(),
-        format!("{}_TRADING_DAYS_PER_YEAR", UNDERLYING_ID),
-        260.0,
-    );
+    let mut swap = sample_swap(PayReceive::Receive);
+    swap.trading_days_per_year = 260.0;
 
     // Act
-    let factor = swap.annualization_factor_with_policy(&ctx);
+    let factor = swap.annualization_factor();
 
     // Assert
     assert_eq!(factor, 260.0);
 }
 
 #[test]
-fn test_annualization_factor_with_global_policy_override() {
+fn test_trading_days_per_year_defaults_to_252_on_the_wire() {
     // Arrange
     let swap = sample_swap(PayReceive::Receive);
-    let ctx = add_unitless(base_context(), "TRADING_DAYS_PER_YEAR", 255.0);
+    let mut value = serde_json::to_value(&swap).expect("serialize");
+    assert_eq!(value["trading_days_per_year"], 252.0);
+    value
+        .as_object_mut()
+        .expect("object")
+        .remove("trading_days_per_year");
 
     // Act
-    let factor = swap.annualization_factor_with_policy(&ctx);
+    let parsed: VarianceSwap = serde_json::from_value(value).expect("deserialize");
 
     // Assert
-    assert_eq!(factor, 255.0);
+    assert_eq!(parsed.trading_days_per_year, 252.0);
 }
 
 #[test]
-fn test_annualization_factor_specific_override_takes_precedence_over_global() {
-    // Arrange
+fn test_market_trading_days_scalar_is_not_an_override_channel() {
+    // Arrange: the retired `TRADING_DAYS_PER_YEAR` market scalars no longer
+    // change the contract's annualisation factor.
     let swap = sample_swap(PayReceive::Receive);
-    let ctx = add_unitless(
-        add_unitless(base_context(), "TRADING_DAYS_PER_YEAR", 250.0),
-        format!("{}_TRADING_DAYS_PER_YEAR", UNDERLYING_ID),
-        260.0,
+    let prices = price_series(&swap, 5_000.0, 3.0);
+    let with_scalars = add_series(
+        add_unitless(
+            add_unitless(base_context(), "TRADING_DAYS_PER_YEAR", 250.0),
+            format!("{}_TRADING_DAYS_PER_YEAR", UNDERLYING_ID),
+            260.0,
+        ),
+        &prices,
     );
+    let without_scalars = add_series(base_context(), &prices);
+    let as_of = date(2025, 2, 1);
 
     // Act
-    let factor = swap.annualization_factor_with_policy(&ctx);
+    let realized_with = swap
+        .partial_realized_variance(&with_scalars, as_of)
+        .expect("realized with scalars");
+    let realized_without = swap
+        .partial_realized_variance(&without_scalars, as_of)
+        .expect("realized without scalars");
 
     // Assert
-    assert_eq!(factor, 260.0); // Specific takes precedence
+    assert_eq!(swap.annualization_factor(), 252.0);
+    assert_eq!(realized_with.to_bits(), realized_without.to_bits());
 }
 
 // Time Elapsed Fraction Tests

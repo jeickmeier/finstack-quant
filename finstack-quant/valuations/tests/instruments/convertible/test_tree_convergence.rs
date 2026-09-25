@@ -26,6 +26,7 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 };
 use time::Month;
 
+use super::fixtures::with_tree_steps;
 use crate::common::test_helpers::tolerances;
 
 /// Create a simple convertible bond for convergence testing.
@@ -120,20 +121,32 @@ fn test_tree_convergence_binomial() {
     let market = create_test_market(as_of);
 
     // Price with increasing tree steps
-    let price_100 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(100), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_100 = price_convertible_bond(
+        &with_tree_steps(&bond, 100),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("pricing should succeed")
+    .amount();
 
-    let price_500 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(500), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_500 = price_convertible_bond(
+        &with_tree_steps(&bond, 500),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("pricing should succeed")
+    .amount();
 
-    let price_1000 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(1000), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_1000 = price_convertible_bond(
+        &with_tree_steps(&bond, 1000),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("pricing should succeed")
+    .amount();
 
     // Verify all prices are finite and positive
     assert!(
@@ -176,20 +189,27 @@ fn test_tree_convergence_trinomial() {
     let market = create_test_market(as_of);
 
     // Price with increasing tree steps
-    let price_50 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial(50), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_50 = price_convertible_bond(
+        &with_tree_steps(&bond, 50),
+        &market,
+        ConvertibleTreeType::Trinomial,
+        as_of,
+    )
+    .expect("pricing should succeed")
+    .amount();
 
-    let price_200 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial(200), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_200 = price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial, as_of)
+        .expect("pricing should succeed")
+        .amount();
 
-    let price_500 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial(500), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_500 = price_convertible_bond(
+        &with_tree_steps(&bond, 500),
+        &market,
+        ConvertibleTreeType::Trinomial,
+        as_of,
+    )
+    .expect("pricing should succeed")
+    .amount();
 
     // Verify all prices are finite and positive
     assert!(
@@ -232,15 +252,23 @@ fn test_binomial_trinomial_consistency() {
     let market = create_test_market(as_of);
 
     // Price with high step count for both tree types
-    let price_binomial =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(500), as_of)
-            .expect("binomial pricing should succeed")
-            .amount();
+    let price_binomial = price_convertible_bond(
+        &with_tree_steps(&bond, 500),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("binomial pricing should succeed")
+    .amount();
 
-    let price_trinomial =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial(500), as_of)
-            .expect("trinomial pricing should succeed")
-            .amount();
+    let price_trinomial = price_convertible_bond(
+        &with_tree_steps(&bond, 500),
+        &market,
+        ConvertibleTreeType::Trinomial,
+        as_of,
+    )
+    .expect("trinomial pricing should succeed")
+    .amount();
 
     // Both trees should converge to similar values (within 1%)
     let relative_diff = (price_binomial - price_trinomial).abs() / price_binomial;
@@ -261,20 +289,27 @@ fn test_convergence_rate_order_one() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let market = create_test_market(as_of);
 
-    let price_100 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(100), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_100 = price_convertible_bond(
+        &with_tree_steps(&bond, 100),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("pricing should succeed")
+    .amount();
 
-    let price_200 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(200), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_200 = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, as_of)
+        .expect("pricing should succeed")
+        .amount();
 
-    let price_400 =
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(400), as_of)
-            .expect("pricing should succeed")
-            .amount();
+    let price_400 = price_convertible_bond(
+        &with_tree_steps(&bond, 400),
+        &market,
+        ConvertibleTreeType::Binomial,
+        as_of,
+    )
+    .expect("pricing should succeed")
+    .amount();
 
     // Use price_400 as reference for true value
     let error_100 = (price_100 - price_400).abs();
@@ -302,7 +337,7 @@ fn test_price_bounds_validity() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let market = create_test_market(as_of);
 
-    let price = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(200), as_of)
+    let price = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, as_of)
         .expect("pricing should succeed")
         .amount();
 

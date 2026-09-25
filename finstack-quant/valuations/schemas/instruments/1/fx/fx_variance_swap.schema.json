@@ -143,6 +143,12 @@
           "format": "double",
           "type": "number"
         },
+        "trading_days_per_year": {
+          "default": 252.0,
+          "description": "Trading days per year used to annualise daily realized variance.\n\nA contract term of the variance-swap confirmation: daily observations\nare annualised by `trading_days_per_year / observation_frequency.count()`.\nMust be finite and positive. Defaults to\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
+          "format": "double",
+          "type": "number"
+        },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "FX volatility surface ID"
@@ -274,6 +280,7 @@
           "spot_id": "EURUSD",
           "start_date": "2024-01-02",
           "strike_variance": 0.04,
+          "trading_days_per_year": 252.0,
           "vol_surface_id": "EURUSD-VOL"
         },
         "type": "fx_variance_swap"

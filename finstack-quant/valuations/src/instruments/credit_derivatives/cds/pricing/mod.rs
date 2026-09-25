@@ -41,8 +41,9 @@
 //! - **< 1bp** for investment grade credits (hazard rate < 1%)
 //! - **2-5 bp** for high yield/distressed credits (hazard rate > 3%)
 //!
-//! To use Bloomberg CDSW-style calculations, set `par_spread_uses_full_premium = true`
-//! in the [`CDSPricerConfig`].
+//! To include accrual-on-default in the par-spread denominator, set the
+//! instrument's `valuation_convention` to `bloomberg_cdsw_clean_full_premium`
+//! (or `quant_lib_isda_parity`).
 //!
 //! # Day Count Convention Handling
 //!

@@ -270,7 +270,7 @@ test('metric fixing requirement preserves validation', () => {
   Object.assign(instrument.instrument.spec, {
     fixing_dates: ['2025-01-03'],
     payment_dates: ['2025-04-03'],
-    metric_pricing_overrides: { theta_period: '2D' },
+    metric_pricing_overrides: { theta_period: { count: 2, unit: 'days' } },
   });
   assert.throws(
     () => price(instrument, fixtures.market, 'static_replication', ['theta']),

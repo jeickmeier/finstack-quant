@@ -108,7 +108,7 @@ it("keys every pricing input, preserves snapshots, and forwards native history",
     { ...requests.bond, asOf: "2025-01-02" },
     { ...requests.bond, model: "hazard_rate" },
     { ...requests.bond, metrics: ["dv01"] },
-    { ...requests.bond, pricingOptions: '{"theta_period":"1W"}' },
+    { ...requests.bond, pricingOptions: '{"theta_period":{"count":1,"unit":"weeks"}}' },
     { ...requests.bond, marketHistory: history },
     { ...requests.bond, metrics: ["hvar"], marketHistory: history },
     { ...requests.bond, model: undefined },
@@ -289,7 +289,7 @@ it("keeps native instrument and override validation ahead of market errors", asy
   const request = {
     ...requests.bond,
     instrumentJson: JSON.stringify(document),
-    pricingOptions: '{"theta_period":"1W"}',
+    pricingOptions: '{"theta_period":{"count":1,"unit":"weeks"}}',
   };
   same(await proxy.price(request), direct(request));
   const bad = { ...requests.bond, instrumentJson: "{", marketJson: "{" };

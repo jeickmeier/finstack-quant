@@ -17,7 +17,6 @@
           "currency": "USD"
         },
         "day_count": "act_365f",
-        "theta_day_basis": "calendar_365",
         "settlement": "cash",
         "discount_curve_id": "DISC",
         "spot_id": "SPOT",

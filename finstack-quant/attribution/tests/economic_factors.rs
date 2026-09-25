@@ -6,7 +6,7 @@ use finstack_quant_attribution::{
 use finstack_quant_core::{
     config::FinstackConfig,
     currency::Currency,
-    dates::{DayCount, StubKind},
+    dates::{DayCount, StubKind, Tenor, TenorUnit},
     market_data::{
         context::MarketContext,
         scalars::{InflationIndex, InflationInterpolation, MarketScalar},
@@ -102,7 +102,7 @@ fn carry_horizon_scaling_must_not_scale_ex_coupon_price_drop() {
         "USD-OIS",
     )
     .unwrap();
-    bond.metric_pricing_overrides.theta_period = Some("2D".into());
+    bond.metric_pricing_overrides.theta_period = Some(Tenor::new(2, TenorUnit::Days).unwrap());
     let instrument: Arc<dyn Instrument> = Arc::new(bond.clone());
     let market = MarketContext::new().insert(discount(t0));
     let metrics = [
@@ -125,7 +125,7 @@ fn carry_horizon_scaling_must_not_scale_ex_coupon_price_drop() {
         attribute_pnl_metrics_based(&instrument, &market, &market, &v0, &v1, t0, t1).unwrap_err();
     assert!(error.to_string().contains("matching theta_period_days"));
 
-    bond.metric_pricing_overrides.theta_period = Some("4D".into());
+    bond.metric_pricing_overrides.theta_period = Some(Tenor::new(4, TenorUnit::Days).unwrap());
     let instrument: Arc<dyn Instrument> = Arc::new(bond);
     let v0 = instrument
         .price_with_metrics(&market, t0, &metrics, PricingOptions::default())

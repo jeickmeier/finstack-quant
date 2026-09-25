@@ -202,7 +202,7 @@ pub(crate) fn compute_greeks(
                 sigma,
                 t,
                 inst.option_type,
-                inst.theta_day_basis.days_per_year(),
+                inst.metric_pricing_overrides.theta_days_per_year(),
             );
 
             // Escrowed-dividend rho correction.
@@ -255,7 +255,7 @@ pub(crate) fn compute_greeks(
             tree_finite_difference_greeks(
                 &params,
                 inst.notional.amount(),
-                inst.theta_day_basis.days_per_year(),
+                inst.metric_pricing_overrides.theta_days_per_year(),
                 price_fn,
             )
         }
@@ -303,7 +303,7 @@ pub(crate) fn compute_greeks(
             tree_finite_difference_greeks(
                 &params,
                 inst.notional.amount(),
-                inst.theta_day_basis.days_per_year(),
+                inst.metric_pricing_overrides.theta_days_per_year(),
                 price_fn,
             )
         }
