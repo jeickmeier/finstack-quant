@@ -27,7 +27,7 @@
 use std::cmp::Ordering;
 
 use crate::currency::Currency;
-use crate::dates::fx::fx_standard_spot_lag_days;
+use crate::dates::fx::fx_standard_settlement_days;
 use crate::Result;
 
 use super::reciprocal_rate_or_err;
@@ -80,8 +80,8 @@ pub struct FxPairConvention {
     pub usd_quotation: FxQuoteConvention,
     /// Pip size in rate units: `0.01` for JPY, KRW, and HUF pairs, else `0.0001`.
     pub pip_size: f64,
-    /// Standard spot lag in business days (T+1 or T+2) for this pair.
-    pub spot_lag_days: u32,
+    /// Standard T+N settlement (spot) lag in business days (T+1 or T+2) for this pair.
+    pub settlement_days: u32,
 }
 
 /// Bloomberg/Reuters CCY1 rank. Lower is stronger (more likely to be CCY1).
@@ -156,7 +156,7 @@ pub fn fx_pair_convention(base: Currency, quote: Currency) -> FxPairConvention {
         quote: ccy2,
         usd_quotation: usd_quotation_for_market_pair(ccy1, ccy2),
         pip_size: fx_pip_size(ccy1, ccy2),
-        spot_lag_days: fx_standard_spot_lag_days(ccy1, ccy2),
+        settlement_days: fx_standard_settlement_days(ccy1, ccy2),
     }
 }
 
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(conv.quote, Currency::USD);
         assert_eq!(conv.usd_quotation, FxQuoteConvention::Direct);
         assert_eq!(conv.pip_size, 0.0001);
-        assert_eq!(conv.spot_lag_days, 2);
+        assert_eq!(conv.settlement_days, 2);
         let inverted = fx_pair_convention(Currency::USD, Currency::EUR);
         assert_eq!(inverted, conv);
     }
@@ -241,14 +241,14 @@ mod tests {
         assert_eq!(conv.quote, Currency::JPY);
         assert_eq!(conv.usd_quotation, FxQuoteConvention::Indirect);
         assert_eq!(conv.pip_size, 0.01);
-        assert_eq!(conv.spot_lag_days, 2);
+        assert_eq!(conv.settlement_days, 2);
     }
 
     #[test]
     fn fx_pair_convention_usdcad_is_t1() {
         let conv = fx_pair_convention(Currency::USD, Currency::CAD);
         assert_eq!(conv.usd_quotation, FxQuoteConvention::Indirect);
-        assert_eq!(conv.spot_lag_days, 1);
+        assert_eq!(conv.settlement_days, 1);
         assert_eq!(conv.pip_size, 0.0001);
     }
 

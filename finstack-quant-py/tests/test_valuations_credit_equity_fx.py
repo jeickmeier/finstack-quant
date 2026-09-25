@@ -525,7 +525,7 @@ class TestFxForward:
         )
         assert fwd.contract_rate is None
         assert fwd.maturity > datetime.date(2025, 4, 10)
-        assert FxForward.standard_spot_days("EUR", "USD") == 2
+        assert FxForward.standard_settlement_days("EUR", "USD") == 2
         with_points = fwd.with_forward_points(1.10, 0.0025)
         assert with_points.contract_rate == pytest.approx(1.1025)
         with_pips = fwd.with_forward_pips(1.10, 25.0)

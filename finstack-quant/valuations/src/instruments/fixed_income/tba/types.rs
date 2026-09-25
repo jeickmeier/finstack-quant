@@ -53,26 +53,6 @@ impl std::fmt::Display for TbaTerm {
     }
 }
 
-/// TBA settlement information.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct TbaSettlement {
-    /// Good delivery (settlement) date
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub settlement_date: Date,
-    /// Last trading day (48 hours before settlement)
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub notification_date: Date,
-}
-
 /// TBA (To-Be-Announced) forward trade.
 ///
 /// Represents a forward contract to buy or sell agency MBS at a specified
@@ -151,7 +131,7 @@ pub struct AgencyTba {
     ///
     /// When set, bypasses the SIFMA calendar lookup for
     /// `settlement_year`/`settlement_month` in
-    /// [`AgencyTba::get_settlement_date`]. Dollar rolls use this to keep leg
+    /// [`AgencyTba::effective_settlement_date`]. Dollar rolls use this to keep leg
     /// pricing consistent with explicit roll settlement dates.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -262,7 +242,7 @@ impl AgencyTba {
                 "{context} settlement_month must be in 1..=12"
             )));
         }
-        if let (Some(trade), Ok(settlement)) = (self.trade_date, self.get_settlement_date()) {
+        if let (Some(trade), Ok(settlement)) = (self.trade_date, self.effective_settlement_date()) {
             if trade > settlement {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} trade_date cannot follow settlement"
@@ -310,20 +290,13 @@ impl AgencyTba {
             .build()
     }
 
-    /// Builder helper for settlement month.
-    pub fn settlement_month(mut self, year: i32, month: u8) -> Self {
-        self.settlement_year = year;
-        self.settlement_month = month;
-        self
-    }
-
-    /// Get the settlement date.
+    /// Resolve the effective settlement date.
     ///
     /// Returns the explicit `settlement_date` override when set. Otherwise
     /// resolves the date from the SIFMA calendar, using the explicit
     /// `settlement_class` if set or inferring the class from `agency` and
     /// `term`.
-    pub fn get_settlement_date(&self) -> finstack_quant_core::Result<Date> {
+    pub fn effective_settlement_date(&self) -> finstack_quant_core::Result<Date> {
         if let Some(date) = self.settlement_date {
             return Ok(date);
         }
@@ -470,7 +443,7 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
     }
 
     fn expiry(&self) -> Option<Date> {
-        self.get_settlement_date().ok()
+        self.effective_settlement_date().ok()
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -582,7 +555,7 @@ mod tests {
     #[test]
     fn test_settlement_date() {
         let tba = AgencyTba::example().expect("AgencyTba example is valid");
-        let settle = tba.get_settlement_date().expect("valid date");
+        let settle = tba.effective_settlement_date().expect("valid date");
         assert_eq!(settle.month(), Month::March);
         assert_eq!(settle.year(), 2027);
     }

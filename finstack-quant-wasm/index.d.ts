@@ -1705,7 +1705,7 @@ export interface FxPairConvention extends WasmOwned {
   /**
    * Standard spot lag in business days (T+1 or T+2).
    */
-  readonly spotLagDays: number;
+  readonly settlementDays: number;
 }
 
 /**
@@ -1722,7 +1722,7 @@ export interface FxPairConvention extends WasmOwned {
  * conv.base.code;          // "EUR"
  * conv.usdQuotation.toString(); // "direct"
  * conv.pipSize;            // 0.0001
- * conv.spotLagDays;        // 2
+ * conv.settlementDays;     // 2
  * ```
  */
 export interface FxPairConventionConstructor {

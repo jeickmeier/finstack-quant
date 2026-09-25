@@ -2539,7 +2539,7 @@ impl PyCapFloorBuilder {
     /// value : dict | str
     ///     Rust ``OvernightCouponConvention`` in serde form, e.g.
     ///     ``{"compounding": {"compounded_in_arrears": {"lookback_days": 0}},
-    ///     "payment_delay_days": 2}``.
+    ///     "payment_lag_days": 2}``.
     ///
     /// Returns
     /// -------

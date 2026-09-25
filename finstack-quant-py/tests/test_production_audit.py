@@ -461,7 +461,7 @@ def test_cds_option_premium_settlement_does_not_change_variance() -> None:
     )
     values = []
     for settlement in ["2025-01-06", "2025-07-01"]:
-        f["instrument"]["instrument"]["spec"]["cash_settlement_date"] = settlement
+        f["instrument"]["instrument"]["spec"]["premium_settlement_date"] = settlement
         values.append(
             price_instrument(
                 json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "bloomberg_cdso", []

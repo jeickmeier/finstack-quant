@@ -521,7 +521,7 @@ test('CDS option premium settlement does not change option variance', () => {
     )
   );
   const values = ['2025-01-06', '2025-07-01'].map((settlement) => {
-    f.instrument.instrument.spec.cash_settlement_date = settlement;
+    f.instrument.instrument.spec.premium_settlement_date = settlement;
     return valuations.instruments.priceInstrument(
       JSON.stringify(f.instrument),
       JSON.stringify(f.market),

@@ -84,7 +84,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
     // FX spot finding).
     let spot = fx_spot_date_for_pair(
         ctx.as_of(),
-        conv.spot_lag_days,
+        conv.settlement_days,
         conv.base_currency,
         conv.quote_currency,
         Some(&conv.base_calendar_id),

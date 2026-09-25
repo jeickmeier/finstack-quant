@@ -644,7 +644,7 @@ impl Ndf {
     /// * `domestic_discount_curve_id` - Settlement/quote currency discount curve
     /// * `base_calendar_id` - Optional base currency calendar
     /// * `quote_calendar_id` - Optional quote/settlement currency calendar
-    /// * `spot_lag_days` - Spot lag (typically 2)
+    /// * `settlement_days` - T+N spot lag in business days (typically 2)
     /// * `fixing_offset_days` - Days before maturity for fixing (typically 2)
     /// * `business_day_convention` - Business day convention
     /// * `end_of_month` - Preserve month-end when the spot date is month-end.
@@ -660,7 +660,7 @@ impl Ndf {
         domestic_discount_curve_id: impl Into<CurveId>,
         base_calendar_id: Option<String>,
         quote_calendar_id: Option<String>,
-        spot_lag_days: i32,
+        settlement_days: u32,
         fixing_offset_days: i64,
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
@@ -676,7 +676,7 @@ impl Ndf {
         // quote side of the pair.
         let spot_date = fx_spot_date_for_pair(
             trade_date,
-            spot_lag_days,
+            settlement_days,
             base_currency,
             settlement_currency,
             base_calendar_id.as_deref(),

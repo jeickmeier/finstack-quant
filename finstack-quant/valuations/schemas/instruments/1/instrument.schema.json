@@ -278,15 +278,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Original face amount (initial principal balance)."
         },
-        "payment_lag_days": {
-          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "pool_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Pool identifier (CUSIP or internal pool ID)."
@@ -309,6 +300,15 @@
           "description": "Annual servicing fee in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
           "format": "double",
           "type": "number"
+        },
+        "stated_delay_days": {
+          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "wac": {
           "description": "Weighted average coupon (gross rate on underlying mortgages).",
@@ -456,7 +456,7 @@
               "type": "null"
             }
           ],
-          "description": "Explicit settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for\n`settlement_year`/`settlement_month` in\n[`AgencyTba::get_settlement_date`]. Dollar rolls use this to keep leg\npricing consistent with explicit roll settlement dates."
+          "description": "Explicit settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for\n`settlement_year`/`settlement_month` in\n[`AgencyTba::effective_settlement_date`]. Dollar rolls use this to keep leg\npricing consistent with explicit roll settlement dates."
         },
         "settlement_month": {
           "description": "Settlement month (1-12).",
@@ -3247,17 +3247,6 @@
           "default": {},
           "description": "Additional attributes"
         },
-        "cash_settlement_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-        },
         "cds_maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Underlying CDS maturity date"
@@ -3321,6 +3310,17 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (Call = right to buy protection, Put = right to sell protection)"
+        },
+        "premium_settlement_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
         },
         "protection_start_convention": {
           "$ref": "#/$defs/ProtectionStartConvention",
@@ -6057,7 +6057,7 @@
             "null"
           ]
         },
-        "settlement_lag_days": {
+        "settlement_days": {
           "description": "Settlement lag in business days (T+N).\n\nDefaults to 2 for most commodity markets (T+2). If `convention` is set,\nuses the convention's default unless explicitly overridden here.\n\n# Market Standards\n\n| Market | Settlement |\n|--------|------------|\n| Energy (WTI, Brent, NG) | T+2 |\n| Precious metals | T+2 |\n| Base metals (LME) | T+2 |\n| Power | T+1 |",
           "format": "uint32",
           "minimum": 0,
@@ -6104,6 +6104,10 @@
           "default": {},
           "description": "Attributes for selection and reporting."
         },
+        "fixing": {
+          "$ref": "#/$defs/CommodityFutureFixing",
+          "description": "Final-settlement price fixing rule (single observation or average)."
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
@@ -6124,10 +6128,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement": {
-          "$ref": "#/$defs/CommodityFutureSettlement",
-          "description": "Official final-settlement observation rule."
-        },
         "terms": {
           "$ref": "#/$defs/ListedFutureTerms",
           "description": "Standard listed position and lifecycle terms."
@@ -6142,48 +6142,12 @@
         "underlying",
         "terms",
         "price_curve_id",
-        "settlement"
+        "fixing"
       ],
       "type": "object"
     },
-    "CommodityFutureOption": {
-      "additionalProperties": false,
-      "description": "Exchange-listed option on an arbitrary commodity futures contract.",
-      "properties": {
-        "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {},
-          "description": "Attributes for selection and reporting."
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier."
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
-        },
-        "metric_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-          "description": "Metric-time pricing configuration."
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "terms": {
-          "$ref": "#/$defs/FutureOptionTerms",
-          "description": "Caller-supplied option-on-future pricing and settlement terms."
-        }
-      },
-      "required": [
-        "id",
-        "terms"
-      ],
-      "type": "object"
-    },
-    "CommodityFutureSettlement": {
-      "description": "Exchange final-settlement rule for a linear commodity future.",
+    "CommodityFutureFixing": {
+      "description": "Final-settlement price fixing rule for a linear commodity future: which\nobservations set the official settlement price and how they are averaged.\nThe cash/physical delivery method lives in `terms.settlement`.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -6254,6 +6218,42 @@
           "type": "object"
         }
       ]
+    },
+    "CommodityFutureOption": {
+      "additionalProperties": false,
+      "description": "Exchange-listed option on an arbitrary commodity futures contract.",
+      "properties": {
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "default": {},
+          "description": "Attributes for selection and reporting."
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier."
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
+          "description": "Metric-time pricing configuration."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "terms": {
+          "$ref": "#/$defs/FutureOptionTerms",
+          "description": "Caller-supplied option-on-future pricing and settlement terms."
+        }
+      },
+      "required": [
+        "id",
+        "terms"
+      ],
+      "type": "object"
     },
     "CommodityOption": {
       "additionalProperties": false,
@@ -8587,7 +8587,7 @@
     },
     "Deposit": {
       "additionalProperties": false,
-      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `spot_lag_days`: Number of business days from trade date to spot date (default: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + spot_lag` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
+      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + settlement_days` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -8653,9 +8653,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
-        "spot_lag_days": {
-          "description": "Optional spot lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
-          "format": "int32",
+        "settlement_days": {
+          "description": "Optional T+N settlement (spot) lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
+          "format": "uint32",
+          "minimum": 0,
           "type": [
             "integer",
             "null"
@@ -12395,7 +12396,7 @@
     },
     "FxSpot": {
       "additionalProperties": false,
-      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_lag_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_lag_days` overrides that default.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
+      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -12465,7 +12466,7 @@
           "default": {},
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement": {
+        "settlement_date": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -12475,11 +12476,12 @@
             }
           ],
           "default": null,
-          "description": "Optional settlement date (T+2 typically for spot)"
+          "description": "Optional explicit settlement (value) date"
         },
-        "settlement_lag_days": {
-          "description": "Optional settlement lag in business days when `settlement` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
-          "format": "int32",
+        "settlement_days": {
+          "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+          "format": "uint32",
+          "minimum": 0,
           "type": [
             "integer",
             "null"
@@ -16845,9 +16847,9 @@
           ],
           "description": "Calendar used to apply the payment delay."
         },
-        "payment_delay_days": {
+        "payment_lag_days": {
           "default": 0,
-          "description": "Payment delay in business days after the accrual end date.",
+          "description": "Payment lag in business days after the accrual end date.",
           "format": "int32",
           "maximum": 31,
           "minimum": 0,
@@ -25250,7 +25252,7 @@
             "currency": "USD"
           },
           "quote_rate": "0.045",
-          "spot_lag_days": 2,
+          "settlement_days": 2,
           "start_date": "2024-01-01"
         },
         "type": "deposit"
@@ -25687,8 +25689,8 @@
           },
           "quote_calendar_id": null,
           "quote_currency": "USD",
-          "settlement": null,
-          "settlement_lag_days": 2,
+          "settlement_date": null,
+          "settlement_days": 2,
           "spot_rate": 1.1
         },
         "type": "fx_spot"
@@ -26139,9 +26141,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "id": "SGX-IRON-ORE-DEC26",
-          "price_curve_id": "IRON-ORE-FORWARD",
-          "settlement": {
+          "fixing": {
             "fixing_dates": [
               "2026-12-29",
               "2026-12-30",
@@ -26150,6 +26150,8 @@
             "realized_fixings": [],
             "type": "arithmetic_average"
           },
+          "id": "SGX-IRON-ORE-DEC26",
+          "price_curve_id": "IRON-ORE-FORWARD",
           "terms": {
             "contracts": 10.0,
             "currency": "USD",

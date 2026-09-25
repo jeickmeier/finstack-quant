@@ -3,4 +3,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use types::{CommodityFuture, CommodityFutureSettlement};
+pub use types::{CommodityFuture, CommodityFutureFixing};

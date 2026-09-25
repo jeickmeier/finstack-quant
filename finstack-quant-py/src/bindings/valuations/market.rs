@@ -487,10 +487,10 @@ impl PyXccyConventions {
         self.inner.quote_index_id.to_string()
     }
 
-    /// Spot lag in business days.
+    /// T+N spot settlement lag in business days.
     #[getter]
-    fn spot_lag_days(&self) -> i32 {
-        self.inner.spot_lag_days
+    fn settlement_days(&self) -> u32 {
+        self.inner.settlement_days
     }
 
     /// Payment frequency of both legs.
@@ -532,12 +532,12 @@ impl PyXccyConventions {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "XccyConventions(base_currency='{}', quote_currency='{}', base_index_id='{}', quote_index_id='{}', spot_lag_days={})",
+            "XccyConventions(base_currency='{}', quote_currency='{}', base_index_id='{}', quote_index_id='{}', settlement_days={})",
             self.inner.base_currency,
             self.inner.quote_currency,
             self.inner.base_index_id,
             self.inner.quote_index_id,
-            self.inner.spot_lag_days,
+            self.inner.settlement_days,
         )
     }
 }

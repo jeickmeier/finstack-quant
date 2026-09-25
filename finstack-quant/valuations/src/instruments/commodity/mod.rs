@@ -78,7 +78,7 @@ pub(crate) mod forward_price;
 
 pub use commodity_asian_option::CommodityAsianOption;
 pub use commodity_forward::CommodityForward;
-pub use commodity_future::{CommodityFuture, CommodityFutureSettlement};
+pub use commodity_future::{CommodityFuture, CommodityFutureFixing};
 pub use commodity_future_option::CommodityFutureOption;
 pub use commodity_option::CommodityOption;
 pub use commodity_spread_option::CommoditySpreadOption;

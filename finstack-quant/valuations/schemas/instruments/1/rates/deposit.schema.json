@@ -2,7 +2,7 @@
   "$defs": {
     "Deposit": {
       "additionalProperties": false,
-      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `spot_lag_days`: Number of business days from trade date to spot date (default: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + spot_lag` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
+      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + settlement_days` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -68,9 +68,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
-        "spot_lag_days": {
-          "description": "Optional spot lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
-          "format": "int32",
+        "settlement_days": {
+          "description": "Optional T+N settlement (spot) lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
+          "format": "uint32",
+          "minimum": 0,
           "type": [
             "integer",
             "null"
@@ -135,7 +136,7 @@
             "currency": "USD"
           },
           "quote_rate": "0.045",
-          "spot_lag_days": 2,
+          "settlement_days": 2,
           "start_date": "2024-01-01"
         },
         "type": "deposit"

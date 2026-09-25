@@ -24,7 +24,7 @@ Import path:
 | `CDSOptionStrikeKind` | Discriminant for branching pricing and metric paths. |
 | `ProtectionStartConvention` | `Spot` (default) or `Forward`. |
 
-Useful methods on `CDSOption`: `effective_cash_settlement_date(as_of)`, and the
+Useful methods on `CDSOption`: `effective_premium_settlement_date(as_of)`, and the
 direct Greek entry points `delta`, `gamma`, `vega`, `theta` and
 `implied_vol(curves, as_of, target_price, initial_guess)`. Each is the same
 computation the corresponding metric calculator registers.
@@ -107,7 +107,7 @@ option's delivered CDS excludes pre-expiry defaults.
 
 Spread variance uses Actual/365F time from the current valuation date to
 legal expiry. Exercise proceeds are discounted to `exercise_settlement_date`
-(default: expiry). `cash_settlement_date` describes the separately agreed
+(default: expiry). `premium_settlement_date` describes the separately agreed
 trade-premium payment and does not freeze variance or protection windows.
 
 ## Settlement

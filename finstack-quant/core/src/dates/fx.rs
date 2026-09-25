@@ -31,7 +31,7 @@
 //! - [`adjust_joint_calendar`] for applying a business-day convention on a joint calendar
 //! - [`add_joint_business_days`] for T+n style symmetric joint counting
 //! - [`fx_spot_date`] for market-convention (USD-aware) spot rolling
-//! - [`fx_standard_spot_lag_days`] for the pair-aware T+1 / T+2 spot lag
+//! - [`fx_standard_settlement_days`] for the pair-aware T+1 / T+2 spot lag
 //!
 //! # References
 //!
@@ -62,7 +62,7 @@ use time::Duration;
 /// # Returns
 ///
 /// Spot settlement lag in business days (`1` or `2`).
-pub fn fx_standard_spot_lag_days(base: Currency, quote: Currency) -> u32 {
+pub fn fx_standard_settlement_days(base: Currency, quote: Currency) -> u32 {
     match (base, quote) {
         (Currency::USD, Currency::CAD)
         | (Currency::CAD, Currency::USD)
@@ -261,7 +261,7 @@ pub fn add_joint_business_days(
 ///   both currency calendars and, when supplied, the USD calendar (crosses
 ///   settle via two USD legs). If the T+n candidate is not good in all
 ///   calendars, spot rolls forward to the next date that is.
-/// - `spot_lag_days == 0` returns `trade_date` unchanged (T+0 behavior matches
+/// - `lag_days == 0` returns `trade_date` unchanged (T+0 behavior matches
 ///   [`add_joint_business_days`]).
 /// - Negative lags move backward by joint business days. Intermediate and
 ///   final-day calendar rules are applied in the same direction.
@@ -276,7 +276,7 @@ pub fn add_joint_business_days(
 /// # Arguments
 ///
 /// * `trade_date` - The trade execution date
-/// * `spot_lag_days` - Signed business days to spot; positive values move
+/// * `lag_days` - Signed business days to spot; positive values move
 ///   forward and negative values represent T−N settlement.
 /// * `base_cal_id` - Optional calendar ID for the base currency
 /// * `quote_cal_id` - Optional calendar ID for the quote currency
@@ -302,7 +302,7 @@ pub fn add_joint_business_days(
 /// ```
 pub fn fx_spot_date(
     trade_date: Date,
-    spot_lag_days: i32,
+    lag_days: i32,
     base_cal_id: Option<&str>,
     quote_cal_id: Option<&str>,
     usd_cal_id: Option<&str>,
@@ -314,18 +314,18 @@ pub fn fx_spot_date(
         None => None,
     };
 
-    if spot_lag_days == 0 {
+    if lag_days == 0 {
         return Ok(trade_date);
     }
     const MAX_ABS_FX_SPOT_LAG_DAYS: u32 = 31;
-    let lag_magnitude = spot_lag_days.unsigned_abs();
+    let lag_magnitude = lag_days.unsigned_abs();
     if lag_magnitude > MAX_ABS_FX_SPOT_LAG_DAYS {
         return Err(Error::Validation(format!(
-            "FX spot lag {spot_lag_days} exceeds the supported range \
+            "FX spot lag {lag_days} exceeds the supported range \
              [-{MAX_ABS_FX_SPOT_LAG_DAYS}, {MAX_ABS_FX_SPOT_LAG_DAYS}]"
         )));
     }
-    let direction = if spot_lag_days > 0 { 1 } else { -1 };
+    let direction = if lag_days > 0 { 1 } else { -1 };
 
     let is_usd = |id: Option<&str>| matches!((id, usd_cal_id), (Some(a), Some(u)) if a.eq_ignore_ascii_case(u));
     let base_is_usd = is_usd(base_cal_id);
@@ -491,13 +491,13 @@ mod tests {
     static JAN_30_AND_31_HOLIDAYS: Jan30And31Holidays = Jan30And31Holidays;
 
     #[test]
-    fn fx_standard_spot_lag_days_t1_pairs_and_default() {
-        assert_eq!(fx_standard_spot_lag_days(Currency::USD, Currency::CAD), 1);
-        assert_eq!(fx_standard_spot_lag_days(Currency::CAD, Currency::USD), 1);
-        assert_eq!(fx_standard_spot_lag_days(Currency::USD, Currency::TRY), 1);
-        assert_eq!(fx_standard_spot_lag_days(Currency::TRY, Currency::USD), 1);
-        assert_eq!(fx_standard_spot_lag_days(Currency::USD, Currency::MXN), 2);
-        assert_eq!(fx_standard_spot_lag_days(Currency::EUR, Currency::USD), 2);
+    fn fx_standard_settlement_days_t1_pairs_and_default() {
+        assert_eq!(fx_standard_settlement_days(Currency::USD, Currency::CAD), 1);
+        assert_eq!(fx_standard_settlement_days(Currency::CAD, Currency::USD), 1);
+        assert_eq!(fx_standard_settlement_days(Currency::USD, Currency::TRY), 1);
+        assert_eq!(fx_standard_settlement_days(Currency::TRY, Currency::USD), 1);
+        assert_eq!(fx_standard_settlement_days(Currency::USD, Currency::MXN), 2);
+        assert_eq!(fx_standard_settlement_days(Currency::EUR, Currency::USD), 2);
     }
 
     #[test]

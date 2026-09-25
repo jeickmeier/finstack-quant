@@ -160,7 +160,7 @@ tests. Its fourteen fields classify as:
 
 - required: `id`, `notional`, `start_date`, `maturity`, `day_count`,
   `discount_curve_id`
-- `Option<_>`, so optional: `quote_rate`, `spot_lag_days`, `calendar_id`
+- `Option<_>`, so optional: `quote_rate`, `settlement_days`, `calendar_id`
 - required-but-defaulted: `business_day_convention`
   (`#[builder(default = BusinessDayConvention::ModifiedFollowing)]`) and the
   three override bags `instrument_pricing_overrides`,

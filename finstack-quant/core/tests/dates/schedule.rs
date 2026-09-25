@@ -996,7 +996,7 @@ fn payment_lag_shifts_adjusted_period_ends() {
         .unwrap()
         .frequency(Tenor::weekly())
         .adjust_with(BusinessDayConvention::Following, &cal)
-        .payment_lag_business_days(2)
+        .payment_lag_days(2)
         .build()
         .unwrap();
 

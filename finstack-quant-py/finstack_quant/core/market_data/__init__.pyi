@@ -4003,7 +4003,7 @@ class FxPairConvention:
     --------
     >>> from finstack_quant.core.market_data import fx_pair_convention
     >>> conv = fx_pair_convention("USD", "EUR")
-    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.spot_lag_days)
+    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
     ('EUR', 'USD', 'direct', 0.0001, 2)
 
     """
@@ -4073,7 +4073,7 @@ class FxPairConvention:
         ...
 
     @property
-    def spot_lag_days(self) -> int:
+    def settlement_days(self) -> int:
         """
         Conventional settlement lag from trade date to spot.
 
@@ -4162,7 +4162,7 @@ def fx_pair_convention(
     --------
     >>> from finstack_quant.core.market_data import fx_pair_convention
     >>> conv = fx_pair_convention("USD", "JPY")
-    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.spot_lag_days)
+    >>> (conv.base.code, conv.quote.code, str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
     ('USD', 'JPY', 'indirect', 0.01, 2)
 
     """

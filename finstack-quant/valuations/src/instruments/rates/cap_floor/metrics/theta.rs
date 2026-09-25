@@ -105,7 +105,7 @@ mod tests {
         .expect("caplet");
         option.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
@@ -169,7 +169,7 @@ mod tests {
         .expect("caplet");
         option.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,

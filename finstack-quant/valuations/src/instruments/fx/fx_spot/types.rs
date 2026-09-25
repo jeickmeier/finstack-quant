@@ -82,9 +82,9 @@ use finstack_quant_core::Result;
 ///
 /// # Settlement
 ///
-/// When `settlement_lag_days` is `None`, the pair-aware default is T+1 for
+/// When `settlement_days` is `None`, the pair-aware default is T+1 for
 /// USD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit
-/// `settlement_lag_days` overrides that default.
+/// `settlement_days` overrides that default; `settlement_date` overrides both.
 ///
 /// See module-level documentation for comprehensive FX quoting conventions.
 #[derive(
@@ -104,21 +104,22 @@ pub struct FxSpot {
     pub base_currency: Currency,
     /// Quote currency (the currency used for pricing)
     pub quote_currency: Currency,
-    /// Optional settlement date (T+2 typically for spot)
+    /// Optional explicit settlement (value) date. When set it is only
+    /// business-day adjusted and `settlement_days` is ignored.
     #[builder(optional)]
     #[serde(default, with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
-    pub settlement: Option<Date>,
-    /// Optional settlement lag in business days when `settlement` is not provided.
+    pub settlement_date: Option<Date>,
+    /// Optional T+N settlement lag in business days when `settlement_date` is not provided.
     ///
     /// `None` uses the pair-aware default from
-    /// [`finstack_quant_core::dates::fx::fx_standard_spot_lag_days`]: T+1 for
+    /// [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
     /// USD↔CAD and USD↔TRY, T+2 otherwise.
     #[builder(optional)]
-    pub settlement_lag_days: Option<i32>,
+    pub settlement_days: Option<u32>,
     /// Optional spot rate (if not provided, will look up from market data)
     #[builder(optional)]
     pub spot_rate: Option<f64>,
@@ -184,17 +185,17 @@ struct FxSpotUnchecked {
     base_currency: Currency,
     /// Quote currency (the currency used for pricing)
     quote_currency: Currency,
-    /// Optional settlement date (T+2 typically for spot)
+    /// Optional explicit settlement (value) date
     #[serde(default, with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
-    settlement: Option<Date>,
-    /// Optional settlement lag in business days when `settlement` is not provided.
+    settlement_date: Option<Date>,
+    /// Optional T+N settlement lag in business days when `settlement_date` is not provided.
     ///
     /// `None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.
-    settlement_lag_days: Option<i32>,
+    settlement_days: Option<u32>,
     /// Optional spot rate (if not provided, will look up from market data)
     spot_rate: Option<f64>,
     /// Optional quote-currency discount curve for PV-ing the settlement
@@ -241,8 +242,8 @@ impl TryFrom<FxSpotUnchecked> for FxSpot {
             id: value.id,
             base_currency: value.base_currency,
             quote_currency: value.quote_currency,
-            settlement: value.settlement,
-            settlement_lag_days: value.settlement_lag_days,
+            settlement_date: value.settlement_date,
+            settlement_days: value.settlement_days,
             spot_rate: value.spot_rate,
             discount_curve_id: value.discount_curve_id,
             notional: value.notional,
@@ -268,8 +269,8 @@ impl FxSpot {
             id,
             base_currency,
             quote_currency,
-            settlement: None,
-            settlement_lag_days: None,
+            settlement_date: None,
+            settlement_days: None,
             spot_rate: None,
             discount_curve_id: None,
             notional: Money::from((1_i64, base_currency)),
@@ -297,8 +298,8 @@ impl FxSpot {
     /// # Arguments
     ///
     /// * `as_of` - Trade/valuation date used as the T+0 origin when
-    ///   `settlement` is unset. The spot lag and joint-calendar roll are
-    ///   applied from this date; an explicit `settlement` is only
+    ///   `settlement_date` is unset. The spot lag and joint-calendar roll are
+    ///   applied from this date; an explicit `settlement_date` is only
     ///   business-day-adjusted and ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
         use crate::instruments::common_impl::fx_dates::{
@@ -309,7 +310,7 @@ impl FxSpot {
         let use_joint_calendar =
             self.base_calendar_id.is_some() || self.quote_calendar_id.is_some();
 
-        if let Some(date) = self.settlement {
+        if let Some(date) = self.settlement_date {
             // Explicit settlement date provided - adjust for business days
             if use_joint_calendar {
                 adjust_joint_calendar(
@@ -323,9 +324,12 @@ impl FxSpot {
             }
         } else {
             // Compute T+N from as_of date
-            let lag_days = self
-                .settlement_lag_days
-                .unwrap_or(self.standard_spot_lag() as i32);
+            let settlement_days = self.settlement_days.unwrap_or_else(|| {
+                finstack_quant_core::dates::fx::fx_standard_settlement_days(
+                    self.base_currency,
+                    self.quote_currency,
+                )
+            });
 
             if use_joint_calendar {
                 // CLS-consistent spot roll: a US holiday on an intermediate day
@@ -333,21 +337,31 @@ impl FxSpot {
                 // review, FX spot finding).
                 fx_spot_date_for_pair(
                     as_of,
-                    lag_days,
+                    settlement_days,
                     self.base_currency,
                     self.quote_currency,
                     self.base_calendar_id.as_deref(),
                     self.quote_calendar_id.as_deref(),
                 )
             } else {
+                let lag_days = i32::try_from(settlement_days).map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "FxSpot settlement_days {settlement_days} exceeds the supported range"
+                    ))
+                })?;
                 Ok(as_of.add_weekdays(lag_days))
             }
         }
     }
 
-    /// Set the settlement date
-    pub fn with_settlement(mut self, date: Date) -> Self {
-        self.settlement = Some(date);
+    /// Set the explicit settlement (value) date.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Contractual settlement date; business-day adjusted on the
+    ///   configured calendars and overrides `settlement_days`.
+    pub fn with_settlement_date(mut self, date: Date) -> Self {
+        self.settlement_date = Some(date);
         self
     }
 
@@ -448,9 +462,14 @@ impl FxSpot {
         self
     }
 
-    /// Set the settlement lag in business days (positive for T+N, negative for T-N).
-    pub fn with_settlement_lag_days(mut self, lag_days: i32) -> Self {
-        self.settlement_lag_days = Some(lag_days);
+    /// Set the T+N settlement lag.
+    ///
+    /// # Arguments
+    ///
+    /// * `settlement_days` - Business days from the trade/valuation date to
+    ///   settlement (T+N, non-negative); overrides the pair default.
+    pub fn with_settlement_days(mut self, settlement_days: u32) -> Self {
+        self.settlement_days = Some(settlement_days);
         self
     }
 
@@ -497,7 +516,7 @@ impl FxSpot {
             Self::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
                 .with_notional(Money::from((1_000_000_i64, Currency::EUR)))?
                 .with_rate(1.10)?
-                .with_settlement_lag_days(2),
+                .with_settlement_days(2),
         )
     }
 
@@ -525,7 +544,7 @@ impl FxSpot {
     /// );
     /// ```
     pub fn new_t1(id: InstrumentId, base_currency: Currency, quote_currency: Currency) -> Self {
-        Self::new(id, base_currency, quote_currency).with_settlement_lag_days(1)
+        Self::new(id, base_currency, quote_currency).with_settlement_days(1)
     }
 
     /// Check if this is a same-region pair that typically settles T+1.
@@ -539,17 +558,13 @@ impl FxSpot {
     /// - **USD/CAD**: North American same-day zone (T+1)
     /// - **USD/TRY**: Turkish Lira settles T+1 per Istanbul market convention
     ///
-    /// When `settlement_lag_days` is unset, [`Self::effective_settlement_date`]
+    /// When `settlement_days` is unset, [`Self::effective_settlement_date`]
     /// uses this list to choose T+1 versus T+2.
     pub fn is_t1_pair(&self) -> bool {
-        self.standard_spot_lag() == 1
-    }
-
-    fn standard_spot_lag(&self) -> u32 {
-        finstack_quant_core::dates::fx::fx_standard_spot_lag_days(
+        finstack_quant_core::dates::fx::fx_standard_settlement_days(
             self.base_currency,
             self.quote_currency,
-        )
+        ) == 1
     }
 }
 
@@ -726,7 +741,7 @@ mod tests {
     fn test_fx_spot_effective_settlement_date_explicit() {
         let settle_date = date(2025, Month::January, 20);
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement(settle_date);
+            .with_settlement_date(settle_date);
 
         let as_of = date(2025, Month::January, 15);
         let settle = spot
@@ -738,7 +753,7 @@ mod tests {
     #[test]
     fn test_fx_spot_effective_settlement_date_custom_lag() {
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement_lag_days(1);
+            .with_settlement_days(1);
 
         // Wednesday -> should settle Thursday (T+1 weekdays)
         let as_of = date(2025, Month::January, 15); // Wednesday
@@ -752,7 +767,7 @@ mod tests {
     fn test_fx_spot_returns_zero_when_settled() {
         let settle_date = date(2025, Month::January, 10);
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement(settle_date)
+            .with_settlement_date(settle_date)
             .with_rate(1.10)
             .expect("valid rate");
 
@@ -898,26 +913,35 @@ mod tests {
     }
 
     #[test]
-    fn test_fx_spot_negative_settlement_lag() {
-        // Negative lag for historical valuations (T-1)
-        let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_base_calendar_id("target2")
-            .with_quote_calendar_id("usny")
-            .with_settlement_lag_days(-1);
+    fn negative_settlement_days_are_rejected_on_the_wire() {
+        // `settlement_days` is a non-negative T+N lag (u32); T-N lags are not supported.
+        let mut value = serde_json::to_value(FxSpot::example().expect("example")).expect("ser");
+        value["settlement_days"] = serde_json::json!(-1);
+        let err = serde_json::from_value::<FxSpot>(value).expect_err("negative lag must fail");
+        assert!(err.to_string().contains("invalid value"), "{err}");
+    }
 
-        // Wednesday with T-1 -> should settle Tuesday
-        let as_of = date(2025, Month::January, 15); // Wednesday
-        let settle = spot
-            .effective_settlement_date(as_of)
-            .expect("should compute");
-        assert_eq!(settle, date(2025, Month::January, 14)); // Tuesday (T-1)
+    #[test]
+    // schema-rejection-test: retired `settlement` / `settlement_lag_days` keys
+    fn retired_settlement_keys_are_rejected() {
+        for (canonical, retired) in [
+            ("settlement_date", "settlement"),
+            ("settlement_days", "settlement_lag_days"),
+        ] {
+            let mut value = serde_json::to_value(FxSpot::example().expect("example")).expect("ser");
+            let map = value.as_object_mut().expect("object");
+            let inner = map.remove(canonical).expect("canonical key serialized");
+            map.insert(retired.to_string(), inner);
+            let err = serde_json::from_value::<FxSpot>(value).expect_err("retired key");
+            assert!(err.to_string().contains(retired), "{retired}: {err}");
+        }
     }
 
     #[test]
     fn test_fx_spot_zero_settlement_lag() {
         // T+0 same-day settlement
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_settlement_lag_days(0);
+            .with_settlement_days(0);
 
         let as_of = date(2025, Month::January, 15);
         let settle = spot
@@ -954,8 +978,8 @@ mod tests {
             "id": "EURUSD",
             "base_currency": "EUR",
             "quote_currency": "USD",
-            "settlement": null,
-            "settlement_lag_days": null,
+            "settlement_date": null,
+            "settlement_days": null,
             "spot_rate": -1.10,
             "notional": {"amount": "1000000", "currency": "EUR"},
             "base_calendar_id": null,
@@ -983,7 +1007,7 @@ mod tests {
         let undiscounted = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
             .with_rate(1.10)
             .expect("valid rate")
-            .with_settlement(settle);
+            .with_settlement_date(settle);
         let mut discounted = undiscounted.clone();
         discounted.discount_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-OIS"));
 
@@ -1039,7 +1063,7 @@ mod tests {
         )
         .with_rate(1.10)
         .expect("valid rate")
-        .with_settlement(settlement);
+        .with_settlement_date(settlement);
 
         let schedule = spot
             .cashflow_schedule(&market, as_of)

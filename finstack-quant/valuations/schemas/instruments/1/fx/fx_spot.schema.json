@@ -2,7 +2,7 @@
   "$defs": {
     "FxSpot": {
       "additionalProperties": false,
-      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_lag_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_lag_days` overrides that default.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
+      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -72,7 +72,7 @@
           "default": {},
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement": {
+        "settlement_date": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -82,11 +82,12 @@
             }
           ],
           "default": null,
-          "description": "Optional settlement date (T+2 typically for spot)"
+          "description": "Optional explicit settlement (value) date"
         },
-        "settlement_lag_days": {
-          "description": "Optional settlement lag in business days when `settlement` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
-          "format": "int32",
+        "settlement_days": {
+          "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+          "format": "uint32",
+          "minimum": 0,
           "type": [
             "integer",
             "null"
@@ -152,8 +153,8 @@
           },
           "quote_calendar_id": null,
           "quote_currency": "USD",
-          "settlement": null,
-          "settlement_lag_days": 2,
+          "settlement_date": null,
+          "settlement_days": 2,
           "spot_rate": 1.1
         },
         "type": "fx_spot"

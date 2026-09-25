@@ -733,7 +733,7 @@ def commodity_inputs() -> dict[str, dict[str, Any]]:
             "attributes": {},
             "price_curve_id": "WTI-FORWARD",
             "underlying": "CL",
-            "settlement": {"type": "single", "observation_date": "2025-09-15", "realized_price": None},
+            "fixing": {"type": "single", "observation_date": "2025-09-15", "realized_price": None},
             "terms": {
                 "contracts": 1.0,
                 "currency": "USD",

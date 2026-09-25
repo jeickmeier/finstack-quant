@@ -294,7 +294,7 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
         .quote_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
-        .spot_lag_days_opt(Some(2))
+        .settlement_days_opt(Some(2))
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(Some("nyse".into()))
         .build()
@@ -351,14 +351,14 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
 
 /// Test that deposit without spot lag uses raw dates.
 ///
-/// When spot_lag_days is not set, the raw start/end dates should be used
+/// When settlement_days is not set, the raw start/end dates should be used
 /// (optionally BDC-adjusted if calendar is set).
 #[test]
 fn test_deposit_without_spot_lag_uses_raw_dates() {
     let trade_date = date(2025, 1, 3); // Friday
     let ctx = ctx_with_flat_rate(trade_date, "USD-OIS", 0.02);
 
-    // Build deposit WITHOUT spot_lag_days - should use raw start date
+    // Build deposit WITHOUT settlement_days - should use raw start date
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-USD-RAW"))
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
@@ -368,7 +368,7 @@ fn test_deposit_without_spot_lag_uses_raw_dates() {
         .quote_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
-        // No spot_lag_days_opt - should use raw dates
+        // No settlement_days_opt - should use raw dates
         .build()
         .expect("Valid deposit");
 
@@ -376,7 +376,7 @@ fn test_deposit_without_spot_lag_uses_raw_dates() {
     let effective_start = dep.effective_start_date().unwrap();
     assert_eq!(
         effective_start, trade_date,
-        "Without spot_lag, effective start should equal raw start"
+        "Without settlement_days, effective start should equal raw start"
     );
 
     // Execute - should price without error
@@ -402,7 +402,7 @@ fn test_gbp_deposit_t0_settlement() {
         .quote_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("GBP-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
-        .spot_lag_days_opt(Some(0)) // T+0 for GBP
+        .settlement_days_opt(Some(0)) // T+0 for GBP
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .build()
         .expect("Valid deposit");

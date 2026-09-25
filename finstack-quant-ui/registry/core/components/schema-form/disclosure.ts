@@ -22,6 +22,7 @@ const SCHEDULE = new Set([
   "end_of_month",
   "stub",
   "payment_lag_days",
+  "stated_delay_days",
   "settlement_days",
   "settlement_delay",
   "ex_coupon_days",

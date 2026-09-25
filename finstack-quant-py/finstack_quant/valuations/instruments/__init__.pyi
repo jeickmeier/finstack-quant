@@ -7693,7 +7693,7 @@ class CapFloorBuilder:
         Parameters
         ----------
         value : dict[str, object] | str
-            Rust ``OvernightCouponConvention`` in serde form (``dict`` or JSON string), e.g. ``{"compounding": {"compounded_in_arrears": {"lookback_days": 0}}, "payment_delay_days": 2}``.
+            Rust ``OvernightCouponConvention`` in serde form (``dict`` or JSON string), e.g. ``{"compounding": {"compounded_in_arrears": {"lookback_days": 0}}, "payment_lag_days": 2}``.
 
         Returns
         -------
@@ -12167,14 +12167,14 @@ class FxForward:
         *,
         base_calendar_id: str | None = None,
         quote_calendar_id: str | None = None,
-        spot_lag_days: int | None = None,
+        settlement_days: int | None = None,
         business_day_convention: BusinessDayConvention | str | None = None,
         end_of_month: bool = False,
     ) -> FxForward:
         """
         Build a forward from a trade date and a standard FX tenor (mirrors Rust
         ``FxForward::from_trade_date``): the spot date is rolled from
-        ``trade_date`` by ``spot_lag_days`` business days (CLS-consistent pair
+        ``trade_date`` by ``settlement_days`` business days (CLS-consistent pair
         roll), then ``tenor`` is added with the FX end-of-month rule and
         ``business_day_convention``.
 
@@ -12200,9 +12200,9 @@ class FxForward:
             Base-currency holiday calendar; ``None`` uses weekends only.
         quote_calendar_id : str | None
             Quote-currency holiday calendar; ``None`` uses weekends only.
-        spot_lag_days : int | None
-            Spot lag in business days; ``None`` uses
-            :meth:`FxForward.standard_spot_days` for the pair.
+        settlement_days : int | None
+            T+N spot lag in business days (non-negative); ``None`` uses
+            :meth:`FxForward.standard_settlement_days` for the pair.
         business_day_convention : BusinessDayConvention | str | None
             Roll rule applied to the maturity; ``None`` means ``"modified_following"``.
         end_of_month : bool, default False
@@ -12232,10 +12232,10 @@ class FxForward:
         """
         ...
     @staticmethod
-    def standard_spot_days(base: Currency | str, quote: Currency | str) -> int:
+    def standard_settlement_days(base: Currency | str, quote: Currency | str) -> int:
         """
         Market-standard spot lag (business days) for a currency pair (mirrors
-        Rust ``FxForward::standard_spot_days``).
+        Rust ``FxForward::standard_settlement_days``).
 
         Parameters
         ----------
@@ -12257,7 +12257,7 @@ class FxForward:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import FxForward
-        >>> FxForward.standard_spot_days("EUR", "USD")
+        >>> FxForward.standard_settlement_days("EUR", "USD")
         2
         """
         ...

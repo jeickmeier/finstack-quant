@@ -9,17 +9,6 @@
           "default": {},
           "description": "Additional attributes"
         },
-        "cash_settlement_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-        },
         "cds_maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Underlying CDS maturity date"
@@ -83,6 +72,17 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (Call = right to buy protection, Put = right to sell protection)"
+        },
+        "premium_settlement_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
         },
         "protection_start_convention": {
           "$ref": "#/$defs/ProtectionStartConvention",

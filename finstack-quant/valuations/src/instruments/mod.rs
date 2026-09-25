@@ -233,8 +233,8 @@ pub use fx::{
 };
 
 pub use commodity::{
-    CommodityAsianOption, CommodityForward, CommodityFuture, CommodityFutureOption,
-    CommodityFutureSettlement, CommodityOption, CommoditySpreadOption, CommoditySwap,
+    CommodityAsianOption, CommodityForward, CommodityFuture, CommodityFutureFixing,
+    CommodityFutureOption, CommodityOption, CommoditySpreadOption, CommoditySwap,
     CommoditySwaption,
 };
 

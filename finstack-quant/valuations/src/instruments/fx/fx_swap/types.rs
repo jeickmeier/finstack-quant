@@ -245,7 +245,7 @@ impl FxSwap {
 
     /// Construct an FX swap from trade date and a standard calendar tenor.
     ///
-    /// `spot_lag_days` defaults to 2 in most markets; supply calendar IDs to enforce
+    /// `settlement_days` (the T+N spot lag) is 2 in most markets; supply calendar IDs to enforce
     /// base/quote business-day adjustment. `end_of_month` explicitly controls
     /// whether a month-end near date produces a month-end far date.
     #[allow(clippy::too_many_arguments)]
@@ -260,7 +260,7 @@ impl FxSwap {
         foreign_discount_curve_id: impl Into<CurveId>,
         base_calendar_id: Option<String>,
         quote_calendar_id: Option<String>,
-        spot_lag_days: i32,
+        settlement_days: u32,
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
@@ -272,7 +272,7 @@ impl FxSwap {
         // finding).
         let near_date = fx_spot_date_for_pair(
             trade_date,
-            spot_lag_days,
+            settlement_days,
             base_currency,
             quote_currency,
             base_calendar_id.as_deref(),

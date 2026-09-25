@@ -8,11 +8,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
-/// Exchange final-settlement rule for a linear commodity future.
+/// Final-settlement price fixing rule for a linear commodity future: which
+/// observations set the official settlement price and how they are averaged.
+/// The cash/physical delivery method lives in `terms.settlement`.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum CommodityFutureSettlement {
+pub enum CommodityFutureFixing {
     /// One official observation at the supplied date.
     Single {
         /// Date whose forward or realized price determines final settlement.
@@ -68,8 +70,8 @@ pub struct CommodityFuture {
     pub terms: ListedFutureTerms,
     /// Price-curve identifier used for projected observations.
     pub price_curve_id: CurveId,
-    /// Official final-settlement observation rule.
-    pub settlement: CommodityFutureSettlement,
+    /// Final-settlement price fixing rule (single observation or average).
+    pub fixing: CommodityFutureFixing,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -106,8 +108,8 @@ impl CommodityFuture {
                 "CommodityFuture underlying must not be empty".to_string(),
             ));
         }
-        match &self.settlement {
-            CommodityFutureSettlement::Single {
+        match &self.fixing {
+            CommodityFutureFixing::Single {
                 observation_date,
                 realized_price,
             } => {
@@ -123,7 +125,7 @@ impl CommodityFuture {
                     ));
                 }
             }
-            CommodityFutureSettlement::ArithmeticAverage {
+            CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates,
                 realized_fixings,
             } => {
@@ -189,7 +191,7 @@ impl CommodityFuture {
                 Position::Long,
             )?)
             .price_curve_id(CurveId::new("IRON-ORE-FORWARD"))
-            .settlement(CommodityFutureSettlement::ArithmeticAverage {
+            .fixing(CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates: vec![
                     date!(2026 - 12 - 29),
                     date!(2026 - 12 - 30),
@@ -213,8 +215,8 @@ impl CommodityFuture {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        match &self.settlement {
-            CommodityFutureSettlement::Single {
+        match &self.fixing {
+            CommodityFutureFixing::Single {
                 observation_date,
                 realized_price,
             } => {
@@ -231,7 +233,7 @@ impl CommodityFuture {
                         .price_on_date(*observation_date)
                 }
             }
-            CommodityFutureSettlement::ArithmeticAverage {
+            CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates,
                 realized_fixings,
             } => {
@@ -309,11 +311,11 @@ impl CommodityFuture {
     /// * `as_of` - Valuation date separating realized from projected observations.
     pub fn price_curve_delta(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        let projected_weight = match &self.settlement {
-            CommodityFutureSettlement::Single {
+        let projected_weight = match &self.fixing {
+            CommodityFutureFixing::Single {
                 observation_date, ..
             } => f64::from(*observation_date >= as_of),
-            CommodityFutureSettlement::ArithmeticAverage { fixing_dates, .. } => {
+            CommodityFutureFixing::ArithmeticAverage { fixing_dates, .. } => {
                 fixing_dates.iter().filter(|date| **date >= as_of).count() as f64
                     / fixing_dates.len() as f64
             }
@@ -386,7 +388,7 @@ mod tests {
                 .expect("valid terms"),
             )
             .price_curve_id(CurveId::new("INDEX-FWD"))
-            .settlement(CommodityFutureSettlement::ArithmeticAverage {
+            .fixing(CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates: vec![
                     date!(2026 - 01 - 02),
                     date!(2026 - 01 - 05),

@@ -100,7 +100,7 @@
           ],
           "meta": {}
         },
-        "spot_lag_days": 0,
+        "settlement_days": 0,
         "calendar_id": null
       }
     }

@@ -10,7 +10,7 @@
         "quote_currency": "USD",
         "base_index_id": "EUR-ESTR-OIS",
         "quote_index_id": "USD-SOFR-OIS",
-        "spot_lag_days": 2,
+        "settlement_days": 2,
         "payment_frequency": "3M",
         "day_count": "act_360",
         "business_day_convention": "modified_following",

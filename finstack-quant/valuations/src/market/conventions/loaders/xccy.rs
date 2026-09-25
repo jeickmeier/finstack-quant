@@ -15,7 +15,7 @@ struct XccyConventionRecord {
     quote_currency: Currency,
     base_index_id: String,
     quote_index_id: String,
-    spot_lag_days: i32,
+    settlement_days: u32,
     payment_frequency: String,
     day_count: DayCount,
     business_day_convention: BusinessDayConvention,
@@ -31,10 +31,10 @@ impl XccyConventionRecord {
                 "XCCY conventions must specify different base and quote currencies".to_string(),
             ));
         }
-        if self.spot_lag_days < 0 || self.spot_lag_days > 7 {
+        if self.settlement_days > 7 {
             return Err(Error::Validation(format!(
-                "XCCY spot_lag_days exceeds reasonable bound: {}",
-                self.spot_lag_days
+                "XCCY settlement_days exceeds reasonable bound: {}",
+                self.settlement_days
             )));
         }
 
@@ -50,7 +50,7 @@ impl XccyConventionRecord {
             quote_currency: self.quote_currency,
             base_index_id: IndexId::new(self.base_index_id),
             quote_index_id: IndexId::new(self.quote_index_id),
-            spot_lag_days: self.spot_lag_days,
+            settlement_days: self.settlement_days,
             payment_frequency,
             day_count: self.day_count,
             business_day_convention: self.business_day_convention,
@@ -118,7 +118,7 @@ mod tests {
         assert_eq!(conv.quote_currency, Currency::USD);
         assert_eq!(conv.base_index_id, IndexId::new("EUR-ESTR-OIS"));
         assert_eq!(conv.quote_index_id, IndexId::new("USD-SOFR-OIS"));
-        assert_eq!(conv.spot_lag_days, 2);
+        assert_eq!(conv.settlement_days, 2);
         assert_eq!(conv.base_calendar_id, "target2");
         assert_eq!(conv.quote_calendar_id, "usny");
     }

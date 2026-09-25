@@ -3129,7 +3129,7 @@ class Schedule:
             ``end`` (ISO dates), ``frequency`` (``"3M"``), ``stub``,
             ``business_day_convention``, ``calendar_id``, ``end_of_month``,
             ``imm_mode``, ``cds_imm_mode``, ``error_policy``,
-            ``payment_lag_business_days`` and ``fixing_lag_business_days``
+            ``payment_lag_days`` and ``fixing_lag_business_days``
             (as produced by :meth:`ScheduleBuilder.to_spec`).
 
         Returns
@@ -3455,7 +3455,7 @@ class ScheduleBuilder:
         """
         ...
 
-    def payment_lag_business_days(self, lag: int) -> ScheduleBuilder:
+    def payment_lag_days(self, lag: int) -> ScheduleBuilder:
         """
         Shift each payment date by *lag* business days after the adjusted period end.
 
@@ -3585,7 +3585,7 @@ class ScheduleBuilder:
             The canonical spec fields (``start``, ``end``, ``frequency``,
             ``stub``, ``business_day_convention``, ``calendar_id``,
             ``end_of_month``, ``imm_mode``, ``cds_imm_mode``,
-            ``error_policy``, ``payment_lag_business_days``,
+            ``error_policy``, ``payment_lag_days``,
             ``fixing_lag_business_days``), accepted by
             :meth:`Schedule.from_spec`.
 

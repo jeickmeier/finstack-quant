@@ -72,7 +72,7 @@ def test_schedule_payment_and_fixing_dates() -> None:
         .builder(date(2025, 1, 2), date(2025, 1, 9))
         .frequency("1W")
         .adjust_with(BusinessDayConvention.FOLLOWING, "weekends_only")
-        .payment_lag_business_days(2)
+        .payment_lag_days(2)
         .fixing_lag_business_days(2)
         .build()
     )

@@ -1372,8 +1372,8 @@
     {
       "instruments": [
         {
-          "artifact_id": "sha256:e863a423dd331dbec54247894d660bd1c133cbcefedec64045a785416328fbbf",
-          "content_hash": "sha256:e863a423dd331dbec54247894d660bd1c133cbcefedec64045a785416328fbbf",
+          "artifact_id": "sha256:e93c11f7d5074cae0fd54e8518ecd99b28caeb66a7ce7ced8eece183473a565f",
+          "content_hash": "sha256:e93c11f7d5074cae0fd54e8518ecd99b28caeb66a7ce7ced8eece183473a565f",
           "dependencies": {
             "curves": {
               "credit_curves": [],
@@ -1403,7 +1403,7 @@
                   "currency": "USD"
                 },
                 "quote_rate": null,
-                "spot_lag_days": null,
+                "settlement_days": null,
                 "start_date": "2024-01-01"
               },
               "type": "deposit"
@@ -1425,7 +1425,7 @@
       },
       "positions": [
         {
-          "artifact_id": "sha256:e863a423dd331dbec54247894d660bd1c133cbcefedec64045a785416328fbbf",
+          "artifact_id": "sha256:e93c11f7d5074cae0fd54e8518ecd99b28caeb66a7ce7ced8eece183473a565f",
           "entity_id": "ACME_CORP",
           "id": "POS_001",
           "instrument_id": "DEP_1M",

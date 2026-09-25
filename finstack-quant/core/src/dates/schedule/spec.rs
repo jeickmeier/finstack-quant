@@ -38,7 +38,7 @@ pub struct ScheduleSpec {
     pub error_policy: ScheduleErrorPolicy,
     /// Business days after each (adjusted) period end for the payment date.
     #[serde(default)]
-    pub payment_lag_business_days: i32,
+    pub payment_lag_days: i32,
     /// Optional T-minus business days from each period's accrual start.
     #[serde(default)]
     pub fixing_lag_business_days: Option<i32>,
@@ -64,7 +64,7 @@ struct ScheduleSpecWire {
     cds_imm_mode: bool,
     error_policy: ScheduleErrorPolicy,
     #[serde(default)]
-    payment_lag_business_days: i32,
+    payment_lag_days: i32,
     #[serde(default)]
     fixing_lag_business_days: Option<i32>,
 }
@@ -87,7 +87,7 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
             imm_mode: wire.imm_mode,
             cds_imm_mode: wire.cds_imm_mode,
             error_policy: wire.error_policy,
-            payment_lag_business_days: wire.payment_lag_business_days,
+            payment_lag_days: wire.payment_lag_days,
             fixing_lag_business_days: wire.fixing_lag_business_days,
         })
     }
@@ -117,7 +117,7 @@ impl ScheduleSpec {
             imm_mode: builder.imm_mode,
             cds_imm_mode: builder.cds_imm_mode,
             error_policy: builder.error_policy,
-            payment_lag_business_days: builder.payment_lag_business_days,
+            payment_lag_days: builder.payment_lag_days,
             fixing_lag_business_days: builder.fixing_lag_business_days,
         })
     }
@@ -158,8 +158,8 @@ impl ScheduleSpec {
             builder = builder.adjust_with_id(conv, id);
         }
 
-        if self.payment_lag_business_days != 0 {
-            builder = builder.payment_lag_business_days(self.payment_lag_business_days);
+        if self.payment_lag_days != 0 {
+            builder = builder.payment_lag_days(self.payment_lag_days);
         }
         if let Some(lag) = self.fixing_lag_business_days {
             builder = builder.fixing_lag_business_days(lag);

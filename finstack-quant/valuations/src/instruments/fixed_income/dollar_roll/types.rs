@@ -233,7 +233,8 @@ impl DollarRoll {
                 )));
             }
         }
-        if let (Some(trade), Ok(front)) = (self.trade_date, self.front_settle_date()) {
+        if let (Some(trade), Ok(front)) = (self.trade_date, self.effective_front_settlement_date())
+        {
             if trade > front {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} trade_date cannot follow front settlement"
@@ -290,19 +291,19 @@ impl DollarRoll {
     }
 
     /// Resolve the front-month settlement date.
-    pub fn front_settle_date(&self) -> finstack_quant_core::Result<Date> {
+    pub fn effective_front_settlement_date(&self) -> finstack_quant_core::Result<Date> {
         if let Some(d) = self.front_settlement_date {
             return Ok(d);
         }
-        self.front_leg()?.get_settlement_date()
+        self.front_leg()?.effective_settlement_date()
     }
 
     /// Resolve the back-month settlement date.
-    pub fn back_settle_date(&self) -> finstack_quant_core::Result<Date> {
+    pub fn effective_back_settlement_date(&self) -> finstack_quant_core::Result<Date> {
         if let Some(d) = self.back_settlement_date {
             return Ok(d);
         }
-        self.back_leg()?.get_settlement_date()
+        self.back_leg()?.effective_settlement_date()
     }
 
     /// Create the front-month TBA leg.
@@ -349,10 +350,11 @@ impl DollarRoll {
             .build()
     }
 
-    /// Calculate days between settlement dates.
-    pub fn settlement_days(&self) -> finstack_quant_core::Result<i64> {
-        let front = self.front_settle_date()?;
-        let back = self.back_settle_date()?;
+    /// Roll period in calendar days between the effective front and back
+    /// settlement dates (the ACT/360 denominator of the implied financing rate).
+    pub fn roll_days(&self) -> finstack_quant_core::Result<i64> {
+        let front = self.effective_front_settlement_date()?;
+        let back = self.effective_back_settlement_date()?;
         let days = (back - front).whole_days();
         if days <= 0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -438,8 +440,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
         _market: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let front_date = self.front_settle_date()?;
-        let back_date = self.back_settle_date()?;
+        let front_date = self.effective_front_settlement_date()?;
+        let back_date = self.effective_back_settlement_date()?;
         let ccy = self.notional.currency();
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             vec![
@@ -509,7 +511,7 @@ mod tests {
     ///
     /// Before the fix, `front_leg`/`back_leg` built `AgencyTba` legs from
     /// year/month only, so the MTM pricer discounted to SIFMA calendar dates
-    /// while `front_settle_date()`/`back_settle_date()` honored the explicit
+    /// while `effective_front_settlement_date()`/`effective_back_settlement_date()` honored the explicit
     /// overrides — one trade, two discount horizons.
     #[test]
     fn explicit_settlement_overrides_flow_into_priced_legs() {
@@ -528,19 +530,28 @@ mod tests {
         // The priced legs must discount to the SAME dates the carry
         // analytics use.
         assert_eq!(
-            front_leg.get_settlement_date().expect("front leg settle"),
-            roll.front_settle_date().expect("front settle")
+            front_leg
+                .effective_settlement_date()
+                .expect("front leg settle"),
+            roll.effective_front_settlement_date()
+                .expect("front settle")
         );
         assert_eq!(
-            back_leg.get_settlement_date().expect("back leg settle"),
-            roll.back_settle_date().expect("back settle")
+            back_leg
+                .effective_settlement_date()
+                .expect("back leg settle"),
+            roll.effective_back_settlement_date().expect("back settle")
         );
         assert_eq!(
-            front_leg.get_settlement_date().expect("front leg settle"),
+            front_leg
+                .effective_settlement_date()
+                .expect("front leg settle"),
             front_override
         );
         assert_eq!(
-            back_leg.get_settlement_date().expect("back leg settle"),
+            back_leg
+                .effective_settlement_date()
+                .expect("back leg settle"),
             back_override
         );
 
@@ -551,7 +562,7 @@ mod tests {
             no_override
                 .front_leg()
                 .expect("front leg")
-                .get_settlement_date()
+                .effective_settlement_date()
                 .expect("sifma front"),
             front_override
         );
@@ -560,7 +571,7 @@ mod tests {
     #[test]
     fn test_settlement_days() {
         let roll = DollarRoll::example().expect("DollarRoll example is valid");
-        let days = roll.settlement_days().expect("valid dates");
+        let days = roll.roll_days().expect("valid dates");
 
         // One month apart should be roughly 28-31 days
         assert!((25..=35).contains(&days));
@@ -581,8 +592,15 @@ mod tests {
             2,
             "dollar roll should emit front and back settlements"
         );
-        assert_eq!(flows[0].0, roll.front_settle_date().expect("front settle"));
-        assert_eq!(flows[1].0, roll.back_settle_date().expect("back settle"));
+        assert_eq!(
+            flows[0].0,
+            roll.effective_front_settlement_date()
+                .expect("front settle")
+        );
+        assert_eq!(
+            flows[1].0,
+            roll.effective_back_settlement_date().expect("back settle")
+        );
         assert!(flows[0].1.amount() > 0.0, "front sale should be a receipt");
         assert!(
             flows[1].1.amount() < 0.0,

@@ -88,7 +88,7 @@ fn schedule_spec_builds_expected_dates() {
         imm_mode: false,
         cds_imm_mode: false,
         error_policy: finstack_quant_core::dates::ScheduleErrorPolicy::Strict,
-        payment_lag_business_days: 0,
+        payment_lag_days: 0,
         fixing_lag_business_days: None,
     };
 
@@ -130,6 +130,32 @@ fn schedule_spec_rejects_retired_policy_booleans() {
 }
 
 #[test]
+// schema-rejection-test: ScheduleSpec `payment_lag_business_days` (now `payment_lag_days`)
+fn schedule_spec_rejects_retired_payment_lag_business_days() {
+    let base = r#"{
+        "start":"2025-01-15",
+        "end":"2025-09-30",
+        "frequency":{"count":3,"unit":"months"},
+        "stub":"short_back",
+        "business_day_convention":null,
+        "calendar_id":null,
+        "end_of_month":false,
+        "imm_mode":false,
+        "cds_imm_mode":false,
+        "error_policy":"strict","#;
+    let canonical: ScheduleSpec =
+        serde_json::from_str(&format!("{base}\"payment_lag_days\":2}}")).unwrap();
+    assert_eq!(canonical.payment_lag_days, 2);
+    let err =
+        serde_json::from_str::<ScheduleSpec>(&format!("{base}\"payment_lag_business_days\":2}}"))
+            .unwrap_err();
+    assert!(
+        err.to_string().contains("payment_lag_business_days"),
+        "{err}"
+    );
+}
+
+#[test]
 fn schedule_spec_rejects_dual_imm_modes() {
     let malformed = r#"{
         "start":"2025-01-15",
@@ -156,7 +182,7 @@ fn schedule_spec_rejects_dual_imm_modes() {
         imm_mode: true,
         cds_imm_mode: true,
         error_policy: finstack_quant_core::dates::ScheduleErrorPolicy::Strict,
-        payment_lag_business_days: 0,
+        payment_lag_days: 0,
         fixing_lag_business_days: None,
     };
     assert!(spec.build().is_err());

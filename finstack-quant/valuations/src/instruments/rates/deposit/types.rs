@@ -41,12 +41,12 @@ use finstack_quant_core::types::IndexId;
 /// The instrument supports optional settlement convention fields for proper
 /// business-day adjusted cashflow generation:
 ///
-/// - `spot_lag_days`: Number of business days from trade date to spot date (default: 2 for USD/EUR/JPY, 0 for GBP)
+/// - `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)
 /// - `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)
 /// - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
 ///
 /// When these fields are set, the effective start date is computed as
-/// `start + spot_lag` adjusted by the business day convention. In this case,
+/// `start + settlement_days` adjusted by the business day convention. In this case,
 /// `start` is treated as the trade date; otherwise it is the accrual start date.
 #[derive(
     Clone,
@@ -118,12 +118,12 @@ pub struct Deposit {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 
-    /// Optional spot lag in business days from trade date to effective start.
+    /// Optional T+N settlement (spot) lag in business days from trade date to effective start.
     ///
     /// Market convention: T+2 for USD/EUR/JPY, T+0 for GBP.
     /// If not set, the raw `start` date is used without adjustment.
     #[builder(optional)]
-    pub spot_lag_days: Option<i32>,
+    pub settlement_days: Option<u32>,
 
     /// Business day convention for date adjustments.
     ///
@@ -177,7 +177,7 @@ impl Deposit {
             .quote_rate_opt(Decimal::try_from(0.045).ok())
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
-            .spot_lag_days_opt(Some(2))
+            .settlement_days_opt(Some(2))
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .build()
     }
@@ -221,7 +221,14 @@ impl Deposit {
             )?))
             .discount_curve_id(CurveId::new(discount_curve_id))
             .attributes(attributes)
-            .spot_lag_days_opt(Some(conv.market_settlement_days))
+            .settlement_days_opt(Some(u32::try_from(conv.market_settlement_days).map_err(
+                |_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "rate index convention market_settlement_days must be non-negative, got {}",
+                        conv.market_settlement_days
+                    ))
+                },
+            )?))
             .business_day_convention(conv.market_business_day_convention)
             .calendar_id_opt(Some(conv.market_calendar_id.clone().into()))
             .build()?;
@@ -380,16 +387,6 @@ impl Deposit {
             },
         )?;
 
-        // Validate non-negative spot lag (negative has no financial meaning)
-        if let Some(lag) = self.spot_lag_days {
-            if lag < 0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Deposit spot_lag_days must be non-negative, got {}",
-                    lag
-                )));
-            }
-        }
-
         // Warn about extreme rates (don't fail, as they may be intentional)
         if let Some(r) = self.quote_rate {
             let r_f64 = decimal_to_f64(r, "Deposit quote_rate")?;
@@ -413,10 +410,10 @@ impl Deposit {
 
     /// Compute the effective start date considering spot lag and business day adjustments.
     ///
-    /// If `spot_lag_days` is set, computes the start date as `start + spot_lag` business days
+    /// If `settlement_days` is set, computes the start date as `start + settlement_days` business days
     /// (or calendar days if no calendar is set), then applies the business day convention.
     ///
-    /// If `spot_lag_days` is not set, returns the raw `start` date optionally adjusted by BDC.
+    /// If `settlement_days` is not set, returns the raw `start` date optionally adjusted by BDC.
     ///
     /// # Returns
     /// The effective start date after all adjustments.
@@ -433,8 +430,14 @@ impl Deposit {
 
         let business_day_convention = self.business_day_convention;
 
-        let base_start = if let Some(lag_days) = self.spot_lag_days {
-            // Compute spot date: start + spot_lag business days
+        let base_start = if let Some(settlement_days) = self.settlement_days {
+            // Compute spot date: start + settlement_days business days
+            let lag_days = i32::try_from(settlement_days).map_err(|_| {
+                finstack_quant_core::Error::Validation(format!(
+                    "Deposit '{}' settlement_days {settlement_days} exceeds the supported range",
+                    self.id
+                ))
+            })?;
             if let Some(cal) = calendar {
                 self.start_date.add_business_days(lag_days, cal)?
             } else {
@@ -502,7 +505,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         self.validate()?;
 
         // Compute effective dates with spot lag and business day adjustments.
-        // When spot_lag_days is set, compute effective start from trade date (start).
+        // When settlement_days is set, compute effective start from trade date (start).
         // Otherwise, use the raw start/end dates (optionally BDC-adjusted).
         let effective_start = self.effective_start_date()?;
         let effective_end = self.effective_end_date()?;
@@ -591,7 +594,7 @@ mod tests {
             Some(0.045)
         );
         assert_eq!(deposit.discount_curve_id, CurveId::new("USD-OIS"));
-        assert_eq!(deposit.spot_lag_days, Some(2));
+        assert_eq!(deposit.settlement_days, Some(2));
         assert_eq!(
             deposit.business_day_convention,
             BusinessDayConvention::ModifiedFollowing

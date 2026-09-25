@@ -1253,7 +1253,7 @@ fn core_market_data_dts_exposes_data_only_fx_surface_and_rate_result() {
         "readonly usdQuotation: FxQuoteConvention;"
     ));
     assert!(contains_signature(pair, "readonly pipSize: number;"));
-    assert!(contains_signature(pair, "readonly spotLagDays: number;"));
+    assert!(contains_signature(pair, "readonly settlementDays: number;"));
     assert!(contains_signature(
         core_ns,
         "FxQuoteConvention: FxQuoteConventionConstructor;"

@@ -71,15 +71,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Original face amount (initial principal balance)."
         },
-        "payment_lag_days": {
-          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "pool_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Pool identifier (CUSIP or internal pool ID)."
@@ -102,6 +93,15 @@
           "description": "Annual servicing fee in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
           "format": "double",
           "type": "number"
+        },
+        "stated_delay_days": {
+          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "wac": {
           "description": "Weighted average coupon (gross rate on underlying mortgages).",

@@ -588,7 +588,7 @@ impl JsFxQuoteConvention {
 /// conv.base.code;          // "EUR"
 /// conv.usdQuotation.toString(); // "direct"
 /// conv.pipSize;            // 0.0001
-/// conv.spotLagDays;        // 2
+/// conv.settlementDays;     // 2
 /// ```
 #[wasm_bindgen(js_name = FxPairConvention)]
 #[derive(Clone, Copy, Debug)]
@@ -629,9 +629,9 @@ impl JsFxPairConvention {
     }
 
     /// Standard spot lag in business days (T+1 or T+2).
-    #[wasm_bindgen(getter, js_name = spotLagDays)]
-    pub fn spot_lag_days(&self) -> u32 {
-        self.inner.spot_lag_days
+    #[wasm_bindgen(getter, js_name = settlementDays)]
+    pub fn settlement_days(&self) -> u32 {
+        self.inner.settlement_days
     }
 }
 
@@ -1182,7 +1182,7 @@ mod tests {
         assert_eq!(conv.quote().code(), "JPY");
         assert_eq!(conv.usd_quotation().to_string(), "indirect");
         assert!((conv.pip_size() - 0.01).abs() < 1e-12);
-        assert_eq!(conv.spot_lag_days(), 2);
+        assert_eq!(conv.settlement_days(), 2);
         assert!((fx_pip_size("EUR", "USD").expect("EURUSD pip") - 0.0001).abs() < 1e-12);
         let inverted = invert_fx_rate(1.10).expect("positive rate");
         assert!((inverted - 1.0 / 1.10).abs() < 1e-12);

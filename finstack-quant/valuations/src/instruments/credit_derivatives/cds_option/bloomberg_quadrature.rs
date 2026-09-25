@@ -1039,7 +1039,7 @@ mod tests {
         let market = market(as_of);
         let expected = context_for(&option, &market, as_of, 0.3).front_end_protection;
         for settlement in [date!(2025 - 01 - 09), date!(2025 - 07 - 01)] {
-            option.cash_settlement_date = Some(settlement);
+            option.premium_settlement_date = Some(settlement);
             assert_eq!(
                 context_for(&option, &market, as_of, 0.3).front_end_protection,
                 expected
@@ -1850,7 +1850,7 @@ mod tests {
             let initial = date!(2025 - 01 - 01);
             let later = date!(2025 - 07 - 01);
             let mut option = option(initial, OptionType::Call, 100.0, 0.3);
-            option.cash_settlement_date = Some(date!(2025 - 01 - 06));
+            option.premium_settlement_date = Some(date!(2025 - 01 - 06));
             option.exercise_settlement_date = Some(option.expiry + time::Duration::days(5));
             let expected = (option.expiry - later).whole_days() as f64 / 365.0;
             assert!(
@@ -1866,7 +1866,7 @@ mod tests {
             let mut option = option(initial, OptionType::Call, 100.0, 0.3);
             option.underlying_is_index = true;
             option.knockout = false;
-            option.cash_settlement_date = Some(date!(2025 - 01 - 06));
+            option.premium_settlement_date = Some(date!(2025 - 01 - 06));
             let curves = market(initial);
             let ctx = context_for(&option, &curves, later, 0.3);
             let t = (option.expiry - later).whole_days() as f64 / 365.0;

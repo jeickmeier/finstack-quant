@@ -397,7 +397,7 @@ fn test_business_day_convention_adjustment_causes_effective_date_crossover() {
         .day_count(DayCount::Act360)
         .quote_rate_opt(Some(Decimal::try_from(0.03).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .spot_lag_days_opt(Some(2)) // T+2: Friday + 2 biz days = Tuesday Jan 7
+        .settlement_days_opt(Some(2)) // T+2: Friday + 2 biz days = Tuesday Jan 7
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(Some("nyse".into()))
         .build();

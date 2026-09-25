@@ -2,6 +2,66 @@
 
 ## [Unreleased]
 
+### Settlement and payment timing (2026-09-24)
+
+`settlement_date` is a date, `settlement` is only the delivery method, the T+N
+lag is `settlement_days: u32`, the business-day payment lag is
+`payment_lag_days`, the agency MBS calendar-day delay is `stated_delay_days`,
+and an accessor that resolves a default is named `effective_*`. No numbers
+change.
+
+#### Changed (BREAKING)
+
+- `FxSpot.settlement` (now `settlement_date`), `FxSpot::with_settlement` (now
+  `with_settlement_date`) and `FxSpot.settlement_lag_days: Option<i32>` (now
+  `settlement_days: Option<u32>`, with `with_settlement_days(u32)`). Negative
+  (T-N) lags are no longer accepted. Rust, JSON.
+- `CommodityFuture.settlement` (now `fixing`) and `CommodityFutureSettlement`
+  (now `CommodityFutureFixing`, variants unchanged); the cash/physical method
+  stays at `terms.settlement`. Rust, JSON.
+- `CommodityForward.settlement_lag_days` (now `settlement_days`) and
+  `CommodityForward::effective_settlement_lag` (now
+  `effective_settlement_days`). Rust, JSON.
+- `Deposit.spot_lag_days: Option<i32>` (now `settlement_days: Option<u32>`).
+  Rust, JSON.
+- `CDSOption.cash_settlement_date` (now `premium_settlement_date`) and
+  `CDSOption::effective_cash_settlement_date` (now
+  `effective_premium_settlement_date`). Rust, JSON.
+- CapFloor `OvernightCouponConvention.payment_delay_days` (now
+  `payment_lag_days`). Rust, Python docs, JSON.
+- core `ScheduleSpec.payment_lag_business_days` and
+  `ScheduleBuilder::payment_lag_business_days` (now `payment_lag_days`). Rust,
+  Python `ScheduleBuilder.payment_lag_days`, JSON.
+- `AgencyMbsPassthrough.payment_lag_days` (now `stated_delay_days`, calendar
+  days from accrual start), `AgencyProgram::payment_lag_days` (now
+  `stated_delay_days`) and `AgencyMbsPassthrough::effective_payment_delay` (now
+  `effective_stated_delay_days`). Rust, JSON (agency MBS, TBA and CMO
+  payloads).
+- core `FxPairConvention.spot_lag_days` (now `settlement_days`; Python
+  `settlement_days`, WASM `settlementDays`) and
+  `dates::fx::fx_standard_spot_lag_days` (now `fx_standard_settlement_days`).
+  Rust, Python, WASM.
+- `FxForward::standard_spot_days` (now `standard_settlement_days`), and the
+  `FxForward`/`FxSwap`/`Ndf::from_trade_date` argument `spot_lag_days: i32`
+  (now `settlement_days: u32`; Python keyword `settlement_days`). Rust, Python.
+- `XccyConventions.spot_lag_days: i32` (now `settlement_days: u32`, also the
+  `xccy_conventions.json` registry key and the Python getter). Rust, Python,
+  JSON.
+- `AgencyTba::get_settlement_date` (now `effective_settlement_date`) and
+  `DollarRoll::front_settle_date` / `back_settle_date` (now
+  `effective_front_settlement_date` / `effective_back_settlement_date`). Rust.
+- `DollarRoll::settlement_days()` and `CarryResult.settlement_days` (now
+  `roll_days`: calendar days between the front and back settlement dates).
+  Rust.
+- `CDSTranchePricerConfig.index_settlement_lag` / `bespoke_settlement_lag`
+  (now `index_settlement_days` / `bespoke_settlement_days`). Rust.
+
+#### Removed
+
+- `tba::TbaSettlement` (unused) and the inherent
+  `AgencyTba::settlement_month(year, month)` helper; the builder's
+  `settlement_year` / `settlement_month` setters remain. Rust.
+
 ### Pool statistics (2026-09-24)
 
 Collateral pool statistics use the market acronym with a unit suffix unless

@@ -182,10 +182,10 @@ pub enum OvernightSpreadCompounding {
 pub struct OvernightCouponConvention {
     /// Daily overnight compounding convention.
     pub compounding: FloatingLegCompounding,
-    /// Payment delay in business days after the accrual end date.
+    /// Payment lag in business days after the accrual end date.
     #[serde(default)]
     #[cfg_attr(feature = "json-schema", schemars(range(min = 0, max = 31)))]
-    pub payment_delay_days: i32,
+    pub payment_lag_days: i32,
     /// Calendar used for overnight observations and fixings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixing_calendar_id: Option<CalendarId>,
@@ -500,7 +500,7 @@ impl CapFloor {
         let overnight_payment_delay = self
             .overnight_coupon
             .as_ref()
-            .map(|terms| terms.payment_delay_days);
+            .map(|terms| terms.payment_lag_days);
         let params = crate::cashflow::builder::periods::BuildPeriodsParams {
             start: self.start_date,
             end: self.maturity,
@@ -567,7 +567,7 @@ impl CapFloor {
                 period.payment_date =
                     crate::instruments::common_impl::pricing::swap_legs::add_payment_delay(
                         period.accrual_end,
-                        terms.payment_delay_days,
+                        terms.payment_lag_days,
                         payment_calendar_id,
                     )?;
             }
@@ -642,7 +642,7 @@ impl CapFloor {
 
     pub(crate) fn resolved_payment_lag_days(&self) -> i32 {
         if let Some(terms) = &self.overnight_coupon {
-            return terms.payment_delay_days;
+            return terms.payment_lag_days;
         }
         let Ok(registry) = ConventionRegistry::try_global() else {
             return 0;
@@ -752,11 +752,11 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
                     self.id, self.forward_curve_id
                 )));
             }
-            if overnight.payment_delay_days < 0 || overnight.payment_delay_days > 31 {
+            if overnight.payment_lag_days < 0 || overnight.payment_lag_days > 31 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CapFloor '{}' overnight payment delay must be between 0 and 31 business \
+                    "CapFloor '{}' overnight_coupon.payment_lag_days must be between 0 and 31 business \
                      days, got {}",
-                    self.id, overnight.payment_delay_days
+                    self.id, overnight.payment_lag_days
                 )));
             }
             match overnight.compounding {
@@ -1276,7 +1276,7 @@ mod tests {
         .expect("valid cap");
         cap.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 2 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,

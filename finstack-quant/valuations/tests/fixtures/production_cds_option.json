@@ -28,7 +28,7 @@
         "underlying_convention": "isda_na",
         "underlying_is_index": false,
         "vol_surface_id": "CDSOPT-VOL",
-        "cash_settlement_date": "2025-01-06",
+        "premium_settlement_date": "2025-01-06",
         "instrument_pricing_overrides": {
           "market_quotes": {
             "implied_volatility": 0.3

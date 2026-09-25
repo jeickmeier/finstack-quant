@@ -273,7 +273,7 @@ impl PySchedule {
     /// with the canonical ``ScheduleSpec`` fields (``start``, ``end``,
     /// ``frequency``, ``stub``, ``business_day_convention``, ``calendar_id``,
     /// ``end_of_month``, ``imm_mode``, ``cds_imm_mode``, ``error_policy``,
-    /// ``payment_lag_business_days``, ``fixing_lag_business_days``).
+    /// ``payment_lag_days``, ``fixing_lag_business_days``).
     ///
     /// Raises ``ValueError`` when the spec is malformed or the schedule
     /// cannot be built.
@@ -518,8 +518,8 @@ impl PyScheduleBuilder {
     }
 
     /// Shift each payment date by ``lag`` business days after the adjusted period end.
-    fn payment_lag_business_days(mut slf: PyRefMut<'_, Self>, lag: i32) -> PyRefMut<'_, Self> {
-        slf.spec.payment_lag_business_days = lag;
+    fn payment_lag_days(mut slf: PyRefMut<'_, Self>, lag: i32) -> PyRefMut<'_, Self> {
+        slf.spec.payment_lag_days = lag;
         slf
     }
 

@@ -1178,7 +1178,7 @@ mod tests {
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
@@ -1289,7 +1289,7 @@ mod tests {
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
-            payment_delay_days: 0,
+            payment_lag_days: 0,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
@@ -1383,7 +1383,7 @@ mod tests {
         .expect("caplet");
         delayed.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
@@ -1406,7 +1406,7 @@ mod tests {
             .overnight_coupon
             .as_mut()
             .expect("overnight terms")
-            .payment_delay_days = 0;
+            .payment_lag_days = 0;
         let immediate_pv = CapFloorHullWhitePricer
             .price_internal(&immediate, &market, as_of)
             .expect("immediate HW price")
@@ -1490,7 +1490,7 @@ mod tests {
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
@@ -1557,7 +1557,7 @@ mod tests {
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
@@ -1657,7 +1657,7 @@ mod tests {
         .expect("caplet");
         caplet.overnight_coupon = Some(OvernightCouponConvention {
             compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
-            payment_delay_days: 2,
+            payment_lag_days: 2,
             fixing_calendar_id: Some("usny".into()),
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,

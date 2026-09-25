@@ -21,8 +21,8 @@ pub struct CarryResult {
     pub implied_rate: f64,
     /// Dollar drop (front price - back price)
     pub drop: f64,
-    /// Days between settlements
-    pub settlement_days: i64,
+    /// Roll period: calendar days between the front and back settlement dates
+    pub roll_days: i64,
     /// Expected coupon income during roll period (per $100 face)
     pub coupon_income: f64,
     /// Expected principal paydown during roll period (per $100 face)
@@ -64,12 +64,12 @@ pub struct CarryResult {
 /// Returns an error when the settlement dates or the assumed pool cannot be
 /// resolved, or when the pool projection fails.
 pub fn implied_financing_rate(roll: &DollarRoll) -> Result<CarryResult> {
-    let days = roll.settlement_days()?;
+    let days = roll.roll_days()?;
     let drop = roll.drop();
 
     let front_leg = roll.front_leg()?;
-    let front_settle = roll.front_settle_date()?;
-    let back_settle = roll.back_settle_date()?;
+    let front_settle = roll.effective_front_settlement_date()?;
+    let back_settle = roll.effective_back_settlement_date()?;
 
     let pool = create_assumed_pool(&front_leg)?;
     let months = (back_settle.year() - front_settle.year()) * 12
@@ -113,7 +113,7 @@ pub fn implied_financing_rate(roll: &DollarRoll) -> Result<CarryResult> {
     Ok(CarryResult {
         implied_rate,
         drop,
-        settlement_days: days,
+        roll_days: days,
         coupon_income,
         principal_paydown,
     })
@@ -218,8 +218,8 @@ mod tests {
             "expected positive principal paydown over the roll"
         );
 
-        let front = roll.front_settle_date().expect("front");
-        let back = roll.back_settle_date().expect("back");
+        let front = roll.effective_front_settlement_date().expect("front");
+        let back = roll.effective_back_settlement_date().expect("back");
         let boundary =
             finstack_quant_core::dates::Date::from_calendar_date(back.year(), back.month(), 1)
                 .expect("boundary");
@@ -279,7 +279,7 @@ mod tests {
     fn test_carry_round_trip_consistency() {
         let roll = DollarRoll::example().expect("DollarRoll example is valid");
         let result = implied_financing_rate(&roll).expect("ok");
-        let front = roll.front_settle_date().expect("front");
+        let front = roll.effective_front_settlement_date().expect("front");
         let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
         let front_accrued = settlement_accrued_interest(&pool, front).expect("accrued") * 100.0
             / pool.current_face.amount();
@@ -290,7 +290,7 @@ mod tests {
             roll.back_price,
             result.coupon_income,
             result.principal_paydown,
-            result.settlement_days,
+            result.roll_days,
         );
         assert!(
             (be - roll.drop()).abs() < 1e-10,

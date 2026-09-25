@@ -11,7 +11,7 @@
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_cds_option.json",
-      "sha256": "0c766434942892039cc5803c53dd3ee1284ab2a37f8b1560f02baae0144a9059"
+      "sha256": "6002df1a0a47c512b54ac0cbb90de15445987502f059e487aaf71ab910669cf9"
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_inflation.json",
@@ -981,7 +981,7 @@
       "type": "commodity_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/commodity_future.json",
-        "sha256": "bd711d4383cb338204cad3dfed1f29ff61e1ee8c0c3ab0e75c273283581cf232",
+        "sha256": "5b9c7c02466df1db17302e97b73633230211b54a95906330966ef748c320ca44",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1323,7 +1323,7 @@
       "type": "deposit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/deposit.json",
-        "sha256": "b79684e20757090781030a30dbccfb34c3c814e3b5545d7fe9a6d7302c7f02f9",
+        "sha256": "07deddd09ee19d3f21ac4e1e94c37205f36a7d469a2e34f8146e9e0710177dd1",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -1893,7 +1893,7 @@
       "type": "fx_spot",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_spot.json",
-        "sha256": "6dcbe9347f923f2c7c2b2a3a2f992373be8a836590d26bd65a787c0e4a9d3f61",
+        "sha256": "6d64e2c0a4958f64c29e6860206b50bc6aeaa208299ad5b236ab25b5022e5b6a",
         "pointer": []
       },
       "instrumentPatches": [],

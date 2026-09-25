@@ -90,7 +90,7 @@ fn delivers_into(pool: AgencyProgram, tba: AgencyProgram) -> bool {
 /// the TBA's agency, coupon, and term, and the TBA's `prepayment_spec`
 /// when set (embedded generic PSA otherwise).
 pub(crate) fn create_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthrough> {
-    let settlement_date = tba.get_settlement_date()?;
+    let settlement_date = tba.effective_settlement_date()?;
     let term_months = tba.term.months();
     let defaults = assumed_pool_assumptions()?;
 
@@ -170,7 +170,7 @@ pub(crate) fn resolve_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthrou
                 pool.agency, tba.agency
             )));
         }
-        let settlement = tba.get_settlement_date()?;
+        let settlement = tba.effective_settlement_date()?;
         if pool.issue_date > settlement {
             return Err(finstack_quant_core::Error::Validation(
                 "TBA delivered pool must be issued on or before settlement".into(),
@@ -210,7 +210,7 @@ pub(crate) fn resolve_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthrou
 /// * `market` - Market context with discount curves
 /// * `as_of` - Valuation date
 pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) -> Result<Money> {
-    let settlement_date = tba.get_settlement_date()?;
+    let settlement_date = tba.effective_settlement_date()?;
     if as_of >= settlement_date {
         return Ok(Money::from((0_i64, tba.notional.currency())));
     }

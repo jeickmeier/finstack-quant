@@ -138,7 +138,7 @@ pub struct ScheduleBuilder<'a> {
     pub(super) cds_imm_mode: bool,
     pub(super) error_policy: ScheduleErrorPolicy,
     /// Business days after each (adjusted) period end for the payment date.
-    pub(super) payment_lag_business_days: i32,
+    pub(super) payment_lag_days: i32,
     /// Optional T-minus business days from each period's accrual start.
     pub(super) fixing_lag_business_days: Option<i32>,
 }
@@ -182,7 +182,7 @@ impl<'a> ScheduleBuilder<'a> {
             imm_mode: false,
             cds_imm_mode: false,
             error_policy: ScheduleErrorPolicy::Strict,
-            payment_lag_business_days: 0,
+            payment_lag_days: 0,
             fixing_lag_business_days: None,
         })
     }
@@ -320,8 +320,8 @@ impl<'a> ScheduleBuilder<'a> {
     ///   anchor to the actual payment date. Zero is T+0 (pay on the adjusted
     ///   end). Negative values are rejected at [`build`](Self::build).
     #[must_use]
-    pub fn payment_lag_business_days(mut self, lag: i32) -> Self {
-        self.payment_lag_business_days = lag;
+    pub fn payment_lag_days(mut self, lag: i32) -> Self {
+        self.payment_lag_days = lag;
         self
     }
 
@@ -541,7 +541,7 @@ impl<'a> ScheduleBuilder<'a> {
             &dates,
             self.conv,
             resolved_cal,
-            self.payment_lag_business_days,
+            self.payment_lag_days,
             self.fixing_lag_business_days,
         )?;
 

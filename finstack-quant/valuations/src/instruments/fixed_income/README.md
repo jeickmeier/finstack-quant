@@ -49,7 +49,7 @@ re-exported flat at `finstack_quant_valuations::instruments`:
 `AgencyTba`, `TbaTerm`, `TermLoan`.
 
 Types that exist only under the family path, not at `instruments::*`, include
-`cmo::PacCollar`, `tba::TbaSettlement`, `inflation_linked_bond::{IndexationMethod,
+`cmo::PacCollar`, `inflation_linked_bond::{IndexationMethod,
 DeflationProtection, InflationLinkedBondParams}`, the `convertible::*`
 conversion and greeks types, and everything the four README'd leaves export.
 

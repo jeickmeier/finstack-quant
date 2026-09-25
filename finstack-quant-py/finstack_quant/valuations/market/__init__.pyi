@@ -1010,7 +1010,7 @@ class XccyConventions:
         ...
 
     @property
-    def spot_lag_days(self) -> int:
+    def settlement_days(self) -> int:
         """
         Settlement lag from trade date to the swap effective date.
 

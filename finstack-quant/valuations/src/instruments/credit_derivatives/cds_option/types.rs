@@ -128,7 +128,7 @@ pub struct CDSOption {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     #[builder(default)]
-    pub cash_settlement_date: Option<Date>,
+    pub premium_settlement_date: Option<Date>,
     /// Payment date of the exercise proceeds, defaulting to legal expiry.
     /// Must be on or after expiry and before CDS maturity. Discounting uses
     /// this date; spread variance ends at legal expiry.
@@ -290,11 +290,11 @@ impl CDSOption {
         validation::validate_money_gt(self.notional, 0.0, "CDS option notional")?;
 
         if let (Some(cash_settlement), Some(exercise_settlement)) =
-            (self.cash_settlement_date, self.exercise_settlement_date)
+            (self.premium_settlement_date, self.exercise_settlement_date)
         {
             if exercise_settlement <= cash_settlement {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "exercise_settlement_date ({}) must be after cash_settlement_date ({})",
+                    "exercise_settlement_date ({}) must be after premium_settlement_date ({})",
                     exercise_settlement, cash_settlement
                 )));
             }
@@ -510,7 +510,7 @@ impl CDSOption {
             cds_maturity: option_params.cds_maturity,
             notional: option_params.notional,
             settlement: option_params.settlement,
-            cash_settlement_date: None,
+            premium_settlement_date: None,
             exercise_settlement_date: None,
             underlying_effective_date: None,
             protection_start_convention: option_params.protection_start_convention,
@@ -542,12 +542,15 @@ impl CDSOption {
         Ok(((self.expiry - as_of).whole_days() as f64 / 365.0).max(0.0))
     }
 
-    /// Effective cash-settlement date for the option premium. Defaults to
+    /// Effective settlement (payment) date of the option premium. Defaults to
     /// the underlying CDS convention's settlement lag from the next
     /// business day after `as_of`.
     #[doc(hidden)]
-    pub fn effective_cash_settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
-        if let Some(date) = self.cash_settlement_date {
+    pub fn effective_premium_settlement_date(
+        &self,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Date> {
+        if let Some(date) = self.premium_settlement_date {
             return Ok(date);
         }
 
@@ -789,7 +792,7 @@ mod tests {
         let as_of = date!(2026 - 05 - 02);
         assert_eq!(
             option
-                .effective_cash_settlement_date(as_of)
+                .effective_premium_settlement_date(as_of)
                 .expect("cash settlement date"),
             date!(2026 - 05 - 07)
         );

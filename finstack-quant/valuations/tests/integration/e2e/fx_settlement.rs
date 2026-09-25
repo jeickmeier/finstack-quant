@@ -498,7 +498,7 @@ fn test_fx_spot_instrument_eur_usd_us_holiday_intermediate_2025() {
         .expect("valid notional")
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny")
-        .with_settlement_lag_days(2);
+        .with_settlement_days(2);
 
     let settlement = fx
         .effective_settlement_date(trade_date)
@@ -527,7 +527,7 @@ fn test_fx_spot_instrument_eur_usd_us_holiday_final_date_2025() {
         .expect("valid notional")
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny")
-        .with_settlement_lag_days(2);
+        .with_settlement_days(2);
 
     let settlement = fx
         .effective_settlement_date(trade_date)

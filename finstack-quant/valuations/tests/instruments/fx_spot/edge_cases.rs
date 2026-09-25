@@ -87,7 +87,7 @@ fn test_negative_notional() {
 
 #[test]
 fn test_settlement_far_future() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2050, 1, 15)); // 25 years out
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2050, 1, 15)); // 25 years out
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -98,7 +98,7 @@ fn test_settlement_far_future() {
 
 #[test]
 fn test_settlement_far_past() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2000, 1, 15)); // 25 years ago
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2000, 1, 15)); // 25 years ago
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -118,7 +118,7 @@ fn test_valuation_on_leap_day() {
 
 #[test]
 fn test_settlement_on_leap_day() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2024, 2, 29));
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2024, 2, 29));
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, d(2024, 2, 28)).unwrap();
@@ -129,7 +129,7 @@ fn test_settlement_on_leap_day() {
 
 #[test]
 fn test_year_boundary_settlement() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 12, 31));
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 12, 31));
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, d(2025, 12, 30)).unwrap();
@@ -227,7 +227,7 @@ fn test_rate_precision_limits() {
 fn test_weekend_settlement_adjustment() {
     // Settlement on Saturday should adjust to Monday (with Following convention)
     let fx = eurusd_with_notional(1_000_000.0, 1.20)
-        .with_settlement(d(2025, 1, 18)) // Saturday
+        .with_settlement_date(d(2025, 1, 18)) // Saturday
         .with_business_day_convention(BusinessDayConvention::Following)
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny");
@@ -253,7 +253,7 @@ fn test_extreme_settlement_lag() {
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
-        .with_settlement(far_future);
+        .with_settlement_date(far_future);
 
     let market = MarketContext::new();
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();

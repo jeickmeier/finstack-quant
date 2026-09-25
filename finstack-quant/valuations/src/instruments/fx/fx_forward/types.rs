@@ -292,8 +292,8 @@ impl FxForward {
     /// # Returns
     ///
     /// Number of business days for spot settlement (1 or 2).
-    pub fn standard_spot_days(base: Currency, quote: Currency) -> u32 {
-        finstack_quant_core::dates::fx::fx_standard_spot_lag_days(base, quote)
+    pub fn standard_settlement_days(base: Currency, quote: Currency) -> u32 {
+        finstack_quant_core::dates::fx::fx_standard_settlement_days(base, quote)
     }
 
     /// Construct an FX forward from trade date and tenor using joint calendar spot roll.
@@ -310,8 +310,9 @@ impl FxForward {
     /// * `foreign_discount_curve_id` - Base currency discount curve
     /// * `base_calendar_id` - Optional base currency calendar
     /// * `quote_calendar_id` - Optional quote currency calendar
-    /// * `spot_lag_days` - Spot lag (typically 2, or 1 for USD/CAD). Use
-    ///   [`standard_spot_days`](Self::standard_spot_days) to determine automatically.
+    /// * `settlement_days` - T+N spot lag in business days (typically 2, or 1 for
+    ///   USD/CAD). Use [`standard_settlement_days`](Self::standard_settlement_days)
+    ///   to determine it automatically.
     /// * `business_day_convention` - Business day convention
     /// * `end_of_month` - Preserve month-end when the spot date is month-end.
     #[allow(clippy::too_many_arguments)]
@@ -326,7 +327,7 @@ impl FxForward {
         foreign_discount_curve_id: impl Into<CurveId>,
         base_calendar_id: Option<String>,
         quote_calendar_id: Option<String>,
-        spot_lag_days: i32,
+        settlement_days: u32,
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
@@ -339,7 +340,7 @@ impl FxForward {
         // finding).
         let spot_date = fx_spot_date_for_pair(
             trade_date,
-            spot_lag_days,
+            settlement_days,
             base_currency,
             quote_currency,
             base_calendar_id.as_deref(),
@@ -968,19 +969,19 @@ mod tests {
     #[test]
     fn standard_spot_days_matches_core_helper() {
         assert_eq!(
-            FxForward::standard_spot_days(Currency::USD, Currency::CAD),
+            FxForward::standard_settlement_days(Currency::USD, Currency::CAD),
             1
         );
         assert_eq!(
-            FxForward::standard_spot_days(Currency::USD, Currency::TRY),
+            FxForward::standard_settlement_days(Currency::USD, Currency::TRY),
             1
         );
         assert_eq!(
-            FxForward::standard_spot_days(Currency::EUR, Currency::USD),
+            FxForward::standard_settlement_days(Currency::EUR, Currency::USD),
             2
         );
         assert_eq!(
-            FxForward::standard_spot_days(Currency::USD, Currency::MXN),
+            FxForward::standard_settlement_days(Currency::USD, Currency::MXN),
             2
         );
     }

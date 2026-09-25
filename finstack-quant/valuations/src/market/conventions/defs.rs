@@ -246,8 +246,8 @@ pub struct XccyConventions {
     pub base_index_id: IndexId,
     /// Rate index identifier for the quote-currency floating leg.
     pub quote_index_id: IndexId,
-    /// Standard spot settlement lag in business days.
-    pub spot_lag_days: i32,
+    /// Standard T+N spot settlement lag in business days.
+    pub settlement_days: u32,
     /// Coupon payment frequency for both legs.
     pub payment_frequency: Tenor,
     /// Accrual day count convention.

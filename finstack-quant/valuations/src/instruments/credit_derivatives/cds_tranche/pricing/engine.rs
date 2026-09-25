@@ -515,9 +515,9 @@ impl CDSTranchePricer {
             || tranche.index_name.starts_with("iTraxx")
             || tranche.index_name.starts_with("ITRAXX");
         let settlement_lag = if is_standard_index {
-            self.params.index_settlement_lag
+            self.params.index_settlement_days
         } else {
-            self.params.bespoke_settlement_lag
+            self.params.bespoke_settlement_days
         };
 
         // Use calendar if available, otherwise fall back to weekday-only adjustment

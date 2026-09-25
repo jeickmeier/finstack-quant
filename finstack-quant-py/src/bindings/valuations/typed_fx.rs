@@ -500,7 +500,7 @@ impl PyFxForward {
     /// Build a forward from a trade date and a standard FX tenor.
     ///
     /// Mirrors Rust ``FxForward::from_trade_date``: the spot date is rolled
-    /// from ``trade_date`` by ``spot_lag_days`` business days (CLS-consistent
+    /// from ``trade_date`` by ``settlement_days`` business days (CLS-consistent
     /// pair roll), then ``tenor`` is added with the FX end-of-month rule and
     /// ``business_day_convention``.
     ///
@@ -526,9 +526,9 @@ impl PyFxForward {
     ///     Base-currency holiday calendar; ``None`` uses weekends only.
     /// quote_calendar_id : str | None
     ///     Quote-currency holiday calendar; ``None`` uses weekends only.
-    /// spot_lag_days : int | None
-    ///     Spot lag in business days; ``None`` uses the market standard for
-    ///     the pair (``FxForward.standard_spot_days``): T+1 for USD/CAD,
+    /// settlement_days : int | None
+    ///     T+N spot lag in business days (non-negative); ``None`` uses the market standard for
+    ///     the pair (``FxForward.standard_settlement_days``): T+1 for USD/CAD,
     ///     USD/TRY, USD/RUB and T+2 otherwise.
     /// business_day_convention : BusinessDayConvention | str | None
     ///     Roll rule applied to the maturity; ``None`` means ``"modified_following"``.
@@ -551,12 +551,12 @@ impl PyFxForward {
     #[staticmethod]
     #[pyo3(signature = (id, base_currency, quote_currency, trade_date, tenor, notional,
                         domestic_discount_curve_id, foreign_discount_curve_id, *,
-                        base_calendar_id=None, quote_calendar_id=None, spot_lag_days=None,
+                        base_calendar_id=None, quote_calendar_id=None, settlement_days=None,
                         business_day_convention=None, end_of_month=false))]
     #[pyo3(
         text_signature = "(id, base_currency, quote_currency, trade_date, tenor, notional, \
 domestic_discount_curve_id, foreign_discount_curve_id, *, base_calendar_id=None, \
-quote_calendar_id=None, spot_lag_days=None, business_day_convention=None, \
+quote_calendar_id=None, settlement_days=None, business_day_convention=None, \
 end_of_month=False)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
@@ -572,7 +572,7 @@ end_of_month=False)"
         foreign_discount_curve_id: &str,
         base_calendar_id: Option<String>,
         quote_calendar_id: Option<String>,
-        spot_lag_days: Option<i32>,
+        settlement_days: Option<u32>,
         business_day_convention: Option<&Bound<'_, PyAny>>,
         end_of_month: bool,
     ) -> PyResult<Self> {
@@ -582,13 +582,9 @@ end_of_month=False)"
             Some(value) if !value.is_none() => bdc_from_py(value, "business_day_convention")?,
             _ => finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
         };
-        let spot_lag_days = match spot_lag_days {
-            Some(days) => days,
-            None => i32::try_from(
-                finstack_quant_valuations::instruments::FxForward::standard_spot_days(base, quote),
-            )
-            .map_err(|_| value_error("standard spot lag does not fit in i32"))?,
-        };
+        let settlement_days = settlement_days.unwrap_or_else(|| {
+            finstack_quant_valuations::instruments::FxForward::standard_settlement_days(base, quote)
+        });
         let inner = finstack_quant_valuations::instruments::FxForward::from_trade_date(
             InstrumentId::new(id.to_string()),
             base,
@@ -600,7 +596,7 @@ end_of_month=False)"
             CurveId::new(foreign_discount_curve_id.to_string()),
             base_calendar_id,
             quote_calendar_id,
-            spot_lag_days,
+            settlement_days,
             convention,
             end_of_month,
         )
@@ -610,7 +606,7 @@ end_of_month=False)"
 
     /// Market-standard spot lag (business days) for a currency pair.
     ///
-    /// Mirrors Rust ``FxForward::standard_spot_days``.
+    /// Mirrors Rust ``FxForward::standard_settlement_days``.
     ///
     /// Parameters
     /// ----------
@@ -630,9 +626,12 @@ end_of_month=False)"
     ///     If a currency code is not ISO-4217.
     #[staticmethod]
     #[pyo3(text_signature = "(base, quote)")]
-    fn standard_spot_days(base: &Bound<'_, PyAny>, quote: &Bound<'_, PyAny>) -> PyResult<u32> {
+    fn standard_settlement_days(
+        base: &Bound<'_, PyAny>,
+        quote: &Bound<'_, PyAny>,
+    ) -> PyResult<u32> {
         Ok(
-            finstack_quant_valuations::instruments::FxForward::standard_spot_days(
+            finstack_quant_valuations::instruments::FxForward::standard_settlement_days(
                 currency_from_py(base, "base")?,
                 currency_from_py(quote, "quote")?,
             ),

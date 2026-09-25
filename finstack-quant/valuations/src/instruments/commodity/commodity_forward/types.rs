@@ -197,7 +197,7 @@ pub struct CommodityForward {
     /// | Power | T+1 |
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settlement_lag_days: Option<u32>,
+    pub settlement_days: Option<u32>,
     /// Calendar ID for settlement date adjustments.
     ///
     /// Used for business day adjustment of the settlement date. If `convention`
@@ -384,11 +384,11 @@ impl CommodityForward {
     /// Get the effective settlement lag in business days.
     ///
     /// Resolution order:
-    /// 1. `settlement_lag_days` if explicitly set
+    /// 1. `settlement_days` if explicitly set
     /// 2. `convention.settlement_days()` if convention is set
     /// 3. Default: 2 (T+2, standard for most commodities)
-    pub fn effective_settlement_lag(&self) -> u32 {
-        self.settlement_lag_days
+    pub fn effective_settlement_days(&self) -> u32 {
+        self.settlement_days
             .or_else(|| self.convention.map(|c| c.settlement_days()))
             .unwrap_or(2)
     }
@@ -816,7 +816,7 @@ mod tests {
             .expect("should build");
 
         // WTI convention: T+2, Following, NYMEX calendar
-        assert_eq!(forward.effective_settlement_lag(), 2);
+        assert_eq!(forward.effective_settlement_days(), 2);
         assert_eq!(forward.effective_settlement_calendar(), Some("nymex"));
         assert_eq!(
             forward.effective_settlement_business_day_convention(),
@@ -842,7 +842,7 @@ mod tests {
             .build()
             .expect("should build");
 
-        assert_eq!(gold_forward.effective_settlement_lag(), 2);
+        assert_eq!(gold_forward.effective_settlement_days(), 2);
         assert_eq!(gold_forward.effective_settlement_calendar(), Some("comex"));
         assert_eq!(
             gold_forward.effective_settlement_business_day_convention(),
@@ -870,13 +870,13 @@ mod tests {
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .convention_opt(Some(CommodityConvention::WtiCrude)) // T+2, Following
-            .settlement_lag_days_opt(Some(1)) // Override to T+1
+            .settlement_days_opt(Some(1)) // Override to T+1
             .settlement_business_day_convention_opt(Some(BusinessDayConvention::ModifiedFollowing)) // Override BDC
             .build()
             .expect("should build");
 
         // Explicit values take precedence over convention
-        assert_eq!(forward.effective_settlement_lag(), 1);
+        assert_eq!(forward.effective_settlement_days(), 1);
         assert_eq!(
             forward.effective_settlement_business_day_convention(),
             BusinessDayConvention::ModifiedFollowing
@@ -908,7 +908,7 @@ mod tests {
             .expect("should build");
 
         // Defaults: T+2, Following, no calendar
-        assert_eq!(forward.effective_settlement_lag(), 2);
+        assert_eq!(forward.effective_settlement_days(), 2);
         assert_eq!(forward.effective_settlement_calendar(), None);
         assert_eq!(
             forward.effective_settlement_business_day_convention(),

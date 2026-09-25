@@ -1336,7 +1336,7 @@
           },
           "fixing_calendar_id": "usny",
           "payment_calendar_id": "usny",
-          "payment_delay_days": 2,
+          "payment_lag_days": 2,
           "spread_compounding": "exclude"
         },
         "instrument_pricing_overrides": {

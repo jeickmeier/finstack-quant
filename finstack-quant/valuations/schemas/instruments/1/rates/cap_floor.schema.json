@@ -320,9 +320,9 @@
           ],
           "description": "Calendar used to apply the payment delay."
         },
-        "payment_delay_days": {
+        "payment_lag_days": {
           "default": 0,
-          "description": "Payment delay in business days after the accrual end date.",
+          "description": "Payment lag in business days after the accrual end date.",
           "format": "int32",
           "maximum": 31,
           "minimum": 0,

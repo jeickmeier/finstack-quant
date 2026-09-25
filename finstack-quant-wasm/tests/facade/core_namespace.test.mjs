@@ -173,7 +173,7 @@ test('core FX pair convention helpers', () => {
   assert.equal(conv.quote.code, 'JPY');
   assert.equal(conv.usdQuotation.toString(), 'indirect');
   assert.equal(conv.pipSize, 0.01);
-  assert.equal(conv.spotLagDays, 2);
+  assert.equal(conv.settlementDays, 2);
   assert.equal(core.fxPipSize('EUR', 'USD'), 0.0001);
   assert.ok(Math.abs(core.invertFxRate(1.1) - 1 / 1.1) < 1e-12);
   assert.equal(core.FxQuoteConvention.direct().toString(), 'direct');

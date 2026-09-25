@@ -30,7 +30,7 @@ Example: EURGBP not GBPEUR, AUDUSD not USDAUD
 ### Audit checklist - FX Spot
 
 - [x] Quote convention follows market standard (`FxQuoteConvention` / `fx_pair_convention`)
-- [x] Settlement days correct (for example USD/CAD, USD/TRY, and USD/RUB are T+1; many G10 pairs are T+2) — `fx_standard_spot_lag_days` / `FxPairConvention.spot_lag_days` (USD/RUB still defaults to T+2)
+- [x] Settlement days correct (for example USD/CAD, USD/TRY, and USD/RUB are T+1; many G10 pairs are T+2) — `fx_standard_settlement_days` / `FxPairConvention.settlement_days` (USD/RUB still defaults to T+2)
 - [ ] Business day calendar uses joint calendars (both currencies)
 - [x] Base/quote currency follows priority rules (`fx_market_pair`: EUR > GBP > AUD > NZD > USD > other)
 

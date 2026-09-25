@@ -16,6 +16,8 @@ mod common;
 mod registry_coverage;
 #[path = "instruments/serde_skip_guard.rs"]
 mod serde_skip_guard;
+#[path = "instruments/settlement_timing_wire_keys.rs"]
+mod settlement_timing_wire_keys;
 #[path = "instruments/unit_suffix_wire_keys.rs"]
 mod unit_suffix_wire_keys;
 

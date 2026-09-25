@@ -510,18 +510,18 @@ impl PyFxPairConvention {
 
     /// Standard spot lag in business days (T+1 or T+2).
     #[getter]
-    fn spot_lag_days(&self) -> u32 {
-        self.inner.spot_lag_days
+    fn settlement_days(&self) -> u32 {
+        self.inner.settlement_days
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "FxPairConvention(base={}, quote={}, usd_quotation={}, pip_size={}, spot_lag_days={})",
+            "FxPairConvention(base={}, quote={}, usd_quotation={}, pip_size={}, settlement_days={})",
             self.inner.base,
             self.inner.quote,
             self.inner.usd_quotation,
             self.inner.pip_size,
-            self.inner.spot_lag_days,
+            self.inner.settlement_days,
         )
     }
 }

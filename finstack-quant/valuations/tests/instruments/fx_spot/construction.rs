@@ -13,7 +13,7 @@ fn test_basic_construction() {
     assert_eq!(fx.id.as_str(), "EURUSD");
     assert_eq!(fx.base_currency, Currency::EUR);
     assert_eq!(fx.quote_currency, Currency::USD);
-    assert!(fx.settlement.is_none());
+    assert!(fx.settlement_date.is_none());
     assert!(fx.spot_rate.is_none());
     assert_eq!(
         fx.notional,
@@ -58,9 +58,9 @@ fn test_construction_with_mismatched_currency_fails() {
 #[test]
 fn test_construction_with_settlement() {
     let settlement = d(2025, 1, 17);
-    let fx = sample_eurusd().with_settlement(settlement);
+    let fx = sample_eurusd().with_settlement_date(settlement);
 
-    assert_eq!(fx.settlement, Some(settlement));
+    assert_eq!(fx.settlement_date, Some(settlement));
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn test_construction_full_builder() {
         .unwrap()
         .with_rate(1.32)
         .expect("test rate")
-        .with_settlement(d(2025, 1, 17))
+        .with_settlement_date(d(2025, 1, 17))
         .with_business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .with_base_calendar_id("London")
         .with_quote_calendar_id("USNY");
@@ -90,7 +90,7 @@ fn test_construction_full_builder() {
     assert_eq!(fx.quote_currency, Currency::USD);
     assert_eq!(fx.notional.amount(), 5_000_000.0);
     assert_eq!(fx.spot_rate, Some(1.32));
-    assert_eq!(fx.settlement, Some(d(2025, 1, 17)));
+    assert_eq!(fx.settlement_date, Some(d(2025, 1, 17)));
     assert_eq!(
         fx.business_day_convention,
         BusinessDayConvention::ModifiedFollowing
@@ -179,7 +179,7 @@ fn test_clone_preserves_all_fields() {
         .unwrap()
         .with_rate(1.18)
         .expect("test rate")
-        .with_settlement(d(2025, 1, 17));
+        .with_settlement_date(d(2025, 1, 17));
 
     let cloned = fx.clone();
 
@@ -188,7 +188,7 @@ fn test_clone_preserves_all_fields() {
     assert_eq!(cloned.quote_currency, fx.quote_currency);
     assert_eq!(cloned.notional, fx.notional);
     assert_eq!(cloned.spot_rate, fx.spot_rate);
-    assert_eq!(cloned.settlement, fx.settlement);
+    assert_eq!(cloned.settlement_date, fx.settlement_date);
 }
 
 #[test]

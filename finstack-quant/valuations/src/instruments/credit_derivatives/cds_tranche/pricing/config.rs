@@ -153,9 +153,9 @@ pub struct CDSTranchePricerConfig {
     /// If true, generate ISDA coupon dates (IMM-20 schedule)
     pub use_isda_coupon_dates: bool,
     /// Settlement lag in business days for index CDS (default: 1 for Big Bang)
-    pub index_settlement_lag: i32,
+    pub index_settlement_days: i32,
     /// Settlement lag in business days for bespoke tranches (default: 3 per ISDA)
-    pub bespoke_settlement_lag: i32,
+    pub bespoke_settlement_days: i32,
 
     // Numerical Stability
     /// Smooth boundary width for correlation clamping transitions
@@ -188,8 +188,8 @@ impl Default for CDSTranchePricerConfig {
             accrual_on_default_enabled: true,
             schedule_stub: StubKind::ShortFront,
             use_isda_coupon_dates: false,
-            index_settlement_lag: DEFAULT_INDEX_SETTLEMENT_LAG,
-            bespoke_settlement_lag: DEFAULT_BESPOKE_SETTLEMENT_LAG,
+            index_settlement_days: DEFAULT_INDEX_SETTLEMENT_LAG,
+            bespoke_settlement_days: DEFAULT_BESPOKE_SETTLEMENT_LAG,
 
             // Numerical stability
             corr_boundary_width: DEFAULT_CORR_BOUNDARY_WIDTH,
@@ -251,10 +251,10 @@ impl CDSTranchePricerConfig {
         }
         validate_range("corr_boundary_width", self.corr_boundary_width, 0.0, 1.0)?;
         validate_positive("grid_step", self.grid_step)?;
-        if self.index_settlement_lag < 0 || self.bespoke_settlement_lag < 0 {
+        if self.index_settlement_days < 0 || self.bespoke_settlement_days < 0 {
             return Err(CoreError::Validation(format!(
                 "settlement lags must be non-negative, got index={} bespoke={}",
-                self.index_settlement_lag, self.bespoke_settlement_lag
+                self.index_settlement_days, self.bespoke_settlement_days
             )));
         }
         Ok(())

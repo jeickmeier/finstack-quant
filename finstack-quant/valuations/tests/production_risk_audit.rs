@@ -55,7 +55,7 @@ fn fx01_follows_active_spot_and_forward_overrides() {
     let mut spot = FxSpot::new("SPOT".into(), Currency::EUR, Currency::USD)
         .with_rate(1.1)
         .expect("spot")
-        .with_settlement(maturity);
+        .with_settlement_date(maturity);
     spot.notional = Money::from((100_i64, Currency::EUR));
     let ndf = Ndf::builder()
         .id("NDF".into())

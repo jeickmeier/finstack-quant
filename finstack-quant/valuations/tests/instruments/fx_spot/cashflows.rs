@@ -14,7 +14,7 @@ use finstack_quant_valuations::instruments::Instrument;
 #[test]
 fn test_settlement_explicit_date() {
     let settlement = d(2025, 1, 17);
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(settlement);
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(settlement);
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -33,7 +33,7 @@ fn test_settlement_explicit_date() {
 #[test]
 fn test_full_schedule_marks_settlement_as_notional() {
     let settlement = d(2025, 1, 17);
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(settlement);
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(settlement);
     let market = MarketContext::new();
 
     let schedule = fx
@@ -61,7 +61,7 @@ fn test_settlement_lag_default() {
 #[test]
 fn test_settlement_already_settled() {
     let settlement = d(2025, 1, 10);
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(settlement);
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(settlement);
     let market = MarketContext::new();
     let as_of = d(2025, 1, 15);
 
@@ -74,7 +74,7 @@ fn test_settlement_already_settled() {
 #[test]
 fn test_settlement_on_valuation_date() {
     let settlement = d(2025, 1, 15);
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(settlement);
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(settlement);
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, settlement).unwrap();
@@ -89,7 +89,7 @@ fn test_settlement_from_fx_matrix() {
     let fx = sample_eurusd()
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_settlement(d(2025, 1, 17));
+        .with_settlement_date(d(2025, 1, 17));
     let market = market_with_fx_matrix();
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -106,7 +106,7 @@ fn test_settlement_from_fx_matrix() {
 
 #[test]
 fn test_settlement_explicit_rate_overrides_matrix() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.25).with_settlement(d(2025, 1, 17));
+    let fx = eurusd_with_notional(1_000_000.0, 1.25).with_settlement_date(d(2025, 1, 17));
     let market = market_with_fx_matrix(); // Has EUR/USD = 1.20
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -128,7 +128,7 @@ fn test_settlement_lag_custom() {
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
-        .with_settlement(d(2025, 1, 16)); // T+1
+        .with_settlement_date(d(2025, 1, 16)); // T+1
 
     let market = MarketContext::new();
     let as_of = d(2025, 1, 15); // Wednesday
@@ -157,7 +157,7 @@ fn test_settlement_with_business_day_convention() {
     // Test that BDC is applied when calendar is present
     let settlement = d(2025, 1, 18); // Saturday
     let fx = eurusd_with_notional(1_000_000.0, 1.20)
-        .with_settlement(settlement)
+        .with_settlement_date(settlement)
         .with_business_day_convention(BusinessDayConvention::Following)
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny");
@@ -182,7 +182,7 @@ fn test_settlement_zero_notional() {
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
-        .with_settlement(d(2025, 1, 17));
+        .with_settlement_date(d(2025, 1, 17));
     let market = MarketContext::new();
 
     let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
@@ -198,8 +198,8 @@ fn test_settlement_zero_notional() {
 
 #[test]
 fn test_multiple_instruments_independent_settlement() {
-    let fx1 = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 17));
-    let fx2 = eurusd_with_notional(2_000_000.0, 1.22).with_settlement(d(2025, 1, 20));
+    let fx1 = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 1, 17));
+    let fx2 = eurusd_with_notional(2_000_000.0, 1.22).with_settlement_date(d(2025, 1, 20));
 
     let market = MarketContext::new();
     let as_of = test_date();
@@ -220,7 +220,7 @@ fn test_settlement_without_rate_or_matrix_fails() {
     let fx = sample_eurusd()
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_settlement(d(2025, 1, 17));
+        .with_settlement_date(d(2025, 1, 17));
     let market = MarketContext::new(); // No FX matrix
 
     let result = fx.dated_cashflows(&market, test_date());
@@ -229,7 +229,7 @@ fn test_settlement_without_rate_or_matrix_fails() {
 
 #[test]
 fn test_value_matches_provider_flows() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 17));
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 1, 17));
     let market = MarketContext::new();
     let as_of = test_date();
 
@@ -262,7 +262,7 @@ fn test_settlement_lag_negative() {
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
-        .with_settlement(d(2025, 1, 15)); // Past date
+        .with_settlement_date(d(2025, 1, 15)); // Past date
 
     let market = MarketContext::new();
     let as_of = d(2025, 1, 17); // Friday
@@ -282,7 +282,7 @@ fn test_calendar_aware_settlement_lag() {
         .expect("test rate")
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny")
-        .with_settlement(d(2025, 1, 17)); // T+2
+        .with_settlement_date(d(2025, 1, 17)); // T+2
 
     let market = MarketContext::new();
     let as_of = d(2025, 1, 15);
@@ -328,7 +328,7 @@ fn cashflow_uses_valuation_date_spot_not_settlement_date_rate() {
     )
     .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
     .expect("valid notional")
-    .with_settlement(d(2025, 1, 17));
+    .with_settlement_date(d(2025, 1, 17));
     let market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(DateAwareFx {
         valuation_date: as_of,
     })));

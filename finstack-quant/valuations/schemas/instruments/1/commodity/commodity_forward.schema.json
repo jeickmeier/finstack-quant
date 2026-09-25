@@ -168,7 +168,7 @@
             "null"
           ]
         },
-        "settlement_lag_days": {
+        "settlement_days": {
           "description": "Settlement lag in business days (T+N).\n\nDefaults to 2 for most commodity markets (T+2). If `convention` is set,\nuses the convention's default unless explicitly overridden here.\n\n# Market Standards\n\n| Market | Settlement |\n|--------|------------|\n| Energy (WTI, Brent, NG) | T+2 |\n| Precious metals | T+2 |\n| Base metals (LME) | T+2 |\n| Power | T+1 |",
           "format": "uint32",
           "minimum": 0,

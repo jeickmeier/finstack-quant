@@ -1383,7 +1383,7 @@ mod tests {
             .expect("FxSpot notional should be valid")
             .with_rate(1.10)
             .expect("FxSpot rate should be valid")
-            .with_settlement(
+            .with_settlement_date(
                 Date::from_calendar_date(2024, Month::January, 15).expect("Valid test date"),
             )
             .with_base_calendar_id("TARGET")

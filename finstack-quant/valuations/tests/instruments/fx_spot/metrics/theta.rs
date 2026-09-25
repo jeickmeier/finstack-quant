@@ -26,7 +26,7 @@ fn theta_for(fx: FxSpot, market: &MarketContext, as_of: Date) -> f64 {
 
 #[test]
 fn test_theta_basic() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 17));
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 1, 17));
     let market = market_full();
     let theta = theta_for(fx, &market, test_date());
 
@@ -37,7 +37,7 @@ fn test_theta_basic() {
 
 #[test]
 fn test_theta_settled_position() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 10)); // Past
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 1, 10)); // Past
     let market = market_full();
     let theta = theta_for(fx, &market, test_date());
 
@@ -52,7 +52,7 @@ fn test_theta_zero_notional() {
         .unwrap()
         .with_rate(1.20)
         .expect("test rate")
-        .with_settlement(d(2025, 1, 17));
+        .with_settlement_date(d(2025, 1, 17));
     let market = market_full();
     let theta = theta_for(fx, &market, test_date());
     approx_eq(theta, 0.0, EPSILON, "Theta zero for zero notional");
@@ -62,14 +62,14 @@ fn test_theta_zero_notional() {
 fn test_theta_calculation_completes() {
     // Regression test: ensure theta calculation completes without error
     let test_cases = vec![
-        eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 17)),
-        eurusd_with_notional(5_000_000.0, 1.25).with_settlement(d(2025, 2, 15)),
+        eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 1, 17)),
+        eurusd_with_notional(5_000_000.0, 1.25).with_settlement_date(d(2025, 2, 15)),
         sample_gbpusd()
             .with_notional(Money::new(2_000_000.0, Currency::GBP).expect("valid money fixture"))
             .unwrap()
             .with_rate(1.40)
             .expect("test rate")
-            .with_settlement(d(2025, 3, 15)),
+            .with_settlement_date(d(2025, 3, 15)),
     ];
 
     for fx in test_cases {

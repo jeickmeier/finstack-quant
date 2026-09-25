@@ -32,14 +32,14 @@ pub use finstack_quant_core::dates::fx::{
 /// # Arguments
 ///
 /// * `trade_date` - FX trade date from which spot settlement is rolled.
-/// * `spot_lag_days` - Contractual spot lag in joint business days.
+/// * `settlement_days` - Contractual T+N spot lag in joint business days.
 /// * `base_currency` - Base leg currency used to detect the pair's USD leg.
 /// * `quote_currency` - Quote leg currency used to detect the pair's USD leg.
 /// * `base_cal_id` - Optional base-currency business-calendar identifier.
 /// * `quote_cal_id` - Optional quote-currency business-calendar identifier.
 pub fn fx_spot_date_for_pair(
     trade_date: Date,
-    spot_lag_days: i32,
+    settlement_days: u32,
     base_currency: Currency,
     quote_currency: Currency,
     base_cal_id: Option<&str>,
@@ -52,13 +52,12 @@ pub fn fx_spot_date_for_pair(
     } else {
         None
     };
-    fx_spot_date(
-        trade_date,
-        spot_lag_days,
-        base_cal_id,
-        quote_cal_id,
-        usd_cal_id,
-    )
+    let lag_days = i32::try_from(settlement_days).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!(
+            "FX settlement_days {settlement_days} exceeds the supported range"
+        ))
+    })?;
+    fx_spot_date(trade_date, lag_days, base_cal_id, quote_cal_id, usd_cal_id)
 }
 
 /// Add a standard calendar tenor to an FX spot date and apply the joint roll.

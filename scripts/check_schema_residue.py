@@ -186,6 +186,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"servicing_fee_rate|guarantee_fee_rate|agency_guarantee_fee_rate|gnma_guarantee_fee_rate|"
             r"pass_through_rate|current_factor|collateral_wam|lower_psa|upper_psa|psa_multiplier|average_life|weighted_avg_coupon|weighted_avg_rating_factor|"
             r"cash_pct|pik_pct|min_3m|max_price|"
+            r"settlement_lag_days|spot_lag_days|payment_delay_days|payment_lag_business_days|cash_settlement_date|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

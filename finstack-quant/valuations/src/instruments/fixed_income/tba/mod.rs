@@ -45,4 +45,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{AgencyTba, TbaSettlement, TbaTerm};
+pub use types::{AgencyTba, TbaTerm};

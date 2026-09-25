@@ -9,6 +9,10 @@
           "default": {},
           "description": "Attributes for selection and reporting."
         },
+        "fixing": {
+          "$ref": "#/$defs/CommodityFutureFixing",
+          "description": "Final-settlement price fixing rule (single observation or average)."
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
@@ -29,10 +33,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement": {
-          "$ref": "#/$defs/CommodityFutureSettlement",
-          "description": "Official final-settlement observation rule."
-        },
         "terms": {
           "$ref": "#/$defs/ListedFutureTerms",
           "description": "Standard listed position and lifecycle terms."
@@ -47,12 +47,12 @@
         "underlying",
         "terms",
         "price_curve_id",
-        "settlement"
+        "fixing"
       ],
       "type": "object"
     },
-    "CommodityFutureSettlement": {
-      "description": "Exchange final-settlement rule for a linear commodity future.",
+    "CommodityFutureFixing": {
+      "description": "Final-settlement price fixing rule for a linear commodity future: which\nobservations set the official settlement price and how they are averaged.\nThe cash/physical delivery method lives in `terms.settlement`.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -285,9 +285,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "id": "SGX-IRON-ORE-DEC26",
-          "price_curve_id": "IRON-ORE-FORWARD",
-          "settlement": {
+          "fixing": {
             "fixing_dates": [
               "2026-12-29",
               "2026-12-30",
@@ -296,6 +294,8 @@
             "realized_fixings": [],
             "type": "arithmetic_average"
           },
+          "id": "SGX-IRON-ORE-DEC26",
+          "price_curve_id": "IRON-ORE-FORWARD",
           "terms": {
             "contracts": 10.0,
             "currency": "USD",

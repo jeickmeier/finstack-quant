@@ -11,7 +11,7 @@ use finstack_quant_valuations::{instruments::Instrument, metrics::MetricId};
 
 /// Request `metric` on an FX spot position and return the rejection message.
 fn reject_message(metric: MetricId) -> String {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 17));
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 1, 17));
     let error = fx
         .price_with_metrics(
             &MarketContext::new(),
@@ -40,7 +40,7 @@ fn test_bucketed_dv01_not_registered_for_fx_spot() {
 
 #[test]
 fn fx_spot_still_computes_its_registered_metrics() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 1, 17));
+    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement_date(d(2025, 1, 17));
     let result = fx
         .price_with_metrics(
             &MarketContext::new(),

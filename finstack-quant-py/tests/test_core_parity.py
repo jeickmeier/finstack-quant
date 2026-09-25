@@ -347,7 +347,7 @@ class TestFxConventionParity:
         assert str(conv.usd_quotation) == "indirect"
         assert conv.usd_quotation == FxQuoteConvention.INDIRECT
         assert conv.pip_size == 0.01
-        assert conv.spot_lag_days == 2
+        assert conv.settlement_days == 2
 
     def test_fx_pip_size_and_invert(self) -> None:
         assert fx_pip_size("USD", "JPY") == 0.01

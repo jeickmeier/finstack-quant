@@ -580,7 +580,7 @@
             "implied_volatility": 0.3663
           }
         },
-        "cash_settlement_date": "2026-05-12",
+        "premium_settlement_date": "2026-05-12",
         "exercise_settlement_date": "2026-06-23",
         "underlying_effective_date": "2026-03-20",
         "underlying_is_index": true,

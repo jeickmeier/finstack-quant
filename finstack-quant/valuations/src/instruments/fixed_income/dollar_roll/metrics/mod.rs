@@ -34,8 +34,8 @@ pub(crate) struct RollSpecialnessCalculator;
 impl MetricCalculator for RollSpecialnessCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let roll: &crate::instruments::DollarRoll = context.instrument_as()?;
-        let front = roll.front_settle_date()?;
-        let back = roll.back_settle_date()?;
+        let front = roll.effective_front_settlement_date()?;
+        let back = roll.effective_back_settlement_date()?;
         let accrual = finstack_quant_core::dates::DayCount::Act360.year_fraction(
             front,
             back,
