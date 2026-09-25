@@ -195,7 +195,11 @@ impl MetricId {
     /// Per-constituent delta for basket instruments.
     ///
     /// Decomposes basket delta by individual constituent, providing
-    /// per-name or per-asset sensitivity attribution.
+    /// per-name or per-asset sensitivity attribution. Each bucket
+    /// (`constituent_delta::<label>`) is the basket PV change for a +1%
+    /// relative move in that constituent's price; the total is their sum.
+    ///
+    /// Units: currency per 1% constituent price move.
     pub const ConstituentDelta: Self = Self(Cow::Borrowed("constituent_delta"));
 
     /// Convexity adjustment risk (CMS options)

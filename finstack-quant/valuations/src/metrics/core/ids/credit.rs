@@ -66,8 +66,10 @@ impl MetricId {
     /// with the API producing the measure.
     pub const DefaultProbability: Self = Self(Cow::Borrowed("default_probability"));
 
-    /// Expected recovery rate
-    pub const Recovery01: Self = Self(Cow::Borrowed("recovery_01"));
+    /// PV change per +1% (0.01 absolute) recovery-rate move.
+    ///
+    /// Units: currency.
+    pub const Recovery01: Self = Self(Cow::Borrowed("recovery01"));
 
     // Structured Credit Metrics
 

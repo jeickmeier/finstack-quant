@@ -661,7 +661,7 @@
     "risky_pv01": 4680.88,
     "dv01": 45.91,
     "cs01": 4680.88,
-    "recovery_01": 76.03,
+    "recovery01": 76.03,
     "jump_to_default": 5988055.555555556,
     "default_exposure": 6181992.0
   },
@@ -691,7 +691,7 @@
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Spread DV01 to cents; widened to allow the remaining CDS curve/bootstrap convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
-    "recovery_01": {
+    "recovery01": {
       "abs": 0.3,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Rec Risk (1%) to cents; widened to allow the remaining recovery-risk convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."

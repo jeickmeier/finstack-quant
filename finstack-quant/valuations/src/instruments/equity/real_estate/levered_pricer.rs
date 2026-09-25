@@ -19,7 +19,19 @@ pub(crate) fn compute_pv(
     if asset_pv.currency() != inst.currency {
         return Err(CoreError::Validation("asset PV currency mismatch".into()));
     }
-    let mut financing_pv = 0.0;
+    Money::new(
+        asset_pv.amount() - financing_pv(inst, market, as_of)?,
+        inst.currency,
+    )
+}
+
+/// Total PV of the financing instruments, in the equity currency.
+pub(crate) fn financing_pv(
+    inst: &LeveredRealEstateEquity,
+    market: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    let mut total = 0.0;
     for financing in &inst.financing {
         let pv = financing.as_instrument().value(market, as_of)?;
         if pv.currency() != inst.currency {
@@ -27,9 +39,9 @@ pub(crate) fn compute_pv(
                 "financing PV currency mismatch".into(),
             ));
         }
-        financing_pv += pv.amount();
+        total += pv.amount();
     }
-    Money::new(asset_pv.amount() - financing_pv, inst.currency)
+    Ok(total)
 }
 
 pub(crate) fn validate_currency(inst: &LeveredRealEstateEquity) -> finstack_quant_core::Result<()> {

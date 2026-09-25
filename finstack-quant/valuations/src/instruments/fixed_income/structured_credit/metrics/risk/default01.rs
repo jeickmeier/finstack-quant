@@ -1,12 +1,12 @@
 //! Default01 calculator for StructuredCredit.
 //!
 //! Computes Default01 (default rate sensitivity) using finite differences.
-//! Default01 measures the change in PV for a 1bp (0.0001) change in the
-//! default rate (CDR).
+//! Default01 is the PV change per 1bp (0.0001) move in the default rate
+//! (CDR), in currency.
 //!
 //! # Formula
 //! ```text
-//! Default01 = (PV(CDR + 1bp) - PV(CDR - 1bp)) / achieved_bump
+//! Default01 = (PV(CDR + 1bp) - PV(CDR - 1bp)) / achieved_bump × 1bp
 //! ```
 //! Where the nominal bump is 1bp (0.0001) of annual CDR and `achieved_bump`
 //! is the realized two-sided width after clamping at zero.

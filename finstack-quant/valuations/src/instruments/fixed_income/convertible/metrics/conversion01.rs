@@ -1,13 +1,14 @@
 //! Conversion01 calculator for ConvertibleBond.
 //!
 //! Computes Conversion01 (conversion ratio/price sensitivity) using finite differences.
-//! Conversion01 measures the change in PV for a 1% change in conversion ratio or price.
+//! Conversion01 is the PV change per 1% relative move in the conversion ratio
+//! or price, in currency.
 //!
 //! # Formula
 //! ```text
-//! Conversion01 = (PV(conversion_ratio * 1.01) - PV(conversion_ratio * 0.99)) / (2 * bump_size)
+//! Conversion01 = (PV(conversion_ratio * 1.01) - PV(conversion_ratio * 0.99)) / 2
 //! ```
-//! Where bump_size is 1% (0.01).
+//! i.e. `(PV_up - PV_down) / width × bump` with width 2% and bump 1%.
 //!
 //! # Note
 //! This metric bumps the conversion ratio or conversion price (whichever is defined)

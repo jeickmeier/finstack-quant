@@ -341,3 +341,64 @@ fn literal_custom_bases_and_nested_coordinates_roundtrip() {
         );
     }
 }
+
+#[test]
+fn recovery01_key_and_unit() {
+    // Recovery01 is a `<factor>01` key: PV change per +0.01 recovery, in currency.
+    assert_eq!(MetricId::Recovery01.as_str(), "recovery01");
+    assert_eq!(
+        MetricId::parse_strict("recovery01").expect("canonical key"),
+        MetricId::Recovery01
+    );
+    assert_eq!(MetricId::Recovery01.unit(), MetricUnit::Currency);
+    assert!(MetricGroup::Credit
+        .metrics()
+        .contains(&MetricId::Recovery01));
+}
+
+#[test]
+fn retired_recovery01_spelling_is_rejected() {
+    // schema-rejection-test: the retired `recovery_01` spelling is not a metric key.
+    assert!(MetricId::parse_strict("recovery_01").is_err());
+}
+
+#[test]
+fn metric_groups_start_and_end_at_their_first_and_last_members() {
+    let bounds = [
+        (MetricGroup::Pricing, MetricId::DirtyPrice, MetricId::Basis),
+        (MetricGroup::Carry, MetricId::Theta, MetricId::Breakeven),
+        (
+            MetricGroup::Sensitivity,
+            MetricId::Dv01,
+            MetricId::ConvexityAdjustmentRisk,
+        ),
+        (MetricGroup::Greeks, MetricId::Delta, MetricId::VarianceVega),
+        (MetricGroup::Credit, MetricId::Cs01, MetricId::Recovery01),
+        (
+            MetricGroup::Rates,
+            MetricId::Annuity,
+            MetricId::FloatingFirstAccrualFactor,
+        ),
+        (MetricGroup::Fx, MetricId::SpotRate, MetricId::FxVega),
+        (
+            MetricGroup::Equity,
+            MetricId::EquityPricePerShare,
+            MetricId::VarianceTimeToMaturity,
+        ),
+        (
+            MetricGroup::StructuredCredit,
+            MetricId::WAL,
+            MetricId::AbfResidualIrr,
+        ),
+        (
+            MetricGroup::Alternatives,
+            MetricId::RealYield,
+            MetricId::ExpectedShortfall,
+        ),
+    ];
+    for (group, first, last) in bounds {
+        let metrics = group.metrics();
+        assert_eq!(metrics.first(), Some(&first), "{group:?} first member");
+        assert_eq!(metrics.last(), Some(&last), "{group:?} last member");
+    }
+}

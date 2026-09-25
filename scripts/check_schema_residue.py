@@ -179,7 +179,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"margin_stepups|commitment_step_downs|commitment_schedule|"
             r"behavior_overrides|credit_factors|cpr_annual|cdr_annual|reinvestment_price|"
             r"annual_noi|annual_debt_service|trustee_fee_annual|prepayment_model|"
-            r"cds_aod_half_day_bias|cds_act360_include_last_day|"
+            r"cds_aod_half_day_bias|cds_act360_include_last_day|recovery_01|real_estate::cap_rate_sensitivity|real_estate::discount_rate_sensitivity|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

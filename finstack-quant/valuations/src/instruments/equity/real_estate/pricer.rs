@@ -77,7 +77,7 @@ pub(crate) fn compute_npv_dcf(
 ///
 /// `bump_at = |_| 0.0` reproduces the unbumped NPV exactly. The terminal cap
 /// rate is *not* bumped; it has its own sensitivity metric
-/// (`real_estate::cap_rate_sensitivity`).
+/// (`real_estate::cap_rate01`).
 pub(crate) fn pv_with_rf_bump_dcf(
     asset: &RealEstateAsset,
     as_of: Date,

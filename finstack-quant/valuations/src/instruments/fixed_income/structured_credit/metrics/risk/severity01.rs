@@ -1,13 +1,15 @@
 //! Severity01 calculator for StructuredCredit.
 //!
 //! Computes Severity01 (loss severity sensitivity) using finite differences.
-//! Severity01 measures the change in PV for a 1% (0.01) change in loss severity.
+//! Severity01 is the PV change per 1% (0.01 absolute) move in loss severity,
+//! in currency.
 //!
 //! # Formula
 //! ```text
-//! Severity01 = (PV(severity + 1%) - PV(severity - 1%)) / (2 * bump_size)
+//! Severity01 = (PV(severity + 1%) - PV(severity - 1%)) / achieved_width × 1%
 //! ```
-//! Where bump_size is 1% (0.01).
+//! Where `achieved_width` is the realized two-sided severity width after
+//! clamping recovery to `[0, 1]` (2% when neither side clamps).
 //!
 //! # Note
 //! Loss Severity = 1 - Recovery Rate (LGD = Loss Given Default)
@@ -73,7 +75,7 @@ impl MetricCalculator for Severity01Calculator {
         inst_down.credit_model.recovery_spec = recovery_down;
         let pv_down = super::super::reprice_in_scope(context, &inst_down, as_of)?;
 
-        // Severity01 = (PV_up - PV_down) / achieved_bump
+        // Severity01 = (PV_up - PV_down) / achieved_bump × SEVERITY_BUMP
         // PV_up is with lower recovery (higher severity)
         // PV_down is with higher recovery (lower severity)
         let severity01 = if achieved_bump > 0.0 {

@@ -119,7 +119,7 @@ _METRIC_FMT: dict[str, tuple[str, str]] = {
     "expected_loss": ("Expected Loss", "money"),
     "default_probability": ("Default Probability", "pct"),
     "default01": ("Default01", "money"),
-    "recovery_01": ("Recovery01", "money"),
+    "recovery01": ("Recovery01", "money"),
     "delta": ("Delta", "ratio4"),
     "gamma": ("Gamma", "ratio4"),
     "vega": ("Vega", "ratio"),
@@ -322,7 +322,7 @@ _ANALYTICS_GROUPS: dict[str, list[list[str]]] = {
     "credit_default_swap": [
         ["protection_leg_pv", "premium_leg_pv", "risky_annuity"],
         ["par_spread", "risky_pv01", "default01"],
-        ["cs01", "expected_loss", "jump_to_default", "recovery_01"],
+        ["cs01", "expected_loss", "jump_to_default", "recovery01"],
     ],
     "equity_option": [
         ["implied_vol"],

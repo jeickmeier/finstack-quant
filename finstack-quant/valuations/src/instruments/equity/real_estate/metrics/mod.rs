@@ -9,7 +9,9 @@ mod sensitivities;
 
 use crate::metrics::MetricRegistry;
 
-use crate::instruments::equity::real_estate::{pricer, RealEstateAsset};
+use crate::instruments::equity::real_estate::{
+    levered_pricer, pricer, LeveredRealEstateEquity, RealEstateAsset,
+};
 use crate::metrics::RfComponentPriced;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -22,6 +24,21 @@ impl RfComponentPriced for RealEstateAsset {
         bump_at: &dyn Fn(f64) -> f64,
     ) -> finstack_quant_core::Result<f64> {
         pricer::pv_with_rf_bump(self, as_of, bump_at)
+    }
+}
+
+impl RfComponentPriced for LeveredRealEstateEquity {
+    /// Asset PV at the bumped property discount rate less the financing PV,
+    /// which does not depend on that rate.
+    fn pv_with_rf_bump(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        bump_at: &dyn Fn(f64) -> f64,
+    ) -> finstack_quant_core::Result<f64> {
+        levered_pricer::validate_currency(self)?;
+        let asset_pv = pricer::pv_with_rf_bump(&self.asset, as_of, bump_at)?;
+        Ok(asset_pv - levered_pricer::financing_pv(self, market, as_of)?)
     }
 }
 
@@ -67,13 +84,8 @@ pub(crate) fn register_real_estate_metrics(
     )?;
 
     registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::cap_rate_sensitivity"),
-        Arc::new(sensitivities::CapRateSensitivity::default()),
-        &[InstrumentType::RealEstateAsset],
-    )?;
-    registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::discount_rate_sensitivity"),
-        Arc::new(sensitivities::DiscountRateSensitivity::default()),
+        crate::metrics::MetricId::custom("real_estate::cap_rate01"),
+        Arc::new(sensitivities::CapRate01Calculator),
         &[InstrumentType::RealEstateAsset],
     )?;
     Ok(())
@@ -136,13 +148,15 @@ pub(crate) fn register_levered_real_estate_metrics(
     )?;
 
     registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::cap_rate_sensitivity"),
-        Arc::new(sensitivities::CapRateSensitivity::default()),
+        crate::metrics::MetricId::custom("real_estate::discount_rate01"),
+        Arc::new(crate::metrics::RfComponentDv01Calculator::<
+            crate::instruments::LeveredRealEstateEquity,
+        >::new()),
         &[InstrumentType::LeveredRealEstateEquity],
     )?;
     registry.register_metric(
-        crate::metrics::MetricId::custom("real_estate::discount_rate_sensitivity"),
-        Arc::new(sensitivities::DiscountRateSensitivity::default()),
+        crate::metrics::MetricId::custom("real_estate::cap_rate01"),
+        Arc::new(sensitivities::CapRate01Calculator),
         &[InstrumentType::LeveredRealEstateEquity],
     )?;
     Ok(())

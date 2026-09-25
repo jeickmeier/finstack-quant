@@ -153,8 +153,7 @@ schedule.
 | `custom("real_estate::unlevered_irr")` | Requires `purchase_price` + `terminal_cap_rate` |
 | `custom("real_estate::unlevered_multiple")` | Requires `purchase_price` + `terminal_cap_rate` |
 | `custom("real_estate::unlevered_cash_on_cash_first")` | Requires `purchase_price` |
-| `custom("real_estate::cap_rate_sensitivity")` | Finite difference: DirectCap bumps `cap_rate`, DCF bumps `terminal_cap_rate` |
-| `custom("real_estate::discount_rate_sensitivity")` | Finite difference on `discount_rate` |
+| `custom("real_estate::cap_rate01")` | PV change per +1bp cap-rate move: DirectCap bumps `cap_rate`, DCF bumps `terminal_cap_rate` |
 
 ### `LeveredRealEstateEquity`
 
@@ -166,12 +165,13 @@ schedule.
 | `custom("real_estate::ltv")`, `custom("real_estate::ltv_at_origination")` | Loan-to-value |
 | `custom("real_estate::dscr_min")`, `custom("real_estate::dscr_min_interest_only")` | Minimum debt service coverage |
 | `custom("real_estate::debt_payoff_at_exit")` | Financing payoff at the exit date |
-| `custom("real_estate::cap_rate_sensitivity")`, `custom("real_estate::discount_rate_sensitivity")` | Same finite differences, applied through the wrapper |
+| `custom("real_estate::discount_rate01")`, `custom("real_estate::cap_rate01")` | The asset sensitivities, applied through the wrapper (financing PV does not depend on either rate) |
 
-**Sensitivity units**: both sensitivities return `dV/dr` per **unit** of rate
-(1.0 = 10,000 bp), computed with a 1 bp central difference. Divide by 10,000
-for a per-bp value change. When `sale_price` is set, cap-rate sensitivity is
-zero because terminal proceeds no longer depend on the cap rate.
+**Sensitivity units**: `discount_rate01` and `cap_rate01` are currency per 1bp,
+`(PV(r + h) − PV(r − h)) / (2h) × 1bp`, with `h` the resolved `rate_bump_bp`
+(1bp by default). `cap_rate01` is not applicable (an error) when the value does
+not depend on a cap rate: DirectCap without `cap_rate`, or DCF with an explicit
+`sale_price` or no `terminal_cap_rate`.
 
 **DSCR definition**: `dscr_min` and `dscr_min_interest_only` measure NOI over
 **scheduled** debt service — cash interest and fees, plus scheduled

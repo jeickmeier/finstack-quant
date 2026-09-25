@@ -445,8 +445,8 @@ mod tests {
         let pv_dn = compute_pv(&opt, &market(as_of, 100.0, 0.20, base_rate - h, 0.0), as_of)
             .expect("pv dn")
             .amount();
-        // analytic rho is per 1% (100bp); FD slope per unit-rate * 0.01.
-        let fd_rho = (pv_up - pv_dn) / (2.0 * h) * 0.01;
+        // analytic rho is per 1bp; FD slope per unit-rate * 0.0001.
+        let fd_rho = (pv_up - pv_dn) / (2.0 * h) * 0.0001;
 
         let denom = analytic.abs().max(fd_rho.abs()).max(1e-9);
         assert!(
@@ -470,7 +470,8 @@ mod tests {
             opt.metric_pricing_overrides.theta_days_per_year(),
         )
         .rho_r
-            * opt.notional.amount();
+            * opt.notional.amount()
+            / 100.0; // `BsGreeks::rho_r` is per 1%; compare per 1bp.
         assert!(
             (analytic - naive).abs() / denom > 1e-3,
             "the ∂S*/∂r correction must move rho away from the S*-fixed value: \

@@ -1,13 +1,14 @@
 //! Constituent delta calculator for baskets.
 //!
 //! Computes delta (price sensitivity) for each constituent using finite differences.
-//! For each constituent, bumps its price by 1% and measures the impact on basket NAV.
+//! For each constituent, bumps its price by 1% and measures the impact on basket PV.
 //!
 //! # Formula
 //! ```text
-//! ConstituentDelta_i = (PV(basket with bumped constituent_i) - PV_base) / bump_size
+//! ConstituentDelta_i = PV(basket with price_i × 1.01) - PV_base
 //! ```
-//! Where bump_size is 1% (0.01) of the constituent price.
+//! i.e. the basket PV change per +1% relative move in constituent `i`'s price,
+//! in the basket currency. The metric total is the sum over constituents.
 //!
 //! Results are stored as a series with labels derived from constituent IDs or tickers.
 //!
@@ -145,16 +146,12 @@ fn bump_and_measure_delta(
         }
     };
 
-    // Constituent delta: sensitivity of basket PV to a 1% move in constituent price.
-    //
-    // Formula: delta = (PV_bumped - PV_base) / (price * 1%) * price
-    //        = (PV_bumped - PV_base) / 1%
-    //
-    // Units: currency units per 1% move in the constituent price.
+    // Constituent delta: basket PV change for a +1% relative move in the
+    // constituent price, in currency (per bump, not per unit move).
     // Example: delta = 5.0 means a 1% price increase adds 5.0 to basket PV.
     let bump_size = current_price * PRICE_BUMP_PCT;
     let delta = if bump_size.abs() > 1e-10 {
-        (pv_bumped - base_pv) / PRICE_BUMP_PCT
+        pv_bumped - base_pv
     } else {
         0.0
     };

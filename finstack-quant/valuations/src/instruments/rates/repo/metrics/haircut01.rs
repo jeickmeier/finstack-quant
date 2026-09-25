@@ -1,13 +1,14 @@
 //! Haircut01 calculator for Repo.
 //!
 //! Computes Haircut01 (haircut sensitivity) using finite differences.
-//! Haircut01 measures the change in PV for a 1bp (0.0001 = 0.01%) change in haircut.
+//! Haircut01 is the PV change per 1bp (0.0001 = 0.01%) move in the haircut,
+//! in currency.
 //!
 //! # Formula
 //! ```text
-//! Haircut01 = (PV(haircut + 1bp) - PV(haircut - 1bp)) / (2 * bump_size)
+//! Haircut01 = (PV(haircut + 1bp) - PV(haircut - 1bp)) / achieved_width × 1bp
 //! ```
-//! Where bump_size is 1bp (0.0001).
+//! Where `achieved_width` is 2bp unless the down bump clamps at a zero haircut.
 //!
 //! # Important Limitation
 //!

@@ -2,13 +2,14 @@
 //!
 //! Computes CollateralPrice01 (collateral price sensitivity) using finite differences.
 //!
+//! CollateralPrice01 is the PV change per 1% relative move in the collateral
+//! price, in currency.
+//!
 //! # Formula
 //! ```text
-//! CollateralPrice01 = (PV(price × 1.01) - PV(price × 0.99)) / (2 × 0.01)
+//! CollateralPrice01 = (PV(price × 1.01) - PV(price × 0.99)) / (2 × 0.01) × 0.01
 //! ```
-//! i.e. the central difference normalized by the **relative** bump width, so the
-//! result is the PV change per unit relative move in the collateral price
-//! (divide by 100 for a per-1% view).
+//! i.e. `(PV_up - PV_down) / width × bump` with width 2% and bump 1%.
 //!
 //! # Important Limitation
 //!
@@ -69,11 +70,9 @@ impl MetricCalculator for CollateralPrice01Calculator {
         )?;
         let pv_down = repo.value(&ctx_down, as_of)?.amount();
 
-        // CollateralPrice01 = (PV_up - PV_down) / (2 * 0.01): the central
-        // difference normalized by the relative bump width, i.e. the PV change
-        // per *unit* relative move in the collateral price (divide by 100 for
-        // a per-1% view). Identically zero in the current model — see the
-        // module-level limitation note.
+        // CollateralPrice01 = (PV_up - PV_down) / (2 * 0.01) * 0.01: the PV
+        // change per 1% relative move in the collateral price. Identically
+        // zero in the current model — see the module-level limitation note.
         // `COLLATERAL_PRICE_BUMP_PCT` is a fixed positive constant, so the bump
         // width is never degenerate; the helper's error path cannot trigger here.
         let collateral_price01 = if current_price.abs() > 1e-10 {

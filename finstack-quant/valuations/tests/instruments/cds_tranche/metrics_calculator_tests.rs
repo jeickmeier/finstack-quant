@@ -683,8 +683,8 @@ fn test_recovery01_metric_via_price_with_metrics() {
 
     let recovery01 = *result
         .measures
-        .get("recovery_01")
-        .expect("recovery_01 should be in measures");
+        .get("recovery01")
+        .expect("recovery01 should be in measures");
 
     assert!(
         recovery01.is_finite(),

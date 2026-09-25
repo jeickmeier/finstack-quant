@@ -599,7 +599,7 @@ fn test_recovery01_finite_and_nonzero() {
             crate::test_support::credit::pricing_options(),
         )
         .unwrap();
-    let recovery01 = *result.measures.get("recovery_01").unwrap();
+    let recovery01 = *result.measures.get("recovery01").unwrap();
 
     assert!(
         recovery01.is_finite(),
@@ -632,7 +632,7 @@ fn test_recovery01_scales_with_notional() {
         )
         .unwrap()
         .measures
-        .get("recovery_01")
+        .get("recovery01")
         .unwrap();
     let rec01_20mm = *idx_20mm
         .price_with_metrics(
@@ -643,7 +643,7 @@ fn test_recovery01_scales_with_notional() {
         )
         .unwrap()
         .measures
-        .get("recovery_01")
+        .get("recovery01")
         .unwrap();
 
     assert_linear_scaling(

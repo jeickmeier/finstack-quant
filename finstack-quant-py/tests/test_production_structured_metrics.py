@@ -50,9 +50,9 @@ def test_recovery_risk_uses_credit_model_recovery() -> None:
     spec["default_spec"]["cdr"] = 0.03
     spec["recovery_spec"]["rate"] = 0.55
     result = price_instrument(
-        json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["recovery_01"]
+        json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["recovery01"]
     )
-    assert abs(result.get_metric("recovery_01")) > 1.0
+    assert abs(result.get_metric("recovery01")) > 1.0
 
 
 def test_clean_dirty_settlement_target_and_typed_date() -> None:

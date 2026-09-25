@@ -512,7 +512,18 @@ impl EquityOption {
         Ok(greeks.theta)
     }
 
-    /// Calculate rho of this equity option
+    /// Rho of this equity option: PV change per 1bp (0.0001) move in the
+    /// risk-free rate, in the option's currency (same unit as the `rho` metric).
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Market data holding the discount curve, spot, dividend
+    ///   yield and volatility surface named by the option.
+    /// * `as_of` - Valuation date; time to expiry is measured from it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a required market input is missing or pricing fails.
     pub fn rho(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -629,8 +640,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
         as_of: finstack_quant_core::dates::Date,
         _bumps: crate::instruments::common_impl::traits::GreekBumps,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        // EquityOptionGreeks::rho is per 1% rate move; metrics expose per 1bp.
-        Ok(Some(self.greeks(market, as_of)?.rho / 100.0))
+        Ok(Some(self.greeks(market, as_of)?.rho))
     }
 
     fn option_vanna(

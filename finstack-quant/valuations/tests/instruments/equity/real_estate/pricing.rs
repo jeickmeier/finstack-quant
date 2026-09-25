@@ -438,8 +438,7 @@ fn test_real_estate_sensitivities_metrics_compute_and_have_expected_signs() {
     let market = MarketContext::new(); // curve-free so discount_rate is used
 
     let metrics = [
-        MetricId::custom("real_estate::cap_rate_sensitivity"),
-        MetricId::custom("real_estate::discount_rate_sensitivity"),
+        MetricId::custom("real_estate::cap_rate01"),
         MetricId::custom("real_estate::discount_rate01"),
     ];
     let result = asset
@@ -451,25 +450,17 @@ fn test_real_estate_sensitivities_metrics_compute_and_have_expected_signs() {
         )
         .expect("price_with_metrics");
 
-    let d_v_d_cap = *result
+    let cap_rate01 = *result
         .measures
-        .get(&MetricId::custom("real_estate::cap_rate_sensitivity"))
-        .expect("cap rate sens present");
-    let d_v_d_r = *result
-        .measures
-        .get(&MetricId::custom("real_estate::discount_rate_sensitivity"))
-        .expect("discount rate sens present");
+        .get(&MetricId::custom("real_estate::cap_rate01"))
+        .expect("cap-rate 01 present");
     let discount_rate01 = *result
         .measures
         .get(&MetricId::custom("real_estate::discount_rate01"))
         .expect("discount-rate 01 present");
 
     // Higher cap rates / discount rates should reduce value.
-    assert!(d_v_d_cap < 0.0, "cap sensitivity should be negative");
-    assert!(
-        d_v_d_r < 0.0,
-        "discount-rate sensitivity should be negative"
-    );
+    assert!(cap_rate01 < 0.0, "cap-rate 01 should be negative");
     assert!(discount_rate01 < 0.0, "discount-rate 01 should be negative");
 }
 
@@ -697,8 +688,8 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
     let market = MarketContext::new().insert(build_flat_discount_curve("USD-OIS", as_of, 0.05));
 
     let metrics = [
-        MetricId::custom("real_estate::cap_rate_sensitivity"),
-        MetricId::custom("real_estate::discount_rate_sensitivity"),
+        MetricId::custom("real_estate::cap_rate01"),
+        MetricId::custom("real_estate::discount_rate01"),
     ];
     let result = levered
         .price_with_metrics(
@@ -983,4 +974,189 @@ fn test_real_estate_direct_cap_appraisal_without_cap_rate() {
 
     let pv = asset.value(&MarketContext::new(), as_of).expect("npv");
     assert_eq!(pv.amount(), 1_500.0);
+}
+
+/// `real_estate::cap_rate01` is the PV change per 1bp cap-rate move.
+///
+/// Reference: DirectCap value is `NOI / cap`, so the per-bp sensitivity is
+/// `-NOI / cap² × 1e-4`. The metric is a central difference over ±1bp, whose
+/// truncation error is `(h / cap)² ≈ 2.8e-6` relative at cap = 6%; 1e-5
+/// relative covers it.
+#[test]
+fn cap_rate01_matches_direct_cap_closed_form() {
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = date(2025, 1, 1);
+    let noi = 1_000_000.0;
+    let cap = 0.06;
+    let asset = RealEstateAsset::builder()
+        .id(InstrumentId::new("RE-CAP01"))
+        .currency(Currency::USD)
+        .valuation_date(as_of)
+        .valuation_method(RealEstateValuationMethod::DirectCap)
+        .noi_schedule(vec![(date(2026, 1, 1), noi)])
+        .cap_rate_opt(Some(cap))
+        .day_count(DayCount::Act365F)
+        .attributes(Attributes::new())
+        .build()
+        .expect("asset build");
+
+    let key = MetricId::custom("real_estate::cap_rate01");
+    let result = asset
+        .price_with_metrics(
+            &MarketContext::new(),
+            as_of,
+            std::slice::from_ref(&key),
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("price_with_metrics");
+    let cap_rate01 = *result.measures.get(&key).expect("cap-rate 01 present");
+
+    let expected = -noi / (cap * cap) * 1e-4;
+    assert!(
+        ((cap_rate01 - expected) / expected).abs() < 1e-5,
+        "cap_rate01={cap_rate01} vs closed form {expected}"
+    );
+}
+
+/// `real_estate::cap_rate01` is not applicable (a validation error, not 0) for a
+/// DCF asset whose value does not depend on a cap rate: an explicit
+/// `sale_price` or no `terminal_cap_rate`. The metric rejected these
+/// configurations before the per-bp rename too.
+#[test]
+fn cap_rate01_errors_for_dcf_without_cap_rate_dependence() {
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = date(2025, 1, 1);
+    let base = || {
+        RealEstateAsset::builder()
+            .id(InstrumentId::new("RE-CAP01-NA"))
+            .currency(Currency::USD)
+            .valuation_date(as_of)
+            .valuation_method(RealEstateValuationMethod::Dcf)
+            .noi_schedule(vec![(date(2026, 1, 1), 100.0), (date(2027, 1, 1), 100.0)])
+            .discount_rate_opt(Some(0.10))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+    };
+    let with_sale_price = base()
+        .terminal_cap_rate_opt(Some(0.08))
+        .sale_date_opt(Some(date(2027, 1, 1)))
+        .sale_price_opt(Some(
+            Money::new(1_000.0, Currency::USD).expect("valid money fixture"),
+        ))
+        .build()
+        .expect("asset build");
+    let without_terminal_cap = base().build().expect("asset build");
+
+    let key = MetricId::custom("real_estate::cap_rate01");
+    for asset in [with_sale_price, without_terminal_cap] {
+        let err = asset
+            .price_with_metrics(
+                &MarketContext::new(),
+                as_of,
+                std::slice::from_ref(&key),
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .expect_err("cap_rate01 must reject a DCF asset without cap-rate dependence");
+        assert!(
+            err.to_string()
+                .contains("real_estate::cap_rate01: not applicable"),
+            "unexpected error: {err}"
+        );
+    }
+}
+
+/// Financing PV does not depend on the property discount rate, so the levered
+/// equity's `discount_rate01` equals the underlying asset's.
+#[test]
+fn levered_discount_rate01_equals_asset_discount_rate01() {
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = date(2025, 1, 1);
+    let noi2 = date(2027, 1, 1);
+    let asset = RealEstateAsset::builder()
+        .id(InstrumentId::new("RE-DR01"))
+        .currency(Currency::USD)
+        .valuation_date(as_of)
+        .valuation_method(RealEstateValuationMethod::Dcf)
+        .noi_schedule(vec![(date(2026, 1, 1), 100.0), (noi2, 100.0)])
+        .purchase_price_opt(Some(Money::new(1_000.0, Currency::USD).expect("money")))
+        .discount_rate_opt(Some(0.10))
+        .terminal_cap_rate_opt(Some(0.08))
+        .day_count(DayCount::Act365F)
+        .attributes(Attributes::new())
+        .build()
+        .expect("asset build");
+    let loan = Bond::fixed(
+        "RE-DR01-LOAN",
+        Money::new(500.0, Currency::USD).expect("money"),
+        finstack_quant_core::types::Rate::from_decimal(0.06).expect("valid rate fixture"),
+        as_of,
+        noi2,
+        StubKind::None,
+        "USD-OIS",
+    )
+    .expect("bond build");
+    let levered = LeveredRealEstateEquity::builder()
+        .id(InstrumentId::new("RE-DR01-L"))
+        .currency(Currency::USD)
+        .asset(asset.clone())
+        .financing(vec![RealEstateFinancing::Bond(loan)])
+        .exit_date_opt(Some(noi2))
+        .attributes(Attributes::new())
+        .build()
+        .expect("levered build");
+    let market = MarketContext::new().insert(build_flat_discount_curve("USD-OIS", as_of, 0.05));
+
+    let key = MetricId::custom("real_estate::discount_rate01");
+    let options = finstack_quant_valuations::instruments::PricingOptions::default;
+    let asset_dr01 = *asset
+        .price_with_metrics(&market, as_of, std::slice::from_ref(&key), options())
+        .expect("asset metrics")
+        .measures
+        .get(&key)
+        .expect("asset discount-rate 01");
+    let levered_dr01 = *levered
+        .price_with_metrics(&market, as_of, std::slice::from_ref(&key), options())
+        .expect("levered metrics")
+        .measures
+        .get(&key)
+        .expect("levered discount-rate 01");
+
+    assert!(asset_dr01 < 0.0);
+    assert!(
+        (levered_dr01 - asset_dr01).abs() < 1e-9 * asset_dr01.abs(),
+        "levered {levered_dr01} vs asset {asset_dr01}"
+    );
+}
+
+#[test]
+fn retired_real_estate_sensitivity_keys_are_not_registered() {
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = date(2025, 1, 1);
+    let asset = RealEstateAsset::builder()
+        .id(InstrumentId::new("RE-RETIRED"))
+        .currency(Currency::USD)
+        .valuation_date(as_of)
+        .valuation_method(RealEstateValuationMethod::DirectCap)
+        .noi_schedule(vec![(date(2026, 1, 1), 100.0)])
+        .cap_rate_opt(Some(0.06))
+        .day_count(DayCount::Act365F)
+        .attributes(Attributes::new())
+        .build()
+        .expect("asset build");
+    for retired in [
+        "real_estate::cap_rate_sensitivity",      // schema-rejection-test
+        "real_estate::discount_rate_sensitivity", // schema-rejection-test
+    ] {
+        let result = asset.price_with_metrics(
+            &MarketContext::new(),
+            as_of,
+            &[MetricId::custom(retired)],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        );
+        assert!(result.is_err(), "{retired} must not be a registered metric");
+    }
 }

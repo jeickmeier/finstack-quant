@@ -2,6 +2,66 @@
 
 ## [Unreleased]
 
+### Sensitivity units (2026-09-24)
+
+Every `<factor>01` sensitivity and EquityOption rho now report the currency
+change per stated bump, with the same unit in the Rust accessor, the `MetricId`
+and the bindings.
+
+#### Changed (BREAKING)
+
+- `EquityOption::rho()` and `EquityOptionGreeks.rho` (now currency per 1bp,
+  was per 1%). Rust only; the `rho` metric and Python/WASM `EquityOption.rho()`
+  were already per 1bp and do not move.
+- `MetricId::Recovery01` key `recovery_01` (now `recovery01`), with unit
+  `MetricUnit::Currency` (was `Decimal`) and the doc "PV change per +1% (0.01
+  absolute) recovery-rate move". Rust, Python, WASM and JSON result keys
+  (`measures`, golden `expected`); `recovery_01` is rejected by
+  `MetricId::parse_strict`.
+- `MetricGroup` ranges corrected: `theta_gamma` and `variance_vega` are Greeks,
+  `default_probability` and `recovery01` are Credit, and the Rates, FX, Equity,
+  Structured Credit and Alternatives groups now start at their first member
+  (each boundary was two metrics early). Rust, Python and WASM group listings.
+- `real_estate::cap_rate_sensitivity` (now `real_estate::cap_rate01`, currency
+  per 1bp cap-rate move from the resolved `rate_bump_bp`) on `RealEstateAsset`
+  and `LeveredRealEstateEquity`. Rust metric key.
+- `real_estate::discount_rate01` is now also registered on
+  `LeveredRealEstateEquity` (asset discount-rate sensitivity; financing PV does
+  not depend on that rate). Rust metric key.
+- `constituent_delta` (and each `constituent_delta::<label>` bucket) is now the
+  basket PV change per +1% relative constituent price move (was the PV change
+  per unit relative move, 100× larger), documented on
+  `MetricId::ConstituentDelta`. Rust, Python, WASM.
+
+#### Removed
+
+- `real_estate::discount_rate_sensitivity`: it was `discount_rate01` × 10,000.
+  Use `real_estate::discount_rate01`. Rust metric key.
+
+#### Fixed
+
+- Formula docs for Severity01, Default01, Prepayment01, Conversion01,
+  CollateralHaircut01 and CollateralPrice01 now show the per-bump value the code
+  returns, `(PV_up − PV_down) / width × bump`, not a per-unit derivative.
+- Real-estate README: it said cap-rate sensitivity is zero when `sale_price` is
+  set. The metric has always returned a validation error (not applicable) for a
+  DCF asset with an explicit `sale_price` or no `terminal_cap_rate`, on both
+  `RealEstateAsset` and `LeveredRealEstateEquity`; `cap_rate01` keeps that
+  behaviour, the README now says so, and a test pins it. Docs only.
+
+#### Numbers change
+
+- `EquityOption::rho()` / `EquityOptionGreeks.rho`: ÷100 (per 1% → per 1bp).
+  Reference: QuantLib `spx_atm_call_1y` rho 0.4803947 (golden tolerance 1e-7);
+  the accessor now equals the `rho` metric bit for bit.
+- `real_estate::cap_rate01` = old `cap_rate_sensitivity` × 1e-4 at the default
+  1bp bump. Reference: DirectCap closed form `−NOI / cap² × 1bp` (1e-5 relative,
+  the O(h²) central-difference residual).
+- `constituent_delta`: ÷100. Reference: a units basket is linear in each price,
+  so a 1% move changes PV by exactly `0.01 × units × price` (1e-9).
+- The Bloomberg `cds_5y_par_spread` Rec Risk (1%) of 76.03 is unchanged; only
+  its key is renamed.
+
 ### Python kwargs for metric overrides (2026-09-24)
 
 Binding-layer only; no JSON wire field or number changes. `pricing_options`

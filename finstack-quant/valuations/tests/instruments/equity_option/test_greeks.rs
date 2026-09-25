@@ -726,3 +726,56 @@ fn test_all_greeks_computed_together() {
     assert!(theta < 0.0, "Theta should be negative for long option");
     assert!(rho > 0.0, "Call rho should be positive");
 }
+
+/// `EquityOption::rho()` reports currency per 1bp, the same unit as the `rho`
+/// metric, for every exercise style.
+///
+/// Reference: the QuantLib `spx_atm_call_1y` golden (AnalyticEuropeanEngine,
+/// rho rescaled to per 1bp). Both sides use the same Black-Scholes-Merton
+/// closed form, so the golden's own 1e-7 absolute tolerance applies.
+#[test]
+fn equity_option_rho_accessor_is_per_bp() {
+    use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
+    use finstack_quant_valuations::instruments::ExerciseStyle;
+
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../golden/data/pricing/quantlib/equity_option/spx_atm_call_1y_quantlib.json"
+    ))
+    .expect("golden fixture parses");
+    let option: EquityOption =
+        serde_json::from_value(fixture["instrument"]["instrument"]["spec"].clone())
+            .expect("equity option spec");
+    let market: finstack_quant_core::market_data::context::MarketContext =
+        serde_json::from_value(fixture["market"]["data"].clone()).expect("market snapshot");
+    let as_of = date!(2026 - 04 - 30);
+    let quantlib_rho = fixture["expected"]["rho"].as_f64().expect("expected rho");
+
+    let rho = option.rho(&market, as_of).expect("rho accessor");
+    assert!(
+        (rho - quantlib_rho).abs() < 1e-7,
+        "EquityOption::rho() must be per 1bp: got {rho}, QuantLib {quantlib_rho}"
+    );
+
+    // The accessor and the metric share one unit for every exercise style.
+    for style in [ExerciseStyle::European, ExerciseStyle::American] {
+        let mut styled = option.clone();
+        styled.exercise_style = style;
+        let accessor = styled.rho(&market, as_of).expect("rho accessor");
+        let metric = *styled
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Rho],
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .expect("rho metric")
+            .measures
+            .get("rho")
+            .expect("rho measure");
+        assert_eq!(
+            accessor.to_bits(),
+            metric.to_bits(),
+            "{style:?}: accessor {accessor} and metric {metric} must agree"
+        );
+    }
+}

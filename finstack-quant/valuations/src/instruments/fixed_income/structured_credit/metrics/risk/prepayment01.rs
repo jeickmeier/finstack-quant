@@ -1,12 +1,12 @@
 //! Prepayment01 calculator for StructuredCredit.
 //!
 //! Computes Prepayment01 (prepayment rate sensitivity) using finite differences.
-//! Prepayment01 measures the change in PV for a 1bp (0.0001) change in the
-//! prepayment rate (CPR).
+//! Prepayment01 is the PV change per 1bp (0.0001) move in the prepayment
+//! rate (CPR), in currency.
 //!
 //! # Formula
 //! ```text
-//! Prepayment01 = (PV(CPR + 1bp) - PV(CPR - 1bp)) / achieved_bump
+//! Prepayment01 = (PV(CPR + 1bp) - PV(CPR - 1bp)) / achieved_bump × 1bp
 //! ```
 //! Where the nominal bump is 1bp (0.0001) of annual CPR and `achieved_bump`
 //! is the realized two-sided width after clamping at zero.

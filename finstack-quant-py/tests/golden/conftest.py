@@ -68,7 +68,7 @@ ZERO_RISK_METRICS_REQUIRING_REASON = {
     "foreign_rho",
     "gamma",
     "inflation01",
-    "recovery_01",
+    "recovery01",
     "rho",
     "spread_dv01",
     "vega",

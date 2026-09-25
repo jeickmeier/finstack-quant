@@ -1628,3 +1628,69 @@ fn production_risk_basket_weights_are_currency_per_bp() {
     assert!((rows[0].1 + 1.5).abs() < 1e-9, "{:?}", rows);
     assert!((rows[1].1 - 1.5).abs() < 1e-9);
 }
+
+/// `constituent_delta` is the basket PV change for a +1% relative move in
+/// each constituent price.
+///
+/// Reference: with explicit units, no expense ratio and a unit notional the
+/// basket PV is `Σ units_i × price_i`, which is linear in each price, so a 1%
+/// move in constituent `i` changes PV by exactly `0.01 × units_i × price_i`
+/// (AAPL: 0.01 × 10 × 150 = 15; MSFT: 0.01 × 5 × 300 = 15). Only floating-point
+/// residuals remain, hence 1e-9.
+#[test]
+fn constituent_delta_is_pv_change_per_one_percent_move() {
+    let basket = Basket::builder()
+        .id("DELTA_BASKET".into())
+        .constituents(vec![
+            BasketConstituent {
+                id: "AAPL".to_string(),
+                reference: ConstituentReference::MarketData {
+                    price_id: "AAPL".into(),
+                    asset_type: AssetType::Equity,
+                },
+                weight: 0.0,
+                units: Some(10.0),
+                ticker: None,
+            },
+            BasketConstituent {
+                id: "MSFT".to_string(),
+                reference: ConstituentReference::MarketData {
+                    price_id: "MSFT".into(),
+                    asset_type: AssetType::Equity,
+                },
+                weight: 0.0,
+                units: Some(5.0),
+                ticker: None,
+            },
+        ])
+        .expense_ratio(0.0)
+        .currency(Currency::USD)
+        .notional(usd(1.0))
+        .discount_curve_id("USD-OIS".into())
+        .instrument_pricing_overrides(Default::default())
+        .metric_pricing_overrides(Default::default())
+        .scenario_pricing_overrides(Default::default())
+        .attributes(Attributes::new())
+        .pricing_config(BasketPricingConfig::default())
+        .build()
+        .unwrap();
+    let market = equity_market_context();
+    let as_of = date(2025, 1, 1);
+
+    let result = basket
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ConstituentDelta],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+
+    let total = *result.measures.get("constituent_delta").unwrap();
+    assert!(
+        (total - 30.0).abs() < 1e-9,
+        "total constituent delta {total}"
+    );
+    let aapl = *result.measures.get("constituent_delta::AAPL").unwrap();
+    assert!((aapl - 15.0).abs() < 1e-9, "AAPL constituent delta {aapl}");
+}

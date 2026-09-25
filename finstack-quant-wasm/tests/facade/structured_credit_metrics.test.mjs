@@ -63,8 +63,8 @@ test('recovery sensitivity bumps the credit-model recovery', () => {
     JSON.stringify(f.market),
     f.as_of,
     'discounting',
-    ['recovery_01']
-  ).measures.recovery_01;
+    ['recovery01']
+  ).measures.recovery01;
   assert.ok(Math.abs(recovery01) > 1);
 });
 

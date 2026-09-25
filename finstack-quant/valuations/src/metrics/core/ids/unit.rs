@@ -127,7 +127,6 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "equity_dividend_yield"
         | "implied_vol"
         | "variance_strike_vol"
-        | "recovery_01"
         | "clo_recovery_rate"
         | "abs_delinquency"
         | "abs_charge_off"

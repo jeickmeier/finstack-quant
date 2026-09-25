@@ -282,7 +282,7 @@ fn production_structured_metrics_credit_model_risks_move_pv() {
             PricingOptions::default(),
         )
         .expect("credit-model risks");
-    for metric in ["prepayment01", "default01", "recovery_01"] {
+    for metric in ["prepayment01", "default01", "recovery01"] {
         assert!(
             result.measures[metric].abs() > 1e-3,
             "{metric} must move PV"

@@ -89,7 +89,8 @@ pub(crate) fn compute_pv(
     )?;
     Money::new(unit_price * inst.notional.amount(), ccy)
 }
-/// Cash greeks for an equity option (scaled by contract size; vega per 1% vol).
+/// Cash greeks for an equity option (scaled by contract size; vega per 1% vol,
+/// rho per 1bp).
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct EquityOptionGreeks {
     /// Delta: sensitivity to underlying price (scaled by contract size)
@@ -100,7 +101,7 @@ pub struct EquityOptionGreeks {
     pub vega: f64,
     /// Theta: time decay per day
     pub theta: f64,
-    /// Rho: sensitivity to 1% change in risk-free rate
+    /// Rho: PV change per 1bp (0.0001) move in the risk-free rate, in currency
     pub rho: f64,
 }
 
@@ -213,9 +214,9 @@ pub(crate) fn compute_greeks(
             // `∂V/∂S* · ∂S*/∂r` chain-rule term. Total rho is
             // rho_total = rho_BS(S*) + delta(S*) · ∂S*/∂r,
             // expressed per 1% rate move (hence the `ONE_PERCENT` factor:
-            // `greeks_unit.rho_r` and `vega` are already per-1%, while
-            // `delta` and `∂S*/∂r` are per-unit).
-            let rho_unit = {
+            // `greeks_unit.rho_r` is per-1%, while `delta` and `∂S*/∂r` are
+            // per-unit). The result is rescaled to per 1bp below.
+            let rho_pct = {
                 let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
                 let future_divs = future_dividends(inst, disc_curve.as_ref(), as_of)?;
                 if future_divs.is_empty() {
@@ -234,7 +235,7 @@ pub(crate) fn compute_greeks(
                 gamma: greeks_unit.gamma * scale,
                 vega: greeks_unit.vega * scale,
                 theta: greeks_unit.theta * scale,
-                rho: rho_unit * scale,
+                rho: rho_pct * scale / 100.0,
             })
         }
         ExerciseStyle::American => {
@@ -354,7 +355,9 @@ fn tree_finite_difference_greeks(
     let actual_vol_width = p_v_up.volatility - p_v_dn.volatility;
     let vega_unit = (price_v_up - price_v_dn) / actual_vol_width * h_v;
 
-    // Rho (1% rate bump)
+    // Rho: central difference over a ±1% rate bump (wide enough to stay
+    // clear of lattice noise), which gives the PV change per 1%; divided by
+    // 100 below to report per 1bp.
     let h_r = 0.01;
     let mut p_r_up = params.clone();
     p_r_up.rate += h_r;
@@ -362,7 +365,7 @@ fn tree_finite_difference_greeks(
     let mut p_r_dn = params.clone();
     p_r_dn.rate -= h_r;
     let price_r_dn = price_fn(&p_r_dn)?;
-    let rho_unit = (price_r_up - price_r_dn) / 2.0;
+    let rho_pct = (price_r_up - price_r_dn) / 2.0;
 
     // Theta: one day on the instrument's configured reporting basis.
     let dt = 1.0 / theta_days_per_year;
@@ -380,7 +383,7 @@ fn tree_finite_difference_greeks(
         gamma: gamma_unit * scale,
         vega: vega_unit * scale,
         theta: theta_unit * scale,
-        rho: rho_unit * scale,
+        rho: rho_pct * scale / 100.0,
     })
 }
 
