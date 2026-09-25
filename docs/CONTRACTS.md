@@ -92,8 +92,9 @@ The wire vocabulary uses full concept names:
   values;
 - `as_of_spreads`;
 - `vol_surface_id` for volatility-surface dependencies;
-- `credit_curve_id` for instrument dependencies;
-- `hazard_curve_id` only for concrete hazard state, calibration, or output.
+- `credit_curve_id` for every hazard-curve reference (instrument
+  dependencies, function inputs and outputs); it always names a
+  `HazardCurve`.
 
 Day-count values are exactly `act_360`, `act_365f`, `act_365l`, `nl_365`,
 `30_360`, `30e_360`, `30e_360_isda`, `act_act`, `act_act_isma`, and

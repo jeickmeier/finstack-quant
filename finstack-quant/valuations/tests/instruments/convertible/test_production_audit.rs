@@ -5,7 +5,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     price_convertible_bond, ConversionPolicy, ConvertibleTreeType,
@@ -260,21 +260,16 @@ fn production_convertible_cross_gamma_follows_scalar_and_override_volatility() {
 }
 
 #[test]
-fn production_convertible_cross_gamma_uses_risky_discount_curve() {
+fn production_convertible_cross_gamma_uses_issuer_hazard_curve() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = create_standard_convertible();
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
+    // Zero-recovery hazard curve: a 1 bp spread bump is a 1 bp hazard shift.
     let make_market = |spread_sign: f64, vol_sign: f64| {
         market(as_of, 0.03, 90.0, 0.4 + vol_sign * 0.01).insert(
-            DiscountCurve::builder("CREDIT")
-                .base_date(as_of)
-                .knots([
-                    (0.0, 1.0),
-                    (10.0, (-(0.08 + spread_sign * 0.0001) * 10.0).exp()),
-                ])
-                .build()
-                .expect("risky discount"),
+            HazardCurve::flat("CREDIT", as_of, 0.05 + spread_sign * 0.0001, 0.0)
+                .expect("issuer hazard"),
         )
     };
     let corner = |spread_sign, vol_sign| {
@@ -397,13 +392,9 @@ fn production_convertible_bond_floor_uses_the_pricing_recovery_blend() {
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
     bond.metric_pricing_overrides = bond.metric_pricing_overrides.with_rate_bump(1.0);
-    let ctx = market(as_of, 0.03, 0.001, 0.2).insert(
-        DiscountCurve::builder("CREDIT")
-            .base_date(as_of)
-            .knots([(0.0, 1.0), (10.0, (-0.08_f64 * 10.0).exp())])
-            .build()
-            .expect("zero-recovery risky discount"),
-    );
+    // 5% hazard over the 3% risk-free curve: the zero-recovery risky rate is 8%.
+    let ctx = market(as_of, 0.03, 0.001, 0.2)
+        .insert(HazardCurve::flat("CREDIT", as_of, 0.05, 0.0).expect("issuer hazard"));
     let result = bond
         .price_with_metrics(
             &ctx,
@@ -427,12 +418,17 @@ fn production_convertible_bond_floor_uses_the_pricing_recovery_blend() {
 }
 
 #[test]
-fn production_convertible_risky_discount_is_a_rate_dependency() {
+fn production_convertible_credit_curve_is_a_hazard_dependency() {
     let mut bond = create_standard_convertible();
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
     let deps = bond.market_dependencies().expect("dependencies");
     assert!(deps
+        .curves
+        .credit_curves
+        .iter()
+        .any(|id| id.as_str() == "CREDIT"));
+    assert!(!deps
         .curves
         .discount_curves
         .iter()

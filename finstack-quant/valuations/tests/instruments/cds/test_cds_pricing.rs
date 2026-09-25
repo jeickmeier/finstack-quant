@@ -344,7 +344,7 @@ fn test_par_spread_gives_zero_npv() {
     let par_spread = metric_value(&cds, &market, as_of, MetricId::ParSpread);
 
     // Set spread to par (convert f64 to Decimal)
-    cds.premium.spread_bp = Decimal::try_from(par_spread).expect("valid par_spread");
+    cds.premium.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
 
     // NPV should be near zero; f64→Decimal rounding introduces ~0.07bp on spread → ~$350 residual on $10M
     let npv = cds.value(&market, as_of).unwrap();

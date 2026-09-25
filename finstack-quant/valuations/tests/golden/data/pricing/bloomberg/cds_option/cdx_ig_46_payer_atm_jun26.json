@@ -585,8 +585,8 @@
         "underlying_effective_date": "2026-03-20",
         "underlying_is_index": true,
         "index_factor": 1.0,
-        "realized_index_loss": null,
-        "underlying_cds_coupon": "0.01",
+        "realized_loss": 0.0,
+        "coupon_bp": "100",
         "exercise_style": "european",
         "settlement": "cash",
         "attributes": {

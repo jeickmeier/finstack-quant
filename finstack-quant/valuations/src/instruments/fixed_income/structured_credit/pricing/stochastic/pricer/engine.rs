@@ -1340,8 +1340,8 @@ impl PathTrancheMetrics {
 struct TrancheScenarioStats {
     tranche_id: String,
     seniority: TrancheSeniority,
-    attachment: f64,
-    detachment: f64,
+    attach_pct: f64,
+    detach_pct: f64,
     /// Current note balance at the valuation date: the face the tranche
     /// price is quoted on.
     current_balance: f64,
@@ -1362,8 +1362,8 @@ impl TrancheScenarioStats {
         Self {
             tranche_id: tranche.id.to_string(),
             seniority: tranche.seniority,
-            attachment: tranche.attachment_pct() / 100.0,
-            detachment: tranche.detachment_pct() / 100.0,
+            attach_pct: tranche.effective_attach_pct(),
+            detach_pct: tranche.effective_detach_pct(),
             current_balance: tranche.current_balance.amount(),
             pv_stats: OnlineStats::new(),
             loss_stats: OnlineStats::new(),
@@ -1413,7 +1413,7 @@ impl TrancheScenarioStats {
             Money::new(mean_pv, currency)?,
         )
         .with_price_pct(price_pct)
-        .with_subordination(self.attachment, self.detachment)
+        .with_subordination(self.attach_pct, self.detach_pct)
         .with_risk_metrics(
             Money::new(mean_loss, currency)?,
             Money::new(loss_std, currency)?,

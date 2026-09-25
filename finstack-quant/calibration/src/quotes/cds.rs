@@ -15,12 +15,12 @@ use ts_rs::TS;
 /// coupons (ISDA Standard European Contract, Big Bang/Small Bang 2009).
 const STANDARD_UPFRONT_RUNNING_COUPONS_BP: [f64; 4] = [25.0, 100.0, 500.0, 1000.0];
 
-fn is_standard_upfront_running_coupon_bp(running_spread_bp: f64) -> bool {
+fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
     // Running coupons are quoted in whole bp market standards, so an absolute
     // tolerance is intentional here.
     STANDARD_UPFRONT_RUNNING_COUPONS_BP
         .iter()
-        .any(|standard| (running_spread_bp - standard).abs() <= 1e-9)
+        .any(|standard| (coupon_bp - standard).abs() <= 1e-9)
 }
 
 /// Market quote for credit default swap (CDS) instruments.
@@ -72,7 +72,7 @@ fn is_standard_upfront_running_coupon_bp(running_spread_bp: f64) -> bool {
 ///         doc_clause: CdsDocClause::Cr14,
 ///     },
 ///     pillar: Pillar::Tenor("5Y".parse()?),
-///     running_spread_bp: 500.0,
+///     coupon_bp: 500.0,
 ///     upfront_pct: 0.02, // 2% upfront
 ///     recovery_rate: 0.40,
 /// };
@@ -117,8 +117,8 @@ pub enum CdsQuote {
         /// Maturity pillar.
         #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         pillar: Pillar,
-        /// Running spread in basis points (25.0, 100.0, 500.0 or 1000.0).
-        running_spread_bp: f64,
+        /// Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).
+        coupon_bp: f64,
         /// Upfront payment percentage of notional (e.g. 0.01 for 1%).
         upfront_pct: f64,
         /// Recovery rate assumption.
@@ -166,7 +166,7 @@ impl CdsQuote {
 
     /// Create a new quote with the spread bumped.
     ///
-    /// For par spread quotes, bumps `spread_bp`. For upfront quotes, bumps `running_spread_bp`.
+    /// For par spread quotes, bumps `spread_bp`. For upfront quotes, bumps `coupon_bp`.
     /// The upfront percentage remains unchanged.
     ///
     /// # Arguments
@@ -214,9 +214,7 @@ impl CdsQuote {
         let mut quote = self.clone();
         match &mut quote {
             Self::CdsParSpread { spread_bp, .. } => *spread_bp += bump_bp,
-            Self::CdsUpfront {
-                running_spread_bp, ..
-            } => *running_spread_bp += bump_bp,
+            Self::CdsUpfront { coupon_bp, .. } => *coupon_bp += bump_bp,
         }
         quote
     }
@@ -233,12 +231,12 @@ impl CdsQuote {
                 validate::unit_interval(*recovery_rate, "recovery_rate")?;
             }
             Self::CdsUpfront {
-                running_spread_bp,
+                coupon_bp,
                 upfront_pct,
                 recovery_rate,
                 ..
             } => {
-                validate::positive(*running_spread_bp, "running_spread_bp")?;
+                validate::positive(*coupon_bp, "coupon_bp")?;
                 validate::finite(*upfront_pct, "upfront_pct")?;
                 validate::unit_interval(*recovery_rate, "recovery_rate")?;
             }
@@ -255,15 +253,14 @@ impl CdsQuote {
         }
     }
 
-    /// Return the quoted running spread in basis points.
+    /// Running coupon, in basis points, of the CDS built from this quote.
     ///
-    /// Par-spread quotes return the par spread. Upfront quotes return the fixed running coupon.
-    pub fn quoted_running_spread_bp(&self) -> f64 {
+    /// Par-spread quotes return the par spread (the built CDS runs at par).
+    /// Upfront quotes return the contractual running coupon.
+    pub fn coupon_bp(&self) -> f64 {
         match self {
             CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
-            CdsQuote::CdsUpfront {
-                running_spread_bp, ..
-            } => *running_spread_bp,
+            CdsQuote::CdsUpfront { coupon_bp, .. } => *coupon_bp,
         }
     }
 
@@ -271,14 +268,11 @@ impl CdsQuote {
     ///
     /// ISDA-style upfront quotes are only supported with standard running coupons.
     pub fn validate_market_conventions(&self) -> Result<()> {
-        if let CdsQuote::CdsUpfront {
-            running_spread_bp, ..
-        } = self
-        {
-            if !is_standard_upfront_running_coupon_bp(*running_spread_bp) {
+        if let CdsQuote::CdsUpfront { coupon_bp, .. } = self {
+            if !is_standard_upfront_running_coupon_bp(*coupon_bp) {
                 return Err(Error::Validation(format!(
                     "CDS upfront quotes require a standard running coupon of 25bp, 100bp, 500bp or 1000bp; got {}bp",
-                    running_spread_bp
+                    coupon_bp
                 )));
             }
         }

@@ -241,8 +241,8 @@ impl StructuredCredit {
         const EPS: f64 = 1e-9;
 
         for (idx, tranche) in self.tranches.tranches.iter().enumerate() {
-            let attachment = tranche.attachment_pct();
-            let detachment = tranche.detachment_pct();
+            let attachment = tranche.effective_attach_pct();
+            let detachment = tranche.effective_detach_pct();
             if !attachment.is_finite() || !detachment.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "structured-credit tranche '{}' has non-finite attachment/detachment",

@@ -271,7 +271,7 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
         detachment: 0.03,
         maturity: Date::from_calendar_date(2030, Month::June, 20).expect("maturity"),
         upfront_pct: -0.02,
-        running_spread_bp: 500.0,
+        coupon_bp: 500.0,
         convention: CdsConventionKey {
             currency: Currency::USD,
             doc_clause: CdsDocClause::Cr14,
@@ -294,7 +294,7 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
             business_day_convention: None,
             calendar_id: None,
             detachment_points: Vec::new(),
-            use_imm_dates: false,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         }),
     };
 
@@ -321,7 +321,7 @@ fn base_correlation_preflight_requires_credit_index_data() {
         detachment: 0.03,
         maturity: Date::from_calendar_date(2030, Month::June, 20).expect("maturity"),
         upfront_pct: -0.02,
-        running_spread_bp: 500.0,
+        coupon_bp: 500.0,
         convention: CdsConventionKey {
             currency: Currency::USD,
             doc_clause: CdsDocClause::Cr14,
@@ -344,7 +344,7 @@ fn base_correlation_preflight_requires_credit_index_data() {
             business_day_convention: None,
             calendar_id: None,
             detachment_points: vec![0.03],
-            use_imm_dates: false,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         }),
     };
 
@@ -398,7 +398,7 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
         detachment: 0.10, // invalid: detachment < attachment
         maturity: Date::from_calendar_date(2030, Month::June, 20).expect("maturity"),
         upfront_pct: -0.02,
-        running_spread_bp: 500.0,
+        coupon_bp: 500.0,
         convention: CdsConventionKey {
             currency: Currency::USD,
             doc_clause: CdsDocClause::Cr14,
@@ -421,7 +421,7 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
             business_day_convention: None,
             calendar_id: None,
             detachment_points: vec![0.03],
-            use_imm_dates: false,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
         }),
     };
 

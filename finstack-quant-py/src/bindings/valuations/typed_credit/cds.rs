@@ -96,7 +96,7 @@ impl PyCreditDefaultSwap {
     /// Canonical example: 5-year USD 10,000,000 investment-grade payer CDS.
     ///
     /// Mirrors Rust ``CreditDefaultSwap::example()``: ``isda_na`` convention,
-    /// 100bp running spread, 40% recovery, curves ``USD-OIS`` /
+    /// 100bp running coupon, 40% recovery, curves ``USD-OIS`` /
     /// ``CORP-HAZARD``, premium 2024-03-20 to 2029-03-20.
     ///
     /// Returns
@@ -113,7 +113,7 @@ impl PyCreditDefaultSwap {
 
     /// Par spread implied by the market, in basis points.
     ///
-    /// Mirrors Rust ``CreditDefaultSwap::get_par_spread``: the running
+    /// Mirrors Rust ``CreditDefaultSwap::par_spread``: the running
     /// spread that makes the contract worth zero under this CDS's valuation
     /// convention, premium schedule, discount curve, hazard curve and
     /// recovery assumption.
@@ -137,7 +137,7 @@ impl PyCreditDefaultSwap {
     /// ValueError
     ///     If the curve recovery metadata conflicts with the contract recovery.
     #[pyo3(text_signature = "($self, market, as_of)")]
-    fn get_par_spread(
+    fn par_spread(
         &self,
         py: Python<'_>,
         market: &Bound<'_, PyAny>,
@@ -145,9 +145,7 @@ impl PyCreditDefaultSwap {
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
         let as_of = extract_date(as_of)?;
-        self.inner
-            .get_par_spread(&market, as_of)
-            .map_err(core_to_py)
+        self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
     /// Notional amount of protection.
@@ -258,11 +256,11 @@ impl PyCreditDefaultSwap {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CreditDefaultSwap(id={:?}, side={:?}, notional={}, spread_bp={}, start={}, end={}, convention={:?})",
+            "CreditDefaultSwap(id={:?}, side={:?}, notional={}, coupon_bp={}, start={}, end={}, convention={:?})",
             self.inner.id.as_str(),
             enum_to_py_string(&self.inner.side).unwrap_or_default(),
             money_repr(self.inner.notional),
-            opt_repr(self.inner.premium.spread_bp.to_f64()),
+            opt_repr(self.inner.premium.coupon_bp.to_f64()),
             date_repr(self.inner.premium.start),
             date_repr(self.inner.premium.end),
             enum_to_py_string(&self.inner.convention).unwrap_or_default(),
@@ -406,8 +404,8 @@ impl PyCreditDefaultSwapBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let leg = value.inner.clone();
         let shown = format!(
-            "PremiumLegSpec(spread_bp={}, start={}, end={})",
-            leg.spread_bp,
+            "PremiumLegSpec(coupon_bp={}, start={}, end={})",
+            leg.coupon_bp,
             date_repr(leg.start),
             date_repr(leg.end)
         );

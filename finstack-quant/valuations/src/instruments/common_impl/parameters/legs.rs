@@ -402,11 +402,12 @@ pub struct BasisSwapLeg {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PremiumLegSpec {
-    /// Whether to use the standard quarterly CDS roll grid (20 March,
-    /// June, September and December), including a final maturity stub.
-    /// Requires quarterly `frequency` and `ShortFront` `stub`. Set false
-    /// for bespoke schedules generated from the supplied frequency/stub.
-    pub standard_imm_dates: bool,
+    /// Premium roll-date grid. `cds_imm` selects the standard quarterly CDS
+    /// roll grid (20 March, June, September and December), including a final
+    /// maturity stub, and requires quarterly `frequency` and `short_front`
+    /// `stub`. `none` generates a bespoke schedule from the supplied
+    /// `frequency` and `stub`. The equity-futures `imm` grid is rejected.
+    pub roll_rule: finstack_quant_cashflows::builder::specs::RollRule,
     /// Start date of protection
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -433,13 +434,14 @@ pub struct PremiumLegSpec {
     pub calendar_id: Option<String>,
     /// Day count convention
     pub day_count: DayCount,
-    /// Fixed spread in basis points (e.g., 100 = 100bp = 1%)
+    /// Contractual running coupon in basis points (e.g., `100` = 1% per
+    /// annum, the standard CDX.NA.IG coupon; `500` for high yield).
     #[serde(with = "finstack_quant_core::wire::decimal")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
-    pub spread_bp: Decimal,
+    pub coupon_bp: Decimal,
     /// Discount curve identifier
     pub discount_curve_id: CurveId,
 }
@@ -449,9 +451,9 @@ pub struct PremiumLegSpec {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ProtectionLegSpec {
-    /// Credit curve identifier for default probabilities
+    /// Hazard curve identifier for default probabilities
     pub credit_curve_id: CurveId,
-    /// Recovery rate (0.0 to 1.0)
+    /// Recovery rate as a decimal fraction in `[0.0, 1.0)`
     pub recovery_rate: f64,
     /// Settlement delay in business days
     pub settlement_delay: u16,
@@ -462,11 +464,12 @@ impl ProtectionLegSpec {
     ///
     /// # Arguments
     /// * `credit_curve_id` - Identifier for the hazard/credit curve
-    /// * `recovery_rate` - Recovery rate in [0.0, 1.0] (e.g., 0.4 = 40%)
+    /// * `recovery_rate` - Recovery rate as a decimal fraction in `[0.0, 1.0)`
+    ///   (e.g., 0.4 = 40%)
     /// * `settlement_delay` - Settlement delay in business days
     ///
     /// # Errors
-    /// Returns an error if `recovery_rate` is outside [0.0, 1.0].
+    /// Returns an error if `recovery_rate` is outside `[0.0, 1.0)`.
     pub fn new(
         credit_curve_id: impl Into<CurveId>,
         recovery_rate: f64,

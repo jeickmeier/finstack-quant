@@ -28,7 +28,7 @@ pub fn maturity_5y() -> Date {
 }
 
 fn with_imm_dates(mut tranche: CDSTranche) -> CDSTranche {
-    tranche.standard_imm_dates = true;
+    tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;
     tranche
 }
 
@@ -256,7 +256,7 @@ pub fn senior_tranche() -> CDSTranche {
 pub fn custom_tranche(
     attach_pct: f64,
     detach_pct: f64,
-    running_coupon_bp: f64,
+    coupon_bp: f64,
     side: TrancheSide,
 ) -> CDSTranche {
     let tranche_params = CDSTrancheParams::new(
@@ -266,7 +266,7 @@ pub fn custom_tranche(
         detach_pct,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         maturity_5y(),
-        running_coupon_bp,
+        coupon_bp,
     );
     let schedule_params = ScheduleParams::quarterly_act360();
     with_imm_dates(

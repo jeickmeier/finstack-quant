@@ -10,6 +10,7 @@
 use pyo3::prelude::*;
 use rust_decimal::prelude::ToPrimitive;
 
+use crate::bindings::cashflows::builder::specs::PyRollRule;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
@@ -701,14 +702,15 @@ impl PyPremiumLegSpec {
     ///     Payment frequency.
     /// day_count : DayCount
     ///     Day count convention for accrual.
-    /// spread_bp : float | Bps
-    ///     Fixed running spread in basis points (``100.0`` = 100bp = 1%).
+    /// coupon_bp : float | Bps
+    ///     Contractual running coupon in basis points (``100.0`` = 100bp = 1%).
     /// discount_curve_id : str
     ///     Discount curve identifier for pricing this leg.
-    /// standard_imm_dates : bool
-    ///     True for prescribed quarterly CDS 20th dates; false for bespoke
-    ///     frequency/stub schedules. Standard dates require quarterly frequency
-    ///     and a short-front stub when the leg is priced.
+    /// roll_rule : RollRule
+    ///     ``RollRule.CDS_IMM`` for the prescribed quarterly CDS 20th dates
+    ///     (requires quarterly frequency and a short-front stub when the leg is
+    ///     priced); ``RollRule.NONE`` for bespoke frequency/stub schedules.
+    ///     ``RollRule.IMM`` is rejected when the leg is priced.
     /// stub : str | StubKind, default "short_front"
     ///     Stub period handling rule.
     /// business_day_convention : str, default "modified_following"
@@ -724,26 +726,27 @@ impl PyPremiumLegSpec {
     /// Raises
     /// ------
     /// ValueError
-    ///     If an enum value is invalid or ``spread_bp`` is not finite.
+    ///     If an enum value is invalid or ``coupon_bp`` is not finite.
     /// TypeError
-    ///     If ``spread_bp`` is neither a number nor a ``Bps``, or a date
+    ///     If ``coupon_bp`` is neither a number nor a ``Bps``, or a date
     ///     cannot be interpreted.
     ///
     /// Examples
     /// --------
+    /// >>> from finstack_quant.cashflows.builder import RollRule
     /// >>> from finstack_quant.core.dates import DayCount, Tenor
     /// >>> from finstack_quant.valuations.instruments import PremiumLegSpec
     /// >>> leg = PremiumLegSpec(
     /// ...     "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS",
-    /// ...     standard_imm_dates=True,
+    /// ...     roll_rule=RollRule.CDS_IMM,
     /// ... )
-    /// >>> leg.spread_bp
+    /// >>> leg.coupon_bp
     /// 100.0
     #[new]
-    #[pyo3(signature = (start, end, frequency, day_count, spread_bp, discount_curve_id, *, standard_imm_dates,
+    #[pyo3(signature = (start, end, frequency, day_count, coupon_bp, discount_curve_id, *, roll_rule,
                         stub = None, business_day_convention = "modified_following", calendar_id = None))]
     #[pyo3(
-        text_signature = "(start, end, frequency, day_count, spread_bp, discount_curve_id, *, standard_imm_dates, \
+        text_signature = "(start, end, frequency, day_count, coupon_bp, discount_curve_id, *, roll_rule, \
 stub='short_front', business_day_convention='modified_following', calendar_id=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
@@ -753,16 +756,16 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         end: &Bound<'_, PyAny>,
         frequency: PyRef<'_, PyTenor>,
         day_count: PyRef<'_, PyDayCount>,
-        spread_bp: &Bound<'_, PyAny>,
+        coupon_bp: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        standard_imm_dates: bool,
+        roll_rule: PyRef<'_, PyRollRule>,
         stub: Option<&Bound<'_, PyAny>>,
         business_day_convention: &str,
         calendar_id: Option<String>,
     ) -> PyResult<Self> {
-        let spread_bp = bps_from_py(spread_bp, "spread_bp")?;
+        let coupon_bp = bps_from_py(coupon_bp, "coupon_bp")?;
         let inner = finstack_quant_valuations::instruments::PremiumLegSpec {
-            standard_imm_dates,
+            roll_rule: roll_rule.inner,
             start: extract_date(start)?,
             end: extract_date(end)?,
             frequency: frequency.inner,
@@ -773,7 +776,7 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
             )?,
             calendar_id,
             day_count: day_count.inner,
-            spread_bp: decimal_from_f64(spread_bp, "spread_bp")?,
+            coupon_bp: decimal_from_f64(coupon_bp, "coupon_bp")?,
             discount_curve_id: finstack_quant_core::types::CurveId::new(
                 discount_curve_id.to_string(),
             ),
@@ -828,10 +831,12 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         serde_to_py(py, &self.inner)
     }
 
-    /// Whether the leg uses prescribed quarterly CDS 20th dates.
+    /// Premium roll-date grid (``RollRule.CDS_IMM`` or ``RollRule.NONE``).
     #[getter]
-    fn standard_imm_dates(&self) -> bool {
-        self.inner.standard_imm_dates
+    fn roll_rule(&self) -> PyRollRule {
+        PyRollRule {
+            inner: self.inner.roll_rule,
+        }
     }
 
     /// Protection / accrual start date.
@@ -876,10 +881,10 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         PyDayCount::from_inner(self.inner.day_count)
     }
 
-    /// Running spread in basis points.
+    /// Contractual running coupon in basis points.
     #[getter]
-    fn spread_bp(&self) -> f64 {
-        self.inner.spread_bp.to_f64().unwrap_or(f64::NAN)
+    fn coupon_bp(&self) -> f64 {
+        self.inner.coupon_bp.to_f64().unwrap_or(f64::NAN)
     }
 
     /// Discount curve identifier.
@@ -891,13 +896,13 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
     /// Return ``repr(self)``.
     pub(crate) fn __repr__(&self) -> String {
         format!(
-            "PremiumLegSpec(start={}, end={}, frequency={}, day_count={}, spread_bp={}, \
+            "PremiumLegSpec(start={}, end={}, frequency={}, day_count={}, coupon_bp={}, \
 discount_curve_id={:?}, stub={:?}, business_day_convention={:?}, calendar_id={})",
             self.inner.start,
             self.inner.end,
             self.inner.frequency,
             self.inner.day_count,
-            decimal_repr(self.inner.spread_bp),
+            decimal_repr(self.inner.coupon_bp),
             self.inner.discount_curve_id.as_str(),
             enum_to_py_string(&self.inner.stub).unwrap_or_default(),
             enum_to_py_string(&self.inner.business_day_convention).unwrap_or_default(),

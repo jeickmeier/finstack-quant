@@ -37,7 +37,7 @@ fn test_buy_protection_constructor() {
     assert_eq!(cds.notional.amount(), 10_000_000.0);
     assert_eq!(cds.notional.currency(), Currency::USD);
     assert_eq!(cds.side, PayReceive::Pay);
-    assert_eq!(cds.premium.spread_bp, Decimal::from(100));
+    assert_eq!(cds.premium.coupon_bp, Decimal::from(100));
     assert_eq!(cds.convention, CdsConvention::IsdaNa);
 }
 
@@ -59,7 +59,7 @@ fn test_sell_protection_constructor() {
     .expect("CDS construction should succeed");
 
     assert_eq!(cds.side, PayReceive::Receive);
-    assert_eq!(cds.premium.spread_bp, Decimal::from(150));
+    assert_eq!(cds.premium.coupon_bp, Decimal::from(150));
     assert_eq!(cds.notional.currency(), Currency::EUR);
 }
 
@@ -115,7 +115,7 @@ fn test_builder_pattern() {
         .side(PayReceive::Pay)
         .convention(convention)
         .premium(PremiumLegSpec {
-            standard_imm_dates: true,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start,
             end,
             frequency: convention.frequency(),
@@ -123,7 +123,7 @@ fn test_builder_pattern() {
             business_day_convention: convention.business_day_convention(),
             calendar_id: None,
             day_count: convention.day_count(),
-            spread_bp: Decimal::from(200),
+            coupon_bp: Decimal::from(200),
             discount_curve_id: "USD-OIS".into(),
         })
         .protection(ProtectionLegSpec {
@@ -137,7 +137,7 @@ fn test_builder_pattern() {
         .unwrap();
 
     assert_eq!(cds.id.as_str(), "BUILDER_TEST");
-    assert_eq!(cds.premium.spread_bp, Decimal::from(200));
+    assert_eq!(cds.premium.coupon_bp, Decimal::from(200));
     assert_eq!(cds.protection.recovery_rate, 0.40);
 }
 

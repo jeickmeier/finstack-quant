@@ -78,16 +78,31 @@ impl HazardCurve {
     }
 
     /// Apply a bump specification in-place, mutating lambda values and rebuilding the interpolator.
+    ///
+    /// The spread shift `s` is converted to a hazard shift `s / (1 − R)`
+    /// (credit triangle). A parallel bump adds it to every hazard rate; a
+    /// triangular key-rate bump scales it at each knot by the bucket's
+    /// triangular weight, so the bucket shifts sum to the parallel shift at
+    /// every knot.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
         use BumpType;
 
         spec.validate_finite()?;
-        if !matches!(spec.bump_type, BumpType::Parallel) {
-            return Err(crate::error::InputError::UnsupportedBump {
-                reason: "HazardCurve only supports Parallel bumps, not key-rate bumps".to_string(),
+        let bucket = match spec.bump_type {
+            BumpType::Parallel => None,
+            BumpType::TriangularKeyRate {
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            } => {
+                crate::market_data::term_structures::common::validate_triangular_bucket_grid(
+                    prev_bucket,
+                    target_bucket,
+                    next_bucket,
+                )?;
+                Some((prev_bucket, target_bucket, next_bucket))
             }
-            .into());
-        }
+        };
 
         // Recovery must be within [0, 1) for the par spread ⇢ hazard
         // conversion below; recovery == 1.0 would divide by zero and yield an
@@ -122,8 +137,13 @@ impl HazardCurve {
         // still leave `self` untouched, and nothing is committed until the
         // fallible interpolator build succeeds.
         let mut lambdas = self.lambdas.clone();
-        for lambda in lambdas.iter_mut() {
-            let shifted = *lambda + shift;
+        for (lambda, &t) in lambdas.iter_mut().zip(self.knots.iter()) {
+            let weight = bucket.map_or(1.0, |(prev, target, next)| {
+                crate::market_data::term_structures::common::triangular_weight(
+                    t, prev, target, next,
+                )
+            });
+            let shifted = *lambda + shift * weight;
             if !shifted.is_finite() || shifted < 0.0 {
                 return Err(crate::error::InputError::UnsupportedBump {
                     reason: "non-finite or negative hazard rate after bump".to_string(),
@@ -331,7 +351,6 @@ impl HazardCurve {
 
 impl Bumpable for HazardCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
-        spec.validate_parallel("HazardCurve")?;
         spec.resolve_standard_values_or_error(
             "HazardCurve",
             "only supports Additive/{RateBp,Percent,Fraction} bumps",

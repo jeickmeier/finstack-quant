@@ -27,7 +27,7 @@ fn create_test_cds() -> CreditDefaultSwap {
         as_of,
         maturity,
         "USD-OIS",     // discount_curve_id
-        "ACME-HAZARD", // credit_id (hazard curve contains recovery rate)
+        "ACME-HAZARD", // credit_curve_id (hazard curve contains recovery rate)
     )
     .expect("CDS construction should succeed")
 }
@@ -200,7 +200,7 @@ fn test_cds_different_tenors_determinism() {
             as_of,
             maturity,
             "USD-OIS",     // discount_curve_id
-            "ACME-HAZARD", // credit_id
+            "ACME-HAZARD", // credit_curve_id
         )
         .expect("CDS construction should succeed");
 

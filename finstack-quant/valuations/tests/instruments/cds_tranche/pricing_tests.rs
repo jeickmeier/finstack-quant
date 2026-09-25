@@ -227,7 +227,7 @@ fn test_missing_credit_index_errors_for_price_tranche() {
 fn test_fully_wiped_tranche_prices_to_zero() {
     let pricer = CDSTranchePricer::new();
     let mut tranche = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
-    tranche.accumulated_loss = tranche.detach_pct / 100.0;
+    tranche.realized_loss = tranche.detach_pct / 100.0;
 
     let pv = pricer
         .price_tranche(&tranche, &standard_market_context(), base_date())

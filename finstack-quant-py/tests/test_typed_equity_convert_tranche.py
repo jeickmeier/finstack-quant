@@ -7,6 +7,7 @@ import json
 
 import pytest
 
+from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
@@ -131,7 +132,7 @@ class TestCDSTrancheTyped:
             .detach_pct(3.0)
             .notional(Money(5_000_000.0, Currency("USD")))
             .maturity(datetime.date(2029, 6, 20))
-            .running_coupon_bp(500.0)
+            .coupon_bp(500.0)
             .frequency(Tenor.quarterly())
             .day_count(DayCount.ACT_360)
             .calendar_id("NYSE")
@@ -139,8 +140,8 @@ class TestCDSTrancheTyped:
             .credit_index_id("CDX-IG-42-CURVE")
             .side("sell_protection")
             .effective_date(datetime.date(2024, 6, 20))
-            .accumulated_loss(0.01)
-            .standard_imm_dates(False)
+            .realized_loss(0.01)
+            .roll_rule(RollRule.NONE)
             .build()
         )
         payload = json.loads(tranche.to_json())

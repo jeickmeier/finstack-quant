@@ -422,8 +422,7 @@ fn compute_taylor_result(
     // Credit sensitivities — credit-curve move, key-rate aware.
     //
     // Hazard curves are measured in par CDS spread moves; discount-style credit
-    // curves (for example convertible risky discount curves) are measured in zero
-    // rate moves. `BucketedCs01` is requested once here; instruments without that
+    // curves are measured in zero rate moves. `BucketedCs01` is requested once here; instruments without that
     // calculator yield no per-tenor keys and the per-curve `compute_credit_factor`
     // falls back to an aggregate CS01 times an average credit-curve move.
     let credit_curves = &market_deps.curves.credit_curves;
@@ -1109,9 +1108,8 @@ fn compute_curve_factor(
 
 /// Compute credit (CS01) attribution for a single credit curve.
 ///
-/// The credit curve may be a `HazardCurve` (CDS-family instruments) or a
-/// `DiscountCurve` (the Tsiveriotis–Zhang risky discount curve a convertible
-/// bond prices off). [`measure_credit_curve_shift`] /
+/// The credit curve may be a `HazardCurve` or a `DiscountCurve` serving a
+/// credit role. [`measure_credit_curve_shift`] /
 /// [`measure_per_tenor_credit_curve_shift`] measure the move in whichever basis
 /// the instrument's own CS01 is defined on — par CDS spread for a hazard curve,
 /// zero rate for a discount-style credit curve — so the move always pairs

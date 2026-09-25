@@ -21,6 +21,7 @@ from __future__ import annotations
 import datetime
 import json
 
+from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext, ScalarTimeSeries
@@ -55,8 +56,8 @@ def _single_tranche() -> Tranche:
         Tranche
         .builder()
         .id("A")
-        .attachment_point(0.0)
-        .detachment_point(100.0)
+        .attach_pct(0.0)
+        .detach_pct(100.0)
         .seniority("senior")
         .original_balance(Money(1.0, Currency("USD")))
         .coupon_fixed(0.05)
@@ -219,7 +220,7 @@ def test_cds_tranche_builder_setters_accept_keyword_value() -> None:
         .detach_pct(value=7.0)
         .notional(value=Money(10_000_000.0, Currency("USD")))
         .maturity(value=datetime.date(2029, 6, 20))
-        .running_coupon_bp(value=100.0)
+        .coupon_bp(value=100.0)
         .frequency(value=Tenor.quarterly())
         .day_count(value=DayCount.ACT_360)
         .calendar_id(value="NYSE")
@@ -227,8 +228,8 @@ def test_cds_tranche_builder_setters_accept_keyword_value() -> None:
         .credit_index_id(value="CDX-IG-42-CURVE")
         .side(value="buy_protection")
         .effective_date(value=datetime.date(2024, 6, 20))
-        .accumulated_loss(value=0.01)
-        .standard_imm_dates(value=False)
+        .realized_loss(value=0.01)
+        .roll_rule(value=RollRule.NONE)
         .build()
     )
     assert tranche.id == "CDXTR-KW"
@@ -267,19 +268,19 @@ def test_premium_and_protection_leg_spec_accept_keyword_arguments() -> None:
         end=datetime.date(2029, 6, 20),
         frequency=Tenor.quarterly(),
         day_count=DayCount.ACT_360,
-        spread_bp=100.0,
+        coupon_bp=100.0,
         discount_curve_id="USD-OIS",
         stub="short_front",
         business_day_convention="modified_following",
         calendar_id=None,
-        standard_imm_dates=False,
+        roll_rule=RollRule.NONE,
     )
     protection = ProtectionLegSpec(
         credit_curve_id="ACME-CDS",
         recovery_rate=0.4,
         settlement_delay=3,
     )
-    assert "spread_bp=100" in repr(premium)
+    assert "coupon_bp=100" in repr(premium)
     assert "recovery_rate=0.4" in repr(protection)
 
 
@@ -313,8 +314,8 @@ def test_tranche_builder_setters_accept_keyword_value() -> None:
         Tranche
         .builder()
         .id(value="TR-KW")
-        .attachment_point(value=10.0)
-        .detachment_point(value=100.0)
+        .attach_pct(value=10.0)
+        .detach_pct(value=100.0)
         .seniority(value="senior")
         .original_balance(value=Money(72_000_000.0, Currency("USD")))
         .coupon_fixed(rate=0.05)

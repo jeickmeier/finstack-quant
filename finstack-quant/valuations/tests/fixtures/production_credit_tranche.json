@@ -4,7 +4,7 @@
   "instrument": {
     "instrument": {
       "spec": {
-        "accumulated_loss": 0.0,
+        "realized_loss": 0.0,
         "attach_pct": 0.0,
         "attributes": {},
         "business_day_convention": "following",
@@ -25,10 +25,10 @@
           "amount": "30000",
           "currency": "USD"
         },
-        "running_coupon_bp": 0.0,
+        "coupon_bp": 0.0,
         "series": 42,
         "side": "buy_protection",
-        "standard_imm_dates": false,
+        "roll_rule": "none",
         "upfront": null
       },
       "type": "cds_tranche"

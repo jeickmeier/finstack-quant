@@ -141,7 +141,7 @@ def instruments(stage: str = "base") -> dict[str, dict[str, Any]]:
         _, credit = cds(0)
         credit["spec"].update({"id": "ACME-CDS", "notional": {"amount": "1000000", "currency": "USD"}})
         credit["spec"]["premium"]["end"] = "2030-03-20"
-        credit["spec"]["premium"]["spread_bp"] = "100"
+        credit["spec"]["premium"]["coupon_bp"] = "100"
         credit["spec"]["protection"]["credit_curve_id"] = "ACME-HZD"
         credit["spec"]["attributes"] = {"tags": ["credit-hedge"], "meta": {"sector": "corporate"}}
         raw["ACME-CDS"] = credit

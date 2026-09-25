@@ -30,7 +30,7 @@ const SCHEDULE = new Set([
   "index_lag_days",
   "compounding_simple",
   "accrual_method",
-  "standard_imm_dates",
+  "roll_rule",
   "protection_start_convention",
   "delta_convention",
   "underlying_convention",

@@ -150,8 +150,8 @@ def _tranche(id_: str, attach: float, detach: float, seniority: str, balance: fl
         Tranche
         .builder()
         .id(id_)
-        .attachment_point(attach)
-        .detachment_point(detach)
+        .attach_pct(attach)
+        .detach_pct(detach)
         .seniority(seniority)
         .original_balance(Money(balance, Currency("USD")))
         .coupon_fixed(0.05)
@@ -163,7 +163,7 @@ def _tranche(id_: str, attach: float, detach: float, seniority: str, balance: fl
 def test_tranche_value_object_contract() -> None:
     tranche = _tranche("A", 10.0, 100.0, "senior", 90.0)
     assert tranche.id == "A"
-    assert tranche.attachment_point == 10.0
+    assert tranche.attach_pct == 10.0
     assert tranche.maturity == dt.date(2031, 1, 15)
     assert tranche.original_balance == Money(90.0, Currency("USD"))
     assert isinstance(tranche.coupon, dict)
@@ -174,8 +174,8 @@ def test_tranche_value_object_contract() -> None:
     assert tranche.to_dict() == json.loads(tranche.to_json())
     assert repr(tranche).startswith("Tranche(id='A', seniority=")
     assert "pik_enabled=False" in repr(tranche)
-    builder = Tranche.builder().attachment_point(0.0)
-    assert repr(builder) == "TrancheBuilder(attachment_point=0, detachment_point=None, consumed=False)"
+    builder = Tranche.builder().attach_pct(0.0)
+    assert repr(builder) == "TrancheBuilder(attach_pct=0, detach_pct=None, consumed=False)"
 
 
 def test_tranche_builder_accepts_rate_objects_and_dict_coupon() -> None:
@@ -185,8 +185,8 @@ def test_tranche_builder_accepts_rate_objects_and_dict_coupon() -> None:
         Tranche
         .builder()
         .id("A")
-        .attachment_point(0.0)
-        .detachment_point(100.0)
+        .attach_pct(0.0)
+        .detach_pct(100.0)
         .seniority("senior")
         .original_balance(Money(100.0, Currency("USD")))
         .coupon_fixed(Rate(0.05))
@@ -199,8 +199,8 @@ def test_tranche_builder_accepts_rate_objects_and_dict_coupon() -> None:
         Tranche
         .builder()
         .id("F")
-        .attachment_point(0.0)
-        .detachment_point(100.0)
+        .attach_pct(0.0)
+        .detach_pct(100.0)
         .seniority("senior")
         .original_balance(Money(100.0, Currency("USD")))
         .coupon_floating(json.loads(json.dumps(via_float.coupon)))

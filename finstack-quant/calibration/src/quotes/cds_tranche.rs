@@ -37,7 +37,7 @@ use ts_rs::TS;
 ///     detachment: 0.07,
 ///     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
 ///     upfront_pct: -0.025,
-///     running_spread_bp: 500.0,
+///     coupon_bp: 500.0,
 ///     convention: CdsConventionKey {
 ///         currency: Currency::USD,
 ///         doc_clause: CdsDocClause::Cr14,
@@ -73,8 +73,8 @@ pub struct CdsTrancheQuote {
     pub maturity: finstack_quant_core::dates::Date,
     /// Upfront payment as a decimal fraction of tranche notional (e.g., -0.025 for -2.5%).
     pub upfront_pct: f64,
-    /// Running spread (bp).
-    pub running_spread_bp: f64,
+    /// Contractual running coupon of the tranche, in basis points.
+    pub coupon_bp: f64,
     /// Convention key (currency + doc clause).
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub convention: CdsConventionKey,
@@ -105,7 +105,7 @@ impl CdsTrancheQuote {
     ///     detachment: 0.07,
     ///     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
     ///     upfront_pct: -0.025,
-    ///     running_spread_bp: 500.0,
+    ///     coupon_bp: 500.0,
     ///     convention: CdsConventionKey {
     ///         currency: Currency::USD,
     ///         doc_clause: CdsDocClause::Cr14,
@@ -137,7 +137,7 @@ impl CdsTrancheQuote {
                 self.upfront_pct
             )));
         }
-        validate::positive(self.running_spread_bp, "running_spread_bp")
+        validate::positive(self.coupon_bp, "coupon_bp")
     }
 
     /// Create a new quote with the running spread bumped.
@@ -171,7 +171,7 @@ impl CdsTrancheQuote {
     ///     detachment: 0.07,
     ///     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
     ///     upfront_pct: -0.025,
-    ///     running_spread_bp: 500.0,
+    ///     coupon_bp: 500.0,
     ///     convention: CdsConventionKey {
     ///         currency: Currency::USD,
     ///         doc_clause: CdsDocClause::Cr14,
@@ -189,7 +189,7 @@ impl CdsTrancheQuote {
     /// Bump by spread in basis points (e.g., `1.0` = 1bp).
     pub fn bump_spread_bp(&self, bump_bp: f64) -> Self {
         let mut quote = self.clone();
-        quote.running_spread_bp += bump_bp;
+        quote.coupon_bp += bump_bp;
         quote
     }
 }

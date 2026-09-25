@@ -630,7 +630,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let cds_id = format!("CDS_{}", i);
         let convention = CdsConvention::IsdaNa;
         let premium = PremiumLegSpec {
-            standard_imm_dates: true,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start: base,
             end: maturity_5y(),
             frequency: convention.frequency(),
@@ -638,7 +638,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             business_day_convention: convention.business_day_convention(),
             calendar_id: None,
             day_count: convention.day_count(),
-            spread_bp: rust_decimal::Decimal::from(100),
+            coupon_bp: rust_decimal::Decimal::from(100),
             discount_curve_id: "USD-OIS".into(),
         };
         let protection = ProtectionLegSpec {
@@ -922,7 +922,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             TrancheSide::BuyProtection,
         )
         .expect("Valid tranche parameters");
-        tranche.standard_imm_dates = true;
+        tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

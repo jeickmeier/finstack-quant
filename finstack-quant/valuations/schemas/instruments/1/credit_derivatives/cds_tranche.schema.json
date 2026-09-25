@@ -4,11 +4,6 @@
       "additionalProperties": false,
       "description": "CDS Tranche instrument definition (boilerplate)",
       "properties": {
-        "accumulated_loss": {
-          "description": "Accumulated realized loss as fraction of original portfolio notional",
-          "format": "double",
-          "type": "number"
-        },
         "attach_pct": {
           "description": "Attachment point in percent (e.g., 0.0 for equity)",
           "format": "double",
@@ -29,6 +24,11 @@
             "string",
             "null"
           ]
+        },
+        "coupon_bp": {
+          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+          "format": "double",
+          "type": "number"
         },
         "credit_index_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -87,10 +87,15 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount of the tranche"
         },
-        "running_coupon_bp": {
-          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+        "realized_loss": {
+          "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
           "format": "double",
           "type": "number"
+        },
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "default": "none",
+          "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -107,10 +112,10 @@
           "$ref": "#/$defs/TrancheSide",
           "description": "Tranche side (buy/sell protection)"
         },
-        "standard_imm_dates": {
-          "default": false,
-          "description": "Whether to enforce standard IMM dates (20th of Mar, Jun, Sep, Dec).\n\nDefaults to `false` so [`Self::new`] and the builder honor\n`ScheduleParams` frequency. Use [`Self::standard`] or set this to\n`true` for IMM rolls.",
-          "type": "boolean"
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`."
         },
         "upfront": {
           "default": null,
@@ -139,13 +144,13 @@
         "detach_pct",
         "notional",
         "maturity",
-        "running_coupon_bp",
+        "coupon_bp",
         "frequency",
         "day_count",
         "discount_curve_id",
         "credit_index_id",
         "side",
-        "accumulated_loss",
+        "realized_loss",
         "attributes"
       ],
       "type": "object"
@@ -154,6 +159,56 @@
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
+    },
+    "RollRule": {
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid).",
+          "type": "string"
+        },
+        {
+          "const": "imm",
+          "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.",
+          "type": "string"
+        },
+        {
+          "const": "cds_imm",
+          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "type": "string"
+        }
+      ]
+    },
+    "StubKind": {
+      "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No stub allowed: start/end must align exactly with the frequency,\notherwise schedule generation returns an error.",
+          "type": "string"
+        },
+        {
+          "const": "short_front",
+          "description": "Short stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "short_back",
+          "description": "Short stub period at the end of the schedule (final step truncated to maturity).",
+          "type": "string"
+        },
+        {
+          "const": "long_front",
+          "description": "Long stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "long_back",
+          "description": "Long stub period at the end of the schedule (merges final two periods).",
+          "type": "string"
+        }
+      ]
     },
     "TrancheSide": {
       "description": "Buyer/seller perspective for CDS tranche premium/protection",
@@ -196,11 +251,11 @@
     {
       "instrument": {
         "spec": {
-          "accumulated_loss": 0.0,
           "attach_pct": 0.0,
           "attributes": {},
           "business_day_convention": "following",
           "calendar_id": null,
+          "coupon_bp": 100.0,
           "credit_index_id": "CDX.NA.IG.HAZARD",
           "day_count": "act_360",
           "detach_pct": 3.0,
@@ -217,10 +272,11 @@
             "amount": "10000000",
             "currency": "USD"
           },
-          "running_coupon_bp": 100.0,
+          "realized_loss": 0.0,
+          "roll_rule": "cds_imm",
           "series": 42,
           "side": "buy_protection",
-          "standard_imm_dates": true,
+          "stub": "short_front",
           "upfront": null
         },
         "type": "cds_tranche"

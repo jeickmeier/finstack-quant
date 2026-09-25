@@ -84,7 +84,7 @@ fn tranche_upfront_frac(
     maturity: Date,
     attach_pct: f64,
     detach_pct: f64,
-    running_coupon_bp: f64,
+    coupon_bp: f64,
     notional: f64,
     market: &MarketContext,
 ) -> f64 {
@@ -96,7 +96,7 @@ fn tranche_upfront_frac(
         .detach_pct(detach_pct)
         .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .maturity(maturity)
-        .running_coupon_bp(running_coupon_bp)
+        .coupon_bp(coupon_bp)
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::Following)
@@ -105,8 +105,8 @@ fn tranche_upfront_frac(
         .credit_index_id(CurveId::from("CDX"))
         .side(TrancheSide::BuyProtection)
         .effective_date_opt(None)
-        .accumulated_loss(0.0)
-        .standard_imm_dates(true)
+        .realized_loss(0.0)
+        .roll_rule(finstack_quant_cashflows::builder::specs::RollRule::CdsImm)
         .attributes(Attributes::new())
         .build()
         .expect("tranche");
@@ -122,7 +122,7 @@ fn tranche_upfront_frac(
 fn fixture_upfronts(
     base_date: Date,
     maturity: Date,
-    running_coupon_bp: f64,
+    coupon_bp: f64,
     notional: f64,
     quote_market: &MarketContext,
 ) -> (f64, f64) {
@@ -132,7 +132,7 @@ fn fixture_upfronts(
             maturity,
             0.0,
             3.0,
-            running_coupon_bp,
+            coupon_bp,
             notional,
             quote_market,
         );
@@ -141,7 +141,7 @@ fn fixture_upfronts(
             maturity,
             3.0,
             7.0,
-            running_coupon_bp,
+            coupon_bp,
             notional,
             quote_market,
         );
@@ -177,14 +177,9 @@ fn base_correlation_step_builds_curve_and_updates_credit_index_data() {
         );
 
     let notional = 1.0;
-    let running_coupon_bp = 100.0;
-    let (upfront_0_3, upfront_3_7) = fixture_upfronts(
-        base_date,
-        maturity,
-        running_coupon_bp,
-        notional,
-        &quote_market,
-    );
+    let coupon_bp = 100.0;
+    let (upfront_0_3, upfront_3_7) =
+        fixture_upfronts(base_date, maturity, coupon_bp, notional, &quote_market);
 
     // Start calibration from a different seed curve to ensure the step updates the context.
     let seed_corr = Arc::new(
@@ -212,7 +207,7 @@ fn base_correlation_step_builds_curve_and_updates_credit_index_data() {
             detachment: 0.03,
             maturity,
             upfront_pct: upfront_0_3,
-            running_spread_bp: running_coupon_bp,
+            coupon_bp,
             convention: CdsConventionKey {
                 currency: Currency::USD,
                 doc_clause: CdsDocClause::IsdaNa,
@@ -226,7 +221,7 @@ fn base_correlation_step_builds_curve_and_updates_credit_index_data() {
             detachment: 0.07,
             maturity,
             upfront_pct: upfront_3_7,
-            running_spread_bp: running_coupon_bp,
+            coupon_bp,
             convention: CdsConventionKey {
                 currency: Currency::USD,
                 doc_clause: CdsDocClause::IsdaNa,
@@ -265,7 +260,7 @@ fn base_correlation_step_builds_curve_and_updates_credit_index_data() {
                 business_day_convention: Some(BusinessDayConvention::Following),
                 calendar_id: None,
                 detachment_points: vec![0.03, 0.07],
-                use_imm_dates: true,
+                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             }),
         }],
     };

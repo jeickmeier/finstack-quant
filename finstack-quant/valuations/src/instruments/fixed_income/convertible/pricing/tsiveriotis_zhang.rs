@@ -12,18 +12,18 @@ use super::valuator::ConvertibleBondValuator;
 /// Uses per-step discount factors from the full term structure instead of
 /// flat-rate discounting. The equity component is discounted at the risk-free
 /// forward rate and the cash component at the recovery-adjusted risky forward
-/// rate, both extracted step-by-step from the respective discount curves.
+/// rate, both extracted step-by-step from the risk-free discount curve and the
+/// issuer hazard curve.
 /// The tree's risk-neutral branch probabilities are recomputed per step from
 /// the same risk-free forwards, so drift and discounting stay consistent on
 /// non-flat curves.
 ///
 /// ## Credit model
 ///
-/// **Credit curve convention**: the supplied `credit_curve_id` curve must
-/// represent ZERO-RECOVERY (pure hazard) risky discounting, i.e.
-/// `risky_df = rf_df * survival_probability`. The recovery blend below is what
-/// converts it to recovery-adjusted discounting. Supplying a market
-/// recovery-adjusted spread curve here would double-count `(1 - R)`.
+/// **Credit curve convention**: `credit_curve_id` names the issuer
+/// `HazardCurve`. The zero-recovery risky forward is
+/// `risky_fwd = rf_fwd × S(t_{i+1}) / S(t_i)`; the recovery blend below
+/// converts it to recovery-adjusted discounting.
 ///
 /// The risky step discount factors are adjusted for recovery:
 ///

@@ -12,6 +12,7 @@ use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::ContextScratch;
 use crate::CalibrationReport;
+use finstack_quant_cashflows::builder::specs::RollRule;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
@@ -186,7 +187,7 @@ impl BaseCorrelationTarget {
             day_count: self.params.day_count,
             business_day_convention: self.params.business_day_convention,
             calendar_id: self.params.calendar_id.clone(),
-            use_imm_dates: self.params.use_imm_dates,
+            roll_rule: self.params.roll_rule,
         }
     }
 
@@ -250,7 +251,11 @@ impl BaseCorrelationTarget {
         }
 
         let expected_detachments = self.normalized_expected_detachments();
-        let maturity_tol_days: i64 = if self.params.use_imm_dates { 40 } else { 7 };
+        let maturity_tol_days: i64 = if self.params.roll_rule == RollRule::CdsImm {
+            40
+        } else {
+            7
+        };
         let time_day_count = self.params.day_count.unwrap_or(DayCount::Act365F);
         let build_ctx = self.build_ctx();
         let overrides = self.build_overrides();
@@ -450,7 +455,7 @@ impl BootstrapTarget for BaseCorrelationTarget {
                 // Fit to the market upfront quote directly (vendor-style).
                 let model_upfront =
                     self.pricer
-                        .calculate_upfront(tranche, ctx, self.params.base_date)?;
+                        .calculate_model_upfront(tranche, ctx, self.params.base_date)?;
                 let market_upfront = upfront.as_ref().map(|m| m.amount()).unwrap_or(0.0);
                 Ok((model_upfront - market_upfront) / self.params.notional)
             },
@@ -545,7 +550,7 @@ mod tests {
             business_day_convention: Some(BusinessDayConvention::Following),
             calendar_id: None,
             detachment_points: vec![3.0, 7.0],
-            use_imm_dates: false,
+            roll_rule: RollRule::None,
         }
     }
 
@@ -651,7 +656,7 @@ mod tests {
             overrides.business_day_convention,
             target.params.business_day_convention
         );
-        assert_eq!(overrides.use_imm_dates, target.params.use_imm_dates);
+        assert_eq!(overrides.roll_rule, target.params.roll_rule);
 
         assert!(target.validate_knot(7.0, 0.5).is_ok());
         assert!(target.validate_knot(7.0, 1.1).is_err());

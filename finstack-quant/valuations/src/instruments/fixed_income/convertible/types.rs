@@ -127,15 +127,15 @@ pub struct ConvertibleBond {
     pub maturity: Date,
     /// Discount curve identifier for the debt component (risk-free or funding).
     pub discount_curve_id: CurveId,
-    /// Credit curve identifier for risky discounting (bond floor).
-    /// If not provided, falls back to discount_curve_id (implies no credit spread).
+    /// Issuer hazard curve identifier (a `HazardCurve`, as on every credit
+    /// instrument). When `None`, the cash component is discounted at the
+    /// risk-free `discount_curve_id` (no credit spread).
     ///
-    /// **Convention**: this curve must represent ZERO-RECOVERY (pure hazard)
-    /// risky discounting, i.e. `risky_df = rf_df * survival_probability`. The
-    /// pricer converts it to recovery-adjusted discounting via the blend
-    /// `risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a
-    /// market recovery-adjusted spread curve here double-counts `(1 - R)` and
-    /// overstates the credit discount.
+    /// The pricer derives the zero-recovery risky discount factor
+    /// `risky_df = rf_df × S(t)` from the curve's survival probabilities and
+    /// blends it with risk-free discounting as `risky × (1 − R) + rf × R`
+    /// using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
+    /// used only to convert spread bumps into hazard shifts for CS01.
     #[builder(optional)]
     pub credit_curve_id: Option<CurveId>,
     /// Conversion terms for equity conversion.
@@ -1101,7 +1101,6 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(credit_curve_id) = &self.credit_curve_id {
-            deps.add_discount_curve(credit_curve_id.clone());
             deps.add_credit_curve(credit_curve_id.clone());
         }
         if let Some(floating_coupon) = &self.floating_coupon {

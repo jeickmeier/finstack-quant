@@ -45,8 +45,8 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Sim
 /// ...     Tranche
 /// ...     .builder()
 /// ...     .id("A")
-/// ...     .attachment_point(0.0)
-/// ...     .detachment_point(100.0)
+/// ...     .attach_pct(0.0)
+/// ...     .detach_pct(100.0)
 /// ...     .seniority("senior")
 /// ...     .original_balance(Money(80_000_000.0, Currency("USD")))
 /// ...     .coupon_fixed(0.05)

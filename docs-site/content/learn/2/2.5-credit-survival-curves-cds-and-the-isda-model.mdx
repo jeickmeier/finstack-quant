@@ -124,14 +124,14 @@ cds_terms = cds['instrument']['spec']
 print({'base_stage_added': sorted(set(base_inputs) - option_ids),
        'cds_terms': {'id': cds_terms['id'], 'currency': cds_terms['notional']['currency'],
                      'notional': cds_terms['notional']['amount'],
-                     'spread_bp': cds_terms['premium']['spread_bp'],
+                     'spread_bp': cds_terms['premium']['coupon_bp'],
                      'discount_curve': cds_terms['premium']['discount_curve_id'],
                      'credit_curve': cds_terms['protection']['credit_curve_id']}})
 priced = price_instrument(CreditDefaultSwap.from_json(json.dumps(cds)), market, AS_OF,
     metrics=['par_spread', 'cs01', 'bucketed_cs01', 'protection_leg_pv', 'premium_leg_pv', 'risky_annuity'])
 par_spread_bp = priced.get_metric('par_spread')
 par = copy.deepcopy(cds)
-par['instrument']['spec']['premium']['spread_bp'] = str(par_spread_bp)
+par['instrument']['spec']['premium']['coupon_bp'] = str(par_spread_bp)
 notional = float(cds['instrument']['spec']['notional']['amount'])
 upfront_pv_fraction = priced.price / notional
 boundaries = [date(year, month, 20) for year in range(2025, 2031) for month in (3, 6, 9, 12)
@@ -207,12 +207,13 @@ The native premium/protection builders expose recovery, calendar and start/end d
 from datetime import date
 import json
 from finstack_quant.core.dates import Tenor,DayCount,next_cds_date,next_imm
+from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.money import Money
 from finstack_quant.calibration import calibrate
 from finstack_quant.valuations.instruments import CreditDefaultSwap,PremiumLegSpec,ProtectionLegSpec,price_instrument
 from _shared.analyst_book import calibration_envelope
 AS_OF = date(2025, 1, 15)
-premium=PremiumLegSpec('2025-03-20','2030-03-20',Tenor.quarterly(),DayCount.ACT_360,100.,'USD-OIS',calendar_id='usny',business_day_convention='following')
+premium=PremiumLegSpec('2025-03-20','2030-03-20',Tenor.quarterly(),DayCount.ACT_360,100.,'USD-OIS',calendar_id='usny',business_day_convention='following',roll_rule=RollRule.CDS_IMM)
 protection=ProtectionLegSpec('ACME-HZD',.4,3)
 cds=(CreditDefaultSwap.builder().id('TYPED-ACME-CDS').notional(Money(1_000_000,'USD')).side('pay')
  .convention('isda_na').premium(premium).protection(protection).build())

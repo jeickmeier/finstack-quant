@@ -3,6 +3,7 @@
 use crate::build::helpers::{resolve_calendar, resolve_spot_date};
 use crate::build::BuildCtx;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
+use finstack_quant_cashflows::builder::specs::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::{
     adjust, next_cds_date, BusinessDayConvention, DateExt, DayCount, Tenor,
@@ -48,11 +49,12 @@ pub struct CDSTrancheBuildOverrides {
     ///
     /// If `None`, uses the calendar ID from the CDS convention.
     pub calendar_id: Option<String>,
-    /// Whether to use standard IMM dates for the schedule.
+    /// Coupon roll-date grid for the built tranche.
     ///
-    /// When `true`, payment dates are aligned to IMM dates (20th of Mar/Jun/Sep/Dec).
-    /// When `false`, payment dates follow the standard schedule calculation.
-    pub use_imm_dates: bool,
+    /// `CdsImm` aligns payment dates to CDS IMM dates (20th of
+    /// Mar/Jun/Sep/Dec); `None` follows the convention frequency and stub.
+    /// `Imm` is rejected.
+    pub roll_rule: RollRule,
 }
 
 impl Default for CDSTrancheBuildOverrides {
@@ -62,7 +64,7 @@ impl Default for CDSTrancheBuildOverrides {
             day_count: None,
             business_day_convention: None,
             calendar_id: None,
-            use_imm_dates: true,
+            roll_rule: RollRule::CdsImm,
         }
     }
 }
@@ -128,7 +130,7 @@ impl Default for CDSTrancheBuildOverrides {
 ///     detachment: 0.07,   // 7%
 ///     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
 ///     upfront_pct: -0.025, // -2.5% upfront (decimal fraction)
-///     running_spread_bp: 500.0,
+///     coupon_bp: 500.0,
 ///     convention: CdsConventionKey {
 ///         currency: Currency::USD,
 ///         doc_clause: CdsDocClause::Cr14,
@@ -162,7 +164,7 @@ pub fn build_cds_tranche_instrument(
     let attachment = quote.attachment;
     let detachment = quote.detachment;
     let maturity = quote.maturity;
-    let running_spread_bp = quote.running_spread_bp;
+    let coupon_bp = quote.coupon_bp;
     let upfront_pct = quote.upfront_pct;
 
     let conv = registry.resolve_cds(convention_key)?;
@@ -200,7 +202,7 @@ pub fn build_cds_tranche_instrument(
     }
 
     // `upfront_pct` is expressed as a decimal fraction (e.g. -0.025 means -2.5% of tranche notional).
-    let upfront_payment = (upfront_pct.abs() > 0.0)
+    let upfront = (upfront_pct.abs() > 0.0)
         .then(|| {
             Ok::<_, finstack_quant_core::Error>((
                 spot,
@@ -209,17 +211,25 @@ pub fn build_cds_tranche_instrument(
         })
         .transpose()?;
 
-    let (effective_date, maturity_date, standard_imm_dates) = if overrides.use_imm_dates {
-        // CDS-style effective date (prior IMM) and IMM-aligned maturity.
-        let roll_anchor = spot.add_months(-3);
-        let effective_date = next_cds_date(roll_anchor);
-        // Use unadjusted maturity date for IMM roll selection to prevent BDC
-        // from pushing the date past the 20th into the next quarter.
-        let maturity_imm = next_cds_date(maturity - time::Duration::days(1));
-        (effective_date, maturity_imm, true)
-    } else {
-        let maturity_adj = adjust(maturity, conv.business_day_convention, cal)?;
-        (spot, maturity_adj, false)
+    let (effective_date, maturity_date) = match overrides.roll_rule {
+        RollRule::CdsImm => {
+            // CDS-style effective date (prior IMM) and IMM-aligned maturity.
+            let roll_anchor = spot.add_months(-3);
+            let effective_date = next_cds_date(roll_anchor);
+            // Use unadjusted maturity date for IMM roll selection to prevent BDC
+            // from pushing the date past the 20th into the next quarter.
+            let maturity_imm = next_cds_date(maturity - time::Duration::days(1));
+            (effective_date, maturity_imm)
+        }
+        RollRule::None => {
+            let maturity_adj = adjust(maturity, conv.business_day_convention, cal)?;
+            (spot, maturity_adj)
+        }
+        other => {
+            return Err(Error::Validation(format!(
+                "CDS tranche roll_rule must be cds_imm or none, got {other:?}"
+            )));
+        }
     };
 
     let tranche_params = CDSTrancheParams {
@@ -229,8 +239,8 @@ pub fn build_cds_tranche_instrument(
         detach_pct: detachment * 100.0, // Params expect percent
         notional: Money::new(notional_amt, convention_key.currency)?,
         maturity: maturity_date,
-        running_coupon_bp: running_spread_bp,
-        accumulated_loss: 0.0,
+        coupon_bp,
+        realized_loss: 0.0,
     };
 
     let schedule_params = ScheduleParams {
@@ -247,7 +257,7 @@ pub fn build_cds_tranche_instrument(
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+        roll_rule: overrides.roll_rule,
     };
 
     // Quote-built tranches are constructed as buy-protection (pay premium),
@@ -262,9 +272,8 @@ pub fn build_cds_tranche_instrument(
         CurveId::new(credit_id),
         side,
     )?;
-    instrument.standard_imm_dates = standard_imm_dates;
     instrument.effective_date = Some(effective_date);
-    instrument.upfront = upfront_payment;
+    instrument.upfront = upfront;
 
     Ok(Box::new(instrument))
 }
@@ -302,12 +311,12 @@ mod tests {
             detachment: 0.07,
             maturity,
             upfront_pct: -0.025, // -2.5% as decimal fraction
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: convention_key.clone(),
         };
 
         let overrides = CDSTrancheBuildOverrides {
-            use_imm_dates: false,
+            roll_rule: RollRule::None,
             ..CDSTrancheBuildOverrides::default()
         };
 
@@ -318,7 +327,7 @@ mod tests {
             .downcast_ref::<CDSTranche>()
             .expect("should be CDSTranche");
 
-        assert!(!tranche.standard_imm_dates);
+        assert_eq!(tranche.roll_rule, RollRule::None);
 
         let conv = ConventionRegistry::try_global()
             .expect("registry")
@@ -364,7 +373,7 @@ mod tests {
             detachment: 0.07,
             maturity,
             upfront_pct: -0.025, // -2.5% as decimal fraction
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: convention_key,
         };
 
@@ -419,7 +428,7 @@ mod tests {
             detachment: 0.07,
             maturity,
             upfront_pct: -2.5, // WRONG: this is percentage-point notation
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: convention_key,
         };
 
@@ -459,7 +468,7 @@ mod tests {
             detachment: 0.07,
             maturity,
             upfront_pct: 0.0, // No upfront
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: convention_key,
         };
 

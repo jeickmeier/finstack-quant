@@ -60,8 +60,9 @@ rejected with no compatibility fallback.
 - **`CleanPricePct`** — percentage-price points. `{"clean_price_pct": "107.0"}`
   means a clean-price fraction `K = 1.07`. CDX HY index options quote this way.
   A price strike requires an index underlying (`underlying_is_index`),
-  no-knockout terms, an explicit `underlying_cds_coupon`, the current index
-  factor `f` (`index_factor`), and the original strike factor `f0`
+  no-knockout terms, an explicit running coupon `coupon_bp` (in bp), the
+  current index factor `f` (`index_factor`, default `1.0`), and the original
+  strike factor `f0`
   (`strike_index_factor`). `f0` is never inferred from `f` after a default,
   because settled defaults reduce `f` below `f0`.
 

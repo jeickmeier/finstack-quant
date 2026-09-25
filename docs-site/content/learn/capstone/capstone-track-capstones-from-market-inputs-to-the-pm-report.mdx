@@ -93,7 +93,7 @@ from _shared import analyst_tracks as tracks
 from _shared.analyst_history import history_market, history_quotes, history_events
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.market_data import DiscountCurve,FxMatrix,PriceCurve,VolSurface
+from finstack_quant.core.market_data import DiscountCurve,FxMatrix,HazardCurve,PriceCurve,VolSurface
 from finstack_quant.portfolio import Portfolio,value_portfolio,brinson_fachler,carino_link,twrr_linked
 from finstack_quant.valuations.instruments import price_instrument,structured_credit_tranche_metrics
 AS_OF = date(2025, 1, 15)
@@ -226,7 +226,6 @@ def capstone_scenario_value(shock):
     for curve in snapshot["curves"]:
         if curve["type"]=="discount":
             shift=eur if curve["id"]=="EUR-OIS" else usd
-            if curve["id"]=="CONVERT-RISKY":shift+=.025*math.expm1(hazard)
             curve["knot_points"]=[[t,df*math.exp(-shift*t)] for t,df in curve["knot_points"]]
             curve.pop("rate_calibration",None)
         elif curve["type"]=="forward":
@@ -325,7 +324,7 @@ for quote in index_calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=.015
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=100.0
 stress.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
-stress.insert(DiscountCurve("CONVERT-RISKY",AS_OF,[(t,math.exp(-.095*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
+stress.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.055)],recovery_rate=0.))
 stress.insert_price("CONVERT",80.,"USD")
 stressed_deal=deepcopy(holding["deal"])
 stressed_deal["instrument"]["spec"].update({"default_spec":{"cdr":.05,"curve":None},
@@ -373,8 +372,7 @@ for quote in index_calibration["market_data"]:
     elif quote["kind"]=="cds_quote":quote["spread_bp"]+=credit_change_bp
 replay_market.insert(calibrate(index_calibration).market.get_hazard("CDX-HAZ"))
 replay_market.insert_price("CONVERT",100*equity_ratio,"USD")
-replay_market.insert(DiscountCurve("CONVERT-RISKY",AS_OF,
-    [(t,math.exp(-(.065+rate_change+credit_change_bp/10000)*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
+replay_market.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.025+credit_change_bp/10000)],recovery_rate=0.))
 replay_native=value_portfolio(book,replay_market,metrics=[])
 replay_wire=json.loads(replay_native.to_json())
 replay_bbb=holding["quantity"]*structured_credit_tranche_metrics(json.dumps(holding["deal"]),"BBB",replay_market,AS_OF).pv
@@ -723,7 +721,7 @@ from _shared import analyst_tracks as tracks
 from _shared.analyst_history import history_market, history_quotes, history_events
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.market_data import DiscountCurve,FxMatrix,PriceCurve,VolSurface
+from finstack_quant.core.market_data import DiscountCurve,FxMatrix,HazardCurve,PriceCurve,VolSurface
 from finstack_quant.portfolio import Portfolio,value_portfolio,brinson_fachler,carino_link,twrr_linked
 from finstack_quant.valuations.instruments import price_instrument
 AS_OF = date(2025, 1, 15)
@@ -851,7 +849,6 @@ def capstone_scenario_value(shock):
     for curve in snapshot["curves"]:
         if curve["type"]=="discount":
             shift=eur if curve["id"]=="EUR-OIS" else usd
-            if curve["id"]=="CONVERT-RISKY":shift+=.025*math.expm1(hazard)
             curve["knot_points"]=[[t,df*math.exp(-shift*t)] for t,df in curve["knot_points"]]
             curve.pop("rate_calibration",None)
         elif curve["type"]=="forward":

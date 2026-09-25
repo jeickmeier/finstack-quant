@@ -3163,6 +3163,23 @@
           "$ref": "#/$defs/PayReceive",
           "description": "Protection buyer/seller perspective"
         },
+        "upfront": {
+          "description": "Contractual upfront payment `(payment date, amount)` on the index\nnotional. A positive amount is paid by the protection buyer to the\nseller; a negative amount by the seller to the buyer. It is\ndiscounted from its payment date and dropped once that date is before\nthe valuation date.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "version": {
           "description": "Version number within series",
           "format": "uint16",
@@ -3225,6 +3242,18 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Underlying CDS maturity date"
         },
+        "coupon_bp": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
+        },
         "credit_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Credit curve identifier"
@@ -3257,12 +3286,10 @@
           "description": "Unique instrument identifier"
         },
         "index_factor": {
-          "description": "Optional index factor scaling for the index underlying.\n\nThis is the **current** index factor `f` at valuation. See\n[`Self::strike_index_factor`] for the original factor `f0` attached\nto a clean-price strike.",
+          "default": 1.0,
+          "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
           "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": "number"
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -3301,13 +3328,11 @@
           "default": "spot",
           "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_effective_date` is not explicitly supplied."
         },
-        "realized_index_loss": {
-          "description": "Realized cumulative index loss from option inception to valuation\ndate, expressed per unit of original index notional.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this unset.",
+        "realized_loss": {
+          "default": 0.0,
+          "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
           "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": "number"
         },
         "recovery_rate": {
           "description": "Recovery rate assumption",
@@ -3333,18 +3358,6 @@
             "number",
             "null"
           ]
-        },
-        "underlying_cds_coupon": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Contractual coupon `c` of the underlying CDS, expressed as a decimal\nrate (e.g., 0.01 for the 100 bp standard CDX coupon, 0.05 for the\n500 bp standard CDX.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
         },
         "underlying_convention": {
           "$ref": "#/$defs/CdsConvention",
@@ -3423,11 +3436,6 @@
       "additionalProperties": false,
       "description": "CDS Tranche instrument definition (boilerplate)",
       "properties": {
-        "accumulated_loss": {
-          "description": "Accumulated realized loss as fraction of original portfolio notional",
-          "format": "double",
-          "type": "number"
-        },
         "attach_pct": {
           "description": "Attachment point in percent (e.g., 0.0 for equity)",
           "format": "double",
@@ -3448,6 +3456,11 @@
             "string",
             "null"
           ]
+        },
+        "coupon_bp": {
+          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+          "format": "double",
+          "type": "number"
         },
         "credit_index_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -3506,10 +3519,15 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount of the tranche"
         },
-        "running_coupon_bp": {
-          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+        "realized_loss": {
+          "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
           "format": "double",
           "type": "number"
+        },
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "default": "none",
+          "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -3526,10 +3544,10 @@
           "$ref": "#/$defs/TrancheSide",
           "description": "Tranche side (buy/sell protection)"
         },
-        "standard_imm_dates": {
-          "default": false,
-          "description": "Whether to enforce standard IMM dates (20th of Mar, Jun, Sep, Dec).\n\nDefaults to `false` so [`Self::new`] and the builder honor\n`ScheduleParams` frequency. Use [`Self::standard`] or set this to\n`true` for IMM rolls.",
-          "type": "boolean"
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`."
         },
         "upfront": {
           "default": null,
@@ -3558,13 +3576,13 @@
         "detach_pct",
         "notional",
         "maturity",
-        "running_coupon_bp",
+        "coupon_bp",
         "frequency",
         "day_count",
         "discount_curve_id",
         "credit_index_id",
         "side",
-        "accumulated_loss",
+        "realized_loss",
         "attributes"
       ],
       "type": "object"
@@ -7199,7 +7217,7 @@
               "type": "null"
             }
           ],
-          "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread).\n\n**Convention**: this curve must represent ZERO-RECOVERY (pure hazard)\nrisky discounting, i.e. `risky_df = rf_df * survival_probability`. The\npricer converts it to recovery-adjusted discounting via the blend\n`risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a\nmarket recovery-adjusted spread curve here double-counts `(1 - R)` and\noverstates the credit discount."
+          "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -17794,6 +17812,10 @@
             "null"
           ]
         },
+        "coupon_bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Contractual running coupon in basis points (e.g., `100` = 1% per\nannum, the standard CDX.NA.IG coupon; `500` for high yield)."
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day count convention"
@@ -17810,13 +17832,9 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Payment frequency"
         },
-        "spread_bp": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Fixed spread in basis points (e.g., 100 = 100bp = 1%)"
-        },
-        "standard_imm_dates": {
-          "description": "Whether to use the standard quarterly CDS roll grid (20 March,\nJune, September and December), including a final maturity stub.\nRequires quarterly `frequency` and `ShortFront` `stub`. Set false\nfor bespoke schedules generated from the supplied frequency/stub.",
-          "type": "boolean"
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "description": "Premium roll-date grid. `cds_imm` selects the standard quarterly CDS\nroll grid (20 March, June, September and December), including a final\nmaturity stub, and requires quarterly `frequency` and `short_front`\n`stub`. `none` generates a bespoke schedule from the supplied\n`frequency` and `stub`. The equity-futures `imm` grid is rejected."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -17829,12 +17847,12 @@
         }
       },
       "required": [
-        "standard_imm_dates",
+        "roll_rule",
         "start",
         "end",
         "frequency",
         "day_count",
-        "spread_bp",
+        "coupon_bp",
         "discount_curve_id"
       ],
       "type": "object"
@@ -18179,10 +18197,10 @@
       "properties": {
         "credit_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Credit curve identifier for default probabilities"
+          "description": "Hazard curve identifier for default probabilities"
         },
         "recovery_rate": {
-          "description": "Recovery rate (0.0 to 1.0)",
+          "description": "Recovery rate as a decimal fraction in `[0.0, 1.0)`",
           "format": "double",
           "type": "number"
         },
@@ -22689,7 +22707,7 @@
       "additionalProperties": false,
       "description": "Structured credit tranche with attachment/detachment points",
       "properties": {
-        "attachment_point": {
+        "attach_pct": {
           "description": "Lower structural boundary as a percent of the capital structure\n(`0.0` for the first-loss class). `None` until\n[`TrancheStructure::new`] derives it from the balance shares in\npayment-priority order; a declared value must match that share\nwithin the structure's thickness tolerance.",
           "format": "double",
           "type": [
@@ -22717,8 +22735,8 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Accumulated deferred interest (if payment has been deferred)"
         },
-        "detachment_point": {
-          "description": "Upper structural boundary as a percent of the capital structure\n(`100.0` for the most senior class); derived like\n[`Self::attachment_point`] when `None`.",
+        "detach_pct": {
+          "description": "Upper structural boundary as a percent of the capital structure\n(`100.0` for the most senior class); derived like\n[`Self::attach_pct`](field@Self::attach_pct) when `None`.",
           "format": "double",
           "type": [
             "number",

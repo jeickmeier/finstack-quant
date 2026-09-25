@@ -29,7 +29,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use rust_decimal::Decimal;
 
 /// Price the CDS option at `as_of` under the Bloomberg CDSO numerical
 /// quadrature model.
@@ -247,11 +246,10 @@ pub(crate) fn synthetic_underlying_cds(
     // The contractual coupon `c` of the underlying CDS — for CDX it is
     // 100 bp; for single-name SNAC it is the strike spread. Clean-price
     // strikes require an explicit coupon.
-    let coupon_decimal = option.effective_underlying_cds_coupon()?;
-    let spread_bp = coupon_decimal * Decimal::new(10_000, 0);
+    let coupon_bp = option.effective_coupon_bp()?;
 
     let notional_scale = if option.underlying_is_index {
-        option.index_factor.unwrap_or(1.0)
+        option.index_factor
     } else {
         1.0
     };
@@ -264,7 +262,7 @@ pub(crate) fn synthetic_underlying_cds(
         )?,
         PayReceive::Pay,
         option.underlying_convention,
-        spread_bp,
+        coupon_bp,
         option.effective_underlying_effective_date(as_of),
         option.cds_maturity,
         option.recovery_rate,
@@ -456,7 +454,7 @@ mod settlement_and_sigma_tests {
         .expect("valid factor")
         .with_strike_index_factor(1.0)
         .expect("valid strike factor")
-        .with_underlying_cds_coupon(Decimal::new(5, 2));
+        .with_coupon_bp(Decimal::new(500, 0));
         let credit = CreditParams::corporate_standard("HY", "HZ-SN");
         CDSOption::new("CDSO-HY-SIGMA", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid option")

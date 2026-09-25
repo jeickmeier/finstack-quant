@@ -441,10 +441,10 @@ def test_instrument_cds_renders_credit_blocks() -> None:
             "notional": {"amount": "10000000", "currency": "USD"},
             "side": "pay",
             "premium": {
-                "standard_imm_dates": True,
+                "roll_rule": "cds_imm",
                 "start": "2024-06-20",
                 "end": "2029-06-20",
-                "spread_bp": "100",
+                "coupon_bp": "100",
                 "frequency": {"count": 3, "unit": "months"},
             },
             "protection": {"credit_curve_id": "ACME-SR", "recovery_rate": 0.4},

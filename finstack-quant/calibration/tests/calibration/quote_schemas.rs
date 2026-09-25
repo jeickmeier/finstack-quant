@@ -62,20 +62,20 @@ fn cds_quote_id_and_bump_semantics() {
             doc_clause: CdsDocClause::Cr14,
         },
         pillar: Pillar::Tenor("5Y".parse().unwrap()),
-        running_spread_bp: 500.0,
+        coupon_bp: 500.0,
         upfront_pct: 0.02,
         recovery_rate: 0.40,
     };
     let bumped2 = q2.bump_spread_decimal(0.0002); // +2bp
     match bumped2 {
         CdsQuote::CdsUpfront {
-            running_spread_bp,
+            coupon_bp,
             upfront_pct,
             ..
         } => {
             assert!(
-                (running_spread_bp - 502.0).abs() < tolerances::TIGHT,
-                "running spread mismatch: expected 502.0, got {running_spread_bp}"
+                (coupon_bp - 502.0).abs() < tolerances::TIGHT,
+                "running spread mismatch: expected 502.0, got {coupon_bp}"
             );
             assert!(
                 (upfront_pct - 0.02).abs() < tolerances::TIGHT,
@@ -96,7 +96,7 @@ fn cds_tranche_quote_id_and_bump_semantics() {
         detachment: 0.07,
         maturity: d(2029, time::Month::June, 20),
         upfront_pct: -2.5,
-        running_spread_bp: 500.0,
+        coupon_bp: 500.0,
         convention: CdsConventionKey {
             currency: Currency::USD,
             doc_clause: CdsDocClause::Cr14,
@@ -106,9 +106,9 @@ fn cds_tranche_quote_id_and_bump_semantics() {
 
     let bumped = q.bump_spread_decimal(0.0001);
     assert!(
-        (bumped.running_spread_bp - 501.0).abs() < tolerances::TIGHT,
+        (bumped.coupon_bp - 501.0).abs() < tolerances::TIGHT,
         "running spread mismatch: expected 501.0, got {}",
-        bumped.running_spread_bp
+        bumped.coupon_bp
     );
     assert!(
         (bumped.upfront_pct + 2.5).abs() < tolerances::TIGHT,
@@ -153,7 +153,7 @@ fn spread_bump_bp_decimal_parity_for_cds_and_tranche() {
         detachment: 0.10,
         maturity: d(2030, time::Month::June, 20),
         upfront_pct: -1.25,
-        running_spread_bp: 400.0,
+        coupon_bp: 400.0,
         convention: CdsConventionKey {
             currency: Currency::USD,
             doc_clause: CdsDocClause::Cr14,
@@ -161,16 +161,8 @@ fn spread_bump_bp_decimal_parity_for_cds_and_tranche() {
     };
     let tranche_decimal = tranche.bump_spread_decimal(0.0001);
     let tranche_bp = tranche.bump_spread_bp(1.0);
-    let (
-        CdsTrancheQuote {
-            running_spread_bp: dec,
-            ..
-        },
-        CdsTrancheQuote {
-            running_spread_bp: bp,
-            ..
-        },
-    ) = (tranche_decimal, tranche_bp);
+    let (CdsTrancheQuote { coupon_bp: dec, .. }, CdsTrancheQuote { coupon_bp: bp, .. }) =
+        (tranche_decimal, tranche_bp);
     assert!(
         (dec - bp).abs() < tolerances::TIGHT,
         "tranche decimal/bp bump mismatch: decimal {dec}, bp {bp}"
@@ -325,7 +317,7 @@ fn quote_serialization_roundtrip() {
         detachment: 0.07,
         maturity: d(2029, time::Month::June, 20),
         upfront_pct: -2.5,
-        running_spread_bp: 500.0,
+        coupon_bp: 500.0,
         convention: CdsConventionKey {
             currency: Currency::USD,
             doc_clause: CdsDocClause::Cr14,
@@ -335,13 +327,13 @@ fn quote_serialization_roundtrip() {
     let tranche_parsed: CdsTrancheQuote =
         serde_json::from_str(&tranche_json).expect("deserialize tranche");
     let CdsTrancheQuote {
-        running_spread_bp,
+        coupon_bp,
         upfront_pct,
         ..
     } = tranche_parsed;
     assert!(
-        (running_spread_bp - 500.0).abs() < tolerances::TIGHT,
-        "tranche roundtrip spread mismatch: expected 500.0, got {running_spread_bp}"
+        (coupon_bp - 500.0).abs() < tolerances::TIGHT,
+        "tranche roundtrip spread mismatch: expected 500.0, got {coupon_bp}"
     );
     assert!(
         (upfront_pct + 2.5).abs() < tolerances::TIGHT,
@@ -463,7 +455,7 @@ fn quote_denies_unknown_fields() {
       "detachment": 0.07,
       "maturity": "2029-06-20",
       "upfront_pct": -2.5,
-      "running_spread_bp": 500.0,
+      "coupon_bp": 500.0,
       "convention": { "currency": "USD", "doc_clause": "cr14" },
       "extra": "nope"
     }"#;

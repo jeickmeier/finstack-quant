@@ -133,13 +133,11 @@ impl CDSIndexPricer {
     ///
     /// NPV is computed by delegating to `CDSPricer::npv_full` per resolved
     /// position (one synthetic CDS in `SingleCurve` mode, N constituents
-    /// otherwise) and then summing. The index-level upfront override
-    /// (`pricing_overrides.market_quotes.upfront_payment`) is applied once at
-    /// the aggregate, with the same sign convention used by `CDSPricer::npv_full`
-    /// for single-name CDS upfronts.
-    ///
-    /// `CDSIndex` does not currently model a dated upfront (`Option<(Date, Money)>`)
-    /// — only the already-discounted PV-adjustment override is honored.
+    /// otherwise) and then summing. The contractual index upfront
+    /// (`CDSIndex.upfront`) is discounted from its payment date on the
+    /// premium discount curve and applied once at the aggregate, with the same
+    /// sign convention used by `CDSPricer::npv_full` for single-name CDS
+    /// upfronts. Upfronts paid before `as_of` are dropped.
     pub(crate) fn npv_detailed(
         &self,
         index: &CDSIndex,
@@ -156,11 +154,11 @@ impl CDSIndexPricer {
                 Money::new(raw, cds.notional.currency())
             },
         )?;
-        if let Some(upfront) = index
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment
-        {
+        if let Some((date, amount)) = index.upfront.filter(|(date, _)| *date >= as_of) {
+            let df = curves
+                .get_discount(index.premium.discount_curve_id.as_str())?
+                .df_between_dates(as_of, date)?;
+            let upfront = Money::new(amount.amount() * df, amount.currency())?;
             result.total = match index.side {
                 PayReceive::Pay => result.total.checked_sub(upfront)?,
                 PayReceive::Receive => result.total.checked_add(upfront)?,
@@ -750,15 +748,10 @@ impl CDSIndexPricer {
     }
 
     fn synthetic_cds(&self, index: &CDSIndex) -> Result<CreditDefaultSwap> {
-        // `to_synthetic_cds()` already applies `index_factor` to notional.
-        let mut cds = index.to_synthetic_cds()?;
-        // The index applies its `upfront_payment` override once at the
-        // aggregate level in `npv_detailed`; clear it on the synthetic CDS
-        // so `CDSPricer::npv_full` does not subtract it a second time.
-        cds.instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment = None;
-        Ok(cds)
+        // `to_synthetic_cds()` already applies `index_factor` to notional and
+        // leaves the synthetic CDS without an upfront: the index applies its
+        // own upfront once at the aggregate level in `npv_detailed`.
+        index.to_synthetic_cds()
     }
 
     fn project_cds_flows(
@@ -801,7 +794,7 @@ impl CDSIndexPricer {
                 let delta_default = (prev_survival - current_survival).max(0.0);
                 let conditional_default = delta_default / conditioning_survival;
                 let conditional_survival = current_survival / conditioning_survival;
-                let projected_survival = if self.cds_config.include_accrual {
+                let projected_survival = if self.cds_config.include_accrual_on_default {
                     conditional_survival + 0.5 * conditional_default
                 } else {
                     conditional_survival
@@ -1026,16 +1019,15 @@ mod tests {
     }
 
     #[test]
-    fn upfront_override_respects_pay_receive_sign() {
+    fn upfront_respects_pay_receive_sign() {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
         let pricer = CDSIndexPricer::new();
         let upfront = Money::from((125_000_i64, Currency::USD));
 
+        // Paid on the valuation date, so the discount factor is exactly 1.
         let mut pay = CDSIndex::example();
-        pay.instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment = Some(upfront);
+        pay.upfront = Some((as_of, upfront));
         let pay_base = pricer
             .npv(&CDSIndex::example(), &market, as_of)
             .expect("base pay npv");
@@ -1046,10 +1038,7 @@ mod tests {
         let mut receive = CDSIndex::example();
         receive.side = crate::instruments::credit_derivatives::cds::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
-        receive_with_upfront
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment = Some(upfront);
+        receive_with_upfront.upfront = Some((as_of, upfront));
         let receive_base = pricer
             .npv(&receive, &market, as_of)
             .expect("base receive npv");

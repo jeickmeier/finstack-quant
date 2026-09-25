@@ -484,6 +484,54 @@ fn parallel_bump_rejects_negative_shift_that_crosses_zero_hazard() {
         "unexpected error: {err}"
     );
 }
+#[test]
+fn triangular_key_rate_bumps_partition_the_parallel_hazard_shift() {
+    use crate::market_data::bumps::Bumpable;
+
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let curve = HazardCurve::builder("KR")
+        .base_date(base)
+        .knots([(1.0, 0.010), (2.0, 0.012), (5.0, 0.015), (10.0, 0.020)])
+        .recovery_rate(0.40)
+        .build()
+        .expect("valid hazard curve");
+    let buckets = [1.0, 3.0, 5.0, 10.0];
+    let spec_for = |i: usize| match i {
+        0 => BumpSpec::triangular_key_rate_first_bp(buckets[0], buckets[1], 10.0),
+        3 => BumpSpec::triangular_key_rate_last_bp(buckets[2], buckets[3], 10.0),
+        _ => BumpSpec::triangular_key_rate_bp(buckets[i - 1], buckets[i], buckets[i + 1], 10.0),
+    };
+    let parallel = curve
+        .apply_bump(BumpSpec::parallel_bp(10.0))
+        .expect("parallel bump");
+
+    // Knot-wise the bucket shifts are w_b(t_i) * s / (1 - R); the weights sum
+    // to one at every knot, so the bucket shifts add up to the parallel one.
+    let mut summed = [0.0; 4];
+    for i in 0..buckets.len() {
+        let bumped = curve.apply_bump(spec_for(i)).expect("key-rate bump");
+        for (k, ((_, base_lambda), (_, lambda))) in
+            curve.knot_points().zip(bumped.knot_points()).enumerate()
+        {
+            summed[k] += lambda - base_lambda;
+        }
+    }
+    for (k, ((_, base_lambda), (_, lambda))) in
+        curve.knot_points().zip(parallel.knot_points()).enumerate()
+    {
+        assert!(
+            (summed[k] - (lambda - base_lambda)).abs() < 1e-15,
+            "knot {k}: {} vs {}",
+            summed[k],
+            lambda - base_lambda
+        );
+    }
+    // The 2y knot sits between the 1y and 3y buckets: half of the shift each.
+    let first = curve.apply_bump(spec_for(0)).expect("first bucket");
+    let lambda_2y = first.knot_points().nth(1).expect("2y knot").1;
+    assert!((lambda_2y - (0.012 + 0.5 * 0.0010 / 0.60)).abs() < 1e-15);
+}
+
 mod seniority_tests {
     use super::Seniority;
 

@@ -44,7 +44,7 @@ fn test_build_cds_par_spread() {
 
     if let Some(cds) = instrument.as_any().downcast_ref::<CreditDefaultSwap>() {
         assert_eq!(cds.notional.currency(), Currency::USD);
-        assert_eq!(cds.premium.spread_bp, Decimal::from(120));
+        assert_eq!(cds.premium.coupon_bp, Decimal::from(120));
         assert_eq!(cds.protection.recovery_rate, 0.40);
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
         assert_eq!(cds.doc_clause, Some(CdsDocClause::IsdaNa));
@@ -75,7 +75,7 @@ fn test_build_cds_upfront() {
         entity: "XYZ-CORP-SNR".to_string(),
         convention: key,
         pillar: Pillar::Tenor(Tenor::parse("5Y").unwrap()),
-        running_spread_bp: 100.0,
+        coupon_bp: 100.0,
         upfront_pct: 0.02, // 2% upfront
         recovery_rate: 0.40,
     };
@@ -83,7 +83,7 @@ fn test_build_cds_upfront() {
     let instrument = build_cds_instrument(&quote, &ctx).expect("build cds upfront");
 
     if let Some(cds) = instrument.as_any().downcast_ref::<CreditDefaultSwap>() {
-        assert_eq!(cds.premium.spread_bp, Decimal::from(100)); // Running
+        assert_eq!(cds.premium.coupon_bp, Decimal::from(100)); // Running
         assert!(cds.upfront.is_some());
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
         assert_eq!(cds.doc_clause, Some(CdsDocClause::IsdaNa));

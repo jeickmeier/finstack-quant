@@ -41,9 +41,9 @@ fn create_cds_option(
         notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         settlement: finstack_quant_valuations::instruments::SettlementType::Cash,
         underlying_is_index: false,
-        index_factor: None,
+        index_factor: 1.0,
         strike_index_factor: None,
-        underlying_cds_coupon: None,
+        coupon_bp: None,
         protection_start_convention: ProtectionStartConvention::Forward,
     };
 
@@ -66,8 +66,8 @@ fn create_cds_option(
 fn create_index_cds_option() -> CDSOption {
     let mut option = create_cds_option(OptionType::Call, 1, 5);
     option.underlying_is_index = true;
-    option.index_factor = Some(1.0);
-    option.underlying_cds_coupon = Some(Decimal::new(1, 2));
+    option.index_factor = 1.0;
+    option.coupon_bp = Some(Decimal::new(100, 0));
     option.protection_start_convention = ProtectionStartConvention::Spot;
     option.knockout = false;
     option

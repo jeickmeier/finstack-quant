@@ -384,7 +384,7 @@ impl CreditDefaultSwap {
     ///
     /// Returns an error when the instrument is invalid, required curves are
     /// missing, recovery assumptions conflict, or par-spread pricing fails.
-    pub fn get_par_spread(
+    pub fn par_spread(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
@@ -407,7 +407,7 @@ impl CreditDefaultSwap {
         let business_day_convention = convention.business_day_convention();
         let stub = convention.stub_convention();
 
-        let spread_bp_decimal = Decimal::try_from(100.0)
+        let coupon_bp = Decimal::try_from(100.0)
             .expect("Example CDS spread 100bp should always be representable as Decimal");
 
         let cds = CreditDefaultSwap::builder()
@@ -416,7 +416,7 @@ impl CreditDefaultSwap {
             .side(PayReceive::Pay)
             .convention(convention)
             .premium(PremiumLegSpec {
-                standard_imm_dates: true,
+                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 03 - 20),
                 frequency,
@@ -424,7 +424,7 @@ impl CreditDefaultSwap {
                 business_day_convention,
                 calendar_id: Some(convention.default_calendar().to_string()),
                 day_count,
-                spread_bp: spread_bp_decimal,
+                coupon_bp,
                 discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             })
             .protection(ProtectionLegSpec {
@@ -457,12 +457,12 @@ impl CreditDefaultSwap {
         notional: Money,
         side: PayReceive,
         convention: CdsConvention,
-        spread_bp: Decimal,
+        coupon_bp: Decimal,
         start: finstack_quant_core::dates::Date,
         end: finstack_quant_core::dates::Date,
         recovery_rate: f64,
         discount_curve_id: impl Into<finstack_quant_core::types::CurveId>,
-        credit_id: impl Into<finstack_quant_core::types::CurveId>,
+        credit_curve_id: impl Into<finstack_quant_core::types::CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let day_count = convention.day_count();
         let frequency = convention.frequency();
@@ -475,7 +475,7 @@ impl CreditDefaultSwap {
             side,
             convention,
             premium: PremiumLegSpec {
-                standard_imm_dates: true,
+                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start,
                 end,
                 frequency,
@@ -483,11 +483,11 @@ impl CreditDefaultSwap {
                 business_day_convention,
                 calendar_id: Some(convention.default_calendar().to_string()),
                 day_count,
-                spread_bp,
+                coupon_bp,
                 discount_curve_id: discount_curve_id.into(),
             },
             protection: ProtectionLegSpec {
-                credit_curve_id: credit_id.into(),
+                credit_curve_id: credit_curve_id.into(),
                 recovery_rate,
                 settlement_delay: convention.settlement_delay(),
             },
@@ -525,6 +525,7 @@ impl CreditDefaultSwap {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::CurveId;
+    /// use finstack_quant_cashflows::builder::specs::RollRule;
     /// use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
     /// use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsConvention;
     /// use finstack_quant_valuations::instruments::{
@@ -541,7 +542,7 @@ impl CreditDefaultSwap {
     ///     .side(PayReceive::Pay)
     ///     .convention(CdsConvention::IsdaNa)
     ///     .premium(PremiumLegSpec {
-    ///         standard_imm_dates: true,
+    ///         roll_rule: RollRule::CdsImm,
     ///         start: date!(2024 - 03 - 20),
     ///         end: date!(2029 - 03 - 20),
     ///         frequency: CdsConvention::IsdaNa.frequency(),
@@ -549,7 +550,7 @@ impl CreditDefaultSwap {
     ///         business_day_convention: CdsConvention::IsdaNa.business_day_convention(),
     ///         calendar_id: Some(CdsConvention::IsdaNa.default_calendar().to_string()),
     ///         day_count: CdsConvention::IsdaNa.day_count(),
-    ///         spread_bp: Decimal::try_from(100.0).expect("valid bp"),
+    ///         coupon_bp: Decimal::try_from(100.0).expect("valid bp"),
     ///         discount_curve_id: CurveId::new("USD-OIS"),
     ///     })
     ///     .protection(ProtectionLegSpec {
@@ -597,19 +598,6 @@ impl CreditDefaultSwap {
             if upfront.currency() != currency {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CDS upfront currency {} must match notional currency {}",
-                    upfront.currency(),
-                    currency
-                )));
-            }
-        }
-        if let Some(upfront) = self
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment
-        {
-            if upfront.currency() != currency {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CDS upfront override currency {} must match notional currency {}",
                     upfront.currency(),
                     currency
                 )));
@@ -678,9 +666,9 @@ impl CreditDefaultSwap {
     fn build_premium_leg_schedule(
         &self,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        let spread = self.premium.spread_bp.to_f64().ok_or_else(|| {
+        let spread = self.premium.coupon_bp.to_f64().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
-                "premium spread_bp cannot be represented as f64".to_string(),
+                "premium.coupon_bp cannot be represented as f64".to_string(),
             )
         })? / 10_000.0;
         let pricer = CDSPricer::new();
@@ -732,7 +720,7 @@ impl CreditDefaultSwap {
     /// This is **not** a pricing entry point; it is a schedule helper that
     /// exposes the convention-driven coupon dates used by the CDS pricer.
     ///
-    /// - With `premium.standard_imm_dates`, dates use the prescribed quarterly
+    /// - With `premium.roll_rule = cds_imm`, dates use the prescribed quarterly
     ///   CDS 20th grid. Bespoke legs use `premium.frequency` and `premium.stub`.
     /// - Payments use the instrument calendar and business-day convention;
     ///   absent calendars leave payment dates unadjusted.
@@ -903,7 +891,7 @@ mod tests {
             cds.premium.calendar_id.as_deref(),
             Some(CdsConvention::IsdaNa.default_calendar())
         );
-        assert_eq!(cds.premium.spread_bp.to_f64(), Some(100.0));
+        assert_eq!(cds.premium.coupon_bp.to_f64(), Some(100.0));
         assert_eq!(cds.premium.discount_curve_id, CurveId::new("USD-OIS"));
         assert_eq!(cds.protection.credit_curve_id, CurveId::new("CORP-HAZARD"));
         assert_eq!(cds.protection.recovery_rate, 0.40);

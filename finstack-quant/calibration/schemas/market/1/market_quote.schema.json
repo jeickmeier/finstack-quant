@@ -402,6 +402,11 @@
               "$ref": "#/$defs/CdsConventionKey",
               "description": "Convention key."
             },
+            "coupon_bp": {
+              "description": "Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).",
+              "format": "double",
+              "type": "number"
+            },
             "entity": {
               "description": "Reference entity name.",
               "type": "string"
@@ -416,11 +421,6 @@
             },
             "recovery_rate": {
               "description": "Recovery rate assumption.",
-              "format": "double",
-              "type": "number"
-            },
-            "running_spread_bp": {
-              "description": "Running spread in basis points (25.0, 100.0, 500.0 or 1000.0).",
               "format": "double",
               "type": "number"
             },
@@ -440,7 +440,7 @@
             "entity",
             "convention",
             "pillar",
-            "running_spread_bp",
+            "coupon_bp",
             "upfront_pct",
             "recovery_rate"
           ],
@@ -475,6 +475,11 @@
           "$ref": "#/$defs/CdsConventionKey",
           "description": "Convention key (currency + doc clause)."
         },
+        "coupon_bp": {
+          "description": "Contractual running coupon of the tranche, in basis points.",
+          "format": "double",
+          "type": "number"
+        },
         "detachment": {
           "description": "Detachment point (decimal, e.g. 0.07).",
           "format": "double",
@@ -491,11 +496,6 @@
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Maturity date."
-        },
-        "running_spread_bp": {
-          "description": "Running spread (bp).",
-          "format": "double",
-          "type": "number"
         },
         "series": {
           "description": "CDS index series number.",
@@ -519,7 +519,7 @@
         "detachment",
         "maturity",
         "upfront_pct",
-        "running_spread_bp",
+        "coupon_bp",
         "convention"
       ],
       "type": "object"

@@ -2,6 +2,115 @@
 
 ## [Unreleased]
 
+### Credit family (2026-09-24)
+
+`credit_curve_id` always names a `HazardCurve`, including on
+`ConvertibleBond`; the CDS-family running coupon is `coupon_bp`; the only
+contractual upfront is the dated `upfront` field; settled index loss is
+`realized_loss`; the CDS roll grid is `roll_rule` (`cds_imm` or `none`) with
+the tranche `stub` on the instrument; and structured-credit tranche bounds are
+`attach_pct`/`detach_pct`.
+
+#### Changed (BREAKING)
+
+- `PremiumLegSpec.spread_bp` (now `coupon_bp`) and
+  `PremiumLegSpec.standard_imm_dates` (now `roll_rule: RollRule`, required:
+  `cds_imm` for the standard 20th-of-quarter grid, `none` for a bespoke
+  frequency/stub schedule; `imm` is rejected at pricing). Rust, Python
+  (`PremiumLegSpec(..., coupon_bp, ..., roll_rule=RollRule.CDS_IMM)`, getters
+  `coupon_bp`/`roll_rule`), JSON.
+- `CDSTranche.running_coupon_bp` (now `coupon_bp`), `.accumulated_loss` (now
+  `realized_loss`) and `.standard_imm_dates` (now `roll_rule`, default `none`;
+  `imm` is rejected by `validate`); new `CDSTranche.stub` (default
+  `short_front`). `CDSTranche::new` now honours `ScheduleParams.stub` and
+  `.roll_rule` instead of dropping them. `CDSTrancheParams.running_coupon_bp`
+  and `.accumulated_loss` (now `coupon_bp`/`realized_loss`),
+  `CDSTrancheParams::with_accumulated_loss` (now `with_realized_loss`). Rust,
+  Python (`CDSTrancheBuilder.roll_rule`/`.stub`), JSON.
+- `CDSTranche::upfront(curves, as_of)` (now `model_upfront`),
+  `CDSTranchePricer::calculate_upfront` (now `calculate_model_upfront`) and the
+  tranche metric key `upfront` (now `model_upfront`). Rust, metric key.
+- `CDSIndexParams.fixed_coupon_bp` (now `coupon_bp`). Rust, Python.
+- `CDSOption.underlying_cds_coupon` (a decimal rate) is now `coupon_bp` in
+  basis points (`"0.01"` becomes `"100"`); `CDSOptionParams::with_underlying_cds_coupon`
+  (now `with_coupon_bp`); `CDSOption.realized_index_loss: Option<f64>` (now
+  `realized_loss: f64`, default `0.0`); `CDSOption.index_factor` and
+  `CDSOptionParams.index_factor` are `f64` with default `1.0` instead of
+  `Option<f64>`. Rust, JSON.
+- `CDSOption` recovery validation now uses the shared credit domain `[0, 1)`
+  (zero recovery is accepted). Rust.
+- `CreditDefaultSwap::get_par_spread` (now `par_spread`). Rust, Python.
+- `CDSPricerConfig.include_accrual` and
+  `CDSTranchePricerConfig.accrual_on_default_enabled` (now
+  `include_accrual_on_default`). Rust.
+- `CdsQuote::CdsUpfront.running_spread_bp` and `CdsTrancheQuote.running_spread_bp`
+  (now `coupon_bp`); `CdsQuote::quoted_running_spread_bp` (now `coupon_bp`);
+  the Python calibration quote getter `running_spread_bp` (now `coupon_bp`).
+  Rust, Python, JSON.
+- `BaseCorrelationParams.use_imm_dates` and `CDSTrancheBuildOverrides.use_imm_dates`
+  (now `roll_rule`, default `none`). Rust, JSON.
+- `InstrumentCashflowEnvelope.hazard_curve_id` (now `credit_curve_id`) and
+  `CashFlowSchedule::pv_by_period(hazard_curve_id)` (now `credit_curve_id`).
+  Rust, Python, JSON output. `docs/SERDE_STABILITY.md` and `docs/CONTRACTS.md`
+  now reserve `credit_curve_id` for every hazard-curve reference.
+- Structured-credit `Tranche.attachment_point`/`.detachment_point` (now
+  `attach_pct`/`detach_pct`), `Tranche::attachment_pct()`/`detachment_pct()`
+  (now `effective_attach_pct()`/`effective_detach_pct()`),
+  `TrancheBuilder::attachment_detachment` (now `attach_detach`), and
+  `TranchePricingResult.attachment`/`.detachment` (fractions documented as
+  percent; now `attach_pct`/`detach_pct` in percent, as are the stochastic
+  result `to_dataframe()` columns). Rust, Python, JSON.
+- `CreditDefaultSwap::new_isda(credit_id)` (now `credit_curve_id`). Rust.
+- `HazardCurve` market bumps now accept triangular key-rate specs: each
+  knot's hazard shift is the spread shift `/ (1 − R)` weighted by the bucket's
+  triangular weight, so bucket shifts sum to the parallel shift. Rust.
+
+#### Added
+
+- `CDSIndex.upfront: Option<(Date, Money)>`, the contractual dated upfront
+  (discounted from its payment date on the premium discount curve, applied
+  once at the index level). Rust, Python (`CDSIndex.upfront`,
+  `CDSIndexBuilder.upfront`), JSON.
+
+#### Removed
+
+- `MarketQuoteOverrides.upfront_payment` and
+  `InstrumentPricingOverrides::with_upfront`: the already-discounted PV
+  adjustment that CDS, CDS index and CDS tranche pricers summed on top of the
+  dated `upfront`. Use `upfront: Some((as_of, amount))` for an amount paid on
+  the valuation date. Rust, JSON.
+- `CDSTranchePricerConfig.schedule_stub` and `.use_isda_coupon_dates`
+  (now `CDSTranche.stub` and `CDSTranche.roll_rule`). Rust.
+
+#### Changed (BREAKING): ConvertibleBond hazard semantics
+
+- `ConvertibleBond.credit_curve_id` now names the issuer `HazardCurve`
+  instead of a zero-recovery risky `DiscountCurve`. The cash component's
+  zero-recovery risky forward is `rf_fwd × S(t_{i+1}) / S(t_i)`, blended with
+  the risk-free forward by `recovery_rate` as before. The credit curve is a
+  credit dependency only (no longer also a discount dependency).
+- Convertible CS01/bucketed CS01 shock the hazard curve by 1 bp of spread
+  (hazard shift `1bp / (1 − R_curve)`); without a credit curve the z-spread
+  fallback uses a zero-hazard, zero-recovery synthetic curve and a forward
+  difference. Convertible OAS shifts every hazard rate by the spread.
+- Attribution `MarketSnapshot.credit_discount_curves` and `.credit_curve_ids`
+  are removed; convertible credit P&L is measured on the hazard curve.
+
+#### Numbers change
+
+- ConvertibleBond PV, DV01, CS01 and OAS with a credit curve: the regression
+  goldens `conv_bond_atm_3y` and `conv_bond_distressed` now reference the
+  issuer hazard curve `ACME-HZD` (recovery 0 on the instrument) instead of the
+  `USD-CORP` risky discount curve, and DV01 now reaches the PV through the
+  risk-free `USD-OIS` curve. A hazard curve equivalent to the former risky
+  curve reproduces the former PV and CS01 to 1e-10 relative
+  (`convertible_hazard_equals_equivalent_risky_curve`, pinned on
+  ed2d9f2f3); full recovery equals risk-free pricing; a deep
+  out-of-the-money zero-recovery convertible converges to QuantLib's
+  `usd_fixed_5y_hazard` NPV 95.3527 (2.3e-12 at 2000 steps).
+- Convertible CS01 without a credit curve is now a forward difference
+  (`O(bump²)` from the former central value).
+
 ### Listed futures (2026-09-24)
 
 Interest-rate, bond and volatility-index futures now carry the shared

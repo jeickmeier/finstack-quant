@@ -83,7 +83,7 @@ market = tracks.build_market("credit")
 calibration = calibrate(tracks.credit_calibration_envelope())
 index = price_instrument(json.dumps(inputs["ANALYST-CDX"]), market, AS_OF, model="hazard_rate")
 hazard_approx = 120 / 10000 / (1 - 0.4)
-print(pd.DataFrame([{"names": 125, "running_coupon_bp": 100, "calibration_par_bp": 120,
+print(pd.DataFrame([{"names": 125, "coupon_bp": 100, "calibration_par_bp": 120,
                "hazard_approx_decimal": hazard_approx, "index_pv_usd": index.value.amount}]))
 ```
 {/* /notebook-block */}
@@ -150,7 +150,7 @@ option_risk=price_instrument(json.dumps(quoted),market,AS_OF,model="bloomberg_cd
 receiver=deepcopy(payer);receiver["instrument"]["spec"]["option_type"]="put"
 receiver_price=price_instrument(json.dumps(receiver),market,AS_OF,model="bloomberg_cdso").value.amount
 post_option=deepcopy(payer)
-post_option["instrument"]["spec"].update({"index_factor":124/125,"realized_index_loss":.6/125})
+post_option["instrument"]["spec"].update({"index_factor":124/125,"realized_loss":.6/125})
 post_option_price=price_instrument(json.dumps(post_option),market,AS_OF,model="bloomberg_cdso").value.amount
 print(pd.Series(option_risk.metrics))
 print({"payer_pv":nonko.value.amount,"receiver_pv":receiver_price,"post_default_payer_pv":post_option_price})

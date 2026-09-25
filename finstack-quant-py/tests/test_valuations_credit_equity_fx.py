@@ -19,6 +19,7 @@ import pickle
 import pytest
 
 from finstack_quant.calibration import calibrate
+from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import (
@@ -125,7 +126,7 @@ def _cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
         DayCount.ACT_360,
         100.0,
         "USD-OIS",
-        standard_imm_dates=True,
+        roll_rule=RollRule.CDS_IMM,
     )
     return premium, ProtectionLegSpec("CORP-HAZARD", 0.4, 3)
 
@@ -183,9 +184,9 @@ class TestCreditDefaultSwap:
         cs01 = cds.metric(_credit_market(), "2024-06-20", "cs01", "hazard_rate")
         assert math.isfinite(cs01)
 
-    def test_get_par_spread_is_close_to_flat_hazard_spread(self) -> None:
+    def test_par_spread_is_close_to_flat_hazard_spread(self) -> None:
         cds = CreditDefaultSwap.example()
-        par_bp = cds.get_par_spread(_credit_market(), "2024-06-20")
+        par_bp = cds.par_spread(_credit_market(), "2024-06-20")
         # 2% flat hazard, 40% recovery -> ~120bp credit-triangle par spread.
         assert 90.0 < par_bp < 150.0
 
@@ -202,7 +203,7 @@ class TestCreditDefaultSwap:
     def test_instrument_repr_carries_economics(self) -> None:
         text = repr(CreditDefaultSwap.example())
         assert 'side="pay"' in text
-        assert "spread_bp=100" in text
+        assert "coupon_bp=100" in text
         assert "datetime.date(2029, 3, 20)" in text
 
     def test_iso_string_dates_and_margin_spec_dict(self) -> None:
@@ -308,7 +309,7 @@ class TestCDSTranche:
     def test_standard_and_example(self) -> None:
         params = CDSTrancheParams.mezzanine_tranche("CDX.NA.IG", 42, Money(10_000_000.0, USD), "2029-12-20", Bps(100.0))
         assert (params.attach_pct, params.detach_pct) == (3.0, 7.0)
-        assert params.running_coupon_bp == 100.0
+        assert params.coupon_bp == 100.0
         tranche = CDSTranche.standard("CDX-42-3X7", params, "USD-OIS", "CDX.NA.IG.HAZARD", "buy_protection")
         assert tranche.side == "buy_protection"
         assert tranche.day_count == "act_360"
@@ -332,7 +333,7 @@ class TestCDSTranche:
             .detach_pct(7.0)
             .notional(Money(10_000_000.0, USD))
             .maturity("2029-06-20")
-            .running_coupon_bp(Bps(100.0))
+            .coupon_bp(Bps(100.0))
             .frequency("3M")
             .day_count("act_360")
             .business_day_convention("modified_following")
@@ -343,11 +344,11 @@ class TestCDSTranche:
             .attributes(Attributes())
             .build()
         )
-        assert tranche.running_coupon_bp == 100.0
+        assert tranche.coupon_bp == 100.0
         assert tranche.upfront[0] == datetime.date(2024, 6, 25)
         assert tranche.business_day_convention == "modified_following"
-        with pytest.raises(ValueError, match="accumulated_loss"):
-            CDSTrancheParams("CDX.NA.IG", 42, 0.0, 3.0, Money(1.0, USD), "2029-12-20", 100.0, accumulated_loss=2.0)
+        with pytest.raises(ValueError, match="realized_loss"):
+            CDSTrancheParams("CDX.NA.IG", 42, 0.0, 3.0, Money(1.0, USD), "2029-12-20", 100.0, realized_loss=2.0)
 
 
 class TestConvertibleBond:

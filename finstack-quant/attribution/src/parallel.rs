@@ -289,9 +289,7 @@ fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSna
                 || !snapshot.parametric_curves.is_empty()
                 || !snapshot.fixing_series.is_empty()
         }
-        ParallelRestoredFactor::Credit => {
-            !snapshot.hazard_curves.is_empty() || !snapshot.credit_discount_curves.is_empty()
-        }
+        ParallelRestoredFactor::Credit => !snapshot.hazard_curves.is_empty(),
         ParallelRestoredFactor::Inflation => {
             !snapshot.inflation_curves.is_empty() || !snapshot.inflation_indices.is_empty()
         }

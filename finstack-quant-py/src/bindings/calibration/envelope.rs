@@ -456,7 +456,7 @@ impl PyCdsQuote {
     ///     ISDA documentation clause (see ``par_spread``).
     /// pillar : str | datetime.date | dict
     ///     Maturity pillar.
-    /// running_spread_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Standard running coupon in basis points (e.g. ``100.0``).
     /// upfront_pct : float
     ///     Upfront payment as a percentage of notional (points).
@@ -469,7 +469,7 @@ impl PyCdsQuote {
     ///     If the convention, pillar or numeric inputs are invalid.
     #[staticmethod]
     #[pyo3(
-        text_signature = "(id, entity, currency, doc_clause, pillar, running_spread_bp, upfront_pct, recovery_rate)"
+        text_signature = "(id, entity, currency, doc_clause, pillar, coupon_bp, upfront_pct, recovery_rate)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn upfront(
@@ -479,7 +479,7 @@ impl PyCdsQuote {
         currency: &Bound<'_, PyAny>,
         doc_clause: &str,
         pillar: &Bound<'_, PyAny>,
-        running_spread_bp: &Bound<'_, PyAny>,
+        coupon_bp: &Bound<'_, PyAny>,
         upfront_pct: f64,
         recovery_rate: f64,
     ) -> PyResult<Self> {
@@ -492,10 +492,7 @@ impl PyCdsQuote {
             doc_clause,
             pillar,
             vec![
-                (
-                    "running_spread_bp",
-                    extract_basis_points(running_spread_bp)?,
-                ),
+                ("coupon_bp", extract_basis_points(coupon_bp)?),
                 ("upfront_pct", upfront_pct),
                 ("recovery_rate", recovery_rate),
             ],
@@ -518,10 +515,12 @@ impl PyCdsQuote {
         }
     }
 
-    /// Quoted running spread in basis points.
+    /// Running coupon, in basis points, of the CDS built from this quote:
+    /// the par spread for ``cds_par_spread`` quotes and the contractual
+    /// running coupon for ``cds_upfront`` quotes.
     #[getter]
-    fn running_spread_bp(&self) -> f64 {
-        self.inner.quoted_running_spread_bp()
+    fn coupon_bp(&self) -> f64 {
+        self.inner.coupon_bp()
     }
 
     /// Serialize to compact JSON.
@@ -1276,7 +1275,7 @@ impl PyCalibrationStep {
     /// **params
     ///     Optional wire fields: ``notional``, ``frequency``, ``day_count``,
     ///     ``business_day_convention``, ``calendar_id``, ``detachment_points``,
-    ///     ``use_imm_dates``.
+    ///     ``roll_rule``.
     ///
     /// Raises
     /// ------

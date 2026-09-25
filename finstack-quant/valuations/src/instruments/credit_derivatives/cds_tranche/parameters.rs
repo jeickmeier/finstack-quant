@@ -20,9 +20,9 @@ pub struct CDSTrancheParams {
     /// Maturity date
     pub maturity: Date,
     /// Running coupon in basis points
-    pub running_coupon_bp: f64,
-    /// Accumulated realized loss as fraction of original portfolio notional [0.0, 1.0]
-    pub accumulated_loss: f64,
+    pub coupon_bp: f64,
+    /// Realized (settled) loss as a decimal fraction of the original portfolio notional, in `[0.0, 1.0]`
+    pub realized_loss: f64,
 }
 
 impl CDSTrancheParams {
@@ -35,7 +35,7 @@ impl CDSTrancheParams {
         detach_pct: f64,
         notional: Money,
         maturity: Date,
-        running_coupon_bp: f64,
+        coupon_bp: f64,
     ) -> Self {
         Self {
             index_name: index_name.into(),
@@ -44,29 +44,29 @@ impl CDSTrancheParams {
             detach_pct,
             notional,
             maturity,
-            running_coupon_bp,
-            accumulated_loss: 0.0,
+            coupon_bp,
+            realized_loss: 0.0,
         }
     }
 
-    /// Set the accumulated loss with validation.
+    /// Set the realized loss with validation.
     ///
     /// # Arguments
     ///
-    /// * `loss` - Accumulated realized loss as a fraction of portfolio notional.
+    /// * `loss` - Realized (settled) loss as a decimal fraction of the original portfolio notional.
     ///   Must be in range [0.0, 1.0].
     ///
     /// # Errors
     ///
     /// Returns an error if loss is outside the valid range [0.0, 1.0].
-    pub fn with_accumulated_loss(mut self, loss: f64) -> Result<Self> {
+    pub fn with_realized_loss(mut self, loss: f64) -> Result<Self> {
         if !(0.0..=1.0).contains(&loss) {
             return Err(Error::Validation(format!(
-                "accumulated_loss must be in [0.0, 1.0], got {}",
+                "realized_loss must be in [0.0, 1.0], got {}",
                 loss
             )));
         }
-        self.accumulated_loss = loss;
+        self.realized_loss = loss;
         Ok(self)
     }
 
@@ -76,17 +76,9 @@ impl CDSTrancheParams {
         series: u16,
         notional: Money,
         maturity: Date,
-        running_coupon_bp: f64,
+        coupon_bp: f64,
     ) -> Self {
-        Self::new(
-            index_name,
-            series,
-            0.0,
-            3.0,
-            notional,
-            maturity,
-            running_coupon_bp,
-        )
+        Self::new(index_name, series, 0.0, 3.0, notional, maturity, coupon_bp)
     }
 
     /// Create mezzanine tranche parameters (3-7% typically)
@@ -95,17 +87,9 @@ impl CDSTrancheParams {
         series: u16,
         notional: Money,
         maturity: Date,
-        running_coupon_bp: f64,
+        coupon_bp: f64,
     ) -> Self {
-        Self::new(
-            index_name,
-            series,
-            3.0,
-            7.0,
-            notional,
-            maturity,
-            running_coupon_bp,
-        )
+        Self::new(index_name, series, 3.0, 7.0, notional, maturity, coupon_bp)
     }
 }
 

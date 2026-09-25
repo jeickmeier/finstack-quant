@@ -1292,7 +1292,7 @@ class CashFlowSchedule:
         disc_curve_id: str,
         base: datetime.date,
         day_count: DayCount | None = None,
-        hazard_curve_id: str | None = None,
+        credit_curve_id: str | None = None,
     ) -> PeriodAggregation:
         """
         Periodized present values resolved from a market context.
@@ -1312,7 +1312,7 @@ class CashFlowSchedule:
             times.
         day_count : DayCount, optional
             Day-count convention for discount times (default Act/365F).
-        hazard_curve_id : str, optional
+        credit_curve_id : str, optional
             Hazard curve identifier for credit-adjusted present value.
 
         Returns

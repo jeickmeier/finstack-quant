@@ -11,7 +11,7 @@
         "exercise_style": "european",
         "expiry": "2026-01-01",
         "id": "CDSOPT-CALL-CORP-5Y",
-        "index_factor": null,
+        "index_factor": 1.0,
         "knockout": true,
         "notional": {
           "amount": "10000000",
@@ -24,7 +24,7 @@
         "strike": {
           "spread": "0.01"
         },
-        "underlying_cds_coupon": "0.01",
+        "coupon_bp": "100",
         "underlying_convention": "isda_na",
         "underlying_is_index": false,
         "vol_surface_id": "CDSOPT-VOL",

@@ -57,8 +57,8 @@ impl PyTrancheStructure {
     /// >>> senior = (
     /// ...     Tranche.builder()
     /// ...     .id("A")
-    /// ...     .attachment_point(10.0)
-    /// ...     .detachment_point(100.0)
+    /// ...     .attach_pct(10.0)
+    /// ...     .detach_pct(100.0)
     /// ...     .seniority("senior")
     /// ...     .original_balance(Money(72_000_000.0, Currency("USD")))
     /// ...     .coupon_fixed(0.05)
@@ -68,8 +68,8 @@ impl PyTrancheStructure {
     /// >>> equity = (
     /// ...     Tranche.builder()
     /// ...     .id("E")
-    /// ...     .attachment_point(0.0)
-    /// ...     .detachment_point(10.0)
+    /// ...     .attach_pct(0.0)
+    /// ...     .detach_pct(10.0)
     /// ...     .seniority("equity")
     /// ...     .original_balance(Money(8_000_000.0, Currency("USD")))
     /// ...     .coupon_fixed(0.0)
@@ -131,7 +131,7 @@ impl PyTrancheStructure {
     /// ...     return (Tranche.builder().id(id_).seniority(seniority).original_balance(Money(balance, Currency("USD")))
     /// ...             .coupon_fixed(0.05).maturity(datetime.date(2031, 1, 15)).build())
     /// >>> structure = TrancheStructure.from_balances([note("A", "senior", 60.0), note("B", "mezzanine", 30.0), note("E", "equity", 10.0)])
-    /// >>> [(t.id, t.attachment_point, t.detachment_point) for t in structure.tranches]
+    /// >>> [(t.id, t.attach_pct, t.detach_pct) for t in structure.tranches]
     /// [('A', 40.0, 100.0), ('B', 10.0, 40.0), ('E', 0.0, 10.0)]
     #[staticmethod]
     #[pyo3(text_signature = "(tranches)")]

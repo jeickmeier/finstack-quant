@@ -1,7 +1,7 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
 use crate::cashflow::primitives::CashFlow;
-use finstack_quant_core::dates::{Date, StubKind};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::types::Percentage;
 use finstack_quant_core::{Error as CoreError, Result as CoreResult};
@@ -147,11 +147,7 @@ pub struct CDSTranchePricerConfig {
     /// Whether to use mid-period discounting for protection leg (ISDA standard: true)
     pub mid_period_protection: bool,
     /// Whether to include accrual-on-default in the premium leg
-    pub accrual_on_default_enabled: bool,
-    /// Stub convention for schedule generation
-    pub schedule_stub: StubKind,
-    /// If true, generate ISDA coupon dates (IMM-20 schedule)
-    pub use_isda_coupon_dates: bool,
+    pub include_accrual_on_default: bool,
     /// Settlement lag in business days for index CDS (default: 1 for Big Bang)
     pub index_settlement_days: i32,
     /// Settlement lag in business days for bespoke tranches (default: 3 per ISDA)
@@ -185,9 +181,7 @@ impl Default for CDSTranchePricerConfig {
 
             // ISDA conventions
             mid_period_protection: true, // ISDA standard
-            accrual_on_default_enabled: true,
-            schedule_stub: StubKind::ShortFront,
-            use_isda_coupon_dates: false,
+            include_accrual_on_default: true,
             index_settlement_days: DEFAULT_INDEX_SETTLEMENT_LAG,
             bespoke_settlement_days: DEFAULT_BESPOKE_SETTLEMENT_LAG,
 

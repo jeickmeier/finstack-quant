@@ -216,7 +216,7 @@ pub struct ForwardCdsContext {
     /// underlyings).
     pub scale: f64,
     /// Realized index loss per unit of original notional.
-    pub realized_index_loss: f64,
+    pub realized_loss: f64,
     /// Expected pre-expiry default loss per unit current notional.
     /// Index options include it in the loss-adjusted forward; a non-knockout
     /// single-name payer receives it as a separate default claim.
@@ -380,7 +380,7 @@ impl ForwardCdsContext {
         let mut forward_par_spread =
             forward_protection_pv / (risky_annuity_at_value_dt * cds.notional.amount());
 
-        let coupon = decimal_to_f64(option.effective_underlying_cds_coupon()?)?;
+        let coupon = decimal_to_f64(option.effective_coupon_bp()? / Decimal::new(10_000, 0))?;
         let strike = match &option.strike {
             super::strike::CDSOptionStrike::Spread(spread) => QuadratureStrike::Spread {
                 strike: decimal_to_f64(*spread)?,
@@ -401,11 +401,11 @@ impl ForwardCdsContext {
             }
         };
         let scale = if option.underlying_is_index {
-            option.index_factor.unwrap_or(1.0)
+            option.index_factor
         } else {
             1.0
         };
-        let realized_index_loss = option.realized_index_loss.unwrap_or(0.0);
+        let realized_loss = option.realized_loss;
         let front_end_protection = if !option.knockout {
             let fep_start = as_of;
             if fep_start >= option.expiry {
@@ -446,7 +446,7 @@ impl ForwardCdsContext {
             strike,
             option_type: option.option_type,
             scale,
-            realized_index_loss,
+            realized_loss,
             front_end_protection,
             is_index: option.underlying_is_index,
             knockout: option.knockout,
@@ -551,7 +551,7 @@ impl ForwardCdsContext {
             return 0.0;
         }
         let scale = self.scale.max(numerical::ZERO_TOLERANCE);
-        self.sign() * self.realized_index_loss / scale
+        self.sign() * self.realized_loss / scale
     }
 
     /// Knockout options exercise only if the underlying survives to expiry.
@@ -614,7 +614,7 @@ impl ForwardCdsContext {
         };
         let f = self.scale.max(numerical::ZERO_TOLERANCE);
         let f0 = strike_index_factor.max(numerical::ZERO_TOLERANCE);
-        let k_atm = 1.0 - (f * self.forward_value() + self.realized_index_loss) / f0;
+        let k_atm = 1.0 - (f * self.forward_value() + self.realized_loss) / f0;
         Ok(100.0 * k_atm)
     }
 }
@@ -923,7 +923,7 @@ mod tests {
             option_type,
         )
         .expect("valid option params")
-        .with_underlying_cds_coupon(bp_to_decimal(coupon_bp));
+        .with_coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"));
         let credit = CreditParams::corporate_standard("SN", "HZ-SN");
         let mut option = CDSOption::new("CDSO-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid cds option");
@@ -1053,8 +1053,8 @@ mod tests {
         let mut option = option(as_of, OptionType::Call, 100.0, 0.30);
         option.underlying_is_index = true;
         option.knockout = false;
-        option.index_factor = Some(1.0);
-        option.underlying_cds_coupon = Some(bp_to_decimal(100.0));
+        option.index_factor = 1.0;
+        option.coupon_bp = Some(Decimal::new(100, 0));
 
         let market = market(as_of);
         let base_ctx = context_for(&option, &market, as_of, 0.30);
@@ -1474,11 +1474,11 @@ mod tests {
         .expect("valid index factor")
         .with_strike_index_factor(strike_factor)
         .expect("valid strike index factor")
-        .with_underlying_cds_coupon(bp_to_decimal(coupon_bp));
+        .with_coupon_bp(Decimal::try_from(coupon_bp).expect("valid coupon bp"));
         let credit = CreditParams::corporate_standard("HY", "HZ-SN");
         let mut option = CDSOption::new("CDSO-HY-UNIT", &params, &credit, "USD-OIS", "CDSO-VOL")
             .expect("valid cds option");
-        option.realized_index_loss = realized_loss;
+        option.realized_loss = realized_loss.unwrap_or(0.0);
         option
             .instrument_pricing_overrides
             .market_quotes

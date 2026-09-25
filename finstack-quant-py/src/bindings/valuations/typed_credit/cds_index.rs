@@ -16,8 +16,8 @@ use finstack_quant_valuations::instruments::{CreditParams, Instrument, Instrumen
 use rust_decimal::prelude::ToPrimitive;
 
 use super::super::convert::{
-    attributes_from_py, bool_repr, bps_from_py, builder_repr, date_repr, enum_to_py_string,
-    float_repr, money_from_py, money_repr, money_to_py, opt_repr,
+    attributes_from_py, bool_repr, bps_from_py, builder_repr, date_repr, dated_money_from_py,
+    enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py, opt_repr,
 };
 use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
 use super::super::typed_fx::{
@@ -66,7 +66,7 @@ impl PyCDSIndexParams {
     ///     Series number (e.g. ``42``).
     /// version : int
     ///     Version within the series (e.g. ``1``).
-    /// fixed_coupon_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Fixed running coupon in basis points (``100.0`` = 1%).
     /// convention : {"isda_na", "isda_eu", "isda_as", "custom"}
     ///     Regional ISDA convention; default ``"isda_na"`` (SNAC standard).
@@ -84,23 +84,23 @@ impl PyCDSIndexParams {
     /// ValueError
     ///     If ``convention`` is not an accepted string.
     /// TypeError
-    ///     If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
     ///
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import CDSIndexParams
-    /// >>> CDSIndexParams("CDX.NA.HY", 42, 1, 500.0).fixed_coupon_bp
+    /// >>> CDSIndexParams("CDX.NA.HY", 42, 1, 500.0).coupon_bp
     /// 500.0
     #[new]
-    #[pyo3(signature = (index_name, series, version, fixed_coupon_bp, convention="isda_na", num_constituents=None))]
+    #[pyo3(signature = (index_name, series, version, coupon_bp, convention="isda_na", num_constituents=None))]
     #[pyo3(
-        text_signature = "(index_name, series, version, fixed_coupon_bp, convention='isda_na', num_constituents=None)"
+        text_signature = "(index_name, series, version, coupon_bp, convention='isda_na', num_constituents=None)"
     )]
     fn new(
         index_name: &str,
         series: u16,
         version: u16,
-        fixed_coupon_bp: &Bound<'_, PyAny>,
+        coupon_bp: &Bound<'_, PyAny>,
         convention: &str,
         num_constituents: Option<u32>,
     ) -> PyResult<Self> {
@@ -108,7 +108,7 @@ impl PyCDSIndexParams {
             index_name,
             series,
             version,
-            bps_from_py(fixed_coupon_bp, "fixed_coupon_bp")?,
+            bps_from_py(coupon_bp, "coupon_bp")?,
             cds_convention_from_str(convention)?,
         );
         if let Some(n) = num_constituents {
@@ -125,7 +125,7 @@ impl PyCDSIndexParams {
     ///     Series number.
     /// version : int
     ///     Version within the series.
-    /// fixed_coupon_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Fixed running coupon in basis points (``100.0`` for CDX.NA.IG).
     ///
     /// Returns
@@ -136,7 +136,7 @@ impl PyCDSIndexParams {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
     ///
     /// Examples
     /// --------
@@ -144,14 +144,10 @@ impl PyCDSIndexParams {
     /// >>> CDSIndexParams.cdx_na_ig(42, 1, 100.0).num_constituents
     /// 125
     #[staticmethod]
-    #[pyo3(text_signature = "(series, version, fixed_coupon_bp)")]
-    fn cdx_na_ig(series: u16, version: u16, fixed_coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(text_signature = "(series, version, coupon_bp)")]
+    fn cdx_na_ig(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: CDSIndexParams::cdx_na_ig(
-                series,
-                version,
-                bps_from_py(fixed_coupon_bp, "fixed_coupon_bp")?,
-            ),
+            inner: CDSIndexParams::cdx_na_ig(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
         })
     }
 
@@ -163,7 +159,7 @@ impl PyCDSIndexParams {
     ///     Series number.
     /// version : int
     ///     Version within the series.
-    /// fixed_coupon_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Fixed running coupon in basis points (``500.0`` for CDX.NA.HY).
     ///
     /// Returns
@@ -174,7 +170,7 @@ impl PyCDSIndexParams {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
     ///
     /// Examples
     /// --------
@@ -182,14 +178,10 @@ impl PyCDSIndexParams {
     /// >>> CDSIndexParams.cdx_na_hy(42, 1, 500.0).num_constituents
     /// 100
     #[staticmethod]
-    #[pyo3(text_signature = "(series, version, fixed_coupon_bp)")]
-    fn cdx_na_hy(series: u16, version: u16, fixed_coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(text_signature = "(series, version, coupon_bp)")]
+    fn cdx_na_hy(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: CDSIndexParams::cdx_na_hy(
-                series,
-                version,
-                bps_from_py(fixed_coupon_bp, "fixed_coupon_bp")?,
-            ),
+            inner: CDSIndexParams::cdx_na_hy(series, version, bps_from_py(coupon_bp, "coupon_bp")?),
         })
     }
 
@@ -201,7 +193,7 @@ impl PyCDSIndexParams {
     ///     Series number.
     /// version : int
     ///     Version within the series.
-    /// fixed_coupon_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Fixed running coupon in basis points (``100.0`` for iTraxx Europe).
     ///
     /// Returns
@@ -212,7 +204,7 @@ impl PyCDSIndexParams {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
     ///
     /// Examples
     /// --------
@@ -220,17 +212,13 @@ impl PyCDSIndexParams {
     /// >>> CDSIndexParams.itraxx_europe(41, 1, 100.0).convention
     /// 'isda_eu'
     #[staticmethod]
-    #[pyo3(text_signature = "(series, version, fixed_coupon_bp)")]
-    fn itraxx_europe(
-        series: u16,
-        version: u16,
-        fixed_coupon_bp: &Bound<'_, PyAny>,
-    ) -> PyResult<Self> {
+    #[pyo3(text_signature = "(series, version, coupon_bp)")]
+    fn itraxx_europe(series: u16, version: u16, coupon_bp: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             inner: CDSIndexParams::itraxx_europe(
                 series,
                 version,
-                bps_from_py(fixed_coupon_bp, "fixed_coupon_bp")?,
+                bps_from_py(coupon_bp, "coupon_bp")?,
             ),
         })
     }
@@ -255,8 +243,8 @@ impl PyCDSIndexParams {
 
     /// Fixed running coupon in basis points.
     #[getter]
-    fn fixed_coupon_bp(&self) -> f64 {
-        self.inner.fixed_coupon_bp
+    fn coupon_bp(&self) -> f64 {
+        self.inner.coupon_bp
     }
 
     /// Regional ISDA convention (serde name).
@@ -274,11 +262,11 @@ impl PyCDSIndexParams {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSIndexParams(index_name={:?}, series={}, version={}, fixed_coupon_bp={}, convention={:?}, num_constituents={})",
+            "CDSIndexParams(index_name={:?}, series={}, version={}, coupon_bp={}, convention={:?}, num_constituents={})",
             self.inner.index_name,
             self.inner.series,
             self.inner.version,
-            float_repr(self.inner.fixed_coupon_bp),
+            float_repr(self.inner.coupon_bp),
             enum_to_py_string(&self.inner.convention).unwrap_or_default(),
             opt_repr(self.inner.num_constituents),
         )
@@ -533,7 +521,7 @@ instrument_pricing_methods!(PyCDSIndex);
 impl PyCDSIndex {
     /// Canonical example: CDX.NA.IG series 42, USD 10,000,000 payer.
     ///
-    /// Mirrors Rust ``CDSIndex::example()``: 60bp running spread,
+    /// Mirrors Rust ``CDSIndex::example()``: 60bp running coupon,
     /// ``single_curve`` pricing off ``CDX.NA.IG.HAZARD`` discounted on
     /// ``USD-OIS``, premium 2024-03-20 to 2029-12-20, 125 names.
     ///
@@ -811,6 +799,17 @@ impl PyCDSIndex {
         self.inner.num_constituents
     }
 
+    /// Contractual upfront payment as ``(payment_date, amount)``, or ``None``.
+    ///
+    /// Positive means the protection buyer pays the seller.
+    #[getter]
+    fn upfront<'py>(&self, py: Python<'py>) -> PyResult<Option<(Bound<'py, PyAny>, PyMoney)>> {
+        self.inner
+            .upfront
+            .map(|(date, money)| Ok((date_to_py(py, date)?, money_to_py(money))))
+            .transpose()
+    }
+
     /// OTC margin specification as a dict, or ``None`` for unmargined trades.
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -832,13 +831,13 @@ impl PyCDSIndex {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSIndex(id={:?}, index_name={:?}, series={}, side={:?}, notional={}, spread_bp={}, end={}, pricing={:?})",
+            "CDSIndex(id={:?}, index_name={:?}, series={}, side={:?}, notional={}, coupon_bp={}, end={}, pricing={:?})",
             self.inner.id.as_str(),
             self.inner.index_name,
             self.inner.series,
             enum_to_py_string(&self.inner.side).unwrap_or_default(),
             money_repr(self.inner.notional),
-            opt_repr(self.inner.premium.spread_bp.to_f64()),
+            opt_repr(self.inner.premium.coupon_bp.to_f64()),
             date_repr(self.inner.premium.end),
             enum_to_py_string(&self.inner.pricing).unwrap_or_default(),
         )
@@ -1074,8 +1073,8 @@ impl PyCDSIndexBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let leg = value.inner.clone();
         let shown = format!(
-            "PremiumLegSpec(spread_bp={}, start={}, end={})",
-            leg.spread_bp,
+            "PremiumLegSpec(coupon_bp={}, start={}, end={})",
+            leg.coupon_bp,
             date_repr(leg.start),
             date_repr(leg.end)
         );
@@ -1196,6 +1195,36 @@ impl PyCDSIndexBuilder {
             value.to_string(),
             |b: CdsIndexBuilderInner| b.num_constituents(value)
         )
+    }
+
+    /// Set the contractual upfront payment.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : tuple[datetime.date | str, Money]
+    ///     ``(payment_date, amount)`` on the index notional; positive means
+    ///     the protection buyer pays. The amount currency must match the
+    ///     index notional. Discounted from the payment date and dropped once
+    ///     that date is before the valuation date.
+    ///
+    /// Returns
+    /// -------
+    /// CDSIndexBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// TypeError
+    ///     If ``value`` is not a ``(date, Money)`` pair.
+    #[pyo3(text_signature = "($self, value)")]
+    fn upfront<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let (date, money) = dated_money_from_py(value, None, "upfront")?;
+        let shown = format!("({}, {})", date_repr(date), money_repr(money));
+        cds_index_set!(slf, upfront, shown, |b: CdsIndexBuilderInner| b
+            .upfront((date, money)))
     }
 
     /// Set the OTC margin specification for VM/IM.

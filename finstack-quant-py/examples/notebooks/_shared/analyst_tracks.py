@@ -28,6 +28,7 @@ from finstack_quant.core.market_data import (
     BaseCorrelationCurve,
     CreditIndexData,
     DiscountCurve,
+    HazardCurve,
     MarketContext,
     PriceCurve,
     ScalarTimeSeries,
@@ -186,12 +187,12 @@ def structured_index_inputs() -> dict[str, dict[str, Any]]:
     """
     _, index = cds_index(0)
     index["spec"].update({"id": "ANALYST-CDX", "series": 43, "notional": {"amount": "1000000", "currency": "USD"}})
-    index["spec"]["premium"].update({"start": "2024-12-20", "end": "2029-12-20", "spread_bp": "100"})
+    index["spec"]["premium"].update({"start": "2024-12-20", "end": "2029-12-20", "coupon_bp": "100"})
     tranche = {
         "type": "cds_tranche",
         "spec": {
             "id": "CDX-0-3",
-            "accumulated_loss": 0.0,
+            "realized_loss": 0.0,
             "attach_pct": 0.0,
             "detach_pct": 3.0,
             "attributes": {},
@@ -205,10 +206,10 @@ def structured_index_inputs() -> dict[str, dict[str, Any]]:
             "index_name": "CDX.NA.IG",
             "maturity": "2029-12-20",
             "notional": {"amount": "1000000", "currency": "USD"},
-            "running_coupon_bp": 500.0,
+            "coupon_bp": 500.0,
             "series": 43,
             "side": "buy_protection",
-            "standard_imm_dates": True,
+            "roll_rule": "cds_imm",
             "upfront": None,
         },
     }
@@ -250,7 +251,7 @@ def credit_index_inputs() -> dict[str, dict[str, Any]]:
             "recovery_rate": 0.4,
             "settlement": "cash",
             "strike": {"spread": "0.01"},
-            "underlying_cds_coupon": "0.01",
+            "coupon_bp": "100",
             "underlying_convention": "isda_na",
             "underlying_is_index": True,
             "vol_surface_id": "CDX-OPTION-VOL",
@@ -426,8 +427,8 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
             .maturity(maturity)
             .day_count(DayCount.ACT_360)
             .frequency(Tenor.quarterly())
-            .attachment_point(attach)
-            .detachment_point(detach)
+            .attach_pct(attach)
+            .detach_pct(detach)
             .build()
         )
     deal = StructuredCredit.new_clo("ANALYST-CLO", pool, TrancheStructure(notes), AS_OF, maturity, "USD-OIS")
@@ -953,12 +954,17 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
                 [[0.40] * 3] * 4,
             )
         )
-        for iid, rate in (("CONVERT-RISKY", 0.065), ("CONVERT-LIMIT-DF", 0.04)):
-            market.insert(
-                DiscountCurve(
-                    iid, as_of, [(t, math.exp(-rate * t)) for t in (0.0, 1.0, 5.0, 10.0)], day_count="act_365f"
-                )
+        # Issuer hazard curve for the analyst convertible: flat 2.5% intensity,
+        # zero recovery (the zero-recovery risky discount factor is DF_OIS x S).
+        market.insert(HazardCurve("CONVERT-RISKY", as_of, [(1.0, 0.025)], recovery_rate=0.0))
+        market.insert(
+            DiscountCurve(
+                "CONVERT-LIMIT-DF",
+                as_of,
+                [(t, math.exp(-0.04 * t)) for t in (0.0, 1.0, 5.0, 10.0)],
+                day_count="act_365f",
             )
+        )
         for underlying in ("CONVERT", "CONVERT-LIMIT"):
             market.insert_price(underlying, 100.0, "USD")
             market.insert_price(f"{underlying}-VOL", 0.25)

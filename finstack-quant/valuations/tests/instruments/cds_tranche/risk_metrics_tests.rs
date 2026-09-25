@@ -478,7 +478,7 @@ fn test_par_spread_gives_zero_npv() {
         .unwrap();
 
     // Set tranche to par spread and reprice
-    tranche.running_coupon_bp = par_spread;
+    tranche.coupon_bp = par_spread;
     let pv_at_par = pricer
         .price_tranche(&tranche, &market, as_of)
         .unwrap()
@@ -561,7 +561,7 @@ fn test_par_spread_positive_and_side_invariant() {
     let npv_tol = notional * 0.001; // 0.1% of notional
 
     let mut at_par_sell = tranche_sell;
-    at_par_sell.running_coupon_bp = par_sell;
+    at_par_sell.coupon_bp = par_sell;
     let npv_sell = pricer
         .price_tranche(&at_par_sell, &market, as_of)
         .unwrap()
@@ -574,7 +574,7 @@ fn test_par_spread_positive_and_side_invariant() {
     );
 
     let mut at_par_buy = tranche_buy;
-    at_par_buy.running_coupon_bp = par_buy;
+    at_par_buy.coupon_bp = par_buy;
     let npv_buy = pricer
         .price_tranche(&at_par_buy, &market, as_of)
         .unwrap()
@@ -598,7 +598,9 @@ fn test_upfront_equals_pv() {
     let as_of = base_date();
 
     // Act
-    let upfront = pricer.calculate_upfront(&tranche, &market, as_of).unwrap();
+    let upfront = pricer
+        .calculate_model_upfront(&tranche, &market, as_of)
+        .unwrap();
     let pv = pricer
         .price_tranche(&tranche, &market, as_of)
         .unwrap()

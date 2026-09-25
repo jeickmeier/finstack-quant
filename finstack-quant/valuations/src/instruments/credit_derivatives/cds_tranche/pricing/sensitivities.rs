@@ -4,6 +4,7 @@ use super::config::{
     CDSTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_MAX_ITER, PAR_SPREAD_TOLERANCE,
 };
 use super::registry::JumpToDefaultResult;
+use crate::cashflow::builder::specs::RollRule;
 use crate::cashflow::primitives::CFKind;
 use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
@@ -265,7 +266,7 @@ impl CDSTranchePricer {
 
     /// Calculate prior realized loss on the tranche as a fraction of original tranche notional.
     pub(super) fn calculate_prior_tranche_loss(&self, tranche: &CDSTranche) -> f64 {
-        let l = tranche.accumulated_loss;
+        let l = tranche.realized_loss;
         let attach = tranche.attach_pct / 100.0;
         let detach = tranche.detach_pct / 100.0;
         let width = detach - attach;
@@ -279,9 +280,9 @@ impl CDSTranchePricer {
         loss_in_tranche / width
     }
 
-    /// Realized pool default state implied by the accumulated loss.
+    /// Realized pool default state implied by the realized loss.
     ///
-    /// `accumulated_loss` records the realized pool LOSS fraction `L`
+    /// `realized_loss` records the realized pool LOSS fraction `L`
     /// (original-pool units). With recovery `R`, the defaulted NOTIONAL
     /// fraction is `X = L / (1 − R)` and the recovered notional `G = X·R`
     /// is amortized from the top of the capital structure (senior-side
@@ -292,7 +293,7 @@ impl CDSTranchePricer {
         tranche: &CDSTranche,
         recovery_rate: f64,
     ) -> (f64, f64) {
-        let l = tranche.accumulated_loss.clamp(0.0, 1.0);
+        let l = tranche.realized_loss.clamp(0.0, 1.0);
         let lgd = (1.0 - recovery_rate).max(1e-9);
         let defaulted = (l / lgd).min(1.0);
         let recovered = defaulted * recovery_rate.clamp(0.0, 1.0);
@@ -350,7 +351,7 @@ impl CDSTranchePricer {
     ) -> Result<Vec<Date>> {
         let start_date = tranche.contractual_effective_date(as_of).unwrap_or(as_of);
 
-        let dates = if self.params.use_isda_coupon_dates || tranche.standard_imm_dates {
+        let dates = if tranche.roll_rule == RollRule::CdsImm {
             // Business-day-adjust IMM roll dates with the tranche's calendar
             // and convention (Modified Following per ISDA standard), matching
             // the single-name CDS schedule path. Unadjusted 20ths landing on
@@ -385,7 +386,7 @@ impl CDSTranchePricer {
                     start: start_date,
                     end: tranche.maturity,
                     frequency: tranche.frequency,
-                    stub: self.params.schedule_stub,
+                    stub: tranche.stub,
                     business_day_convention: tranche.business_day_convention,
                     calendar_id: tranche
                         .calendar_id
@@ -407,11 +408,12 @@ impl CDSTranchePricer {
         Ok(dates)
     }
 
-    /// Calculate upfront amount for the tranche.
+    /// Calculate the model upfront for the tranche.
     ///
-    /// This is the net present value at inception, representing the
-    /// payment required to enter the position at the standard coupon.
-    pub fn calculate_upfront(
+    /// This is the net present value at the contractual running coupon,
+    /// representing the payment required to enter the position at that
+    /// coupon.
+    pub fn calculate_model_upfront(
         &self,
         tranche: &CDSTranche,
         market_ctx: &MarketContext,
@@ -432,10 +434,10 @@ impl CDSTranchePricer {
     ) -> Result<f64> {
         // Central difference: (PV(c+1bp) - PV(c-1bp)) / 2
         let mut tranche_up = tranche.clone();
-        tranche_up.running_coupon_bp += 1.0;
+        tranche_up.coupon_bp += 1.0;
 
         let mut tranche_down = tranche.clone();
-        tranche_down.running_coupon_bp -= 1.0;
+        tranche_down.coupon_bp -= 1.0;
 
         let pv_up = self.price_tranche(&tranche_up, market_ctx, as_of)?.amount();
         let pv_down = self
@@ -476,7 +478,7 @@ impl CDSTranchePricer {
         // BuyProtection vs SellProtection), so we use their absolute values to guarantee a
         // positive seed for both protection sides.
         let mut unit_tranche = tranche.clone();
-        unit_tranche.running_coupon_bp = 1.0;
+        unit_tranche.coupon_bp = 1.0;
         let premium_per_bp_rows =
             self.project_discountable_rows(&unit_tranche, market_ctx, as_of)?;
         let premium_per_bp = self.discount_projected_rows(
@@ -524,7 +526,7 @@ impl CDSTranchePricer {
         for _iter in 0..PAR_SPREAD_MAX_ITER {
             // Create test tranche with current spread guess
             let mut test_tranche = tranche.clone();
-            test_tranche.running_coupon_bp = spread;
+            test_tranche.coupon_bp = spread;
 
             // Calculate NPV at current spread
             let npv = self
@@ -755,7 +757,7 @@ impl CDSTranchePricer {
         let base_weight = 1.0 / (num_constituents as f64);
         let base_recovery = index_data.recovery_rate;
         let width = detach_frac - attach_frac;
-        let current_loss = tranche.accumulated_loss;
+        let current_loss = tranche.realized_loss;
 
         // Collect JTD impacts for all names
         let mut impacts: Vec<f64> = Vec::with_capacity(num_constituents);
@@ -836,7 +838,7 @@ impl CDSTranchePricer {
     /// ```
     ///
     /// Where:
-    /// - Coupon is the running coupon rate (running_coupon_bp / 10000)
+    /// - Coupon is the running coupon rate (coupon_bp / 10000)
     /// - Accrual_Fraction is the day count fraction from last payment to as_of
     /// - Outstanding_Notional accounts for any realized losses
     ///
@@ -911,7 +913,7 @@ impl CDSTranchePricer {
             tranche.notional.amount() * (1.0 - prior_loss - prior_writedown).max(0.0);
 
         // Calculate accrued premium
-        let coupon = tranche.running_coupon_bp / BASIS_POINTS_PER_UNIT;
+        let coupon = tranche.coupon_bp / BASIS_POINTS_PER_UNIT;
         let accrued = coupon * accrual_fraction * outstanding_notional;
 
         Ok(accrued)

@@ -269,6 +269,17 @@
       "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
       "description": "Valuation date."
     },
+    "credit_curve_id": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hazard curve ID (`credit_curve_id`) used (omitted for `discounting` model)."
+    },
     "currency": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
       "description": "Reporting currency used for row PVs and `total_pv`."
@@ -283,17 +294,6 @@
         "$ref": "#/$defs/CashflowRow"
       },
       "type": "array"
-    },
-    "hazard_curve_id": {
-      "anyOf": [
-        {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Hazard curve ID used (omitted for `discounting` model)."
     },
     "instrument_id": {
       "description": "Instrument identifier.",

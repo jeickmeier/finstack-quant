@@ -21,7 +21,7 @@ pub(crate) fn validate_common_terms(
     strike: &CDSOptionStrike,
     expiry: Date,
     cds_maturity: Date,
-    index_factor: Option<f64>,
+    index_factor: f64,
 ) -> finstack_quant_core::Result<()> {
     match strike {
         CDSOptionStrike::Spread(spread) => {
@@ -55,15 +55,17 @@ pub(crate) fn validate_common_terms(
             expiry, cds_maturity
         )));
     }
-    if let Some(factor) = index_factor {
-        if !factor.is_finite() || factor <= 0.0 || factor > 1.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "index_factor must be finite and in (0, 1], got {}",
-                factor
-            )));
-        }
+    if !index_factor.is_finite() || index_factor <= 0.0 || index_factor > 1.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "index_factor must be finite and in (0, 1], got {index_factor}"
+        )));
     }
     Ok(())
+}
+
+/// Serde default for `index_factor`: a full index (no defaults settled).
+pub(crate) fn default_index_factor() -> f64 {
+    1.0
 }
 
 /// Construction-time inputs for a CDS option.
@@ -100,20 +102,22 @@ pub struct CDSOptionParams {
     /// no-knockout calibration.
     #[serde(default)]
     pub underlying_is_index: bool,
-    /// Optional index-factor scaling for re-versioned indices. Must be in
-    /// `(0, 1]`. This is the current factor `f` at valuation.
-    pub index_factor: Option<f64>,
+    /// Current index factor `f` at valuation: the surviving fraction of the
+    /// original index notional, in `(0, 1]`. Defaults to `1.0` (no settled
+    /// defaults). Applied to the notional only when `underlying_is_index`.
+    #[serde(default = "default_index_factor")]
+    pub index_factor: f64,
     /// Original index factor `f0` attached to the option strike. Required
     /// for clean-price strikes; rejected for spread strikes.
     #[serde(default)]
     pub strike_index_factor: Option<f64>,
-    /// Contractual coupon `c` of the underlying CDS as a decimal rate
-    /// (e.g., `0.01` for 100 bp standard CDX). When `None`, the synthetic
-    /// underlying CDS uses the strike spread as its running coupon
+    /// Contractual running coupon `c` of the underlying CDS, in basis points
+    /// (e.g., `100` for the standard CDX.NA.IG coupon). When `None`, the
+    /// synthetic underlying CDS uses the strike spread as its running coupon
     /// (single-name SNAC default). Required for CDX/iTraxx index options
     /// and for all clean-price strikes.
     #[serde(default)]
-    pub underlying_cds_coupon: Option<Decimal>,
+    pub coupon_bp: Option<Decimal>,
     /// Convention for selecting the synthetic underlying CDS accrual start
     /// when the option does not provide an explicit effective date.
     #[serde(default)]
@@ -150,9 +154,9 @@ impl CDSOptionParams {
             option_type,
             settlement: SettlementType::Cash,
             underlying_is_index: false,
-            index_factor: None,
+            index_factor: default_index_factor(),
             strike_index_factor: None,
-            underlying_cds_coupon: None,
+            coupon_bp: None,
             protection_start_convention: ProtectionStartConvention::default(),
         };
         params.validate()?;
@@ -182,7 +186,7 @@ impl CDSOptionParams {
     /// Mark this option as referencing a CDS index and set its index factor.
     pub fn as_index(mut self, index_factor: f64) -> finstack_quant_core::Result<Self> {
         self.underlying_is_index = true;
-        self.index_factor = Some(index_factor);
+        self.index_factor = index_factor;
         self.validate()?;
         Ok(self)
     }
@@ -205,11 +209,16 @@ impl CDSOptionParams {
         self
     }
 
-    /// Set the contractual coupon `c` of the underlying CDS as a decimal
-    /// rate. Required for CDX/iTraxx index options.
+    /// Set the contractual running coupon `c` of the underlying CDS.
+    /// Required for CDX/iTraxx index options.
+    ///
+    /// # Arguments
+    ///
+    /// * `coupon_bp` - Running coupon in basis points (`100` = 1% per annum,
+    ///   the CDX.NA.IG standard; `500` for CDX.NA.HY).
     #[must_use]
-    pub fn with_underlying_cds_coupon(mut self, coupon: Decimal) -> Self {
-        self.underlying_cds_coupon = Some(coupon);
+    pub fn with_coupon_bp(mut self, coupon_bp: Decimal) -> Self {
+        self.coupon_bp = Some(coupon_bp);
         self
     }
 
@@ -288,7 +297,7 @@ mod tests {
         assert!(params.clone().as_index(1.5).is_err());
         let indexed = params.as_index(0.85).unwrap();
         assert!(indexed.underlying_is_index);
-        assert_eq!(indexed.index_factor, Some(0.85));
+        assert_eq!(indexed.index_factor, 0.85);
     }
 
     #[test]

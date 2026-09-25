@@ -427,7 +427,7 @@ impl HazardCurveTarget {
                             ))
                         })?;
                     let spread_bp = cds
-                        .get_par_spread(&calibrated_context, params.base_date)
+                        .par_spread(&calibrated_context, params.base_date)
                         .map_err(|error| {
                             finstack_quant_core::Error::Validation(format!(
                                 "cannot derive par-spread replay input for upfront quote '{}': {error}",
@@ -503,9 +503,7 @@ impl HazardCurveTarget {
         let curve_recovery = self.params.recovery_rate;
         let quote_spread_bp = match pq.quote.as_ref() {
             crate::quotes::cds::CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
-            crate::quotes::cds::CdsQuote::CdsUpfront {
-                running_spread_bp, ..
-            } => *running_spread_bp,
+            crate::quotes::cds::CdsQuote::CdsUpfront { coupon_bp, .. } => *coupon_bp,
         };
         let recovery = if curve_recovery.is_finite() {
             curve_recovery

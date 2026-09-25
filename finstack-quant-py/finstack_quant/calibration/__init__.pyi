@@ -947,7 +947,7 @@ class CdsQuote:
         currency: str,
         doc_clause: str,
         pillar: str,
-        running_spread_bp: float,
+        coupon_bp: float,
         upfront_pct: float,
         recovery_rate: float,
     ) -> CdsQuote:
@@ -965,7 +965,7 @@ class CdsQuote:
             ISDA documentation clause, for example ``"xr14"``.
         pillar : str
             Contract tenor code, for example ``"5Y"``.
-        running_spread_bp : float
+        coupon_bp : float
             Fixed running coupon in basis points per annum (``100.0`` or ``500.0``
             for the standard North American coupons).
         upfront_pct : float
@@ -1020,7 +1020,7 @@ class CdsQuote:
         """
 
     @property
-    def running_spread_bp(self) -> float:
+    def coupon_bp(self) -> float:
         """
         Running or par spread in basis points per annum.
 

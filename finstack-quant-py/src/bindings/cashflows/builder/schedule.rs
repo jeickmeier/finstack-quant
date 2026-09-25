@@ -593,7 +593,7 @@ impl PyCashFlowSchedule {
     ///     Valuation date for discount times; flows on or before it get zero PV.
     /// day_count : DayCount, optional
     ///     Day-count for discount times (default Act/365F).
-    /// hazard_curve_id : str, optional
+    /// credit_curve_id : str, optional
     ///     Hazard curve identifier for credit-adjusted PV.
     ///
     /// Returns
@@ -610,8 +610,8 @@ impl PyCashFlowSchedule {
     ///     If periods overlap or discount inputs are inconsistent.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(
-        signature = (periods, market, disc_curve_id, base, day_count=None, hazard_curve_id=None),
-        text_signature = "(self, periods, market, disc_curve_id, base, day_count=None, hazard_curve_id=None)"
+        signature = (periods, market, disc_curve_id, base, day_count=None, credit_curve_id=None),
+        text_signature = "(self, periods, market, disc_curve_id, base, day_count=None, credit_curve_id=None)"
     )]
     fn pv_by_period<'py>(
         &self,
@@ -621,7 +621,7 @@ impl PyCashFlowSchedule {
         disc_curve_id: &str,
         base: &Bound<'_, PyAny>,
         day_count: Option<PyRef<'_, PyDayCount>>,
-        hazard_curve_id: Option<&str>,
+        credit_curve_id: Option<&str>,
     ) -> PyResult<PyPeriodAggregation> {
         let periods: Vec<finstack_quant_core::dates::Period> =
             periods.iter().map(|p| p.inner.clone()).collect();
@@ -629,7 +629,7 @@ impl PyCashFlowSchedule {
         let base = extract_date(base)?;
         let day_count = day_count.map(|d| d.inner);
         let disc_id = CurveId::from(disc_curve_id);
-        let hazard_id = hazard_curve_id.map(CurveId::from);
+        let hazard_id = credit_curve_id.map(CurveId::from);
         let schedule = self.inner.clone();
         py.detach(move || {
             schedule.pv_by_period(

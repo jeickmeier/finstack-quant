@@ -99,7 +99,7 @@ fn test_credit_spread_effect_larger_for_otm() {
         let rf_rate = market_params::RISK_FREE_RATE;
         let credit_rate = rf_rate + 0.02; // 200bp spread
         use finstack_quant_core::market_data::scalars::MarketScalar;
-        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
         use finstack_quant_core::math::interp::InterpStyle;
 
         let rf_curve = DiscountCurve::builder("USD-OIS")
@@ -108,12 +108,8 @@ fn test_credit_spread_effect_larger_for_otm() {
             .interp(InterpStyle::Linear)
             .build()
             .unwrap();
-        let credit_curve = DiscountCurve::builder("USD-CREDIT")
-            .base_date(base_date)
-            .knots([(0.0, 1.0), (10.0, (-credit_rate * 10.0).exp())])
-            .interp(InterpStyle::Linear)
-            .build()
-            .unwrap();
+        let credit_curve =
+            HazardCurve::flat("USD-CREDIT", base_date, credit_rate - rf_rate, 0.0).unwrap();
 
         finstack_quant_core::market_data::context::MarketContext::new()
             .insert(rf_curve)

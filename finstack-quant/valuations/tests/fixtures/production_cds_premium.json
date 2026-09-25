@@ -21,10 +21,10 @@
             "count": 6,
             "unit": "months"
           },
-          "spread_bp": "100",
+          "coupon_bp": "100",
           "start": "2025-01-01",
           "stub": "short_front",
-          "standard_imm_dates": false
+          "roll_rule": "none"
         },
         "protection": {
           "credit_curve_id": "HZ",

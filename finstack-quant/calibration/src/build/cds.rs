@@ -178,7 +178,7 @@ fn resolve_cds_dates(
 ///         doc_clause: CdsDocClause::Cr14,
 ///     },
 ///     pillar: Pillar::Tenor("5Y".parse().unwrap()),
-///     running_spread_bp: 500.0,
+///     coupon_bp: 500.0,
 ///     upfront_pct: 0.02, // 2% upfront
 ///     recovery_rate: 0.40,
 /// };
@@ -198,7 +198,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
     let registry = ConventionRegistry::try_global()?;
 
     // Normalize both quote styles onto a shared running-coupon path before building.
-    let spread_bp = quote.quoted_running_spread_bp();
+    let spread_bp = quote.coupon_bp();
 
     let (id, convention_key, entity, pillar, recovery_rate, upfront) = match quote {
         CdsQuote::CdsParSpread {
@@ -238,7 +238,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
     let credit_id = ctx.require_curve_id("credit")?.to_string();
 
     // Amount = Notional * pct; Date = Spot (Settlement)
-    let upfront_payment = upfront
+    let upfront = upfront
         .map(|pct| {
             Ok::<_, finstack_quant_core::Error>((
                 dates.spot,
@@ -254,7 +254,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
         side: PayReceive::Pay,
         convention: conv.family,
         premium: PremiumLegSpec {
-            standard_imm_dates: true,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start: dates.start,
             end: dates.maturity,
             frequency: conv.frequency,
@@ -262,9 +262,9 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
             business_day_convention: conv.business_day_convention,
             calendar_id: Some(conv.calendar_id.clone()),
             day_count: conv.day_count,
-            spread_bp: Decimal::try_from(spread_bp).map_err(|e| {
+            coupon_bp: Decimal::try_from(spread_bp).map_err(|e| {
                 finstack_quant_core::Error::Validation(format!(
-                    "spread_bp {} cannot be represented as Decimal: {}",
+                    "premium.coupon_bp {} cannot be represented as Decimal: {}",
                     spread_bp, e
                 ))
             })?,
@@ -279,7 +279,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         valuation_convention: ctx.cds_valuation_convention().unwrap_or_default(),
-        upfront: upfront_payment,
+        upfront,
         doc_clause: Some(convention_key.doc_clause),
         protection_effective_date: None,
         margin_spec: None,

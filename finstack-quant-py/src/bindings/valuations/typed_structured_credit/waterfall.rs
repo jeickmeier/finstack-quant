@@ -31,7 +31,7 @@ use super::PyCoverageRules;
 /// ...     PoolAsset.fixed_rate_bond("LOAN-1", Money(80_000_000.0, Currency("USD")), 0.07, maturity, DayCount.ACT_360)
 /// ... ])
 /// >>> note = (
-/// ...     Tranche.builder().id("A").attachment_point(0.0).detachment_point(100.0)
+/// ...     Tranche.builder().id("A").attach_pct(0.0).detach_pct(100.0)
 /// ...     .seniority("senior").original_balance(Money(80_000_000.0, Currency("USD")))
 /// ...     .coupon_fixed(0.05).maturity(maturity).build()
 /// ... )

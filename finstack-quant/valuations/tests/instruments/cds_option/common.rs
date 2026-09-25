@@ -147,8 +147,8 @@ pub struct CDSOptionBuilder {
     is_index: bool,
     index_factor: Option<f64>,
     strike_index_factor: Option<f64>,
-    realized_index_loss: Option<f64>,
-    underlying_cds_coupon_bp: Option<f64>,
+    realized_loss: Option<f64>,
+    coupon_bp: Option<f64>,
     protection_start_convention: ProtectionStartConvention,
     knockout: Option<bool>,
 }
@@ -167,8 +167,8 @@ impl CDSOptionBuilder {
             is_index: false,
             index_factor: None,
             strike_index_factor: None,
-            realized_index_loss: None,
-            underlying_cds_coupon_bp: None,
+            realized_loss: None,
+            coupon_bp: None,
             protection_start_convention: ProtectionStartConvention::Forward,
             knockout: None,
         }
@@ -203,8 +203,8 @@ impl CDSOptionBuilder {
 
     /// Realized cumulative index loss per unit original notional.
     #[allow(dead_code)]
-    pub fn realized_index_loss(mut self, loss: f64) -> Self {
-        self.realized_index_loss = Some(loss);
+    pub fn realized_loss(mut self, loss: f64) -> Self {
+        self.realized_loss = Some(loss);
         self
     }
 
@@ -255,8 +255,8 @@ impl CDSOptionBuilder {
     /// points. Required for CDX-style index options (e.g. 100 bp) where
     /// the running coupon differs from the option strike.
     #[allow(dead_code)]
-    pub fn underlying_cds_coupon_bp(mut self, bp: f64) -> Self {
-        self.underlying_cds_coupon_bp = Some(bp);
+    pub fn coupon_bp(mut self, bp: f64) -> Self {
+        self.coupon_bp = Some(bp);
         self
     }
 
@@ -302,8 +302,9 @@ impl CDSOptionBuilder {
                 .with_strike_index_factor(f0)
                 .expect("valid strike index factor");
         }
-        if let Some(bp) = self.underlying_cds_coupon_bp {
-            option_params = option_params.with_underlying_cds_coupon(bp_to_decimal(bp));
+        if let Some(bp) = self.coupon_bp {
+            option_params = option_params
+                .with_coupon_bp(rust_decimal::Decimal::try_from(bp).expect("valid coupon bp"));
         }
 
         let credit_params = CreditParams::corporate_standard("SN", "HZ-SN");
@@ -323,7 +324,7 @@ impl CDSOptionBuilder {
                 .implied_volatility = Some(vol);
         }
         option.knockout = self.knockout.unwrap_or(!self.is_index);
-        option.realized_index_loss = self.realized_index_loss;
+        option.realized_loss = self.realized_loss.unwrap_or(0.0);
 
         option
     }

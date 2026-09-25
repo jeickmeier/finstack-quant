@@ -20,6 +20,7 @@ mod test_credit_curve;
 mod test_edge_cases;
 mod test_embedded_options;
 mod test_greeks;
+mod test_hazard_credit;
 mod test_metrics;
 mod test_pricing_basic;
 mod test_production_audit;

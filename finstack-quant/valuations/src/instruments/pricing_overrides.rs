@@ -202,28 +202,6 @@ pub struct MarketQuoteOverrides {
     /// other instrument (CDSIndex included) reads it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cds_quote_bp: Option<f64>,
-
-    /// PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-    ///
-    /// This is an **already-discounted** adjustment to the net present value.
-    /// It is added directly to the NPV without further discounting.
-    ///
-    /// # Sign Convention
-    ///
-    /// For CDS, CDS index, and CDS tranche instruments, a positive amount is
-    /// paid by the protection buyer: it decreases buyer NPV and increases
-    /// seller NPV. Other instrument families may treat the amount as an
-    /// explicitly signed PV adjustment and document that convention locally.
-    ///
-    /// # Relationship to CDS Dated Upfront
-    ///
-    /// For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-    /// - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-    /// - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-    ///
-    /// Both can be set simultaneously without double-counting.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub upfront_payment: Option<Money>,
 }
 
 impl MarketQuoteOverrides {
@@ -873,12 +851,6 @@ impl InstrumentPricingOverrides {
     /// Set the CDS par-spread quote in basis points.
     pub fn with_cds_quote_bp(mut self, spread_bp: f64) -> Self {
         self.market_quotes.cds_quote_bp = Some(spread_bp);
-        self
-    }
-
-    /// Set the upfront payment used by credit-derivative pricers.
-    pub fn with_upfront(mut self, upfront: Money) -> Self {
-        self.market_quotes.upfront_payment = Some(upfront);
         self
     }
 

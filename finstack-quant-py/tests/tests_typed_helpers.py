@@ -17,6 +17,7 @@ import datetime
 import json
 from pathlib import Path
 
+from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
@@ -153,7 +154,7 @@ def cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
             DayCount.ACT_360,
             100.0,
             "USD-OIS",
-            standard_imm_dates=True,
+            roll_rule=RollRule.CDS_IMM,
         ),
         ProtectionLegSpec("ACME-CDS", 0.4, 3),
     )
@@ -258,7 +259,7 @@ def build_cds_tranche() -> CDSTranche:
         .detach_pct(7.0)
         .notional(Money(10_000_000.0, Currency("USD")))
         .maturity(datetime.date(2029, 6, 20))
-        .running_coupon_bp(100.0)
+        .coupon_bp(100.0)
         .frequency(Tenor.quarterly())
         .day_count(DayCount.ACT_360)
         .discount_curve_id("USD-OIS")
@@ -314,8 +315,8 @@ def structured_credit_tranches() -> TrancheStructure:
         Tranche
         .builder()
         .id("A")
-        .attachment_point(10.0)
-        .detachment_point(100.0)
+        .attach_pct(10.0)
+        .detach_pct(100.0)
         .seniority("senior")
         .original_balance(Money(72_000_000.0, Currency("USD")))
         .coupon_fixed(0.05)
@@ -326,8 +327,8 @@ def structured_credit_tranches() -> TrancheStructure:
         Tranche
         .builder()
         .id("E")
-        .attachment_point(0.0)
-        .detachment_point(10.0)
+        .attach_pct(0.0)
+        .detach_pct(10.0)
         .seniority("equity")
         .original_balance(Money(8_000_000.0, Currency("USD")))
         .coupon_fixed(0.0)

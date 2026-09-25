@@ -69,9 +69,9 @@ pub struct InstrumentCashflowEnvelope {
     pub as_of: Date,
     /// Discount curve ID used.
     pub discount_curve_id: CurveId,
-    /// Hazard curve ID used (omitted for `discounting` model).
+    /// Hazard curve ID (`credit_curve_id`) used (omitted for `discounting` model).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hazard_curve_id: Option<CurveId>,
+    pub credit_curve_id: Option<CurveId>,
     /// Recovery rate from the hazard curve (omitted for `discounting` model).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recovery_rate: Option<f64>,
@@ -303,7 +303,7 @@ fn build_envelope(
     };
     let primary_discount = market.get_discount(discount_curve_id.as_str())?;
 
-    let (hazard_curve_id, hazard_arc) = if matches!(model_key, ModelKey::HazardRate) {
+    let (credit_curve_id, hazard_arc) = if matches!(model_key, ModelKey::HazardRate) {
         let id = curves.credit_curves.first().cloned().ok_or_else(|| {
             Error::Validation(
                 "instrument declares no hazard curve; hazard_rate model requires one".into(),
@@ -357,7 +357,7 @@ fn build_envelope(
                      at as_of {as_of_date}; an already-defaulted name cannot be exported as a \
                      surviving cashflow stream — value recovery proceeds instead. \
                      Check the hazard curve's base date and calibration.",
-                    hazard_curve_id
+                    credit_curve_id
                         .as_ref()
                         .map(|id| id.as_str())
                         .unwrap_or("<unknown>")
@@ -529,7 +529,7 @@ fn build_envelope(
         model: model_key.to_string(),
         as_of: as_of_date,
         discount_curve_id,
-        hazard_curve_id,
+        credit_curve_id,
         recovery_rate,
         flows: rows,
         total_pv,

@@ -70,8 +70,10 @@ The maintained root inventory and artifact links are in
 - WASM exposes the corresponding camelCase name.
 - Use `frequency`, `day_count`, and `business_day_convention`.
 - Use `*_currency`, `*_bp`, `as_of_spreads`, and `vol_surface_id`.
-- Use `credit_curve_id` for instrument dependencies. Reserve
-  `hazard_curve_id` for concrete hazard state, calibration, and output.
+- Use `credit_curve_id` for every hazard-curve reference: instrument
+  dependencies, function inputs, and outputs that echo them (for example the
+  cashflow envelope). It always names a `HazardCurve`, never a risky discount
+  curve.
 - Fix names at their canonical Rust source. Never retain a bad name through an
   alias or binding-only rename.
 

@@ -150,7 +150,7 @@ fn sample_tranche() -> CDSTranche {
             7.0,                                          // detach_pct (7%)
             Money::from((10_000_000_i64, Currency::USD)), // $10MM notional
             maturity,                                     // maturity
-            500.0,                                        // running_coupon_bp (5%)
+            500.0,                                        // coupon_bp (5%)
         );
         let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
         let mut tranche = CDSTranche::new(
@@ -162,7 +162,7 @@ fn sample_tranche() -> CDSTranche {
             TrancheSide::SellProtection,
         )
         .expect("Valid tranche parameters");
-        tranche.standard_imm_dates = true;
+        tranche.roll_rule = crate::cashflow::builder::specs::RollRule::CdsImm;
         tranche
     }
 }
@@ -178,7 +178,7 @@ fn test_model_creation() {
 }
 
 #[test]
-fn upfront_override_uses_protection_side_and_survives_wipeout() {
+fn upfront_uses_protection_side_and_survives_wipeout() {
     let market = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
     let upfront = Money::from((125000_i64, Currency::USD));
@@ -188,10 +188,7 @@ fn upfront_override_uses_protection_side_and_survives_wipeout() {
     let seller_base = pricer
         .price_tranche(&seller, &market, as_of)
         .expect("seller base");
-    seller
-        .instrument_pricing_overrides
-        .market_quotes
-        .upfront_payment = Some(upfront);
+    seller.upfront = Some((as_of, upfront));
     let seller_with = pricer
         .price_tranche(&seller, &market, as_of)
         .expect("seller upfront");
@@ -199,23 +196,17 @@ fn upfront_override_uses_protection_side_and_survives_wipeout() {
 
     let mut buyer = seller;
     buyer.side = TrancheSide::BuyProtection;
-    buyer
-        .instrument_pricing_overrides
-        .market_quotes
-        .upfront_payment = None;
+    buyer.upfront = None;
     let buyer_base = pricer
         .price_tranche(&buyer, &market, as_of)
         .expect("buyer base");
-    buyer
-        .instrument_pricing_overrides
-        .market_quotes
-        .upfront_payment = Some(upfront);
+    buyer.upfront = Some((as_of, upfront));
     let buyer_with = pricer
         .price_tranche(&buyer, &market, as_of)
         .expect("buyer upfront");
     assert!((buyer_with.amount() - buyer_base.amount() + upfront.amount()).abs() < 1e-9);
 
-    buyer.accumulated_loss = buyer.detach_pct / 100.0;
+    buyer.realized_loss = buyer.detach_pct / 100.0;
     assert_eq!(
         pricer
             .price_tranche(&buyer, &market, as_of)
@@ -395,7 +386,7 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
     let ctx_base = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let mut tranche = sample_tranche();
-    tranche.running_coupon_bp = 0.0; // isolate protection leg
+    tranche.coupon_bp = 0.0; // isolate protection leg
 
     // Build a context with issuer curves identical to index curve
     let index_data = ctx_base
@@ -774,7 +765,7 @@ fn test_payment_schedule_imm_vs_non_imm() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
 
     let mut imm_tranche = sample_tranche();
-    imm_tranche.standard_imm_dates = true;
+    imm_tranche.roll_rule = crate::cashflow::builder::specs::RollRule::CdsImm;
     imm_tranche.effective_date =
         Some(Date::from_calendar_date(2025, Month::March, 20).expect("cds date"));
     imm_tranche.maturity = Date::from_calendar_date(2030, Month::March, 20).expect("cds date");
@@ -806,7 +797,7 @@ fn test_payment_schedule_imm_vs_non_imm() {
     }
 
     let mut non_imm_tranche = sample_tranche();
-    non_imm_tranche.standard_imm_dates = false;
+    non_imm_tranche.roll_rule = crate::cashflow::builder::specs::RollRule::None;
     non_imm_tranche.effective_date =
         Some(Date::from_calendar_date(2025, Month::January, 15).expect("valid date"));
     non_imm_tranche.maturity =
@@ -850,7 +841,7 @@ fn new_honors_monthly_schedule_params() {
     .expect("Valid tranche parameters");
 
     assert!(
-        !tranche.standard_imm_dates,
+        tranche.roll_rule != crate::cashflow::builder::specs::RollRule::CdsImm,
         "CDSTranche::new must honor ScheduleParams rather than implicit IMM"
     );
     assert_eq!(
@@ -899,7 +890,10 @@ fn standard_constructor_uses_imm_cds_dates() {
     )
     .expect("Valid tranche parameters");
 
-    assert!(tranche.standard_imm_dates);
+    assert_eq!(
+        tranche.roll_rule,
+        crate::cashflow::builder::specs::RollRule::CdsImm
+    );
     assert!(tranche.calendar_id.is_none());
 
     let dates = model
@@ -1249,8 +1243,8 @@ fn test_realized_loss_impact() {
     tranche.attach_pct = 0.0;
     tranche.detach_pct = 3.0;
     tranche.series = 42;
-    tranche.accumulated_loss = 0.0;
-    tranche.standard_imm_dates = true;
+    tranche.realized_loss = 0.0;
+    tranche.roll_rule = crate::cashflow::builder::specs::RollRule::CdsImm;
 
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -1264,7 +1258,7 @@ fn test_realized_loss_impact() {
     // 2. Price with 1% realized loss (portfolio lost 1%, so tranche is 1/3 wiped out)
     // Remaining tranche is effectively [0, (3-1)/(1-0.01)] = [0, 2.02%] on surviving portfolio
     // Outstanding notional starts at 2/3 of original
-    tranche.accumulated_loss = 0.01;
+    tranche.realized_loss = 0.01;
     let pv_loss = model
         .price_tranche(&tranche, &market_ctx, as_of)
         .expect("Pricing tranche with loss")
@@ -1274,7 +1268,7 @@ fn test_realized_loss_impact() {
     assert!(pv_loss != pv_clean, "Realized loss should impact PV");
 
     // 3. Price with 4% realized loss (tranche wiped out)
-    tranche.accumulated_loss = 0.04;
+    tranche.realized_loss = 0.04;
     let pv_wiped = model
         .price_tranche(&tranche, &market_ctx, as_of)
         .expect("Pricing wiped tranche")
@@ -1370,7 +1364,7 @@ fn test_nearly_wiped_tranche() {
     tranche.attach_pct = 0.0;
     tranche.detach_pct = 3.0;
     // 2.99% loss means only 0.01% remaining (99.67% wiped)
-    tranche.accumulated_loss = 0.0299;
+    tranche.realized_loss = 0.0299;
 
     let market_ctx = sample_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -1521,7 +1515,7 @@ fn test_par_spread_solver_convergence() {
 
     // Verify: pricing at par spread should give near-zero NPV
     let mut test_tranche = tranche;
-    test_tranche.running_coupon_bp = spread;
+    test_tranche.coupon_bp = spread;
     let npv = model.price_tranche(&test_tranche, &market_ctx, as_of);
     assert!(npv.is_ok());
     let npv_amount = npv.expect("NPV should be Ok").amount().abs();
@@ -1573,7 +1567,7 @@ fn par_spread_ok_result_is_always_a_true_par() {
                     // genuine par spread, not a silent last iterate.
                     assert!(spread.is_finite() && spread >= 0.0);
                     let mut at_par = tranche.clone();
-                    at_par.running_coupon_bp = spread;
+                    at_par.coupon_bp = spread;
                     let npv = model
                         .price_tranche(&at_par, &market_ctx, as_of)
                         .expect("pricing at par")
@@ -2245,9 +2239,9 @@ fn aod_enabled_premium_exceeds_disabled_premium() {
     let tranche = sample_tranche(); // sell protection, 500bp coupon
 
     let mut enabled = CDSTranchePricer::new();
-    enabled.params.accrual_on_default_enabled = true;
+    enabled.params.include_accrual_on_default = true;
     let mut disabled = CDSTranchePricer::new();
-    disabled.params.accrual_on_default_enabled = false;
+    disabled.params.include_accrual_on_default = false;
 
     let pv_enabled = premium_leg_pv(&enabled, &tranche, &market_ctx);
     let pv_disabled = premium_leg_pv(&disabled, &tranche, &market_ctx);
@@ -2316,7 +2310,7 @@ fn rising_hazard_lowers_premium_leg_pv() {
 
     for aod_enabled in [true, false] {
         let mut pricer = CDSTranchePricer::new();
-        pricer.params.accrual_on_default_enabled = aod_enabled;
+        pricer.params.include_accrual_on_default = aod_enabled;
 
         let pv_low = premium_leg_pv(&pricer, &tranche, &build_ctx(1.0));
         let pv_high = premium_leg_pv(&pricer, &tranche, &build_ctx(3.0));
@@ -2422,7 +2416,7 @@ fn zero_recovery_has_no_senior_writedown() {
 
     // Realized state: X = L when R = 0.
     let mut seasoned = tranche;
-    seasoned.accumulated_loss = 0.05;
+    seasoned.realized_loss = 0.05;
     let (defaulted, recovered) = pricer.realized_default_state(&seasoned, 0.0);
     assert!((defaulted - 0.05).abs() < 1e-12, "X must equal L at R=0");
     assert!(recovered.abs() < 1e-15, "G must be zero at R=0");
@@ -2480,7 +2474,7 @@ fn super_senior_premium_falls_as_hazard_rises() {
 }
 
 /// Regression: hand-computed seasoned case. With
-/// `accumulated_loss = 6%` and `R = 40%`: defaulted `X = 0.06/0.6 = 10%`,
+/// `realized_loss = 6%` and `R = 40%`: defaulted `X = 0.06/0.6 = 10%`,
 /// recovered `G = 4%`, pool factor `0.9`. A `[95%, 100%]` super-senior is
 /// written down from the top by `G = 4%` of the pool = 80% of its 5% width;
 /// effective detach erodes to `1 − G`.
@@ -2488,7 +2482,7 @@ fn super_senior_premium_falls_as_hazard_rises() {
 fn seasoned_recovery_writedown_matches_hand_computation() {
     let pricer = CDSTranchePricer::new();
     let mut tranche = super_senior_tranche(95.0, 100.0);
-    tranche.accumulated_loss = 0.06;
+    tranche.realized_loss = 0.06;
     let recovery = 0.40;
 
     let (defaulted, recovered) = pricer.realized_default_state(&tranche, recovery);
@@ -2526,7 +2520,7 @@ fn mid_period_protection_uses_survival_weighted_timing() {
 
     // Sell-protection, zero coupon: PV is the (signed) protection leg only.
     let mut tranche = sample_tranche();
-    tranche.running_coupon_bp = 0.0;
+    tranche.coupon_bp = 0.0;
 
     let mut with_mid = CDSTranchePricer::new();
     with_mid.params.mid_period_protection = true;
@@ -2566,8 +2560,8 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
     let effective_date = Date::from_calendar_date(2024, Month::December, 20).expect("date");
     let mut tranche = sample_tranche();
     tranche.effective_date = Some(effective_date);
-    tranche.standard_imm_dates = false;
-    tranche.running_coupon_bp = 0.0;
+    tranche.roll_rule = crate::cashflow::builder::specs::RollRule::None;
+    tranche.coupon_bp = 0.0;
 
     let pricer = CDSTranchePricer::new();
     let rows = pricer

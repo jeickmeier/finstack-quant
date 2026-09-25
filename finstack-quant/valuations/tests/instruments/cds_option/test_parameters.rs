@@ -32,8 +32,8 @@ fn test_call_constructor() {
     assert_eq!(params.notional.currency(), Currency::USD);
     assert!(matches!(params.option_type, OptionType::Call));
     assert!(!params.underlying_is_index);
-    assert_eq!(params.index_factor, None);
-    assert_eq!(params.underlying_cds_coupon, None);
+    assert_eq!(params.index_factor, 1.0);
+    assert_eq!(params.coupon_bp, None);
 }
 
 #[test]
@@ -72,11 +72,11 @@ fn test_index_option_builder() {
     .expect("valid index factor");
 
     assert!(params.underlying_is_index);
-    assert_eq!(params.index_factor, Some(0.85));
+    assert_eq!(params.index_factor, 0.85);
 }
 
 #[test]
-fn test_underlying_cds_coupon_for_index() {
+fn test_coupon_bp_for_index() {
     // CDX/iTraxx index options have a contractual coupon distinct from
     // the option strike (e.g. 100 bp standard CDX). The Bloomberg CDSO
     // strike-adjustment term H(K) = ξN(c − K)A(K) is non-zero only when
@@ -94,9 +94,9 @@ fn test_underlying_cds_coupon_for_index() {
     .expect("valid call params")
     .as_index(1.0)
     .expect("valid index factor")
-    .with_underlying_cds_coupon(Decimal::new(1, 2)); // 0.01 = 100 bp standard CDX
+    .with_coupon_bp(Decimal::new(100, 0)); // 0.01 = 100 bp standard CDX
 
-    assert_eq!(params.underlying_cds_coupon, Some(Decimal::new(1, 2)));
+    assert_eq!(params.coupon_bp, Some(Decimal::new(100, 0)));
     assert!(params.underlying_is_index);
 }
 
@@ -115,13 +115,13 @@ fn test_chained_builders() {
     .expect("valid put params")
     .as_index(0.75)
     .expect("valid index factor")
-    .with_underlying_cds_coupon(Decimal::new(1, 2));
+    .with_coupon_bp(Decimal::new(100, 0));
 
     assert!(matches!(params.option_type, OptionType::Put));
     assert_eq!(params.strike.spread_decimal(), Some(Decimal::new(2, 2)));
     assert!(params.underlying_is_index);
-    assert_eq!(params.index_factor, Some(0.75));
-    assert_eq!(params.underlying_cds_coupon, Some(Decimal::new(1, 2)));
+    assert_eq!(params.index_factor, 0.75);
+    assert_eq!(params.coupon_bp, Some(Decimal::new(100, 0)));
 }
 
 #[test]

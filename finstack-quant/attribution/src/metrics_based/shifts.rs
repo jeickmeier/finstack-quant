@@ -341,8 +341,7 @@ const TWIST_FRACTION_THRESHOLD: f64 = 1e-2;
 /// tenor grid. Counterpart of [`discount_curve_abs_shift_bp`] for credit.
 ///
 /// For a hazard curve this is the L1 mean of the par CDS spread move; for a
-/// discount-style credit curve (e.g. a convertible's risky discount curve) it
-/// is the L1 mean of the zero-rate move. Either way it pairs with the signed
+/// discount-style credit curve it is the L1 mean of the zero-rate move. Either way it pairs with the signed
 /// mean that the per-method credit attribution consumes.
 ///
 /// Returns `0.0` if either side's curve is missing.

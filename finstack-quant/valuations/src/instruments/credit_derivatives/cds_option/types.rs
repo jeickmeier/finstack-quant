@@ -44,8 +44,6 @@ use time::Month;
 use super::parameters::CDSOptionParams;
 use crate::impl_instrument_base;
 
-/// Maximum valid recovery rate (exclusive upper bound).
-pub(crate) const MAX_RECOVERY_RATE: f64 = 1.0;
 /// Maximum valid implied volatility (inclusive upper bound).
 /// 500% lognormal vol is extremely high but theoretically valid.
 pub(crate) const MAX_IMPLIED_VOL: f64 = 5.0;
@@ -213,12 +211,14 @@ pub struct CDSOption {
     /// knock out on default and skip it.
     #[serde(default)]
     pub underlying_is_index: bool,
-    /// Optional index factor scaling for the index underlying.
-    ///
-    /// This is the **current** index factor `f` at valuation. See
-    /// [`Self::strike_index_factor`] for the original factor `f0` attached
-    /// to a clean-price strike.
-    pub index_factor: Option<f64>,
+    /// Current index factor `f` at valuation: the surviving fraction of the
+    /// original index notional, in `(0, 1]`. Defaults to `1.0` (no settled
+    /// defaults) and scales the notional only when `underlying_is_index`.
+    /// See [`Self::strike_index_factor`] for the original factor `f0`
+    /// attached to a clean-price strike.
+    #[serde(default = "super::parameters::default_index_factor")]
+    #[builder(default = 1.0)]
+    pub index_factor: f64,
     /// Original index factor `f0` attached to the option strike.
     ///
     /// Distinct from [`Self::index_factor`], which is the current factor
@@ -232,19 +232,20 @@ pub struct CDSOption {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default)]
     pub strike_index_factor: Option<f64>,
-    /// Realized cumulative index loss from option inception to valuation
-    /// date, expressed per unit of original index notional.
+    /// Realized (settled) cumulative index loss from option inception to
+    /// valuation date, as a decimal fraction of the original index notional
+    /// in `[0, 1]`. Defaults to `0.0`.
     ///
     /// Bloomberg CDSO treats index options as no-knockout. Settled losses
     /// after option inception are therefore deterministic payoff adjustments
     /// at exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name
-    /// options knock out instead and must leave this unset.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// options knock out instead and must leave this at `0.0`.
+    #[serde(default)]
     #[builder(default)]
-    pub realized_index_loss: Option<f64>,
-    /// Contractual coupon `c` of the underlying CDS, expressed as a decimal
-    /// rate (e.g., 0.01 for the 100 bp standard CDX coupon, 0.05 for the
-    /// 500 bp standard CDX.HY coupon). When `None`, the synthetic underlying
+    pub realized_loss: f64,
+    /// Contractual running coupon `c` of the underlying CDS, in basis points
+    /// (e.g., `100` for the standard CDX.NA.IG coupon, `500` for the
+    /// standard CDX.NA.HY coupon). When `None`, the synthetic underlying
     /// CDS uses `strike` as its running coupon — the appropriate single-name
     /// SNAC default where the trade is struck at the par spread. For CDS
     /// index options where the index has a fixed standard coupon different
@@ -256,7 +257,7 @@ pub struct CDSOption {
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DecimalWire>")
     )]
-    pub underlying_cds_coupon: Option<Decimal>,
+    pub coupon_bp: Option<Decimal>,
 }
 
 impl CDSOption {
@@ -321,41 +322,31 @@ impl CDSOption {
             }
         }
 
-        // Recovery rate validation
-        if !self.recovery_rate.is_finite()
-            || self.recovery_rate <= 0.0
-            || self.recovery_rate >= MAX_RECOVERY_RATE
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "recovery_rate must be finite and in (0, 1), got {}",
-                self.recovery_rate
-            )));
-        }
+        // Recovery rate: the shared credit-instrument invariant, `[0, 1)`.
+        crate::instruments::common_impl::validation::validate_recovery_rate(self.recovery_rate)?;
 
         // Realized index loss validation
-        if let Some(loss) = self.realized_index_loss {
-            if !(0.0..=1.0).contains(&loss) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "realized_index_loss must be in [0, 1], got {}",
-                    loss
-                )));
-            }
-            if loss > 0.0 && !self.underlying_is_index {
-                return Err(finstack_quant_core::Error::Validation(
-                    "realized_index_loss is only supported for CDS index options".to_string(),
-                ));
-            }
+        if !(0.0..=1.0).contains(&self.realized_loss) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "realized_loss must be in [0, 1], got {}",
+                self.realized_loss
+            )));
         }
-
-        if self.underlying_is_index && self.underlying_cds_coupon.is_none() {
+        if self.realized_loss > 0.0 && !self.underlying_is_index {
             return Err(finstack_quant_core::Error::Validation(
-                "underlying_cds_coupon is required for CDS index options".to_string(),
+                "realized_loss is only supported for CDS index options".to_string(),
             ));
         }
-        if let Some(coupon) = self.underlying_cds_coupon {
-            if coupon <= Decimal::ZERO {
+
+        if self.underlying_is_index && self.coupon_bp.is_none() {
+            return Err(finstack_quant_core::Error::Validation(
+                "coupon_bp is required for CDS index options".to_string(),
+            ));
+        }
+        if let Some(coupon_bp) = self.coupon_bp {
+            if coupon_bp <= Decimal::ZERO {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "underlying_cds_coupon must be positive when set, got {coupon}"
+                    "coupon_bp must be positive when set, got {coupon_bp}"
                 )));
             }
         }
@@ -430,24 +421,18 @@ impl CDSOption {
                         "strike_index_factor must be finite and in (0, 1], got {f0}"
                     )));
                 }
-                let Some(f) = self.index_factor else {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "index_factor (current factor f) is required for \
-                         clean-price strikes"
-                            .to_string(),
-                    ));
-                };
+                let f = self.index_factor;
                 if f > f0 + FACTOR_TOLERANCE {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "current index_factor {f} exceeds strike_index_factor {f0}; \
                          the factor cannot rise after defaults"
                     )));
                 }
-                let loss = self.realized_index_loss.unwrap_or(0.0);
+                let loss = self.realized_loss;
                 let removed_notional = (f0 - f).max(0.0);
                 if loss > removed_notional + FACTOR_TOLERANCE {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "realized_index_loss {loss} exceeds removed original notional \
+                        "realized_loss {loss} exceeds removed original notional \
                          {removed_notional} (f0 − f = {f0} − {f}); loss cannot exceed \
                          the defaulted weight"
                     )));
@@ -487,7 +472,7 @@ impl CDSOption {
     ///
     /// - `id`: Unique instrument identifier
     /// - `option_params`: deal-level fields (strike as decimal rate, expiry, CDS maturity, notional, option type)
-    /// - `credit_params`: reference entity, recovery rate, and the hazard `credit_id`
+    /// - `credit_params`: reference entity, recovery rate, and the hazard `credit_curve_id`
     /// - `discount_curve_id`: discount curve identifier for discounting cashflows
     /// - `vol_surface_id`: volatility surface identifier for the CDS option
     ///
@@ -528,8 +513,8 @@ impl CDSOption {
             underlying_is_index: option_params.underlying_is_index,
             index_factor: option_params.index_factor,
             strike_index_factor: option_params.strike_index_factor,
-            realized_index_loss: None,
-            underlying_cds_coupon: option_params.underlying_cds_coupon,
+            realized_loss: 0.0,
+            coupon_bp: option_params.coupon_bp,
         };
         option.validate()?;
         Ok(option)
@@ -562,11 +547,11 @@ impl CDSOption {
         )
     }
 
-    /// Effective contractual coupon `c` of the synthetic underlying CDS,
-    /// as a decimal rate. Returns the explicitly-set `underlying_cds_coupon`
-    /// when present (e.g., the 100 bp standard CDX coupon), otherwise falls
-    /// back to the strike spread for single-name SNAC trades where the
-    /// option is struck at the underlying CDS coupon.
+    /// Effective contractual running coupon `c` of the synthetic underlying
+    /// CDS, in basis points. Returns the explicitly-set `coupon_bp` when
+    /// present (e.g., the 100 bp standard CDX coupon), otherwise falls back
+    /// to the strike spread (converted from decimal to bp) for single-name
+    /// SNAC trades where the option is struck at the underlying CDS coupon.
     ///
     /// # Errors
     ///
@@ -574,17 +559,16 @@ impl CDSOption {
     /// serve as the running coupon: the coupon must be explicit for
     /// price-struck options (validation enforces this for index options,
     /// which price strikes always are).
-    pub(crate) fn effective_underlying_cds_coupon(&self) -> finstack_quant_core::Result<Decimal> {
-        if let Some(coupon) = self.underlying_cds_coupon {
-            return Ok(coupon);
+    pub(crate) fn effective_coupon_bp(&self) -> finstack_quant_core::Result<Decimal> {
+        if let Some(coupon_bp) = self.coupon_bp {
+            return Ok(coupon_bp);
         }
         match &self.strike {
-            super::strike::CDSOptionStrike::Spread(s) => Ok(*s),
+            super::strike::CDSOptionStrike::Spread(s) => Ok(*s * Decimal::new(10_000, 0)),
             super::strike::CDSOptionStrike::CleanPricePct(p) => {
                 Err(finstack_quant_core::Error::Validation(format!(
                     "CDS option '{}' has clean-price strike {p} and no explicit \
-                     underlying_cds_coupon; a price strike cannot serve as the \
-                     running coupon",
+                     coupon_bp; a price strike cannot serve as the running coupon",
                     self.id
                 )))
             }
@@ -806,7 +790,7 @@ mod tests {
     }
 
     #[test]
-    fn index_option_requires_underlying_cds_coupon() {
+    fn index_option_requires_coupon_bp() {
         let option_params = CDSOptionParams::call(
             CDSOptionStrike::Spread(Decimal::from_str_exact("0.005").expect("valid strike")),
             date!(2026 - 06 - 26),
@@ -828,8 +812,8 @@ mod tests {
         .expect_err("index option without contractual coupon should fail");
 
         assert!(
-            err.to_string().contains("underlying_cds_coupon"),
-            "error should point to missing underlying_cds_coupon: {err}"
+            err.to_string().contains("coupon_bp"),
+            "error should point to missing coupon_bp: {err}"
         );
     }
 

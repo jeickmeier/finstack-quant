@@ -203,7 +203,7 @@ pub fn cds_buy_protection(
     start: Date,
     maturity: Date,
     discount_curve_id: impl Into<CurveId>,
-    credit_id: impl Into<CurveId>,
+    credit_curve_id: impl Into<CurveId>,
 ) -> finstack_quant_core::Result<CreditDefaultSwap> {
     let convention = CdsConvention::IsdaNa;
     let day_count = convention.day_count();
@@ -224,7 +224,7 @@ pub fn cds_buy_protection(
         .side(PayReceive::Pay)
         .convention(convention)
         .premium(PremiumLegSpec {
-            standard_imm_dates: true,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start,
             end: maturity,
             frequency,
@@ -232,11 +232,11 @@ pub fn cds_buy_protection(
             business_day_convention,
             calendar_id: Some(convention.default_calendar().to_string()),
             day_count,
-            spread_bp: spread_bp_decimal,
+            coupon_bp: spread_bp_decimal,
             discount_curve_id: discount_curve_id.into(),
         })
         .protection(ProtectionLegSpec {
-            credit_curve_id: credit_id.into(),
+            credit_curve_id: credit_curve_id.into(),
             recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),
         })
@@ -257,7 +257,7 @@ pub fn cds_sell_protection(
     start: Date,
     maturity: Date,
     discount_curve_id: impl Into<CurveId>,
-    credit_id: impl Into<CurveId>,
+    credit_curve_id: impl Into<CurveId>,
 ) -> finstack_quant_core::Result<CreditDefaultSwap> {
     let convention = CdsConvention::IsdaNa;
     let day_count = convention.day_count();
@@ -278,7 +278,7 @@ pub fn cds_sell_protection(
         .side(PayReceive::Receive)
         .convention(convention)
         .premium(PremiumLegSpec {
-            standard_imm_dates: true,
+            roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start,
             end: maturity,
             frequency,
@@ -286,11 +286,11 @@ pub fn cds_sell_protection(
             business_day_convention,
             calendar_id: Some(convention.default_calendar().to_string()),
             day_count,
-            spread_bp: spread_bp_decimal,
+            coupon_bp: spread_bp_decimal,
             discount_curve_id: discount_curve_id.into(),
         })
         .protection(ProtectionLegSpec {
-            credit_curve_id: credit_id.into(),
+            credit_curve_id: credit_curve_id.into(),
             recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),
         })

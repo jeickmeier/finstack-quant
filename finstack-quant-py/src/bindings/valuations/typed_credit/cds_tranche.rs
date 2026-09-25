@@ -3,6 +3,8 @@
 
 use pyo3::prelude::*;
 
+use crate::bindings::cashflows::builder::specs::PyRollRule;
+use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, extract_date};
@@ -15,11 +17,13 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::convert::{
-    attributes_from_py, bdc_from_py, bool_repr, bps_from_py, builder_repr, date_repr,
-    dated_money_from_py, day_count_from_py, enum_to_py_string, float_repr, money_from_py,
-    money_repr, money_to_py, tenor_from_py,
+    attributes_from_py, bdc_from_py, bps_from_py, builder_repr, date_repr, dated_money_from_py,
+    day_count_from_py, enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py,
+    tenor_from_py,
 };
-use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
+use super::super::instruments::{
+    enum_from_str, serialize_typed_instrument_json, stub_kind_from_py,
+};
 use super::super::typed_fx::{
     instrument_envelope_methods, instrument_pricing_methods, take_builder,
 };
@@ -74,9 +78,9 @@ impl PyCDSTrancheParams {
     ///     Tranche notional.
     /// maturity : datetime.date | str
     ///     Scheduled maturity (an IMM date for standard tranches).
-    /// running_coupon_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Running coupon in basis points (``100.0`` = 1%).
-    /// accumulated_loss : float
+    /// realized_loss : float
     ///     Realized portfolio loss so far as a fraction of the original
     ///     portfolio notional, in ``[0, 1]``; default ``0.0``.
     ///
@@ -88,9 +92,9 @@ impl PyCDSTrancheParams {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``accumulated_loss`` is outside ``[0, 1]``.
+    ///     If ``realized_loss`` is outside ``[0, 1]``.
     /// TypeError
-    ///     If ``running_coupon_bp`` is neither a number nor ``Bps``.
+    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
     ///
     /// Examples
     /// --------
@@ -101,12 +105,12 @@ impl PyCDSTrancheParams {
     /// >>> params = CDSTrancheParams(
     /// ...     "CDX.NA.IG", 42, 7.0, 15.0, Money(5_000_000.0, Currency("USD")), "2029-12-20", 100.0
     /// ... )
-    /// >>> params.running_coupon_bp
+    /// >>> params.coupon_bp
     /// 100.0
     #[new]
-    #[pyo3(signature = (index_name, series, attach_pct, detach_pct, notional, maturity, running_coupon_bp, accumulated_loss=0.0))]
+    #[pyo3(signature = (index_name, series, attach_pct, detach_pct, notional, maturity, coupon_bp, realized_loss=0.0))]
     #[pyo3(
-        text_signature = "(index_name, series, attach_pct, detach_pct, notional, maturity, running_coupon_bp, accumulated_loss=0.0)"
+        text_signature = "(index_name, series, attach_pct, detach_pct, notional, maturity, coupon_bp, realized_loss=0.0)"
     )]
     // PyO3 binding: the argument list mirrors the Rust constructor one-for-one.
     #[allow(clippy::too_many_arguments)]
@@ -117,8 +121,8 @@ impl PyCDSTrancheParams {
         detach_pct: f64,
         notional: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
-        running_coupon_bp: &Bound<'_, PyAny>,
-        accumulated_loss: f64,
+        coupon_bp: &Bound<'_, PyAny>,
+        realized_loss: f64,
     ) -> PyResult<Self> {
         let inner = CDSTrancheParams::new(
             index_name,
@@ -127,9 +131,9 @@ impl PyCDSTrancheParams {
             detach_pct,
             money_from_py(notional, None, "notional")?,
             extract_date(maturity)?,
-            bps_from_py(running_coupon_bp, "running_coupon_bp")?,
+            bps_from_py(coupon_bp, "coupon_bp")?,
         )
-        .with_accumulated_loss(accumulated_loss)
+        .with_realized_loss(realized_loss)
         .map_err(core_to_py)?;
         Ok(Self { inner })
     }
@@ -146,7 +150,7 @@ impl PyCDSTrancheParams {
     ///     Tranche notional.
     /// maturity : datetime.date | str
     ///     Scheduled maturity.
-    /// running_coupon_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Running coupon in basis points.
     ///
     /// Returns
@@ -157,7 +161,7 @@ impl PyCDSTrancheParams {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``running_coupon_bp`` is neither a number nor ``Bps``.
+    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
     ///
     /// Examples
     /// --------
@@ -169,13 +173,13 @@ impl PyCDSTrancheParams {
     /// ... ).detach_pct
     /// 3.0
     #[staticmethod]
-    #[pyo3(text_signature = "(index_name, series, notional, maturity, running_coupon_bp)")]
+    #[pyo3(text_signature = "(index_name, series, notional, maturity, coupon_bp)")]
     fn equity_tranche(
         index_name: &str,
         series: u16,
         notional: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
-        running_coupon_bp: &Bound<'_, PyAny>,
+        coupon_bp: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: CDSTrancheParams::equity_tranche(
@@ -183,7 +187,7 @@ impl PyCDSTrancheParams {
                 series,
                 money_from_py(notional, None, "notional")?,
                 extract_date(maturity)?,
-                bps_from_py(running_coupon_bp, "running_coupon_bp")?,
+                bps_from_py(coupon_bp, "coupon_bp")?,
             ),
         })
     }
@@ -200,7 +204,7 @@ impl PyCDSTrancheParams {
     ///     Tranche notional.
     /// maturity : datetime.date | str
     ///     Scheduled maturity.
-    /// running_coupon_bp : float | Bps
+    /// coupon_bp : float | Bps
     ///     Running coupon in basis points.
     ///
     /// Returns
@@ -211,7 +215,7 @@ impl PyCDSTrancheParams {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``running_coupon_bp`` is neither a number nor ``Bps``.
+    ///     If ``coupon_bp`` is neither a number nor ``Bps``.
     ///
     /// Examples
     /// --------
@@ -223,13 +227,13 @@ impl PyCDSTrancheParams {
     /// ... ).attach_pct
     /// 3.0
     #[staticmethod]
-    #[pyo3(text_signature = "(index_name, series, notional, maturity, running_coupon_bp)")]
+    #[pyo3(text_signature = "(index_name, series, notional, maturity, coupon_bp)")]
     fn mezzanine_tranche(
         index_name: &str,
         series: u16,
         notional: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
-        running_coupon_bp: &Bound<'_, PyAny>,
+        coupon_bp: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: CDSTrancheParams::mezzanine_tranche(
@@ -237,7 +241,7 @@ impl PyCDSTrancheParams {
                 series,
                 money_from_py(notional, None, "notional")?,
                 extract_date(maturity)?,
-                bps_from_py(running_coupon_bp, "running_coupon_bp")?,
+                bps_from_py(coupon_bp, "coupon_bp")?,
             ),
         })
     }
@@ -280,28 +284,28 @@ impl PyCDSTrancheParams {
 
     /// Running coupon in basis points.
     #[getter]
-    fn running_coupon_bp(&self) -> f64 {
-        self.inner.running_coupon_bp
+    fn coupon_bp(&self) -> f64 {
+        self.inner.coupon_bp
     }
 
     /// Realized portfolio loss so far (fraction of original notional).
     #[getter]
-    fn accumulated_loss(&self) -> f64 {
-        self.inner.accumulated_loss
+    fn realized_loss(&self) -> f64 {
+        self.inner.realized_loss
     }
 
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSTrancheParams(index_name={:?}, series={}, attach_pct={}, detach_pct={}, notional={}, maturity={}, running_coupon_bp={}, accumulated_loss={})",
+            "CDSTrancheParams(index_name={:?}, series={}, attach_pct={}, detach_pct={}, notional={}, maturity={}, coupon_bp={}, realized_loss={})",
             self.inner.index_name,
             self.inner.series,
             float_repr(self.inner.attach_pct),
             float_repr(self.inner.detach_pct),
             money_repr(self.inner.notional),
             date_repr(self.inner.maturity),
-            float_repr(self.inner.running_coupon_bp),
-            float_repr(self.inner.accumulated_loss),
+            float_repr(self.inner.coupon_bp),
+            float_repr(self.inner.realized_loss),
         )
     }
 }
@@ -309,7 +313,7 @@ impl PyCDSTrancheParams {
 /// Synthetic CDO / index tranche (typed wrapper for Rust ``CDSTranche``).
 ///
 /// Protection on portfolio losses between ``attach_pct`` and ``detach_pct``
-/// (percent points), paying ``running_coupon_bp`` on the surviving tranche
+/// (percent points), paying ``coupon_bp`` on the surviving tranche
 /// notional. Priced with the one-factor Gaussian copula against the
 /// ``credit_index_id`` loss distribution.
 ///
@@ -351,7 +355,7 @@ instrument_envelope_methods!(
     CDSTranche,
     "cds_tranche",
     PyCDSTrancheBuilder,
-    finstack_quant_valuations::instruments::CDSTranche::builder().accumulated_loss(0.0)
+    finstack_quant_valuations::instruments::CDSTranche::builder().realized_loss(0.0)
 );
 instrument_pricing_methods!(PyCDSTranche);
 
@@ -524,8 +528,8 @@ impl PyCDSTranche {
 
     /// Running coupon in basis points.
     #[getter]
-    fn running_coupon_bp(&self) -> f64 {
-        self.inner.running_coupon_bp
+    fn coupon_bp(&self) -> f64 {
+        self.inner.coupon_bp
     }
 
     /// Payment frequency.
@@ -581,14 +585,23 @@ impl PyCDSTranche {
 
     /// Realized portfolio loss so far (fraction of original notional).
     #[getter]
-    fn accumulated_loss(&self) -> f64 {
-        self.inner.accumulated_loss
+    fn realized_loss(&self) -> f64 {
+        self.inner.realized_loss
     }
 
-    /// Whether coupon dates are forced onto standard IMM dates.
+    /// Coupon roll-date grid: ``RollRule.CDS_IMM`` (CDS roll dates, 20th of
+    /// Mar/Jun/Sep/Dec) or ``RollRule.NONE`` (bespoke ``frequency``/``stub``).
     #[getter]
-    fn standard_imm_dates(&self) -> bool {
-        self.inner.standard_imm_dates
+    fn roll_rule(&self) -> PyRollRule {
+        PyRollRule {
+            inner: self.inner.roll_rule,
+        }
+    }
+
+    /// Stub convention for a bespoke (``RollRule.NONE``) coupon schedule.
+    #[getter]
+    fn stub(&self) -> PyStubKind {
+        PyStubKind::from_inner(self.inner.stub)
     }
 
     /// Upfront payment as ``(payment_date, amount)``, or ``None``.
@@ -611,7 +624,7 @@ impl PyCDSTranche {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "CDSTranche(id={:?}, index_name={:?}, series={}, attach_pct={}, detach_pct={}, side={:?}, notional={}, running_coupon_bp={}, maturity={})",
+            "CDSTranche(id={:?}, index_name={:?}, series={}, attach_pct={}, detach_pct={}, side={:?}, notional={}, coupon_bp={}, maturity={})",
             self.inner.id.as_str(),
             self.inner.index_name,
             self.inner.series,
@@ -619,7 +632,7 @@ impl PyCDSTranche {
             float_repr(self.inner.detach_pct),
             enum_to_py_string(&self.inner.side).unwrap_or_default(),
             money_repr(self.inner.notional),
-            float_repr(self.inner.running_coupon_bp),
+            float_repr(self.inner.coupon_bp),
             date_repr(self.inner.maturity),
         )
     }
@@ -628,8 +641,9 @@ impl PyCDSTranche {
 /// Fluent builder for ``CDSTranche``; wraps the Rust
 /// ``FinancialBuilder``-generated builder (consuming setters).
 ///
-/// The builder pre-seeds ``accumulated_loss(0.0)``; ``standard_imm_dates``
-/// defaults to ``False`` and ``business_day_convention`` to
+/// The builder pre-seeds ``realized_loss(0.0)``; ``roll_rule`` defaults to
+/// ``RollRule.NONE``, ``stub`` to ``"short_front"`` and
+/// ``business_day_convention`` to
 /// ``"modified_following"``. Builders are consumed by ``build()``; create a
 /// new builder per instrument.
 #[pyclass(
@@ -828,16 +842,16 @@ impl PyCDSTrancheBuilder {
     /// TypeError
     ///     If ``value`` is neither a number nor ``Bps``.
     #[pyo3(text_signature = "($self, value)")]
-    fn running_coupon_bp<'py>(
+    fn coupon_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let bp = bps_from_py(value, "running_coupon_bp")?;
+        let bp = bps_from_py(value, "coupon_bp")?;
         tranche_set!(
             slf,
-            running_coupon_bp,
+            coupon_bp,
             float_repr(bp),
-            |b: CdsTrancheBuilderInner| b.running_coupon_bp(bp)
+            |b: CdsTrancheBuilderInner| b.coupon_bp(bp)
         )
     }
 
@@ -1036,8 +1050,8 @@ impl PyCDSTrancheBuilder {
     /// Parameters
     /// ----------
     /// value : datetime.date | str
-    ///     Effective date. If never set, uses the as-of date (or standard
-    ///     IMM-date rolling, if ``standard_imm_dates`` is true).
+    ///     Effective date. If never set, uses the as-of date (or the prior CDS
+    ///     roll date when ``roll_rule`` is ``RollRule.CDS_IMM``).
     ///
     /// Returns
     /// -------
@@ -1057,12 +1071,12 @@ impl PyCDSTrancheBuilder {
         )
     }
 
-    /// Set the accumulated realized loss.
+    /// Set the realized (settled) loss.
     ///
     /// Parameters
     /// ----------
     /// value : float
-    ///     Accumulated realized loss as a fraction of the original portfolio
+    ///     Realized loss as a fraction of the original portfolio
     ///     notional. Defaults to ``0.0`` when never set explicitly.
     ///
     /// Returns
@@ -1070,40 +1084,74 @@ impl PyCDSTrancheBuilder {
     /// CDSTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn accumulated_loss<'py>(
+    fn realized_loss<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
         tranche_set!(
             slf,
-            accumulated_loss,
+            realized_loss,
             float_repr(value),
-            |b: CdsTrancheBuilderInner| b.accumulated_loss(value)
+            |b: CdsTrancheBuilderInner| b.realized_loss(value)
         )
     }
 
-    /// Set whether to enforce standard IMM dates.
+    /// Set the coupon roll-date grid.
     ///
     /// Parameters
     /// ----------
-    /// value : bool
-    ///     Whether to enforce standard IMM dates (20th of Mar, Jun, Sep,
-    ///     Dec). Defaults to ``False`` when never set explicitly.
+    /// value : RollRule
+    ///     ``RollRule.CDS_IMM`` for the standard CDS roll dates (20th of Mar,
+    ///     Jun, Sep, Dec) or ``RollRule.NONE`` (the default) for a schedule
+    ///     generated from ``frequency`` and ``stub``. ``RollRule.IMM`` is
+    ///     rejected by ``build()``.
     ///
     /// Returns
     /// -------
     /// CDSTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn standard_imm_dates<'py>(
+    fn roll_rule<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: bool,
+        value: PyRef<'_, PyRollRule>,
     ) -> PyResult<PyRefMut<'py, Self>> {
+        let rule = value.inner;
         tranche_set!(
             slf,
-            standard_imm_dates,
-            bool_repr(value).to_string(),
-            |b: CdsTrancheBuilderInner| b.standard_imm_dates(value)
+            roll_rule,
+            format!("{rule:?}"),
+            |b: CdsTrancheBuilderInner| b.roll_rule(rule)
+        )
+    }
+
+    /// Set the stub convention for a bespoke coupon schedule.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : str | StubKind
+    ///     Stub rule used when ``roll_rule`` is ``RollRule.NONE``. Defaults to
+    ///     ``"short_front"``.
+    ///
+    /// Returns
+    /// -------
+    /// CDSTrancheBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` is not a known stub rule.
+    #[pyo3(text_signature = "($self, value)")]
+    fn stub<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let stub = stub_kind_from_py(Some(value), "stub")?;
+        tranche_set!(
+            slf,
+            stub,
+            format!("{stub:?}"),
+            |b: CdsTrancheBuilderInner| b.stub(stub)
         )
     }
 

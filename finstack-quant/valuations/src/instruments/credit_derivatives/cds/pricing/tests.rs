@@ -82,7 +82,7 @@ fn test_accrual_on_default() {
     let cds = create_test_cds("TEST-CDS", as_of, as_of.add_months(60), 100.0, 0.40);
     let pricer_with = CDSPricer::new();
     let pricer_without = CDSPricer::with_config(CDSPricerConfig {
-        include_accrual: false,
+        include_accrual_on_default: false,
         ..Default::default()
     });
     let pv_with = pricer_with
@@ -138,7 +138,7 @@ fn test_par_spread_calculation() {
         .expect("should succeed");
     assert!(par_spread > 0.0 && par_spread < 2000.0);
     let mut cds_at_par = cds;
-    cds_at_par.premium.spread_bp = Decimal::try_from(par_spread).expect("valid par_spread");
+    cds_at_par.premium.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
     let npv = pricer
         .npv_full(&cds_at_par, &disc, &credit, as_of)
         .expect("should succeed");
@@ -316,7 +316,7 @@ fn test_doc_clause_default_when_omitted() {
         .convention(crate::instruments::credit_derivatives::cds::CdsConvention::IsdaNa)
         .premium(
             crate::instruments::common_impl::parameters::legs::PremiumLegSpec {
-                standard_imm_dates: true,
+                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start: as_of,
                 end: as_of.add_months(60),
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -325,7 +325,7 @@ fn test_doc_clause_default_when_omitted() {
                     finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
                 calendar_id: Some("nyse".to_string()),
                 day_count: finstack_quant_core::dates::DayCount::Act360,
-                spread_bp: Decimal::try_from(100.0).expect("valid"),
+                coupon_bp: Decimal::try_from(100.0).expect("valid"),
                 discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             },
         )
@@ -403,7 +403,7 @@ fn test_premium_leg_per_bp_matches_risky_annuity_without_accrual_on_default() {
     let cds = create_test_cds("CDS-PER-BP", as_of, as_of.add_months(60), 100.0, 0.40);
 
     let without_aod = CDSPricer::with_config(CDSPricerConfig {
-        include_accrual: false,
+        include_accrual_on_default: false,
         ..Default::default()
     });
     let risky_annuity = without_aod
@@ -465,7 +465,7 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
 }
 
 #[test]
-fn test_npv_full_combines_dated_and_market_quote_upfronts() {
+fn test_npv_full_discounts_dated_upfront() {
     use crate::instruments::common_impl::traits::Instrument;
 
     let (disc, credit) = create_test_curves();
@@ -480,25 +480,21 @@ fn test_npv_full_combines_dated_and_market_quote_upfronts() {
 
     let dated_upfront_date = as_of.add_months(6);
     let dated_upfront_amount = 150_000.0;
-    let quote_adjustment = Money::from((25_000_i64, Currency::USD));
     cds.upfront = Some((
         dated_upfront_date,
         Money::new(dated_upfront_amount, Currency::USD).expect("valid money fixture"),
     ));
-    cds.instrument_pricing_overrides
-        .market_quotes
-        .upfront_payment = Some(quote_adjustment);
 
     let dated_df = disc
         .df_between_dates(as_of, dated_upfront_date)
         .expect("discount factor");
-    let expected = base_npv - dated_upfront_amount * dated_df - quote_adjustment.amount();
+    let expected = base_npv - dated_upfront_amount * dated_df;
     let npv_with_upfront = pricer
         .npv_full(&cds, &disc, &credit, as_of)
         .expect("npv with upfront");
     assert!(
         (npv_with_upfront - expected).abs() < 1e-8,
-        "dated upfront and direct PV adjustment should combine additively"
+        "dated upfront should be discounted from its payment date"
     );
 
     let market = MarketContext::new().insert(disc).insert(credit);
@@ -774,7 +770,7 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2026 - 04 - 01);
     let mut cds = create_test_cds("BESPOKE-SCHEDULE", start, end, 100.0, 0.4);
-    cds.premium.standard_imm_dates = false;
+    cds.premium.roll_rule = crate::cashflow::builder::specs::RollRule::None;
     cds.premium.calendar_id = None;
     cds.premium.frequency = Tenor::semi_annual();
     cds.premium.stub = StubKind::ShortFront;

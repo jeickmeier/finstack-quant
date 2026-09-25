@@ -57,7 +57,7 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CDSTran
         TrancheSide::SellProtection,
     )
     .expect("Valid tranche parameters");
-    tranche.standard_imm_dates = true;
+    tranche.roll_rule = finstack_quant_cashflows::builder::specs::RollRule::CdsImm;
     tranche
 }
 

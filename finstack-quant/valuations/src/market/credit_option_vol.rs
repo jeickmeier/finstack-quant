@@ -410,7 +410,7 @@ mod tests {
         .expect("params")
         .as_index(1.0)
         .expect("index factor")
-        .with_underlying_cds_coupon(Decimal::new(1, 2));
+        .with_coupon_bp(Decimal::new(100, 0));
         let credit = CreditParams::corporate_standard("CDX", "CDX-IG");
         CDSOption::new(
             "CDX-IG-CDSO",
@@ -734,7 +734,7 @@ mod tests {
         .expect("index factor")
         .with_strike_index_factor(1.0)
         .expect("strike factor")
-        .with_underlying_cds_coupon(Decimal::new(5, 2));
+        .with_coupon_bp(Decimal::new(500, 0));
         let credit = CreditParams::corporate_standard("CDXHY", "CDX-HY");
         let option = CDSOption::new(
             "CDX-HY-CDSO",

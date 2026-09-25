@@ -33,9 +33,8 @@ pub(super) fn apply(
     //   where Δs is the credit-curve move from `measure_credit_curve_shift` /
     //   `measure_per_tenor_credit_curve_shift`. Those measure the move in
     //   whichever basis the instrument's CS01 is defined on: a par CDS spread
-    //   move for a hazard curve (CDS-family), or a zero-rate move for a
-    //   discount-style credit curve (a convertible's Tsiveriotis–Zhang risky
-    //   discount curve). Pairing a par-spread CS01 with a hazard-rate move would
+    //   move for a hazard curve, or a zero-rate move for a discount-style
+    //   credit curve. Pairing a par-spread CS01 with a hazard-rate move would
     //   overstate credit P&L by 1/(1−R), so the move always matches the CS01.
     //
     // Accuracy ladder (best first):

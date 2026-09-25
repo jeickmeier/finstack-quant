@@ -355,15 +355,15 @@ compose with these rules.
 
 ### Attachment points
 
-`Tranche.attachment_point` / `detachment_point` are `Option<f64>` percents.
+`Tranche.attach_pct` / `detach_pct` are `Option<f64>` percents.
 `Tranche::from_balance(...)` (and a `TrancheBuilder` without points) leaves
 them `None`; `TrancheStructure::new` derives them from the original-balance
 shares in payment-priority order (first-loss class at 0, most senior class
 detaching at exactly 100) and validates any declared points against those
 same shares within 0.5%. `TrancheStructure::from_balances(tranches)` discards
 declared points and derives all of them. The stochastic pricer's
-`TranchePricingResult.attachment` / `detachment` read the resolved points, so
-a derived structure prices exactly like its declared twin
+`TranchePricingResult.attach_pct` / `detach_pct` (percent) read the resolved
+points, so a derived structure prices exactly like its declared twin
 (`unit/attachment_derivation_tests.rs`).
 
 ### Coverage tests

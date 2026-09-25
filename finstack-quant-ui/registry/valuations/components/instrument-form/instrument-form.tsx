@@ -60,8 +60,8 @@ const promotedTerms: Record<string, PromotedTerm> = {
     kind: "market-quote",
   },
   credit_default_swap: {
-    path: "instrument.spec.premium.spread_bp",
-    label: "Running spread",
+    path: "instrument.spec.premium.coupon_bp",
+    label: "Running coupon",
     unit: "bp",
     hint: "Contract premium; par spread appears in Results.",
     kind: "contract-term",

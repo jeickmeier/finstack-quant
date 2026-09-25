@@ -1,16 +1,16 @@
 //! Credit-spread P&L attribution for convertible bonds.
 //!
-//! A `ConvertibleBond` carries credit risk through a Tsiveriotis–Zhang risky
-//! *discount* curve (`credit_curve_id`), not a `HazardCurve`. These tests pin
-//! that the attribution credit factor still fires for that curve representation
-//! — i.e. a credit-spread move is attributed to `credit_curves_pnl` rather than
-//! leaking into the residual.
+//! A `ConvertibleBond` carries credit risk through its issuer `HazardCurve`
+//! (`credit_curve_id`), from which the Tsiveriotis–Zhang pricer derives the
+//! risky discount factor of the cash component. These tests pin that a
+//! credit-spread move is attributed to `credit_curves_pnl` rather than leaking
+//! into the residual.
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use std::sync::Arc;
@@ -34,8 +34,8 @@ fn t1() -> Date {
     Date::from_calendar_date(2025, Month::January, 2).unwrap()
 }
 
-/// OTM (bond-like) convertible referencing a separate risky discount curve as
-/// its credit curve — the configuration that exercises the credit factor.
+/// OTM (bond-like) convertible referencing an issuer hazard curve — the
+/// configuration that exercises the credit factor.
 fn convertible_with_credit() -> Arc<dyn Instrument> {
     let conversion = ConversionSpec {
         ratio: Some(10.0),
@@ -90,13 +90,17 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
     })
 }
 
-/// Market with a risk-free `USD-OIS` curve and a wider risky `USD-CREDIT`
-/// discount curve. Only `credit_spread_bp` varies between the two test dates;
+/// Market with a risk-free `USD-OIS` curve and a flat zero-recovery issuer
+/// hazard curve `USD-CREDIT` at `credit_spread_bp` (so the hazard rate equals
+/// the spread). Only `credit_spread_bp` varies between the two test dates;
 /// `USD-OIS`, spot and vol are held fixed so the P&L is purely a credit move.
 fn market(credit_spread_bp: f64) -> MarketContext {
+    market_with_rate(credit_spread_bp, 0.03)
+}
+
+/// [`market`] with the flat risk-free rate `rf` (decimal) as well.
+fn market_with_rate(credit_spread_bp: f64, rf: f64) -> MarketContext {
     let base = t0();
-    let rf = 0.03;
-    let credit = rf + credit_spread_bp / 10_000.0;
 
     // LogLinear so the flat zero rate extrapolates cleanly past the last knot
     // to the 30Y tenors the key-rate attribution samples (Linear DF
@@ -107,17 +111,8 @@ fn market(credit_spread_bp: f64) -> MarketContext {
         .interp(InterpStyle::LogLinear)
         .build()
         .unwrap();
-    let credit_curve = DiscountCurve::builder("USD-CREDIT")
-        .base_date(base)
-        .knots([
-            (0.0, 1.0),
-            (1.0, (-credit).exp()),
-            (10.0, (-credit * 10.0).exp()),
-        ])
-        .interp(InterpStyle::LogLinear)
-        .build()
-        .unwrap();
-
+    let credit_curve =
+        HazardCurve::flat("USD-CREDIT", base, credit_spread_bp / 10_000.0, 0.0).unwrap();
     MarketContext::new()
         .insert(ois)
         .insert(credit_curve)
@@ -130,10 +125,8 @@ fn market(credit_spread_bp: f64) -> MarketContext {
 
 /// Taylor attribution must explain a convertible-bond credit-spread move.
 ///
-/// REGRESSION: the convertible's credit curve is a `DiscountCurve`. The credit
-/// factor previously measured the move only via `measure_par_spread_shift`
-/// (hazard-curve only), so `compute_credit_factor` errored and the factor was
-/// silently dropped — the entire credit-spread P&L fell into the residual.
+/// The credit factor measures the move on the issuer hazard curve, so the
+/// entire credit-spread P&L is explained rather than left in the residual.
 #[test]
 fn taylor_explains_convertible_credit_spread_move() {
     let conv = convertible_with_credit();
@@ -268,7 +261,7 @@ fn metrics_based_explains_convertible_credit_spread_move() {
 }
 
 #[test]
-fn repricing_methods_classify_risky_discount_curve_as_credit() {
+fn repricing_methods_classify_issuer_hazard_curve_as_credit() {
     let instrument = convertible_with_credit();
     let opening = market(150.0);
     let closing = market(300.0);
@@ -374,8 +367,12 @@ fn taylor_market_gamma_uses_opening_conversion_state() {
         ..Default::default()
     });
     let mut changed = conversion_change_spec(method);
-    changed.market_t1 =
-        finstack_quant_core::market_data::context::MarketContextState::from(&market(170.0));
+    // A rates move: the issuer hazard curve is entered directly (no
+    // calibration recipe), so quote-space credit gamma is unavailable and the
+    // gamma path is exercised on the risk-free curve.
+    changed.market_t1 = finstack_quant_core::market_data::context::MarketContextState::from(
+        &market_with_rate(150.0, 0.035),
+    );
     let mut fixed = changed.clone();
     fixed.instrument = finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
         convertible_with_credit()

@@ -3,7 +3,7 @@
   "schema": "finstack_quant.calibration/1",
   "plan": {
     "id": "cdx_ig_46_base_correlation",
-    "description": "CDX.NA.IG.46 base correlation curve calibrated from 5 standard CDX tranche quotes (0/3%, 3/7%, 7/10%, 10/15%, 15/30% detachment points), chained on a USD-OIS discount curve and CDX-NA-IG-46 index hazard curve that are bootstrapped in the same plan. Step 1 produces the USD-OIS discount curve from deposit and IRS quotes; step 2 calibrates the CDX-NA-IG-46 index hazard curve from realistic par-spread CDS quotes (50/75/100/110/120 bp); step 3 solves for the base correlation smile. No hand-entered USD-OIS discount curve remains in prior_market \u2014 it is produced entirely from quotes. A placeholder CDX-NA-IG-46 hazard curve in prior_market is required because the credit_indices entry must reference an existing hazard curve at context-load time; step 2 overwrites it with the bootstrapped curve. A seed base_correlation curve (CDX-NA-IG-46_CORR) and credit_indices entry also remain in prior_market as required by the base correlation solver. Tranche upfront quotes are self-consistent with the chained USD-OIS + realistic CDX-IG-46 hazard market (re-derived by pricing each tranche against the bootstrapped market at seed correlations [0.20, 0.21, 0.22, 0.23, 0.24]). The base_correlation step uses use_imm_dates: true to align tranche payment dates to IMM convention. Used by 12 (full credit desk composite).",
+    "description": "CDX.NA.IG.46 base correlation curve calibrated from 5 standard CDX tranche quotes (0/3%, 3/7%, 7/10%, 10/15%, 15/30% detachment points), chained on a USD-OIS discount curve and CDX-NA-IG-46 index hazard curve that are bootstrapped in the same plan. Step 1 produces the USD-OIS discount curve from deposit and IRS quotes; step 2 calibrates the CDX-NA-IG-46 index hazard curve from realistic par-spread CDS quotes (50/75/100/110/120 bp); step 3 solves for the base correlation smile. No hand-entered USD-OIS discount curve remains in prior_market \u2014 it is produced entirely from quotes. A placeholder CDX-NA-IG-46 hazard curve in prior_market is required because the credit_indices entry must reference an existing hazard curve at context-load time; step 2 overwrites it with the bootstrapped curve. A seed base_correlation curve (CDX-NA-IG-46_CORR) and credit_indices entry also remain in prior_market as required by the base correlation solver. Tranche upfront quotes are self-consistent with the chained USD-OIS + realistic CDX-IG-46 hazard market (re-derived by pricing each tranche against the bootstrapped market at seed correlations [0.20, 0.21, 0.22, 0.23, 0.24]). The base_correlation step uses roll_rule: cds_imm to align tranche payment dates to IMM convention. Used by 12 (full credit desk composite).",
     "quote_sets": {
       "usd_rate_quotes": [
         "USD-SOFR-DEP-1M",
@@ -78,7 +78,7 @@
           0.15,
           0.3
         ],
-        "use_imm_dates": true
+        "roll_rule": "cds_imm"
       }
     ],
     "settings": {}
@@ -261,7 +261,7 @@
       "detachment": 0.03,
       "maturity": "2031-06-20",
       "upfront_pct": 0.6683840994,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -276,7 +276,7 @@
       "detachment": 0.07,
       "maturity": "2031-06-20",
       "upfront_pct": 0.2868463538,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -291,7 +291,7 @@
       "detachment": 0.1,
       "maturity": "2031-06-20",
       "upfront_pct": 0.1068773173,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -306,7 +306,7 @@
       "detachment": 0.15,
       "maturity": "2031-06-20",
       "upfront_pct": 0.0241734717,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -321,7 +321,7 @@
       "detachment": 0.3,
       "maturity": "2031-06-20",
       "upfront_pct": -0.0322877182,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"

@@ -16,6 +16,7 @@ import pickle
 
 import pytest
 
+from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import (
@@ -254,7 +255,7 @@ def test_leg_specs_pickle_round_trip() -> None:
     fixed = _fixed_leg(calendar_id="usny", stub="none")
     floating = _float_leg(reset_lag_days=2, fixing_calendar_id="usny")
     premium = PremiumLegSpec(
-        "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS", standard_imm_dates=True
+        "2024-03-20", "2029-06-20", Tenor.quarterly(), DayCount.ACT_360, 100.0, "USD-OIS", roll_rule=RollRule.CDS_IMM
     )
     protection = ProtectionLegSpec("ACME-HZD", 0.4, 3)
     for leg in (fixed, floating, premium, protection):
@@ -263,7 +264,7 @@ def test_leg_specs_pickle_round_trip() -> None:
         assert repr(clone) == repr(leg)
     assert pickle.loads(pickle.dumps(fixed)).calendar_id == "usny"  # noqa: S301
     assert pickle.loads(pickle.dumps(floating)).reset_lag_days == 2  # noqa: S301
-    assert pickle.loads(pickle.dumps(premium)).spread_bp == pytest.approx(100.0)  # noqa: S301
+    assert pickle.loads(pickle.dumps(premium)).coupon_bp == pytest.approx(100.0)  # noqa: S301
     assert pickle.loads(pickle.dumps(protection)).settlement_delay == 3  # noqa: S301
 
 
@@ -273,9 +274,9 @@ def test_leg_specs_accept_rate_and_bps_objects() -> None:
     floating = _float_leg(spread_bp=Bps(25))
     assert floating.spread_bp == pytest.approx(25.0)
     premium = PremiumLegSpec(
-        AS_OF, END, Tenor.quarterly(), DayCount.ACT_360, Bps(100), "USD-OIS", standard_imm_dates=True
+        AS_OF, END, Tenor.quarterly(), DayCount.ACT_360, Bps(100), "USD-OIS", roll_rule=RollRule.CDS_IMM
     )
-    assert premium.spread_bp == pytest.approx(100.0)
+    assert premium.coupon_bp == pytest.approx(100.0)
     with pytest.raises(TypeError):
         _fixed_leg(rate="4%")
 

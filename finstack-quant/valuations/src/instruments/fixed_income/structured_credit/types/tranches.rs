@@ -226,12 +226,12 @@ pub struct Tranche {
     /// payment-priority order; a declared value must match that share
     /// within the structure's thickness tolerance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attachment_point: Option<f64>,
+    pub attach_pct: Option<f64>,
     /// Upper structural boundary as a percent of the capital structure
     /// (`100.0` for the most senior class); derived like
-    /// [`Self::attachment_point`] when `None`.
+    /// [`Self::attach_pct`](field@Self::attach_pct) when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub detachment_point: Option<f64>,
+    pub detach_pct: Option<f64>,
 
     /// Tranche characteristics
     pub seniority: TrancheSeniority,
@@ -310,24 +310,24 @@ impl Tranche {
     /// Create a new tranche with required fields
     pub fn new(
         id: impl Into<String>,
-        attachment_point: f64,
-        detachment_point: f64,
+        attach_pct: f64,
+        detach_pct: f64,
         seniority: TrancheSeniority,
         original_balance: Money,
         coupon: TrancheCoupon,
         maturity: Date,
     ) -> finstack_quant_core::Result<Self> {
-        if attachment_point < 0.0 || detachment_point <= attachment_point {
+        if attach_pct < 0.0 || detach_pct <= attach_pct {
             return Err(finstack_quant_core::InputError::Invalid.into());
         }
-        if detachment_point > 100.0 {
+        if detach_pct > 100.0 {
             return Err(finstack_quant_core::InputError::Invalid.into());
         }
 
         Ok(Self {
             id: InstrumentId::new(id.into()),
-            attachment_point: Some(attachment_point),
-            detachment_point: Some(detachment_point),
+            attach_pct: Some(attach_pct),
+            detach_pct: Some(detach_pct),
             seniority,
             rating: None,
             original_balance,
@@ -388,31 +388,31 @@ impl Tranche {
             coupon,
             maturity,
         )?;
-        tranche.attachment_point = None;
-        tranche.detachment_point = None;
+        tranche.attach_pct = None;
+        tranche.detach_pct = None;
         Ok(tranche)
     }
 
     /// Resolved attachment point in percent (`0.0` for a tranche whose
     /// points have not been derived yet).
-    pub fn attachment_pct(&self) -> f64 {
-        self.attachment_point.unwrap_or(0.0)
+    pub fn effective_attach_pct(&self) -> f64 {
+        self.attach_pct.unwrap_or(0.0)
     }
 
     /// Resolved detachment point in percent (`0.0` for a tranche whose
     /// points have not been derived yet).
-    pub fn detachment_pct(&self) -> f64 {
-        self.detachment_point.unwrap_or(0.0)
+    pub fn effective_detach_pct(&self) -> f64 {
+        self.detach_pct.unwrap_or(0.0)
     }
 
     /// Tranche thickness (detachment - attachment)
     pub fn thickness(&self) -> f64 {
-        self.detachment_pct() - self.attachment_pct()
+        self.effective_detach_pct() - self.effective_attach_pct()
     }
 
     /// Check if tranche is first loss (attachment at 0%)
     pub fn is_first_loss(&self) -> bool {
-        self.attachment_pct() == 0.0
+        self.effective_attach_pct() == 0.0
     }
 
     /// Check if tranche is currently impaired by losses.
@@ -425,7 +425,7 @@ impl Tranche {
     /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
     ///   performing pool balance, in `[0, 100]` (for example, `5.0` means 5%).
     pub fn is_impaired(&self, cumulative_loss_pct: f64) -> bool {
-        cumulative_loss_pct > self.attachment_pct()
+        cumulative_loss_pct > self.effective_attach_pct()
     }
 
     /// Calculate the dollar loss allocated to this tranche given cumulative pool losses.
@@ -439,15 +439,15 @@ impl Tranche {
     /// * `cumulative_loss_pct` - Cumulative net loss in percentage points of
     ///   performing pool balance, in `[0, 100]` (for example, `12.0` means 12%).
     pub fn loss_allocation(&self, cumulative_loss_pct: f64) -> Money {
-        if cumulative_loss_pct <= self.attachment_pct() {
+        if cumulative_loss_pct <= self.effective_attach_pct() {
             // Losses have not reached this tranche's subordination
             Money::from((0_i64, self.original_balance.currency()))
-        } else if cumulative_loss_pct >= self.detachment_pct() {
+        } else if cumulative_loss_pct >= self.effective_detach_pct() {
             // Tranche fully impaired — written down to zero
             self.original_balance
         } else {
             // Partial loss: only the portion between attachment and detachment
-            let loss_within_tranche_pct = cumulative_loss_pct - self.attachment_pct();
+            let loss_within_tranche_pct = cumulative_loss_pct - self.effective_attach_pct();
             let loss_rate = loss_within_tranche_pct / self.thickness();
             self.original_balance * loss_rate
         }
@@ -497,8 +497,8 @@ impl Tranche {
 /// Builder for creating tranches with validation
 pub struct TrancheBuilder {
     id: Option<String>,
-    attachment_point: Option<f64>,
-    detachment_point: Option<f64>,
+    attach_pct: Option<f64>,
+    detach_pct: Option<f64>,
     seniority: Option<TrancheSeniority>,
     original_balance: Option<Money>,
     coupon: Option<TrancheCoupon>,
@@ -520,8 +520,8 @@ impl TrancheBuilder {
     pub fn new() -> Self {
         Self {
             id: None,
-            attachment_point: None,
-            detachment_point: None,
+            attach_pct: None,
+            detach_pct: None,
             seniority: None,
             original_balance: None,
             coupon: None,
@@ -548,9 +548,9 @@ impl TrancheBuilder {
 
     /// Set attachment and detachment points (as percentages)
     #[must_use]
-    pub fn attachment_detachment(mut self, attachment: f64, detachment: f64) -> Self {
-        self.attachment_point = Some(attachment);
-        self.detachment_point = Some(detachment);
+    pub fn attach_detach(mut self, attachment: f64, detachment: f64) -> Self {
+        self.attach_pct = Some(attachment);
+        self.detach_pct = Some(detachment);
         self
     }
 
@@ -690,7 +690,7 @@ impl TrancheBuilder {
     /// supplying only one of the two is an error.
     pub fn build(self) -> finstack_quant_core::Result<Tranche> {
         let id = self.id.ok_or(finstack_quant_core::InputError::Invalid)?;
-        let points = match (self.attachment_point, self.detachment_point) {
+        let points = match (self.attach_pct, self.detach_pct) {
             (Some(attachment), Some(detachment)) => Some((attachment, detachment)),
             (None, None) => None,
             _ => return Err(finstack_quant_core::InputError::Invalid.into()),
@@ -714,10 +714,10 @@ impl TrancheBuilder {
             .ok_or(finstack_quant_core::InputError::Invalid)?;
 
         let mut tranche = match points {
-            Some((attachment_point, detachment_point)) => Tranche::new(
+            Some((attach_pct, detach_pct)) => Tranche::new(
                 id,
-                attachment_point,
-                detachment_point,
+                attach_pct,
+                detach_pct,
                 seniority,
                 original_balance,
                 coupon,
@@ -853,8 +853,8 @@ impl TrancheStructure {
     /// currencies, non-positive balances).
     pub fn from_balances(mut tranches: Vec<Tranche>) -> finstack_quant_core::Result<Self> {
         for tranche in &mut tranches {
-            tranche.attachment_point = None;
-            tranche.detachment_point = None;
+            tranche.attach_pct = None;
+            tranche.detach_pct = None;
         }
         Self::new(tranches)
     }
@@ -894,15 +894,15 @@ impl TrancheStructure {
     fn resolve_attachment_points(tranches: &mut [Tranche]) -> finstack_quant_core::Result<()> {
         if tranches
             .iter()
-            .all(|t| t.attachment_point.is_some() && t.detachment_point.is_some())
+            .all(|t| t.attach_pct.is_some() && t.detach_pct.is_some())
         {
             return Ok(());
         }
         let derived = Self::derived_attachment_points(tranches)?;
         for (tranche, (attachment, detachment)) in tranches.iter_mut().zip(derived) {
-            if tranche.attachment_point.is_none() || tranche.detachment_point.is_none() {
-                tranche.attachment_point = Some(attachment);
-                tranche.detachment_point = Some(detachment);
+            if tranche.attach_pct.is_none() || tranche.detach_pct.is_none() {
+                tranche.attach_pct = Some(attachment);
+                tranche.detach_pct = Some(detachment);
             }
         }
         Ok(())
@@ -925,8 +925,8 @@ impl TrancheStructure {
     /// priorities; callers must therefore pass pari-passu Class A-1/A-2/A-3 in
     /// seniority order.
     ///
-    /// Ranking on the seniority enum (rather than `attachment_point`) is
-    /// deliberate: `attachment_point` is used inconsistently across the
+    /// Ranking on the seniority enum (rather than `attach_pct`) is
+    /// deliberate: `attach_pct` is used inconsistently across the
     /// codebase's deals (some put the senior class at `0%`, some at the top of
     /// the stack), whereas `TrancheSeniority` is unambiguous. This preserves
     /// the historical relative ordering for every distinct-seniority deal and
@@ -965,26 +965,31 @@ impl TrancheStructure {
     fn validate_structure(tranches: &[Tranche]) -> finstack_quant_core::Result<()> {
         // Validate attachment points are resolved and finite before sorting
         for tranche in tranches {
-            if !tranche.attachment_pct().is_finite() || !tranche.detachment_pct().is_finite() {
+            if !tranche.effective_attach_pct().is_finite()
+                || !tranche.effective_detach_pct().is_finite()
+            {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
         }
 
         // Sort by attachment point for validation
         let mut sorted_tranches = tranches.to_vec();
-        sorted_tranches.sort_by(|a, b| a.attachment_pct().total_cmp(&b.attachment_pct()));
+        sorted_tranches.sort_by(|a, b| {
+            a.effective_attach_pct()
+                .total_cmp(&b.effective_attach_pct())
+        });
 
         let mut expected_attachment = 0.0;
         const TOLERANCE: f64 = 1e-6;
 
         for tranche in &sorted_tranches {
-            if (tranche.attachment_pct() - expected_attachment).abs() > TOLERANCE {
+            if (tranche.effective_attach_pct() - expected_attachment).abs() > TOLERANCE {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
-            if tranche.detachment_pct() <= tranche.attachment_pct() {
+            if tranche.effective_detach_pct() <= tranche.effective_attach_pct() {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
-            expected_attachment = tranche.detachment_pct();
+            expected_attachment = tranche.effective_detach_pct();
         }
 
         // Should reach 100%
@@ -1013,8 +1018,8 @@ impl TrancheStructure {
                          capital structure; declared points must match balance \
                          shares within {THICKNESS_TOLERANCE_PCT}%",
                         tranche.id,
-                        tranche.attachment_pct(),
-                        tranche.detachment_pct(),
+                        tranche.effective_attach_pct(),
+                        tranche.effective_detach_pct(),
                         thickness_pct,
                         balance_share_pct,
                     )));
@@ -1108,8 +1113,8 @@ mod tests {
         )
         .expect("should succeed");
 
-        assert_eq!(tranche.attachment_point, Some(0.0));
-        assert_eq!(tranche.detachment_point, Some(10.0));
+        assert_eq!(tranche.attach_pct, Some(0.0));
+        assert_eq!(tranche.detach_pct, Some(10.0));
         assert_eq!(tranche.thickness(), 10.0);
         assert!(tranche.is_first_loss());
     }
@@ -1145,7 +1150,7 @@ mod tests {
     fn test_tranche_structure_validation() {
         let equity = Tranche::builder()
             .id("EQUITY")
-            .attachment_detachment(0.0, 10.0)
+            .attach_detach(0.0, 10.0)
             .seniority(TrancheSeniority::Equity)
             .balance(Money::from((100_000_000_i64, Currency::USD)))
             .coupon(TrancheCoupon::Fixed { rate: 0.12 })
@@ -1155,7 +1160,7 @@ mod tests {
 
         let senior = Tranche::builder()
             .id("SENIOR")
-            .attachment_detachment(10.0, 100.0)
+            .attach_detach(10.0, 100.0)
             .seniority(TrancheSeniority::Senior)
             .balance(Money::from((900_000_000_i64, Currency::USD)))
             .coupon(TrancheCoupon::Floating(

@@ -152,10 +152,10 @@ def build_single_name_cds() -> dict[str, Any]:
                     "start": "2025-09-22",
                     "end": "2030-12-20",
                     "frequency": {"count": 3, "unit": "months"},
-                    "standard_imm_dates": True,
+                    "roll_rule": "cds_imm",
                     "calendar_id": "weekends_only",
                     "day_count": "act_360",
-                    "spread_bp": "100.0",
+                    "coupon_bp": "100.0",
                     "discount_curve_id": "USD-FLAT-2PCT",
                 },
                 "protection": {

@@ -1,12 +1,13 @@
 //! CS01 calculator for convertible bonds.
 //!
 //! Convertible bonds are hybrid instruments with both debt and equity
-//! components and are typically priced without a separate hazard curve, so
-//! this calculator deviates from the [canonical CS01 convention][canonical]
-//! (par CDS curve bump). It instead applies a parallel 1 bp shock to the
-//! configured **credit curve ID** (resolved against the discount-curve
-//! container, which may already embed the credit spread) and uses the same
-//! symmetric (central) finite difference as the canonical helpers:
+//! components. Their issuer `credit_curve_id` names a `HazardCurve`, but the
+//! curve is usually entered directly rather than bootstrapped from a CDS
+//! strip, so this calculator deviates from the [canonical CS01
+//! convention][canonical] (par CDS curve bump with re-bootstrap). It applies a
+//! parallel 1 bp **spread** shock straight to the hazard curve — a hazard shift
+//! of `1bp / (1 − R_curve)` (credit triangle), no re-bootstrap — and uses the
+//! same symmetric (central) finite difference as the canonical helpers:
 //!
 //! ```text
 //! CS01 = (PV(s + 1bp) - PV(s - 1bp)) / 2
@@ -14,13 +15,15 @@
 //!
 //! When `credit_curve_id` is `None`, the calculator falls back to the
 //! **z-spread bump method** (the market convention for bonds without a
-//! hazard curve): a copy of the risk-free discount curve is inserted under a
-//! synthetic ID, a bond clone is repointed at it as its credit curve (zero
-//! recovery), and the ±1 bp shock is applied to that synthetic curve only.
-//! In the Tsiveriotis-Zhang split this shocks the cash-component (risky)
-//! discounting while leaving the equity leg's drift and discounting
-//! unchanged — a true credit-spread sensitivity, not rho. The fallback is
-//! logged at debug level.
+//! hazard curve): a zero-hazard, zero-recovery synthetic curve is inserted
+//! under a derived ID and a bond clone is repointed at it (zero recovery), so
+//! a 1 bp spread shock is a 1 bp hazard shift that hits only the
+//! cash-component (Tsiveriotis-Zhang risky) discounting while leaving the
+//! equity leg's drift and discounting unchanged — a true credit-spread
+//! sensitivity, not rho. A hazard rate cannot go below zero, so the fallback
+//! uses the forward difference `PV(s + 1bp) − PV(s)`, the same deviation the
+//! bond z-spread CS01 documents (`O(bump²)` from the central value). The
+//! fallback is logged at debug level.
 //!
 //! Sign convention is identical to the canonical reference:
 //! - Long convertible → CS01 negative (wider spreads reduce PV).
@@ -30,45 +33,113 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
-use crate::metrics::bump_discount_curve_parallel;
 use crate::metrics::sensitivities::config::{format_bucket_label_cow, STANDARD_BUCKETS_YEARS};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use std::borrow::Cow;
 
-/// Build the z-spread fallback pricing setup for a convertible with no credit
-/// curve: a faithful copy of the risk-free discount curve inserted under a
-/// synthetic ID, plus a bond clone repointed at that copy as its credit curve
-/// with zero recovery. Bumping the synthetic curve then shocks only the
-/// cash-component (Tsiveriotis-Zhang risky) discounting, leaving the equity
-/// leg untouched — the z-spread bump method for instruments without a hazard
-/// curve.
+/// Finite-difference stencil for a spread shock.
+#[derive(Clone, Copy)]
+enum Stencil {
+    /// `(PV(+h) − PV(−h)) / 2h`: the canonical central difference.
+    Central,
+    /// `(PV(+h) − PV(0)) / h`: the z-spread fallback, whose zero-hazard curve
+    /// cannot be shocked downward.
+    Forward,
+}
+
+/// Pricing setup for a CS01 shock: the bond to reprice, the market holding
+/// the hazard curve to shock, that curve's ID and the stencil.
+struct Cs01Setup {
+    bond: ConvertibleBond,
+    market: MarketContext,
+    curve_id: CurveId,
+    stencil: Stencil,
+}
+
+/// Resolve the curve to shock: the bond's own hazard curve, or the z-spread
+/// fallback for a convertible with no credit curve.
+///
+/// The fallback inserts a zero-hazard, zero-recovery curve under a derived ID
+/// (knots on the standard CS01 buckets so key-rate shocks resolve per bucket,
+/// base date and day count of the risk-free curve) and repoints a bond clone
+/// at it with explicit zero recovery. Its base PV equals the bond's PV with no
+/// credit curve, and a 1 bp spread shock is a 1 bp z-spread on the cash
+/// component.
 ///
 /// # Arguments
 ///
-/// * `bond` - Convertible bond without a configured `credit_curve_id`; cloned
-///   and repointed at the synthetic curve.
-/// * `market` - Base market context supplying the bond's risk-free discount
-///   curve; cloned with the synthetic curve inserted.
-fn zspread_fallback_setup(
-    bond: &ConvertibleBond,
-    market: &MarketContext,
-) -> Result<(ConvertibleBond, MarketContext, CurveId)> {
+/// * `bond` - Convertible bond to shock; cloned (and, for the fallback,
+///   repointed at the synthetic curve).
+/// * `market` - Base market context supplying the risk-free discount curve and,
+///   when set, the bond's hazard curve; cloned with the synthetic curve
+///   inserted for the fallback.
+fn cs01_setup(bond: &ConvertibleBond, market: &MarketContext) -> Result<Cs01Setup> {
+    if let Some(curve_id) = &bond.credit_curve_id {
+        return Ok(Cs01Setup {
+            bond: bond.clone(),
+            market: market.clone(),
+            curve_id: curve_id.clone(),
+            stencil: Stencil::Central,
+        });
+    }
+    tracing::debug!(
+        instrument = %bond.id.as_str(),
+        "convertible CS01: no credit curve configured; falling back to a z-spread \
+         bump of the cash component"
+    );
     let rf_curve = market.get_discount(bond.discount_curve_id.as_str())?;
-    // A 0 bp parallel bump yields an identical curve under a derived
-    // "<id>_bump_0bp" ID — a faithful copy we can shock independently.
-    let synthetic = rf_curve.with_parallel_bump(0.0)?;
-    let synthetic_id = synthetic.id().clone();
-    let market = market.clone().insert(synthetic);
+    let curve_id = CurveId::new(format!("{}::zspread-hazard", bond.id.as_str()));
+    let synthetic = HazardCurve::builder(curve_id.clone())
+        .base_date(rf_curve.base_date())
+        .day_count(rf_curve.day_count())
+        .recovery_rate(0.0)
+        .knots(STANDARD_BUCKETS_YEARS.iter().map(|&t| (t, 0.0)))
+        .build()?;
     let mut shocked = bond.clone();
-    shocked.credit_curve_id = Some(synthetic_id.clone());
+    shocked.credit_curve_id = Some(curve_id.clone());
     // Pure z-spread bump: explicit zero recovery makes the full shock hit the
     // cash component without introducing an implicit recovery assumption.
     shocked.recovery_rate = Some(0.0);
-    Ok((shocked, market, synthetic_id))
+    Ok(Cs01Setup {
+        bond: shocked,
+        market: market.clone().insert(synthetic),
+        curve_id,
+        stencil: Stencil::Forward,
+    })
+}
+
+impl Cs01Setup {
+    /// Reprice after shocking the hazard curve with `spec`.
+    fn pv_with(&self, spec: BumpSpec, as_of: Date) -> Result<f64> {
+        let bumped = self.market.bump([MarketBump::Curve {
+            id: self.curve_id.clone(),
+            spec,
+        }])?;
+        Ok(self.bond.value(&bumped, as_of)?.amount())
+    }
+
+    /// CS01 in currency per 1 bp of spread for the shock built by `spec_for`
+    /// from a signed basis-point size.
+    fn cs01(&self, as_of: Date, spec_for: impl Fn(f64) -> BumpSpec) -> Result<f64> {
+        let bump_bp = 1.0;
+        let pv_up = self.pv_with(spec_for(bump_bp), as_of)?;
+        match self.stencil {
+            Stencil::Central => {
+                let pv_down = self.pv_with(spec_for(-bump_bp), as_of)?;
+                Ok((pv_up - pv_down) / (2.0 * bump_bp))
+            }
+            Stencil::Forward => {
+                let pv_base = self.bond.value(&self.market, as_of)?.amount();
+                Ok((pv_up - pv_base) / bump_bp)
+            }
+        }
+    }
 }
 
 /// CS01 calculator for convertible bonds.
@@ -83,29 +154,7 @@ impl MetricCalculator for Cs01Calculator {
             return Ok(0.0);
         }
 
-        let bump_bp = 1.0;
-
-        let (bond, market, curve_to_bump) = match &bond.credit_curve_id {
-            Some(id) => (bond.clone(), context.curves.as_ref().clone(), id.clone()),
-            None => {
-                tracing::debug!(
-                    instrument = %bond.id.as_str(),
-                    "convertible CS01: no credit curve configured; falling back to \
-                     z-spread bump of the cash component"
-                );
-                zspread_fallback_setup(bond, context.curves.as_ref())?
-            }
-        };
-
-        let curves_up = bump_discount_curve_parallel(&market, &curve_to_bump, bump_bp)?;
-        let curves_down = bump_discount_curve_parallel(&market, &curve_to_bump, -bump_bp)?;
-
-        let pv_up = bond.value(&curves_up, as_of)?.amount();
-        let pv_down = bond.value(&curves_down, as_of)?.amount();
-
-        let cs01 = (pv_up - pv_down) / 2.0;
-
-        Ok(cs01)
+        cs01_setup(bond, context.curves.as_ref())?.cs01(as_of, BumpSpec::parallel_bp)
     }
 }
 
@@ -134,10 +183,11 @@ fn key_rate_spec(i: usize, bump_bp: f64, buckets: &[f64]) -> BumpSpec {
 
 /// Key-rate (bucketed) CS01 calculator for convertible bonds.
 ///
-/// Mirrors [`Cs01Calculator`] but applies a *triangular key-rate* shock to the
-/// credit curve at each standard bucket tenor instead of a single parallel
-/// shock, producing a per-tenor CS01 series. The per-bucket CS01s sum (within
-/// the usual key-rate tolerance) to the parallel CS01.
+/// Mirrors [`Cs01Calculator`] but applies a *triangular key-rate* spread shock
+/// to the hazard curve at each standard bucket tenor instead of a single
+/// parallel shock, producing a per-tenor CS01 series. The bucket weights sum to
+/// one at every hazard knot, so the per-bucket CS01s sum (within the usual
+/// key-rate tolerance) to the parallel CS01.
 ///
 /// The series is stored under `bucketed_cs01::{credit_curve_id}` so downstream
 /// consumers read it exactly like the generic `BucketedCs01`. When
@@ -159,42 +209,20 @@ impl MetricCalculator for BucketedCs01Calculator {
             return Ok(0.0);
         }
 
-        let (bond, market, curve_id, series_key) = match &bond.credit_curve_id {
-            Some(id) => {
-                let id = id.clone();
-                let key = id.as_str().to_string();
-                (bond, context.curves.as_ref().clone(), id, key)
-            }
-            None => {
-                tracing::debug!(
-                    instrument = %bond.id.as_str(),
-                    "convertible bucketed CS01: no credit curve configured; falling back \
-                     to z-spread key-rate bumps of the cash component"
-                );
-                let key = bond.id.as_str().to_string();
-                let (bond, market, synthetic_id) =
-                    zspread_fallback_setup(&bond, context.curves.as_ref())?;
-                (bond, market, synthetic_id, key)
-            }
-        };
-
-        let bump_bp = 1.0;
+        let series_key = bond
+            .credit_curve_id
+            .as_ref()
+            .map_or_else(|| bond.id.as_str(), CurveId::as_str)
+            .to_string();
+        let setup = cs01_setup(&bond, context.curves.as_ref())?;
 
         let mut series: Vec<(Cow<'static, str>, f64)> = Vec::new();
         let mut total = 0.0;
         for (i, &t) in STANDARD_BUCKETS_YEARS.iter().enumerate() {
-            let up = market.bump([MarketBump::Curve {
-                id: curve_id.clone(),
-                spec: key_rate_spec(i, bump_bp, &STANDARD_BUCKETS_YEARS),
-            }])?;
-            let down = market.bump([MarketBump::Curve {
-                id: curve_id.clone(),
-                spec: key_rate_spec(i, -bump_bp, &STANDARD_BUCKETS_YEARS),
-            }])?;
-            let pv_up = bond.value(&up, as_of)?.amount();
-            let pv_down = bond.value(&down, as_of)?.amount();
-            // Central difference, $ per bp of spread at this bucket.
-            let cs01 = (pv_up - pv_down) / (2.0 * bump_bp);
+            // $ per bp of spread at this bucket.
+            let cs01 = setup.cs01(as_of, |bump_bp| {
+                key_rate_spec(i, bump_bp, &STANDARD_BUCKETS_YEARS)
+            })?;
             series.push((format_bucket_label_cow(t), cs01));
             total += cs01;
         }

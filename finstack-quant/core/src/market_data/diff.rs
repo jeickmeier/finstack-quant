@@ -297,17 +297,16 @@ pub fn measure_per_tenor_par_spread_shift(
 /// - a [`HazardCurve`](crate::market_data::term_structures::HazardCurve) — the
 ///   move is the **par CDS spread** shift ([`measure_par_spread_shift`]), the
 ///   basis a hazard-curve `Cs01` is defined on; or
-/// - a [`DiscountCurve`](crate::market_data::term_structures::DiscountCurve) —
-///   e.g. the Tsiveriotis–Zhang risky discount curve a convertible bond prices
-///   off — the move is the **zero-rate** shift
+/// - a [`DiscountCurve`](crate::market_data::term_structures::DiscountCurve)
+///   serving a credit role — the move is the **zero-rate** shift
 ///   ([`measure_discount_curve_shift`]), the basis a discount-style `Cs01` is
 ///   bumped on.
 ///
 /// The hazard interpretation is tried first, falling back to the discount
 /// interpretation, so the returned move is always unit-consistent with the
 /// instrument's own CS01. Used by P&L attribution so credit-spread P&L from a
-/// convertible's risky discount curve is attributed to the credit factor
-/// rather than leaking into the residual.
+/// discount-style credit curve is attributed to the credit factor rather than
+/// leaking into the residual.
 ///
 /// # Arguments
 ///
@@ -816,8 +815,7 @@ mod tests {
 
     #[test]
     fn test_credit_curve_shift_falls_back_to_discount_zero_rate() {
-        // A credit curve modelled as a `DiscountCurve` (e.g. a convertible's
-        // risky discount curve) has no par CDS quote — `measure_credit_curve_shift`
+        // A credit curve modelled as a `DiscountCurve` has no par CDS quote — `measure_credit_curve_shift`
         // must fall back to the zero-rate shift instead of erroring.
         let base_date = sample_date();
         let curve = |rate: f64| {

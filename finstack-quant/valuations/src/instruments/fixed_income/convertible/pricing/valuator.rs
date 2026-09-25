@@ -42,7 +42,8 @@ pub(super) struct ConvertibleBondValuator {
     /// With recovery rate R:
     /// `risky_fwd_adj = risky_fwd * (1 - R) + rf_fwd * R`
     ///
-    /// At R=0 this equals the raw credit-curve forward (zero-recovery TZ model).
+    /// At R=0 this equals `rf_fwd × S(t_{i+1}) / S(t_i)` from the issuer hazard
+    /// curve (zero-recovery TZ model).
     /// At R=1 this equals the risk-free forward (no credit effect).
     pub(super) risky_step_dfs: Vec<f64>,
     /// Equity volatility (stored for soft-call trigger adjustment).
@@ -244,16 +245,6 @@ impl ConvertibleBondValuator {
 
         // ---- M1: Per-step discount factors from full term structure ----
         let rf_curve = market_context.get_discount(bond.discount_curve_id.as_str())?;
-        let credit_curve = if let Some(credit_id) = &bond.credit_curve_id {
-            if credit_id != &bond.discount_curve_id {
-                Some(market_context.get_discount(credit_id.as_str())?)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
         let recovery = match (bond.recovery_rate, bond.credit_curve_id.as_ref()) {
             (Some(r), _) if !r.is_finite() || !(0.0..=1.0).contains(&r) => {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -272,6 +263,18 @@ impl ConvertibleBondValuator {
             (None, None) => 0.0,
         };
 
+        // Survival probabilities S(t) at every step date from the issuer
+        // hazard curve; `None` prices the cash component at the risk-free rate.
+        let survival = bond
+            .credit_curve_id
+            .as_ref()
+            .map(|credit_curve_id| {
+                market_context
+                    .get_hazard(credit_curve_id.as_str())?
+                    .survival_at_dates(&step_dates)
+            })
+            .transpose()?;
+
         let mut rf_step_dfs = Vec::with_capacity(steps);
         let mut risky_step_dfs = Vec::with_capacity(steps);
 
@@ -281,16 +284,19 @@ impl ConvertibleBondValuator {
             let rf_fwd = rf_curve.df_between_dates(step_start, step_end)?;
             rf_step_dfs.push(rf_fwd);
 
-            if let Some(ref cc) = credit_curve {
-                let raw_risky_fwd = cc.df_between_dates(step_start, step_end)?;
+            if let Some(survival) = &survival {
+                if survival[i] <= 0.0 {
+                    return Err(Error::Validation(format!(
+                        "Convertible bond {} hazard curve implies zero survival by {step_start}",
+                        bond.id.as_str()
+                    )));
+                }
+                // Zero-recovery risky forward DF: rf_fwd × S(end) / S(start).
+                let raw_risky_fwd = rf_fwd * (survival[i + 1] / survival[i]);
                 // Blend risky and risk-free using recovery:
                 //   adjusted = risky * (1 - R) + rf * R
                 // At R=0: pure zero-recovery TZ model.
                 // At R=1: cash component discounted at risk-free (no credit effect).
-                //
-                // NOTE: this blend assumes the credit curve encodes ZERO-RECOVERY
-                // (pure hazard) risky discounting; see `ConvertibleBond::credit_curve_id`.
-                // A market recovery-adjusted spread curve would double-count (1 - R).
                 let risky_fwd = raw_risky_fwd * (1.0 - recovery) + rf_fwd * recovery;
                 risky_step_dfs.push(risky_fwd);
             } else {

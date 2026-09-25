@@ -34,7 +34,7 @@ This reference has USD 1 million face, a 2% cash coupon, five years to maturity 
 
 The conversion specification distinguishes voluntary exercise from mandatory conversion and controls exercise dates, dilution protection and corporate-action adjustments. The reference is voluntary. A future down-round is uncertain and belongs in a scenario; an already effective down-round belongs in today's effective conversion ratio. Applying an event both to the ratio and again as an adjustment double counts protection.
 
-The debt component requires a risky **discount curve**. `CONVERT-RISKY` contains the risk-free rate plus a credit discount spread; it is not a hazard-curve identifier. We set recovery to zero for an unambiguous discounted-debt floor. A nonzero-recovery model requires a consistent spread/hazard interpretation. Omitting the credit curve and discounting debt at the risk-free rate would erase the credit exposure we are trying to study.
+The debt component discounts at the risk-free curve times the issuer's survival probability. `CONVERT-RISKY` is that issuer **hazard curve** (a flat 2.5% default intensity), so the zero-recovery risky discount factor is `DF_OIS(t) × S(t)`. We set recovery to zero for an unambiguous discounted-debt floor; a nonzero recovery blends risky and risk-free discounting. Omitting the credit curve and discounting debt at the risk-free rate would erase the credit exposure we are trying to study.
 
 ### Interpret the three regimes
 
@@ -54,7 +54,7 @@ A finite tree can produce locally uneven delta estimates. A small bump is not au
 
 ### Establish the debt and equity inputs
 
-The shared credit market contains both discount curves, the stock price and the convertible volatility/dividend inputs. Each market factory returns a fresh object so one spot scenario cannot alter the next.
+The shared credit market contains the risk-free discount curve, the issuer hazard curve, the stock price and the convertible volatility/dividend inputs. Each market factory returns a fresh object so one spot scenario cannot alter the next.
 
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-setup" role="build" */}
 ```python exec id=convertible-setup role=build
@@ -92,7 +92,7 @@ print(pd.DataFrame(regimes))
 
 ### Verify two independent reference values
 
-The straight bond uses the same debt cashflows and risky discount curve, with zero settlement lag. Its discounted payment sum matches the reported floor. The analytical limit then removes coupon, credit and early conversion so the equity call can be checked independently. These are different controls: the floor tests debt construction; the limit tests the option component under simplified economics.
+The straight bond uses the same debt cashflows, risk-free curve and issuer hazard curve (hazard-rate model), with zero settlement lag. Its discounted payment sum matches the reported floor. The analytical limit then removes coupon, credit and early conversion so the equity call can be checked independently. These are different controls: the floor tests debt construction; the limit tests the option component under simplified economics.
 
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-floor-proof" role="build" */}
 ```python exec id=convertible-floor-proof role=build
@@ -102,10 +102,10 @@ _,floor_bond=fixed_bond(0)
 spec=convert["instrument"]["spec"]
 floor_bond["spec"].update({"id":"CONVERT-FLOOR-BOND","notional":spec["notional"],
     "issue_date":spec["issue_date"],"maturity":spec["maturity"],"cashflow_spec":{"fixed":spec["fixed_coupon"]},
-    "discount_curve_id":spec["credit_curve_id"],"settlement_days":0})
+    "discount_curve_id":spec["discount_curve_id"],"credit_curve_id":spec["credit_curve_id"],"settlement_days":0})
 floor_payload=json.dumps(instrument_envelope(floor_bond))
-floor_value=price_instrument(floor_payload,credit_market,AS_OF).value.amount
-floor_envelope,floor_flows=instrument_cashflows(floor_payload,credit_market,AS_OF,model="discounting")
+floor_value=price_instrument(floor_payload,credit_market,AS_OF,model="hazard_rate").value.amount
+floor_envelope,floor_flows=instrument_cashflows(floor_payload,credit_market,AS_OF,model="hazard_rate")
 print(pd.Series({"matched_bond_floor_usd":floor_value,"native_convert_floor_usd":regimes[1]["bond_floor"]}))
 ```
 {/* /notebook-block */}
@@ -233,18 +233,18 @@ print("The static delta hedge removes the local first-order spot term, not gamma
 
 </Exercise>
 
-<Exercise id="c5-credit" title="Widen credit in every spot regime" question="Raise the risky discount rate from 6.5% to 7.5% at stock 50, 100 and 150. Explain why conversion value is unchanged but the convertible loses value.">
+<Exercise id="c5-credit" title="Widen credit in every spot regime" question="Raise the issuer hazard rate from 2.5% to 3.5% at stock 50, 100 and 150. Explain why conversion value is unchanged but the convertible loses value.">
 
-The stock and contractual ratio are fixed within each credit comparison, so immediate conversion value cannot change. The straight-debt floor loses the same amount in each regime; the convertible's loss is smaller when equity optionality dominates. This is a controlled discount-curve credit stress, not a full issuer-default or stock-credit correlation simulation.
+The stock and contractual ratio are fixed within each credit comparison, so immediate conversion value cannot change. The straight-debt floor loses the same amount in each regime; the convertible's loss is smaller when equity optionality dominates. This is a controlled hazard-curve credit stress, not a full issuer-default or stock-credit correlation simulation.
 
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="c5-exercise-credit" role="exercise" */}
 ```python exec id=c5-exercise-credit role=exercise
-from finstack_quant.core.market_data import DiscountCurve
+from finstack_quant.core.market_data import HazardCurve
 credit_rows=[]
 for spot in [50.,100.,150.]:
     base_market=tracks.build_market("credit");base_market.insert_price("CONVERT",spot,"USD")
     widened=tracks.build_market("credit");widened.insert_price("CONVERT",spot,"USD")
-    widened.insert(DiscountCurve("CONVERT-RISKY",AS_OF,[(t,math.exp(-.075*t)) for t in [0.,1.,5.,10.]],day_count="act_365f"))
+    widened.insert(HazardCurve("CONVERT-RISKY",AS_OF,[(1.0,.035)],recovery_rate=0.))
     before=price_instrument(json.dumps(convert),base_market,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
     after=price_instrument(json.dumps(convert),widened,AS_OF,model="tree",metrics=["bond_floor","conversion_value"])
     credit_rows.append({"spot":spot,"convert_credit_pnl":after.value.amount-before.value.amount,

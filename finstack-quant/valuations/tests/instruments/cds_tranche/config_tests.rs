@@ -69,7 +69,7 @@ fn test_default_config_accrual_on_default() {
 
     // Assert
     assert!(
-        config.accrual_on_default_enabled,
+        config.include_accrual_on_default,
         "Accrual-on-default should be enabled by default"
     );
 }
@@ -249,11 +249,11 @@ fn test_accumulated_loss_valid_zero() {
     );
 
     // Act
-    let result = params.with_accumulated_loss(0.0);
+    let result = params.with_realized_loss(0.0);
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().accumulated_loss, 0.0);
+    assert_eq!(result.unwrap().realized_loss, 0.0);
 }
 
 #[test]
@@ -268,11 +268,11 @@ fn test_accumulated_loss_valid_mid_range() {
     );
 
     // Act
-    let result = params.with_accumulated_loss(0.5);
+    let result = params.with_realized_loss(0.5);
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().accumulated_loss, 0.5);
+    assert_eq!(result.unwrap().realized_loss, 0.5);
 }
 
 #[test]
@@ -287,11 +287,11 @@ fn test_accumulated_loss_valid_one() {
     );
 
     // Act
-    let result = params.with_accumulated_loss(1.0);
+    let result = params.with_realized_loss(1.0);
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().accumulated_loss, 1.0);
+    assert_eq!(result.unwrap().realized_loss, 1.0);
 }
 
 #[test]
@@ -306,14 +306,14 @@ fn test_accumulated_loss_invalid_negative() {
     );
 
     // Act
-    let result = params.with_accumulated_loss(-0.01);
+    let result = params.with_realized_loss(-0.01);
 
     // Assert
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
-        err.to_string().contains("accumulated_loss"),
-        "Error should mention accumulated_loss: {}",
+        err.to_string().contains("realized_loss"),
+        "Error should mention realized_loss: {}",
         err
     );
 }
@@ -330,14 +330,14 @@ fn test_accumulated_loss_invalid_greater_than_one() {
     );
 
     // Act
-    let result = params.with_accumulated_loss(1.01);
+    let result = params.with_realized_loss(1.01);
 
     // Assert
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
-        err.to_string().contains("accumulated_loss"),
-        "Error should mention accumulated_loss: {}",
+        err.to_string().contains("realized_loss"),
+        "Error should mention realized_loss: {}",
         err
     );
 }
@@ -354,7 +354,7 @@ fn test_accumulated_loss_invalid_large_value() {
     );
 
     // Act
-    let result = params.with_accumulated_loss(2.5);
+    let result = params.with_realized_loss(2.5);
 
     // Assert
     assert!(result.is_err());

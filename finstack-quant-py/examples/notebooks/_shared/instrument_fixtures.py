@@ -212,7 +212,7 @@ def cds(idx: int) -> tuple[str, dict]:
             "side": side,
             "convention": "isda_na",
             "premium": {
-                "standard_imm_dates": True,
+                "roll_rule": "cds_imm",
                 "start": "2025-03-20",
                 "end": f"{mat_year}-03-20",
                 "frequency": {"count": 3, "unit": "months"},
@@ -220,7 +220,7 @@ def cds(idx: int) -> tuple[str, dict]:
                 "business_day_convention": "following",
                 "calendar_id": "usny",
                 "day_count": "act_360",
-                "spread_bp": str(spread),
+                "coupon_bp": str(spread),
                 "discount_curve_id": "USD-OIS",
             },
             "protection": {"credit_curve_id": "CORP-HAZARD", "recovery_rate": 0.4, "settlement_delay": 3},
@@ -247,7 +247,7 @@ def cds_index(idx: int) -> tuple[str, dict]:
             "side": side,
             "convention": "isda_na",
             "premium": {
-                "standard_imm_dates": True,
+                "roll_rule": "cds_imm",
                 "start": "2025-03-20",
                 "end": f"{mat_year}-12-20",
                 "frequency": {"count": 3, "unit": "months"},
@@ -255,7 +255,7 @@ def cds_index(idx: int) -> tuple[str, dict]:
                 "business_day_convention": "following",
                 "calendar_id": None,
                 "day_count": "act_360",
-                "spread_bp": str(spread),
+                "coupon_bp": str(spread),
                 "discount_curve_id": "USD-OIS",
             },
             "protection": {"credit_curve_id": "CDX-HAZ", "recovery_rate": 0.4, "settlement_delay": 3},
@@ -281,7 +281,7 @@ def cds_tranche(idx: int) -> tuple[str, dict]:
             "detach_pct": d,
             "notional": {"amount": "10000000", "currency": "USD"},
             "maturity": "2029-12-20",
-            "running_coupon_bp": coupon,
+            "coupon_bp": coupon,
             "frequency": {"count": 3, "unit": "months"},
             "day_count": "act_360",
             "business_day_convention": "following",
@@ -289,8 +289,8 @@ def cds_tranche(idx: int) -> tuple[str, dict]:
             "discount_curve_id": "USD-OIS",
             "credit_index_id": "CDX.NA.IG.HAZARD",
             "side": "buy_protection",
-            "accumulated_loss": 0.0,
-            "standard_imm_dates": False,
+            "realized_loss": 0.0,
+            "roll_rule": "none",
             "attributes": {"tags": ["structured-credit"], "meta": {}},
         },
     }
@@ -316,7 +316,7 @@ def cds_option(idx: int) -> tuple[str, dict]:
             "credit_curve_id": "CORP-HAZARD",
             "vol_surface_id": "CDS-SPREAD-VOL",
             "underlying_is_index": False,
-            "index_factor": None,
+            "index_factor": 1.0,
             "attributes": {"tags": ["credit-vol"], "meta": {}},
         },
     }
@@ -371,8 +371,8 @@ def _structured_credit_spec(iid: str, deal_type: str, idx: int) -> dict:
                 "tranches": [
                     {
                         "id": f"{iid}-A",
-                        "attachment_point": 0.0,
-                        "detachment_point": 100.0,
+                        "attach_pct": 0.0,
+                        "detach_pct": 100.0,
                         "seniority": "senior",
                         "rating": None,
                         "original_balance": {"amount": "10000000", "currency": "USD"},
@@ -750,13 +750,13 @@ def instrument_description(instrument_spec: dict) -> str:
 
     if itype == "credit_default_swap":
         tenor = int(s["premium"]["end"][:4]) - ref_year
-        spread = float(s["premium"]["spread_bp"])
+        spread = float(s["premium"]["coupon_bp"])
         side = s["side"][:3].title()
         return f"CDS {side} {tenor}Y {spread:.0f}bp"
 
     if itype == "cds_index":
         tenor = int(s["premium"]["end"][:4]) - ref_year
-        spread = float(s["premium"]["spread_bp"])
+        spread = float(s["premium"]["coupon_bp"])
         side = s["side"][:3].title()
         return f"CDX IG {side} {tenor}Y {spread:.0f}bp"
 

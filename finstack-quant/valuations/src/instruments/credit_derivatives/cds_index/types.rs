@@ -11,6 +11,7 @@ use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::parameters::CreditParams;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_margin::types::OtcMarginSpec;
@@ -168,6 +169,19 @@ pub struct CDSIndex {
     #[serde(default)]
     #[builder(default)]
     pub num_constituents: Option<u32>,
+    /// Contractual upfront payment `(payment date, amount)` on the index
+    /// notional. A positive amount is paid by the protection buyer to the
+    /// seller; a negative amount by the seller to the buyer. It is
+    /// discounted from its payment date and dropped once that date is before
+    /// the valuation date.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "finstack_quant_core::wire::optional_dated_money")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
+    #[builder(default)]
+    pub upfront: Option<(Date, Money)>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -241,7 +255,7 @@ impl CDSIndex {
             side: PayReceive::Pay,
             convention,
             premium: PremiumLegSpec {
-                standard_imm_dates: true,
+                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 12 - 20),
                 frequency,
@@ -249,7 +263,7 @@ impl CDSIndex {
                 business_day_convention,
                 calendar_id: Some(convention.default_calendar().to_string()),
                 day_count,
-                spread_bp: Decimal::from(60),
+                coupon_bp: Decimal::from(60),
                 discount_curve_id: CurveId::new("USD-OIS"),
             },
             protection: ProtectionLegSpec {
@@ -260,6 +274,7 @@ impl CDSIndex {
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
             num_constituents: Some(125),
+            upfront: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -293,7 +308,7 @@ impl CDSIndex {
     ///
     /// # Errors
     ///
-    /// Returns an error if `preset.fixed_coupon_bp` cannot be represented
+    /// Returns an error if `preset.coupon_bp` cannot be represented
     /// as `Decimal`.
     #[allow(clippy::too_many_arguments)]
     pub fn from_preset(
@@ -313,10 +328,10 @@ impl CDSIndex {
         let business_day_convention = convention.business_day_convention();
         let stub = convention.stub_convention();
 
-        let spread_bp_decimal = Decimal::try_from(preset.fixed_coupon_bp).map_err(|e| {
+        let coupon_bp = Decimal::try_from(preset.coupon_bp).map_err(|e| {
             finstack_quant_core::Error::Validation(format!(
-                "fixed_coupon_bp {} cannot be represented as Decimal: {}",
-                preset.fixed_coupon_bp, e
+                "coupon_bp {} cannot be represented as Decimal: {}",
+                preset.coupon_bp, e
             ))
         })?;
 
@@ -330,7 +345,7 @@ impl CDSIndex {
             side,
             convention,
             premium: PremiumLegSpec {
-                standard_imm_dates: true,
+                roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start,
                 end,
                 frequency,
@@ -338,7 +353,7 @@ impl CDSIndex {
                 business_day_convention,
                 calendar_id: Some(convention.default_calendar().to_string()),
                 day_count,
-                spread_bp: spread_bp_decimal,
+                coupon_bp,
                 discount_curve_id: discount_curve_id.into(),
             },
             protection: ProtectionLegSpec {
@@ -349,6 +364,7 @@ impl CDSIndex {
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
             num_constituents: preset.num_constituents,
+            upfront: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -397,14 +413,10 @@ impl CDSIndex {
         if let Some(margin_spec) = &self.margin_spec {
             margin_spec.validate_for_credit()?;
         }
-        if let Some(upfront) = self
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment
-        {
+        if let Some((_, upfront)) = self.upfront {
             if upfront.currency() != self.notional.currency() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "CDS Index '{}' upfront override currency {} must match notional currency {}",
+                    "CDS Index '{}' upfront currency {} must match notional currency {}",
                     self.id,
                     upfront.currency(),
                     self.notional.currency()

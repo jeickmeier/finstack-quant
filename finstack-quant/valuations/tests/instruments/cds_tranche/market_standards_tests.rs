@@ -255,7 +255,7 @@ fn test_aod_enabled_by_default() {
     let config =
         finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CDSTranchePricerConfig::default();
     assert!(
-        config.accrual_on_default_enabled,
+        config.include_accrual_on_default,
         "Accrual-on-default should be enabled by default per ISDA standards"
     );
 }

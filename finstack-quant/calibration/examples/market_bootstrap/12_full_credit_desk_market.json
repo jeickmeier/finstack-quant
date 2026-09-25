@@ -78,7 +78,7 @@
           0.15,
           0.3
         ],
-        "use_imm_dates": true
+        "roll_rule": "cds_imm"
       }
     ],
     "settings": {
@@ -267,7 +267,7 @@
       "detachment": 0.03,
       "maturity": "2031-06-20",
       "upfront_pct": -0.0423239892,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -282,7 +282,7 @@
       "detachment": 0.07,
       "maturity": "2031-06-20",
       "upfront_pct": -0.0473018185,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -297,7 +297,7 @@
       "detachment": 0.1,
       "maturity": "2031-06-20",
       "upfront_pct": -0.0473018185,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -312,7 +312,7 @@
       "detachment": 0.15,
       "maturity": "2031-06-20",
       "upfront_pct": -0.0473018185,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"
@@ -327,7 +327,7 @@
       "detachment": 0.3,
       "maturity": "2031-06-20",
       "upfront_pct": -0.0473018146,
-      "running_spread_bp": 100.0,
+      "coupon_bp": 100.0,
       "convention": {
         "currency": "USD",
         "doc_clause": "isda_na"

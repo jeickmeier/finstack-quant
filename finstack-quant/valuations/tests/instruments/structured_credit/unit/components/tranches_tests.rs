@@ -41,8 +41,8 @@ fn test_tranche_creation_basic() {
 
     // Assert
     assert_eq!(tranche.id.as_str(), "EQUITY");
-    assert_eq!(tranche.attachment_point, Some(0.0));
-    assert_eq!(tranche.detachment_point, Some(10.0));
+    assert_eq!(tranche.attach_pct, Some(0.0));
+    assert_eq!(tranche.detach_pct, Some(10.0));
     assert_eq!(tranche.seniority, TrancheSeniority::Equity);
     assert_eq!(tranche.original_balance.amount(), 10_000_000.0);
     assert_eq!(tranche.current_balance.amount(), 10_000_000.0);
@@ -169,7 +169,7 @@ fn test_tranche_builder_complete() {
     // Arrange & Act
     let tranche = Tranche::builder()
         .id("MEZZANINE")
-        .attachment_detachment(10.0, 15.0)
+        .attach_detach(10.0, 15.0)
         .seniority(TrancheSeniority::Mezzanine)
         .balance(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.08 })
@@ -181,8 +181,8 @@ fn test_tranche_builder_complete() {
 
     // Assert
     assert_eq!(tranche.id.as_str(), "MEZZANINE");
-    assert_eq!(tranche.attachment_point, Some(10.0));
-    assert_eq!(tranche.detachment_point, Some(15.0));
+    assert_eq!(tranche.attach_pct, Some(10.0));
+    assert_eq!(tranche.detach_pct, Some(15.0));
     assert_eq!(tranche.rating, Some(CreditRating::BBB));
 }
 
@@ -191,7 +191,7 @@ fn test_tranche_builder_missing_required_field() {
     // Arrange & Act: Missing balance
     let result = Tranche::builder()
         .id("INCOMPLETE")
-        .attachment_detachment(0.0, 10.0)
+        .attach_detach(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
         // Missing: .balance()
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
@@ -370,7 +370,7 @@ fn test_tranche_structure_creation() {
     // Arrange
     let equity = Tranche::builder()
         .id("EQUITY")
-        .attachment_detachment(0.0, 10.0)
+        .attach_detach(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
         .balance(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
@@ -380,7 +380,7 @@ fn test_tranche_structure_creation() {
 
     let senior = Tranche::builder()
         .id("SENIOR")
-        .attachment_detachment(10.0, 100.0)
+        .attach_detach(10.0, 100.0)
         .seniority(TrancheSeniority::Senior)
         .balance(Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
@@ -404,7 +404,7 @@ fn test_tranche_structure_validates_gaps() {
     // Arrange: Gap between 10% and 20%
     let equity = Tranche::builder()
         .id("EQUITY")
-        .attachment_detachment(0.0, 10.0)
+        .attach_detach(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
         .balance(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
@@ -414,7 +414,7 @@ fn test_tranche_structure_validates_gaps() {
 
     let senior = Tranche::builder()
         .id("SENIOR")
-        .attachment_detachment(20.0, 100.0) // Gap!
+        .attach_detach(20.0, 100.0) // Gap!
         .seniority(TrancheSeniority::Senior)
         .balance(Money::new(80_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
@@ -434,7 +434,7 @@ fn test_tranche_structure_validates_overlap() {
     // Arrange: Overlap between tranches
     let tranche1 = Tranche::builder()
         .id("T1")
-        .attachment_detachment(0.0, 15.0)
+        .attach_detach(0.0, 15.0)
         .seniority(TrancheSeniority::Equity)
         .balance(Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
@@ -444,7 +444,7 @@ fn test_tranche_structure_validates_overlap() {
 
     let tranche2 = Tranche::builder()
         .id("T2")
-        .attachment_detachment(10.0, 100.0) // Overlaps with T1!
+        .attach_detach(10.0, 100.0) // Overlaps with T1!
         .seniority(TrancheSeniority::Senior)
         .balance(Money::new(85_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
@@ -464,7 +464,7 @@ fn test_tranche_structure_validates_reaches_100() {
     // Arrange: Only goes to 90%
     let tranche = Tranche::builder()
         .id("INCOMPLETE")
-        .attachment_detachment(0.0, 90.0)
+        .attach_detach(0.0, 90.0)
         .seniority(TrancheSeniority::Senior)
         .balance(Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
@@ -640,7 +640,7 @@ fn create_tranche_with_balance(
 fn tranche_structure_wire_omits_derived_fields() {
     let equity = Tranche::builder()
         .id("EQUITY")
-        .attachment_detachment(0.0, 10.0)
+        .attach_detach(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
         .balance(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
@@ -650,7 +650,7 @@ fn tranche_structure_wire_omits_derived_fields() {
     assert_eq!(equity.payment_priority, 0, "unassigned outside a structure");
     let senior = Tranche::builder()
         .id("SENIOR")
-        .attachment_detachment(10.0, 100.0)
+        .attach_detach(10.0, 100.0)
         .seniority(TrancheSeniority::Senior)
         .balance(Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })

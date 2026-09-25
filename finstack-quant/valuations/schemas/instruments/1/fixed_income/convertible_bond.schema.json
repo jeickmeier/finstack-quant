@@ -303,7 +303,7 @@
               "type": "null"
             }
           ],
-          "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread).\n\n**Convention**: this curve must represent ZERO-RECOVERY (pure hazard)\nrisky discounting, i.e. `risky_df = rf_df * survival_probability`. The\npricer converts it to recovery-adjusted discounting via the blend\n`risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a\nmarket recovery-adjusted spread curve here double-counts `(1 - R)` and\noverstates the credit discount."
+          "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",

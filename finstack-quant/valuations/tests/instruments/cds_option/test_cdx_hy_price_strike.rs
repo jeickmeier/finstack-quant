@@ -30,8 +30,8 @@ fn hy_option(option_type: OptionType, strike_price_pct: f64, as_of: Date) -> CDS
         .clean_price_strike(strike_price_pct)
         .with_index(CURRENT_FACTOR)
         .strike_index_factor(STRIKE_FACTOR)
-        .realized_index_loss(REALIZED_LOSS)
-        .underlying_cds_coupon_bp(HY_COUPON_BP)
+        .realized_loss(REALIZED_LOSS)
+        .coupon_bp(HY_COUPON_BP)
         .implied_vol(VOL);
     builder = match option_type {
         OptionType::Call => builder.call(),

@@ -206,7 +206,7 @@ fn test_cdx_na_ig_params() {
     assert_eq!(params.index_name, "CDX.NA.IG");
     assert_eq!(params.series, 42);
     assert_eq!(params.version, 1);
-    assert_eq!(params.fixed_coupon_bp, 100.0);
+    assert_eq!(params.coupon_bp, 100.0);
 }
 
 #[test]
@@ -217,7 +217,7 @@ fn test_cdx_na_hy_params() {
     assert_eq!(params.index_name, "CDX.NA.HY");
     assert_eq!(params.series, 39);
     assert_eq!(params.version, 2);
-    assert_eq!(params.fixed_coupon_bp, 500.0);
+    assert_eq!(params.coupon_bp, 500.0);
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn test_itraxx_europe_params() {
     assert_eq!(params.index_name, "iTraxx Europe");
     assert_eq!(params.series, 41);
     assert_eq!(params.version, 1);
-    assert_eq!(params.fixed_coupon_bp, 25.0);
+    assert_eq!(params.coupon_bp, 25.0);
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn test_to_synthetic_cds_conversion() {
     assert_eq!(cds.notional, idx.notional);
     assert_eq!(cds.side, idx.side);
     assert_eq!(cds.convention, idx.convention);
-    assert_eq!(cds.premium.spread_bp, idx.premium.spread_bp);
+    assert_eq!(cds.premium.coupon_bp, idx.premium.coupon_bp);
     assert_eq!(cds.protection.recovery_rate, idx.protection.recovery_rate);
 }
 
@@ -289,11 +289,7 @@ fn test_pricing_overrides_default() {
 
     let idx = standard_single_curve_index("CDX-OVERRIDE", start, end, 10_000_000.0);
 
-    assert!(idx
-        .instrument_pricing_overrides
-        .market_quotes
-        .upfront_payment
-        .is_none());
+    assert!(idx.upfront.is_none());
 }
 
 #[test]

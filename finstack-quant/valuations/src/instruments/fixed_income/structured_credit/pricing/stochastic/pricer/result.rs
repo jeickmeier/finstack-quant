@@ -164,11 +164,11 @@ pub struct TranchePricingResult {
     /// Expected shortfall
     pub expected_shortfall: Money,
 
-    /// Attachment point (percentage)
-    pub attachment: f64,
+    /// Attachment point in percent of the capital structure (0 = first loss).
+    pub attach_pct: f64,
 
-    /// Detachment point (percentage)
-    pub detachment: f64,
+    /// Detachment point in percent of the capital structure (100 = most senior).
+    pub detach_pct: f64,
 
     /// Weighted-average life (WAL, years) averaged over the paths on which
     /// the tranche received principal; `0.0` when it never did.
@@ -207,8 +207,8 @@ impl TranchePricingResult {
             expected_loss: Money::from((0_i64, currency)),
             unexpected_loss: Money::from((0_i64, currency)),
             expected_shortfall: Money::from((0_i64, currency)),
-            attachment: 0.0,
-            detachment: 1.0,
+            attach_pct: 0.0,
+            detach_pct: 100.0,
             wal: 0.0,
             paths_with_principal: 0,
             credit_duration: 0.0,
@@ -233,9 +233,14 @@ impl TranchePricingResult {
     }
 
     /// Set attachment and detachment points.
-    pub fn with_subordination(mut self, attachment: f64, detachment: f64) -> Self {
-        self.attachment = attachment;
-        self.detachment = detachment;
+    ///
+    /// # Arguments
+    ///
+    /// * `attach_pct` - Attachment point in percent of the capital structure.
+    /// * `detach_pct` - Detachment point in percent of the capital structure.
+    pub fn with_subordination(mut self, attach_pct: f64, detach_pct: f64) -> Self {
+        self.attach_pct = attach_pct;
+        self.detach_pct = detach_pct;
         self
     }
 
@@ -280,9 +285,9 @@ impl TranchePricingResult {
         self
     }
 
-    /// Get thickness (width of the tranche).
+    /// Tranche thickness in percent of the capital structure (`detach_pct - attach_pct`).
     pub fn thickness(&self) -> f64 {
-        self.detachment - self.attachment
+        self.detach_pct - self.attach_pct
     }
 }
 
@@ -309,9 +314,9 @@ mod tests {
         let npv = Money::from((100_000_i64, currency));
 
         let tranche = TranchePricingResult::new("A".to_string(), TrancheSeniority::Senior, npv)
-            .with_subordination(0.20, 1.00);
+            .with_subordination(20.0, 100.0);
 
-        assert!((tranche.thickness() - 0.80).abs() < 1e-10);
+        assert!((tranche.thickness() - 80.0).abs() < 1e-10);
         assert_eq!(
             serde_json::to_value(&tranche).expect("serialize")["seniority"],
             "senior"

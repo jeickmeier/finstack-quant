@@ -62,7 +62,13 @@ fn points(structure: &TrancheStructure) -> Vec<(String, f64, f64)> {
     structure
         .tranches
         .iter()
-        .map(|t| (t.id.to_string(), t.attachment_pct(), t.detachment_pct()))
+        .map(|t| {
+            (
+                t.id.to_string(),
+                t.effective_attach_pct(),
+                t.effective_detach_pct(),
+            )
+        })
         .collect()
 }
 
@@ -184,7 +190,7 @@ fn from_balances_discards_declared_points_and_missing_points_are_filled() {
     // A builder with only one of the two points is rejected.
     assert!(Tranche::builder()
         .id("X")
-        .attachment_detachment(0.0, 10.0)
+        .attach_detach(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
         .balance(usd(1.0))
         .coupon(TrancheCoupon::Fixed { rate: 0.0 })
@@ -199,7 +205,7 @@ fn from_balances_discards_declared_points_and_missing_points_are_filled() {
         .maturity(maturity())
         .build()
         .expect("no points");
-    assert_eq!(alone.attachment_point, None);
+    assert_eq!(alone.attach_pct, None);
 
     // JSON without points round-trips through the derivation as well.
     let json = serde_json::to_string(&derived).expect("serialize");
@@ -312,8 +318,8 @@ fn derived_structure_prices_like_the_declared_one() {
         .zip(&derived_result.tranche_results)
     {
         assert_eq!(left.tranche_id, right.tranche_id);
-        assert_eq!(left.attachment, right.attachment);
-        assert_eq!(left.detachment, right.detachment);
+        assert_eq!(left.attach_pct, right.attach_pct);
+        assert_eq!(left.detach_pct, right.detach_pct);
         assert_eq!(left.npv, right.npv);
     }
     assert_eq!(declared_result.npv, derived_result.npv);

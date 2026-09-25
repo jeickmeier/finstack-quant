@@ -8,7 +8,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use time::Month;
@@ -462,15 +462,16 @@ pub fn theoretical_parity(spot: f64, conversion_ratio: f64, notional: f64) -> f6
     theoretical_conversion_value(spot, conversion_ratio) / notional
 }
 
-/// Create market context with a separate credit curve (higher spread than risk-free).
+/// Create market context with an issuer hazard curve.
 ///
-/// The credit curve is constructed with a spread above the risk-free curve to
-/// exercise the TZ credit/equity decomposition path, which is skipped when
+/// The flat zero-recovery hazard curve `USD-CREDIT` has hazard rate
+/// `credit_spread_bp / 10_000`, so the zero-recovery risky discount rate of
+/// the cash component sits `credit_spread_bp` above the risk-free rate. It
+/// exercises the TZ credit/equity decomposition path, which is skipped when
 /// `credit_curve_id` is `None`.
 pub fn create_market_context_with_credit(credit_spread_bp: f64) -> MarketContext {
     let base_date = dates::base_date();
     let rf_rate = market_params::RISK_FREE_RATE;
-    let credit_rate = rf_rate + credit_spread_bp / 10_000.0;
 
     let rf_curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
@@ -485,18 +486,8 @@ pub fn create_market_context_with_credit(credit_spread_bp: f64) -> MarketContext
         .build()
         .unwrap();
 
-    let credit_curve = DiscountCurve::builder("USD-CREDIT")
-        .base_date(base_date)
-        // The mid pillar lies on the linear-DF segment, so the curve is
-        // unchanged; three pillars let the market roll one day for theta.
-        .knots([
-            (0.0, 1.0),
-            (5.0, 0.5 * (1.0 + (-credit_rate * 10.0).exp())),
-            (10.0, (-credit_rate * 10.0).exp()),
-        ])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let credit_curve =
+        HazardCurve::flat("USD-CREDIT", base_date, credit_spread_bp / 10_000.0, 0.0).unwrap();
 
     MarketContext::new()
         .insert(rf_curve)

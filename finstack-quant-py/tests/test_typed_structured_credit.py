@@ -81,8 +81,8 @@ class TestStructuredCreditTyped:
                 Tranche
                 .builder()
                 .id("BAD")
-                .attachment_point(50.0)
-                .detachment_point(10.0)
+                .attach_pct(50.0)
+                .detach_pct(10.0)
                 .seniority("senior")
                 .original_balance(Money(1.0, Currency("USD")))
                 .coupon_fixed(0.05)

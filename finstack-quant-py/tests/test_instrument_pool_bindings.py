@@ -43,8 +43,8 @@ def tranches(senior: float, equity: float) -> TrancheStructure:
         Tranche
         .builder()
         .id("EQ")
-        .attachment_point(0.0)
-        .detachment_point(10.0)
+        .attach_pct(0.0)
+        .detach_pct(10.0)
         .seniority("equity")
         .original_balance(Money(equity, Currency("USD")))
         .coupon_fixed(0.0)
@@ -55,8 +55,8 @@ def tranches(senior: float, equity: float) -> TrancheStructure:
         Tranche
         .builder()
         .id("A")
-        .attachment_point(10.0)
-        .detachment_point(100.0)
+        .attach_pct(10.0)
+        .detach_pct(100.0)
         .seniority("senior")
         .original_balance(Money(senior, Currency("USD")))
         .coupon_fixed(0.05)

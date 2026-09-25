@@ -142,8 +142,8 @@ def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
         Tranche
         .builder()
         .id("A")
-        .attachment_point(30.0)
-        .detachment_point(100.0)
+        .attach_pct(30.0)
+        .detach_pct(100.0)
         .seniority("senior")
         .original_balance(usd(8_400_000.0))
         .coupon_fixed(0.05)
@@ -152,8 +152,8 @@ def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
         Tranche
         .builder()
         .id("E")
-        .attachment_point(0.0)
-        .detachment_point(30.0)
+        .attach_pct(0.0)
+        .detach_pct(30.0)
         .seniority("equity")
         .original_balance(usd(3_600_000.0))
         .coupon_fixed(0.0)

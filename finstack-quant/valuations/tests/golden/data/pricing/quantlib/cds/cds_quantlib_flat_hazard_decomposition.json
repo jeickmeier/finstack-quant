@@ -37,6 +37,7 @@
         },
         "premium": {
           "calendar_id": "weekends_only",
+          "coupon_bp": "100.0",
           "day_count": "act_360",
           "discount_curve_id": "USD-FLAT-2PCT",
           "end": "2030-12-20",
@@ -44,8 +45,7 @@
             "count": 3,
             "unit": "months"
           },
-          "spread_bp": "100.0",
-          "standard_imm_dates": true,
+          "roll_rule": "cds_imm",
           "start": "2025-09-22"
         },
         "protection": {

@@ -156,7 +156,7 @@ it("adds and removes a flat option volatility quote without duplicating its form
 });
 
 it.each([
-  ["credit_default_swap", "Running spread", "premium", "spread_bp", "125"],
+  ["credit_default_swap", "Running coupon", "premium", "coupon_bp", "125"],
   ["interest_rate_swap", "Fixed coupon", "fixed", "rate", "0.045"],
   ["xccy_swap", "Leg 2 spread", "leg2", "spread_bp", "15"],
 ] as const)(

@@ -369,7 +369,7 @@
           "currency": "USD"
         },
         "maturity": "2031-04-30",
-        "running_coupon_bp": 100.0,
+        "coupon_bp": 100.0,
         "frequency": {
           "count": 3,
           "unit": "months"
@@ -381,8 +381,8 @@
         "credit_index_id": "CDX.NA.IG.HAZARD",
         "side": "buy_protection",
         "effective_date": "2026-04-30",
-        "accumulated_loss": 0.0,
-        "standard_imm_dates": false,
+        "realized_loss": 0.0,
+        "roll_rule": "none",
         "attributes": {
           "tags": [
             "golden"

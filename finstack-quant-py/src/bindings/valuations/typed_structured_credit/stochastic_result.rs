@@ -48,8 +48,8 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Sto
 /// ...     Tranche
 /// ...     .builder()
 /// ...     .id("A")
-/// ...     .attachment_point(0.0)
-/// ...     .detachment_point(100.0)
+/// ...     .attach_pct(0.0)
+/// ...     .detach_pct(100.0)
 /// ...     .seniority("senior")
 /// ...     .original_balance(Money(80_000_000.0, Currency("USD")))
 /// ...     .coupon_fixed(0.05)
@@ -252,7 +252,7 @@ impl PyStochasticPricingResult {
     ///
     /// Columns: ``tranche_id``, ``seniority``, ``npv``, ``expected_loss``,
     /// ``unexpected_loss``, ``expected_shortfall`` (currency units),
-    /// ``attachment``, ``detachment`` (decimal), ``wal`` (years, over
+    /// ``attach_pct``, ``detach_pct`` (percent of the capital structure), ``wal`` (years, over
     /// the paths that returned principal), ``paths_with_principal``,
     /// ``credit_duration`` and ``draw_option_cost`` (currency units).
     ///
@@ -280,8 +280,8 @@ impl PyStochasticPricingResult {
                     "expected_loss": tranche.expected_loss.amount(),
                     "unexpected_loss": tranche.unexpected_loss.amount(),
                     "expected_shortfall": tranche.expected_shortfall.amount(),
-                    "attachment": tranche.attachment,
-                    "detachment": tranche.detachment,
+                    "attach_pct": tranche.attach_pct,
+                    "detach_pct": tranche.detach_pct,
                     "wal": tranche.wal,
                     "paths_with_principal": tranche.paths_with_principal,
                     "credit_duration": tranche.credit_duration,
@@ -300,8 +300,8 @@ impl PyStochasticPricingResult {
                 ("expected_loss", "float64"),
                 ("unexpected_loss", "float64"),
                 ("expected_shortfall", "float64"),
-                ("attachment", "float64"),
-                ("detachment", "float64"),
+                ("attach_pct", "float64"),
+                ("detach_pct", "float64"),
                 ("wal", "float64"),
                 ("paths_with_principal", "int64"),
                 ("credit_duration", "float64"),

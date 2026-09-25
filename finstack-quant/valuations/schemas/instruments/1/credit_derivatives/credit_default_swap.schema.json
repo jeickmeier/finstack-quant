@@ -680,6 +680,10 @@
             "null"
           ]
         },
+        "coupon_bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Contractual running coupon in basis points (e.g., `100` = 1% per\nannum, the standard CDX.NA.IG coupon; `500` for high yield)."
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day count convention"
@@ -696,13 +700,9 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Payment frequency"
         },
-        "spread_bp": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Fixed spread in basis points (e.g., 100 = 100bp = 1%)"
-        },
-        "standard_imm_dates": {
-          "description": "Whether to use the standard quarterly CDS roll grid (20 March,\nJune, September and December), including a final maturity stub.\nRequires quarterly `frequency` and `ShortFront` `stub`. Set false\nfor bespoke schedules generated from the supplied frequency/stub.",
-          "type": "boolean"
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "description": "Premium roll-date grid. `cds_imm` selects the standard quarterly CDS\nroll grid (20 March, June, September and December), including a final\nmaturity stub, and requires quarterly `frequency` and `short_front`\n`stub`. `none` generates a bespoke schedule from the supplied\n`frequency` and `stub`. The equity-futures `imm` grid is rejected."
         },
         "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -715,12 +715,12 @@
         }
       },
       "required": [
-        "standard_imm_dates",
+        "roll_rule",
         "start",
         "end",
         "frequency",
         "day_count",
-        "spread_bp",
+        "coupon_bp",
         "discount_curve_id"
       ],
       "type": "object"
@@ -731,10 +731,10 @@
       "properties": {
         "credit_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Credit curve identifier for default probabilities"
+          "description": "Hazard curve identifier for default probabilities"
         },
         "recovery_rate": {
-          "description": "Recovery rate (0.0 to 1.0)",
+          "description": "Recovery rate as a decimal fraction in `[0.0, 1.0)`",
           "format": "double",
           "type": "number"
         },
@@ -752,6 +752,26 @@
         "settlement_delay"
       ],
       "type": "object"
+    },
+    "RollRule": {
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid).",
+          "type": "string"
+        },
+        {
+          "const": "imm",
+          "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.",
+          "type": "string"
+        },
+        {
+          "const": "cds_imm",
+          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "type": "string"
+        }
+      ]
     },
     "SimmCreditClassification": {
       "description": "Explicit ISDA SIMM credit risk-class and bucket assignment.\n\nCorporate, sovereign, and index credit exposures belong to credit\nqualifying, including high-yield sectors represented by SIMM buckets 7-12.\nCredit non-qualifying is reserved for securitizations and other exposures\ngoverned by the non-qualifying risk class.",
@@ -968,6 +988,7 @@
           "premium": {
             "business_day_convention": "modified_following",
             "calendar_id": "nyse",
+            "coupon_bp": "100",
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "end": "2029-03-20",
@@ -975,8 +996,7 @@
               "count": 3,
               "unit": "months"
             },
-            "spread_bp": "100",
-            "standard_imm_dates": true,
+            "roll_rule": "cds_imm",
             "start": "2024-03-20",
             "stub": "short_front"
           },

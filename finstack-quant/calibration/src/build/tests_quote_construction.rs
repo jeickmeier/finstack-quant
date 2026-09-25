@@ -128,7 +128,7 @@ fn test_all_quote_types_instrument_construction() {
             detachment: 0.03, // 0-3% Equity
             maturity: base_date.add_months(60),
             upfront_pct: 0.10,
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: CdsConventionKey {
                 currency: Currency::USD,
                 doc_clause: CdsDocClause::IsdaNa,
@@ -142,7 +142,7 @@ fn test_all_quote_types_instrument_construction() {
             detachment: 0.07, // 3-7% Mezz
             maturity: base_date.add_months(60),
             upfront_pct: 0.0,
-            running_spread_bp: 300.0,
+            coupon_bp: 300.0,
             convention: CdsConventionKey {
                 currency: Currency::USD,
                 doc_clause: CdsDocClause::IsdaNa,

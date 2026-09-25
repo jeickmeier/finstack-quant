@@ -43,7 +43,7 @@ $$
 L_{a,d}=N\min\{\max(L/N-a,0),d-a\}.
 $$
 
-The equity loss tranche attaches first at zero. Do not transfer those coordinates into the cash-stack builder without reading its contract: the native structured-credit fixture's senior `attachment_point`/`detachment_point` describe capital-stack ordering. Its AAA 0–80% coordinates are not an equity first-loss 0–80% tranche. The displayed copula experiment uses explicit loss attachment/detachment fractions in a separate object.
+The equity loss tranche attaches first at zero. Do not transfer those coordinates into the cash-stack builder without reading its contract: the native structured-credit fixture's senior `attach_pct`/`detach_pct` describe capital-stack ordering. Its AAA 0–80% coordinates are not an equity first-loss 0–80% tranche. The displayed copula experiment uses explicit loss attachment/detachment fractions in a separate object.
 
 ### Correlation changes joint outcomes while marginal default risk stays fixed
 

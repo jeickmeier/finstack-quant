@@ -40,8 +40,8 @@ def _tranche(
 ) -> dict[str, object]:
     return {
         "id": tranche_id,
-        "attachment_point": attachment,
-        "detachment_point": detachment,
+        "attach_pct": attachment,
+        "detach_pct": detachment,
         "seniority": seniority,
         "rating": None,
         "original_balance": _money(balance),

@@ -1175,7 +1175,7 @@ impl CashFlowSchedule {
     /// * `periods` - Reporting periods that define the output buckets.
     /// * `market` - Market context containing the discount (and optional hazard) curves.
     /// * `disc_curve_id` - Discount curve identifier resolved against `market`.
-    /// * `hazard_curve_id` - Optional hazard curve identifier for credit-adjusted PV.
+    /// * `credit_curve_id` - Optional hazard curve identifier for credit-adjusted PV.
     /// * `base` - Valuation date used as the day-count origin for discount times.
     /// * `day_count` - Day-count for discount times; `None` selects Act/365F.
     ///
@@ -1188,11 +1188,11 @@ impl CashFlowSchedule {
         periods: &[Period],
         market: &MarketContext,
         disc_curve_id: &CurveId,
-        hazard_curve_id: Option<&CurveId>,
+        credit_curve_id: Option<&CurveId>,
         base: Date,
         day_count: Option<DayCount>,
     ) -> finstack_quant_core::Result<crate::aggregation::PeriodAggregation> {
-        let curves = resolve_credit_curves(market, disc_curve_id, hazard_curve_id)?;
+        let curves = resolve_credit_curves(market, disc_curve_id, credit_curve_id)?;
         self.pv_by_period_with_discounting(
             periods,
             PvDiscountSource::Discount {
@@ -1296,10 +1296,10 @@ impl CreditCurveHandles {
 pub(crate) fn resolve_credit_curves(
     market: &MarketContext,
     disc_curve_id: &CurveId,
-    hazard_curve_id: Option<&CurveId>,
+    credit_curve_id: Option<&CurveId>,
 ) -> finstack_quant_core::Result<CreditCurveHandles> {
     let discount = market.get_discount(disc_curve_id.as_str())?;
-    let hazard = if let Some(hazard_id) = hazard_curve_id {
+    let hazard = if let Some(hazard_id) = credit_curve_id {
         Some(market.get_hazard(hazard_id.as_str())?)
     } else {
         None

@@ -13,6 +13,18 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Underlying CDS maturity date"
         },
+        "coupon_bp": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
+        },
         "credit_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Credit curve identifier"
@@ -45,12 +57,10 @@
           "description": "Unique instrument identifier"
         },
         "index_factor": {
-          "description": "Optional index factor scaling for the index underlying.\n\nThis is the **current** index factor `f` at valuation. See\n[`Self::strike_index_factor`] for the original factor `f0` attached\nto a clean-price strike.",
+          "default": 1.0,
+          "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
           "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": "number"
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -89,13 +99,11 @@
           "default": "spot",
           "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_effective_date` is not explicitly supplied."
         },
-        "realized_index_loss": {
-          "description": "Realized cumulative index loss from option inception to valuation\ndate, expressed per unit of original index notional.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this unset.",
+        "realized_loss": {
+          "default": 0.0,
+          "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
           "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": "number"
         },
         "recovery_rate": {
           "description": "Recovery rate assumption",
@@ -121,18 +129,6 @@
             "number",
             "null"
           ]
-        },
-        "underlying_cds_coupon": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Contractual coupon `c` of the underlying CDS, expressed as a decimal\nrate (e.g., 0.01 for the 100 bp standard CDX coupon, 0.05 for the\n500 bp standard CDX.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
         },
         "underlying_convention": {
           "$ref": "#/$defs/CdsConvention",
@@ -330,12 +326,13 @@
         "spec": {
           "attributes": {},
           "cds_maturity": "2030-06-20",
+          "coupon_bp": null,
           "credit_curve_id": "CORP-HAZARD",
           "discount_curve_id": "USD-OIS",
           "exercise_style": "european",
           "expiry": "2025-06-20",
           "id": "CDSOPT-CALL-CORP-5Y",
-          "index_factor": null,
+          "index_factor": 1.0,
           "knockout": false,
           "notional": {
             "amount": "10000000",
@@ -343,12 +340,12 @@
           },
           "option_type": "call",
           "protection_start_convention": "spot",
+          "realized_loss": 0.0,
           "recovery_rate": 0.4,
           "settlement": "cash",
           "strike": {
             "spread": "0.01"
           },
-          "underlying_cds_coupon": null,
           "underlying_convention": "isda_na",
           "underlying_is_index": false,
           "vol_surface_id": "CDSOPT-VOL"

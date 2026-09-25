@@ -8615,7 +8615,7 @@
       "additionalProperties": false,
       "description": "Structured credit tranche with attachment/detachment points",
       "properties": {
-        "attachment_point": {
+        "attach_pct": {
           "description": "Lower structural boundary as a percent of the capital structure\n(`0.0` for the first-loss class). `None` until\n[`TrancheStructure::new`] derives it from the balance shares in\npayment-priority order; a declared value must match that share\nwithin the structure's thickness tolerance.",
           "format": "double",
           "type": [
@@ -8643,8 +8643,8 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Accumulated deferred interest (if payment has been deferred)"
         },
-        "detachment_point": {
-          "description": "Upper structural boundary as a percent of the capital structure\n(`100.0` for the most senior class); derived like\n[`Self::attachment_point`] when `None`.",
+        "detach_pct": {
+          "description": "Upper structural boundary as a percent of the capital structure\n(`100.0` for the most senior class); derived like\n[`Self::attach_pct`](field@Self::attach_pct) when `None`.",
           "format": "double",
           "type": [
             "number",
@@ -9311,7 +9311,7 @@
           "tranches": {
             "tranches": [
               {
-                "attachment_point": 0.0,
+                "attach_pct": 0.0,
                 "attributes": {},
                 "coupon": {
                   "fixed": {
@@ -9327,7 +9327,7 @@
                   "amount": "0",
                   "currency": "USD"
                 },
-                "detachment_point": 100.0,
+                "detach_pct": 100.0,
                 "frequency": {
                   "count": 3,
                   "unit": "months"

@@ -52,8 +52,8 @@ impl PyTranche {
     fn builder() -> PyTrancheBuilder {
         PyTrancheBuilder {
             inner: Some(Tranche::builder()),
-            attachment_point: None,
-            detachment_point: None,
+            attach_pct: None,
+            detach_pct: None,
         }
     }
 
@@ -104,15 +104,15 @@ impl PyTranche {
     /// or ``None`` for a note built without points that has not yet joined
     /// a ``TrancheStructure`` (which derives it from the balance shares).
     #[getter]
-    fn attachment_point(&self) -> Option<f64> {
-        self.inner.attachment_point
+    fn attach_pct(&self) -> Option<f64> {
+        self.inner.attach_pct
     }
 
     /// Detachment point in percent of the capital structure (0-100 scale),
-    /// or ``None`` until derived (see ``attachment_point``).
+    /// or ``None`` until derived (see ``attach_pct``).
     #[getter]
-    fn detachment_point(&self) -> Option<f64> {
-        self.inner.detachment_point
+    fn detach_pct(&self) -> Option<f64> {
+        self.inner.detach_pct
     }
 
     /// Seniority (serde name, e.g. ``"Senior"``, ``"Mezzanine"``, ``"Equity"``).
@@ -231,11 +231,11 @@ impl PyTranche {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "Tranche(id='{}', seniority='{}', attachment_point={}, detachment_point={}, original_balance={}, maturity='{}', pik_enabled={})",
+            "Tranche(id='{}', seniority='{}', attach_pct={}, detach_pct={}, original_balance={}, maturity='{}', pik_enabled={})",
             self.inner.id.as_str(),
             enum_to_py_string(&self.inner.seniority).unwrap_or_default(),
-            opt_repr(self.inner.attachment_point),
-            opt_repr(self.inner.detachment_point),
+            opt_repr(self.inner.attach_pct),
+            opt_repr(self.inner.detach_pct),
             self.inner.original_balance.amount(),
             self.inner.maturity,
             bool_repr(self.inner.pik_enabled),
@@ -246,9 +246,9 @@ impl PyTranche {
 /// Fluent builder for [`PyTranche`]; wraps the hand-written Rust
 /// `TrancheBuilder` (consuming setters).
 ///
-/// ``attachment_point`` and ``detachment_point`` are tracked separately from
+/// ``attach_pct`` and ``detach_pct`` are tracked separately from
 /// the wrapped Rust builder (which only exposes a combined
-/// `attachment_detachment(a, d)` setter) and applied together on
+/// `attach_detach(a, d)` setter) and applied together on
 /// :meth:`build`, so either call order works.
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
@@ -257,8 +257,8 @@ impl PyTranche {
 )]
 pub struct PyTrancheBuilder {
     inner: Option<TrancheBuilderInner>,
-    attachment_point: Option<f64>,
-    detachment_point: Option<f64>,
+    attach_pct: Option<f64>,
+    detach_pct: Option<f64>,
 }
 
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
@@ -313,14 +313,11 @@ impl PyTrancheBuilder {
     ///     If this builder was already consumed by a prior call to
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
-    fn attachment_point<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: f64,
-    ) -> PyResult<PyRefMut<'py, Self>> {
+    fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         if slf.inner.is_none() {
             return Err(value_error("builder already consumed by build()"));
         }
-        slf.attachment_point = Some(value);
+        slf.attach_pct = Some(value);
         Ok(slf)
     }
 
@@ -343,14 +340,11 @@ impl PyTrancheBuilder {
     ///     If this builder was already consumed by a prior call to
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
-    fn detachment_point<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: f64,
-    ) -> PyResult<PyRefMut<'py, Self>> {
+    fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         if slf.inner.is_none() {
             return Err(value_error("builder already consumed by build()"));
         }
-        slf.detachment_point = Some(value);
+        slf.detach_pct = Some(value);
         Ok(slf)
     }
 
@@ -795,14 +789,14 @@ impl PyTrancheBuilder {
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTranche> {
         let mut b = take_tranche(&mut slf)?;
-        match (slf.attachment_point, slf.detachment_point) {
+        match (slf.attach_pct, slf.detach_pct) {
             (Some(attachment), Some(detachment)) => {
-                b = b.attachment_detachment(attachment, detachment);
+                b = b.attach_detach(attachment, detachment);
             }
             (None, None) => {}
             _ => {
                 return Err(value_error(
-                    "attachment_point and detachment_point must be set together, or both omitted so the TrancheStructure derives them from the balances",
+                    "attach_pct and detach_pct must be set together, or both omitted so the TrancheStructure derives them from the balances",
                 ));
             }
         }
@@ -813,9 +807,9 @@ impl PyTrancheBuilder {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "TrancheBuilder(attachment_point={}, detachment_point={}, consumed={})",
-            opt_repr(self.attachment_point),
-            opt_repr(self.detachment_point),
+            "TrancheBuilder(attach_pct={}, detach_pct={}, consumed={})",
+            opt_repr(self.attach_pct),
+            opt_repr(self.detach_pct),
             bool_repr(self.inner.is_none()),
         )
     }

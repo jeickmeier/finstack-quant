@@ -18,11 +18,11 @@ mod correlation01;
 mod cs01;
 mod expected_loss;
 mod jump_to_default;
+mod model_upfront;
 mod par_spread;
 mod recovery01;
 mod spread_dv01;
 mod tail_dependence;
-mod upfront;
 
 use crate::metrics::MetricRegistry;
 
@@ -36,8 +36,9 @@ pub(crate) fn register_cds_tranche_metrics(
 
     for (id, calculator) in [
         (
-            MetricId::custom("upfront"),
-            Arc::new(upfront::UpfrontCalculator) as Arc<dyn crate::metrics::MetricCalculator>,
+            MetricId::custom("model_upfront"),
+            Arc::new(model_upfront::ModelUpfrontCalculator)
+                as Arc<dyn crate::metrics::MetricCalculator>,
         ),
         (
             MetricId::SpreadDv01,

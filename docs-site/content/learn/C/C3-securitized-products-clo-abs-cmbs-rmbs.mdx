@@ -327,9 +327,9 @@ The capital structures still sum to the same pool balance. Additional funded equ
 {/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-exercise-enhancement" role="exercise" */}
 ```python exec id=c3-exercise-enhancement role=exercise
 subordinated=deepcopy(deal);ss=subordinated["instrument"]["spec"]
-ss["tranches"]["tranches"][0].update(detachment_point=75.,original_balance={"amount":"75000000","currency":"USD"},current_balance={"amount":"75000000","currency":"USD"})
-ss["tranches"]["tranches"][1].update(attachment_point=75.,detachment_point=90.)
-ss["tranches"]["tranches"][2].update(attachment_point=90.,original_balance={"amount":"10000000","currency":"USD"},current_balance={"amount":"10000000","currency":"USD"})
+ss["tranches"]["tranches"][0].update(detach_pct=75.,original_balance={"amount":"75000000","currency":"USD"},current_balance={"amount":"75000000","currency":"USD"})
+ss["tranches"]["tranches"][1].update(attach_pct=75.,detach_pct=90.)
+ss["tranches"]["tranches"][2].update(attach_pct=90.,original_balance={"amount":"10000000","currency":"USD"},current_balance={"amount":"10000000","currency":"USD"})
 spread_enhanced=deepcopy(deal)
 spread_enhanced["instrument"]["spec"]["waterfall_rules"]={"excess_spread":{"target_balance":{"amount":"5000000","currency":"USD"}}}
 enhancement_rows=[]

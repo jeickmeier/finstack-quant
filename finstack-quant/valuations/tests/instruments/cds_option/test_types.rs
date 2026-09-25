@@ -56,9 +56,9 @@ fn test_single_name_option_defaults() {
     let option = CDSOptionBuilder::new().build(as_of);
 
     assert!(!option.underlying_is_index);
-    assert_eq!(option.index_factor, None);
-    assert_eq!(option.realized_index_loss, None);
-    assert_eq!(option.underlying_cds_coupon, None);
+    assert_eq!(option.index_factor, 1.0);
+    assert_eq!(option.realized_loss, 0.0);
+    assert_eq!(option.coupon_bp, None);
 }
 
 #[test]
@@ -66,14 +66,13 @@ fn test_index_option_construction() {
     let as_of = date!(2025 - 01 - 01);
     let option = CDSOptionBuilder::new()
         .with_index(0.88)
-        .underlying_cds_coupon_bp(100.0)
+        .coupon_bp(100.0)
         .build(as_of);
 
     assert!(option.underlying_is_index);
-    assert_eq!(option.index_factor, Some(0.88));
-    // Standard CDX coupon = 100 bp = 0.01 decimal.
-    let expected = Decimal::try_from(100.0 / 10000.0).unwrap();
-    assert_eq!(option.underlying_cds_coupon, Some(expected));
+    assert_eq!(option.index_factor, 0.88);
+    // Standard CDX coupon = 100 bp.
+    assert_eq!(option.coupon_bp, Some(Decimal::new(100, 0)));
 }
 
 #[test]

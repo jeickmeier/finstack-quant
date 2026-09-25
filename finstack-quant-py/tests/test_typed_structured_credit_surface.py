@@ -67,8 +67,8 @@ def _tranche(id_: str, attach: float, detach: float, seniority: str, balance: fl
         Tranche
         .builder()
         .id(id_)
-        .attachment_point(attach)
-        .detachment_point(detach)
+        .attach_pct(attach)
+        .detach_pct(detach)
         .seniority(seniority)
         .original_balance(usd(balance))
         .coupon_fixed(coupon)
@@ -227,8 +227,8 @@ def test_tranche_builder_sets_every_seasoned_field() -> None:
         Tranche
         .builder()
         .id("B")
-        .attachment_point(10.0)
-        .detachment_point(40.0)
+        .attach_pct(10.0)
+        .detach_pct(40.0)
         .seniority("mezzanine")
         .original_balance(usd(30_000_000.0))
         .current_balance(usd(25_000_000.0))
@@ -483,10 +483,10 @@ def test_attachment_points_are_derived_from_balances() -> None:
         )
 
     alone = note("A", "senior", 60_000_000.0)
-    assert alone.attachment_point is None
-    assert alone.detachment_point is None
+    assert alone.attach_pct is None
+    assert alone.detach_pct is None
     with pytest.raises(ValueError, match="together"):
-        Tranche.builder().id("X").attachment_point(0.0).seniority("equity").original_balance(usd(1.0)).coupon_fixed(
+        Tranche.builder().id("X").attach_pct(0.0).seniority("equity").original_balance(usd(1.0)).coupon_fixed(
             0.0
         ).maturity(MATURITY).build()
 
@@ -495,7 +495,7 @@ def test_attachment_points_are_derived_from_balances() -> None:
         note("B", "mezzanine", 30_000_000.0),
         note("E", "equity", 10_000_000.0),
     ])
-    assert [(t.id, t.attachment_point, t.detachment_point) for t in derived.tranches] == [
+    assert [(t.id, t.attach_pct, t.detach_pct) for t in derived.tranches] == [
         ("A", 40.0, 100.0),
         ("B", 10.0, 40.0),
         ("E", 0.0, 10.0),
@@ -508,7 +508,7 @@ def test_attachment_points_are_derived_from_balances() -> None:
     with pytest.raises(ValueError, match="balance shares"):
         TrancheStructure(declared)
     rebuilt = TrancheStructure.from_balances(declared)
-    assert [(t.id, t.attachment_point, t.detachment_point) for t in rebuilt.tranches] == [
+    assert [(t.id, t.attach_pct, t.detach_pct) for t in rebuilt.tranches] == [
         ("A", 40.0, 100.0),
         ("E", 0.0, 40.0),
     ]
@@ -632,8 +632,8 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
             Tranche
             .builder()
             .id(row["id"])
-            .attachment_point(row["attachment_point"])
-            .detachment_point(row["detachment_point"])
+            .attach_pct(row["attach_pct"])
+            .detach_pct(row["detach_pct"])
             .seniority(row["seniority"])
             .original_balance(_money(row["original_balance"]))
             .current_balance(_money(row["current_balance"]))

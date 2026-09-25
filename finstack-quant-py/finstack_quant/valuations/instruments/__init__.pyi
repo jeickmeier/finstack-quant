@@ -28,6 +28,7 @@ from finstack_quant.cashflows.builder import (
     DefaultModelSpec,
     PrepaymentModelSpec,
     RecoveryModelSpec,
+    RollRule,
 )
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import BusinessDayConvention, DayCount, StubKind, Tenor
@@ -4575,6 +4576,7 @@ class PremiumLegSpec:
 
     Examples
     --------
+    >>> from finstack_quant.cashflows.builder import RollRule
     >>> from finstack_quant.core.dates import DayCount, Tenor
     >>> from finstack_quant.valuations.instruments import PremiumLegSpec
     >>> leg = PremiumLegSpec(
@@ -4584,9 +4586,9 @@ class PremiumLegSpec:
     ...     DayCount.ACT_360,
     ...     100.0,
     ...     "USD-OIS",
-    ...     standard_imm_dates=True,
+    ...     roll_rule=RollRule.CDS_IMM,
     ... )
-    >>> leg.spread_bp
+    >>> leg.coupon_bp
     100.0
     """
 
@@ -4596,104 +4598,107 @@ class PremiumLegSpec:
         end: datetime.date | datetime.datetime | pd.Timestamp | str,
         frequency: Tenor,
         day_count: DayCount,
-        spread_bp: float | Bps,
+        coupon_bp: float | Bps,
         discount_curve_id: str,
         *,
-        standard_imm_dates: bool,
+        roll_rule: RollRule,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
     ) -> None:
         """
-        Create a premium leg.
+            Create a premium leg.
 
-        Parameters
-        ----------
-        start : datetime.date | datetime.datetime | pd.Timestamp | str
-            Start date of protection / premium accrual (ISO strings accepted).
-        end : datetime.date | datetime.datetime | pd.Timestamp | str
-            End date of protection / premium accrual.
-        frequency : Tenor
-            Payment frequency.
-        day_count : DayCount
-            Day count convention for accrual.
-        spread_bp : float | Bps
-            Fixed running spread in basis points (``100.0`` = 100bp = 1%).
-        discount_curve_id : str
-            Discount curve identifier for pricing this leg.
-        standard_imm_dates : bool
-            True for prescribed quarterly CDS 20th dates. False generates a
-            bespoke schedule from ``frequency`` and ``stub``. Standard dates
-            require quarterly frequency and a short-front stub at pricing.
-        stub : StubKind | str, default "short_front"
-            Stub period handling rule.
-        business_day_convention : str, default "modified_following"
-            Business day convention for payment dates.
-        calendar_id : str, optional
-            Calendar used for business day adjustments.
+            Parameters
+            ----------
+            start : datetime.date | datetime.datetime | pd.Timestamp | str
+                Start date of protection / premium accrual (ISO strings accepted).
+            end : datetime.date | datetime.datetime | pd.Timestamp | str
+                End date of protection / premium accrual.
+            frequency : Tenor
+                Payment frequency.
+            day_count : DayCount
+                Day count convention for accrual.
+            coupon_bp : float | Bps
+                Contractual running coupon in basis points (``100.0`` = 100bp = 1%).
+            discount_curve_id : str
+                Discount curve identifier for pricing this leg.
+            roll_rule : RollRule
+                ``RollRule.CDS_IMM`` for the prescribed quarterly CDS 20th dates
+                (requires quarterly frequency and a short-front stub at pricing).
+                ``RollRule.NONE`` generates a bespoke schedule from ``frequency``
+                and ``stub``. ``RollRule.IMM`` is rejected at pricing.
+            stub : StubKind | str, default "short_front"
+                Stub period handling rule.
+            business_day_convention : str, default "modified_following"
+                Business day convention for payment dates.
+            calendar_id : str, optional
+                Calendar used for business day adjustments.
 
-        Raises
-        ------
-        ValueError
-            If an enum value is invalid or ``spread_bp`` is not finite.
-        TypeError
-            If ``spread_bp`` is neither a number nor a ``Bps`` or a date
-            cannot be interpreted.
+            Raises
+            ------
+            ValueError
+                If an enum value is invalid or ``coupon_bp`` is not finite.
+            TypeError
+                If ``coupon_bp`` is neither a number nor a ``Bps`` or a date
+                cannot be interpreted.
 
-        Examples
-        --------
+            Examples
+            --------
+            >>> from finstack_quant.cashflows.builder import RollRule
         >>> from finstack_quant.core.dates import DayCount, Tenor
-        >>> from finstack_quant.valuations.instruments import PremiumLegSpec
-        >>> leg = PremiumLegSpec(
-        ...     "2024-03-20",
-        ...     "2029-06-20",
-        ...     Tenor.quarterly(),
-        ...     DayCount.ACT_360,
-        ...     100.0,
-        ...     "USD-OIS",
-        ...     standard_imm_dates=True,
-        ... )
-        >>> leg.discount_curve_id
-        'USD-OIS'
+            >>> from finstack_quant.valuations.instruments import PremiumLegSpec
+            >>> leg = PremiumLegSpec(
+            ...     "2024-03-20",
+            ...     "2029-06-20",
+            ...     Tenor.quarterly(),
+            ...     DayCount.ACT_360,
+            ...     100.0,
+            ...     "USD-OIS",
+            ...     roll_rule=RollRule.CDS_IMM,
+            ... )
+            >>> leg.discount_curve_id
+            'USD-OIS'
         """
         ...
 
     @classmethod
     def from_json(cls, json: str) -> PremiumLegSpec:
         """
-        Deserialize a premium-leg spec from its serde JSON object.
+            Deserialize a premium-leg spec from its serde JSON object.
 
-        Parameters
-        ----------
-        json : str
-            JSON object with the same fields as the Rust ``PremiumLegSpec`` (the value
-            ``PremiumLegSpec.to_json`` returns).
+            Parameters
+            ----------
+            json : str
+                JSON object with the same fields as the Rust ``PremiumLegSpec`` (the value
+                ``PremiumLegSpec.to_json`` returns).
 
-        Returns
-        -------
-        PremiumLegSpec
-            The validated leg.
+            Returns
+            -------
+            PremiumLegSpec
+                The validated leg.
 
-        Raises
-        ------
-        ValueError
-            If the JSON is malformed, has unknown fields, or fails validation.
+            Raises
+            ------
+            ValueError
+                If the JSON is malformed, has unknown fields, or fails validation.
 
-        Examples
-        --------
+            Examples
+            --------
+            >>> from finstack_quant.cashflows.builder import RollRule
         >>> from finstack_quant.core.dates import DayCount, Tenor
-        >>> from finstack_quant.valuations.instruments import PremiumLegSpec
-        >>> leg = PremiumLegSpec(
-        ...     "2024-03-20",
-        ...     "2029-06-20",
-        ...     Tenor.quarterly(),
-        ...     DayCount.ACT_360,
-        ...     100.0,
-        ...     "USD-OIS",
-        ...     standard_imm_dates=True,
-        ... )
-        >>> PremiumLegSpec.from_json(leg.to_json()).spread_bp
-        100.0
+            >>> from finstack_quant.valuations.instruments import PremiumLegSpec
+            >>> leg = PremiumLegSpec(
+            ...     "2024-03-20",
+            ...     "2029-06-20",
+            ...     Tenor.quarterly(),
+            ...     DayCount.ACT_360,
+            ...     100.0,
+            ...     "USD-OIS",
+            ...     roll_rule=RollRule.CDS_IMM,
+            ... )
+            >>> PremiumLegSpec.from_json(leg.to_json()).coupon_bp
+            100.0
         """
         ...
     def to_json(self) -> str:
@@ -4742,17 +4747,18 @@ class PremiumLegSpec:
         """
         ...
     @property
-    def standard_imm_dates(self) -> bool:
-        """Whether the leg uses prescribed quarterly CDS 20th dates.
+    def roll_rule(self) -> RollRule:
+        """Premium roll-date grid.
 
         Returns
         -------
-        bool
-            True for the standard roll grid; false for bespoke frequency/stub dates.
+        RollRule
+            ``RollRule.CDS_IMM`` for the standard CDS roll grid;
+            ``RollRule.NONE`` for bespoke frequency/stub dates.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored flag.
+        This accessor does not raise; it returns the stored rule.
         """
         ...
 
@@ -4877,9 +4883,9 @@ class PremiumLegSpec:
         """
         ...
     @property
-    def spread_bp(self) -> float:
+    def coupon_bp(self) -> float:
         """
-        Running spread in basis points.
+        Contractual running coupon in basis points.
 
         Returns
         -------
@@ -8045,12 +8051,12 @@ class CreditDefaultSwap:
         'CORP-HAZARD'
         """
         ...
-    def get_par_spread(
+    def par_spread(
         self, market: MarketContext | str, as_of: datetime.date | datetime.datetime | pd.Timestamp | str
     ) -> float:
         """
         Par spread implied by the market, in basis points (mirrors Rust
-        ``CreditDefaultSwap::get_par_spread``): the running spread at which the
+        ``CreditDefaultSwap::par_spread``): the running spread at which the
         contract is worth zero under this CDS's valuation convention, premium
         schedule, discount curve, hazard curve and recovery assumption.
 
@@ -8271,7 +8277,7 @@ class CreditDefaultSwap:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CreditDefaultSwap(id='CDS-CORP-5Y', side='pay', notional=Money(10000000.0, 'USD'), spread_bp=100, ...)``.
+        Python-style rendering of the key economics, e.g. ``CreditDefaultSwap(id='CDS-CORP-5Y', side='pay', notional=Money(10000000.0, 'USD'), coupon_bp=100, ...)``.
 
         Returns
         -------
@@ -8306,6 +8312,7 @@ class CreditDefaultSwapBuilder:
     ...     PremiumLegSpec,
     ...     ProtectionLegSpec,
     ... )
+    >>> from finstack_quant.cashflows.builder import RollRule
     >>> premium = PremiumLegSpec(
     ...     datetime.date(2024, 3, 20),
     ...     datetime.date(2029, 6, 20),
@@ -8313,7 +8320,7 @@ class CreditDefaultSwapBuilder:
     ...     DayCount.ACT_360,
     ...     100.0,
     ...     "USD-OIS",
-    ...     standard_imm_dates=True,
+    ...     roll_rule=RollRule.CDS_IMM,
     ... )
     >>> protection = ProtectionLegSpec("ACME-CDS", 0.4, 3)
     >>> cds = (
@@ -8883,7 +8890,7 @@ class CDSIndex:
     def example() -> CDSIndex:
         """
         Canonical CDX.NA.IG series 42 USD 10,000,000 payer (mirrors Rust
-        ``CDSIndex::example``): 60bp running spread, ``single_curve`` pricing off
+        ``CDSIndex::example``): 60bp running coupon, ``single_curve`` pricing off
         ``CDX.NA.IG.HAZARD`` discounted on ``USD-OIS``, premium 2024-03-20 to
         2029-12-20, 125 names.
 
@@ -9246,6 +9253,21 @@ class CDSIndex:
         """
         ...
     @property
+    def upfront(self) -> tuple[datetime.date, Money] | None:
+        """
+        Contractual upfront payment as ``(payment_date, amount)``; positive means the protection buyer pays.
+
+        Returns
+        -------
+        tuple[datetime.date, Money] | None
+            The upfront pair, or ``None`` when the trade has no upfront.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def margin_spec(self) -> dict[str, object] | None:
         """
         OTC margin specification in serde form.
@@ -9277,7 +9299,7 @@ class CDSIndex:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSIndex(id='CDX-IG-42', index_name='CDX.NA.IG', series=42, side='pay', notional=Money(10000000.0, 'USD'), spread_bp=60, ...)``.
+        Python-style rendering of the key economics, e.g. ``CDSIndex(id='CDX-IG-42', index_name='CDX.NA.IG', series=42, side='pay', notional=Money(10000000.0, 'USD'), coupon_bp=60, ...)``.
 
         Returns
         -------
@@ -9313,6 +9335,7 @@ class CDSIndexBuilder:
     ...     PremiumLegSpec,
     ...     ProtectionLegSpec,
     ... )
+    >>> from finstack_quant.cashflows.builder import RollRule
     >>> premium = PremiumLegSpec(
     ...     datetime.date(2024, 3, 20),
     ...     datetime.date(2029, 6, 20),
@@ -9320,7 +9343,7 @@ class CDSIndexBuilder:
     ...     DayCount.ACT_360,
     ...     100.0,
     ...     "USD-OIS",
-    ...     standard_imm_dates=True,
+    ...     roll_rule=RollRule.CDS_IMM,
     ... )
     >>> index = (
     ...     CDSIndex
@@ -9605,6 +9628,27 @@ class CDSIndexBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
+    def upfront(self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]) -> CDSIndexBuilder:
+        """
+        Set the contractual upfront payment.
+
+        Parameters
+        ----------
+        value : tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]
+            ``(payment_date, amount)`` on the index notional; positive means the protection buyer pays. Discounted from
+            the payment date and dropped once that date is before the valuation date.
+
+        Returns
+        -------
+        CDSIndexBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        TypeError
+            If ``value`` is not a ``(date, Money)`` pair.
+        """
+        ...
     def margin_spec(self, value: dict[str, object] | str) -> CDSIndexBuilder:
         """
         Set the OTC margin (CSA / initial-margin) specification.
@@ -9688,7 +9732,7 @@ class CDSTranche:
     """
     Synthetic CDO / index tranche (typed wrapper for the canonical Rust
     ``CDSTranche``): protection on portfolio losses between ``attach_pct``
-    and ``detach_pct`` (percent points), paying ``running_coupon_bp`` on the
+    and ``detach_pct`` (percent points), paying ``coupon_bp`` on the
     surviving tranche notional, priced with the one-factor Gaussian copula
     against the ``credit_index_id`` loss distribution.
 
@@ -10152,9 +10196,9 @@ class CDSTranche:
         """
         ...
     @property
-    def running_coupon_bp(self) -> float:
+    def coupon_bp(self) -> float:
         """
-        Fixed running spread paid on the tranche premium leg.
+        Contractual running coupon (bp) paid on the tranche premium leg.
 
         Returns
         -------
@@ -10291,7 +10335,7 @@ class CDSTranche:
         """
         ...
     @property
-    def accumulated_loss(self) -> float:
+    def realized_loss(self) -> float:
         """
         Realized portfolio loss so far.
 
@@ -10306,14 +10350,30 @@ class CDSTranche:
         """
         ...
     @property
-    def standard_imm_dates(self) -> bool:
+    def roll_rule(self) -> RollRule:
         """
-        Whether coupon dates are forced onto standard IMM dates.
+        Coupon roll-date grid.
 
         Returns
         -------
-        bool
-            ``True`` when IMM rolling is enforced.
+        RollRule
+            ``RollRule.CDS_IMM`` for the CDS roll dates (20th of Mar/Jun/Sep/Dec);
+            ``RollRule.NONE`` for a bespoke ``frequency``/``stub`` schedule.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def stub(self) -> StubKind:
+        """
+        Stub convention for a bespoke (``RollRule.NONE``) coupon schedule.
+
+        Returns
+        -------
+        StubKind
+            The stub rule (``short_front`` by default).
 
         Notes
         -----
@@ -10370,12 +10430,13 @@ class CDSTrancheBuilder:
     Fluent builder for :class:`CDSTranche`; wraps the Rust
     ``FinancialBuilder`` output one setter for one setter.
 
-    The builder pre-seeds ``accumulated_loss(0.0)``; ``standard_imm_dates``
-    defaults to ``False`` and ``business_day_convention`` to
+    The builder pre-seeds ``realized_loss(0.0)``; ``roll_rule`` defaults to
+    ``RollRule.NONE``, ``stub`` to ``"short_front"`` and
+    ``business_day_convention`` to
     ``"modified_following"``. Builders are consumed by ``build()``; create a
     new builder per instrument. Required fields: ``id``, ``index_name``,
     ``series``, ``attach_pct``, ``detach_pct``, ``notional``, ``maturity``,
-    ``running_coupon_bp``, ``frequency``, ``day_count``,
+    ``coupon_bp``, ``frequency``, ``day_count``,
     ``discount_curve_id``, ``credit_index_id``, ``side``.
 
     Examples
@@ -10394,7 +10455,7 @@ class CDSTrancheBuilder:
     ...     .detach_pct(7.0)
     ...     .notional(Money(10_000_000.0, Currency("USD")))
     ...     .maturity("2029-06-20")
-    ...     .running_coupon_bp(100.0)
+    ...     .coupon_bp(100.0)
     ...     .frequency(Tenor.quarterly())
     ...     .day_count(DayCount.ACT_360)
     ...     .discount_curve_id("USD-OIS")
@@ -10402,7 +10463,7 @@ class CDSTrancheBuilder:
     ...     .side("buy_protection")
     ...     .build()
     ... )
-    >>> tranche.running_coupon_bp
+    >>> tranche.coupon_bp
     100.0
     """
 
@@ -10546,7 +10607,7 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def running_coupon_bp(self, value: float | Bps) -> CDSTrancheBuilder:
+    def coupon_bp(self, value: float | Bps) -> CDSTrancheBuilder:
         """
         Set the running coupon.
 
@@ -10715,7 +10776,7 @@ class CDSTrancheBuilder:
         Parameters
         ----------
         value : datetime.date | datetime.datetime | pd.Timestamp | str
-            Effective date; if never set, uses the as-of date (or standard IMM-date rolling, if ``standard_imm_dates`` is true).
+            Effective date; if never set, uses the as-of date (or the prior CDS roll date when ``roll_rule`` is ``RollRule.CDS_IMM``).
 
         Returns
         -------
@@ -10728,14 +10789,14 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
         """
         ...
-    def accumulated_loss(self, value: float) -> CDSTrancheBuilder:
+    def realized_loss(self, value: float) -> CDSTrancheBuilder:
         """
-        Set the accumulated realized loss.
+        Set the realized (settled) loss.
 
         Parameters
         ----------
         value : float
-            Accumulated realized loss as a fraction of the original portfolio notional; ``0.0`` when never set.
+            Realized loss as a fraction of the original portfolio notional; ``0.0`` when never set.
 
         Returns
         -------
@@ -10748,14 +10809,16 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def standard_imm_dates(self, value: bool) -> CDSTrancheBuilder:
+    def roll_rule(self, value: RollRule) -> CDSTrancheBuilder:
         """
-        Set whether to enforce standard IMM dates.
+        Set the coupon roll-date grid.
 
         Parameters
         ----------
-        value : bool
-            Whether to enforce standard IMM dates (20th of Mar, Jun, Sep, Dec); ``False`` when never set.
+        value : RollRule
+            ``RollRule.CDS_IMM`` for the CDS roll dates (20th of Mar, Jun, Sep,
+            Dec) or ``RollRule.NONE`` (the default) for a schedule from
+            ``frequency`` and ``stub``; ``RollRule.IMM`` is rejected by ``build()``.
 
         Returns
         -------
@@ -10766,6 +10829,28 @@ class CDSTrancheBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()``.
+        """
+        ...
+    def stub(
+        self, value: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"]
+    ) -> CDSTrancheBuilder:
+        """
+        Set the stub convention for a bespoke coupon schedule.
+
+        Parameters
+        ----------
+        value : StubKind | str
+            Stub rule used when ``roll_rule`` is ``RollRule.NONE``; ``"short_front"`` when never set.
+
+        Returns
+        -------
+        CDSTrancheBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or the stub is unknown.
         """
         ...
     def upfront(self, value: tuple[datetime.date | datetime.datetime | pd.Timestamp | str, Money]) -> CDSTrancheBuilder:
@@ -10853,9 +10938,11 @@ class ConvertibleBond:
     """
     Convertible bond (typed wrapper for the canonical Rust
     ``ConvertibleBond``): debt with an embedded equity conversion option,
-    priced on a Tsiveriotis–Fernandes style tree. The bond floor discounts on
-    ``credit_curve_id`` (falling back to ``discount_curve_id``), the equity
-    component on the risk-free curve.
+    priced on a Tsiveriotis–Fernandes style tree. The cash component discounts
+    at the risk-free ``discount_curve_id`` times the survival probability of
+    the issuer hazard curve ``credit_curve_id`` (blended by ``recovery_rate``;
+    risk-free when no credit curve is set), the equity component on the
+    risk-free curve.
 
     Construct via :meth:`ConvertibleBond.builder`,
     :meth:`ConvertibleBond.example` / :meth:`ConvertibleBond.example_mandatory`
@@ -11315,12 +11402,12 @@ class ConvertibleBond:
     @property
     def credit_curve_id(self) -> str | None:
         """
-        Credit curve identifier for risky discounting.
+        Issuer hazard curve identifier.
 
         Returns
         -------
         str | None
-            The curve id, or ``None`` (falls back to ``discount_curve_id``).
+            The hazard curve id, or ``None`` (the cash component discounts at the risk-free curve).
 
         Notes
         -----
@@ -11639,12 +11726,14 @@ class ConvertibleBondBuilder:
         ...
     def credit_curve_id(self, value: str) -> ConvertibleBondBuilder:
         """
-        Set the credit curve identifier for risky discounting (bond floor).
+        Set the issuer hazard curve identifier.
 
         Parameters
         ----------
         value : str
-            Credit curve identifier; if not provided, falls back to ``discount_curve_id`` (no credit spread). Must represent zero-recovery (pure hazard) risky discounting.
+            ``HazardCurve`` identifier; the zero-recovery risky discount factor is the risk-free discount factor times its
+            survival probability. If never set, the cash component discounts at the risk-free curve (no credit spread).
+            Requires an explicit ``recovery_rate``.
 
         Returns
         -------
@@ -16501,15 +16590,15 @@ class Tranche:
     ...     Tranche
     ...     .builder()
     ...     .id("A")
-    ...     .attachment_point(0.0)
-    ...     .detachment_point(100.0)
+    ...     .attach_pct(0.0)
+    ...     .detach_pct(100.0)
     ...     .seniority("senior")
     ...     .original_balance(Money(100.0, Currency("USD")))
     ...     .coupon_fixed(0.05)
     ...     .maturity(datetime.date(2029, 1, 1))
     ...     .build()
     ... )
-    >>> tranche.seniority, tranche.attachment_point, tranche.detachment_point
+    >>> tranche.seniority, tranche.attach_pct, tranche.detach_pct
     ('senior', 0.0, 100.0)
 
     """
@@ -16567,8 +16656,8 @@ class Tranche:
         ...     Tranche
         ...     .builder()
         ...     .id("A")
-        ...     .attachment_point(0.0)
-        ...     .detachment_point(100.0)
+        ...     .attach_pct(0.0)
+        ...     .detach_pct(100.0)
         ...     .seniority("senior")
         ...     .original_balance(Money(100.0, Currency("USD")))
         ...     .coupon_fixed(0.05)
@@ -16646,7 +16735,7 @@ class Tranche:
         ...
 
     @property
-    def attachment_point(self) -> float | None:
+    def attach_pct(self) -> float | None:
         """
         Attachment point in percent (0-100 scale).
 
@@ -16665,7 +16754,7 @@ class Tranche:
         ...
 
     @property
-    def detachment_point(self) -> float | None:
+    def detach_pct(self) -> float | None:
         """
         Detachment point in percent (0-100 scale).
 
@@ -16920,9 +17009,9 @@ class TrancheBuilder:
     """
     Fluent builder returned by :meth:`Tranche.builder`.
 
-    ``attachment_point`` and ``detachment_point`` are tracked separately from
+    ``attach_pct`` and ``detach_pct`` are tracked separately from
     the wrapped Rust builder (which only exposes a combined
-    ``attachment_detachment(a, d)`` setter) and applied together on
+    ``attach_detach(a, d)`` setter) and applied together on
     :meth:`build`, so either call order works. Both may be omitted: a
     ``TrancheStructure`` then derives them from the balance shares in
     payment-priority order (the first-loss class attaches at 0).
@@ -16956,7 +17045,7 @@ class TrancheBuilder:
         """
         ...
 
-    def attachment_point(self, value: float) -> TrancheBuilder:
+    def attach_pct(self, value: float) -> TrancheBuilder:
         """
         Set the attachment point.
 
@@ -16979,7 +17068,7 @@ class TrancheBuilder:
         """
         ...
 
-    def detachment_point(self, value: float) -> TrancheBuilder:
+    def detach_pct(self, value: float) -> TrancheBuilder:
         """
         Set the detachment point.
 
@@ -17380,7 +17469,7 @@ class TrancheBuilder:
         Returns
         -------
         str
-            ``TrancheBuilder(attachment_point=..., detachment_point=..., consumed=...)``.
+            ``TrancheBuilder(attach_pct=..., detach_pct=..., consumed=...)``.
         """
         ...
 
@@ -17416,8 +17505,8 @@ class TrancheStructure:
     ...     Tranche
     ...     .builder()
     ...     .id("A")
-    ...     .attachment_point(0.0)
-    ...     .detachment_point(100.0)
+    ...     .attach_pct(0.0)
+    ...     .detach_pct(100.0)
     ...     .seniority("senior")
     ...     .original_balance(Money(100.0, Currency("USD")))
     ...     .coupon_fixed(0.05)
@@ -17466,8 +17555,8 @@ class TrancheStructure:
         ...     Tranche
         ...     .builder()
         ...     .id("A")
-        ...     .attachment_point(10.0)
-        ...     .detachment_point(100.0)
+        ...     .attach_pct(10.0)
+        ...     .detach_pct(100.0)
         ...     .seniority("senior")
         ...     .original_balance(Money(72_000_000.0, Currency("USD")))
         ...     .coupon_fixed(0.05)
@@ -17478,8 +17567,8 @@ class TrancheStructure:
         ...     Tranche
         ...     .builder()
         ...     .id("E")
-        ...     .attachment_point(0.0)
-        ...     .detachment_point(10.0)
+        ...     .attach_pct(0.0)
+        ...     .detach_pct(10.0)
         ...     .seniority("equity")
         ...     .original_balance(Money(8_000_000.0, Currency("USD")))
         ...     .coupon_fixed(0.0)
@@ -17540,7 +17629,7 @@ class TrancheStructure:
         ...     note("B", "mezzanine", 30.0),
         ...     note("E", "equity", 10.0),
         ... ])
-        >>> [(t.id, t.attachment_point, t.detachment_point) for t in structure.tranches]
+        >>> [(t.id, t.attach_pct, t.detach_pct) for t in structure.tranches]
         [('A', 40.0, 100.0), ('B', 10.0, 40.0), ('E', 0.0, 10.0)]
         """
         ...
@@ -17575,8 +17664,8 @@ class TrancheStructure:
         ...     Tranche
         ...     .builder()
         ...     .id("A")
-        ...     .attachment_point(0.0)
-        ...     .detachment_point(100.0)
+        ...     .attach_pct(0.0)
+        ...     .detach_pct(100.0)
         ...     .seniority("senior")
         ...     .original_balance(Money(100.0, Currency("USD")))
         ...     .coupon_fixed(0.05)
@@ -20905,8 +20994,8 @@ class Waterfall:
     ...     Tranche
     ...     .builder()
     ...     .id("A")
-    ...     .attachment_point(0.0)
-    ...     .detachment_point(100.0)
+    ...     .attach_pct(0.0)
+    ...     .detach_pct(100.0)
     ...     .seniority("senior")
     ...     .original_balance(Money(80_000_000.0, Currency("USD")))
     ...     .coupon_fixed(0.05)
@@ -21108,8 +21197,8 @@ class TrancheCashflows:
     ...     Tranche
     ...     .builder()
     ...     .id("A")
-    ...     .attachment_point(0.0)
-    ...     .detachment_point(100.0)
+    ...     .attach_pct(0.0)
+    ...     .detach_pct(100.0)
     ...     .seniority("senior")
     ...     .original_balance(Money(80_000_000.0, Currency("USD")))
     ...     .coupon_fixed(0.05)
@@ -21835,8 +21924,8 @@ class StructuredCredit:
         ...     Tranche
         ...     .builder()
         ...     .id("A")
-        ...     .attachment_point(10.0)
-        ...     .detachment_point(100.0)
+        ...     .attach_pct(10.0)
+        ...     .detach_pct(100.0)
         ...     .seniority("senior")
         ...     .original_balance(Money(72_000_000.0, Currency("USD")))
         ...     .coupon_fixed(0.05)
@@ -21847,8 +21936,8 @@ class StructuredCredit:
         ...     Tranche
         ...     .builder()
         ...     .id("E")
-        ...     .attachment_point(0.0)
-        ...     .detachment_point(10.0)
+        ...     .attach_pct(0.0)
+        ...     .detach_pct(10.0)
         ...     .seniority("equity")
         ...     .original_balance(Money(8_000_000.0, Currency("USD")))
         ...     .coupon_fixed(0.0)
@@ -21922,8 +22011,8 @@ class StructuredCredit:
         ...     Tranche
         ...     .builder()
         ...     .id("A")
-        ...     .attachment_point(0.0)
-        ...     .detachment_point(100.0)
+        ...     .attach_pct(0.0)
+        ...     .detach_pct(100.0)
         ...     .seniority("senior")
         ...     .original_balance(Money(100.0, Currency("USD")))
         ...     .coupon_fixed(0.05)
@@ -21995,8 +22084,8 @@ class StructuredCredit:
         ...     Tranche
         ...     .builder()
         ...     .id("A")
-        ...     .attachment_point(0.0)
-        ...     .detachment_point(100.0)
+        ...     .attach_pct(0.0)
+        ...     .detach_pct(100.0)
         ...     .seniority("senior")
         ...     .original_balance(Money(100.0, Currency("USD")))
         ...     .coupon_fixed(0.05)
@@ -22068,8 +22157,8 @@ class StructuredCredit:
         ...     Tranche
         ...     .builder()
         ...     .id("A")
-        ...     .attachment_point(0.0)
-        ...     .detachment_point(100.0)
+        ...     .attach_pct(0.0)
+        ...     .detach_pct(100.0)
         ...     .seniority("senior")
         ...     .original_balance(Money(100.0, Currency("USD")))
         ...     .coupon_fixed(0.05)
@@ -28225,8 +28314,8 @@ class StochasticPricingResult:
     ...     Tranche
     ...     .builder()
     ...     .id("A")
-    ...     .attachment_point(0.0)
-    ...     .detachment_point(100.0)
+    ...     .attach_pct(0.0)
+    ...     .detach_pct(100.0)
     ...     .seniority("senior")
     ...     .original_balance(Money(80_000_000.0, Currency("USD")))
     ...     .coupon_fixed(0.05)
@@ -28328,7 +28417,7 @@ class StochasticPricingResult:
         ``price_pct`` (percent of the tranche's current balance),
         ``expected_loss``, ``unexpected_loss``, ``expected_shortfall``
         (currency units),
-        ``attachment``, ``detachment`` (decimal), ``wal`` (years, over
+        ``attach_pct``, ``detach_pct`` (percent of the capital structure), ``wal`` (years, over
         the paths that returned principal), ``paths_with_principal``,
         ``credit_duration`` and ``draw_option_cost`` (currency units).
 
@@ -28628,8 +28717,8 @@ class SimulationDiagnostics:
     ...     Tranche
     ...     .builder()
     ...     .id("A")
-    ...     .attachment_point(0.0)
-    ...     .detachment_point(100.0)
+    ...     .attach_pct(0.0)
+    ...     .detach_pct(100.0)
     ...     .seniority("senior")
     ...     .original_balance(Money(80_000_000.0, Currency("USD")))
     ...     .coupon_fixed(0.05)
@@ -29907,7 +29996,7 @@ class CDSIndexParams:
         index_name: str,
         series: int,
         version: int,
-        fixed_coupon_bp: float | Bps,
+        coupon_bp: float | Bps,
         convention: Literal["isda_na", "isda_eu", "isda_as", "custom"] = "isda_na",
         num_constituents: int | None = None,
     ) -> None:
@@ -29922,7 +30011,7 @@ class CDSIndexParams:
             Series number (e.g. ``42``).
         version : int
             Version within the series (e.g. ``1``).
-        fixed_coupon_bp : float | Bps
+        coupon_bp : float | Bps
             Fixed running coupon in basis points (``100.0`` = 1%).
         convention : {"isda_na", "isda_eu", "isda_as", "custom"}, default "isda_na"
             Regional ISDA convention (``"isda_na"`` is the SNAC standard).
@@ -29935,17 +30024,17 @@ class CDSIndexParams:
         ValueError
             If ``convention`` is not an accepted string.
         TypeError
-            If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+            If ``coupon_bp`` is neither a number nor ``Bps``.
 
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import CDSIndexParams
-        >>> CDSIndexParams("CDX.NA.HY", 42, 1, 500.0).fixed_coupon_bp
+        >>> CDSIndexParams("CDX.NA.HY", 42, 1, 500.0).coupon_bp
         500.0
         """
         ...
     @staticmethod
-    def cdx_na_ig(series: int, version: int, fixed_coupon_bp: float | Bps) -> CDSIndexParams:
+    def cdx_na_ig(series: int, version: int, coupon_bp: float | Bps) -> CDSIndexParams:
         """
         CDX North American Investment Grade preset (125 names, ``isda_na``).
 
@@ -29955,7 +30044,7 @@ class CDSIndexParams:
             Series number.
         version : int
             Version within the series.
-        fixed_coupon_bp : float | Bps
+        coupon_bp : float | Bps
             Fixed running coupon in basis points (``100.0`` for CDX.NA.IG).
 
         Returns
@@ -29966,7 +30055,7 @@ class CDSIndexParams:
         Raises
         ------
         TypeError
-            If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+            If ``coupon_bp`` is neither a number nor ``Bps``.
 
         Examples
         --------
@@ -29976,7 +30065,7 @@ class CDSIndexParams:
         """
         ...
     @staticmethod
-    def cdx_na_hy(series: int, version: int, fixed_coupon_bp: float | Bps) -> CDSIndexParams:
+    def cdx_na_hy(series: int, version: int, coupon_bp: float | Bps) -> CDSIndexParams:
         """
         CDX North American High Yield preset (100 names, ``isda_na``).
 
@@ -29986,7 +30075,7 @@ class CDSIndexParams:
             Series number.
         version : int
             Version within the series.
-        fixed_coupon_bp : float | Bps
+        coupon_bp : float | Bps
             Fixed running coupon in basis points (``500.0`` for CDX.NA.HY).
 
         Returns
@@ -29997,7 +30086,7 @@ class CDSIndexParams:
         Raises
         ------
         TypeError
-            If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+            If ``coupon_bp`` is neither a number nor ``Bps``.
 
         Examples
         --------
@@ -30007,7 +30096,7 @@ class CDSIndexParams:
         """
         ...
     @staticmethod
-    def itraxx_europe(series: int, version: int, fixed_coupon_bp: float | Bps) -> CDSIndexParams:
+    def itraxx_europe(series: int, version: int, coupon_bp: float | Bps) -> CDSIndexParams:
         """
         iTraxx Europe Main preset (125 names, ``isda_eu``).
 
@@ -30017,7 +30106,7 @@ class CDSIndexParams:
             Series number.
         version : int
             Version within the series.
-        fixed_coupon_bp : float | Bps
+        coupon_bp : float | Bps
             Fixed running coupon in basis points (``100.0`` for iTraxx Europe).
 
         Returns
@@ -30028,7 +30117,7 @@ class CDSIndexParams:
         Raises
         ------
         TypeError
-            If ``fixed_coupon_bp`` is neither a number nor ``Bps``.
+            If ``coupon_bp`` is neither a number nor ``Bps``.
 
         Examples
         --------
@@ -30087,7 +30176,7 @@ class CDSIndexParams:
         """
         ...
     @property
-    def fixed_coupon_bp(self) -> float:
+    def coupon_bp(self) -> float:
         """
         Fixed running coupon.
 
@@ -30152,7 +30241,7 @@ class CDSIndexParams:
         ...
     def __repr__(self) -> str:
         """
-        Python-style rendering of the key economics, e.g. ``CDSIndexParams(index_name='CDX.NA.IG', series=42, version=1, fixed_coupon_bp=100.0, convention='isda_na', num_constituents=125)``.
+        Python-style rendering of the key economics, e.g. ``CDSIndexParams(index_name='CDX.NA.IG', series=42, version=1, coupon_bp=100.0, convention='isda_na', num_constituents=125)``.
 
         Returns
         -------
@@ -30379,8 +30468,8 @@ class CDSTrancheParams:
         detach_pct: float,
         notional: Money,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        running_coupon_bp: float | Bps,
-        accumulated_loss: float = 0.0,
+        coupon_bp: float | Bps,
+        realized_loss: float = 0.0,
     ) -> None:
         """
         Describe a tranche on a credit index.
@@ -30399,18 +30488,18 @@ class CDSTrancheParams:
             Tranche notional.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Scheduled maturity (an IMM date for standard tranches).
-        running_coupon_bp : float | Bps
+        coupon_bp : float | Bps
             Running coupon in basis points (``100.0`` = 1%).
-        accumulated_loss : float, default 0.0
+        realized_loss : float, default 0.0
             Realized portfolio loss so far as a fraction of the original
             portfolio notional, in ``[0, 1]``.
 
         Raises
         ------
         ValueError
-            If ``accumulated_loss`` is outside ``[0, 1]`` or a date cannot be interpreted.
+            If ``realized_loss`` is outside ``[0, 1]`` or a date cannot be interpreted.
         TypeError
-            If ``running_coupon_bp`` is neither a number nor ``Bps``.
+            If ``coupon_bp`` is neither a number nor ``Bps``.
 
         Examples
         --------
@@ -30419,7 +30508,7 @@ class CDSTrancheParams:
         >>> from finstack_quant.valuations.instruments import CDSTrancheParams
         >>> CDSTrancheParams(
         ...     "CDX.NA.IG", 42, 7.0, 15.0, Money(5_000_000.0, Currency("USD")), "2029-12-20", 100.0
-        ... ).running_coupon_bp
+        ... ).coupon_bp
         100.0
         """
         ...
@@ -30429,7 +30518,7 @@ class CDSTrancheParams:
         series: int,
         notional: Money,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        running_coupon_bp: float | Bps,
+        coupon_bp: float | Bps,
     ) -> CDSTrancheParams:
         """
         Standard equity tranche (0%–3%).
@@ -30444,7 +30533,7 @@ class CDSTrancheParams:
             Tranche notional.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Scheduled maturity.
-        running_coupon_bp : float | Bps
+        coupon_bp : float | Bps
             Running coupon in basis points.
 
         Returns
@@ -30457,7 +30546,7 @@ class CDSTrancheParams:
         ValueError
             If ``maturity`` cannot be interpreted.
         TypeError
-            If ``running_coupon_bp`` is neither a number nor ``Bps``.
+            If ``coupon_bp`` is neither a number nor ``Bps``.
 
         Examples
         --------
@@ -30476,7 +30565,7 @@ class CDSTrancheParams:
         series: int,
         notional: Money,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
-        running_coupon_bp: float | Bps,
+        coupon_bp: float | Bps,
     ) -> CDSTrancheParams:
         """
         Standard mezzanine tranche (3%–7%).
@@ -30491,7 +30580,7 @@ class CDSTrancheParams:
             Tranche notional.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Scheduled maturity.
-        running_coupon_bp : float | Bps
+        coupon_bp : float | Bps
             Running coupon in basis points.
 
         Returns
@@ -30504,7 +30593,7 @@ class CDSTrancheParams:
         ValueError
             If ``maturity`` cannot be interpreted.
         TypeError
-            If ``running_coupon_bp`` is neither a number nor ``Bps``.
+            If ``coupon_bp`` is neither a number nor ``Bps``.
 
         Examples
         --------
@@ -30608,9 +30697,9 @@ class CDSTrancheParams:
         """
         ...
     @property
-    def running_coupon_bp(self) -> float:
+    def coupon_bp(self) -> float:
         """
-        Fixed running spread paid on the tranche premium leg.
+        Contractual running coupon (bp) paid on the tranche premium leg.
 
         Returns
         -------
@@ -30625,7 +30714,7 @@ class CDSTrancheParams:
         """
         ...
     @property
-    def accumulated_loss(self) -> float:
+    def realized_loss(self) -> float:
         """
         Realized portfolio loss so far.
 

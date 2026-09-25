@@ -15,6 +15,7 @@ use crate::config::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
 use crate::hull_white::SwapFrequency;
 use crate::quotes::ids::QuoteId;
 use crate::CalibrationReport;
+use finstack_quant_cashflows::builder::specs::RollRule;
 use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::contract::{
     deserialize_json_value, parse_json_value, ContractDescriptor, ContractError, Diagnostic,
@@ -1180,9 +1181,13 @@ pub struct BaseCorrelationParams {
     /// Detachment points (as percentages) for the tranches.
     #[serde(default)]
     pub detachment_points: Vec<f64>,
-    /// Whether to use IMM dates for coupon schedules.
+    /// Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
+    /// standard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the
+    /// default) for a schedule generated from the convention frequency and
+    /// stub. `imm` is rejected.
     #[serde(default)]
-    pub use_imm_dates: bool,
+    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
+    pub roll_rule: RollRule,
 }
 
 /// Parameters for Student-t copula degrees of freedom calibration.

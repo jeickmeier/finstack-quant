@@ -533,8 +533,8 @@
           "tranches": [
             {
               "id": "EQUITY",
-              "attachment_point": 0.0,
-              "detachment_point": 10.0,
+              "attach_pct": 0.0,
+              "detach_pct": 10.0,
               "seniority": "equity",
               "rating": "BB",
               "original_balance": {
@@ -583,8 +583,8 @@
             },
             {
               "id": "SENIOR",
-              "attachment_point": 10.0,
-              "detachment_point": 100.0,
+              "attach_pct": 10.0,
+              "detach_pct": 100.0,
               "seniority": "senior",
               "rating": "AAA",
               "original_balance": {

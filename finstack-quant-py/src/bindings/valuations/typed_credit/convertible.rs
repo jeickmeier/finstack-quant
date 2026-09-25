@@ -420,9 +420,11 @@ fn call_put_from_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<CallPu
 /// Convertible bond (typed wrapper for Rust ``ConvertibleBond``).
 ///
 /// Debt with an embedded equity conversion option, priced on a
-/// Tsiveriotis–Fernandes style tree: the bond floor discounts on
-/// ``credit_curve_id`` (falling back to ``discount_curve_id``), the equity
-/// component on the risk-free curve. Conversion, call/put, soft-call and
+/// Tsiveriotis–Fernandes style tree: the cash component discounts at the
+/// risk-free ``discount_curve_id`` times the survival probability of the
+/// issuer hazard curve ``credit_curve_id`` (blended by ``recovery_rate``;
+/// risk-free when no credit curve is set), the equity component on the
+/// risk-free curve. Conversion, call/put, soft-call and
 /// coupon terms are typed (``ConversionSpec``, ``CallPutSchedule``) or
 /// dict/JSON inputs.
 ///
@@ -655,7 +657,7 @@ impl PyConvertibleBond {
         self.inner.discount_curve_id.to_string()
     }
 
-    /// Credit curve identifier for risky discounting, or ``None``.
+    /// Issuer hazard curve identifier, or ``None`` (risk-free cash discounting).
     #[getter]
     fn credit_curve_id(&self) -> Option<String> {
         self.inner.credit_curve_id.as_ref().map(|id| id.to_string())
@@ -906,14 +908,15 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the credit curve identifier for risky discounting (bond floor).
+    /// Set the issuer hazard curve identifier.
     ///
     /// Parameters
     /// ----------
     /// value : str
-    ///     Credit curve identifier. If not provided, falls back to
-    ///     ``discount_curve_id`` (implies no credit spread). Must represent
-    ///     zero-recovery (pure hazard) risky discounting.
+    ///     ``HazardCurve`` identifier; the zero-recovery risky discount
+    ///     factor is the risk-free discount factor times its survival
+    ///     probability. If never set, the cash component discounts at the
+    ///     risk-free curve. Requires an explicit ``recovery_rate``.
     ///
     /// Returns
     /// -------

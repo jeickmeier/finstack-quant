@@ -922,17 +922,17 @@
               "format": "double",
               "type": "number"
             },
+            "roll_rule": {
+              "$ref": "#/$defs/RollRule",
+              "default": "none",
+              "description": "Coupon roll-date grid for the synthetic tranches: `cds_imm` for the\nstandard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the\ndefault) for a schedule generated from the convention frequency and\nstub. `imm` is rejected."
+            },
             "series": {
               "description": "Series number of the credit index.",
               "format": "uint16",
               "maximum": 65535,
               "minimum": 0,
               "type": "integer"
-            },
-            "use_imm_dates": {
-              "default": false,
-              "description": "Whether to use IMM dates for coupon schedules.",
-              "type": "boolean"
             }
           },
           "required": [
@@ -2291,6 +2291,11 @@
                   "$ref": "#/$defs/CdsConventionKey",
                   "description": "Convention key."
                 },
+                "coupon_bp": {
+                  "description": "Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).",
+                  "format": "double",
+                  "type": "number"
+                },
                 "entity": {
                   "description": "Reference entity name.",
                   "type": "string"
@@ -2305,11 +2310,6 @@
                 },
                 "recovery_rate": {
                   "description": "Recovery rate assumption.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "running_spread_bp": {
-                  "description": "Running spread in basis points (25.0, 100.0, 500.0 or 1000.0).",
                   "format": "double",
                   "type": "number"
                 },
@@ -2329,7 +2329,7 @@
                 "entity",
                 "convention",
                 "pillar",
-                "running_spread_bp",
+                "coupon_bp",
                 "upfront_pct",
                 "recovery_rate"
               ],
@@ -2360,6 +2360,11 @@
               "$ref": "#/$defs/CdsConventionKey",
               "description": "Convention key (currency + doc clause)."
             },
+            "coupon_bp": {
+              "description": "Contractual running coupon of the tranche, in basis points.",
+              "format": "double",
+              "type": "number"
+            },
             "detachment": {
               "description": "Detachment point (decimal, e.g. 0.07).",
               "format": "double",
@@ -2380,11 +2385,6 @@
             "maturity": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
               "description": "Maturity date."
-            },
-            "running_spread_bp": {
-              "description": "Running spread (bp).",
-              "format": "double",
-              "type": "number"
             },
             "series": {
               "description": "CDS index series number.",
@@ -2408,7 +2408,7 @@
             "detachment",
             "maturity",
             "upfront_pct",
-            "running_spread_bp",
+            "coupon_bp",
             "convention"
           ],
           "type": "object"
@@ -4697,6 +4697,26 @@
         {
           "const": "inverse_duration",
           "description": "Weight by inverse duration (1/DV01 approximation).",
+          "type": "string"
+        }
+      ]
+    },
+    "RollRule": {
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid).",
+          "type": "string"
+        },
+        {
+          "const": "imm",
+          "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.",
+          "type": "string"
+        },
+        {
+          "const": "cds_imm",
+          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
           "type": "string"
         }
       ]

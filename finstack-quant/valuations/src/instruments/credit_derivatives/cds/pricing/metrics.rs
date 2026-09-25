@@ -2,6 +2,7 @@
 //!
 use super::engine::{AodInputs, CDSPricer, CouponPeriod};
 use super::helpers::sp_cond_to;
+use crate::cashflow::builder::specs::RollRule;
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::credit_derivatives::cds::{
@@ -37,22 +38,30 @@ pub(crate) enum AccrualDayCountPolicy {
 impl CDSPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
-        if cds.premium.standard_imm_dates
-            && (cds.premium.frequency != Tenor::quarterly()
-                || cds.premium.stub != StubKind::ShortFront)
-        {
-            return Err(Error::Validation(
-                "standard CDS IMM dates require quarterly frequency and short-front stub; set standard_imm_dates=false for bespoke premium terms".into(),
-            ));
-        }
         let mut builder = ScheduleBuilder::new(cds.premium.start, cds.premium.end)?;
-        if cds.premium.standard_imm_dates {
-            builder = builder.cds_imm();
-        } else {
-            builder = builder
+        builder = match cds.premium.roll_rule {
+            RollRule::CdsImm => {
+                if cds.premium.frequency != Tenor::quarterly()
+                    || cds.premium.stub != StubKind::ShortFront
+                {
+                    return Err(Error::Validation(
+                        "premium.roll_rule = cds_imm requires quarterly frequency and \
+                         short-front stub; set premium.roll_rule = none for bespoke \
+                         premium terms"
+                            .into(),
+                    ));
+                }
+                builder.cds_imm()
+            }
+            RollRule::None => builder
                 .frequency(cds.premium.frequency)
-                .stub_rule(cds.premium.stub);
-        }
+                .stub_rule(cds.premium.stub),
+            other => {
+                return Err(Error::Validation(format!(
+                    "premium.roll_rule must be cds_imm or none for CDS premium legs, got {other:?}"
+                )));
+            }
+        };
         if let Some(calendar_id) = cds.premium.calendar_id.as_deref() {
             builder = builder.adjust_with_id(cds.premium.business_day_convention, calendar_id);
         }
@@ -416,7 +425,7 @@ impl CDSPricer {
 
             per_bp_pv += ONE_BASIS_POINT * accrual * sp * df;
 
-            if self.config.include_accrual {
+            if self.config.include_accrual_on_default {
                 per_bp_pv += self.accrual_on_default_isda_standard_model_cond(AodInputs {
                     cds,
                     spread: ONE_BASIS_POINT,
@@ -532,17 +541,10 @@ impl CDSPricer {
     /// 2. **Dated upfront** (`cds.upfront: Option<(Date, Money)>`): a specific
     ///    payment on a specific date, discounted from `as_of`. Positive
     ///    amount = paid by Buyer (reduces Buyer NPV).
-    /// 3. **PV-adjustment upfront**
-    ///    (`cds.instrument_pricing_overrides.market_quotes.upfront_payment: Option<Money>`):
-    ///    already-discounted PV adjustment at `as_of`. Positive = paid by
-    ///    Buyer.
-    /// 4. **Clean-price accrued add-back**: when [`CreditDefaultSwap::uses_clean_price`]
+    /// 3. **Clean-price accrued add-back**: when [`CreditDefaultSwap::uses_clean_price`]
     ///    is `true`, add (Buyer view) or subtract (Seller view) the
     ///    Bloomberg CDSW-style accrued premium so the reported NPV matches the
     ///    "Principal" line. Cash settlement is `Principal + Accrued`.
-    ///
-    /// Both upfront forms can be set simultaneously without double-counting;
-    /// each is applied exactly once.
     pub(crate) fn npv_full(
         &self,
         cds: &CreditDefaultSwap,
@@ -562,24 +564,16 @@ impl CDSPricer {
             _ => 0.0,
         };
 
-        // PV-adjustment upfront: already-discounted; positive = paid by Buyer.
-        let upfront_adjustment = cds
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment
-            .map(|m| m.amount())
-            .unwrap_or(0.0);
-
         let mut npv_amount = match cds.side {
-            PayReceive::Pay => protection_pv - premium_pv - upfront_pv - upfront_adjustment,
-            PayReceive::Receive => premium_pv - protection_pv + upfront_pv + upfront_adjustment,
+            PayReceive::Pay => protection_pv - premium_pv - upfront_pv,
+            PayReceive::Receive => premium_pv - protection_pv + upfront_pv,
         };
 
         if cds.uses_clean_price() {
             let accrual_fraction =
                 self.coupon_accrued_fraction(cds, as_of, AccrualDayCountPolicy::CdswInclusive)?;
-            let spread = cds.premium.spread_bp.to_f64().ok_or_else(|| {
-                Error::Validation("premium spread_bp cannot be represented as f64".into())
+            let spread = cds.premium.coupon_bp.to_f64().ok_or_else(|| {
+                Error::Validation("premium.coupon_bp cannot be represented as f64".into())
             })? / BASIS_POINTS_PER_UNIT;
             let accrued = cds.notional.amount() * spread * accrual_fraction;
             npv_amount = match cds.side {

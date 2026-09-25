@@ -965,7 +965,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
             id: QuoteId::new("CDS-UP-3Y"),
             entity: "REPRICE-UPFRONT".to_string(),
             pillar: Pillar::Date(Date::from_calendar_date(2028, Month::March, 20).unwrap()),
-            running_spread_bp: 100.0,
+            coupon_bp: 100.0,
             upfront_pct: 0.015,
             recovery_rate: 0.40,
             convention: CdsConventionKey {
@@ -977,7 +977,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
             id: QuoteId::new("CDS-UP-5Y"),
             entity: "REPRICE-UPFRONT".to_string(),
             pillar: Pillar::Date(Date::from_calendar_date(2030, Month::March, 20).unwrap()),
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             upfront_pct: 0.045,
             recovery_rate: 0.40,
             convention: CdsConventionKey {

@@ -553,7 +553,7 @@ mod tests {
             detachment: 0.07,
             maturity: Date::from_calendar_date(2030, Month::March, 20).expect("valid maturity"),
             upfront_pct: -0.01,
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: CdsConventionKey {
                 currency: Currency::USD,
                 doc_clause: CdsDocClause::Cr14,
@@ -612,7 +612,7 @@ mod tests {
             detachment: 0.07,
             maturity: Date::from_calendar_date(2030, Month::March, 20).expect("valid maturity"),
             upfront_pct: -0.01,
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: CdsConventionKey {
                 currency: Currency::USD,
                 doc_clause: CdsDocClause::Cr14,

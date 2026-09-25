@@ -1,5 +1,5 @@
 {
-  "description": "Input-only convertible credit widening from 150bp to 300bp over unchanged 3% risk-free rates. Rates P&L must be zero; credit P&L must dominate the Taylor residual.",
+  "description": "Input-only convertible credit widening from 150bp to 300bp (flat zero-recovery issuer hazard curve) over unchanged 3% risk-free rates. Rates P&L must be zero; credit P&L must dominate the Taylor residual.",
   "instrument": {
     "instrument": {
       "spec": {
@@ -76,32 +76,24 @@
         "fx_policy": null
       },
       {
-        "type": "discount",
+        "type": "hazard",
         "id": "USD-CREDIT",
         "base": "2025-01-01",
+        "currency": null,
         "day_count": "act_365f",
+        "fx_policy": null,
+        "issuer": null,
         "knot_points": [
           [
-            0,
-            1.0
-          ],
-          [
-            1,
-            0.9559974818331
-          ],
-          [
-            10,
-            0.6376281516217733
+            1.0,
+            0.015
           ]
         ],
-        "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
-        "rate_calibration": null,
-        "calibration_ois_cutoff_days": null,
-        "fx_policy": null
+        "par_interp": "linear",
+        "par_points": [],
+        "recovery_rate": 0.0,
+        "seniority": null,
+        "survival_interp": "log_linear"
       }
     ],
     "fx": null,
@@ -158,32 +150,24 @@
         "fx_policy": null
       },
       {
-        "type": "discount",
+        "type": "hazard",
         "id": "USD-CREDIT",
         "base": "2025-01-01",
+        "currency": null,
         "day_count": "act_365f",
+        "fx_policy": null,
+        "issuer": null,
         "knot_points": [
           [
-            0,
-            1.0
-          ],
-          [
-            1,
-            0.9417645335842487
-          ],
-          [
-            10,
-            0.5488116360940264
+            1.0,
+            0.03
           ]
         ],
-        "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
-        "rate_calibration": null,
-        "calibration_ois_cutoff_days": null,
-        "fx_policy": null
+        "par_interp": "linear",
+        "par_points": [],
+        "recovery_rate": 0.0,
+        "seniority": null,
+        "survival_interp": "log_linear"
       }
     ],
     "fx": null,

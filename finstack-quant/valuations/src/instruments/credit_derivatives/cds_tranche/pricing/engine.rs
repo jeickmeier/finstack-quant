@@ -139,8 +139,8 @@ impl CDSTranchePricer {
     ) -> Result<Money> {
         tranche.validate()?;
         let discount_curve = market_ctx.get_discount(tranche.discount_curve_id.as_ref())?;
-        let wiped_out = tranche.accumulated_loss >= tranche.detach_pct / 100.0;
-        let mut net_pv = if wiped_out {
+        let wiped_out = tranche.realized_loss >= tranche.detach_pct / 100.0;
+        let net_pv = if wiped_out {
             // A wiped-out tranche has no remaining premium/protection legs, but
             // a separately contracted upfront can still be due.
             if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
@@ -156,17 +156,6 @@ impl CDSTranchePricer {
             let rows = self.project_discountable_rows(tranche, market_ctx, as_of)?;
             self.discount_projected_rows(&rows, discount_curve.as_ref(), as_of)?
         };
-
-        if let Some(upfront) = tranche
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment
-        {
-            net_pv += match tranche.side {
-                TrancheSide::BuyProtection => -upfront.amount(),
-                TrancheSide::SellProtection => upfront.amount(),
-            };
-        }
 
         Money::new(net_pv, tranche.notional.currency())
     }
@@ -236,7 +225,7 @@ impl CDSTranchePricer {
             return Ok(Vec::new());
         }
 
-        let coupon = tranche.running_coupon_bp / BASIS_POINTS_PER_UNIT;
+        let coupon = tranche.coupon_bp / BASIS_POINTS_PER_UNIT;
         let tranche_notional = tranche.notional.amount();
         let premium_sign = match tranche.side {
             TrancheSide::BuyProtection => -1.0,
@@ -336,7 +325,7 @@ impl CDSTranchePricer {
             // writedown increment (top-down) occur at default time, so they
             // receive the same treatment.
             let delta_erosion = delta_el_fraction + delta_wd_fraction;
-            let aod_adjustment = if self.params.accrual_on_default_enabled {
+            let aod_adjustment = if self.params.include_accrual_on_default {
                 (1.0 - default_fraction) * tranche_notional * delta_erosion
             } else {
                 tranche_notional * delta_erosion
@@ -607,7 +596,7 @@ impl CDSTranchePricer {
     /// Calculate effective attachment/detachment points given realized
     /// defaults (losses AND recoveries).
     ///
-    /// `accumulated_loss` is the realized pool LOSS fraction `L`
+    /// `realized_loss` is the realized pool LOSS fraction `L`
     /// (original-pool units). With recovery `R` the realized DEFAULTED
     /// notional fraction is `X = L / (1 − R)`:
     ///
@@ -622,7 +611,7 @@ impl CDSTranchePricer {
     ///
     /// # Invariants
     ///
-    /// - Accumulated loss is in [0, 1]
+    /// - Realized loss is in [0, 1]
     /// - Attachment <= Detachment (after percentage conversion)
     /// - Results are always in [0, 1]
     pub(super) fn calculate_effective_structure(
@@ -630,14 +619,14 @@ impl CDSTranchePricer {
         tranche: &CDSTranche,
         recovery_rate: f64,
     ) -> EffectiveStructure {
-        let l = tranche.accumulated_loss;
+        let l = tranche.realized_loss;
         let attach = tranche.attach_pct / 100.0;
         let detach = tranche.detach_pct / 100.0;
 
         // Debug assertions for invariants
         debug_assert!(
             (0.0..=1.0).contains(&l),
-            "accumulated_loss {} must be in [0, 1]",
+            "realized_loss {} must be in [0, 1]",
             l
         );
         debug_assert!(

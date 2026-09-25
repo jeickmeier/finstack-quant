@@ -494,7 +494,7 @@ fn with_quote_recovery(quote: &CdsQuote, recovery_rate: f64) -> CdsQuote {
             entity,
             convention,
             pillar,
-            running_spread_bp,
+            coupon_bp,
             upfront_pct,
             ..
         } => CdsQuote::CdsUpfront {
@@ -502,7 +502,7 @@ fn with_quote_recovery(quote: &CdsQuote, recovery_rate: f64) -> CdsQuote {
             entity: entity.clone(),
             convention: convention.clone(),
             pillar: pillar.clone(),
-            running_spread_bp: *running_spread_bp,
+            coupon_bp: *coupon_bp,
             upfront_pct: *upfront_pct,
             recovery_rate,
         },
@@ -915,7 +915,7 @@ pub(crate) fn replay_hazard_at_horizon(
         let cds = instrument.as_any().downcast_ref::<
             finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap>()
             .ok_or_else(|| finstack_quant_core::Error::Validation("expected CDS quote instrument".to_string()))?;
-        let par = cds.get_par_spread(&request.target_market, params.base_date)?;
+        let par = cds.par_spread(&request.target_market, params.base_date)?;
         if let CdsQuote::CdsParSpread { spread_bp, .. } = &mut quote {
             *spread_bp = par;
         }

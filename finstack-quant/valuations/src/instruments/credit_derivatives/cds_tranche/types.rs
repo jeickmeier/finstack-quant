@@ -1,5 +1,6 @@
 //! CDS Tranche types, builder entrypoint, and pricing impl.
 
+use crate::cashflow::builder::specs::RollRule;
 use crate::cashflow::builder::ScheduleParams;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use finstack_quant_core::dates::{
@@ -77,7 +78,7 @@ pub struct CDSTranche {
     )]
     pub maturity: Date,
     /// Running coupon in basis points (e.g., 100 = 1.00%)
-    pub running_coupon_bp: f64,
+    pub coupon_bp: f64,
     /// Payment frequency (typically quarterly)
     pub frequency: Tenor,
     /// Day count (typically Act/360)
@@ -101,16 +102,21 @@ pub struct CDSTranche {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub effective_date: Option<Date>,
-    /// Accumulated realized loss as fraction of original portfolio notional
-    pub accumulated_loss: f64,
-    /// Whether to enforce standard IMM dates (20th of Mar, Jun, Sep, Dec).
-    ///
-    /// Defaults to `false` so [`Self::new`] and the builder honor
-    /// `ScheduleParams` frequency. Use [`Self::standard`] or set this to
-    /// `true` for IMM rolls.
+    /// Realized (settled) loss on the reference pool as a decimal fraction of
+    /// the original portfolio notional, in `[0, 1]`.
+    pub realized_loss: f64,
+    /// Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates
+    /// (20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke
+    /// schedule from `frequency` and `stub`. The equity-futures `imm` grid is
+    /// rejected. Use [`Self::standard`] for the IMM constructor.
     #[builder(default)]
     #[serde(default)]
-    pub standard_imm_dates: bool,
+    pub roll_rule: RollRule,
+    /// Stub convention for a bespoke (`roll_rule = none`) coupon schedule.
+    /// Defaults to `short_front`.
+    #[builder(default = StubKind::ShortFront)]
+    #[serde(default = "crate::serde_defaults::stub_short_front")]
+    pub stub: StubKind,
     /// Optional upfront payment (date, amount). Positive means paid by protection buyer.
     #[serde(default)]
     #[serde(with = "finstack_quant_core::wire::optional_dated_money")]
@@ -150,7 +156,7 @@ impl CDSTranche {
             return Some(effective_date);
         }
 
-        if !self.standard_imm_dates {
+        if self.roll_rule != RollRule::CdsImm {
             return None;
         }
 
@@ -170,8 +176,8 @@ impl CDSTranche {
         for (name, value) in [
             ("attach_pct", self.attach_pct),
             ("detach_pct", self.detach_pct),
-            ("running_coupon_bp", self.running_coupon_bp),
-            ("accumulated_loss", self.accumulated_loss),
+            ("coupon_bp", self.coupon_bp),
+            ("realized_loss", self.realized_loss),
         ] {
             if !value.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -209,10 +215,10 @@ impl CDSTranche {
                 "CDS tranche notional must be finite".to_string(),
             ));
         }
-        if !(0.0..=1.0).contains(&self.accumulated_loss) {
+        if !(0.0..=1.0).contains(&self.realized_loss) {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "CDS tranche accumulated_loss must be in [0, 1], got {}",
-                self.accumulated_loss
+                "CDS tranche realized_loss must be in [0, 1], got {}",
+                self.realized_loss
             )));
         }
         let currency = self.notional.currency();
@@ -225,18 +231,10 @@ impl CDSTranche {
                 )));
             }
         }
-        if let Some(upfront) = self
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment
-        {
-            if upfront.currency() != currency {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CDS tranche upfront override currency {} must match notional currency {}",
-                    upfront.currency(),
-                    currency
-                )));
-            }
+        if self.roll_rule == RollRule::Imm {
+            return Err(finstack_quant_core::Error::Validation(
+                "CDS tranche roll_rule must be cds_imm or none, got imm".to_string(),
+            ));
         }
         Ok(())
     }
@@ -265,9 +263,8 @@ impl CDSTranche {
     /// Create a new CDS tranche using parameter structs.
     ///
     /// Honors `schedule_params` for coupon frequency, day count, business-day
-    /// convention, and calendar. Coupon dates follow that frequency
-    /// (`standard_imm_dates` is `false`). Use [`Self::standard`] for the IMM
-    /// (20th of Mar/Jun/Sep/Dec) constructor.
+    /// convention, calendar, stub and roll rule. Use [`Self::standard`] for
+    /// the IMM (20th of Mar/Jun/Sep/Dec) constructor.
     ///
     /// # Arguments
     ///
@@ -275,7 +272,8 @@ impl CDSTranche {
     /// * `tranche_params` - Attachment/detachment points (percent), notional,
     ///   maturity, running coupon in basis points, and index identity.
     /// * `schedule_params` - Coupon frequency, day count, business-day
-    ///   convention, and calendar used when `standard_imm_dates` is `false`.
+    ///   convention, calendar, `stub` and `roll_rule` (`cds_imm` or `none`;
+    ///   `imm` is rejected by [`Self::validate`]).
     /// * `discount_curve_id` - Discount curve identifier in the tranche quote
     ///   currency.
     /// * `credit_index_id` - Credit-index / hazard identifier used for
@@ -335,7 +333,7 @@ impl CDSTranche {
             detach_pct: tranche_params.detach_pct,
             notional: tranche_params.notional,
             maturity: tranche_params.maturity,
-            running_coupon_bp: tranche_params.running_coupon_bp,
+            coupon_bp: tranche_params.coupon_bp,
             frequency: schedule_params.frequency,
             day_count: schedule_params.day_count,
             business_day_convention: schedule_params.business_day_convention,
@@ -344,8 +342,9 @@ impl CDSTranche {
             credit_index_id: credit_index_id.into(),
             side,
             effective_date: None,
-            accumulated_loss: tranche_params.accumulated_loss,
-            standard_imm_dates: false,
+            realized_loss: tranche_params.realized_loss,
+            roll_rule: schedule_params.roll_rule,
+            stub: schedule_params.stub,
             upfront: None,
             instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides::default(),
             metric_pricing_overrides: Default::default(),
@@ -356,9 +355,8 @@ impl CDSTranche {
 
     /// Create a standard CDS tranche with IMM coupon dates and market conventions.
     ///
-    /// After [`Self::new`], sets `standard_imm_dates` to `true` and clears
-    /// `calendar_id` so the IMM path uses CDS roll dates (20th of
-    /// Mar/Jun/Sep/Dec).
+    /// Builds with `roll_rule = cds_imm` (CDS roll dates, 20th of
+    /// Mar/Jun/Sep/Dec) and no `calendar_id`.
     ///
     /// # Arguments
     ///
@@ -382,6 +380,7 @@ impl CDSTranche {
         credit_index_id: impl Into<CurveId>,
         side: TrancheSide,
     ) -> finstack_quant_core::Result<Self> {
+        use crate::cashflow::builder::specs::RollRule;
         use crate::cashflow::builder::ScheduleParams;
         let sched = ScheduleParams {
             frequency: Tenor::quarterly(),
@@ -392,7 +391,7 @@ impl CDSTranche {
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            roll_rule: RollRule::CdsImm,
         };
 
         let mut tranche = Self::new(
@@ -403,15 +402,36 @@ impl CDSTranche {
             credit_index_id,
             side,
         )?;
-        tranche.standard_imm_dates = true;
         tranche.calendar_id = None;
         Ok(tranche)
     }
 
-    /// Calculate upfront amount for the tranche
-    pub fn upfront(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+    /// Model upfront: the tranche PV at its contractual running coupon.
+    ///
+    /// A computed analytic, distinct from the contractual `upfront` field
+    /// (which this PV already includes).
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Market context holding the discount curve and the credit
+    ///   index data named by the tranche.
+    /// * `as_of` - Valuation date.
+    ///
+    /// # Returns
+    ///
+    /// The model upfront in the tranche notional currency (signed by side).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tranche is invalid or required market data
+    /// is missing.
+    pub fn model_upfront(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
         let pricer = pricing::CDSTranchePricer::new();
-        pricer.calculate_upfront(self, curves, as_of)
+        pricer.calculate_model_upfront(self, curves, as_of)
     }
 
     /// Calculate spread DV01 (sensitivity to 1bp change in running coupon)

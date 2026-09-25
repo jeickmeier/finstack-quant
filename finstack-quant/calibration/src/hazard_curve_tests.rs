@@ -264,7 +264,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         id,
         entity,
         pillar,
-        running_spread_bp: 100.0,
+        coupon_bp: 100.0,
         upfront_pct: 2.0,
         recovery_rate,
         convention,
@@ -477,7 +477,7 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
         id: QuoteId::new("CDS-UPFRONT-250BP"),
         entity: "NONSTANDARD-UPFRONT".to_string(),
         pillar: Pillar::Date(Date::from_calendar_date(2028, Month::March, 20).unwrap()),
-        running_spread_bp: 250.0,
+        coupon_bp: 250.0,
         upfront_pct: 0.02,
         recovery_rate: 0.40,
         convention: CdsConventionKey {

@@ -211,7 +211,7 @@ def _definition_terms(definition: dict[str, Any]) -> list[list[tuple[str, str]]]
                 ("Side", str(spec.get("side", ""))),
             ],
             [
-                ("Running Spread", f"{prem.get('spread_bp', 0)} bp"),
+                ("Running Coupon", f"{prem.get('coupon_bp', 0)} bp"),
                 ("Effective", prem.get("start", "")),
                 ("Maturity", prem.get("end", "")),
                 ("Frequency", _frequency_str(prem.get("frequency", {}))),

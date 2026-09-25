@@ -1658,14 +1658,18 @@ mod tests {
         let mut json = serde_json::to_value(InstrumentJson::CDSOption(option))
             .expect("CDSOption JSON serialization should succeed");
         remove_spec_key(&mut json, "underlying_is_index");
-        remove_spec_key(&mut json, "underlying_cds_coupon");
+        remove_spec_key(&mut json, "coupon_bp");
+        remove_spec_key(&mut json, "index_factor");
+        remove_spec_key(&mut json, "realized_loss");
 
         let deserialized: InstrumentJson =
             serde_json::from_value(json).expect("CDSOption JSON deserialization should succeed");
         match deserialized {
             InstrumentJson::CDSOption(i) => {
                 assert!(!i.underlying_is_index);
-                assert!(i.underlying_cds_coupon.is_none());
+                assert!(i.coupon_bp.is_none());
+                assert_eq!(i.index_factor, 1.0);
+                assert_eq!(i.realized_loss, 0.0);
             }
             _ => panic!("Expected CDSOption variant"),
         }

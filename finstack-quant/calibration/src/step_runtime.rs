@@ -266,7 +266,7 @@ pub(crate) fn execute_params(
                     spread_bp, ..
                 })
                 | MarketQuote::Cds(crate::quotes::cds::CdsQuote::CdsUpfront {
-                    running_spread_bp: spread_bp,
+                    coupon_bp: spread_bp,
                     ..
                 }) => *spread_bp >= 1_000.0,
                 _ => false,
@@ -737,7 +737,7 @@ mod tests {
             detachment: 0.07,
             maturity,
             upfront_pct,
-            running_spread_bp: 500.0,
+            coupon_bp: 500.0,
             convention: CdsConventionKey {
                 currency: Currency::USD,
                 doc_clause: CdsDocClause::IsdaNa,
@@ -828,7 +828,7 @@ mod tests {
         )
         .expect("valid pricer");
         let live = pricer
-            .calculate_upfront(tranche, &market, base_date)
+            .calculate_model_upfront(tranche, &market, base_date)
             .expect("upfront")
             / tranche.notional.amount();
         assert!(

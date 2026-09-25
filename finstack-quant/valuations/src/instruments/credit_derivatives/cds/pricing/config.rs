@@ -10,7 +10,7 @@ use crate::constants::time as time_constants;
 #[derive(Debug, Clone)]
 pub(crate) struct CDSPricerConfig {
     /// Include accrual on default in premium leg calculation
-    pub(crate) include_accrual: bool,
+    pub(crate) include_accrual_on_default: bool,
     /// Par spread denominator methodology:
     /// - `false` (default): Use Risky Annuity only (ISDA Standard Model)
     /// - `true`: Include accrual-on-default in denominator (Bloomberg CDSW style)
@@ -58,7 +58,7 @@ impl CDSPricerConfig {
     #[must_use]
     pub(crate) fn isda_standard() -> Self {
         Self {
-            include_accrual: true,
+            include_accrual_on_default: true,
             par_spread_uses_full_premium: false,
             business_days_per_year: time_constants::BUSINESS_DAYS_PER_YEAR_US,
             protection_leg_substeps_per_year:

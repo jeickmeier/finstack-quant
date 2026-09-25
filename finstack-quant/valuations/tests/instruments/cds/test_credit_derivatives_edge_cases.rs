@@ -307,7 +307,7 @@ fn test_par_spread_npv_consistency() {
 
     // Clone the CDS and update only the spread (preserving schedule)
     let mut cds_at_par = cds_test;
-    cds_at_par.premium.spread_bp = Decimal::try_from(par_spread).expect("valid par_spread");
+    cds_at_par.premium.coupon_bp = Decimal::try_from(par_spread).expect("valid par_spread");
 
     // NPV at par spread should be approximately zero
     let npv_at_par = cds_at_par

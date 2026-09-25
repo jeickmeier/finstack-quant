@@ -29,7 +29,7 @@ fn test_upfront_metric_via_price_with_metrics() {
     let result = tranche.price_with_metrics(
         &market,
         as_of,
-        &[MetricId::custom("upfront")],
+        &[MetricId::custom("model_upfront")],
         finstack_quant_valuations::instruments::PricingOptions::default(),
     );
 
@@ -38,7 +38,7 @@ fn test_upfront_metric_via_price_with_metrics() {
     let valuation = result.unwrap();
     let upfront = *valuation
         .measures
-        .get("upfront")
+        .get("model_upfront")
         .expect("upfront should be in measures");
     assert!(upfront.is_finite(), "Upfront should be finite");
 }
@@ -374,7 +374,7 @@ fn test_all_standard_metrics_calculable() {
     let as_of = base_date();
 
     let all_metrics = vec![
-        MetricId::custom("upfront"),
+        MetricId::custom("model_upfront"),
         MetricId::SpreadDv01,
         MetricId::Correlation01,
         MetricId::Cs01,
@@ -425,7 +425,7 @@ fn test_metrics_with_missing_credit_index() {
 
     // Metrics that should fallback to zero when credit index is missing
     let fallback_metrics = vec![
-        MetricId::custom("upfront"),
+        MetricId::custom("model_upfront"),
         MetricId::custom("spread_dv01"),
         MetricId::ExpectedLoss,
         MetricId::JumpToDefault,

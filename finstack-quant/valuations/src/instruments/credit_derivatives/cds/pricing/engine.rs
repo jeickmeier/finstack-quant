@@ -226,8 +226,8 @@ impl CDSPricer {
             .as_deref()
             .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
         let periods = self.coupon_periods(cds, as_of)?;
-        let spread = cds.premium.spread_bp.to_f64().ok_or_else(|| {
-            Error::Validation("premium spread_bp cannot be represented as f64".into())
+        let spread = cds.premium.coupon_bp.to_f64().ok_or_else(|| {
+            Error::Validation("premium.coupon_bp cannot be represented as f64".into())
         })? / BASIS_POINTS_PER_UNIT;
 
         let mut premium_pv = 0.0;
@@ -251,7 +251,7 @@ impl CDSPricer {
             let scheduled_coupon = cds.notional.amount() * spread * accrual;
             premium_pv += scheduled_coupon * sp * df;
 
-            if self.config.include_accrual {
+            if self.config.include_accrual_on_default {
                 let spread_sign = spread.signum();
                 // Keep AoD on the same dollar basis as the scheduled coupon leg.
                 premium_pv += spread_sign
@@ -451,7 +451,6 @@ pub(crate) struct CdsHazardRepriceCache {
     periods: Vec<(CouponPeriod, f64, f64)>,
     spread: f64,
     upfront_pv: f64,
-    upfront_adjustment: f64,
     clean_accrued: f64,
 }
 
@@ -482,8 +481,8 @@ impl CdsHazardRepriceCache {
             let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
             periods.push((period, accrual, df));
         }
-        let spread = cds.premium.spread_bp.to_f64().ok_or_else(|| {
-            Error::Validation("premium spread_bp cannot be represented as f64".into())
+        let spread = cds.premium.coupon_bp.to_f64().ok_or_else(|| {
+            Error::Validation("premium.coupon_bp cannot be represented as f64".into())
         })? / BASIS_POINTS_PER_UNIT;
         let upfront_pv = match cds.upfront {
             Some((dt, amount)) if dt >= as_of => {
@@ -491,12 +490,6 @@ impl CdsHazardRepriceCache {
             }
             _ => 0.0,
         };
-        let upfront_adjustment = cds
-            .instrument_pricing_overrides
-            .market_quotes
-            .upfront_payment
-            .map(|m| m.amount())
-            .unwrap_or(0.0);
         let clean_accrued = if cds.uses_clean_price() {
             let accrual_fraction = pricer.coupon_accrued_fraction(
                 cds,
@@ -515,7 +508,6 @@ impl CdsHazardRepriceCache {
             periods,
             spread,
             upfront_pv,
-            upfront_adjustment,
             clean_accrued,
         })
     }
@@ -543,7 +535,7 @@ impl CdsHazardRepriceCache {
         for &(period, accrual, df) in &self.periods {
             let sp = sp_cond_to(surv, self.as_of, period.accrual_end)?;
             premium_pv += self.cds.notional.amount() * self.spread * accrual * sp * df;
-            if self.pricer.config.include_accrual {
+            if self.pricer.config.include_accrual_on_default {
                 let spread_sign = self.spread.signum();
                 premium_pv += spread_sign
                     * self.cds.notional.amount()
@@ -572,12 +564,8 @@ impl CdsHazardRepriceCache {
         }
 
         let mut npv_amount = match self.cds.side {
-            PayReceive::Pay => {
-                protection_pv - premium_pv - self.upfront_pv - self.upfront_adjustment
-            }
-            PayReceive::Receive => {
-                premium_pv - protection_pv + self.upfront_pv + self.upfront_adjustment
-            }
+            PayReceive::Pay => protection_pv - premium_pv - self.upfront_pv,
+            PayReceive::Receive => premium_pv - protection_pv + self.upfront_pv,
         };
         if self.cds.uses_clean_price() {
             npv_amount = match self.cds.side {
@@ -688,13 +676,13 @@ mod cds_hazard_reprice_cache_tests {
             "valuation date should fall inside a live coupon accrual period"
         );
         assert!(
-            cache.pricer.config.include_accrual,
+            cache.pricer.config.include_accrual_on_default,
             "CDSPricerConfig::from_cds should enable accrual-on-default"
         );
 
         let discount = market.get_discount(&cds.premium.discount_curve_id)?;
         let without_aod = CDSPricer::with_config(CDSPricerConfig {
-            include_accrual: false,
+            include_accrual_on_default: false,
             ..CDSPricerConfig::from_cds(&cds)
         })
         .npv_full(&cds, discount.as_ref(), &hazard, as_of)?;

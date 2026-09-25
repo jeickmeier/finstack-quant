@@ -14,6 +14,7 @@ use finstack_quant_calibration::api::schema::{
     SwaptionVolParams, VolSurfaceModel, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
+use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
@@ -214,7 +215,7 @@ fn step_params_v2_roundtrip_for_all_variants() {
         business_day_convention: Some(BusinessDayConvention::Following),
         calendar_id: Some("usny".to_string()),
         detachment_points: vec![0.03, 0.07, 0.1],
-        use_imm_dates: true,
+        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
     });
     let _ = roundtrip_json(&base_corr);
 }
@@ -313,4 +314,81 @@ fn test_svi_surface_step_params_serde() {
         dividend_yield_override: None,
     });
     let _ = roundtrip_json(&svi);
+}
+
+#[test]
+// schema-rejection-test: CdsQuote::CdsUpfront `running_spread_bp`
+fn cds_upfront_quote_rejects_running_spread_bp() {
+    let quote = CdsQuote::CdsUpfront {
+        id: QuoteId::new("CDS-UPF-5Y"),
+        entity: "ACME".to_string(),
+        convention: CdsConventionKey {
+            currency: Currency::USD,
+            doc_clause: CdsDocClause::Cr14,
+        },
+        pillar: Pillar::Tenor("5Y".parse().expect("tenor")),
+        coupon_bp: 500.0,
+        upfront_pct: 0.02,
+        recovery_rate: 0.40,
+    };
+    let mut json = serde_json::to_value(&quote).expect("serialize");
+    let object = json.as_object_mut().expect("object");
+    let coupon = object.remove("coupon_bp").expect("coupon_bp present");
+    object.insert("running_spread_bp".to_string(), coupon);
+    let err = serde_json::from_value::<CdsQuote>(json).expect_err("running_spread_bp retired");
+    assert!(err.to_string().contains("running_spread_bp"), "{err}");
+}
+
+#[test]
+// schema-rejection-test: CdsTrancheQuote `running_spread_bp`
+fn cds_tranche_quote_rejects_running_spread_bp() {
+    let quote = CdsTrancheQuote {
+        id: QuoteId::new("CDX-IG-3-7"),
+        index: "CDX.NA.IG".to_string(),
+        series: 46,
+        attachment: 0.03,
+        detachment: 0.07,
+        maturity: Date::from_calendar_date(2029, Month::June, 20).expect("date"),
+        upfront_pct: -0.025,
+        coupon_bp: 500.0,
+        convention: CdsConventionKey {
+            currency: Currency::USD,
+            doc_clause: CdsDocClause::Cr14,
+        },
+    };
+    let mut json = serde_json::to_value(&quote).expect("serialize");
+    let object = json.as_object_mut().expect("object");
+    let coupon = object.remove("coupon_bp").expect("coupon_bp present");
+    object.insert("running_spread_bp".to_string(), coupon);
+    let err =
+        serde_json::from_value::<CdsTrancheQuote>(json).expect_err("running_spread_bp retired");
+    assert!(err.to_string().contains("running_spread_bp"), "{err}");
+}
+
+#[test]
+// schema-rejection-test: BaseCorrelationParams `use_imm_dates`
+fn base_correlation_params_reject_use_imm_dates() {
+    let params = BaseCorrelationParams {
+        index_id: "CDX".to_string(),
+        series: 40,
+        maturity_years: 5.0,
+        base_date: Date::from_calendar_date(2025, Month::January, 2).expect("date"),
+        discount_curve_id: "USD-OIS".into(),
+        currency: Currency::USD,
+        notional: 1.0,
+        frequency: None,
+        day_count: None,
+        business_day_convention: None,
+        calendar_id: None,
+        detachment_points: vec![3.0, 7.0],
+        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
+    };
+    let mut json = serde_json::to_value(&params).expect("serialize");
+    assert_eq!(json["roll_rule"], "cds_imm");
+    json.as_object_mut()
+        .expect("object")
+        .insert("use_imm_dates".to_string(), serde_json::json!(true));
+    let err =
+        serde_json::from_value::<BaseCorrelationParams>(json).expect_err("use_imm_dates retired");
+    assert!(err.to_string().contains("use_imm_dates"), "{err}");
 }

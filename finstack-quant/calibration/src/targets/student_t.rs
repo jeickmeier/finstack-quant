@@ -236,7 +236,7 @@ impl StudentTTarget {
             let Ok(pricer) = CDSTranchePricer::with_params(config) else {
                 return f64::INFINITY;
             };
-            match pricer.calculate_upfront(tranche, &self.base_context, as_of) {
+            match pricer.calculate_model_upfront(tranche, &self.base_context, as_of) {
                 Ok(model_upfront) => model_upfront - market_upfront,
                 Err(_) => f64::INFINITY,
             }

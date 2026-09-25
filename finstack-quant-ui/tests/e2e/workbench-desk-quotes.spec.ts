@@ -19,9 +19,9 @@ const cases = [
   },
   {
     type: "credit_default_swap",
-    label: "Running spread",
+    label: "Running coupon",
     value: "110",
-    path: ["premium", "spread_bp"],
+    path: ["premium", "coupon_bp"],
   },
   {
     type: "equity_option",

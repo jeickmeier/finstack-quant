@@ -28,7 +28,7 @@ pub struct CDSIndexParams {
     /// Index version number within the series.
     pub version: u16,
     /// Running fixed coupon in basis points (e.g. 100bp for CDX.NA.IG).
-    pub fixed_coupon_bp: f64,
+    pub coupon_bp: f64,
     /// Regional ISDA convention. Bundled into the preset because each
     /// well-known index has a fixed convention (CDX uses `IsdaNa`, iTraxx
     /// uses `IsdaEu`).
@@ -59,21 +59,21 @@ impl CDSIndexParams {
     /// * `index_name` - Credit-index family name (e.g. `"CDX.NA.IG"`, `"iTraxx Europe"`).
     /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
     /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
-    /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
+    /// * `coupon_bp` - Fixed coupon rate expressed in basis points per annum.
     /// * `convention` - Regional ISDA CDS convention (day count, calendar, payment frequency)
     ///   applied to the index CDS.
     pub fn new(
         index_name: impl Into<String>,
         series: u16,
         version: u16,
-        fixed_coupon_bp: f64,
+        coupon_bp: f64,
         convention: CdsConvention,
     ) -> Self {
         Self {
             index_name: index_name.into(),
             series,
             version,
-            fixed_coupon_bp,
+            coupon_bp,
             convention,
             num_constituents: None,
         }
@@ -97,13 +97,13 @@ impl CDSIndexParams {
     ///
     /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
     /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
-    /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
-    pub fn cdx_na_ig(series: u16, version: u16, fixed_coupon_bp: f64) -> Self {
+    /// * `coupon_bp` - Fixed coupon rate expressed in basis points per annum.
+    pub fn cdx_na_ig(series: u16, version: u16, coupon_bp: f64) -> Self {
         Self::new(
             "CDX.NA.IG",
             series,
             version,
-            fixed_coupon_bp,
+            coupon_bp,
             CdsConvention::IsdaNa,
         )
         .with_num_constituents(125)
@@ -119,13 +119,13 @@ impl CDSIndexParams {
     ///
     /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
     /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
-    /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
-    pub fn cdx_na_hy(series: u16, version: u16, fixed_coupon_bp: f64) -> Self {
+    /// * `coupon_bp` - Fixed coupon rate expressed in basis points per annum.
+    pub fn cdx_na_hy(series: u16, version: u16, coupon_bp: f64) -> Self {
         Self::new(
             "CDX.NA.HY",
             series,
             version,
-            fixed_coupon_bp,
+            coupon_bp,
             CdsConvention::IsdaNa,
         )
         .with_num_constituents(100)
@@ -140,13 +140,13 @@ impl CDSIndexParams {
     ///
     /// * `series` - Published series number of this index (e.g. 42 for CDX.NA.IG Series 42).
     /// * `version` - Index version within the series after reconstitutions (typically 1 at launch).
-    /// * `fixed_coupon_bp` - Fixed coupon rate expressed in basis points per annum.
-    pub fn itraxx_europe(series: u16, version: u16, fixed_coupon_bp: f64) -> Self {
+    /// * `coupon_bp` - Fixed coupon rate expressed in basis points per annum.
+    pub fn itraxx_europe(series: u16, version: u16, coupon_bp: f64) -> Self {
         Self::new(
             "iTraxx Europe",
             series,
             version,
-            fixed_coupon_bp,
+            coupon_bp,
             CdsConvention::IsdaEu,
         )
         .with_num_constituents(125)

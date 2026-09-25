@@ -201,9 +201,7 @@ fn test_clean_upfront_adjustment_changes_npv_not_leg_pvs() {
     let base_npv = base.value;
 
     let upfront = Money::new(125_000.0, Currency::USD).expect("valid money fixture");
-    cds.instrument_pricing_overrides
-        .market_quotes
-        .upfront_payment = Some(upfront);
+    cds.upfront = Some((as_of, upfront));
 
     let dirty = cds
         .price_with_metrics(

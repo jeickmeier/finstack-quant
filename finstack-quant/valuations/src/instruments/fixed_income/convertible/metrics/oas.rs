@@ -1,12 +1,16 @@
 //! Option-Adjusted Spread (OAS) for convertible bonds.
 //!
-//! OAS is the constant spread added to the credit/risky discount curve such that
-//! the Tsiveriotis-Zhang tree-based model price equals the market-quoted clean
-//! price. It isolates the residual credit component after removing the value of
-//! embedded equity conversion, call, and put options.
+//! OAS is the constant spread added to the zero-recovery risky discount rate
+//! of the cash component such that the Tsiveriotis-Zhang tree-based model
+//! price equals the market-quoted clean price. It isolates the residual credit
+//! component after removing the value of embedded equity conversion, call, and
+//! put options.
 //!
-//! When a separate `credit_curve_id` is configured, OAS bumps that curve only
-//! (affecting the cash/debt component while leaving equity drift unchanged).
+//! When a `credit_curve_id` (issuer hazard curve) is configured, OAS shifts
+//! every hazard rate of that curve by the spread (a direct intensity shift, so
+//! the risky discount factor scales by `exp(-s·t)`), affecting the cash/debt
+//! component while leaving equity drift unchanged. A hazard rate cannot go
+//! negative, so the solver's lower bound is minus the smallest hazard rate.
 //! When no credit curve is set, the risk-free discount curve is bumped as a
 //! fallback, which also shifts the equity component's drift.
 //!
@@ -78,13 +82,6 @@ impl MetricCalculator for OasCalculator {
             1.0
         };
 
-        // Bump the credit curve when available (affects cash/debt component only
-        // in TZ). Fall back to discount curve when no separate credit curve is set.
-        let curve_to_bump = bond
-            .credit_curve_id
-            .as_ref()
-            .unwrap_or(&bond.discount_curve_id);
-
         // Validate the unbumped pricing path before entering the solver. This
         // surfaces missing curves / vol surfaces / equity IDs with their real
         // error messages instead of letting the solver report opaque "did not
@@ -104,9 +101,32 @@ impl MetricCalculator for OasCalculator {
             let prev = captured_err.take();
             captured_err.set(prev.or(Some(e)));
         };
-        let objective = |spread: f64| -> f64 {
+
+        // Shift the issuer hazard curve when available (affects the cash/debt
+        // component only in TZ). Fall back to the discount curve when no credit
+        // curve is set.
+        let hazard = bond
+            .credit_curve_id
+            .as_ref()
+            .map(|id| base_market.get_hazard(id.as_str()))
+            .transpose()?;
+        let curve_to_bump = bond
+            .credit_curve_id
+            .as_ref()
+            .unwrap_or(&bond.discount_curve_id);
+        let shifted_market = |spread: f64| -> finstack_quant_core::Result<
+            finstack_quant_core::market_data::context::MarketContext,
+        > {
             let spread_bp = spread * 10_000.0;
-            let bumped = match bump_discount_curve_parallel(base_market, curve_to_bump, spread_bp) {
+            match &hazard {
+                Some(curve) => Ok(base_market
+                    .clone()
+                    .insert(curve.with_parallel_hazard_rate_bump_bp(spread_bp)?)),
+                None => bump_discount_curve_parallel(base_market, curve_to_bump, spread_bp),
+            }
+        };
+        let objective = |spread: f64| -> f64 {
+            let bumped = match shifted_market(spread) {
                 Ok(m) => m,
                 Err(e) => {
                     record_err(e);
@@ -122,18 +142,31 @@ impl MetricCalculator for OasCalculator {
             }
         };
 
-        let curve = base_market.get_discount(curve_to_bump.as_str())?;
-        let mut forward_floor = curve.min_forward_rate().unwrap_or(f64::NEG_INFINITY);
-        if !curve.allows_non_monotonic() {
-            forward_floor = forward_floor.max(0.0);
-        }
-        let lower_spread = curve.knots().windows(2).zip(curve.dfs().windows(2)).fold(
-            -0.10_f64,
-            |lower, (times, dfs)| {
-                let forward = -(dfs[1] / dfs[0]).ln() / (times[1] - times[0]);
-                lower.max(forward_floor - forward)
-            },
-        );
+        // Lower bound: the most negative spread the shifted curve admits.
+        let (lower_spread, forward_floor) = match &hazard {
+            Some(curve) => {
+                let min_hazard = curve
+                    .knot_points()
+                    .map(|(_, lambda)| lambda)
+                    .fold(f64::INFINITY, f64::min);
+                ((-min_hazard).max(-0.10), 0.0)
+            }
+            None => {
+                let curve = base_market.get_discount(bond.discount_curve_id.as_str())?;
+                let mut forward_floor = curve.min_forward_rate().unwrap_or(f64::NEG_INFINITY);
+                if !curve.allows_non_monotonic() {
+                    forward_floor = forward_floor.max(0.0);
+                }
+                let lower = curve.knots().windows(2).zip(curve.dfs().windows(2)).fold(
+                    -0.10_f64,
+                    |lower, (times, dfs)| {
+                        let forward = -(dfs[1] / dfs[0]).ln() / (times[1] - times[0]);
+                        lower.max(forward_floor - forward)
+                    },
+                );
+                (lower, forward_floor)
+            }
+        };
         let lower_spread = (lower_spread + 1e-12).min(0.0);
         let solver = BrentSolver::new()
             .tolerance(1e-8)
@@ -374,91 +407,126 @@ mod tests {
                 },
             ),
         ] {
-            for separate_credit in [false, true] {
-                let curve_id = if separate_credit { "CREDIT" } else { "USD-OIS" };
-                let curve_builder = || {
-                    DiscountCurve::builder(curve_id)
-                        .base_date(as_of)
-                        .knots([(0.0, 1.0), (10.0, end_df)])
-                        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-                };
-                let unrestricted = curve_builder()
-                    .validation(ValidationMode::Raw {
-                        allow_non_monotonic: true,
-                        forward_floor: None,
-                    })
-                    .build()
-                    .unwrap();
-                let market =
-                    make_market(as_of).insert(curve_builder().validation(policy).build().unwrap());
-                let unrestricted_market = market.clone().insert(unrestricted);
-                for expected_spread in [-0.01, 0.0, 0.05] {
-                    let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
-                    if separate_credit {
-                        bond.credit_curve_id = Some(curve_id.into());
-                        bond.recovery_rate = Some(0.4);
+            let curve_id = "USD-OIS";
+            let curve_builder = || {
+                DiscountCurve::builder(curve_id)
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (10.0, end_df)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            };
+            let unrestricted = curve_builder()
+                .validation(ValidationMode::Raw {
+                    allow_non_monotonic: true,
+                    forward_floor: None,
+                })
+                .build()
+                .unwrap();
+            let market =
+                make_market(as_of).insert(curve_builder().validation(policy).build().unwrap());
+            let unrestricted_market = market.clone().insert(unrestricted);
+            for expected_spread in [-0.01, 0.0, 0.05] {
+                let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
+                let bumped = super::bump_discount_curve_parallel(
+                    &unrestricted_market,
+                    &curve_id.into(),
+                    expected_spread * 10_000.0,
+                )
+                .unwrap();
+                let target = super::price_convertible_bond(
+                    &bond,
+                    &bumped,
+                    super::ConvertibleTreeType::default(),
+                    as_of,
+                )
+                .unwrap();
+                bond.instrument_pricing_overrides
+                    .market_quotes
+                    .quoted_clean_price_pct =
+                    Some(target.amount() / bond.notional.amount() * 100.0);
+                let base_value = bond.value(&market, as_of).unwrap();
+                let mut ctx = MetricContext::new(
+                    Arc::new(bond),
+                    Arc::new(market.clone()),
+                    as_of,
+                    base_value,
+                    Arc::new(FinstackConfig::default()),
+                );
+                let result = super::OasCalculator.calculate(&mut ctx);
+                if expected_spread < 0.0 {
+                    let error = result.unwrap_err();
+                    assert!(matches!(
+                        error,
+                        finstack_quant_core::Error::Input(
+                            finstack_quant_core::InputError::SolverConvergenceFailed { .. }
+                        )
+                    ));
+                    let message = error.to_string();
+                    for detail in [
+                        "Convertible OAS",
+                        curve_id,
+                        "decimal spread bounds",
+                        "forward floor",
+                        "no sign change",
+                    ] {
+                        assert!(message.contains(detail), "{message}");
                     }
-                    let bumped = super::bump_discount_curve_parallel(
-                        &unrestricted_market,
-                        &curve_id.into(),
-                        expected_spread * 10_000.0,
-                    )
-                    .unwrap();
-                    let target = super::price_convertible_bond(
-                        &bond,
-                        &bumped,
-                        super::ConvertibleTreeType::default(),
-                        as_of,
-                    )
-                    .unwrap();
-                    bond.instrument_pricing_overrides
-                        .market_quotes
-                        .quoted_clean_price_pct =
-                        Some(target.amount() / bond.notional.amount() * 100.0);
-                    let base_value = bond.value(&market, as_of).unwrap();
-                    let mut ctx = MetricContext::new(
-                        Arc::new(bond),
-                        Arc::new(market.clone()),
+                    let mut unrestricted_ctx = MetricContext::new(
+                        Arc::clone(&ctx.instrument),
+                        Arc::new(unrestricted_market.clone()),
                         as_of,
                         base_value,
                         Arc::new(FinstackConfig::default()),
                     );
-                    let result = super::OasCalculator.calculate(&mut ctx);
-                    if expected_spread < 0.0 {
-                        let error = result.unwrap_err();
-                        assert!(matches!(
-                            error,
-                            finstack_quant_core::Error::Input(
-                                finstack_quant_core::InputError::SolverConvergenceFailed { .. }
-                            )
-                        ));
-                        let message = error.to_string();
-                        for detail in [
-                            "Convertible OAS",
-                            curve_id,
-                            "decimal spread bounds",
-                            "forward floor",
-                            "no sign change",
-                        ] {
-                            assert!(message.contains(detail), "{message}");
-                        }
-                        let mut unrestricted_ctx = MetricContext::new(
-                            Arc::clone(&ctx.instrument),
-                            Arc::new(unrestricted_market.clone()),
-                            as_of,
-                            base_value,
-                            Arc::new(FinstackConfig::default()),
-                        );
-                        let solved = super::OasCalculator
-                            .calculate(&mut unrestricted_ctx)
-                            .unwrap();
-                        assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
-                    } else {
-                        let solved = result.unwrap();
-                        assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
-                    }
+                    let solved = super::OasCalculator
+                        .calculate(&mut unrestricted_ctx)
+                        .unwrap();
+                    assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
+                } else {
+                    let solved = result.unwrap();
+                    assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
                 }
             }
+        }
+    }
+
+    #[test]
+    fn oas_shifts_the_issuer_hazard_curve() {
+        use finstack_quant_core::market_data::term_structures::HazardCurve;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        let hazard = HazardCurve::flat("CREDIT", as_of, 0.02, 0.4).unwrap();
+        let market = make_market(as_of).insert(hazard.clone());
+        // Spreads down to -λ are admissible; each target is priced on the
+        // hazard curve shifted by exactly that spread.
+        for expected_spread in [-0.01, 0.0, 0.05] {
+            let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
+            bond.credit_curve_id = Some("CREDIT".into());
+            bond.recovery_rate = Some(0.4);
+            let shifted = market.clone().insert(
+                hazard
+                    .with_parallel_hazard_rate_bump_bp(expected_spread * 10_000.0)
+                    .unwrap(),
+            );
+            let target = super::price_convertible_bond(
+                &bond,
+                &shifted,
+                super::ConvertibleTreeType::default(),
+                as_of,
+            )
+            .unwrap();
+            bond.instrument_pricing_overrides
+                .market_quotes
+                .quoted_clean_price_pct = Some(target.amount() / bond.notional.amount() * 100.0);
+            let base_value = bond.value(&market, as_of).unwrap();
+            let mut ctx = MetricContext::new(
+                Arc::new(bond),
+                Arc::new(market.clone()),
+                as_of,
+                base_value,
+                Arc::new(FinstackConfig::default()),
+            );
+            let solved = super::OasCalculator.calculate(&mut ctx).unwrap();
+            assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
         }
     }
 

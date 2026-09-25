@@ -66,7 +66,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-      "bytes": 81785,
+      "bytes": 60007,
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1020549,
+      "bytes": 1021846,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -186,7 +186,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json",
-      "bytes": 43992,
+      "bytes": 46601,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
       "summary": "Standardised CDS index such as CDX or iTraxx.",
@@ -194,7 +194,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_option.schema.json",
-      "bytes": 16104,
+      "bytes": 16202,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_option.schema.json",
       "summary": "Payer or receiver option on a CDS or CDS index.",
@@ -202,7 +202,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json",
-      "bytes": 8116,
+      "bytes": 13022,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/cds_tranche.schema.json",
       "summary": "Synthetic index tranche priced with a correlation model.",
@@ -210,7 +210,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json",
-      "bytes": 48425,
+      "bytes": 50297,
       "kind": "input",
       "path": "schemas/instruments/1/credit_derivatives/credit_default_swap.schema.json",
       "summary": "Single-name CDS priced on the ISDA standard model.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1019516,
+      "bytes": 1020813,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -450,7 +450,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json",
-      "bytes": 54786,
+      "bytes": 54788,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
       "summary": "Corporate bond convertible into a fixed number of shares.",
@@ -482,7 +482,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 404006,
+      "bytes": 404000,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -602,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1109488,
+      "bytes": 1110802,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -746,7 +746,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-      "bytes": 16094,
+      "bytes": 16114,
       "kind": "output",
       "path": "schemas/results/1/instrument_cashflow.schema.json",
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
@@ -754,7 +754,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-      "bytes": 59679,
+      "bytes": 59764,
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",
