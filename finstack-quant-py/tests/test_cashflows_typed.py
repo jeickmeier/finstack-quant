@@ -721,7 +721,7 @@ class TestCashFlowBuilder:
         assert CFKind.FIXED in kinds
         assert CFKind.FLOAT_RESET in kinds
 
-    def test_float_margin_stepup_builds(self) -> None:
+    def test_float_margin_steps_are_effective_from(self) -> None:
         from decimal import Decimal
 
         from finstack_quant.cashflows.builder import (
@@ -746,12 +746,22 @@ class TestCashFlowBuilder:
             CashFlowSchedule
             .builder()
             .principal(Money(1_000_000.0, "USD"), dt.date(2025, 1, 15), dt.date(2026, 1, 15))
-            .float_margin_stepup([(dt.date(2025, 7, 15), Decimal("250"))], spec)
+            .float_margin_steps([(dt.date(2025, 7, 15), Decimal("250"))], spec)
             .build(None)
         )
-        floats = [f for f in schedule.get_flows() if f.kind == CFKind.FLOAT_RESET]
-        assert floats
-        assert all(f.amount.amount > 0.0 for f in floats)
+        floats = sorted(
+            (f for f in schedule.get_flows() if f.kind == CFKind.FLOAT_RESET),
+            key=lambda f: f.date,
+        )
+        # Spread-only fallback (no market): coupon = 1M x spread x days/360.
+        # The base 200 bp applies before the 2025-07-15 step, 250 bp from it.
+        expected = [
+            1_000_000.0 * 0.0200 * 90 / 360,
+            1_000_000.0 * 0.0200 * 91 / 360,
+            1_000_000.0 * 0.0250 * 92 / 360,
+            1_000_000.0 * 0.0250 * 92 / 360,
+        ]
+        assert [f.amount.amount for f in floats] == pytest.approx(expected, rel=1e-12)
 
     def test_add_principal_event_requires_kind(self) -> None:
         from finstack_quant.cashflows.builder import CashFlowSchedule

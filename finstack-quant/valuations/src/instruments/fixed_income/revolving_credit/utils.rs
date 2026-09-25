@@ -519,7 +519,7 @@ mod tests {
             base_rate_spec,
             day_count: DayCount::Act360,
             frequency: payment_frequency,
-            commitment_schedule: Vec::new(),
+            commitment_steps: Vec::new(),
             margin_steps: Vec::new(),
             lc: None,
             scheduled_fees: Vec::new(),

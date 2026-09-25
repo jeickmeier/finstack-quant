@@ -417,16 +417,11 @@ impl TermLoanDiscountingPricer {
         )?;
 
         // Margin events are effective from the start of the contractual accrual
-        // period. Combine coincident covenant and override changes before lookup.
+        // period. Combine coincident covenant changes before lookup.
         let mut margin_deltas = BTreeMap::<finstack_quant_core::dates::Date, i32>::new();
         if let Some(covenants) = &loan.covenants {
-            for step in &covenants.margin_stepups {
+            for step in &covenants.margin_steps {
                 *margin_deltas.entry(step.date).or_default() += step.delta_bp;
-            }
-        }
-        if let Some(overrides) = &loan.instrument_pricing_overrides.term_loan {
-            for (date, delta_bp) in &overrides.margin_add_bp_by_date {
-                *margin_deltas.entry(*date).or_default() += *delta_bp;
             }
         }
 
@@ -753,7 +748,7 @@ mod tests {
         let mut loan = floating_loan_for_fixings();
         loan.covenants = Some(
             crate::instruments::fixed_income::term_loan::TermLoanCovenantEvents {
-                margin_stepups: vec![crate::instruments::fixed_income::term_loan::MarginStepUp {
+                margin_steps: vec![crate::instruments::fixed_income::term_loan::MarginStep {
                     date: date(2025, 1, 1),
                     delta_bp: 200,
                 }],

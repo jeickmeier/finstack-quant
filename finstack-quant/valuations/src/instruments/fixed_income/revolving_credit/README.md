@@ -22,7 +22,7 @@ Import path:
 | `BaseRateSpec` | `Fixed { rate }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `RevolvingCreditFees` | `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp`. Helper: `flat(..)`. |
 | `DrawRepaySpec`, `DrawRepayEvent` | `Deterministic(Vec<DrawRepayEvent>)` or `Stochastic(Box<StochasticUtilizationSpec>)`. |
-| `CommitmentStep`, `MarginStepUp`, `FeeStep` (from `loan_terms`) | Dated commitment, margin and fee changes; see "Dated terms". |
+| `CommitmentStep`, `MarginStep`, `FeeStep` (from `loan_terms`) | Dated commitment, margin and fee changes; see "Dated terms". |
 | `LetterOfCreditSpec`, `LcEvent` (from `loan_terms`) | LC sublimit, outstanding face, issuances/expiries, LC and fronting fees, LC draw at default. |
 | `UpfrontFee`, `ScheduledFee`, `OidEirSpec` (from `loan_terms`) | Upfront fee as amount or percentage, dated fixed fees, effective-rate reporting switch. |
 | `StochasticUtilizationSpec`, `UtilizationProcess` | Utilization process, Sobol switch and optional `McConfig`. |
@@ -168,14 +168,14 @@ Three schedules, all optional and all shared with `TermLoan` through
 `instruments::fixed_income::loan_terms`, let a term sheet be entered without
 custom code:
 
-- `commitment_schedule: Vec<CommitmentStep { date, amount, fee_bp }>` — the
+- `commitment_steps: Vec<CommitmentStep { date, amount, fee_bp }>` — the
   commitment in force from each date (amortizing commitments, availability
   expiries, accordions). Utilization is always drawn over the commitment in
   force, so a stochastic facility books the implied principal at a step. A
   step down pays `fee_bp` on the reduced amount on the step date. The drawn
   balance must never exceed the commitment in force: the analyst dates the
   repayment.
-- `margin_steps: Vec<MarginStepUp { date, delta_bp }>` — cumulative shifts of
+- `margin_steps: Vec<MarginStep { date, delta_bp }>` — cumulative shifts of
   the floating spread or the fixed rate: leverage or ratings grids the
   analyst has forecast, scheduled step-ups, default-rate margins.
 - `fees.steps: Vec<FeeStep { date, commitment_delta_bp, usage_delta_bp,
@@ -186,7 +186,7 @@ period is exact. `commitment_at(date)`, `margin_delta_bp_at(date)` and
 `fees.deltas_at(date)` expose the terms in force.
 
 A leverage grid recipe: forecast the covenant ratio per test date, map each
-ratio to the grid margin, and enter one `MarginStepUp` per date the mapped
+ratio to the grid margin, and enter one `MarginStep` per date the mapped
 margin changes (`delta_bp` = new margin − previous margin).
 
 ### Letters of credit
@@ -229,7 +229,7 @@ above and is pinned by an executed test in
   window while the commitment fee runs on the full commitment.
 - **Extension**: move `maturity` and add the extension fee as a
   `ScheduledFee` on the extension date.
-- **Default margin**: a `MarginStepUp` on the default date (and one back on
+- **Default margin**: a `MarginStep` on the default date (and one back on
   the cure date).
 - **Amendment or waiver fee**: a `ScheduledFee`.
 

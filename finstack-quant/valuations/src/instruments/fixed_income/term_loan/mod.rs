@@ -62,13 +62,11 @@
 
 pub(crate) mod cashflows;
 pub(crate) mod metrics;
-pub mod overrides;
 pub(crate) mod pricing;
 pub mod spec;
 pub(crate) mod types;
 
-pub use super::loan_terms::{CommitmentStep, MarginStepUp, OidEirSpec};
-pub use overrides::TermLoanOverrides;
+pub use super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 pub use spec::{
     AmortizationSpec, CashSweepEvent, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall,
     LoanCallSchedule, LoanCallType, OidPolicy, PikToggle, TermLoanCovenantEvents,

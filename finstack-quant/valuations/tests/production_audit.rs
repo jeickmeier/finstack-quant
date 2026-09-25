@@ -364,7 +364,7 @@ fn delayed_draw_loan() -> TermLoan {
                 amount: Money::from((300_000_i64, Currency::USD)),
             },
         ],
-        commitment_step_downs: vec![],
+        commitment_steps: vec![],
         usage_fee_bp: 50.0,
         commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,

@@ -608,17 +608,17 @@ fn principal_funds_the_draw_first_and_then_the_senior_coupon_shortfall() {
 #[test]
 fn stepped_revolver_pool_reproduces_the_standalone_schedule() {
     use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
-        CommitmentStep, MarginStepUp,
+        CommitmentStep, MarginStep,
     };
     let closing = date!(2024 - 01 - 01);
     let maturity = date!(2027 - 01 - 01);
     let mut facility = fixed_revolver(closing, maturity);
-    facility.commitment_schedule = vec![CommitmentStep {
+    facility.commitment_steps = vec![CommitmentStep {
         date: date!(2025 - 07 - 01),
         amount: usd(30_000_000.0),
         fee_bp: 25.0,
     }];
-    facility.margin_steps = vec![MarginStepUp {
+    facility.margin_steps = vec![MarginStep {
         date: date!(2026 - 01 - 01),
         delta_bp: 100,
     }];

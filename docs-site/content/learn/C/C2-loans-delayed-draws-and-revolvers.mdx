@@ -150,7 +150,7 @@ The PIK intervals suppress cash coupons and increase later exposure. The margin-
 contract=deepcopy(loan);contract["instrument"]["spec"]["call_schedule"]=None
 contract["instrument"]["spec"]["settlement_days"]=0
 penalty=deepcopy(contract)
-penalty["instrument"]["spec"]["covenants"]={"margin_stepups":[{"date":"2025-07-15","delta_bp":100}],
+penalty["instrument"]["spec"]["covenants"]={"margin_steps":[{"date":"2025-07-15","delta_bp":100}],
     "pik_toggles":[{"date":"2025-07-15","enable_pik":True},{"date":"2026-01-15","enable_pik":False}],
     "cash_sweeps":[],"draw_stop_dates":[]}
 event_rows=[]
@@ -183,7 +183,7 @@ d.update({"id":"C2-DDTL","upfront_fee":None,"amortization":"none","ddtl":{
     "availability_end":"2026-01-15","draws":[
         {"date":"2025-04-15","amount":{"amount":"400000","currency":"USD"}},
         {"date":"2025-07-15","amount":{"amount":"600000","currency":"USD"}}],
-    "commitment_step_downs":[],"usage_fee_bp":25,"commitment_fee_bp":50,
+    "commitment_steps":[],"usage_fee_bp":25,"commitment_fee_bp":50,
     "fee_base":"undrawn","oid_policy":{"withheld_pct":200}}})
 ddtl_value=price_instrument(json.dumps(ddtl),credit_market,AS_OF,metrics=["all_in_rate","oid_eir_amortization"])
 no_commitment_fee=deepcopy(ddtl);no_commitment_fee["instrument"]["spec"]["ddtl"]["commitment_fee_bp"]=0

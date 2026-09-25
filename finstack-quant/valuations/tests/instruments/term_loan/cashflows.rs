@@ -121,7 +121,7 @@ fn test_fixed_amount_oid_prorated_across_draws() {
                 amount: Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
             },
         ],
-        commitment_step_downs: vec![],
+        commitment_steps: vec![],
         usage_fee_bp: 0.0,
         commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
@@ -541,7 +541,7 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
                 date: issue,
                 amount: Money::new(drawn, Currency::USD).expect("valid money fixture"),
             }],
-            commitment_step_downs: vec![],
+            commitment_steps: vec![],
             usage_fee_bp: 0.0,
             commitment_fee_bp: 0.0,
             fee_base: CommitmentFeeBase::Undrawn,
@@ -612,7 +612,7 @@ fn test_commitment_fees_use_correct_kind() {
             availability_start: issue,
             availability_end: date!(2026 - 01 - 01),
             draws: vec![],
-            commitment_step_downs: vec![],
+            commitment_steps: vec![],
             usage_fee_bp: 0.0,
             commitment_fee_bp: 50.0, // 50bp commitment fee on undrawn
             fee_base: CommitmentFeeBase::Undrawn,
@@ -671,7 +671,7 @@ mod margin_stepup_period_semantics {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_valuations::instruments::fixed_income::term_loan::{
-        MarginStepUp, TermLoanCovenantEvents,
+        MarginStep, TermLoanCovenantEvents,
     };
     use rust_decimal::Decimal;
 
@@ -682,7 +682,7 @@ mod margin_stepup_period_semantics {
 
     fn stepup_covenants() -> TermLoanCovenantEvents {
         TermLoanCovenantEvents {
-            margin_stepups: vec![MarginStepUp {
+            margin_steps: vec![MarginStep {
                 date: STEP_DATE,
                 delta_bp: 100,
             }],
@@ -854,6 +854,51 @@ mod margin_stepup_period_semantics {
         }
     }
 
+    /// Bit pins for floating coupons, captured before `float_margin_steps`
+    /// switched to effective-from dates. The TermLoan translation already
+    /// applied margin steps from the next period start, so the loan's
+    /// coupons must not move: stepless and stepped loans alike.
+    #[test]
+    fn floating_coupons_pinned_across_margin_step_semantics() {
+        let market = market_with_forward();
+        let coupons = |loan: &TermLoan| -> Vec<u64> {
+            let schedule = loan
+                .cashflow_schedule(&market, date!(2025 - 01 - 01))
+                .unwrap();
+            let mut flows: Vec<(time::Date, f64)> = schedule
+                .get_flows()
+                .iter()
+                .filter(|cf| cf.kind.is_interest_like())
+                .map(|cf| (cf.date, cf.amount.amount()))
+                .collect();
+            flows.sort_by_key(|flow| flow.0);
+            flows.iter().map(|(_, amount)| amount.to_bits()).collect()
+        };
+        let base = coupons(&build_floating_loan("TL-PIN-BASE", None));
+        let stepped = coupons(&build_floating_loan(
+            "TL-PIN-STEP",
+            Some(stepup_covenants()),
+        ));
+        assert_eq!(
+            base,
+            vec![
+                4684823470322745344,
+                4684885508739243120,
+                4684947547155740899,
+                4684947547155740899
+            ]
+        );
+        assert_eq!(
+            stepped,
+            vec![
+                4684823470322745344,
+                4684885508739243120,
+                4685825629358478678,
+                4685825629358478678
+            ]
+        );
+    }
+
     /// Fixed and floating loans with the same off-cycle step-up schedule must
     /// produce the same accrual-period boundaries (both apply the new margin
     /// from the start of the next interest period).
@@ -935,7 +980,7 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
                 date: date!(2025 - 02 - 15),
                 amount: Money::new(5_000_000.0, Currency::USD).expect("money"),
             }],
-            commitment_step_downs: vec![],
+            commitment_steps: vec![],
             usage_fee_bp: 0.0,
             commitment_fee_bp: 50.0,
             fee_base: CommitmentFeeBase::Undrawn,

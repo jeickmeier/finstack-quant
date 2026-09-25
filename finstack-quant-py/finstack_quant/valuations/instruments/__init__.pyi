@@ -27041,7 +27041,7 @@ class RevolvingCredit:
         """
         ...
     @property
-    def commitment_schedule(self) -> list[dict[str, Any]]:
+    def commitment_steps(self) -> list[dict[str, Any]]:
         """
         Scheduled commitment changes as serde ``dict`` rows (``date``, ``amount``, ``fee_bp``); empty when the commitment is flat.
 
@@ -27576,7 +27576,7 @@ class RevolvingCreditBuilder:
             already consumed.
         """
         ...
-    def commitment_schedule(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
+    def commitment_steps(self, value: list[dict[str, Any]] | str) -> RevolvingCreditBuilder:
         """
         Set the scheduled commitment changes.
 

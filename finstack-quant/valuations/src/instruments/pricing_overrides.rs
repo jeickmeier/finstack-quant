@@ -1,7 +1,6 @@
 //! Pricing overrides for market-quoted instruments.
 
 use crate::instruments::common_impl::parameters::VolatilityModel;
-use crate::instruments::fixed_income::term_loan::TermLoanOverrides;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::credit::pool::PoolGranularity;
@@ -729,9 +728,6 @@ pub struct InstrumentPricingOverrides {
     /// Model selection and tree pricing parameters.
     #[serde(default, skip_serializing_if = "ModelConfig::is_empty")]
     pub model_config: ModelConfig,
-    /// Term loan specific overrides.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub term_loan: Option<TermLoanOverrides>,
 }
 
 impl InstrumentPricingOverrides {

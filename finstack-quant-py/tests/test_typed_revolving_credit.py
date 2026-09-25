@@ -259,20 +259,18 @@ def test_builder_accepts_dated_commitment_margin_and_fee_steps() -> None:
     facility = (
         builder()
         .fees(fees)
-        .commitment_schedule([
-            {"date": "2026-07-15", "amount": {"amount": "30000000", "currency": "USD"}, "fee_bp": 25.0}
-        ])
+        .commitment_steps([{"date": "2026-07-15", "amount": {"amount": "30000000", "currency": "USD"}, "fee_bp": 25.0}])
         .margin_steps([{"date": "2026-01-15", "delta_bp": 100}])
         .build()
     )
-    assert facility.commitment_schedule[0]["amount"]["amount"] == "30000000"
+    assert facility.commitment_steps[0]["amount"]["amount"] == "30000000"
     assert facility.margin_steps == [{"date": "2026-01-15", "delta_bp": 100}]
     assert facility.fees["steps"][0]["commitment_delta_bp"] == 25.0
     round_trip = RevolvingCredit.from_json(facility.to_json())
-    assert round_trip.commitment_schedule == facility.commitment_schedule
+    assert round_trip.commitment_steps == facility.commitment_steps
     # A step below the drawn balance is a build-time error naming the step.
     with pytest.raises(ValueError, match="below the drawn balance"):
-        builder().commitment_schedule([
+        builder().commitment_steps([
             {"date": "2026-07-15", "amount": {"amount": "5000000", "currency": "USD"}, "fee_bp": 0.0}
         ]).build()
 

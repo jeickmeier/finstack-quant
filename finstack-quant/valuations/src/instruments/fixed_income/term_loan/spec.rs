@@ -42,7 +42,7 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
-pub use super::super::loan_terms::{CommitmentStep, MarginStepUp, OidEirSpec};
+pub use super::super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///
@@ -179,7 +179,7 @@ pub enum CommitmentFeeBase {
 ///     availability_start: create_date(2025, Month::January, 1)?,
 ///     availability_end: create_date(2026, Month::January, 1)?,
 ///     draws: vec![],
-///     commitment_step_downs: vec![],
+///     commitment_steps: vec![],
 ///     usage_fee_bp: 50.0,        // 50 bp usage fee
 ///     commitment_fee_bp: 25.0,   // 25 bp commitment fee
 ///     fee_base: CommitmentFeeBase::Undrawn,
@@ -210,10 +210,10 @@ pub struct DdtlSpec {
     pub availability_end: Date,
     /// Scheduled or actual draw events
     pub draws: Vec<DrawEvent>,
-    /// Commitment step-down schedule: strictly increasing dates inside the
-    /// availability window, non-increasing `amount`s in the loan currency,
-    /// and `fee_bp == 0.0` (term loans carry no reduction fee).
-    pub commitment_step_downs: Vec<CommitmentStep>,
+    /// Commitment steps, each effective from its date: strictly increasing
+    /// dates inside the availability window, non-increasing `amount`s in the
+    /// loan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).
+    pub commitment_steps: Vec<CommitmentStep>,
     /// Usage fee on drawn amounts, in basis points per annum (non-negative,
     /// finite; `25.0` = 0.25%).
     pub usage_fee_bp: f64,
@@ -234,7 +234,7 @@ impl DdtlSpec {
     ///
     /// * `date` - Date the limit is wanted for; a step dated on it applies.
     pub(crate) fn limit_in_force_at(&self, date: Date) -> Money {
-        self.commitment_step_downs
+        self.commitment_steps
             .iter()
             .filter(|step| step.date <= date)
             .map(|step| step.amount)
@@ -290,8 +290,9 @@ pub struct CashSweepEvent {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct TermLoanCovenantEvents {
-    /// Margin step-up schedule
-    pub margin_stepups: Vec<MarginStepUp>,
+    /// Margin steps, each a non-negative cumulative bp change effective from
+    /// the start of the first interest period on or after its date.
+    pub margin_steps: Vec<MarginStep>,
     /// PIK toggle schedule
     pub pik_toggles: Vec<PikToggle>,
     /// Cash sweep (mandatory prepayment) schedule

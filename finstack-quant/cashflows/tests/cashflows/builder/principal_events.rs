@@ -1049,8 +1049,7 @@ fn full_horizon_coupon_programs_are_order_independent() {
         let _ = builder.fixed_to_float(switch, fixed_window(), order_independence_float_spec());
     });
     assert_program_order_independent(principal, issue, maturity, |builder| {
-        let _ =
-            builder.float_margin_stepup(&[(switch, dec!(250))], order_independence_float_spec());
+        let _ = builder.float_margin_steps(&[(switch, dec!(250))], order_independence_float_spec());
     });
 }
 
@@ -1074,4 +1073,108 @@ fn principal_does_not_clear_the_first_builder_error() {
 
     let error = builder.build(None).unwrap_err().to_string();
     assert!(error.contains("strictly increasing"), "{error}");
+}
+
+// Floating margin steps are effective-from
+
+/// Float coupon amounts, in date order, for a 1M loan 2025-01-15 → 2026-01-15
+/// (quarterly Act/360, unadjusted accrual, spread-only projection).
+fn margin_step_coupons(steps: &[(Date, Decimal)]) -> finstack_quant_core::Result<Vec<f64>> {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            issue,
+            maturity,
+        )
+        .float_margin_steps(steps, order_independence_float_spec());
+    let schedule = builder.build(None)?;
+    let mut flows: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .map(|cf| (cf.date, cf.amount.amount()))
+        .collect();
+    flows.sort_by_key(|flow| flow.0);
+    Ok(flows.into_iter().map(|(_, amount)| amount).collect())
+}
+
+/// Hand-computed coupon: 1M x spread x days / 360 (spread-only fallback, so
+/// the index is zero and gearing 1 applies to the spread alone).
+fn act360_coupon(spread_bp: f64, days: f64) -> f64 {
+    1_000_000.0 * spread_bp / 10_000.0 * days / 360.0
+}
+
+/// Relative tolerance for the hand-computed coupons: the only error is f64
+/// rounding of the Decimal rate and the Act/360 fraction.
+fn assert_coupons(actual: &[f64], expected: &[f64]) {
+    assert_eq!(actual.len(), expected.len(), "{actual:?} vs {expected:?}");
+    for (a, e) in actual.iter().zip(expected) {
+        assert!(
+            (a - e).abs() <= 1e-12 * e.abs(),
+            "{actual:?} vs {expected:?}"
+        );
+    }
+}
+
+#[test]
+fn float_margin_steps_apply_base_spread_until_first_step() {
+    // Periods: Jan15-Apr15 (90d), Apr15-Jul15 (91d), Jul15-Oct15 (92d),
+    // Oct15-Jan15 (92d). Base 200 bp until the 2025-07-15 step, 250 bp from it.
+    let step = Date::from_calendar_date(2025, Month::July, 15).unwrap();
+    let coupons = margin_step_coupons(&[(step, dec!(250))]).expect("stepped schedule");
+    assert_coupons(
+        &coupons,
+        &[
+            act360_coupon(200.0, 90.0),
+            act360_coupon(200.0, 91.0),
+            act360_coupon(250.0, 92.0),
+            act360_coupon(250.0, 92.0),
+        ],
+    );
+}
+
+#[test]
+fn float_margin_steps_without_steps_use_base_spread() {
+    let coupons = margin_step_coupons(&[]).expect("stepless schedule");
+    assert_coupons(
+        &coupons,
+        &[
+            act360_coupon(200.0, 90.0),
+            act360_coupon(200.0, 91.0),
+            act360_coupon(200.0, 92.0),
+            act360_coupon(200.0, 92.0),
+        ],
+    );
+}
+
+#[test]
+fn float_margin_step_on_issue_replaces_base_spread_from_issue() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let step = Date::from_calendar_date(2025, Month::October, 15).unwrap();
+    let coupons =
+        margin_step_coupons(&[(issue, dec!(300)), (step, dec!(150))]).expect("stepped schedule");
+    assert_coupons(
+        &coupons,
+        &[
+            act360_coupon(300.0, 90.0),
+            act360_coupon(300.0, 91.0),
+            act360_coupon(300.0, 92.0),
+            act360_coupon(150.0, 92.0),
+        ],
+    );
+}
+
+#[test]
+fn float_margin_steps_reject_non_increasing_dates() {
+    let step = Date::from_calendar_date(2025, Month::July, 15).unwrap();
+    let error = margin_step_coupons(&[(step, dec!(250)), (step, dec!(300))])
+        .expect_err("duplicate step dates must be rejected")
+        .to_string();
+    assert!(
+        error.contains("float_margin_steps dates must be strictly increasing"),
+        "{error}"
+    );
 }

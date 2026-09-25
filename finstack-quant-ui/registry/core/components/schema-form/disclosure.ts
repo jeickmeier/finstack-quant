@@ -96,7 +96,7 @@ const SPEC_GROUPS: Readonly<Record<string, Readonly<Record<string, string>>>> =
       margin_steps: "Facility terms",
       leq: "Facility terms",
       draw_repay_spec: "Facility terms",
-      commitment_schedule: "Facility terms",
+      commitment_steps: "Facility terms",
       scheduled_fees: "Facility terms",
       lc: "Facility terms",
       oid_eir: "Facility terms",

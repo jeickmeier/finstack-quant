@@ -83,9 +83,14 @@ impl ProgramWindow {
         DateWindow::new(resolve_bound(self.start), resolve_bound(self.end))
     }
 
+    /// Resolve a program window, dropping the empty edge pieces that dated
+    /// programs produce: a tail `[maturity, Maturity)` or a head
+    /// `[Issue, issue)` (a step dated on maturity or on issue).
     fn resolve_piece(self, issue: Date, maturity: Date) -> Option<DateWindow> {
         let window = self.resolve(issue, maturity);
-        if matches!(self.end, WindowBound::Maturity) && window.start == maturity {
+        if (matches!(self.end, WindowBound::Maturity) && window.start == maturity)
+            || (matches!(self.start, WindowBound::Issue) && window.end == issue)
+        {
             None
         } else {
             Some(window)

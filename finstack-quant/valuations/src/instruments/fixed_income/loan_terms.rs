@@ -9,7 +9,7 @@
 //! # Quick Example
 //! ```rust
 //! use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
-//!     CommitmentStep, MarginStepUp,
+//!     CommitmentStep, MarginStep,
 //! };
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
@@ -22,7 +22,7 @@
 //!     fee_bp: 25.0,
 //! };
 //! // Margin rises 100 bp on the same date.
-//! let margin = MarginStepUp { date: step.date, delta_bp: 100 };
+//! let margin = MarginStep { date: step.date, delta_bp: 100 };
 //! assert_eq!(margin.delta_bp, 100);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -30,23 +30,23 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
-/// Margin step-up event (covenant penalty or scheduled increase).
+/// Dated margin step (covenant penalty, scheduled change or pricing-grid move).
 ///
-/// Increases the interest margin by a fixed amount at a specified date,
-/// typically triggered by covenant breach or scheduled rating migration. A
-/// negative `delta_bp` steps the margin down (a leverage-grid improvement).
+/// Shifts the interest margin by `delta_bp` from `date` onward (effective-from
+/// date). Steps are cumulative. A negative `delta_bp` steps the margin down (a
+/// leverage-grid improvement); term loans accept only non-negative steps.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct MarginStepUp {
-    /// Effective date of margin increase
+pub struct MarginStep {
+    /// Effective-from date of the margin change.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub date: Date,
-    /// Increase in margin (basis points)
+    /// Change in margin, in basis points (100 = 1%); negative steps down.
     pub delta_bp: i32,
 }
 
@@ -78,7 +78,7 @@ impl Default for OidEirSpec {
 /// balance over the commitment in force, so a stochastic revolving facility
 /// books the implied principal change at the step.
 ///
-/// A delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only
+/// A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
 /// non-increasing steps inside its availability window and no reduction fee
 /// (`fee_bp` must be `0.0`).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

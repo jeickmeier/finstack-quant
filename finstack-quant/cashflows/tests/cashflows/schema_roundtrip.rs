@@ -804,7 +804,7 @@ fn every_canonical_coupon_and_payment_variant_round_trips() {
         }),
         json!({
             "kind": "floating_margin_program",
-            "steps": [{"date": "2026-01-01", "rate": "175"}],
+            "steps": [{"date": "2026-01-01", "spread_bp": "175"}],
             "base": canonical_floating_coupon("150")
         }),
     ];
@@ -908,7 +908,7 @@ fn every_canonical_coupon_variant_dispatches_to_the_builder() {
             "floating_margin_program",
             vec![json!({
                 "kind": "floating_margin_program",
-                "steps": [{"date": "2026-01-01", "rate": "175"}],
+                "steps": [{"date": "2026-01-01", "spread_bp": "175"}],
                 "base": canonical_floating_coupon("150")
             })],
         ),
@@ -965,4 +965,16 @@ fn canonical_payment_window_dispatches_and_overlap_errors() {
         finstack_quant_cashflows::build_cashflow_schedule_json(&overlapping.to_string(), None)
             .expect_err("overlapping payment windows fail");
     assert!(error.to_string().contains("overlapping payment windows"));
+}
+
+#[test]
+// schema-rejection-test: floating_margin_program steps[].rate (now spread_bp)
+fn floating_margin_program_step_rejects_retired_rate_key() {
+    let err = serde_json::from_value::<finstack_quant_cashflows::CouponLegSpec>(json!({
+        "kind": "floating_margin_program",
+        "steps": [{"date": "2026-01-01", "rate": "175"}],
+        "base": canonical_floating_coupon("150")
+    }))
+    .expect_err("retired steps[].rate key must be rejected");
+    assert!(err.to_string().contains("unknown field `rate`"), "{err}");
 }

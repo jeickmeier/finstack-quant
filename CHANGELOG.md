@@ -2,6 +2,59 @@
 
 ## [Unreleased]
 
+### TermLoan override channel (2026-09-24)
+
+Numbers change only for direct callers of the floating margin-step program:
+
+- `CashFlowBuilder.float_margin_steps` (Rust, Python) and the
+  `floating_margin_program` coupon leg (cashflows JSON, WASM) now read each
+  step date as effective-from, the market convention every loan step input
+  already uses: `base.rate_spec.spread_bp` applies from issue until the first
+  step and each step's `spread_bp` from its date until the next. The former
+  `float_margin_stepup` treated each date as a window end and ignored the base
+  spread, so `[(2025-07-15, 250)]` over a 200 bp base paid 250 bp from issue;
+  it now pays 200 bp until 2025-07-15 and 250 bp after. Reference:
+  hand-computed Act/360 spread-only coupons
+  (`float_margin_steps_apply_base_spread_until_first_step`, rel 1e-12). Step
+  dates must now be strictly increasing, and a step dated on the issue date
+  replaces the base spread from issue.
+- TermLoan floating and fixed coupons do not move: the loan already applied
+  covenant margin steps from the next period start. Pinned bit-for-bit by
+  `floating_coupons_pinned_across_margin_step_semantics`.
+
+#### Changed (BREAKING)
+
+- `MarginStepUp` (now `MarginStep`); Rust.
+- `TermLoanCovenantEvents.margin_stepups` (now `margin_steps`); Rust, JSON.
+- `DdtlSpec.commitment_step_downs` (now `commitment_steps`); Rust, JSON.
+- `RevolvingCredit.commitment_schedule` (now `commitment_steps`); Rust, JSON,
+  Python `RevolvingCredit.commitment_steps` getter and
+  `RevolvingCreditBuilder.commitment_steps`.
+- `RateStepSpec` (now `MarginStepSpec`), `RateStepSpec.rate` (now
+  `MarginStepSpec.spread_bp`, bp over the index); Rust, cashflows JSON, WASM
+  `CouponLegSpec`.
+- `CashFlowBuilder.float_margin_stepup` (now `float_margin_steps`,
+  effective-from dates); Rust, Python.
+
+#### Removed
+
+- `TermLoanOverrides` and `InstrumentPricingOverrides.term_loan`
+  (`margin_add_bp_by_date`, `pik_toggle_by_date`, `extra_cash_sweeps`,
+  `draw_stop_date`); Rust, JSON. Express these on `TermLoan.covenants`
+  (`margin_steps`, `pik_toggles`, `cash_sweeps`, `draw_stop_dates`), which
+  validates them.
+- `finstack_quant_core::wire::dated_bool_values` and `dated_i32_values`, whose
+  only user was `TermLoanOverrides`.
+
+#### Fixed
+
+- A dated coupon or payment program whose first date is the issue date no
+  longer fails `build` with an empty `[issue, issue)` window: the empty
+  leading piece is dropped, as an empty trailing `[maturity, maturity)` piece
+  already was. This covers `float_margin_steps`, `payment_split_program` and
+  `fixed_to_float` with the switch on issue, and a TermLoan covenant margin
+  step dated on the issue date.
+
 ### Monte Carlo settings (2026-09-24)
 
 Numbers change for Merton structural-credit bond pricing and for explicit

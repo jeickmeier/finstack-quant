@@ -43,7 +43,7 @@
     },
     "CommitmentStep": {
       "additionalProperties": false,
-      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
       "properties": {
         "amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -561,16 +561,16 @@
       ],
       "type": "object"
     },
-    "MarginStepUp": {
+    "MarginStep": {
       "additionalProperties": false,
-      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration. A\nnegative `delta_bp` steps the margin down (a leverage-grid improvement).",
+      "description": "Dated margin step (covenant penalty, scheduled change or pricing-grid move).\n\nShifts the interest margin by `delta_bp` from `date` onward (effective-from\ndate). Steps are cumulative. A negative `delta_bp` steps the margin down (a\nleverage-grid improvement); term loans accept only non-negative steps.",
       "properties": {
         "date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Effective date of margin increase"
+          "description": "Effective-from date of the margin change."
         },
         "delta_bp": {
-          "description": "Increase in margin (basis points)",
+          "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
           "format": "int32",
           "type": "integer"
         }
@@ -777,13 +777,13 @@
         },
         "commitment_amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_schedule`."
+          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`."
         },
         "commitment_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Date when the facility becomes available."
         },
-        "commitment_schedule": {
+        "commitment_steps": {
           "default": [],
           "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
           "items": {
@@ -857,7 +857,7 @@
           "default": [],
           "description": "Dated margin changes, cumulative from their dates: a leverage or\nratings grid the analyst has forecast, a scheduled step-up or a\ndefault-rate margin. `delta_bp` shifts the floating spread or the fixed\nrate. Dates must be strictly increasing and strictly inside the\nfacility life. Empty by default.",
           "items": {
-            "$ref": "#/$defs/MarginStepUp"
+            "$ref": "#/$defs/MarginStep"
           },
           "type": "array"
         },
@@ -1190,7 +1190,7 @@
             "currency": "USD"
           },
           "commitment_date": "2024-01-01",
-          "commitment_schedule": [],
+          "commitment_steps": [],
           "credit_curve_id": null,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",

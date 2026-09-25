@@ -330,17 +330,20 @@ impl PyCashFlowBuilder {
         Ok(slf)
     }
 
-    /// Consecutive floating windows whose margin changes at ``steps``.
+    /// Floating coupons whose margin changes on effective-from ``steps``.
     ///
     /// Parameters
     /// ----------
     /// steps : list[tuple[datetime.date, decimal.Decimal]]
-    ///     Ordered ``(window_end, spread_bp)`` pairs. Each date is the
-    ///     exclusive end of a window whose margin is that spread.
+    ///     ``(effective_from, spread_bp)`` pairs in strictly increasing date
+    ///     order. Each spread (bp over the index, ``250`` = 2.50%) replaces
+    ///     the base spread from its date until the next step; the last runs
+    ///     to maturity.
     /// base_spec : FloatingCouponSpec
-    ///     Base floating spec; each window replaces ``spread_bp``.
+    ///     Base floating spec; its ``spread_bp`` applies from issue until the
+    ///     first step.
     #[pyo3(text_signature = "(self, steps, base_spec)")]
-    fn float_margin_stepup<'py>(
+    fn float_margin_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
         steps: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)>,
         base_spec: PyRef<'py, PyFloatingCouponSpec>,
@@ -348,7 +351,7 @@ impl PyCashFlowBuilder {
         let steps = date_decimal_pairs(steps)?;
         let _ = slf
             .inner
-            .float_margin_stepup(&steps, base_spec.inner.clone());
+            .float_margin_steps(&steps, base_spec.inner.clone());
         Ok(slf)
     }
 

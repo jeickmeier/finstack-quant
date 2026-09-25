@@ -1069,11 +1069,6 @@
         }
       ]
     },
-    "DateWire": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
-    },
     "DecimalWire": {
       "description": "Exact decimal encoded only as a JSON string.",
       "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
@@ -2138,82 +2133,6 @@
       ],
       "type": "object"
     },
-    "TermLoanOverrides": {
-      "additionalProperties": false,
-      "description": "Term loan specific overrides for covenants and schedule adjustments.",
-      "properties": {
-        "draw_stop_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/DateWire"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Draw stop date (earliest date after which draws are blocked)"
-        },
-        "extra_cash_sweeps": {
-          "description": "Extra cash sweeps by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/DateWire"
-              },
-              {
-                "$ref": "#/$defs/Money"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "margin_add_bp_by_date": {
-          "description": "Additional margin step-ups by date (bp)",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/DateWire"
-              },
-              {
-                "format": "int32",
-                "type": "integer"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "pik_toggle_by_date": {
-          "description": "Force PIK toggles by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/DateWire"
-              },
-              {
-                "type": "boolean"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "margin_add_bp_by_date",
-        "pik_toggle_by_date",
-        "extra_cash_sweeps"
-      ],
-      "type": "object"
-    },
     "ThresholdDirection": {
       "description": "Direction for threshold comparison.",
       "oneOf": [
@@ -2348,17 +2267,6 @@
     "model_config": {
       "$ref": "#/$defs/ModelConfig",
       "description": "Model selection and tree pricing parameters."
-    },
-    "term_loan": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/TermLoanOverrides"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Term loan specific overrides."
     }
   },
   "title": "Instrument Pricing Overrides",

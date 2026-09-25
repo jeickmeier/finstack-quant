@@ -539,32 +539,32 @@ impl TermLoan {
             )));
         }
         let mut prior_limit = ddtl.commitment_limit.amount();
-        for step in &ddtl.commitment_step_downs {
+        for step in &ddtl.commitment_steps {
             if step.date < ddtl.availability_start || step.date > ddtl.availability_end {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} DDTL step-down dates must lie inside the availability window"
+                    "{context} ddtl.commitment_steps dates must lie inside the availability window"
                 )));
             }
-            self.validate_money(step.amount, "DDTL step-down", false)?;
+            self.validate_money(step.amount, "ddtl.commitment_steps amount", false)?;
             if step.amount.amount() > prior_limit {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} DDTL step-down limits cannot increase"
+                    "{context} ddtl.commitment_steps amounts cannot increase"
                 )));
             }
             if step.fee_bp != 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} DDTL commitment steps carry no reduction fee; fee_bp must be 0"
+                    "{context} ddtl.commitment_steps carry no reduction fee; fee_bp must be 0"
                 )));
             }
             prior_limit = step.amount.amount();
         }
         if ddtl
-            .commitment_step_downs
+            .commitment_steps
             .windows(2)
             .any(|steps| steps[0].date >= steps[1].date)
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} DDTL step-down dates must be strictly increasing"
+                "{context} ddtl.commitment_steps dates must be strictly increasing"
             )));
         }
         match &ddtl.oid_policy {
@@ -596,10 +596,10 @@ impl TermLoan {
         covenants: &TermLoanCovenantEvents,
         context: &str,
     ) -> finstack_quant_core::Result<()> {
-        for step in &covenants.margin_stepups {
+        for step in &covenants.margin_steps {
             if step.date < self.issue_date || step.date > self.maturity || step.delta_bp < 0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} margin step-ups must be non-negative and inside the loan life"
+                    "{context} covenants.margin_steps must be non-negative and inside the loan life"
                 )));
             }
         }
@@ -628,7 +628,7 @@ impl TermLoan {
             )));
         }
         if covenants
-            .margin_stepups
+            .margin_steps
             .windows(2)
             .any(|events| events[0].date >= events[1].date)
             || covenants
@@ -747,7 +747,7 @@ impl TermLoan {
                     amount: Money::from((5_000_000_i64, Currency::USD)),
                 },
             ],
-            commitment_step_downs: vec![super::super::loan_terms::CommitmentStep {
+            commitment_steps: vec![super::super::loan_terms::CommitmentStep {
                 date: date!(2024 - 10 - 15),
                 amount: Money::from((15_000_000_i64, Currency::USD)),
                 fee_bp: 0.0,

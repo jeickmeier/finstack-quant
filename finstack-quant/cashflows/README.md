@@ -70,7 +70,7 @@ Builder surface, grouped:
 | Group | Methods |
 |-------|---------|
 | Principal | `principal`, `principal_exchange`, `amortization`, `add_principal_event` |
-| Coupons | `fixed_cf`, `floating_cf`, `step_up_cf`, `fixed_to_float`, `add_fixed_window`, `add_floating_window`, `float_margin_stepup` |
+| Coupons | `fixed_cf`, `floating_cf`, `step_up_cf`, `fixed_to_float`, `add_fixed_window`, `add_floating_window`, `float_margin_steps` |
 | Fees | `fee` |
 | Payment split | `add_payment_window`, `payment_split_program` |
 | Terminal | `build(curves)` |

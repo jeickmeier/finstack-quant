@@ -451,8 +451,8 @@ impl PyRevolvingCredit {
     /// Scheduled commitment changes as a ``list`` of serde ``dict`` rows
     /// (``date``, ``amount``, ``fee_bp``), empty when the commitment is flat.
     #[getter]
-    fn commitment_schedule<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.commitment_schedule)
+    fn commitment_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.commitment_steps)
     }
 
     /// Dated margin steps as a ``list`` of serde ``dict`` rows (``date``,
@@ -970,17 +970,17 @@ impl PyRevolvingCreditBuilder {
     ///     If a row does not match the serde shape or the builder was
     ///     already consumed; ordering and feasibility fail at ``build()``.
     #[pyo3(text_signature = "($self, value)")]
-    fn commitment_schedule<'py>(
+    fn commitment_steps<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let steps: Vec<
             finstack_quant_valuations::instruments::fixed_income::loan_terms::CommitmentStep,
-        > = spec_from_py(py, value, "commitment_schedule")?;
+        > = spec_from_py(py, value, "commitment_steps")?;
         let b = take_builder(&mut slf)?;
-        slf.inner = Some(b.commitment_schedule(steps));
-        slf.fields.push(("commitment_schedule", "[..]".to_string()));
+        slf.inner = Some(b.commitment_steps(steps));
+        slf.fields.push(("commitment_steps", "[..]".to_string()));
         Ok(slf)
     }
 
@@ -1119,7 +1119,7 @@ impl PyRevolvingCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let steps: Vec<
-            finstack_quant_valuations::instruments::fixed_income::loan_terms::MarginStepUp,
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::MarginStep,
         > = spec_from_py(py, value, "margin_steps")?;
         let b = take_builder(&mut slf)?;
         slf.inner = Some(b.margin_steps(steps));

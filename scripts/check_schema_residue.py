@@ -175,6 +175,8 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"rho_bump_decimal|vega_bump_decimal|ytm_bump_decimal|credit_bump_bp|"
             r"hw_kappa|hw_sigma|hazard_volatility|quoted_clean_price|quoted_clean|"
             r"time_steps_per_year|default_recovery_rate|"
+            r"margin_add_bp_by_date|pik_toggle_by_date|extra_cash_sweeps|draw_stop_date|"
+            r"margin_stepups|commitment_step_downs|commitment_schedule|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

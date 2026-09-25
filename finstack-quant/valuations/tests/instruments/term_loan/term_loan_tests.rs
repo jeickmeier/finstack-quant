@@ -64,7 +64,7 @@ fn term_loan_fixed_with_draws_and_fees() {
                     amount: Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
                 },
             ],
-            commitment_step_downs: vec![],
+            commitment_steps: vec![],
             usage_fee_bp: 10.0,
             commitment_fee_bp: 25.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
@@ -125,7 +125,7 @@ fn term_loan_commitment_fee_step_downs() {
             availability_start: issue,
             availability_end,
             draws: vec![],
-            commitment_step_downs: vec![CommitmentStep {
+            commitment_steps: vec![CommitmentStep {
                 date: step_down,
                 amount: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
                 fee_bp: 0.0,
@@ -206,7 +206,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
             availability_start: issue,
             availability_end,
             draws: vec![],
-            commitment_step_downs: vec![],
+            commitment_steps: vec![],
             usage_fee_bp: 0.0,
             commitment_fee_bp: 50.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
@@ -266,7 +266,7 @@ fn term_loan_oid_eir_amortization_schedule() {
                 date: issue,
                 amount: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             }],
-            commitment_step_downs: vec![],
+            commitment_steps: vec![],
             usage_fee_bp: 0.0,
             commitment_fee_bp: 0.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
@@ -313,7 +313,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
     let maturity = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
 
     let cov = term_loan::TermLoanCovenantEvents {
-        margin_stepups: vec![],
+        margin_steps: vec![],
         pik_toggles: vec![term_loan::PikToggle {
             date: Date::from_calendar_date(2025, time::Month::July, 1).unwrap(),
             enable_pik: true,
@@ -377,7 +377,7 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
     let step_date = Date::from_calendar_date(2025, time::Month::July, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
     let covenants = term_loan::TermLoanCovenantEvents {
-        margin_stepups: vec![term_loan::MarginStepUp {
+        margin_steps: vec![term_loan::MarginStep {
             date: step_date,
             delta_bp: 200,
         }],
@@ -560,4 +560,88 @@ fn term_loan_amortizing_outstanding_path() {
         has_positive,
         "Schedule should have positive coupon/amortization flows"
     );
+}
+
+// Retired wire keys: the TermLoan override channel and old step names.
+
+fn envelope_with(example: &str, pointer: &str, key: &str, value: serde_json::Value) -> String {
+    let mut json: serde_json::Value = serde_json::from_str(example).expect("example JSON");
+    json.pointer_mut(pointer)
+        .and_then(serde_json::Value::as_object_mut)
+        .unwrap_or_else(|| panic!("example is missing object {pointer}"))
+        .insert(key.to_string(), value);
+    json.to_string()
+}
+
+fn assert_envelope_rejects(json: &str, key: &str) {
+    let err =
+        serde_json::from_str::<finstack_quant_valuations::instruments::InstrumentEnvelope>(json)
+            .expect_err("retired key must be rejected");
+    assert!(err.to_string().contains(key), "{err}");
+}
+
+const TERM_LOAN_EXAMPLE: &str = include_str!("../json_examples/term_loan.json");
+const REVOLVER_EXAMPLE: &str = include_str!("../json_examples/revolving_credit.json");
+
+#[test]
+// schema-rejection-test: instrument_pricing_overrides.term_loan
+fn term_loan_rejects_retired_pricing_override_channel() {
+    let json = envelope_with(
+        TERM_LOAN_EXAMPLE,
+        "/instrument/spec",
+        "instrument_pricing_overrides",
+        serde_json::json!({"term_loan": {"margin_add_bp_by_date": [["2025-07-01", 100]]}}),
+    );
+    assert_envelope_rejects(&json, "term_loan");
+}
+
+#[test]
+// schema-rejection-test: covenants.margin_stepups (now margin_steps)
+fn term_loan_rejects_retired_margin_stepups_key() {
+    let json = envelope_with(
+        TERM_LOAN_EXAMPLE,
+        "/instrument/spec",
+        "covenants",
+        serde_json::json!({
+            "margin_stepups": [{"date": "2025-07-01", "delta_bp": 100}],
+            "pik_toggles": [],
+            "cash_sweeps": [],
+            "draw_stop_dates": []
+        }),
+    );
+    assert_envelope_rejects(&json, "margin_stepups");
+}
+
+#[test]
+// schema-rejection-test: ddtl.commitment_step_downs (now commitment_steps)
+fn term_loan_rejects_retired_commitment_step_downs_key() {
+    let json = envelope_with(
+        TERM_LOAN_EXAMPLE,
+        "/instrument/spec",
+        "ddtl",
+        serde_json::json!({
+            "commitment_limit": {"amount": "1000000", "currency": "USD"},
+            "availability_start": "2025-01-01",
+            "availability_end": "2026-01-01",
+            "draws": [],
+            "commitment_step_downs": [],
+            "usage_fee_bp": 0.0,
+            "commitment_fee_bp": 0.0,
+            "fee_base": "undrawn",
+            "oid_policy": null
+        }),
+    );
+    assert_envelope_rejects(&json, "commitment_step_downs");
+}
+
+#[test]
+// schema-rejection-test: RevolvingCredit.commitment_schedule (now commitment_steps)
+fn revolving_credit_rejects_retired_commitment_schedule_key() {
+    let json = envelope_with(
+        REVOLVER_EXAMPLE,
+        "/instrument/spec",
+        "commitment_schedule",
+        serde_json::json!([]),
+    );
+    assert_envelope_rejects(&json, "commitment_schedule");
 }

@@ -321,7 +321,7 @@ pub(super) enum MarginTerms {
 #[derive(Debug, Clone)]
 pub(super) struct RevolverTerms {
     /// Commitment in force during each legal period (the facility's
-    /// `commitment_schedule` read at the period start), aligned with the
+    /// `commitment_steps` read at the period start), aligned with the
     /// prepared periods.
     pub(super) commitments: Vec<f64>,
     /// Loan-equivalent exposure: fraction of the undrawn commitment drawn at

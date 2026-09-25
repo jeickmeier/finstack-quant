@@ -146,22 +146,9 @@ pub(crate) fn generate_cashflows(
             }
         }
     }
-    if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
-        for (dt, amt) in &ov.extra_cash_sweeps {
-            if amt.amount() > 0.0 {
-                principal_events.push(PrincipalEvent {
-                    date: *dt,
-                    payment_date: *dt,
-                    delta: Money::new(-amt.amount(), amt.currency())?,
-                    cash: *amt,
-                    kind: CFKind::Amortization,
-                });
-            }
-        }
-    }
 
     // Coupon dates for amortization conversion, plus the unadjusted
-    // accrual-period start grid used to snap floating margin step-ups to
+    // accrual-period start grid used to snap floating margin steps to
     // whole-period boundaries.
     let (coupon_dates, accrual_starts): (Vec<(Date, Date)>, Vec<Date>) = {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
@@ -343,23 +330,15 @@ pub(crate) fn generate_cashflows(
             // Convert rate from basis points to decimal using exact Decimal arithmetic
             // to avoid f64 representation errors (e.g., 333 bp → 0.0333 exactly).
             let initial_rate = Decimal::from(*rate_bp) / Decimal::from(10_000);
-            let mut dated_deltas = BTreeMap::<Date, i32>::new();
-            if let Some(cov) = &loan.covenants {
-                for step in &cov.margin_stepups {
-                    *dated_deltas.entry(step.date).or_default() += step.delta_bp;
-                }
-            }
-            if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
-                for (date, delta_bp) in &ov.margin_add_bp_by_date {
-                    *dated_deltas.entry(*date).or_default() += *delta_bp;
-                }
-            }
-
+            let margin_steps = loan
+                .covenants
+                .as_ref()
+                .map_or(&[][..], |cov| cov.margin_steps.as_slice());
             let mut running_rate = initial_rate;
-            let mut step_schedule = Vec::with_capacity(dated_deltas.len());
-            for (date, delta_bp) in dated_deltas {
-                running_rate += Decimal::from(delta_bp) / Decimal::from(10_000);
-                step_schedule.push((date, running_rate));
+            let mut step_schedule = Vec::with_capacity(margin_steps.len());
+            for step in margin_steps {
+                running_rate += Decimal::from(step.delta_bp) / Decimal::from(10_000);
+                step_schedule.push((step.date, running_rate));
             }
 
             let spec = StepUpCouponSpec {
@@ -371,70 +350,42 @@ pub(crate) fn generate_cashflows(
             let _ = builder.step_up_cf(spec);
         }
         super::types::RateSpec::Floating(spec) => {
-            // Build margin step-up schedule for `float_margin_stepup`.
-            //
-            // Convention: each entry `(date, margin_bp)` defines the END of a window
-            // and the margin that applies from the PREVIOUS endpoint (or issue) up to
-            // `date`.  So for a constant-spread loan the list is simply
-            // `[(maturity, base_spread)]`, creating one window `[issue, maturity)`.
-            //
-            // Covenant step-ups and pricing overrides are deltas added at their
-            // effective dates.  We push a breakpoint BEFORE applying the delta so
-            // that the preceding window has the pre-step-up margin.
-            let mut raw_step_ups = BTreeMap::<Date, Decimal>::new();
-            if let Some(cov) = &loan.covenants {
-                for step in &cov.margin_stepups {
-                    *raw_step_ups.entry(step.date).or_default() += Decimal::from(step.delta_bp);
-                }
-            }
-            if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
-                for (dt, bp) in &ov.margin_add_bp_by_date {
-                    *raw_step_ups.entry(*dt).or_default() += Decimal::from(*bp);
-                }
-            }
-
             // LSTA convention: a margin change takes effect from the start of
             // the NEXT interest period on or after its effective date, never
-            // mid-period. Snap each step-up date to the accrual-period grid
-            // (the first accrual start >= the step date) before building
-            // windows; passing raw off-cycle dates to
-            // `float_margin_stepup` would split the enclosing period
-            // into mid-period stubs, diverging from the fixed-rate branch
-            // whose compiler applies `rate_for(period.accrual_start)`
-            // whole-period semantics. A step dated after the final period
-            // start snaps to maturity and therefore never applies.
-            let mut step_ups = BTreeMap::<Date, Decimal>::new();
-            for (date, delta) in raw_step_ups {
-                let effective = accrual_starts
-                    .iter()
-                    .copied()
-                    .find(|start| *start >= date)
-                    .unwrap_or(loan.maturity);
-                *step_ups.entry(effective).or_default() += delta;
+            // mid-period. Snap each covenant step date to the accrual-period
+            // grid (the first accrual start >= the step date) before building
+            // the effective-from program; passing raw off-cycle dates to
+            // `float_margin_steps` would split the enclosing period into
+            // mid-period stubs, diverging from the fixed-rate branch whose
+            // compiler applies `rate_for(period.accrual_start)` whole-period
+            // semantics. A step dated after the final period start snaps to
+            // maturity and therefore never applies.
+            let mut snapped_deltas = BTreeMap::<Date, Decimal>::new();
+            if let Some(cov) = &loan.covenants {
+                for step in &cov.margin_steps {
+                    let effective = accrual_starts
+                        .iter()
+                        .copied()
+                        .find(|start| *start >= step.date)
+                        .unwrap_or(loan.maturity);
+                    *snapped_deltas.entry(effective).or_default() += Decimal::from(step.delta_bp);
+                }
             }
 
-            let mut steps: Vec<(Date, Decimal)> = Vec::new();
+            // Effective-from steps: the base spread applies until the first
+            // step, each step's cumulative spread applies from its date.
+            let mut steps: Vec<(Date, Decimal)> = Vec::with_capacity(snapped_deltas.len());
             let mut running = spec.spread_bp;
-            for (date, delta) in step_ups {
-                // Close the preceding window at the step-up date with the
-                // current running margin (before the step-up takes effect).
-                steps.push((date, running));
+            for (date, delta) in snapped_deltas {
                 running += delta;
-            }
-            // Final window extends to maturity with the final running margin.
-            if steps
-                .last()
-                .map(|(d, _)| *d != loan.maturity)
-                .unwrap_or(true)
-            {
-                steps.push((loan.maturity, running));
+                steps.push((date, running));
             }
 
             let base_spec = FloatingCouponSpec {
                 coupon_type: loan.coupon_type,
                 rate_spec: FloatingRateSpec {
                     index_id: spec.index_id.clone(),
-                    spread_bp: Decimal::ZERO,
+                    spread_bp: spec.spread_bp,
                     gearing: spec.gearing,
                     gearing_includes_spread: spec.gearing_includes_spread,
                     index_floor_bp: spec.index_floor_bp,
@@ -452,7 +403,7 @@ pub(crate) fn generate_cashflows(
                 },
                 schedule: loan_schedule_params(loan),
             };
-            let _ = builder.float_margin_stepup(&steps, base_spec);
+            let _ = builder.float_margin_steps(&steps, base_spec);
         }
     }
 
@@ -463,13 +414,6 @@ pub(crate) fn generate_cashflows(
     if let Some(cov) = &loan.covenants {
         for t in &cov.pik_toggles {
             toggle_events.insert(t.date, t.enable_pik);
-        }
-    }
-    if let Some(ov) = &loan.instrument_pricing_overrides.term_loan {
-        for (dt, en) in &ov.pik_toggle_by_date {
-            // Instrument pricing overrides take precedence over covenant events
-            // when both target the same effective date.
-            toggle_events.insert(*dt, *en);
         }
     }
 
@@ -553,22 +497,9 @@ pub(crate) fn generate_cashflows(
 }
 
 fn effective_draw_stop(loan: &TermLoan) -> Option<Date> {
-    let cov_stop = loan
-        .covenants
+    loan.covenants
         .as_ref()
-        .and_then(|c| c.draw_stop_dates.iter().min().copied());
-    let override_stop = loan
-        .instrument_pricing_overrides
-        .term_loan
-        .as_ref()
-        .and_then(|ov| ov.draw_stop_date);
-
-    match (cov_stop, override_stop) {
-        (Some(a), Some(b)) => Some(a.min(b)),
-        (Some(a), None) => Some(a),
-        (None, Some(b)) => Some(b),
-        (None, None) => None,
-    }
+        .and_then(|c| c.draw_stop_dates.iter().min().copied())
 }
 
 fn build_commitment_fee_flows(
@@ -606,7 +537,7 @@ fn build_commitment_fee_flows(
             .map(|period| period.accrual_end)
             .filter(|end| *end > fee_start && *end < fee_end),
     );
-    for sd in &ddtl.commitment_step_downs {
+    for sd in &ddtl.commitment_steps {
         if sd.date > fee_start && sd.date < fee_end {
             dates.push(sd.date);
         }

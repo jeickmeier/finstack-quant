@@ -322,7 +322,7 @@ fn business_day_convention_is_honoured_on_payment_dates() {
 
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
-    CommitmentStep, FeeStep, MarginStepUp,
+    CommitmentStep, FeeStep, MarginStep,
 };
 
 fn flows_of(facility: &RevolvingCredit) -> Vec<finstack_quant_core::cashflow::CashFlow> {
@@ -353,7 +353,7 @@ fn stepped(
         .instrument_pricing_overrides(InstrumentPricingOverrides::default().with_mc_paths(2))
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
-        .commitment_schedule(steps)
+        .commitment_steps(steps)
         .build()
 }
 
@@ -511,7 +511,7 @@ fn capacity_metrics_read_the_stepped_commitment() {
 
 fn with_steps(
     draw_repay_spec: DrawRepaySpec,
-    margin_steps: Vec<MarginStepUp>,
+    margin_steps: Vec<MarginStep>,
     fee_steps: Vec<FeeStep>,
 ) -> RevolvingCredit {
     let mut fees = RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees");
@@ -550,7 +550,7 @@ fn margin_step_reprices_interest_from_its_date() {
     let base = with_steps(DrawRepaySpec::Deterministic(vec![]), vec![], vec![]);
     let stepped = with_steps(
         DrawRepaySpec::Deterministic(vec![]),
-        vec![MarginStepUp {
+        vec![MarginStep {
             date: date!(2026 - 07 - 15),
             delta_bp: 100,
         }],
@@ -602,7 +602,7 @@ fn fee_step_changes_only_the_named_fee() {
 /// the deterministic and zero-volatility stochastic interest agree.
 #[test]
 fn intra_period_margin_step_is_honoured_by_both_engines() {
-    let step = MarginStepUp {
+    let step = MarginStep {
         date: date!(2026 - 08 - 15),
         delta_bp: 100,
     };
@@ -1363,7 +1363,7 @@ fn term_out_recipe_stops_availability_and_amortizes() {
     ));
     // Availability ends at the term-out and the commitment then follows the
     // amortizing balance, so nothing is undrawn.
-    facility.commitment_schedule = [
+    facility.commitment_steps = [
         (term_out, 4_000_000.0),
         (date!(2026 - 04 - 15), 3_000_000.0),
         (date!(2026 - 07 - 15), 2_000_000.0),
@@ -1452,7 +1452,7 @@ fn accordion_allows_draws_above_the_opening_commitment() {
         .expect("fixings"),
     );
     let mut facility = exposure_facility(8_000_000.0, 0.5, true);
-    facility.commitment_schedule = vec![CommitmentStep {
+    facility.commitment_steps = vec![CommitmentStep {
         date: date!(2026 - 01 - 15),
         amount: usd(15_000_000.0),
         fee_bp: 0.0,
@@ -1489,7 +1489,7 @@ fn accordion_allows_draws_above_the_opening_commitment() {
 fn historical_commitment_steps_book_no_principal() {
     let mut facility = seasoned(zero_vol_stochastic_at(0.5));
     facility.commitment_amount = usd(20_000_000.0);
-    facility.commitment_schedule = vec![CommitmentStep {
+    facility.commitment_steps = vec![CommitmentStep {
         date: date!(2024 - 07 - 15),
         amount: usd(10_000_000.0),
         fee_bp: 25.0,

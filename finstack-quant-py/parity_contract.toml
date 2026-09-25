@@ -395,7 +395,7 @@ python_package = "finstack_quant.cashflows.builder"
 # PvCreditAdjustment / PvDiscountSource (enum metadata carried inside schedule
 # JSON), evaluate_fee_tiers / FeeTier / DefaultCurve /
 # PrepaymentCurve (spec internals reachable through the spec types).
-note = "cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (see wasm_cashflows_subset). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_stepup); WASM remains JSON-only via CouponLegSpec."
+note = "cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (see wasm_cashflows_subset). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM remains JSON-only via CouponLegSpec."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",

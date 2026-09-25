@@ -173,7 +173,7 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
                 amount: Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
             },
         ],
-        commitment_step_downs: vec![],
+        commitment_steps: vec![],
         usage_fee_bp: 0.0,
         commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,

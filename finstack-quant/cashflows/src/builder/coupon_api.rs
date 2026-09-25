@@ -467,48 +467,112 @@ impl CashFlowBuilder {
         )
     }
 
-    /// Convenience: floating margin step-up program with Decimal margins.
+    /// Floating coupons whose margin changes on dated, effective-from steps.
     ///
-    /// Creates consecutive floating coupon windows whose margin over the
-    /// floating index changes at the supplied boundary dates.
+    /// `base_spec.rate_spec.spread_bp` applies from issue until the first
+    /// step; each step's spread applies from its date until the next step, and
+    /// the last one runs to maturity. Each date starts a coupon window, so an
+    /// off-cycle step date splits the enclosing accrual period. A step dated
+    /// on the issue date replaces the base spread from issue; one dated on
+    /// maturity never applies.
+    ///
+    /// # Arguments
+    ///
+    /// * `steps` - `(effective-from date, spread_bp)` pairs in strictly
+    ///   increasing date order. `spread_bp` is the margin over the index in
+    ///   basis points (`250` = 2.50%) and replaces the base spread; it is not
+    ///   an increment.
+    /// * `base_spec` - Floating coupon specification (index, gearing,
+    ///   floors/caps, schedule and settlement split) shared by every window;
+    ///   its `spread_bp` is the margin before the first step.
+    ///
+    /// # Errors
+    ///
+    /// Records a validation error, returned by `build`, when step dates are
+    /// not strictly increasing. Dates outside `[issue, maturity]` fail at
+    /// `build` as out-of-horizon coupon windows.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use finstack_quant_cashflows::builder::{
+    ///     CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingRateSpec, ScheduleParams,
+    /// };
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::dates::{Date, Tenor};
+    /// use finstack_quant_core::money::Money;
+    /// use finstack_quant_core::types::CurveId;
+    /// use rust_decimal_macros::dec;
+    /// use time::Month;
+    ///
+    /// let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+    /// let step = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
+    /// let maturity = Date::from_calendar_date(2027, Month::January, 15).expect("valid date");
+    /// let base = FloatingCouponSpec {
+    ///     coupon_type: CouponType::Cash,
+    ///     rate_spec: FloatingRateSpec {
+    ///         index_id: CurveId::new("USD-SOFR"),
+    ///         spread_bp: dec!(100),
+    ///         gearing: dec!(1),
+    ///         gearing_includes_spread: true,
+    ///         index_floor_bp: None,
+    ///         all_in_cap_bp: None,
+    ///         all_in_floor_bp: None,
+    ///         index_cap_bp: None,
+    ///         overnight_index_constraints: Default::default(),
+    ///         reset_frequency: Tenor::quarterly(),
+    ///         index_tenor: None,
+    ///         reset_lag_days: 2,
+    ///         fixing_calendar_id: None,
+    ///         overnight_compounding: None,
+    ///         overnight_basis: None,
+    ///         fallback: Default::default(),
+    ///     },
+    ///     schedule: ScheduleParams::quarterly_act360(),
+    /// };
+    /// let mut builder = CashFlowSchedule::builder();
+    /// // SOFR + 100 bp in year one, SOFR + 250 bp from 2026-01-15.
+    /// let _ = builder
+    ///     .principal(Money::new(1_000_000.0, Currency::USD).expect("valid money"), issue, maturity)
+    ///     .float_margin_steps(&[(step, dec!(250))], base);
+    /// ```
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
-    pub fn float_margin_stepup(
+    pub fn float_margin_steps(
         &mut self,
         steps: &[(Date, Decimal)],
         base_spec: FloatingCouponSpec,
     ) -> &mut Self {
-        let mut prev = WindowBound::Issue;
-        for &(end, margin_decimal) in steps {
-            let window_spec = Self::floating_spec_with_margin(&base_spec, margin_decimal);
+        if self.pending_error.is_some() {
+            return self;
+        }
+        if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
+            self.record_error(finstack_quant_core::Error::Validation(format!(
+                "float_margin_steps dates must be strictly increasing; found {} followed by {}",
+                w[0].0, w[1].0
+            )));
+            return self;
+        }
+        let mut start = WindowBound::Issue;
+        let mut spread_bp = base_spec.rate_spec.spread_bp;
+        let bounds = steps
+            .iter()
+            .map(|&(date, next)| (WindowBound::Date(date), Some(next)))
+            .chain(std::iter::once((WindowBound::Maturity, None)));
+        for (end, next_spread_bp) in bounds {
+            let window_spec = Self::floating_spec_with_margin(&base_spec, spread_bp);
             let _ = self.push_coupon_program(
-                ProgramWindow {
-                    start: prev,
-                    end: WindowBound::Date(end),
-                },
+                ProgramWindow { start, end },
                 window_spec.schedule.clone(),
                 CouponSpec::Float {
                     rate_spec: window_spec.rate_spec,
                 },
                 window_spec.coupon_type,
             );
-            prev = WindowBound::Date(end);
+            start = end;
+            if let Some(next) = next_spread_bp {
+                spread_bp = next;
+            }
         }
-        let margin = steps
-            .last()
-            .map(|(_, margin)| *margin)
-            .unwrap_or(base_spec.rate_spec.spread_bp);
-        let final_spec = Self::floating_spec_with_margin(&base_spec, margin);
-        let _ = self.push_coupon_program(
-            ProgramWindow {
-                start: prev,
-                end: WindowBound::Maturity,
-            },
-            final_spec.schedule.clone(),
-            CouponSpec::Float {
-                rate_spec: final_spec.rate_spec,
-            },
-            final_spec.coupon_type,
-        );
         self
     }
 

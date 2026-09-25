@@ -780,21 +780,24 @@ class CashFlowBuilder:
         """
         ...
 
-    def float_margin_stepup(
+    def float_margin_steps(
         self,
         steps: list[tuple[datetime.date, Decimal]],
         base_spec: FloatingCouponSpec,
     ) -> CashFlowBuilder:
         """
-        Consecutive floating windows whose margin changes at ``steps``.
+        Floating coupons whose margin changes on effective-from ``steps``.
 
         Parameters
         ----------
         steps : list[tuple[datetime.date, decimal.Decimal]]
-            Ordered ``(window_end, spread_bp)`` pairs. Each date is the
-            exclusive end of a window whose margin is that spread.
+            ``(effective_from, spread_bp)`` pairs in strictly increasing date
+            order. Each spread (bp over the index, ``250`` = 2.50%) replaces
+            the base spread from its date until the next step; the last runs
+            to maturity. An off-cycle date splits the enclosing period.
         base_spec : FloatingCouponSpec
-            Base floating spec; each window replaces ``spread_bp``.
+            Base floating spec; its ``spread_bp`` applies from issue until
+            the first step.
 
         Returns
         -------
@@ -804,7 +807,8 @@ class CashFlowBuilder:
         Raises
         ------
         ValueError
-            If a window is empty or a coupon schedule cannot be generated.
+            If step dates are not strictly increasing, a step lies outside
+            the principal horizon, or a coupon schedule cannot be generated.
             The error is deferred and raised from :meth:`build`.
         """
         ...

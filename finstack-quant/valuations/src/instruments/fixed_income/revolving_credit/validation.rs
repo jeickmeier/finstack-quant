@@ -206,20 +206,20 @@ impl RevolvingCredit {
         }
 
         validate_step_dates(
-            self.commitment_schedule.iter().map(|step| step.date),
-            "commitment_schedule",
+            self.commitment_steps.iter().map(|step| step.date),
+            "commitment_steps",
             self.commitment_date,
             self.maturity,
             true,
         )?;
-        for (index, step) in self.commitment_schedule.iter().enumerate() {
+        for (index, step) in self.commitment_steps.iter().enumerate() {
             validation::validate_money_finite(
                 step.amount,
-                &format!("RevolvingCredit commitment_schedule[{index}].amount"),
+                &format!("RevolvingCredit commitment_steps[{index}].amount"),
             )?;
             validation::require_with(step.amount.amount() >= 0.0, || {
                 format!(
-                    "RevolvingCredit commitment_schedule[{index}].amount must be non-negative \
+                    "RevolvingCredit commitment_steps[{index}].amount must be non-negative \
                      (zero ends availability), got {}",
                     step.amount
                 )
@@ -227,11 +227,11 @@ impl RevolvingCredit {
             validation::validate_money_currency(
                 step.amount,
                 self.commitment_amount.currency(),
-                "RevolvingCredit commitment_schedule amount currency",
+                "RevolvingCredit commitment_steps amount currency",
             )?;
             validation::validate_f64_non_negative(
                 step.fee_bp,
-                &format!("RevolvingCredit commitment_schedule[{index}].fee_bp"),
+                &format!("RevolvingCredit commitment_steps[{index}].fee_bp"),
             )?;
         }
         if let Some(lc) = &self.lc {
@@ -526,7 +526,7 @@ impl RevolvingCredit {
                 }
                 // A step down must not leave the balance above the new
                 // commitment: the analyst dates the repayment.
-                for step in &self.commitment_schedule {
+                for step in &self.commitment_steps {
                     let balance_at_step = self
                         .drawn_balance_at(events.iter().copied(), self.commitment_date, step.date)?
                         .amount();

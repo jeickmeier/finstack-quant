@@ -16,7 +16,7 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::fixed_income::loan_terms::{
-    CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStepUp, OidEirSpec, ScheduledFee, UpfrontFee,
+    CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStep, OidEirSpec, ScheduledFee, UpfrontFee,
 };
 use rust_decimal::prelude::ToPrimitive;
 
@@ -41,7 +41,7 @@ pub struct RevolvingCredit {
     pub id: InstrumentId,
 
     /// Opening commitment of the facility, in force from `commitment_date`
-    /// until the first entry of `commitment_schedule`.
+    /// until the first entry of `commitment_steps`.
     pub commitment_amount: Money,
 
     /// Scheduled commitment changes (amortizing commitments, availability
@@ -52,7 +52,7 @@ pub struct RevolvingCredit {
     /// `fee_bp` on the reduced amount. Empty by default.
     #[builder(default)]
     #[serde(default)]
-    pub commitment_schedule: Vec<CommitmentStep>,
+    pub commitment_steps: Vec<CommitmentStep>,
 
     /// Dated margin changes, cumulative from their dates: a leverage or
     /// ratings grid the analyst has forecast, a scheduled step-up or a
@@ -61,7 +61,7 @@ pub struct RevolvingCredit {
     /// facility life. Empty by default.
     #[builder(default)]
     #[serde(default)]
-    pub margin_steps: Vec<MarginStepUp>,
+    pub margin_steps: Vec<MarginStep>,
 
     /// Letter-of-credit sub-facility. Outstanding letters of credit reduce
     /// availability and the commitment-fee base, count as usage for fee
@@ -1018,14 +1018,14 @@ impl RevolvingCredit {
         Ok(balance)
     }
 
-    /// Commitment in force on `date`: the last `commitment_schedule` entry
+    /// Commitment in force on `date`: the last `commitment_steps` entry
     /// dated on or before it, else the opening `commitment_amount`.
     ///
     /// # Arguments
     ///
     /// * `date` - Date the commitment is wanted for.
     pub fn commitment_at(&self, date: Date) -> Money {
-        self.commitment_schedule
+        self.commitment_steps
             .iter()
             .rev()
             .find(|step| step.date <= date)
@@ -1066,7 +1066,7 @@ impl RevolvingCredit {
     /// sorted and deduplicated. Both cashflow engines slice accrual on them.
     pub fn step_dates(&self) -> Vec<Date> {
         let mut dates: Vec<Date> = self
-            .commitment_schedule
+            .commitment_steps
             .iter()
             .map(|step| step.date)
             .chain(self.margin_steps.iter().map(|step| step.date))
@@ -1207,7 +1207,7 @@ impl RevolvingCredit {
     ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let mut previous = self.commitment_amount;
         let mut fees = Vec::new();
-        for step in &self.commitment_schedule {
+        for step in &self.commitment_steps {
             let reduction = previous.amount() - step.amount.amount();
             if step.date > as_of && reduction > 0.0 && step.fee_bp > 0.0 {
                 fees.push((

@@ -20,10 +20,9 @@ Import path:
 | `RateSpec` | `Fixed { rate_bp }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `AmortizationSpec` | `None` (bullet), `Linear { start, end }`, `PercentPerPeriod { bp }`, `PercentOfOriginalNotional { .. }`, `Custom(..)`. |
 | `DdtlSpec`, `DrawEvent`, `CommitmentStep`, `CommitmentFeeBase` | Delayed-draw commitment, draw calendar, step-downs (the `loan_terms::CommitmentStep` shared with the revolver; no reduction fee), commitment/usage fee bases. |
-| `TermLoanCovenantEvents`, `MarginStepUp`, `PikToggle`, `CashSweepEvent` | Covenant-driven margin step-ups, PIK toggles, cash sweeps, draw-stop dates. |
+| `TermLoanCovenantEvents`, `MarginStep`, `PikToggle`, `CashSweepEvent` | Covenant-driven margin steps (`margin_steps`), PIK toggles, cash sweeps, draw-stop dates. |
 | `OidPolicy`, `OidEirSpec` | OID withheld from proceeds vs tracked separately, plus EIR amortization settings. |
 | `LoanCallSchedule`, `LoanCall`, `LoanCallType` | Borrower prepayment options: `Hard`, `Soft`, `MakeWhole { treasury_spread_bp }`. |
-| `TermLoanOverrides` | Scenario-time covenant/schedule adjustments (extra step-ups, forced PIK toggles, extra sweeps, draw stop). |
 | `TermLoanDiscountingPricer`, `TermLoanTreePricer` | The two registered pricers. |
 
 Field-level documentation is in the rustdoc; this file covers the layout,
@@ -36,7 +35,6 @@ term_loan/
 ├── mod.rs         # re-exports + module-level overview
 ├── types.rs       # TermLoan, RateSpec, builder, examples, Instrument impl
 ├── spec.rs        # serde-stable term-sheet component types (DDTL, covenants, amortization, calls)
-├── overrides.rs   # TermLoanOverrides
 ├── cashflows.rs   # full internal cashflow schedule (draws, interest, amort, PIK, fees)
 ├── pricing/
 │   ├── discounting.rs  # TermLoanDiscountingPricer (ModelKey::Discounting)
@@ -180,8 +178,8 @@ envelope; unknown fields are rejected on deserialize.
 - Deterministic cashflow projection: no stochastic prepayment or default model.
   Credit risk enters through the discount/credit curve, not through simulated
   default events.
-- Covenant evaluation consumes the supplied `TermLoanCovenantEvents` /
-  `TermLoanOverrides` inputs; it does not read live financial statements.
+- Covenant evaluation consumes the supplied `TermLoanCovenantEvents` input;
+  it does not read live financial statements.
   Statement-driven covenant testing lives in `finstack-quant-covenants` and
   `finstack-quant-statements-analytics`.
 - Fees beyond upfront / commitment / usage require extending `DdtlSpec`.

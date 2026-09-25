@@ -132,34 +132,38 @@ pub enum CouponLegSpec {
         /// Floating coupon specification after the switch.
         floating: FloatingCouponSpec,
     },
-    /// Consecutive floating-rate windows driven by dated margin steps.
+    /// Floating coupons whose margin changes on dated, effective-from steps.
     FloatingMarginProgram {
-        /// Dated floating-margin steps in strictly increasing order.
-        steps: Vec<RateStepSpec>,
-        /// Base floating specification whose spread is replaced by each step.
+        /// Margin steps in strictly increasing date order; each spread applies
+        /// from its date until the next step (the last one to maturity).
+        steps: Vec<MarginStepSpec>,
+        /// Base floating specification; its `spread_bp` applies from issue
+        /// until the first step.
         base: FloatingCouponSpec,
     },
 }
 
-/// A dated decimal step used by coupon programs.
+/// A dated floating-margin step, effective from its date.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct RateStepSpec {
-    /// Boundary date at which the step ends or changes.
+pub struct MarginStepSpec {
+    /// Effective-from date: the new spread applies to coupon periods from
+    /// this date until the next step.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub date: Date,
-    /// Fixed rate or floating margin, according to the parent instruction.
+    /// Floating margin over the index from `date`, in basis points
+    /// (`250` = 2.50%); replaces the base `spread_bp`.
     #[serde(with = "finstack_quant_core::wire::decimal")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
-    pub rate: Decimal,
+    pub spread_bp: Decimal,
 }
 
 /// One canonical payment-split instruction.
@@ -345,8 +349,11 @@ impl CashflowScheduleBuildSpec {
                     let _ = builder.fixed_to_float(*switch, fixed.clone(), floating.clone());
                 }
                 CouponLegSpec::FloatingMarginProgram { steps, base } => {
-                    let steps: Vec<_> = steps.iter().map(|step| (step.date, step.rate)).collect();
-                    let _ = builder.float_margin_stepup(&steps, base.clone());
+                    let steps: Vec<_> = steps
+                        .iter()
+                        .map(|step| (step.date, step.spread_bp))
+                        .collect();
+                    let _ = builder.float_margin_steps(&steps, base.clone());
                 }
             }
         }
