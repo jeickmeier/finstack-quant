@@ -8,15 +8,14 @@ use crate::instruments::fixed_income::structured_credit::{DealType, PoolAsset, S
 use crate::metrics::MetricContext;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::Money;
 
-/// Annual debt service of one loan on its live terms as of `as_of`: the
+/// Debt service per annum of one loan on its live terms as of `as_of`: the
 /// coupon resolved through the market's forward curves for a floating row
 /// (index plus spread, floored), interest only while the loan is inside its
 /// interest-only window or is not amortizing, otherwise the level payment
 /// over the remaining schedule (`contractual_payment` when supplied), at
 /// the deal's payment frequency.
-fn annual_debt_service(
+fn loan_debt_service(
     asset: &PoolAsset,
     closing_date: Date,
     as_of: Date,
@@ -96,10 +95,10 @@ impl crate::metrics::MetricCalculator for CmbsDscrCalculator {
             return Err(finstack_quant_core::InputError::Invalid.into());
         }
 
-        // Loan-level NOI drives the pool DSCR when the assets carry it: debt
-        // service on each loan's live terms (floating coupons through the
-        // market's curves, level payments over the remaining schedule,
-        // interest only inside an interest-only window), annualized.
+        // Pool DSCR: loan-level NOI over debt service on each loan's live
+        // terms (floating coupons through the market's curves, level payments
+        // over the remaining schedule, interest only inside an interest-only
+        // window), annualized. Defaulted loans are excluded.
         let months_per_period = cmbs.frequency.months().unwrap_or(12).max(1);
         let mut pool_noi = 0.0_f64;
         let mut pool_debt_service = 0.0_f64;
@@ -122,7 +121,7 @@ impl crate::metrics::MetricCalculator for CmbsDscrCalculator {
                 Some(_) => {}
             }
             pool_noi += noi.amount();
-            pool_debt_service += annual_debt_service(
+            pool_debt_service += loan_debt_service(
                 asset,
                 cmbs.closing_date,
                 context.as_of,
@@ -130,44 +129,16 @@ impl crate::metrics::MetricCalculator for CmbsDscrCalculator {
                 &context.curves,
             )?;
         }
-        if currency.is_some() {
-            if !pool_debt_service.is_finite() || pool_debt_service <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "CMBS DSCR requires positive loan debt service".to_string(),
-                ));
-            }
-            return Ok(pool_noi / pool_debt_service);
-        }
-
-        let noi = required_money(cmbs.credit_factors.annual_noi, "annual_noi")?;
-        let debt_service = required_money(
-            cmbs.credit_factors.annual_debt_service,
-            "annual_debt_service",
-        )?;
-
-        if noi.currency() != debt_service.currency() {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: noi.currency(),
-                actual: debt_service.currency(),
-            });
-        }
-        if !debt_service.amount().is_finite() || debt_service.amount() <= 0.0 {
+        if currency.is_none() {
             return Err(finstack_quant_core::Error::Validation(
-                "CMBS DSCR requires positive annual_debt_service".to_string(),
+                "CMBS DSCR requires pool.assets[].noi on at least one performing loan".to_string(),
             ));
         }
-        if !noi.amount().is_finite() {
+        if !pool_debt_service.is_finite() || pool_debt_service <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
-                "CMBS DSCR requires finite annual_noi".to_string(),
+                "CMBS DSCR requires positive loan debt service".to_string(),
             ));
         }
-
-        Ok(noi.amount() / debt_service.amount())
+        Ok(pool_noi / pool_debt_service)
     }
-}
-
-fn required_money(value: Option<Money>, field: &str) -> finstack_quant_core::Result<Money> {
-    value.ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!("CMBS DSCR requires credit_factors.{field}"))
-    })
 }

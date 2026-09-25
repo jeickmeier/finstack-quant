@@ -5,8 +5,7 @@
 
 /// Macroeconomic credit factors affecting default rates.
 ///
-/// These are economy-wide factors that influence default behavior,
-/// distinct from individual loan-level `CreditFactors` in the types module.
+/// These are economy-wide factors that influence default behavior.
 #[derive(Debug, Clone, Default)]
 pub struct MacroCreditFactors {
     /// Unemployment rate (e.g., 0.05 for 5%)
@@ -30,12 +29,12 @@ pub struct MacroCreditFactors {
 ///
 /// General form:
 /// ```text
-/// MDR(t, Z) = f(base_mdr, Z, credit_factors)
+/// MDR(t, Z) = f(base_mdr, Z, macro_factors)
 /// ```
 ///
 /// where:
 /// - Z is the systematic factor realization(s)
-/// - credit_factors include macroeconomic conditions
+/// - macro_factors include macroeconomic conditions
 ///
 /// # Sign Convention
 ///

@@ -181,7 +181,7 @@ impl StructuredCredit {
         // Trustee fee first: a flat administrative charge senior to everything.
         let months_per_period = f64::from(self.frequency.months().unwrap_or(12).max(1));
         let periods_per_year = (12.0 / months_per_period).max(1.0);
-        let trustee_period = fees.trustee_fee_annual.amount() / periods_per_year;
+        let trustee_period = fees.trustee_fee.amount() / periods_per_year;
         if trustee_period > 0.0 && trustee_period.is_finite() {
             recipients.push(Recipient::new(
                 "trustee_fee",

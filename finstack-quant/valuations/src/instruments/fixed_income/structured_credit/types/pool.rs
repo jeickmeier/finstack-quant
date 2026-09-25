@@ -146,8 +146,9 @@ pub struct PoolAsset {
     /// advanced on the loan, and the special servicing fee accrues on it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub special_servicing: Option<SpecialServicingSpec>,
-    /// Annual net operating income of the property securing the loan, for
-    /// the pool debt-service coverage ratio.
+    /// Net operating income per annum of the property securing the loan,
+    /// in the loan's currency. The only NOI input of the CMBS pool
+    /// debt-service coverage ratio.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noi: Option<Money>,
     /// Non-performing loan resolution: the loan pays nothing until the
@@ -204,9 +205,7 @@ impl PoolAsset {
         let (rate, spread_bp, index_id, day_count) = economics(&bond.cashflow_spec)?;
         Ok(Self {
             id: bond.id.to_owned(),
-            asset_type: AssetType::HighYieldBond {
-                industry: industry.clone(),
-            },
+            asset_type: AssetType::HighYieldBond {},
             balance: bond.notional,
             rate,
             spread_bp,
@@ -289,7 +288,7 @@ impl PoolAsset {
     ) -> Self {
         Self {
             id: id.into(),
-            asset_type: AssetType::FirstLienLoan { industry: None },
+            asset_type: AssetType::FirstLienLoan {},
             balance,
             rate: spread_bp / BASIS_POINTS_DIVISOR, // Initialize with spread only
             spread_bp: Some(spread_bp),
@@ -335,7 +334,7 @@ impl PoolAsset {
     ) -> Self {
         Self {
             id: id.into(),
-            asset_type: AssetType::HighYieldBond { industry: None },
+            asset_type: AssetType::HighYieldBond {},
             balance,
             rate,
             spread_bp: None, // Fixed rate - no separate spread

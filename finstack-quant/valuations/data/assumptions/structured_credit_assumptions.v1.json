@@ -4,8 +4,8 @@
     "refi_rate": 0.04
   },
   "credit_model_defaults": {
-    "prepayment_cpr_annual": 0.2,
-    "default_cdr_annual": 0.02,
+    "prepayment_cpr": 0.2,
+    "default_cdr": 0.02,
     "recovery_rate": 0.6,
     "recovery_lag_months": 12
   },
@@ -134,7 +134,7 @@
       ],
       "deal_type": "clo",
       "fees": {
-        "trustee_fee_annual": 50000.0,
+        "trustee_fee": 50000.0,
         "senior_mgmt_fee_bp": 15.0,
         "subordinated_mgmt_fee_bp": 35.0,
         "servicing_fee_bp": 0.0,
@@ -151,7 +151,7 @@
           "kind": "constant_cpr",
           "rate": 0.2
         },
-        "default_cdr_annual": 0.02,
+        "default_cdr": 0.02,
         "recovery_rate": 0.6,
         "recovery_lag_months": 12
       }
@@ -163,7 +163,7 @@
       ],
       "deal_type": "rmbs",
       "fees": {
-        "trustee_fee_annual": 30000.0,
+        "trustee_fee": 30000.0,
         "senior_mgmt_fee_bp": 0.0,
         "subordinated_mgmt_fee_bp": 0.0,
         "servicing_fee_bp": 25.0,
@@ -176,7 +176,7 @@
           "kind": "psa",
           "rate": 1.0
         },
-        "default_cdr_annual": 0.006,
+        "default_cdr": 0.006,
         "recovery_rate": 0.6,
         "recovery_lag_months": 18
       }
@@ -191,7 +191,7 @@
       ],
       "deal_type": "abs",
       "fees": {
-        "trustee_fee_annual": 25000.0,
+        "trustee_fee": 25000.0,
         "senior_mgmt_fee_bp": 0.0,
         "subordinated_mgmt_fee_bp": 0.0,
         "servicing_fee_bp": 50.0,
@@ -204,7 +204,7 @@
           "kind": "monthly_abs_speed",
           "rate": 0.015
         },
-        "default_cdr_annual": 0.02,
+        "default_cdr": 0.02,
         "recovery_rate": 0.45,
         "recovery_lag_months": 12
       }
@@ -216,7 +216,7 @@
       ],
       "deal_type": "cmbs",
       "fees": {
-        "trustee_fee_annual": 75000.0,
+        "trustee_fee": 75000.0,
         "senior_mgmt_fee_bp": 0.0,
         "subordinated_mgmt_fee_bp": 0.0,
         "servicing_fee_bp": 0.0,
@@ -230,7 +230,7 @@
           "rate": 0.1,
           "lockout_months": 60
         },
-        "default_cdr_annual": 0.005,
+        "default_cdr": 0.005,
         "recovery_rate": 0.65,
         "recovery_lag_months": 24
       }

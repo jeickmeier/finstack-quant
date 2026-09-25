@@ -15330,7 +15330,7 @@ class RepLine:
     ...     datetime.date(2031, 1, 15),
     ...     12,
     ...     DayCount.ACT_360,
-    ...     asset_type={"type": "first_lien_loan", "industry": None},
+    ...     asset_type={"type": "first_lien_loan"},
     ...     cpr=0.10,
     ...     cdr=0.02,
     ...     recovery_rate=0.45,
@@ -15432,7 +15432,7 @@ class RepLine:
         ...     datetime.date(2031, 1, 15),
         ...     12,
         ...     DayCount.ACT_360,
-        ...     asset_type={"type": "first_lien_loan", "industry": None},
+        ...     asset_type={"type": "first_lien_loan"},
         ...     cpr=0.10,
         ...     cdr=0.02,
         ...     recovery_rate=0.45,
@@ -15477,7 +15477,7 @@ class RepLine:
         ...         datetime.date(2031, 1, 15),
         ...         12,
         ...         DayCount.ACT_360,
-        ...         asset_type={"type": "first_lien_loan", "industry": None},
+        ...         asset_type={"type": "first_lien_loan"},
         ...     ).to_json()
         ... )
         >>> restored.to_json() == RepLine(
@@ -15487,7 +15487,7 @@ class RepLine:
         ...     datetime.date(2031, 1, 15),
         ...     12,
         ...     DayCount.ACT_360,
-        ...     asset_type={"type": "first_lien_loan", "industry": None},
+        ...     asset_type={"type": "first_lien_loan"},
         ... ).to_json()
         True
         """
@@ -15548,7 +15548,7 @@ class RepLine:
         Returns
         -------
         dict[str, Any]
-            Rust AssetType wire object, such as ``{"type": "first_lien_loan", "industry": None}``.
+            Rust AssetType wire object, such as ``{"type": "first_lien_loan"}``.
 
         Raises
         ------
@@ -15885,7 +15885,7 @@ class AssetPool:
         ...         datetime.date(2031, 1, 15),
         ...         12,
         ...         DayCount.ACT_360,
-        ...         asset_type={"type": "first_lien_loan", "industry": None},
+        ...         asset_type={"type": "first_lien_loan"},
         ...     )
         ... ])
         >>> "POOL-1" in repr(pool)
@@ -17750,7 +17750,7 @@ class PoolAsset:
     >>> from finstack_quant.valuations.instruments import PoolAsset
     >>> loan = PoolAsset(
     ...     "LOAN-1",
-    ...     {"type": "first_lien_loan", "industry": "Software"},
+    ...     {"type": "first_lien_loan"},
     ...     Money(10_000_000.0, Currency("USD")),
     ...     0.08,
     ...     datetime.date(2031, 1, 15),
@@ -17805,9 +17805,10 @@ class PoolAsset:
         id : str
             Stable asset identifier, unique within the pool.
         asset_type : dict[str, Any] | str
-            ``AssetType`` serde object such as ``{"type": "first_lien_loan",
-            "industry": None}`` or ``{"type": "high_yield_bond"}``; the type decides whether
-            the row amortizes (level pay) or pays as a bullet.
+            ``AssetType`` serde object such as ``{"type": "first_lien_loan"}`` or
+            ``{"type": "commercial_mortgage", "ltv": 0.6}``; the type decides
+            whether the row amortizes (level pay) or pays as a bullet. The
+            obligor industry is the separate ``industry`` keyword.
         balance : Money
             Current principal balance in the pool currency.
         rate : float
@@ -21798,9 +21799,8 @@ class StructuredCredit:
         """
         Create a fluent builder (mirrors Rust ``StructuredCredit::builder()``).
 
-        The builder pre-seeds ``market_conditions``, ``credit_factors``,
-        ``deal_metadata``, ``behavior_overrides``,
-        and ``hedge_swaps`` with their Rust ``Default`` values (the Rust
+        The builder pre-seeds ``market_conditions``, ``deal_metadata`` and
+        ``hedge_swaps`` with their Rust ``Default`` values (the Rust
         builder fields have no default), which the corresponding ``*_json``
         setters can override. Prefer :meth:`new_abs` / :meth:`new_clo` /
         :meth:`new_cmbs` / :meth:`new_rmbs` for registry-calibrated deal-type
@@ -21886,7 +21886,7 @@ class StructuredCredit:
         ...         datetime.date(2031, 1, 15),
         ...         12,
         ...         DayCount.ACT_360,
-        ...         asset_type={"type": "first_lien_loan", "industry": None},
+        ...         asset_type={"type": "first_lien_loan"},
         ...     )
         ... ])
         >>> senior = (
@@ -22546,23 +22546,6 @@ class StructuredCredit:
         ...
 
     @property
-    def credit_factors(self) -> dict[str, Any]:
-        """
-        Credit factors as their serde ``dict``.
-
-        Returns
-        -------
-        dict[str, Any]
-            ``CreditFactors`` fields (``annual_noi`` ...).
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized.
-        """
-        ...
-
-    @property
     def deal_metadata(self) -> dict[str, Any]:
         """
         Deal metadata as its serde ``dict``.
@@ -22571,23 +22554,6 @@ class StructuredCredit:
         -------
         dict[str, Any]
             ``Metadata`` fields.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized.
-        """
-        ...
-
-    @property
-    def behavior_overrides(self) -> dict[str, Any]:
-        """
-        Behavioural overrides as their serde ``dict``.
-
-        Returns
-        -------
-        dict[str, Any]
-            ``Overrides`` fields.
 
         Raises
         ------
@@ -23393,29 +23359,6 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def credit_factors(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
-        """
-        Set credit factors from a JSON object.
-
-        Parameters
-        ----------
-        value : dict[str, Any] | str
-            ``CreditFactors`` object with optional ``annual_noi`` and
-            ``annual_debt_service`` Money values for CMBS coverage metrics.
-            Missing values remain absent; unknown macro-factor fields fail.
-
-        Returns
-        -------
-        StructuredCreditBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``value`` does not match the ``CreditFactors`` shape.
-        """
-        ...
-
     def waterfall_rules(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
         """
         Set declarative waterfall rules from a JSON object.
@@ -23686,29 +23629,6 @@ class StructuredCreditBuilder:
             the pool currency) and ``fixed_allocation_pct`` (decimal in
             ``(0, 1]``) that fix the investor allocation of trust collections
             once the revolving period ends.
-        Returns
-        -------
-        StructuredCreditBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``value`` does not match the expected shape or this builder
-            was already consumed by :meth:`StructuredCreditBuilder.build`.
-        """
-        ...
-
-    def behavior_overrides(self, value: dict[str, Any] | str) -> StructuredCreditBuilder:
-        """
-        Set behavioural assumption overrides.
-
-        Parameters
-        ----------
-        value : dict[str, Any] | str
-            ``Overrides`` serde object (``cpr_annual``, ``psa_speed_multiplier``,
-            ``cdr_annual``, ``sda_speed_multiplier``, ``recovery_rate``,
-            ``recovery_lag_months``, ``reinvestment_price`` ...).
         Returns
         -------
         StructuredCreditBuilder
@@ -26161,7 +26081,7 @@ class AssetBackedFacilityBuilder:
         Parameters
         ----------
         value : dict[str, Any] | str
-            ``DealFees`` serde object (``trustee_fee_annual`` Money,
+            ``DealFees`` serde object (``trustee_fee`` Money per annum,
             ``senior_mgmt_fee_bp``, ``subordinated_mgmt_fee_bp``,
             ``servicing_fee_bp``, optional ``master_servicer_fee_bp`` /
             ``workout_fee_pct`` / ``liquidation_fee_pct`` /
@@ -28350,7 +28270,7 @@ class StochasticPricingResult:
     ...         maturity,
     ...         12,
     ...         DayCount.ACT_360,
-    ...         asset_type={"type": "first_lien_loan", "industry": None},
+    ...         asset_type={"type": "first_lien_loan"},
     ...     )
     ... ])
     >>> note = (
@@ -28753,7 +28673,7 @@ class SimulationDiagnostics:
     ...         maturity,
     ...         12,
     ...         DayCount.ACT_360,
-    ...         asset_type={"type": "first_lien_loan", "industry": None},
+    ...         asset_type={"type": "first_lien_loan"},
     ...     )
     ... ])
     >>> note = (

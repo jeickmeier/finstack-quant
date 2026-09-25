@@ -124,7 +124,7 @@ def _clo() -> StructuredCredit:
 def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
     loan = PoolAsset(
         "L0",
-        {"type": "first_lien_loan", "industry": "Software"},
+        {"type": "first_lien_loan"},
         usd(10_000_000.0),
         0.08,
         MATURITY,
@@ -176,9 +176,7 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
     with pytest.raises(ValueError, match="assets"):
         AssetPool("P", "cmbs", USD).with_assets(42)
     with pytest.raises(ValueError, match="credit_quality"):
-        PoolAsset(
-            "X", {"type": "high_yield_bond", "industry": None}, usd(1.0), 0.05, MATURITY, credit_quality="not-a-rating"
-        )
+        PoolAsset("X", {"type": "high_yield_bond"}, usd(1.0), 0.05, MATURITY, credit_quality="not-a-rating")
 
     seasoned = pool.with_accounts(cumulative_defaults=usd(8_000_000.0), collection_account=usd(250_000.0))
     assert seasoned.cumulative_defaults == usd(8_000_000.0)
@@ -675,13 +673,9 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
         .prepayment_spec(PrepaymentModelSpec.from_json(json.dumps(spec["prepayment_spec"])))
         .default_spec(DefaultModelSpec.from_json(json.dumps(spec["default_spec"])))
         .recovery_spec(RecoveryModelSpec.from_json(json.dumps(spec["recovery_spec"])))
-        .stochastic_prepay_spec(spec["stochastic_prepay_spec"])
-        .stochastic_default_spec(spec["stochastic_default_spec"])
         .correlation_structure(spec["correlation_structure"])
         .market_conditions(spec["market_conditions"])
-        .credit_factors(spec["credit_factors"])
         .deal_metadata(spec["deal_metadata"])
-        .behavior_overrides(spec["behavior_overrides"])
         .hedge_swaps(spec["hedge_swaps"])
     )
     return builder.build()

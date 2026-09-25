@@ -32,36 +32,27 @@ def test_seasoned_accrued_precedes_projected_losses(cdr: float) -> None:
     assert result.get_metric("accrued") == pytest.approx(750_000.0, abs=1e-6)
 
 
-def test_effective_model_rates_and_override_precedence() -> None:
+def test_effective_model_rates() -> None:
     f = fixture()
     spec = f["instrument"]["instrument"]["spec"]
     spec["prepayment_spec"]["cpr"] = 0.36
     spec["default_spec"]["cdr"] = 0.07
-    for overridden, expected in [(False, (0.36, 0.07)), (True, (0.18, 0.03))]:
-        if overridden:
-            spec["behavior_overrides"].update(cpr_annual=0.18, cdr_annual=0.03)
-        result = price_instrument(
-            json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["cpr", "cdr"]
-        )
-        assert result.get_metric("cpr") == pytest.approx(expected[0], abs=1e-12)
-        assert result.get_metric("cdr") == pytest.approx(expected[1], abs=1e-12)
+    result = price_instrument(
+        json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["cpr", "cdr"]
+    )
+    assert result.get_metric("cpr") == pytest.approx(0.36, abs=1e-12)
+    assert result.get_metric("cdr") == pytest.approx(0.07, abs=1e-12)
 
 
-def test_recovery_risk_uses_active_override() -> None:
+def test_recovery_risk_uses_credit_model_recovery() -> None:
     f = fixture()
     spec = f["instrument"]["instrument"]["spec"]
     spec["default_spec"]["cdr"] = 0.03
-    spec["behavior_overrides"]["recovery_rate"] = 0.55
-    a = price_instrument(
-        json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["recovery_01"]
-    )
-    spec["behavior_overrides"]["recovery_rate"] = None
     spec["recovery_spec"]["rate"] = 0.55
-    b = price_instrument(
+    result = price_instrument(
         json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "discounting", ["recovery_01"]
     )
-    assert a.get_metric("recovery_01") == pytest.approx(b.get_metric("recovery_01"), abs=1e-8)
-    assert abs(a.get_metric("recovery_01")) > 1.0
+    assert abs(result.get_metric("recovery_01")) > 1.0
 
 
 def test_clean_dirty_settlement_target_and_typed_date() -> None:

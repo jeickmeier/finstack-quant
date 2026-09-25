@@ -223,10 +223,10 @@ mod rate_risk_rebuild_tests {
     fn tba_dv01_shifts_the_generic_pool_speed() {
         let mut tba = AgencyTba::example().expect("tba");
         tba.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
-        let base_psa = psa(&create_assumed_pool(&tba).expect("pool").prepayment_model);
+        let base_psa = psa(&create_assumed_pool(&tba).expect("pool").prepayment_spec);
         let at = |bp: f64| {
             let mut shifted = tba.clone();
-            shifted.prepayment_model =
+            shifted.prepayment_spec =
                 Some(PrepaymentModelSpec::psa(base_psa * 2f64.powf(-0.01 * bp)));
             price_tba(&shifted, &bumped(bp), AS_OF)
                 .expect("price")
@@ -247,10 +247,10 @@ mod rate_risk_rebuild_tests {
         roll.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
         let base_psa = psa(&create_assumed_pool(&roll.front_leg().expect("leg"))
             .expect("pool")
-            .prepayment_model);
+            .prepayment_spec);
         let at = |bp: f64| {
             let mut shifted = roll.clone();
-            shifted.prepayment_model =
+            shifted.prepayment_spec =
                 Some(PrepaymentModelSpec::psa(base_psa * 2f64.powf(-0.01 * bp)));
             price_dollar_roll(&shifted, &bumped(bp), AS_OF)
                 .expect("price")
@@ -272,10 +272,10 @@ mod rate_risk_rebuild_tests {
         let mut cmo = AgencyCmo::example().expect("cmo");
         cmo.metric_pricing_overrides.bump_config.rate_bump_bp = Some(1.0);
         let collateral = resolve_collateral(&cmo, AS_OF).expect("collateral");
-        let base_psa = psa(&collateral.prepayment_model);
+        let base_psa = psa(&collateral.prepayment_spec);
         let at = |bp: f64| {
             let mut pool = collateral.clone();
-            pool.prepayment_model = PrepaymentModelSpec::psa(base_psa * 2f64.powf(-0.01 * bp));
+            pool.prepayment_spec = PrepaymentModelSpec::psa(base_psa * 2f64.powf(-0.01 * bp));
             let mut shifted = cmo.clone();
             shifted.collateral = Some(Box::new(pool));
             price_cmo(&shifted, &bumped(bp), AS_OF)

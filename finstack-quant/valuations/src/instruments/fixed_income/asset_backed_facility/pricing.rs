@@ -18,9 +18,9 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, CallAssumption, CoverageRules, CoverageTestSpec,
-    CreditFactors, EarlyAmortizationSpec, LossAllocationPolicy, MarketConditions, Metadata,
-    Overrides, ReinvestmentCriteria, ReinvestmentPeriod, SimulationDiagnostics, StructuredCredit,
-    Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
+    EarlyAmortizationSpec, LossAllocationPolicy, MarketConditions, Metadata, ReinvestmentCriteria,
+    ReinvestmentPeriod, SimulationDiagnostics, StructuredCredit, Tranche, TrancheCashflows,
+    TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
 };
 use crate::instruments::fixed_income::structured_credit::{TrancheDraw, TrancheReadvance};
 
@@ -218,9 +218,7 @@ impl AssetBackedFacility {
             .discount_curve_id(self.discount_curve_id.clone())
             .credit_model(self.credit_model.clone())
             .market_conditions(MarketConditions::default())
-            .credit_factors(CreditFactors::default())
             .deal_metadata(Metadata::default())
-            .behavior_overrides(Overrides::default())
             .hedge_swaps(Vec::new())
             .attributes(self.attributes.clone())
             .coverage_triggers(vec![CoverageTestSpec::borrowing_base(

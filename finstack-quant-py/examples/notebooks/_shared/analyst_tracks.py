@@ -389,7 +389,7 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
     assets = [
         {
             "id": f"CLO-ASSET-{i + 1}",
-            "asset_type": {"type": "first_lien_loan", "industry": industry},
+            "asset_type": {"type": "first_lien_loan"},
             "balance": {"amount": "20000000", "currency": "USD"},
             "rate": 0.08,
             "spread_bp": None,

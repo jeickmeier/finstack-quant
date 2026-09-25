@@ -15,10 +15,9 @@ use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, R
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_equity_metrics, run_simulation, run_simulation_with_diagnostics, CreditFactors,
-    CreditModelConfig, DealFees, DealType, LossAllocationPolicy, LossRecognition, MarketConditions,
-    Metadata, Overrides, PricingMode, StructuredCredit, TrancheDraw, TrancheReadvance,
-    WaterfallRules,
+    calculate_equity_metrics, run_simulation, run_simulation_with_diagnostics, CreditModelConfig,
+    DealFees, DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata,
+    PricingMode, StructuredCredit, TrancheDraw, TrancheReadvance, WaterfallRules,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
@@ -62,13 +61,11 @@ impl PyStructuredCredit {
 impl PyStructuredCredit {
     /// Create a fluent builder (mirrors Rust ``StructuredCredit::builder()``).
     ///
-    /// The builder pre-seeds ``market_conditions``, ``credit_factors``,
-    /// ``deal_metadata``, ``behavior_overrides``,
-    /// and ``hedge_swaps`` with their Rust ``Default`` values (the Rust
+    /// The builder pre-seeds ``market_conditions``, ``deal_metadata`` and
+    /// ``hedge_swaps`` with their Rust ``Default`` values (the Rust
     /// builder fields have no default), which the corresponding setters
-    /// (``market_conditions``, ``credit_factors``, ``waterfall_rules``,
-    /// ``fees``, ``credit_model``, ``behavior_overrides``, ``hedge_swaps``
-    /// ...) can override with typed objects, dicts or JSON strings. Builders are
+    /// (``market_conditions``, ``waterfall_rules``, ``fees``,
+    /// ``credit_model``, ``hedge_swaps`` ...) can override with typed objects, dicts or JSON strings. Builders are
     /// consumed by ``build()``; create a new builder per instrument. Prefer :meth:`new_abs` / :meth:`new_clo` /
     /// :meth:`new_cmbs` / :meth:`new_rmbs` for registry-calibrated deal-type
     /// defaults; use this builder for full manual control.
@@ -91,9 +88,7 @@ impl PyStructuredCredit {
             inner: Some(
                 StructuredCredit::builder()
                     .market_conditions(MarketConditions::default())
-                    .credit_factors(CreditFactors::default())
                     .deal_metadata(Metadata::default())
-                    .behavior_overrides(Overrides::default())
                     .hedge_swaps(Vec::new()),
             ),
             credit_model: None,
@@ -142,7 +137,7 @@ impl PyStructuredCredit {
     /// >>> pool = AssetPool("POOL-1", "abs", Currency("USD")).with_rep_lines([
     /// ...     RepLine(
     /// ...         "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan", "industry": None},
+    /// ...         datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan"},
     /// ...     )
     /// ... ])
     /// >>> senior = (
@@ -802,22 +797,10 @@ impl PyStructuredCredit {
         serde_to_py(py, &self.inner.market_conditions)
     }
 
-    /// Credit factors as their serde ``dict``.
-    #[getter]
-    fn credit_factors<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.credit_factors)
-    }
-
     /// Deal metadata as its serde ``dict``.
     #[getter]
     fn deal_metadata<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.deal_metadata)
-    }
-
-    /// Behavioural overrides as their serde ``dict``.
-    #[getter]
-    fn behavior_overrides<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.behavior_overrides)
     }
 
     /// Hedges settled through the waterfall as typed ``HedgeSwap`` objects.
@@ -1347,37 +1330,6 @@ impl PyStructuredCreditBuilder {
         Ok(slf)
     }
 
-    /// Set credit factors from a JSON object.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``CreditFactors`` object with optional ``annual_noi`` and
-    ///     ``annual_debt_service`` Money values for CMBS coverage metrics.
-    ///     Unknown macro-factor fields fail; missing values remain absent.
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``CreditFactors`` shape.
-    #[pyo3(text_signature = "($self, value)")]
-    fn credit_factors<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        py: Python<'_>,
-        value: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let credit_factors: CreditFactors =
-            crate::bindings::module_utils::py_to_serde(py, value, "credit_factors")?;
-        let b = take_sc(&mut slf)?;
-        slf.inner = Some(b.credit_factors(credit_factors));
-        Ok(slf)
-    }
-
     /// Set declarative waterfall rules from a JSON object.
     ///
     /// Parameters
@@ -1809,38 +1761,6 @@ impl PyStructuredCreditBuilder {
         slf.credit_model
             .get_or_insert_with(CreditModelConfig::default)
             .card = Some(converted);
-        Ok(slf)
-    }
-
-    /// Set behavioural assumption overrides.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``Overrides`` serde object (``cpr_annual``, ``psa_speed_multiplier``,
-    ///     ``cdr_annual``, ``sda_speed_multiplier``, ``recovery_rate``,
-    ///     ``recovery_lag_months``, ``reinvestment_price`` ...).
-    ///
-    /// Returns
-    /// -------
-    /// StructuredCreditBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
-    #[pyo3(text_signature = "($self, value)")]
-    fn behavior_overrides<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        py: Python<'_>,
-        value: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted: Overrides =
-            crate::bindings::module_utils::py_to_serde(py, value, "behavior_overrides")?;
-        let b = take_sc(&mut slf)?;
-        slf.inner = Some(b.behavior_overrides(converted));
         Ok(slf)
     }
 

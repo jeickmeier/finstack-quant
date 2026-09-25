@@ -553,9 +553,9 @@ fn p7_tranche_bump_metrics_are_per_tranche_and_severity01_is_live() {
         "with losses inside equity the senior Default01 {a_mild:.2} is far below equity's {eq_mild:.2}"
     );
 
-    let mut overridden = deal;
-    overridden.behavior_overrides.recovery_rate = Some(0.40);
-    let sev = overridden
+    let mut low_recovery = deal;
+    low_recovery.credit_model.recovery_spec.rate = 0.40;
+    let sev = low_recovery
         .price_with_metrics(
             &mkt,
             close,

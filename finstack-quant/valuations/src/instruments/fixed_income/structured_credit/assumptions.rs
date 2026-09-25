@@ -5,7 +5,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::ca
     CloCalibration, CmbsCalibration, RmbsCalibration,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    CreditFactors, DealFees, DealType, IncentiveFeeSpec,
+    DealFees, DealType, IncentiveFeeSpec,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Tenor;
@@ -43,11 +43,11 @@ impl StructuredCreditAssumptionRegistry {
     }
 
     pub(crate) fn default_prepayment_spec(&self) -> PrepaymentModelSpec {
-        PrepaymentModelSpec::constant_cpr(self.credit_model_defaults.prepayment_cpr_annual)
+        PrepaymentModelSpec::constant_cpr(self.credit_model_defaults.prepayment_cpr)
     }
 
     pub(crate) fn default_default_spec(&self) -> DefaultModelSpec {
-        DefaultModelSpec::constant_cdr(self.credit_model_defaults.default_cdr_annual)
+        DefaultModelSpec::constant_cdr(self.credit_model_defaults.default_cdr)
     }
 
     pub(crate) fn default_recovery_spec(&self) -> RecoveryModelSpec {
@@ -177,7 +177,7 @@ impl StructuredCreditAssumptionRegistry {
     pub(crate) fn deal_fees(&self, id: &str, base_currency: Currency) -> Result<DealFees> {
         let fees = &self.deal_profile(id)?.fees;
         Ok(DealFees {
-            trustee_fee_annual: Money::new(fees.trustee_fee_annual, base_currency)?,
+            trustee_fee: Money::new(fees.trustee_fee, base_currency)?,
             senior_mgmt_fee_bp: fees.senior_mgmt_fee_bp,
             subordinated_mgmt_fee_bp: fees.subordinated_mgmt_fee_bp,
             servicing_fee_bp: fees.servicing_fee_bp,
@@ -194,12 +194,11 @@ impl StructuredCreditAssumptionRegistry {
         Ok(ConstructorDefaults {
             frequency: profile.constructor.frequency.tenor(),
             prepayment_spec: profile.constructor.prepayment.spec(),
-            default_spec: DefaultModelSpec::constant_cdr(profile.constructor.default_cdr_annual),
+            default_spec: DefaultModelSpec::constant_cdr(profile.constructor.default_cdr),
             recovery_spec: RecoveryModelSpec::with_lag(
                 profile.constructor.recovery_rate,
                 profile.constructor.recovery_lag_months,
             ),
-            credit_factors: CreditFactors::default(),
         })
     }
 
@@ -207,7 +206,7 @@ impl StructuredCreditAssumptionRegistry {
         let profile = self.deal_profile(id)?;
         Ok(StandardRates {
             prepayment_rate: profile.constructor.prepayment.rate,
-            cdr_annual: profile.constructor.default_cdr_annual,
+            cdr: profile.constructor.default_cdr,
             recovery_rate: profile.constructor.recovery_rate,
         })
     }
@@ -231,11 +230,11 @@ impl StructuredCreditAssumptionRegistry {
             "refi rate",
         )?;
         finstack_quant_core::validation::validate_f64_unit_interval(
-            self.credit_model_defaults.prepayment_cpr_annual,
+            self.credit_model_defaults.prepayment_cpr,
             "default prepayment CPR",
         )?;
         finstack_quant_core::validation::validate_f64_unit_interval(
-            self.credit_model_defaults.default_cdr_annual,
+            self.credit_model_defaults.default_cdr,
             "default CDR",
         )?;
         finstack_quant_core::validation::validate_f64_unit_interval(
@@ -353,7 +352,6 @@ pub(crate) struct ConstructorDefaults {
     pub(crate) prepayment_spec: PrepaymentModelSpec,
     pub(crate) default_spec: DefaultModelSpec,
     pub(crate) recovery_spec: RecoveryModelSpec,
-    pub(crate) credit_factors: CreditFactors,
 }
 
 /// Headline rates of a deal profile's constructor record, as exposed by the
@@ -364,7 +362,7 @@ pub(crate) struct StandardRates {
     /// CMBS, PSA multiplier for RMBS, monthly ABS speed for auto ABS.
     pub(crate) prepayment_rate: f64,
     /// Annual constant default rate.
-    pub(crate) cdr_annual: f64,
+    pub(crate) cdr: f64,
     /// Recovery rate as a decimal fraction of defaulted par.
     pub(crate) recovery_rate: f64,
 }
@@ -418,8 +416,8 @@ struct MarketConditionsRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CreditModelDefaultsRecord {
-    prepayment_cpr_annual: f64,
-    default_cdr_annual: f64,
+    prepayment_cpr: f64,
+    default_cdr: f64,
     recovery_rate: f64,
     recovery_lag_months: u32,
 }
@@ -550,7 +548,7 @@ struct DealProfileRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FeeRecord {
-    trustee_fee_annual: f64,
+    trustee_fee: f64,
     senior_mgmt_fee_bp: f64,
     subordinated_mgmt_fee_bp: f64,
     servicing_fee_bp: f64,
@@ -565,7 +563,7 @@ struct FeeRecord {
 struct ConstructorRecord {
     frequency: ConstructorFrequency,
     prepayment: ConstructorPrepaymentRecord,
-    default_cdr_annual: f64,
+    default_cdr: f64,
     recovery_rate: f64,
     recovery_lag_months: u32,
 }
@@ -766,7 +764,7 @@ fn validate_concentration_limits(record: &ConcentrationLimitsRecord) -> Result<(
 }
 
 fn validate_fee_record(record: &FeeRecord) -> Result<()> {
-    validate_nonnegative_finite(record.trustee_fee_annual, "trustee annual fee")?;
+    validate_nonnegative_finite(record.trustee_fee, "trustee fee")?;
     validate_nonnegative_finite(record.senior_mgmt_fee_bp, "senior management fee bp")?;
     validate_nonnegative_finite(
         record.subordinated_mgmt_fee_bp,
@@ -804,7 +802,7 @@ fn validate_constructor_record(record: &ConstructorRecord) -> Result<()> {
         ));
     }
     finstack_quant_core::validation::validate_f64_unit_interval(
-        record.default_cdr_annual,
+        record.default_cdr,
         "constructor default CDR",
     )?;
     finstack_quant_core::validation::validate_f64_unit_interval(

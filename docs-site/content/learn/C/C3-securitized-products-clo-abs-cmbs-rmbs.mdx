@@ -158,7 +158,7 @@ print(pd.DataFrame([{"months":age,"PSA100_SMM":PrepaymentModelSpec.psa_100().smm
 {/* notebook-block notebook="02_pricing/instruments/structured_credit.ipynb" cell="c3-fees-reinvestment" role="build" */}
 ```python exec id=c3-fees-reinvestment role=build
 fee_deal=deepcopy(deal)
-fee_deal["instrument"]["spec"]["fees"]={"trustee_fee_annual":{"amount":"50000","currency":"USD"},
+fee_deal["instrument"]["spec"]["fees"]={"trustee_fee":{"amount":"50000","currency":"USD"},
     "senior_mgmt_fee_bp":40.,"subordinated_mgmt_fee_bp":20.,"servicing_fee_bp":0.,
     "master_servicer_fee_bp":None,"special_servicer_fee_bp":None}
 reinvest=deepcopy(fee_deal);reinvest["instrument"]["spec"]["reinvestment_end_date"]="2027-01-15"
@@ -230,7 +230,7 @@ abs_price=price_instrument(json.dumps(abs_deal),market,AS_OF,metrics=["prepaymen
 print({"ABS_PV":abs_price.value.amount,**abs_price.metrics})
 cmbs=deepcopy(presets["cmbs"]);c=cmbs["instrument"]["spec"]
 c["prepayment_spec"]=json.loads(PrepaymentModelSpec.cmbs_with_lockout(60,.10).to_json())
-c["fees"]={"trustee_fee_annual":{"amount":"75000","currency":"USD"},"senior_mgmt_fee_bp":0.,
+c["fees"]={"trustee_fee":{"amount":"75000","currency":"USD"},"senior_mgmt_fee_bp":0.,
     "subordinated_mgmt_fee_bp":0.,"servicing_fee_bp":0.,"master_servicer_fee_bp":25.,"special_servicer_fee_bp":25.}
 cmbs_price=price_instrument(json.dumps(cmbs),market,AS_OF,metrics=["prepayment01"])
 print({"CMBS_PV":cmbs_price.value.amount,**cmbs_price.metrics})

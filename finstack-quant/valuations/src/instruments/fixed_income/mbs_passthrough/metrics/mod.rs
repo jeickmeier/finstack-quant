@@ -198,7 +198,7 @@ mod tests {
             .wam(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .build()

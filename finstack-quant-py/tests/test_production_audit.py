@@ -29,25 +29,19 @@ def test_structured_credit_constructor_derives_first_payment() -> None:
     assert deal.first_payment_date == date(2026, 10, 9)
 
 
-def test_structured_credit_recovery_override_matches_model() -> None:
+def test_structured_credit_rejects_retired_behavior_overrides() -> None:  # schema-rejection-test: behavior_overrides
     fixture = json.loads(
         (
             Path(__file__).resolve().parents[2]
             / "finstack-quant/valuations/tests/fixtures/production_structured_credit.json"
         ).read_text()
     )
-
-    def value() -> float:
-        return price_instrument(
-            json.dumps(fixture["instrument"]), json.dumps(fixture["market"]), fixture["as_of"], "discounting", []
-        ).value.amount
-
-    expected = value()
     spec = fixture["instrument"]["instrument"]["spec"]
-    spec["recovery_spec"] = {"rate": 0.1, "recovery_lag": 0}
-    spec["behavior_overrides"]["recovery_rate"] = 0.7
-    spec["behavior_overrides"]["recovery_lag_months"] = 9
-    assert value() == pytest.approx(expected, abs=1e-6)
+    spec["behavior_overrides"] = {"recovery_rate": 0.7, "recovery_lag_months": 9}
+    with pytest.raises(ValueError, match="behavior_overrides"):
+        price_instrument(
+            json.dumps(fixture["instrument"]), json.dumps(fixture["market"]), fixture["as_of"], "discounting", []
+        )
 
 
 def test_structured_credit_inactive_reinvestment_matches_no_reinvestment() -> None:

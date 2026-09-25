@@ -1612,9 +1612,7 @@ mod coverage_position_tests {
         pool.assets.push(PoolAsset {
             day_count: finstack_quant_core::dates::DayCount::Act360,
             id: InstrumentId::new("ASSET_0"),
-            asset_type: AssetType::FirstLienLoan {
-                industry: Some("Technology".into()),
-            },
+            asset_type: AssetType::FirstLienLoan {},
             balance: usd(balance),
             rate: 0.08,
             spread_bp: Some(400.0),

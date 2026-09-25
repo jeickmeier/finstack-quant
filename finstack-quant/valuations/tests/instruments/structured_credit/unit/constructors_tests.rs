@@ -1,6 +1,6 @@
 //! Tests for structured credit constructors and behavioral overrides.
 
-use finstack_quant_cashflows::builder::PrepaymentModelSpec;
+use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
@@ -137,7 +137,7 @@ fn test_example_has_expected_defaults() {
 }
 
 #[test]
-fn test_prepayment_overrides_use_expected_priority() {
+fn test_prepayment_spec_shapes_drive_monthly_rates() {
     let pool = create_pool_with_balance(1_000_000.0);
     let tranches = create_single_tranche();
     let mut sc = StructuredCredit::new_abs(
@@ -153,12 +153,11 @@ fn test_prepayment_overrides_use_expected_priority() {
     let abs_rate = sc.calculate_prepayment_rate(1).unwrap();
     assert!((abs_rate - 0.02).abs() < 1e-12);
 
-    sc.behavior_overrides.cpr_annual = Some(0.12);
+    sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.12);
     let cpr_rate = sc.calculate_prepayment_rate(1).unwrap();
     assert!((cpr_rate - clamped_cpr_to_smm(0.12)).abs() < 1e-12);
 
-    sc.behavior_overrides.cpr_annual = None;
-    sc.behavior_overrides.psa_speed_multiplier = Some(2.0);
+    sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
     let seasoning = 3;
     let base_cpr = (seasoning as f64 / psa_ramp_months() as f64) * psa_terminal_cpr();
     let expected = clamped_cpr_to_smm(base_cpr * 2.0);
@@ -167,7 +166,7 @@ fn test_prepayment_overrides_use_expected_priority() {
 }
 
 #[test]
-fn test_default_overrides_use_expected_priority() {
+fn test_default_spec_shapes_drive_monthly_rates() {
     let pool = create_pool_with_balance(1_000_000.0);
     let tranches = create_single_tranche();
     let mut sc = StructuredCredit::new_abs(
@@ -179,12 +178,11 @@ fn test_default_overrides_use_expected_priority() {
         "USD-OIS",
     );
 
-    sc.behavior_overrides.cdr_annual = Some(0.12);
+    sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
     let cdr_rate = sc.calculate_default_rate(1).unwrap();
     assert!((cdr_rate - clamped_cdr_to_mdr(0.12)).abs() < 1e-12);
 
-    sc.behavior_overrides.cdr_annual = None;
-    sc.behavior_overrides.sda_speed_multiplier = Some(1.5);
+    sc.credit_model.default_spec = DefaultModelSpec::sda(1.5);
 
     // Canonical PSA SDA shape: months 30-60 sit on the peak plateau.
     let plateau_seasoning = sda_peak_month() + 1;

@@ -37,44 +37,35 @@ for (const cdr of [0, 0.9]) {
   });
 }
 
-test('effective CPR/CDR use the configured model and explicit overrides', () => {
+test('effective CPR/CDR use the configured model', () => {
   const f = fixture();
   const spec = f.instrument.instrument.spec;
   spec.prepayment_spec.cpr = 0.36;
   spec.default_spec.cdr = 0.07;
-  for (const override of [false, true]) {
-    if (override) Object.assign(spec.behavior_overrides, { cpr_annual: 0.18, cdr_annual: 0.03 });
-    const result = valuations.instruments.priceInstrument(
-      JSON.stringify(f.instrument),
-      JSON.stringify(f.market),
-      f.as_of,
-      'discounting',
-      ['cpr', 'cdr']
-    );
-    assert.ok(Math.abs(result.measures.cpr - (override ? 0.18 : 0.36)) < 1e-12);
-    assert.ok(Math.abs(result.measures.cdr - (override ? 0.03 : 0.07)) < 1e-12);
-  }
+  const result = valuations.instruments.priceInstrument(
+    JSON.stringify(f.instrument),
+    JSON.stringify(f.market),
+    f.as_of,
+    'discounting',
+    ['cpr', 'cdr']
+  );
+  assert.ok(Math.abs(result.measures.cpr - 0.36) < 1e-12);
+  assert.ok(Math.abs(result.measures.cdr - 0.07) < 1e-12);
 });
 
-test('recovery sensitivity bumps the active override', () => {
+test('recovery sensitivity bumps the credit-model recovery', () => {
   const f = fixture();
   const spec = f.instrument.instrument.spec;
   spec.default_spec.cdr = 0.03;
-  spec.behavior_overrides.recovery_rate = 0.55;
-  const value = () =>
-    valuations.instruments.priceInstrument(
-      JSON.stringify(f.instrument),
-      JSON.stringify(f.market),
-      f.as_of,
-      'discounting',
-      ['recovery_01']
-    ).measures.recovery_01;
-  const override = value();
-  spec.behavior_overrides.recovery_rate = null;
   spec.recovery_spec.rate = 0.55;
-  const canonical = value();
-  assert.ok(Math.abs(override - canonical) < 1e-8);
-  assert.ok(Math.abs(override) > 1);
+  const recovery01 = valuations.instruments.priceInstrument(
+    JSON.stringify(f.instrument),
+    JSON.stringify(f.market),
+    f.as_of,
+    'discounting',
+    ['recovery_01']
+  ).measures.recovery_01;
+  assert.ok(Math.abs(recovery01) > 1);
 });
 
 test('a deal call adds the to-call twins next to the to-maturity metrics', () => {

@@ -8,7 +8,7 @@
 //! (the `Instrument`) and the `PyFixedLegSpec` pattern in `typed_legs.rs` for
 //! the flat sub-models. Deep sub-configs (`WaterfallRules`,
 //! `CreditModelConfig`'s stochastic specs, `DealFees`,
-//! `MarketConditions`/`CreditFactors`, `DelinquencyModel`,
+//! `MarketConditions`, `DelinquencyModel`,
 //! `CardPortfolioSpec`, the CMBS `PoolAsset` sub-specs, floating
 //! `TrancheCoupon`) stay dict / JSON sub-fields per the nested-spec rule;
 //! every builder setter accepts a dict or JSON string for them.

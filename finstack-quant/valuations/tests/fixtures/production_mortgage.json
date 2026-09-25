@@ -95,7 +95,7 @@
           "pass_through_rate": 0.04,
           "pool_id": "MA1234",
           "pool_type": "generic",
-          "prepayment_model": {
+          "prepayment_spec": {
             "cpr": 0.0
           },
           "servicing_fee_rate": 0.0025,
@@ -189,7 +189,7 @@
           "pass_through_rate": 0.04,
           "pool_id": "MA1234",
           "pool_type": "generic",
-          "prepayment_model": {
+          "prepayment_spec": {
             "cpr": 0.0
           },
           "servicing_fee_rate": 0.0025,
@@ -232,7 +232,7 @@
         "pass_through_rate": 0.04,
         "pool_id": "MA1234",
         "pool_type": "generic",
-        "prepayment_model": {
+        "prepayment_spec": {
           "cpr": 0.0
         },
         "servicing_fee_rate": 0.0025,

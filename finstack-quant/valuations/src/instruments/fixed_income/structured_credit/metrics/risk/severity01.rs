@@ -27,9 +27,8 @@ pub(crate) struct Severity01Calculator;
 
 impl MetricCalculator for Severity01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        // Resolve the behaviour overrides first: the reprice re-resolves the
-        // deal, and an unresolved `behavior_overrides.recovery_rate` would
-        // overwrite both bumps (the audit's Severity01 == 0 defect).
+        // Validate the credit model and normalize the pool once before
+        // bumping `credit_model.recovery_spec.rate`.
         let instrument = context
             .instrument_as::<StructuredCredit>()?
             .resolved_for_pricing()?;

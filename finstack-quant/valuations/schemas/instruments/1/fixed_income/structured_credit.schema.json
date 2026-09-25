@@ -399,13 +399,6 @@
           "additionalProperties": false,
           "description": "First lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "first_lien_loan",
               "type": "string"
@@ -420,13 +413,6 @@
           "additionalProperties": false,
           "description": "Second lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "second_lien_loan",
               "type": "string"
@@ -441,13 +427,6 @@
           "additionalProperties": false,
           "description": "Revolving credit facility",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "revolver_loan",
               "type": "string"
@@ -462,13 +441,6 @@
           "additionalProperties": false,
           "description": "Bridge loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "bridge_loan",
               "type": "string"
@@ -483,13 +455,6 @@
           "additionalProperties": false,
           "description": "Mezzanine loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "mezzanine_loan",
               "type": "string"
@@ -504,13 +469,6 @@
           "additionalProperties": false,
           "description": "High yield bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "high_yield_bond",
               "type": "string"
@@ -525,13 +483,6 @@
           "additionalProperties": false,
           "description": "Investment grade bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "investment_grade_bond",
               "type": "string"
@@ -546,13 +497,6 @@
           "additionalProperties": false,
           "description": "Distressed bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "distressed_bond",
               "type": "string"
@@ -567,13 +511,6 @@
           "additionalProperties": false,
           "description": "Emerging markets bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "emerging_markets_bond",
               "type": "string"
@@ -2667,35 +2604,6 @@
       ],
       "type": "object"
     },
-    "CreditFactors": {
-      "additionalProperties": false,
-      "description": "Optional monetary inputs for CMBS debt-service coverage metrics.",
-      "properties": {
-        "annual_debt_service": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Annual debt service for CMBS collateral, when provided."
-        },
-        "annual_noi": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Annual net operating income for CMBS collateral, when provided."
-        }
-      },
-      "type": "object"
-    },
     "CreditRating": {
       "description": "Unified credit rating scale with notch-level precision (agency-agnostic).\n\nEach variant represents a specific notch in the rating scale. Ratings\nwithout a `Plus`/`Minus` suffix represent the \"flat\" (middle) notch.\n\n| Variant     | S&P/Fitch | Moody's |\n|-------------|-----------|---------|\n| `AAA`       | AAA       | Aaa     |\n| `AAPlus`    | AA+       | Aa1     |\n| `AA`        | AA        | Aa2     |\n| `AAMinus`   | AA-       | Aa3     |\n| `APlus`     | A+        | A1      |\n| `A`         | A         | A2      |\n| `AMinus`    | A-        | A3      |\n| `BBBPlus`   | BBB+      | Baa1    |\n| `BBB`       | BBB       | Baa2    |\n| `BBBMinus`  | BBB-      | Baa3    |\n| `BBPlus`    | BB+       | Ba1     |\n| `BB`        | BB        | Ba2     |\n| `BBMinus`   | BB-       | Ba3     |\n| `BPlus`     | B+        | B1      |\n| `B`         | B         | B2      |\n| `BMinus`    | B-        | B3      |\n| `CCCPlus`   | CCC+      | Caa1    |\n| `CCC`       | CCC       | Caa2    |\n| `CCCMinus`  | CCC-      | Caa3    |\n| `CC`        | CC        | Ca      |\n| `C`         | C         | C       |\n| `D`         | D         | D       |\n| `NR`        | NR        | NR      |\n\n# Investment Grade\n\nRatings of `BBBMinus` and above are considered \"investment grade\":\n\n```rust\nuse finstack_quant_core::types::CreditRating;\n\nassert!(CreditRating::A.is_investment_grade());\nassert!(CreditRating::BBBMinus.is_investment_grade());\nassert!(!CreditRating::BBPlus.is_investment_grade());\n```",
       "oneOf": [
@@ -3096,9 +3004,9 @@
           "format": "double",
           "type": "number"
         },
-        "trustee_fee_annual": {
+        "trustee_fee": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Annual trustee fee (fixed amount)"
+          "description": "Fixed trustee fee per annum; the waterfall divides it by the payment\nperiods per year."
         },
         "workout_fee_pct": {
           "description": "Special servicer workout fee as a percent of the principal and\ninterest collected on specially serviced loans (`1.0` = 1%), taken\noff the top of those collections; `None` for no workout fee.",
@@ -3110,7 +3018,7 @@
         }
       },
       "required": [
-        "trustee_fee_annual",
+        "trustee_fee",
         "senior_mgmt_fee_bp",
         "subordinated_mgmt_fee_bp",
         "servicing_fee_bp"
@@ -5219,70 +5127,6 @@
         }
       ]
     },
-    "Overrides": {
-      "additionalProperties": false,
-      "description": "Behavioral overrides for prepayment, default, and recovery assumptions.",
-      "properties": {
-        "cdr_annual": {
-          "description": "Override default with constant annual CDR.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "cpr_annual": {
-          "description": "Override prepayment with constant annual CPR.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "psa_speed_multiplier": {
-          "description": "Override prepayment with PSA multiplier.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "recovery_lag_months": {
-          "description": "Override recovery lag (months).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "recovery_rate": {
-          "description": "Override recovery with constant rate.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "reinvestment_price": {
-          "description": "Override the replacement-collateral purchase price during the\nreinvestment period, as a percent of par (`97.5` = 97.5); takes\nprecedence over `ReinvestmentAssumptions::price_pct`.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "sda_speed_multiplier": {
-          "description": "Override default with SDA multiplier.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
     "ParRateMethod": {
       "description": "Method for calculating par rates in swaps",
       "oneOf": [
@@ -5912,7 +5756,7 @@
               "type": "null"
             }
           ],
-          "description": "Annual net operating income of the property securing the loan, for\nthe pool debt-service coverage ratio."
+          "description": "Net operating income per annum of the property securing the loan,\nin the loan's currency. The only NOI input of the CMBS pool\ndebt-service coverage ratio."
         },
         "obligor_id": {
           "description": "Optional obligor identifier used for single-name concentration limits.",
@@ -8029,19 +7873,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection."
         },
-        "behavior_overrides": {
-          "$ref": "#/$defs/Overrides",
-          "default": {
-            "cdr_annual": null,
-            "cpr_annual": null,
-            "psa_speed_multiplier": null,
-            "recovery_lag_months": null,
-            "recovery_rate": null,
-            "reinvestment_price": null,
-            "sda_speed_multiplier": null
-          },
-          "description": "Behavioral assumption overrides."
-        },
         "call_assumption": {
           "anyOf": [
             {
@@ -8104,10 +7935,6 @@
             "$ref": "#/$defs/CoverageTestSpec"
           },
           "type": "array"
-        },
-        "credit_factors": {
-          "$ref": "#/$defs/CreditFactors",
-          "description": "Credit factors impacting default behavior."
         },
         "deal_metadata": {
           "$ref": "#/$defs/Metadata",
@@ -8373,8 +8200,7 @@
         "frequency",
         "discount_curve_id",
         "attributes",
-        "market_conditions",
-        "credit_factors"
+        "market_conditions"
       ],
       "type": "object"
     },
@@ -9394,17 +9220,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "behavior_overrides": {
-            "cdr_annual": null,
-            "cpr_annual": null,
-            "psa_speed_multiplier": null,
-            "recovery_lag_months": null,
-            "recovery_rate": null,
-            "reinvestment_price": null,
-            "sda_speed_multiplier": null
-          },
           "closing_date": "2024-01-01",
-          "credit_factors": {},
           "deal_metadata": {
             "manager_id": null,
             "master_servicer_id": null,
@@ -9435,7 +9251,6 @@
               {
                 "acquisition_date": null,
                 "asset_type": {
-                  "industry": null,
                   "type": "high_yield_bond"
                 },
                 "balance": {

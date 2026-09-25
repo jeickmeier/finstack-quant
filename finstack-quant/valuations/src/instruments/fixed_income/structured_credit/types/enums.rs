@@ -81,52 +81,29 @@ impl core::fmt::Display for TrancheSeniority {
 #[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetType {
+    // The loan and bond variants keep empty braces on purpose: serde's
+    // internally tagged unit variants ignore extra keys, while these struct
+    // variants make `deny_unknown_fields` reject a stray payload such as the
+    // retired `industry` (which lives on `PoolAsset.industry`).
     /// First lien corporate loan
-    FirstLienLoan {
-        /// Industry.
-        industry: Option<String>,
-    },
+    FirstLienLoan {},
     /// Second lien corporate loan
-    SecondLienLoan {
-        /// Industry.
-        industry: Option<String>,
-    },
+    SecondLienLoan {},
     /// Revolving credit facility
-    RevolverLoan {
-        /// Industry.
-        industry: Option<String>,
-    },
+    RevolverLoan {},
     /// Bridge loan
-    BridgeLoan {
-        /// Industry.
-        industry: Option<String>,
-    },
+    BridgeLoan {},
     /// Mezzanine loan
-    MezzanineLoan {
-        /// Industry.
-        industry: Option<String>,
-    },
+    MezzanineLoan {},
 
     /// High yield bond
-    HighYieldBond {
-        /// Industry.
-        industry: Option<String>,
-    },
+    HighYieldBond {},
     /// Investment grade bond
-    InvestmentGradeBond {
-        /// Industry.
-        industry: Option<String>,
-    },
+    InvestmentGradeBond {},
     /// Distressed bond
-    DistressedBond {
-        /// Industry.
-        industry: Option<String>,
-    },
+    DistressedBond {},
     /// Emerging markets bond
-    EmergingMarketsBond {
-        /// Industry.
-        industry: Option<String>,
-    },
+    EmergingMarketsBond {},
 
     /// Single family residential mortgage
     SingleFamilyMortgage {

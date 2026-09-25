@@ -1,78 +1,34 @@
-//! Canonical precedence for effective deal behavior.
+//! Validation and pool normalization that run before a deal is priced.
 
-use super::{CreditModelConfig, DefaultModelSpec, PrepaymentModelSpec, StructuredCredit};
+use super::{CreditModelConfig, StructuredCredit};
 use finstack_quant_core::validation::validate_f64_unit_interval;
 use finstack_quant_core::Result;
 
 impl StructuredCredit {
-    /// Resolve explicit behavioral overrides into the model consumed by pricing.
-    /// A rate/curve override fixes that leg's behavior, including in a stochastic
-    /// run; stochastic model specifications apply only to unoverridden legs.
-    pub(crate) fn effective_credit_model(&self) -> CreditModelConfig {
-        let mut model = self.credit_model.clone();
-        let overrides = &self.behavior_overrides;
-        let prepayment = if let Some(cpr) = overrides.cpr_annual {
-            Some(PrepaymentModelSpec::constant_cpr(cpr))
-        } else {
-            overrides.psa_speed_multiplier.map(PrepaymentModelSpec::psa)
-        };
-        if let Some(spec) = prepayment {
-            model.stochastic_prepay_spec = None;
-            model.prepayment_spec = spec;
-        }
-        let default = if let Some(cdr) = overrides.cdr_annual {
-            Some(DefaultModelSpec::constant_cdr(cdr))
-        } else {
-            overrides.sda_speed_multiplier.map(DefaultModelSpec::sda)
-        };
-        if let Some(spec) = default {
-            model.stochastic_default_spec = None;
-            model.default_spec = spec;
-        }
-        if let Some(rate) = overrides.recovery_rate {
-            model.recovery_spec.rate = rate;
-        }
-        if let Some(months) = overrides.recovery_lag_months {
-            model.recovery_spec.recovery_lag = months;
-        }
-        model
-    }
-
-    /// Validate the effective model before it reaches a numerical engine.
-    pub(crate) fn resolved_credit_model(&self) -> Result<CreditModelConfig> {
-        let overrides = &self.behavior_overrides;
-        if let Some(cpr) = overrides.cpr_annual {
-            validate_f64_unit_interval(cpr, "structured-credit annual CPR override")?;
-        }
-        if let Some(cdr) = overrides.cdr_annual {
-            validate_f64_unit_interval(cdr, "structured-credit annual CDR override")?;
-        }
-        let model = self.effective_credit_model();
+    /// Validate `credit_model` before it reaches a numerical engine.
+    pub(crate) fn validated_credit_model(&self) -> Result<&CreditModelConfig> {
+        let model = &self.credit_model;
         // Include peak seasoning to validate an entire PSA/SDA curve, not just
         // the zero-time rate where a malformed multiplier can be hidden.
-        validate_f64_unit_interval(model.prepayment_spec.cpr, "canonical CPR")?;
+        validate_f64_unit_interval(
+            model.prepayment_spec.cpr,
+            "credit_model.prepayment_spec.cpr",
+        )?;
         model.prepayment_spec.validate()?;
         model.default_spec.validate()?;
         model.recovery_spec.validate()?;
         Ok(model)
     }
 
-    /// Copy the deal with effective assumptions made explicit for scenario/risk
-    /// mutations. Clearing resolved rate overrides prevents them masking shocks.
+    /// Copy the deal with a validated credit model and a normalized pool for
+    /// scenario/risk mutations.
     pub(crate) fn resolved_for_pricing(&self) -> Result<Self> {
         self.validate_dates()?;
-        let credit_model = self.resolved_credit_model()?;
+        self.validated_credit_model()?;
         let pool = self.pool.normalized(self.closing_date)?;
         self.validate_resolved_pool(&pool)?;
         let mut deal = self.clone();
-        deal.credit_model = credit_model;
         deal.pool = pool;
-        deal.behavior_overrides.cpr_annual = None;
-        deal.behavior_overrides.psa_speed_multiplier = None;
-        deal.behavior_overrides.cdr_annual = None;
-        deal.behavior_overrides.sda_speed_multiplier = None;
-        deal.behavior_overrides.recovery_rate = None;
-        deal.behavior_overrides.recovery_lag_months = None;
         Ok(deal)
     }
 
@@ -81,7 +37,7 @@ impl StructuredCredit {
     /// representative lines or instrument collateral).
     pub(crate) fn validate_resolvable(&self) -> Result<()> {
         self.validate_dates()?;
-        self.resolved_credit_model()?;
+        self.validated_credit_model()?;
         let pool = self.pool.normalized_view(self.closing_date)?;
         self.validate_resolved_pool(&pool)
     }
@@ -125,13 +81,6 @@ impl StructuredCredit {
                     "performing asset {} cannot carry a default claim",
                     asset.id
                 )));
-            }
-        }
-        if let Some(price) = self.behavior_overrides.reinvestment_price {
-            if !price.is_finite() || price <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(
-                    "reinvestment price must be finite and positive percent of par".into(),
-                ));
             }
         }
         if let Some(period) = &pool.reinvestment_period {

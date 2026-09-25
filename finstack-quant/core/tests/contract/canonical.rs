@@ -270,10 +270,6 @@ fn persisted_contract_fields_do_not_use_fx_hash_maps() {
             "MarketConditions",
         ),
         (
-            "valuations/src/instruments/fixed_income/structured_credit/types/mod.rs",
-            "CreditFactors",
-        ),
-        (
             "valuations/src/instruments/fixed_income/structured_credit/types/results.rs",
             "TrancheValuation",
         ),

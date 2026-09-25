@@ -324,7 +324,7 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
         .wam(wam)
         .issue_date(cmo.issue_date)
         .maturity(maturity)
-        .prepayment_model(PrepaymentModelSpec::psa(defaults.psa_multiplier))
+        .prepayment_spec(PrepaymentModelSpec::psa(defaults.psa_multiplier))
         .discount_curve_id(cmo.discount_curve_id.clone())
         .day_count(DayCount::Thirty360)
         .build()

@@ -194,7 +194,7 @@ pub struct AgencyTba {
     /// together with `assumed_pool` is rejected.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prepayment_model: Option<PrepaymentModelSpec>,
+    pub prepayment_spec: Option<PrepaymentModelSpec>,
     /// Discount curve identifier.
     pub discount_curve_id: CurveId,
     /// Pricing overrides.
@@ -277,14 +277,14 @@ impl AgencyTba {
                     "{context} assumed-pool currency must match TBA notional currency"
                 )));
             }
-            if self.prepayment_model.is_some() {
+            if self.prepayment_spec.is_some() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} prepayment_model applies to the generic pool only; \
+                    "{context} prepayment_spec applies to the generic pool only; \
                      set it on the explicit assumed_pool instead"
                 )));
             }
         }
-        if let Some(model) = &self.prepayment_model {
+        if let Some(model) = &self.prepayment_spec {
             model.validate()?;
         }
         Ok(())
@@ -464,8 +464,8 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
             rebuilt.assumed_pool = Some(Box::new(rate_risk_pool(pool, base, bumped, as_of)?));
         } else {
             let generic = crate::instruments::fixed_income::tba::pricer::create_assumed_pool(self)?;
-            rebuilt.prepayment_model =
-                Some(rate_risk_pool(&generic, base, bumped, as_of)?.prepayment_model);
+            rebuilt.prepayment_spec =
+                Some(rate_risk_pool(&generic, base, bumped, as_of)?.prepayment_spec);
         }
         Ok(Some(Box::new(rebuilt)))
     }
@@ -481,6 +481,20 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
 mod tests {
     use super::*;
     use time::Month;
+
+    #[test]
+    // schema-rejection-test: prepayment_model (now prepayment_spec)
+    fn rejects_retired_prepayment_model_key() {
+        let tba = AgencyTba::example().expect("example");
+        let mut value = serde_json::to_value(&tba).expect("serialize");
+        value
+            .as_object_mut()
+            .expect("object")
+            .insert("prepayment_model".into(), serde_json::json!({"cpr": 0.06}));
+        let err = serde_json::from_value::<AgencyTba>(value)
+            .expect_err("retired prepayment_model key must be rejected");
+        assert!(err.to_string().contains("prepayment_model"), "{err}");
+    }
 
     #[test]
     fn test_tba_example() {

@@ -35,7 +35,7 @@ use super::super::instruments::enum_from_str;
 /// >>> from finstack_quant.valuations.instruments import PoolAsset
 /// >>> loan = PoolAsset(
 /// ...     "LOAN-1",
-/// ...     {"type": "first_lien_loan", "industry": "Software"},
+/// ...     {"type": "first_lien_loan"},
 /// ...     Money(10_000_000.0, Currency("USD")),
 /// ...     0.08,
 /// ...     datetime.date(2031, 1, 15),
@@ -90,9 +90,10 @@ impl PyPoolAsset {
     /// id : str
     ///     Stable asset identifier, unique within the pool.
     /// asset_type : dict | str
-    ///     ``AssetType`` serde object such as ``{"type": "first_lien_loan",
-    ///     "industry": None}`` or ``{"type": "high_yield_bond"}``; the type decides
-    ///     whether the row amortizes (level pay) or pays as a bullet.
+    ///     ``AssetType`` serde object such as ``{"type": "first_lien_loan"}`` or
+    ///     ``{"type": "commercial_mortgage", "ltv": 0.6}``; the type decides
+    ///     whether the row amortizes (level pay) or pays as a bullet. The
+    ///     obligor industry is the separate ``industry`` keyword.
     /// balance : Money
     ///     Current principal balance in the pool currency.
     /// rate : float

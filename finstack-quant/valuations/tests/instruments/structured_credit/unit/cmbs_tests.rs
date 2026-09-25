@@ -132,7 +132,7 @@ fn accrual(from: Date, to: Date) -> f64 {
 
 fn fees(servicing_fee_bp: f64, special_servicer_fee_bp: Option<f64>) -> DealFees {
     DealFees {
-        trustee_fee_annual: usd(0.0),
+        trustee_fee: usd(0.0),
         senior_mgmt_fee_bp: 0.0,
         subordinated_mgmt_fee_bp: 0.0,
         servicing_fee_bp,
@@ -393,7 +393,7 @@ fn dscr_comes_from_loan_level_noi_and_debt_service() {
     let err = CmbsDscrCalculator::new()
         .calculate(&mut without_noi)
         .expect_err("no NOI anywhere");
-    assert!(err.to_string().contains("annual_noi"));
+    assert!(err.to_string().contains("pool.assets[].noi"));
 }
 
 /// Malformed commercial-mortgage terms are rejected by instrument validation.

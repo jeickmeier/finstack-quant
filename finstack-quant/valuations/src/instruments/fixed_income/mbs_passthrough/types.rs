@@ -263,7 +263,7 @@ pub enum PoolType {
 ///     .wam(348)
 ///     .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())
 ///     .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())
-///     .prepayment_model(PrepaymentModelSpec::psa(1.0))
+///     .prepayment_spec(PrepaymentModelSpec::psa(1.0))
 ///     .discount_curve_id(CurveId::new("USD-OIS"))
 ///     .day_count(finstack_quant_core::dates::DayCount::Thirty360)
 ///     .build()
@@ -352,7 +352,7 @@ pub struct AgencyMbsPassthrough {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_lag_days: Option<u32>,
     /// Prepayment model specification.
-    pub prepayment_model: PrepaymentModelSpec,
+    pub prepayment_spec: PrepaymentModelSpec,
     /// Discount curve identifier for pricing.
     pub discount_curve_id: CurveId,
     /// Day count convention for accrual.
@@ -408,7 +408,7 @@ impl AgencyMbsPassthrough {
             .issue_date(date!(2022 - 01 - 01))
             .last_paid_accrual_end_opt(None)
             .maturity(date!(2052 - 01 - 01))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -500,7 +500,7 @@ impl AgencyMbsPassthrough {
     /// Get SMM (single monthly mortality) for given date.
     pub fn smm(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
         let seasoning = self.seasoning_months(as_of);
-        self.prepayment_model.smm(seasoning)
+        self.prepayment_spec.smm(seasoning)
     }
 
     /// Calculate net coupon (pass-through rate) from WAC and fees.
@@ -863,5 +863,18 @@ mod production_mortgage_audit {
                 .expect("payment"),
             date!(2026 - 04 - 27)
         );
+    }
+
+    #[test]
+    // schema-rejection-test: prepayment_model (now prepayment_spec)
+    fn rejects_retired_prepayment_model_key() {
+        let mbs = AgencyMbsPassthrough::example().expect("example");
+        let mut value = serde_json::to_value(&mbs).expect("serialize");
+        let map = value.as_object_mut().expect("object");
+        let spec = map.remove("prepayment_spec").expect("prepayment_spec key");
+        map.insert("prepayment_model".into(), spec);
+        let err = serde_json::from_value::<AgencyMbsPassthrough>(value)
+            .expect_err("retired prepayment_model key must be rejected");
+        assert!(err.to_string().contains("prepayment_model"), "{err}");
     }
 }

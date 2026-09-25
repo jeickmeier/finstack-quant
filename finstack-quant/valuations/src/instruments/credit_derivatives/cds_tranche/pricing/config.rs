@@ -113,8 +113,9 @@ pub struct CDSTranchePricerConfig {
     // Model Selection
     /// Copula model specification (default: Gaussian)
     pub copula_spec: CopulaSpec,
-    /// Recovery model specification (default: use index recovery rate)
-    pub recovery_spec: Option<RecoverySpec>,
+    /// Stochastic (copula) recovery model; `None` (the default) uses the
+    /// index recovery rate.
+    pub stochastic_recovery_spec: Option<RecoverySpec>,
 
     /// Absolute numerical integration budget in portfolio-notional fractions
     /// (default `1e-10`). Must lie in `[1e-12, 1e-4]`. Tail truncation and
@@ -172,7 +173,7 @@ impl Default for CDSTranchePricerConfig {
         Self {
             // Model selection
             copula_spec: CopulaSpec::default(),
-            recovery_spec: None, // Use index recovery rate by default
+            stochastic_recovery_spec: None, // Use index recovery rate by default
 
             // Numerical integration
             integration_tolerance: DEFAULT_INTEGRATION_TOLERANCE,
@@ -224,7 +225,7 @@ impl CDSTranchePricerConfig {
                 )?;
             }
         }
-        if let Some(recovery) = &self.recovery_spec {
+        if let Some(recovery) = &self.stochastic_recovery_spec {
             recovery
                 .validate()
                 .map_err(|error| CoreError::Validation(error.to_string()))?;
@@ -296,7 +297,7 @@ impl CDSTranchePricerConfig {
     /// - Mean: 40%, Vol: 25%, Correlation: +40% (canonical low-factor-stress
     ///   convention: recovery falls when the systematic factor falls)
     pub fn with_stochastic_recovery(mut self) -> Self {
-        self.recovery_spec = Some(RecoverySpec::market_standard_stochastic());
+        self.stochastic_recovery_spec = Some(RecoverySpec::market_standard_stochastic());
         self
     }
 
@@ -308,7 +309,7 @@ impl CDSTranchePricerConfig {
     /// * `corr` - Correlation with factor (typical: +0.30 to +0.50 under the
     ///   canonical low-factor-stress convention)
     pub fn with_custom_stochastic_recovery(mut self, mean: f64, vol: f64, corr: f64) -> Self {
-        self.recovery_spec = Some(RecoverySpec::MarketCorrelated {
+        self.stochastic_recovery_spec = Some(RecoverySpec::MarketCorrelated {
             mean_recovery: mean.clamp(0.0, 1.0),
             recovery_volatility: vol.clamp(0.0, 0.5),
             factor_correlation: corr.clamp(-1.0, 1.0),
@@ -323,7 +324,7 @@ impl CDSTranchePricerConfig {
         vol: Percentage,
         corr: f64,
     ) -> Self {
-        self.recovery_spec = Some(RecoverySpec::MarketCorrelated {
+        self.stochastic_recovery_spec = Some(RecoverySpec::MarketCorrelated {
             mean_recovery: mean.as_decimal().clamp(0.0, 1.0),
             recovery_volatility: vol.as_decimal().clamp(0.0, 0.5),
             factor_correlation: corr.clamp(-1.0, 1.0),
@@ -333,7 +334,7 @@ impl CDSTranchePricerConfig {
 
     /// Set constant recovery rate (overriding index recovery).
     pub fn with_constant_recovery(mut self, rate: f64) -> Self {
-        self.recovery_spec = Some(RecoverySpec::Constant {
+        self.stochastic_recovery_spec = Some(RecoverySpec::Constant {
             rate: rate.clamp(0.0, 1.0),
         });
         self
@@ -341,7 +342,7 @@ impl CDSTranchePricerConfig {
 
     /// Set constant recovery rate using a typed percentage.
     pub fn with_constant_recovery_pct(mut self, rate: Percentage) -> Self {
-        self.recovery_spec = Some(RecoverySpec::Constant {
+        self.stochastic_recovery_spec = Some(RecoverySpec::Constant {
             rate: rate.as_decimal().clamp(0.0, 1.0),
         });
         self

@@ -114,7 +114,7 @@ pub fn generate_cashflows(
         // PSA/CDR seasoning ramps key off pool age (WALA), measured from the
         // issue date.
         let seasoning = mbs.seasoning_months(period_end);
-        let raw_smm = mbs.prepayment_model.smm(seasoning)?;
+        let raw_smm = mbs.prepayment_spec.smm(seasoning)?;
         if !raw_smm.is_finite() || !(0.0..=1.0).contains(&raw_smm) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "MBS prepayment model returned invalid SMM={raw_smm} at seasoning {seasoning} months; expected finite value in [0.0, 1.0]"
@@ -529,7 +529,7 @@ mod tests {
             .wam(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -678,7 +678,7 @@ mod tests {
             .maturity(Date::from_calendar_date(2044, Month::January, 1).expect("valid"))
             // Zero prepayment so the payoff horizon is purely scheduled
             // level-pay amortization.
-            .prepayment_model(PrepaymentModelSpec::constant_cpr(0.0))
+            .prepayment_spec(PrepaymentModelSpec::constant_cpr(0.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -743,7 +743,7 @@ mod tests {
             .wam(360)
             .issue_date(future_issue)
             .maturity(Date::from_calendar_date(2054, Month::March, 20).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -806,10 +806,10 @@ mod tests {
         let market = create_test_market(as_of);
 
         let mut mbs_slow = create_test_mbs();
-        mbs_slow.prepayment_model = PrepaymentModelSpec::psa(0.5);
+        mbs_slow.prepayment_spec = PrepaymentModelSpec::psa(0.5);
 
         let mut mbs_fast = create_test_mbs();
-        mbs_fast.prepayment_model = PrepaymentModelSpec::psa(2.0);
+        mbs_fast.prepayment_spec = PrepaymentModelSpec::psa(2.0);
 
         let pv_slow = price_mbs(&mbs_slow, &market, as_of).expect("should price");
         let pv_fast = price_mbs(&mbs_fast, &market, as_of).expect("should price");
@@ -827,7 +827,7 @@ mod tests {
     fn smm_at_max_cpr_passes_through_pricer_unchanged() {
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
         let mut mbs = create_test_mbs();
-        mbs.prepayment_model = PrepaymentModelSpec::constant_cpr(1.0);
+        mbs.prepayment_spec = PrepaymentModelSpec::constant_cpr(1.0);
 
         let expected_smm = 1.0;
         let cashflows = generate_cashflows(&mbs, as_of, Some(1)).expect("should generate");

@@ -90,7 +90,7 @@ fn delivers_into(pool: AgencyProgram, tba: AgencyProgram) -> bool {
 /// Create the generic assumed pool for TBA valuation.
 ///
 /// Uses standard assumptions for generic pool characteristics based on
-/// the TBA's agency, coupon, and term, and the TBA's `prepayment_model`
+/// the TBA's agency, coupon, and term, and the TBA's `prepayment_spec`
 /// when set (embedded generic PSA otherwise).
 pub(crate) fn create_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthrough> {
     let settlement_date = tba.get_settlement_date()?;
@@ -140,8 +140,8 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthroug
         .wam(term_months)
         .issue_date(issue_date)
         .maturity(maturity)
-        .prepayment_model(
-            tba.prepayment_model
+        .prepayment_spec(
+            tba.prepayment_spec
                 .clone()
                 .unwrap_or_else(|| PrepaymentModelSpec::psa(defaults.psa_multiplier)),
         )

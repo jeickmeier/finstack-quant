@@ -29,7 +29,7 @@
       "pass_through_rate": 0.04,
       "pool_id": "MA1234",
       "pool_type": "generic",
-      "prepayment_model": {
+      "prepayment_spec": {
         "cpr": 0.06,
         "curve": {
           "curve": "psa",

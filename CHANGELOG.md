@@ -2,6 +2,68 @@
 
 ## [Unreleased]
 
+### Structured-credit input channels (2026-09-24)
+
+Numbers change only where a deal relied on a retired channel:
+
+- `StructuredCredit.credit_model` is now the only channel for prepayment,
+  default and recovery assumptions. A deal that set the retired overrides
+  must state the same values on `credit_model`; doing so reproduces the old
+  value bit for bit (`production_structured_credit_model_reproduces_retired_override_value`,
+  pinned at `f64::to_bits` from the pre-change override path). The two
+  structured-credit regression goldens that set every override were rewritten
+  onto `credit_model` with all expected values unchanged.
+- The reinvestment purchase price is `pool.reinvestment_period.assumptions.price_pct`
+  only. A deal that set the retired `reinvestment_price` without
+  `assumptions` now replicates surviving collateral at par (100.0).
+- CMBS DSCR (`MetricId::CmbsDscr`) reads loan-level `pool.assets[].noi` only.
+  A pool with no NOI on a performing loan is now a validation error instead
+  of falling back to the deal-level NOI and user-supplied debt service, which
+  the metric silently replaced whenever any loan carried NOI.
+- Obligor industry is `pool.assets[].industry` only. Industry written inside
+  `asset_type` was never read by concentration limits or the diversity count;
+  it is now rejected. The structured-credit notebook passes it on the
+  `PoolAsset` `industry` keyword, so its industry concentration now sees it.
+
+#### Changed (BREAKING)
+
+- `AgencyMbsPassthrough.prepayment_model`, `AgencyTba.prepayment_model`,
+  `DollarRoll.prepayment_model` and the CMO collateral pool (now
+  `prepayment_spec`, matching `StructuredCredit`/`AssetBackedFacility`); Rust,
+  JSON, builder setter `prepayment_spec`.
+- `DealFees.trustee_fee_annual` (now `trustee_fee`, per annum); Rust, JSON,
+  Python/WASM through JSON.
+- `clo_trustee_fee_annual`, `abs_trustee_fee_annual`, `cmbs_trustee_fee_annual`,
+  `rmbs_trustee_fee_annual` (now `clo_trustee_fee`, `abs_trustee_fee`,
+  `cmbs_trustee_fee`, `rmbs_trustee_fee`); Rust.
+- `AssetType::{FirstLienLoan, SecondLienLoan, RevolverLoan, BridgeLoan,
+  MezzanineLoan, HighYieldBond, InvestmentGradeBond, DistressedBond,
+  EmergingMarketsBond}` carry no `industry` payload (`{"type": "first_lien_loan"}`);
+  an `industry` key inside `asset_type` is rejected. Rust, JSON, Python/WASM
+  `asset_type` dicts.
+- `CDSTranchePricerConfig.recovery_spec` (now `stochastic_recovery_spec`,
+  matching `CreditModelConfig.stochastic_recovery_spec`); Rust.
+- Embedded `structured_credit_assumptions.v1.json` keys
+  `prepayment_cpr_annual`, `default_cdr_annual`, `trustee_fee_annual` (now
+  `prepayment_cpr`, `default_cdr`, `trustee_fee`).
+
+#### Removed
+
+- `StructuredCredit.behavior_overrides` and the `Overrides` type
+  (`cpr_annual`, `psa_speed_multiplier`, `cdr_annual`, `sda_speed_multiplier`,
+  `recovery_rate`, `recovery_lag_months`, `reinvestment_price`); Rust, JSON,
+  Python `StructuredCredit.behavior_overrides` getter and
+  `StructuredCreditBuilder.behavior_overrides`. Use
+  `credit_model.prepayment_spec` (`constant_cpr`/`psa`),
+  `credit_model.default_spec` (`constant_cdr`/`sda`),
+  `credit_model.recovery_spec.{rate, recovery_lag}` and
+  `pool.reinvestment_period.assumptions.price_pct`.
+- `StructuredCredit.credit_factors` and the `CreditFactors` type
+  (`annual_noi`, `annual_debt_service`); Rust, JSON, Python
+  `StructuredCredit.credit_factors` getter and
+  `StructuredCreditBuilder.credit_factors`. Set `noi` (per annum) on each
+  CMBS loan instead.
+
 ### TermLoan override channel (2026-09-24)
 
 Numbers change only for direct callers of the floating margin-step program:

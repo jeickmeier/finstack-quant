@@ -1352,7 +1352,7 @@ impl PyAssetBackedFacilityBuilder {
     /// Parameters
     /// ----------
     /// value : dict | str
-    ///     ``DealFees`` serde object (``trustee_fee_annual`` Money,
+    ///     ``DealFees`` serde object (``trustee_fee`` Money per annum,
     ///     ``senior_mgmt_fee_bp``, ``subordinated_mgmt_fee_bp``,
     ///     ``servicing_fee_bp``, optional ``master_servicer_fee_bp`` /
     ///     ``special_servicer_fee_bp`` / ``incentive_fee``).

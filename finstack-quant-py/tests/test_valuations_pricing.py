@@ -66,7 +66,7 @@ def _structured_credit_json() -> str:
         "assets": [
             {
                 "id": "A1",
-                "asset_type": {"type": "high_yield_bond", "industry": None},
+                "asset_type": {"type": "high_yield_bond"},
                 "balance": _money("1000000"),
                 "rate": 0.06,
                 "spread_bp": None,
@@ -120,7 +120,6 @@ def _structured_credit_json() -> str:
         "market_conditions": {
             "refi_rate": 0.04,
         },
-        "credit_factors": {},
     }
     return _instrument_json({"type": "structured_credit", "spec": spec})
 

@@ -326,7 +326,7 @@ def _pool_assets(iid: str, n: int = 5) -> list[dict]:
     return [
         {
             "id": f"{iid}-LOAN-{j}",
-            "asset_type": {"type": "first_lien_loan", "industry": None},
+            "asset_type": {"type": "first_lien_loan"},
             "balance": {"amount": "2000000", "currency": "USD"},
             "rate": 0.055 + 0.005 * (j % 3),
             "spread_bp": 300.0 + 50.0 * (j % 4),
@@ -402,22 +402,12 @@ def _structured_credit_spec(iid: str, deal_type: str, idx: int) -> dict:
             "market_conditions": {
                 "refi_rate": 0.04,
             },
-            "credit_factors": {},
             "deal_metadata": {
                 "manager_id": None,
                 "servicer_id": None,
                 "master_servicer_id": None,
                 "special_servicer_id": None,
                 "trustee_id": None,
-            },
-            "behavior_overrides": {
-                "cpr_annual": None,
-                "psa_speed_multiplier": None,
-                "cdr_annual": None,
-                "sda_speed_multiplier": None,
-                "recovery_rate": None,
-                "recovery_lag_months": None,
-                "reinvestment_price": None,
             },
         },
     }

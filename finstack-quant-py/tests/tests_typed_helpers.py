@@ -301,7 +301,7 @@ def structured_credit_pool() -> AssetPool:
             datetime.date(2031, 1, 15),
             12,
             DayCount.ACT_360,
-            asset_type={"type": "first_lien_loan", "industry": None},
+            asset_type={"type": "first_lien_loan"},
             cpr=0.10,
             cdr=0.02,
             recovery_rate=0.45,

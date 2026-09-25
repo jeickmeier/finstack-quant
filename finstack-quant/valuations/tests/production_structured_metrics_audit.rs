@@ -265,67 +265,29 @@ fn production_structured_metrics_opening_balance_and_unadjusted_boundary() {
 }
 
 #[test]
-fn production_structured_metrics_shocks_and_scenarios_consume_overrides() {
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        calculate_tranche_breakeven_cdr, scenario_table, ScenarioGrid,
-    };
-    let (mut override_deal, market) = deal_and_market();
-    override_deal.behavior_overrides.cpr_annual = Some(0.18);
-    override_deal.behavior_overrides.cdr_annual = Some(0.03);
-    override_deal.behavior_overrides.recovery_rate = Some(0.55);
-    let mut canonical = override_deal.clone();
-    canonical.behavior_overrides = Default::default();
-    canonical.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.18);
-    canonical.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
-    canonical.credit_model.recovery_spec.rate = 0.55;
-    let requested = [
-        MetricId::Prepayment01,
-        MetricId::Default01,
-        MetricId::Recovery01,
-    ];
-    let a = override_deal
+fn production_structured_metrics_credit_model_risks_move_pv() {
+    let (mut deal, market) = deal_and_market();
+    deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.18);
+    deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
+    deal.credit_model.recovery_spec.rate = 0.55;
+    let result = deal
         .price_with_metrics(
             &market,
-            canonical.closing_date,
-            &requested,
+            deal.closing_date,
+            &[
+                MetricId::Prepayment01,
+                MetricId::Default01,
+                MetricId::Recovery01,
+            ],
             PricingOptions::default(),
         )
-        .expect("override risks");
-    let b = canonical
-        .price_with_metrics(
-            &market,
-            canonical.closing_date,
-            &requested,
-            PricingOptions::default(),
-        )
-        .expect("canonical risks");
+        .expect("credit-model risks");
     for metric in ["prepayment01", "default01", "recovery_01"] {
         assert!(
-            (a.measures[metric] - b.measures[metric]).abs() < 1e-8,
-            "{metric}"
+            result.measures[metric].abs() > 1e-3,
+            "{metric} must move PV"
         );
-        assert!(a.measures[metric].abs() > 1e-3, "{metric} must move PV");
     }
-    let id = canonical.tranches.tranches[0].id.as_str();
-    let a = calculate_tranche_breakeven_cdr(&override_deal, id, &market, canonical.closing_date)
-        .expect("override breakeven");
-    let b = calculate_tranche_breakeven_cdr(&canonical, id, &market, canonical.closing_date)
-        .expect("canonical breakeven");
-    assert_eq!(a, b);
-    let grid = ScenarioGrid {
-        cprs: vec![0.0, 0.36],
-        cdrs: vec![0.0, 0.1],
-        severities: vec![0.45],
-        recovery_lag: None,
-    };
-    let a = scenario_table(&override_deal, id, &market, canonical.closing_date, &grid)
-        .expect("override scenarios");
-    let b = scenario_table(&canonical, id, &market, canonical.closing_date, &grid)
-        .expect("canonical scenarios");
-    assert_eq!(
-        serde_json::to_value(a).expect("json"),
-        serde_json::to_value(b).expect("json")
-    );
 }
 
 #[test]

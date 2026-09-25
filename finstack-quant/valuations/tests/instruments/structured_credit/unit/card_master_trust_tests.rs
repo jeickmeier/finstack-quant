@@ -109,7 +109,7 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
 
 fn fees(servicing_fee_bp: f64) -> DealFees {
     DealFees {
-        trustee_fee_annual: usd(0.0),
+        trustee_fee: usd(0.0),
         senior_mgmt_fee_bp: 0.0,
         subordinated_mgmt_fee_bp: 0.0,
         servicing_fee_bp,

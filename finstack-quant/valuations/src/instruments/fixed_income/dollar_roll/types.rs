@@ -132,7 +132,7 @@ pub struct DollarRoll {
     /// `None` uses the embedded generic PSA assumption of the TBA legs.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prepayment_model: Option<PrepaymentModelSpec>,
+    pub prepayment_spec: Option<PrepaymentModelSpec>,
     /// Discount curve identifier.
     pub discount_curve_id: CurveId,
     /// Optional repo/financing curve identifier (carry-only).
@@ -241,7 +241,7 @@ impl DollarRoll {
                 )));
             }
         }
-        if let Some(model) = &self.prepayment_model {
+        if let Some(model) = &self.prepayment_spec {
             model.validate()?;
         }
         Ok(())
@@ -323,7 +323,7 @@ impl DollarRoll {
             .settlement_date_opt(self.front_settlement_date)
             .notional(self.notional)
             .trade_price(self.front_price)
-            .prepayment_model_opt(self.prepayment_model.clone())
+            .prepayment_spec_opt(self.prepayment_spec.clone())
             .discount_curve_id(self.discount_curve_id.clone())
             .build()
     }
@@ -345,7 +345,7 @@ impl DollarRoll {
             .settlement_date_opt(self.back_settlement_date)
             .notional(self.notional)
             .trade_price(self.back_price)
-            .prepayment_model_opt(self.prepayment_model.clone())
+            .prepayment_spec_opt(self.prepayment_spec.clone())
             .discount_curve_id(self.discount_curve_id.clone())
             .build()
     }
@@ -421,8 +421,8 @@ impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
         let generic =
             crate::instruments::fixed_income::tba::pricer::create_assumed_pool(&self.front_leg()?)?;
         let mut rebuilt = self.clone();
-        rebuilt.prepayment_model =
-            Some(rate_risk_pool(&generic, base, bumped, as_of)?.prepayment_model);
+        rebuilt.prepayment_spec =
+            Some(rate_risk_pool(&generic, base, bumped, as_of)?.prepayment_spec);
         Ok(Some(Box::new(rebuilt)))
     }
 

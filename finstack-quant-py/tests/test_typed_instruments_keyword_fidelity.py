@@ -73,7 +73,7 @@ def _single_rep_line() -> RepLine:
         datetime.date(2031, 1, 15),
         12,
         DayCount.ACT_360,
-        asset_type={"type": "first_lien_loan", "industry": None},
+        asset_type={"type": "first_lien_loan"},
     )
 
 
@@ -291,7 +291,7 @@ def test_rep_line_accepts_keyword_arguments() -> None:
         maturity=datetime.date(2031, 1, 15),
         seasoning_months=12,
         day_count=DayCount.ACT_360,
-        asset_type={"type": "first_lien_loan", "industry": None},
+        asset_type={"type": "first_lien_loan"},
         spread_bp=None,
         index_id=None,
         cpr=0.10,

@@ -633,14 +633,14 @@ Commercial mortgages carry their terms on the `PoolAsset`:
   template's `special_servicer_fee_bp` accrues only on specially serviced balances via
   `PaymentCalculation::PercentageOfSpecialServiced` (custom waterfalls can use
   the same calculation).
-- `noi: Option<Money>` — annual net operating income; when any asset carries
-  it, `MetricId::CmbsDscr` is pool NOI over pool debt service on each loan's
+- `noi: Option<Money>` — net operating income per annum, the only NOI input:
+  `MetricId::CmbsDscr` is pool NOI over pool debt service on each loan's
   live terms as of the valuation date: a floating coupon is resolved through
   the market's forward curves (index plus spread, floored), a loan inside its
   `io_months` window or a non-amortizing row pays interest only, and an
   amortizing row pays the level payment over its remaining schedule
   (`contractual_payment` when supplied), at the deal's payment frequency.
-  Otherwise the deal-level `credit_factors` are used.
+  Defaulted loans are excluded; a pool with no loan-level `noi` is an error.
 
 `unit/cmbs_tests.rs` covers the balloon extension, the ASER shortfall
 ordering, both penalties, the special fee base and the loan-level DSCR.
@@ -816,7 +816,7 @@ Both bindings expose structured credit under their `instruments` namespace:
   `coverage_rules`, `call_assumption`, `cleanup_call_pct`,
   `liquidation_price_pct`, `loss_allocation`,
   `principal_covers_senior_interest`, `waterfall`, `hedge_swaps`, `fees`,
-  `waterfall_rules`, `behavior_overrides`, `attributes` ...), `AssetPool`
+  `waterfall_rules`, `attributes` ...), `AssetPool`
   (`with_assets`, `with_rep_lines`, `with_instruments`, `with_reserve`,
   `with_reinvestment_period`, `with_accounts`), `PoolAsset` (one constructor
   keyword per Rust field, `fixed_rate_bond` / `floating_rate_loan`),
@@ -910,8 +910,7 @@ terms, so the replacement spread, price and tenor drive WAS, par build and
 excess spread. `max_price` is percent of par; `min_yield` is annual decimal current
 yield (coupon divided by price fraction). Floating replacement coupons use the
 current projection. No unspecified eligibility filter is assumed.
-`StructuredCredit::behavior_overrides.reinvestment_price` (percent of par)
-overrides the purchase price from `price_pct` for scenario work.
+Without `assumptions`, surviving collateral is replicated pro rata at par.
 
 Tranche coverage triggers retain their first breach date until the cure ratio is
 reached. `divert_cash_flow` places a coverage-test position after the tranche's

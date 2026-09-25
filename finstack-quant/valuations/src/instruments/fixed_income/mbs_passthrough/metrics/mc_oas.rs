@@ -217,7 +217,7 @@ fn mc_step_schedule(
         )?);
         let period_end = accrual_end - time::Duration::days(1);
         let seasoning = mbs.seasoning_months(period_end);
-        let base_smm = mbs.prepayment_model.smm(seasoning)?;
+        let base_smm = mbs.prepayment_spec.smm(seasoning)?;
         if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
             return Err(CoreError::Validation(format!(
                 "MBS prepayment model returned invalid SMM={base_smm} at seasoning {seasoning} months on MC path; expected finite value in [0.0, 1.0]"
@@ -497,7 +497,7 @@ mod tests {
             .wam(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -581,7 +581,7 @@ mod tests {
         let mut mbs = create_test_mbs();
         // High constant CPR maximises the gap between gross-balance and
         // post-amortization SMM.
-        mbs.prepayment_model = PrepaymentModelSpec::constant_cpr(0.80);
+        mbs.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.80);
 
         let wam = mbs.wam as usize;
         let path = RatePath {
@@ -602,7 +602,7 @@ mod tests {
             // Use issue_date as as_of (fresh pool) to match price_on_path convention.
             let base_seasoning = mbs.seasoning_months(mbs.issue_date);
             let seasoning = base_seasoning + month as u32 + 1;
-            let base_smm = mbs.prepayment_model.smm(seasoning).expect("smm");
+            let base_smm = mbs.prepayment_spec.smm(seasoning).expect("smm");
             let smm = rate_adjusted_smm(base_smm, base_rate, base_rate, 7.0);
 
             let remaining = wam.saturating_sub(month).max(1);
@@ -800,7 +800,7 @@ mod tests {
             .wam(360)
             .issue_date(fresh_issue)
             .maturity(Date::from_calendar_date(2056, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -824,7 +824,7 @@ mod tests {
             .wam(360)
             .issue_date(seasoned_issue)
             .maturity(Date::from_calendar_date(2051, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -915,7 +915,7 @@ mod tests {
             .wam(300)
             .issue_date(Date::from_calendar_date(2021, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2051, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act360)
             .build()

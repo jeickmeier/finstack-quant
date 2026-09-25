@@ -63,9 +63,7 @@ fn single_asset_pool(balance: f64, rate: f64, maturity: Date) -> AssetPool {
     pool.assets.push(PoolAsset {
         day_count: finstack_quant_core::dates::DayCount::Act360,
         id: InstrumentId::new("LOAN_1"),
-        asset_type: AssetType::FirstLienLoan {
-            industry: Some("Technology".to_string()),
-        },
+        asset_type: AssetType::FirstLienLoan {},
         balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
         rate,
         spread_bp: None,
@@ -928,9 +926,7 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
         pool.assets.push(PoolAsset {
             day_count: finstack_quant_core::dates::DayCount::Act360,
             id: InstrumentId::new(format!("LOAN_{}", i)),
-            asset_type: AssetType::FirstLienLoan {
-                industry: Some("Finance".to_string()),
-            },
+            asset_type: AssetType::FirstLienLoan {},
             balance: Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: *rate,
             spread_bp: None,

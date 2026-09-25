@@ -224,7 +224,7 @@ def test_tranche_structure_rep_line_and_asset_pool_contracts() -> None:
         "2031-01-15",
         12,
         DayCount.ACT_360,
-        asset_type={"type": "first_lien_loan", "industry": None},
+        asset_type={"type": "first_lien_loan"},
         spread_bp=150.0,
     )
     assert line.maturity == dt.date(2031, 1, 15)
@@ -279,7 +279,6 @@ def test_structured_credit_getters_and_dict_inputs() -> None:
         .frequency(Tenor.quarterly())
         .discount_curve_id(deal.discount_curve_id)
         .market_conditions(deal.to_dict()["market_conditions"])
-        .credit_factors(deal.to_dict()["credit_factors"])
         .build()
     )
     assert rebuilt.id == deal.id

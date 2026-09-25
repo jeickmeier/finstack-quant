@@ -8,7 +8,8 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
-test('structured credit recovery overrides match canonical model terms', () => {
+// schema-rejection-test: behavior_overrides
+test('structured credit rejects the retired behavior_overrides channel', () => {
   const fixture = JSON.parse(
     readFileSync(
       new URL(
@@ -17,20 +18,18 @@ test('structured credit recovery overrides match canonical model terms', () => {
       )
     )
   );
-  const value = () =>
-    valuations.instruments.priceInstrument(
-      JSON.stringify(fixture.instrument),
-      JSON.stringify(fixture.market),
-      fixture.as_of,
-      'discounting',
-      []
-    ).value.amount;
-  const expected = value();
-  const spec = fixture.instrument.instrument.spec;
-  spec.recovery_spec = { rate: 0.1, recovery_lag: 0 };
-  spec.behavior_overrides.recovery_rate = 0.7;
-  spec.behavior_overrides.recovery_lag_months = 9;
-  assert.ok(Math.abs(value() - expected) < 1e-6);
+  fixture.instrument.instrument.spec.behavior_overrides = { recovery_rate: 0.7 };
+  assert.throws(
+    () =>
+      valuations.instruments.priceInstrument(
+        JSON.stringify(fixture.instrument),
+        JSON.stringify(fixture.market),
+        fixture.as_of,
+        'discounting',
+        []
+      ),
+    /behavior_overrides/
+  );
 });
 
 test('convertible clean exercise pays accrued interest exactly once', () => {

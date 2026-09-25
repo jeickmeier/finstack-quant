@@ -16,8 +16,8 @@ use finstack_quant_core::money::Money;
 
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AssetPool, CmbsDscrCalculator,
-    DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    DealType, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheCoupon,
+    TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext, MetricId};
@@ -214,12 +214,12 @@ fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
 }
 
 #[test]
-fn test_cmbs_dscr_calculator_uses_typed_noi_and_debt_service() {
+fn test_cmbs_dscr_calculator_uses_loan_level_noi() {
+    // The fixture loan is a non-amortizing 5% fixed-rate bond on 10mm par, so
+    // its annual debt service is interest only: 10_000_000 * 0.05 = 500_000.
     let mut cmbs = cmbs_instrument();
-    cmbs.credit_factors.annual_noi =
-        Some(Money::new(1_350_000.0, Currency::USD).expect("valid money fixture"));
-    cmbs.credit_factors.annual_debt_service =
-        Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
+    cmbs.pool.assets[0].noi =
+        Some(Money::new(675_000.0, Currency::USD).expect("valid money fixture"));
 
     let dscr = CmbsDscrCalculator::new()
         .calculate(&mut metric_context(
@@ -232,19 +232,21 @@ fn test_cmbs_dscr_calculator_uses_typed_noi_and_debt_service() {
 }
 
 #[test]
-fn test_cmbs_dscr_requires_typed_inputs_and_matching_currency() {
+fn test_cmbs_dscr_requires_loan_noi_and_matching_currency() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let missing = CmbsDscrCalculator::new()
         .calculate(&mut metric_context(cmbs_instrument(), as_of))
-        .expect_err("missing typed inputs should be rejected");
-    assert!(missing.to_string().contains("annual_noi"));
+        .expect_err("a pool without loan NOI should be rejected");
+    assert!(missing.to_string().contains("pool.assets[].noi"));
 
     let mut mismatch = cmbs_instrument();
-    mismatch.credit_factors.annual_noi =
-        Some(Money::new(1_350_000.0, Currency::USD).expect("valid money fixture"));
-    mismatch.credit_factors.annual_debt_service =
-        Some(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"));
+    let mut second = mismatch.pool.assets[0].clone();
+    second.id = "MORTGAGE-2".into();
+    second.noi = Some(Money::new(675_000.0, Currency::EUR).expect("valid money fixture"));
+    mismatch.pool.assets[0].noi =
+        Some(Money::new(675_000.0, Currency::USD).expect("valid money fixture"));
+    mismatch.pool.assets.push(second);
     let err = CmbsDscrCalculator::new()
         .calculate(&mut metric_context(mismatch, as_of))
         .expect_err("currency mismatch should be rejected");
@@ -254,14 +256,13 @@ fn test_cmbs_dscr_requires_typed_inputs_and_matching_currency() {
     ));
 
     let mut zero_service = cmbs_instrument();
-    zero_service.credit_factors.annual_noi =
-        Some(Money::new(1_350_000.0, Currency::USD).expect("valid money fixture"));
-    zero_service.credit_factors.annual_debt_service =
-        Some(Money::new(0.0, Currency::USD).expect("valid money fixture"));
+    zero_service.pool.assets[0].rate = 0.0;
+    zero_service.pool.assets[0].noi =
+        Some(Money::new(675_000.0, Currency::USD).expect("valid money fixture"));
     let err = CmbsDscrCalculator::new()
         .calculate(&mut metric_context(zero_service, as_of))
         .expect_err("zero debt service should be rejected");
-    assert!(err.to_string().contains("annual_debt_service"));
+    assert!(err.to_string().contains("positive loan debt service"));
 }
 
 #[test]
@@ -271,7 +272,7 @@ fn test_rmbs_wal_adjusts_with_psa_speed() {
 
     let wal = |speed| {
         let mut rmbs = rmbs_instrument();
-        rmbs.behavior_overrides.psa_speed_multiplier = Some(speed);
+        rmbs.credit_model.prepayment_spec = PrepaymentModelSpec::psa(speed);
         rmbs.price_with_metrics(&market, as_of, &[MetricId::WAL], PricingOptions::default())
             .unwrap()
             .measures["wal"]

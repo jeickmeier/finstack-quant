@@ -13,7 +13,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_pool_stats, AssetPool, CdrCalculator, CloWarfCalculator, CprCalculator, DealType,
-    PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    DefaultModelSpec, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheCoupon,
+    TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;
@@ -205,8 +206,8 @@ fn test_rmbs_cpr_and_cdr_use_current_deal_seasoning() {
         maturity_date(),
         "USD-OIS",
     );
-    instrument.behavior_overrides.psa_speed_multiplier = Some(1.0);
-    instrument.behavior_overrides.sda_speed_multiplier = Some(1.0);
+    instrument.credit_model.prepayment_spec = PrepaymentModelSpec::psa(1.0);
+    instrument.credit_model.default_spec = DefaultModelSpec::sda(1.0);
 
     let mut context = MetricContext::new(
         Arc::new(instrument),

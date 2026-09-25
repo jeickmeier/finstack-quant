@@ -2582,7 +2582,7 @@ mod cases {
             pool.assets.push(PoolAsset {
                 day_count: DayCount::Thirty360,
                 id: InstrumentId::new("BND1"),
-                asset_type: AssetType::HighYieldBond { industry: None },
+                asset_type: AssetType::HighYieldBond {},
                 balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
                 rate,
                 spread_bp: None,

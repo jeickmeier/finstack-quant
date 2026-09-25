@@ -103,24 +103,24 @@ pub fn rmbs_servicing_fee_bp() -> f64 {
     rmbs_fees().servicing_fee_bp
 }
 
-/// Standard CLO trustee annual fee (USD).
-pub fn clo_trustee_fee_annual() -> f64 {
-    clo_fees().trustee_fee_annual.amount()
+/// Standard CLO trustee fee per annum (USD).
+pub fn clo_trustee_fee() -> f64 {
+    clo_fees().trustee_fee.amount()
 }
 
-/// Standard ABS trustee annual fee (USD).
-pub fn abs_trustee_fee_annual() -> f64 {
-    abs_fees().trustee_fee_annual.amount()
+/// Standard ABS trustee fee per annum (USD).
+pub fn abs_trustee_fee() -> f64 {
+    abs_fees().trustee_fee.amount()
 }
 
-/// Standard CMBS trustee annual fee (USD).
-pub fn cmbs_trustee_fee_annual() -> f64 {
-    cmbs_fees().trustee_fee_annual.amount()
+/// Standard CMBS trustee fee per annum (USD).
+pub fn cmbs_trustee_fee() -> f64 {
+    cmbs_fees().trustee_fee.amount()
 }
 
-/// Standard RMBS trustee annual fee (USD).
-pub fn rmbs_trustee_fee_annual() -> f64 {
-    rmbs_fees().trustee_fee_annual.amount()
+/// Standard RMBS trustee fee per annum (USD).
+pub fn rmbs_trustee_fee() -> f64 {
+    rmbs_fees().trustee_fee.amount()
 }
 
 /// AssetPool balance threshold (in base currency units) below which cashflow generation stops.
@@ -214,7 +214,7 @@ pub fn default_max_dip() -> f64 {
 
 /// Standard CLO CDR (annual).
 pub fn clo_standard_cdr() -> f64 {
-    standard_rates("clo_standard").cdr_annual
+    standard_rates("clo_standard").cdr
 }
 
 /// Standard CLO recovery rate.
@@ -229,7 +229,7 @@ pub fn clo_standard_cpr() -> f64 {
 
 /// Standard RMBS CDR (annual).
 pub fn rmbs_standard_cdr() -> f64 {
-    standard_rates("rmbs_standard").cdr_annual
+    standard_rates("rmbs_standard").cdr
 }
 
 /// Standard RMBS recovery rate.
@@ -244,7 +244,7 @@ pub fn rmbs_standard_psa() -> f64 {
 
 /// Standard Auto ABS CDR (annual).
 pub fn abs_auto_standard_cdr() -> f64 {
-    standard_rates("abs_auto_standard").cdr_annual
+    standard_rates("abs_auto_standard").cdr
 }
 
 /// Standard Auto ABS recovery rate.
@@ -259,7 +259,7 @@ pub fn abs_auto_standard_speed() -> f64 {
 
 /// Standard CMBS CDR (annual).
 pub fn cmbs_standard_cdr() -> f64 {
-    standard_rates("cmbs_standard").cdr_annual
+    standard_rates("cmbs_standard").cdr
 }
 
 /// Standard CMBS recovery rate.

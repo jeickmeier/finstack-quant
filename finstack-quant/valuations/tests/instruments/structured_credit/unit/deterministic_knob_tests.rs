@@ -12,7 +12,7 @@
 //! - `market_conditions.refi_rate` only feeds the stochastic prepayment tree.
 //! - `pool.reserve_target` governs replenishment from revolver repayments, so
 //!   it only acts on instrument collateral (`instrument_pool_tests`).
-//! - `deal_metadata`, `credit_factors`, `attributes`, pricing overrides,
+//! - `deal_metadata`, `attributes`, pricing overrides,
 //!   `quote_settlement_date` and the pool's `cumulative_*` fields are labels,
 //!   metric inputs or reporting state, not projection inputs.
 
@@ -435,11 +435,6 @@ fn knobs() -> Vec<Knob> {
             change: |d| d.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.7, 3),
         },
         Knob {
-            name: "behavior_overrides.cpr_annual",
-            common: none,
-            change: |d| d.behavior_overrides.cpr_annual = Some(0.25),
-        },
-        Knob {
             name: "credit_model.prepayment_spec (abs curve)",
             common: none,
             change: |d| d.credit_model.prepayment_spec = PrepaymentModelSpec::abs(0.02),
@@ -619,34 +614,14 @@ fn knobs() -> Vec<Knob> {
             },
         },
         Knob {
-            name: "behavior_overrides.psa_speed_multiplier",
+            name: "credit_model.prepayment_spec (psa curve)",
             common: none,
-            change: |d| d.behavior_overrides.psa_speed_multiplier = Some(3.0),
+            change: |d| d.credit_model.prepayment_spec = PrepaymentModelSpec::psa(3.0),
         },
         Knob {
-            name: "behavior_overrides.cdr_annual",
+            name: "credit_model.default_spec (sda curve)",
             common: none,
-            change: |d| d.behavior_overrides.cdr_annual = Some(0.06),
-        },
-        Knob {
-            name: "behavior_overrides.sda_speed_multiplier",
-            common: none,
-            change: |d| d.behavior_overrides.sda_speed_multiplier = Some(3.0),
-        },
-        Knob {
-            name: "behavior_overrides.recovery_rate",
-            common: none,
-            change: |d| d.behavior_overrides.recovery_rate = Some(0.8),
-        },
-        Knob {
-            name: "behavior_overrides.recovery_lag_months",
-            common: none,
-            change: |d| d.behavior_overrides.recovery_lag_months = Some(3),
-        },
-        Knob {
-            name: "behavior_overrides.reinvestment_price",
-            common: open_window,
-            change: |d| d.behavior_overrides.reinvestment_price = Some(90.0),
+            change: |d| d.credit_model.default_spec = DefaultModelSpec::sda(3.0),
         },
         Knob {
             name: "hedge_swaps",
@@ -667,9 +642,9 @@ fn knobs() -> Vec<Knob> {
             },
         },
         Knob {
-            name: "fees.trustee_fee_annual",
+            name: "fees.trustee_fee",
             common: none,
-            change: |d| fees(d).trustee_fee_annual = usd(500_000.0),
+            change: |d| fees(d).trustee_fee = usd(500_000.0),
         },
         Knob {
             name: "fees.senior_mgmt_fee_bp",

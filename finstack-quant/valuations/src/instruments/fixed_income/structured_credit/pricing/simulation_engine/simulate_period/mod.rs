@@ -347,11 +347,7 @@ pub(super) fn simulate_period(
                             .max(0.0)
                     })
                     .sum::<f64>(),
-                instrument
-                    .behavior_overrides
-                    .reinvestment_price
-                    .or_else(|| period.assumptions.as_ref().map(|a| a.price_pct))
-                    .unwrap_or(100.0),
+                period.assumptions.as_ref().map_or(100.0, |a| a.price_pct),
             ),
             None => (0.0, 100.0),
         };

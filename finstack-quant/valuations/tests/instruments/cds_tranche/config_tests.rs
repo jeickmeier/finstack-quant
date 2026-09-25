@@ -171,12 +171,12 @@ fn pricer_rejects_invalid_direct_student_t_spec() {
 #[test]
 fn test_pricer_config_recovery_builders_populate_recovery_spec() {
     let stochastic = CDSTranchePricerConfig::default().with_stochastic_recovery();
-    assert!(stochastic.recovery_spec.is_some());
+    assert!(stochastic.stochastic_recovery_spec.is_some());
 
     let custom =
         CDSTranchePricerConfig::default().with_custom_stochastic_recovery(0.35, 0.20, -0.4);
-    let custom_debug = format!("{:?}", custom.recovery_spec);
-    assert!(custom.recovery_spec.is_some());
+    let custom_debug = format!("{:?}", custom.stochastic_recovery_spec);
+    assert!(custom.stochastic_recovery_spec.is_some());
     assert!(custom_debug.contains("0.35"));
     assert!(custom_debug.contains("0.2"));
     assert!(custom_debug.contains("-0.4"));
@@ -186,20 +186,20 @@ fn test_pricer_config_recovery_builders_populate_recovery_spec() {
         Percentage::new(25.0).expect("finite percentage"),
         -0.3,
     );
-    let custom_pct_debug = format!("{:?}", custom_pct.recovery_spec);
-    assert!(custom_pct.recovery_spec.is_some());
+    let custom_pct_debug = format!("{:?}", custom_pct.stochastic_recovery_spec);
+    assert!(custom_pct.stochastic_recovery_spec.is_some());
     assert!(custom_pct_debug.contains("0.45"));
     assert!(custom_pct_debug.contains("0.25"));
 
     let constant = CDSTranchePricerConfig::default().with_constant_recovery(0.42);
-    let constant_debug = format!("{:?}", constant.recovery_spec);
-    assert!(constant.recovery_spec.is_some());
+    let constant_debug = format!("{:?}", constant.stochastic_recovery_spec);
+    assert!(constant.stochastic_recovery_spec.is_some());
     assert!(constant_debug.contains("0.42"));
 
     let constant_pct = CDSTranchePricerConfig::default()
         .with_constant_recovery_pct(Percentage::new(38.0).expect("finite percentage"));
-    let constant_pct_debug = format!("{:?}", constant_pct.recovery_spec);
-    assert!(constant_pct.recovery_spec.is_some());
+    let constant_pct_debug = format!("{:?}", constant_pct.stochastic_recovery_spec);
+    assert!(constant_pct.stochastic_recovery_spec.is_some());
     assert!(constant_pct_debug.contains("0.38"));
 }
 

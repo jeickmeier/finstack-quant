@@ -337,7 +337,7 @@ impl InstrumentCollateral {
             let (rate, spread_bp, index_id) = bond_economics(&bond.cashflow_spec)?;
             rows.push(PoolAsset {
                 id: bond.id.clone(),
-                asset_type: AssetType::HighYieldBond { industry: None },
+                asset_type: AssetType::HighYieldBond {},
                 balance: bond.notional,
                 rate,
                 spread_bp,
@@ -377,7 +377,7 @@ impl InstrumentCollateral {
             };
             rows.push(PoolAsset {
                 id: loan.id.clone(),
-                asset_type: AssetType::FirstLienLoan { industry: None },
+                asset_type: AssetType::FirstLienLoan {},
                 balance: current_balance(CollateralInstrument::TermLoan(loan), Some(closing_date))?,
                 rate,
                 spread_bp,
@@ -417,7 +417,7 @@ impl InstrumentCollateral {
             };
             rows.push(PoolAsset {
                 id: facility.id.clone(),
-                asset_type: AssetType::RevolverLoan { industry: None },
+                asset_type: AssetType::RevolverLoan {},
                 balance: facility.drawn_amount,
                 rate,
                 spread_bp,

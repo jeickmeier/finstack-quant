@@ -90,7 +90,7 @@ impl PyRepLine {
     /// >>> from finstack_quant.valuations.instruments import RepLine
     /// >>> line = RepLine(
     /// ...     "LINE-1", Money(80_000_000.0, Currency("USD")), 0.07,
-    /// ...     datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan", "industry": None},
+    /// ...     datetime.date(2031, 1, 15), 12, DayCount.ACT_360, asset_type={"type": "first_lien_loan"},
     /// ...     cpr=0.10, cdr=0.02, recovery_rate=0.45,
     /// ... )
     /// >>> "LINE-1" in repr(line)

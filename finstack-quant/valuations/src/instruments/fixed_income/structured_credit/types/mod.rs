@@ -88,7 +88,6 @@ pub use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec, Recove
 
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use serde::{Deserialize, Serialize};
 
@@ -99,19 +98,6 @@ use serde::{Deserialize, Serialize};
 pub struct MarketConditions {
     /// Finite annual decimal refinancing rate for Richard-Roll incentives; may be negative.
     pub refi_rate: f64,
-}
-
-/// Optional monetary inputs for CMBS debt-service coverage metrics.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct CreditFactors {
-    /// Annual net operating income for CMBS collateral, when provided.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub annual_noi: Option<Money>,
-    /// Annual debt service for CMBS collateral, when provided.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub annual_debt_service: Option<Money>,
 }
 
 /// Deal metadata (counterparties and identifiers).
@@ -129,29 +115,6 @@ pub struct Metadata {
     pub special_servicer_id: Option<String>,
     /// Trustee identifier (for ABS).
     pub trustee_id: Option<String>,
-}
-
-/// Behavioral overrides for prepayment, default, and recovery assumptions.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct Overrides {
-    /// Override prepayment with constant annual CPR.
-    pub cpr_annual: Option<f64>,
-    /// Override prepayment with PSA multiplier.
-    pub psa_speed_multiplier: Option<f64>,
-    /// Override default with constant annual CDR.
-    pub cdr_annual: Option<f64>,
-    /// Override default with SDA multiplier.
-    pub sda_speed_multiplier: Option<f64>,
-    /// Override recovery with constant rate.
-    pub recovery_rate: Option<f64>,
-    /// Override recovery lag (months).
-    pub recovery_lag_months: Option<u32>,
-    /// Override the replacement-collateral purchase price during the
-    /// reinvestment period, as a percent of par (`97.5` = 97.5); takes
-    /// precedence over `ReinvestmentAssumptions::price_pct`.
-    pub reinvestment_price: Option<f64>,
 }
 
 /// Configuration for deterministic + optional stochastic credit behavior models.
@@ -321,16 +284,9 @@ pub struct StructuredCredit {
     /// Market conditions impacting behavior.
     pub market_conditions: MarketConditions,
 
-    /// Credit factors impacting default behavior.
-    pub credit_factors: CreditFactors,
-
     /// Deal metadata (counterparties, identifiers).
     #[serde(default)]
     pub deal_metadata: Metadata,
-
-    /// Behavioral assumption overrides.
-    #[serde(default)]
-    pub behavior_overrides: Overrides,
 
     /// Interest rate swaps settled through the waterfall: net receipts join
     /// interest proceeds, net payments rank as senior or junior fees. See

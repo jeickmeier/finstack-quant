@@ -54,7 +54,7 @@
 //!     .wam(348)
 //!     .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())
 //!     .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())
-//!     .prepayment_model(PrepaymentModelSpec::psa(1.0))
+//!     .prepayment_spec(PrepaymentModelSpec::psa(1.0))
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
 //!     .day_count(finstack_quant_core::dates::DayCount::Thirty360)
 //!     .build()

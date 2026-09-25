@@ -465,10 +465,8 @@ fn test_structured_credit_registry_exposes_cmbs_dscr() {
         "USD-OIS",
     )
     .with_payment_calendar("nyse");
-    sc.credit_factors.annual_noi =
-        Some(Money::new(1_250_000.0, Currency::USD).expect("valid money fixture"));
-    sc.credit_factors.annual_debt_service =
-        Some(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"));
+    sc.pool.assets[0].noi =
+        Some(Money::new(625_000.0, Currency::USD).expect("valid money fixture"));
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
 
@@ -481,10 +479,9 @@ fn test_structured_credit_registry_exposes_cmbs_dscr() {
         )
         .expect("CMBS metric request should succeed");
 
-    assert!(
-        result.measures.contains_key("cmbs_dscr"),
-        "CMBS DSCR should be computed through the metric registry"
-    );
+    // Interest-only debt service on the 5% fixed loan: 10mm * 0.05 = 500k.
+    let dscr = result.measures["cmbs_dscr"];
+    assert!((dscr - 1.25).abs() < 1e-12, "{dscr}");
 }
 
 #[test]

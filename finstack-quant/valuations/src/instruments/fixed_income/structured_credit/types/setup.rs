@@ -17,8 +17,9 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DealFees {
-    /// Annual trustee fee (fixed amount)
-    pub trustee_fee_annual: Money,
+    /// Fixed trustee fee per annum; the waterfall divides it by the payment
+    /// periods per year.
+    pub trustee_fee: Money,
     /// Senior management fee (basis points per annum on collateral)
     pub senior_mgmt_fee_bp: f64,
     /// Subordinated management fee (basis points per annum), paid after every
@@ -96,7 +97,7 @@ mod tests {
     fn test_clo_fee_structure() {
         let fees = DealFees::clo_standard(Currency::USD);
 
-        assert_eq!(fees.trustee_fee_annual.amount(), 50_000.0);
+        assert_eq!(fees.trustee_fee.amount(), 50_000.0);
         // BSL CLO convention: a small senior fee ahead of the notes and the
         // larger subordinated fee behind them.
         assert_eq!(fees.senior_mgmt_fee_bp, 15.0);

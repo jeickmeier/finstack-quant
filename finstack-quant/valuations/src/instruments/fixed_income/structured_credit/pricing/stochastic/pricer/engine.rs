@@ -887,7 +887,7 @@ impl StochasticPricer {
     }
 
     /// Evolved prepayment factor series of one path, correlated with the
-    /// evolved `credit_factors` at the configured level; `None` when the
+    /// evolved `factor_path` at the configured level; `None` when the
     /// factor spec is single-factor (prepayment then shares the credit
     /// factor).
     ///
@@ -910,13 +910,13 @@ impl StochasticPricer {
     ///
     /// # Arguments
     ///
-    /// * `credit_factors` - The path's evolved monthly credit factors.
+    /// * `factor_path` - The path's evolved monthly credit factors.
     /// * `path_index` - Path number within the run.
     /// * `antithetic` - Whether paths are drawn as antithetic pairs.
     /// * `prepared` - Run state carrying the factor correlation and κ.
     fn prepay_factors(
         &self,
-        credit_factors: &[f64],
+        factor_path: &[f64],
         (path_index, antithetic): (usize, bool),
         prepared: &PreparedRun,
     ) -> Option<Vec<f64>> {
@@ -927,7 +927,7 @@ impl StochasticPricer {
         } else {
             (base.substream(path_index as u64), false)
         };
-        let independent: Vec<f64> = (0..credit_factors.len())
+        let independent: Vec<f64> = (0..factor_path.len())
             .map(|_| {
                 let draw = rng.next_std_normal();
                 if negate {
@@ -940,7 +940,7 @@ impl StochasticPricer {
         let evolved_independent = Self::evolved_factors(&independent, prepared.factor_kappa);
         let scale = (1.0 - rho * rho).max(0.0).sqrt();
         Some(
-            credit_factors
+            factor_path
                 .iter()
                 .zip(evolved_independent.iter())
                 .map(|(zc, zi)| rho * zc + scale * zi)
@@ -959,12 +959,12 @@ impl StochasticPricer {
         // are innovations. Applied unconditionally — persistence is a property
         // of the factor, not of which channels are simulated.
         let evolved_storage = Self::evolved_factors(factors, prepared.factor_kappa);
-        let credit_factors: &[f64] = &evolved_storage;
-        let prepay_storage = self.prepay_factors(credit_factors, path, prepared);
+        let factor_path: &[f64] = &evolved_storage;
+        let prepay_storage = self.prepay_factors(factor_path, path, prepared);
         // SingleFactor: prepayment shares the credit factor, i.e. implied
         // correlation +1.
-        let prepay_factors: &[f64] = prepay_storage.as_deref().unwrap_or(credit_factors);
-        let factors: &[f64] = credit_factors;
+        let prepay_factors: &[f64] = prepay_storage.as_deref().unwrap_or(factor_path);
+        let factors: &[f64] = factor_path;
         let months_per_period = instrument.frequency.months().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "Structured credit stochastic pricing requires month-based payment frequencies"
@@ -1123,12 +1123,12 @@ impl StochasticPricer {
             .tree_config
             .initial_seasoning
             .saturating_add(month_offset);
-        let credit_factors = [factor];
+        let factor_path = [factor];
         let prepay_factors = [prepay_factor];
 
         PeriodPoolShock::pool_wide(
             self.conditional_smm(prepared, seasoning, &prepay_factors, burnout),
-            self.conditional_mdr(prepared, seasoning, &credit_factors),
+            self.conditional_mdr(prepared, seasoning, &factor_path),
             // Recovery is a CREDIT quantity and stays on the credit factor, so
             // defaults and recoveries continue to co-move as the sign
             // convention requires.

@@ -177,6 +177,8 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"time_steps_per_year|default_recovery_rate|"
             r"margin_add_bp_by_date|pik_toggle_by_date|extra_cash_sweeps|draw_stop_date|"
             r"margin_stepups|commitment_step_downs|commitment_schedule|"
+            r"behavior_overrides|credit_factors|cpr_annual|cdr_annual|reinvestment_price|"
+            r"annual_noi|annual_debt_service|trustee_fee_annual|prepayment_model|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

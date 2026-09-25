@@ -58,9 +58,7 @@ fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
         let asset = PoolAsset {
             day_count: finstack_quant_core::dates::DayCount::Act360,
             id: InstrumentId::new(format!("ASSET_{}", i)),
-            asset_type: AssetType::FirstLienLoan {
-                industry: Some("Technology".into()),
-            },
+            asset_type: AssetType::FirstLienLoan {},
             balance: Money::new(asset_balance, currency).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: Some(400.0),

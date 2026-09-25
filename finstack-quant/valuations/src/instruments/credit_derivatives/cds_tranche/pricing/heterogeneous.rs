@@ -94,8 +94,11 @@ impl CDSTranchePricer {
             PoolExposure::Loss => 1.0 - recovery,
             PoolExposure::Recovery => recovery,
         };
-        let recovery_model: Option<Box<dyn RecoveryModel>> =
-            self.params.recovery_spec.as_ref().map(|spec| spec.build());
+        let recovery_model: Option<Box<dyn RecoveryModel>> = self
+            .params
+            .stochastic_recovery_spec
+            .as_ref()
+            .map(|spec| spec.build());
         let exposure_at = |i: usize, factors: &[f64]| {
             exposure_of(recovery_model.as_ref().map_or(recoveries[i], |model| {
                 model.conditional_recovery(self.recovery_driver_for_factors(factors))

@@ -417,7 +417,7 @@ mod tests {
             );
             assert_eq!(deal.pool.cumulative_defaults, asset.balance);
             assert_eq!(deal.pool.cumulative_recoveries.amount(), 0.0);
-            assert_eq!(deal.behavior_overrides.recovery_lag_months, Some(9));
+            assert_eq!(deal.credit_model.recovery_spec.recovery_lag, 9);
             let historical_loss = asset.balance.amount() - claim.amount();
             let written_down: f64 = deal
                 .tranches

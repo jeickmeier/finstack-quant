@@ -793,9 +793,7 @@ fn test_pool_asset_type_classification() {
     let first_lien = PoolAsset {
         day_count: finstack_quant_core::dates::DayCount::Act360,
         id: "L1".to_string().into(),
-        asset_type: AssetType::FirstLienLoan {
-            industry: Some("Tech".to_string()),
-        },
+        asset_type: AssetType::FirstLienLoan {},
         balance: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         rate: 0.07,
         spread_bp: Some(450.0),
@@ -828,10 +826,6 @@ fn test_pool_asset_type_classification() {
     };
 
     // Assert
-    match first_lien.asset_type {
-        AssetType::FirstLienLoan { industry } => {
-            assert_eq!(industry.as_deref(), Some("Tech"));
-        }
-        _ => panic!("Expected FirstLienLoan"),
-    }
+    assert_eq!(first_lien.asset_type, AssetType::FirstLienLoan {});
+    assert_eq!(first_lien.industry.as_deref(), Some("Technology"));
 }

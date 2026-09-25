@@ -41,7 +41,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Sto
 /// ...         maturity,
 /// ...         12,
 /// ...         DayCount.ACT_360,
-/// ...         asset_type={"type": "first_lien_loan", "industry": None},
+/// ...         asset_type={"type": "first_lien_loan"},
 /// ...     )
 /// ... ])
 /// >>> note = (

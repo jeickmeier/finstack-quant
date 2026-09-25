@@ -1801,8 +1801,8 @@ fn test_stochastic_recovery_default_is_deterministic() {
     // Verify that default configuration uses deterministic (constant) recovery
     let pricer = CDSTranchePricer::new();
     assert!(
-        pricer.get_config().recovery_spec.is_none(),
-        "Default recovery_spec should be None (deterministic)"
+        pricer.get_config().stochastic_recovery_spec.is_none(),
+        "Default stochastic_recovery_spec should be None (deterministic)"
     );
 }
 

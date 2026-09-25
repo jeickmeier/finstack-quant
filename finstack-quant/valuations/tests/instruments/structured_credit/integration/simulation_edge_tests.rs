@@ -36,9 +36,7 @@ fn legal_maturity() -> Date {
 fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: bool) -> PoolAsset {
     PoolAsset {
         id: InstrumentId::new(id.to_string()),
-        asset_type: AssetType::FirstLienLoan {
-            industry: Some("Test".to_string()),
-        },
+        asset_type: AssetType::FirstLienLoan {},
         balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
         rate,
         spread_bp: None,

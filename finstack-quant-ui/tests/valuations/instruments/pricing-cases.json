@@ -62,7 +62,7 @@
       "type": "agency_mbs_passthrough",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json",
-        "sha256": "89e718420b1cabaa28139d1472cf50966600bde06dbc58840115cc6ddf4189cd",
+        "sha256": "f1ce8171107539d0fb78f352e556999ddddab8cb26143a8cec48b1a3bbeb28f9",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -83,13 +83,13 @@
         "path": [
           "instrument",
           "spec",
-          "prepayment_model",
+          "prepayment_spec",
           "curve",
           "speed_multiplier"
         ],
         "from": 1,
         "to": 1.1,
-        "description": "Change prepayment_model.curve.speed_multiplier from 1 to 1.1; native present value must change."
+        "description": "Change prepayment_spec.curve.speed_multiplier from 1 to 1.1; native present value must change."
       },
       "reference": {
         "baseline": {
@@ -182,7 +182,7 @@
       "type": "asset_backed_facility",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json",
-        "sha256": "1831f869ef379a709785c6eb866897c20e7202fe83912661e5cf66c6832ef9b9",
+        "sha256": "47e4619640243abf5935bee77c58cfd23938d12e3609b2e510f2e3b26a540703",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2582,7 +2582,7 @@
       "type": "revolving_credit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/revolving_credit.json",
-        "sha256": "c27c11adf030b9347936e39f66897b5ad6b8603f2b276aec7646929e9c174968",
+        "sha256": "6ea6dd6083f42bb2e146e6908dc69856384d750d11f305983e632367f97c2ddc",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2670,7 +2670,7 @@
       "type": "structured_credit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-        "sha256": "4cfa2247f900a7c5dc4f21499ab4983b37b39cd1c7ae426e781a3c1ec63653f2",
+        "sha256": "a912d2942997206de0404ec2d5c3b91a75d612c17009578108b175774938913f",
         "pointer": []
       },
       "instrumentPatches": [],

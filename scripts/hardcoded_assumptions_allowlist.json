@@ -2236,7 +2236,7 @@
     {
       "path": "finstack-quant/valuations/src/instruments/fixed_income/mbs_passthrough/types.rs",
       "category": "structured_credit",
-      "contains": ".prepayment_model(PrepaymentModelSpec::psa(1.0))",
+      "contains": ".prepayment_spec(PrepaymentModelSpec::psa(1.0))",
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {
@@ -2452,7 +2452,7 @@
     {
       "path": "finstack-quant/valuations/src/instruments/fixed_income/tba/pricer.rs",
       "category": "structured_credit",
-      "contains": ".prepayment_model(PrepaymentModelSpec::psa(1.0))",
+      "contains": ".prepayment_spec(PrepaymentModelSpec::psa(1.0))",
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {

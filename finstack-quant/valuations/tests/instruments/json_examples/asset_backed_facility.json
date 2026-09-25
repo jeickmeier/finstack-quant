@@ -27,7 +27,6 @@
           {
             "acquisition_date": null,
             "asset_type": {
-              "industry": null,
               "type": "high_yield_bond"
             },
             "balance": {

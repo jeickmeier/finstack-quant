@@ -673,13 +673,6 @@
           "additionalProperties": false,
           "description": "First lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "first_lien_loan",
               "type": "string"
@@ -694,13 +687,6 @@
           "additionalProperties": false,
           "description": "Second lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "second_lien_loan",
               "type": "string"
@@ -715,13 +701,6 @@
           "additionalProperties": false,
           "description": "Revolving credit facility",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "revolver_loan",
               "type": "string"
@@ -736,13 +715,6 @@
           "additionalProperties": false,
           "description": "Bridge loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "bridge_loan",
               "type": "string"
@@ -757,13 +729,6 @@
           "additionalProperties": false,
           "description": "Mezzanine loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "mezzanine_loan",
               "type": "string"
@@ -778,13 +743,6 @@
           "additionalProperties": false,
           "description": "High yield bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "high_yield_bond",
               "type": "string"
@@ -799,13 +757,6 @@
           "additionalProperties": false,
           "description": "Investment grade bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "investment_grade_bond",
               "type": "string"
@@ -820,13 +771,6 @@
           "additionalProperties": false,
           "description": "Distressed bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "distressed_bond",
               "type": "string"
@@ -841,13 +785,6 @@
           "additionalProperties": false,
           "description": "Emerging markets bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "emerging_markets_bond",
               "type": "string"
@@ -2834,9 +2771,9 @@
           "format": "double",
           "type": "number"
         },
-        "trustee_fee_annual": {
+        "trustee_fee": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Annual trustee fee (fixed amount)"
+          "description": "Fixed trustee fee per annum; the waterfall divides it by the payment\nperiods per year."
         },
         "workout_fee_pct": {
           "description": "Special servicer workout fee as a percent of the principal and\ninterest collected on specially serviced loans (`1.0` = 1%), taken\noff the top of those collections; `None` for no workout fee.",
@@ -2848,7 +2785,7 @@
         }
       },
       "required": [
-        "trustee_fee_annual",
+        "trustee_fee",
         "senior_mgmt_fee_bp",
         "subordinated_mgmt_fee_bp",
         "servicing_fee_bp"
@@ -4396,7 +4333,7 @@
               "type": "null"
             }
           ],
-          "description": "Annual net operating income of the property securing the loan, for\nthe pool debt-service coverage ratio."
+          "description": "Net operating income per annum of the property securing the loan,\nin the loan's currency. The only NOI input of the CMBS pool\ndebt-service coverage ratio."
         },
         "obligor_id": {
           "description": "Optional obligor identifier used for single-name concentration limits.",
@@ -6526,7 +6463,6 @@
               {
                 "acquisition_date": null,
                 "asset_type": {
-                  "industry": null,
                   "type": "high_yield_bond"
                 },
                 "balance": {

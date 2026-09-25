@@ -4,9 +4,9 @@
 //! appropriate defaults for ABS, CLO, CMBS, and RMBS instruments.
 
 use super::{
-    AssetPool, CreditFactors, CreditModelConfig, DealType, DefaultModelSpec, MarketConditions,
-    Metadata, Overrides, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    AssetPool, CreditModelConfig, DealType, DefaultModelSpec, MarketConditions, Metadata,
+    PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, StructuredCredit, Tranche, TrancheCoupon,
+    TrancheSeniority, TrancheStructure,
 };
 use crate::instruments::fixed_income::structured_credit::assumptions::{
     embedded_registry_or_panic, required_assumption,
@@ -24,9 +24,7 @@ pub(super) struct DealConfig {
     pub prepayment_spec: PrepaymentModelSpec,
     pub default_spec: DefaultModelSpec,
     pub recovery_spec: RecoveryModelSpec,
-    pub credit_factors: CreditFactors,
     pub deal_metadata: Metadata,
-    pub behavior_overrides: Overrides,
 }
 
 /// Core instrument parameters shared across constructors
@@ -195,9 +193,7 @@ impl StructuredCredit {
                 card: None,
             },
             market_conditions: MarketConditions::default(),
-            credit_factors: config.credit_factors,
             deal_metadata: config.deal_metadata,
-            behavior_overrides: config.behavior_overrides,
             // Hedge swaps default to empty
             hedge_swaps: Vec::new(),
             cleanup_call_pct: None,
@@ -387,8 +383,6 @@ fn deal_config_from_registry(profile_id: &str, closing_date: Date) -> DealConfig
         prepayment_spec: defaults.prepayment_spec,
         default_spec: defaults.default_spec,
         recovery_spec: defaults.recovery_spec,
-        credit_factors: defaults.credit_factors,
         deal_metadata: Metadata::default(),
-        behavior_overrides: Overrides::default(),
     }
 }

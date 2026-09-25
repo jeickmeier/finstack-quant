@@ -433,8 +433,11 @@ impl CDSTranchePricer {
         correlation: f64,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        let recovery_model: Option<Box<dyn RecoveryModel>> =
-            self.params.recovery_spec.as_ref().map(|spec| spec.build());
+        let recovery_model: Option<Box<dyn RecoveryModel>> = self
+            .params
+            .stochastic_recovery_spec
+            .as_ref()
+            .map(|spec| spec.build());
         let exposure_of = |recovery: f64| match exposure {
             PoolExposure::Loss => 1.0 - recovery,
             PoolExposure::Recovery => recovery,
@@ -489,7 +492,7 @@ impl CDSTranchePricer {
         date: Date,
     ) -> Result<(f64, f64)> {
         let stochastic = matches!(
-            self.params.recovery_spec,
+            self.params.stochastic_recovery_spec,
             Some(RecoverySpec::MarketCorrelated { .. })
         );
         if stochastic || (self.params.use_issuer_curves && index_data.has_issuer_curves()) {

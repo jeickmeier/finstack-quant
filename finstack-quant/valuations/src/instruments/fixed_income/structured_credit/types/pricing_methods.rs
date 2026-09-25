@@ -32,7 +32,7 @@ impl StructuredCredit {
         &self,
         seasoning_months: u32,
     ) -> finstack_quant_core::Result<f64> {
-        self.resolved_credit_model()?
+        self.validated_credit_model()?
             .prepayment_spec
             .smm(seasoning_months)
     }
@@ -46,7 +46,7 @@ impl StructuredCredit {
         &self,
         seasoning_months: u32,
     ) -> finstack_quant_core::Result<f64> {
-        self.resolved_credit_model()?
+        self.validated_credit_model()?
             .default_spec
             .mdr(seasoning_months)
     }
@@ -199,7 +199,7 @@ impl StructuredCredit {
         tree_config.recovery_spec = match &self.credit_model.stochastic_recovery_spec {
             Some(spec) => spec.clone(),
             None => {
-                StochasticRecoverySpec::constant(self.resolved_credit_model()?.recovery_spec.rate)
+                StochasticRecoverySpec::constant(self.validated_credit_model()?.recovery_spec.rate)
                     .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?
             }
         };
@@ -312,7 +312,7 @@ impl StructuredCredit {
         StochasticDefaultSpec,
         CorrelationStructure,
     )> {
-        let model = self.resolved_credit_model()?;
+        let model = self.validated_credit_model()?;
         // The stochastic engines size defaults from a per-month rate on the
         // surviving balance; curves stated against the original balance and
         // severities by month of default are deterministic-only.
@@ -350,10 +350,12 @@ impl StructuredCredit {
         }
         let prepay = model
             .stochastic_prepay_spec
-            .unwrap_or_else(|| StochasticPrepaySpec::deterministic(model.prepayment_spec));
+            .clone()
+            .unwrap_or_else(|| StochasticPrepaySpec::deterministic(model.prepayment_spec.clone()));
         let default = model
             .stochastic_default_spec
-            .unwrap_or_else(|| StochasticDefaultSpec::deterministic(model.default_spec));
+            .clone()
+            .unwrap_or_else(|| StochasticDefaultSpec::deterministic(model.default_spec.clone()));
 
         let correlation = match &self.credit_model.correlation_structure {
             Some(correlation) => correlation.clone(),
@@ -580,14 +582,15 @@ impl StructuredCredit {
 #[cfg(test)]
 mod production_structured_assumptions {
     use super::*;
+    use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec};
     use time::macros::date;
 
     #[test]
-    fn production_structured_stochastic_uses_behavior_overrides() {
+    fn production_structured_stochastic_uses_credit_model() {
         let mut deal = StructuredCredit::example();
-        deal.behavior_overrides.cpr_annual = Some(0.23);
-        deal.behavior_overrides.cdr_annual = Some(0.12);
-        deal.behavior_overrides.recovery_rate = Some(0.71);
+        deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.23);
+        deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
+        deal.credit_model.recovery_spec.rate = 0.71;
         let config = deal
             .build_scenario_tree_config(deal.closing_date)
             .expect("config");

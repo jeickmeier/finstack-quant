@@ -11,7 +11,7 @@ use finstack_quant_models::credit::pool::{
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CoverageTrigger, DealType, DefaultModelSpec, HedgeSwap, Overrides, PoolAsset,
+    AssetPool, CoverageTrigger, DealType, DefaultModelSpec, HedgeSwap, PoolAsset,
     PrepaymentModelSpec, RecoveryModelSpec, ReinvestmentCriteria, ReinvestmentPeriod,
     StructuredCredit, SwapNotional, SwapPriority, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure, TriggerConsequence,
@@ -131,7 +131,7 @@ fn test_clo_json_roundtrip() {
 }
 
 #[test]
-fn test_rmbs_with_overrides_serialization() {
+fn test_rmbs_credit_model_serialization() {
     // Arrange
     let pool = AssetPool::new("TEST_POOL", DealType::Rmbs, Currency::USD);
 
@@ -156,9 +156,9 @@ fn test_rmbs_with_overrides_serialization() {
         "USD-OIS",
     );
 
-    // Set behavior overrides
-    rmbs.behavior_overrides.psa_speed_multiplier = Some(1.5);
-    rmbs.behavior_overrides.cdr_annual = Some(0.01);
+    // Set the credit model
+    rmbs.credit_model.prepayment_spec = PrepaymentModelSpec::psa(1.5);
+    rmbs.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.01);
 
     // Act
     let json = serde_json::to_string(&rmbs).expect("Serialization failed");
@@ -167,10 +167,13 @@ fn test_rmbs_with_overrides_serialization() {
 
     // Assert
     assert_eq!(
-        deserialized.behavior_overrides.psa_speed_multiplier,
-        Some(1.5)
+        deserialized.credit_model.prepayment_spec,
+        PrepaymentModelSpec::psa(1.5)
     );
-    assert_eq!(deserialized.behavior_overrides.cdr_annual, Some(0.01));
+    assert_eq!(
+        deserialized.credit_model.default_spec,
+        DefaultModelSpec::constant_cdr(0.01)
+    );
 }
 
 // JSON Format Stability Tests
@@ -284,7 +287,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         0.055,
         Date::from_calendar_date(2031, Month::January, 1).unwrap(),
         DayCount::Act360,
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::AssetType::FirstLienLoan { industry: None },
+        finstack_quant_valuations::instruments::fixed_income::structured_credit::AssetType::FirstLienLoan {},
     )
     .with_cpr(0.08)
     .with_cdr(0.03)
@@ -365,12 +368,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
             refi_rate: 0.035,
         };
 
-    deal.credit_factors =
-        finstack_quant_valuations::instruments::fixed_income::structured_credit::CreditFactors {
-            annual_noi: None,
-            annual_debt_service: None,
-        };
-
     deal.deal_metadata =
         finstack_quant_valuations::instruments::fixed_income::structured_credit::Metadata {
             manager_id: Some("Manager-X".to_string()),
@@ -379,16 +376,6 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
             special_servicer_id: Some("Special-W".to_string()),
             trustee_id: Some("Trustee-T".to_string()),
         };
-
-    deal.behavior_overrides = Overrides {
-        cpr_annual: Some(0.18),
-        psa_speed_multiplier: Some(1.3),
-        cdr_annual: Some(0.025),
-        sda_speed_multiplier: Some(1.1),
-        recovery_rate: Some(0.42),
-        recovery_lag_months: Some(9),
-        reinvestment_price: Some(101.0),
-    };
 
     deal.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::factor_correlated(
         PrepaymentModelSpec::psa(1.1),
@@ -485,14 +472,6 @@ fn test_structured_credit_full_feature_json_roundtrip() {
     assert_eq!(
         original.credit_model.recovery_spec,
         parsed.credit_model.recovery_spec
-    );
-    assert_eq!(
-        original.behavior_overrides.cpr_annual,
-        parsed.behavior_overrides.cpr_annual
-    );
-    assert_eq!(
-        original.behavior_overrides.reinvestment_price,
-        parsed.behavior_overrides.reinvestment_price
     );
 
     // Market and credit factors
@@ -737,6 +716,56 @@ fn typo_in_top_level_field_is_rejected() {
     let mut v = full_example_value();
     v["instrument"]["spec"]["cleanup_call_pc"] = serde_json::json!(0.1);
     assert_rejected(&v, "cleanup_call_pc", "StructuredCredit");
+}
+
+/// `credit_model` is the only channel for deal behaviour and loan-level
+/// `noi` the only NOI input, so the retired top-level containers are rejected.
+#[test]
+// schema-rejection-test: behavior_overrides, credit_factors (retired StructuredCredit keys)
+fn retired_behavior_and_credit_factor_channels_are_rejected() {
+    for (key, payload) in [
+        (
+            "behavior_overrides",
+            serde_json::json!({"cpr_annual": 0.1, "reinvestment_price": 99.0}),
+        ),
+        (
+            "credit_factors",
+            serde_json::json!({"annual_noi": {"amount": "1", "currency": "USD"}}),
+        ),
+    ] {
+        let mut v = full_example_value();
+        v["instrument"]["spec"][key] = payload;
+        assert_rejected(&v, key, "StructuredCredit");
+    }
+}
+
+#[test]
+// schema-rejection-test: fees.trustee_fee_annual (now fees.trustee_fee)
+fn retired_trustee_fee_annual_key_is_rejected() {
+    let deal = build_full_feature_structured_credit().with_standard_fees();
+    let mut v = serde_json::to_value(InstrumentEnvelope {
+        schema: finstack_quant_valuations::instruments::json_loader::InstrumentSchema::CURRENT,
+        instrument: InstrumentJson::StructuredCredit(Box::new(deal)),
+    })
+    .expect("provider must serialize");
+    let fees = v["instrument"]["spec"]["fees"]
+        .as_object_mut()
+        .expect("standard fees");
+    let fee = fees.remove("trustee_fee").expect("trustee_fee key");
+    fees.insert("trustee_fee_annual".into(), fee);
+    assert_rejected(&v, "trustee_fee_annual", "DealFees");
+}
+
+/// Industry lives on `PoolAsset.industry` only; the loan and bond asset types
+/// carry no payload, so a stray `industry` inside `asset_type` is rejected
+/// instead of being silently dropped.
+#[test]
+// schema-rejection-test: pool.assets[].asset_type.industry (now pool.assets[].industry)
+fn retired_asset_type_industry_payload_is_rejected() {
+    let mut v = full_example_value();
+    v["instrument"]["spec"]["pool"]["assets"][0]["asset_type"] =
+        serde_json::json!({"type": "first_lien_loan", "industry": "Technology"});
+    assert_rejected(&v, "industry", "AssetType");
 }
 
 /// The unmutated fixture must still parse — strictness must not have broken

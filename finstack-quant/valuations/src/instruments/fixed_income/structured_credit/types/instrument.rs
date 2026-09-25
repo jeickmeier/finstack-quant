@@ -190,11 +190,10 @@ impl Instrument for StructuredCredit {
     }
 
     fn model_params_snapshot(&self) -> ModelParamsSnapshot {
-        let effective = self.effective_credit_model();
         ModelParamsSnapshot::StructuredCredit {
-            prepayment_spec: effective.prepayment_spec,
-            default_spec: effective.default_spec,
-            recovery_spec: effective.recovery_spec,
+            prepayment_spec: self.credit_model.prepayment_spec.clone(),
+            default_spec: self.credit_model.default_spec.clone(),
+            recovery_spec: self.credit_model.recovery_spec.clone(),
         }
     }
 

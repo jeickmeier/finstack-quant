@@ -119,7 +119,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Trade notional (par amount)."
         },
-        "prepayment_model": {
+        "prepayment_spec": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json"

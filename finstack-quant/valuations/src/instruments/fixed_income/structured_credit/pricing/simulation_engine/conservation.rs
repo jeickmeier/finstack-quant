@@ -288,7 +288,7 @@ fn purchase_replacement_collateral(
         ),
         None => PoolAsset::fixed_rate_bond(id, par, spread, maturity, DayCount::Act360),
     };
-    asset.asset_type = AssetType::FirstLienLoan { industry: None };
+    asset.asset_type = AssetType::FirstLienLoan {};
     asset.purchase_price = Some(recyclable);
     asset.acquisition_date = Some(payment_date);
     state

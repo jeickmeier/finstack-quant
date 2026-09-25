@@ -73,7 +73,7 @@ pub(crate) fn rate_risk_pool(
         - bumped_curve.df_between_dates(as_of, end)?.ln())
         / horizon;
     let mut pool = mbs.clone();
-    pool.prepayment_model = rate_shift_prepayment(&mbs.prepayment_model, shift);
+    pool.prepayment_spec = rate_shift_prepayment(&mbs.prepayment_spec, shift);
     Ok(pool)
 }
 
@@ -181,7 +181,7 @@ mod tests {
             .wam(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-TSY"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -284,7 +284,7 @@ mod tests {
             .wam(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
-            .prepayment_model(PrepaymentModelSpec::psa(2.0))
+            .prepayment_spec(PrepaymentModelSpec::psa(2.0))
             .discount_curve_id(CurveId::new("USD-TSY"))
             .day_count(DayCount::Thirty360)
             .build()
@@ -442,7 +442,7 @@ mod production_mortgage_audit {
     fn duration_is_positive_for_a_fixed_prepayment_pool() {
         let as_of = date!(2024 - 01 - 15);
         let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
-        mbs.prepayment_model = PrepaymentModelSpec::psa(0.0);
+        mbs.prepayment_spec = PrepaymentModelSpec::psa(0.0);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)

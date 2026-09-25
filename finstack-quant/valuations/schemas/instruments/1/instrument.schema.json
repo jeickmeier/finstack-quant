@@ -209,7 +209,7 @@
     },
     "AgencyMbsPassthrough": {
       "additionalProperties": false,
-      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_model(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
+      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
       "properties": {
         "agency": {
           "$ref": "#/$defs/AgencyProgram",
@@ -301,7 +301,7 @@
           "default": "generic",
           "description": "Pool type (generic or specified)."
         },
-        "prepayment_model": {
+        "prepayment_spec": {
           "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
           "description": "Prepayment model specification."
         },
@@ -339,7 +339,7 @@
         "wam",
         "issue_date",
         "maturity",
-        "prepayment_model",
+        "prepayment_spec",
         "discount_curve_id",
         "day_count"
       ],
@@ -427,7 +427,7 @@
             "null"
           ]
         },
-        "prepayment_model": {
+        "prepayment_spec": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json"
@@ -1250,13 +1250,6 @@
           "additionalProperties": false,
           "description": "First lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "first_lien_loan",
               "type": "string"
@@ -1271,13 +1264,6 @@
           "additionalProperties": false,
           "description": "Second lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "second_lien_loan",
               "type": "string"
@@ -1292,13 +1278,6 @@
           "additionalProperties": false,
           "description": "Revolving credit facility",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "revolver_loan",
               "type": "string"
@@ -1313,13 +1292,6 @@
           "additionalProperties": false,
           "description": "Bridge loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "bridge_loan",
               "type": "string"
@@ -1334,13 +1306,6 @@
           "additionalProperties": false,
           "description": "Mezzanine loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "mezzanine_loan",
               "type": "string"
@@ -1355,13 +1320,6 @@
           "additionalProperties": false,
           "description": "High yield bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "high_yield_bond",
               "type": "string"
@@ -1376,13 +1334,6 @@
           "additionalProperties": false,
           "description": "Investment grade bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "investment_grade_bond",
               "type": "string"
@@ -1397,13 +1348,6 @@
           "additionalProperties": false,
           "description": "Distressed bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "distressed_bond",
               "type": "string"
@@ -1418,13 +1362,6 @@
           "additionalProperties": false,
           "description": "Emerging markets bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "emerging_markets_bond",
               "type": "string"
@@ -7952,35 +7889,6 @@
       ],
       "type": "object"
     },
-    "CreditFactors": {
-      "additionalProperties": false,
-      "description": "Optional monetary inputs for CMBS debt-service coverage metrics.",
-      "properties": {
-        "annual_debt_service": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Annual debt service for CMBS collateral, when provided."
-        },
-        "annual_noi": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Annual net operating income for CMBS collateral, when provided."
-        }
-      },
-      "type": "object"
-    },
     "CreditParams": {
       "additionalProperties": false,
       "description": "Credit parameters for CDS instruments",
@@ -8406,9 +8314,9 @@
           "format": "double",
           "type": "number"
         },
-        "trustee_fee_annual": {
+        "trustee_fee": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Annual trustee fee (fixed amount)"
+          "description": "Fixed trustee fee per annum; the waterfall divides it by the payment\nperiods per year."
         },
         "workout_fee_pct": {
           "description": "Special servicer workout fee as a percent of the principal and\ninterest collected on specially serviced loans (`1.0` = 1%), taken\noff the top of those collections; `None` for no workout fee.",
@@ -8420,7 +8328,7 @@
         }
       },
       "required": [
-        "trustee_fee_annual",
+        "trustee_fee",
         "senior_mgmt_fee_bp",
         "subordinated_mgmt_fee_bp",
         "servicing_fee_bp"
@@ -9130,7 +9038,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Trade notional (par amount)."
         },
-        "prepayment_model": {
+        "prepayment_spec": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json"
@@ -17004,70 +16912,6 @@
         }
       ]
     },
-    "Overrides": {
-      "additionalProperties": false,
-      "description": "Behavioral overrides for prepayment, default, and recovery assumptions.",
-      "properties": {
-        "cdr_annual": {
-          "description": "Override default with constant annual CDR.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "cpr_annual": {
-          "description": "Override prepayment with constant annual CPR.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "psa_speed_multiplier": {
-          "description": "Override prepayment with PSA multiplier.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "recovery_lag_months": {
-          "description": "Override recovery lag (months).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "recovery_rate": {
-          "description": "Override recovery with constant rate.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "reinvestment_price": {
-          "description": "Override the replacement-collateral purchase price during the\nreinvestment period, as a percent of par (`97.5` = 97.5); takes\nprecedence over `ReinvestmentAssumptions::price_pct`.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "sda_speed_multiplier": {
-          "description": "Override default with SDA multiplier.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
     "PacCollar": {
       "additionalProperties": false,
       "description": "PAC collar boundaries.",
@@ -17867,7 +17711,7 @@
               "type": "null"
             }
           ],
-          "description": "Annual net operating income of the property securing the loan, for\nthe pool debt-service coverage ratio."
+          "description": "Net operating income per annum of the property securing the loan,\nin the loan's currency. The only NOI input of the CMBS pool\ndebt-service coverage ratio."
         },
         "obligor_id": {
           "description": "Optional obligor identifier used for single-name concentration limits.",
@@ -21643,19 +21487,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection."
         },
-        "behavior_overrides": {
-          "$ref": "#/$defs/Overrides",
-          "default": {
-            "cdr_annual": null,
-            "cpr_annual": null,
-            "psa_speed_multiplier": null,
-            "recovery_lag_months": null,
-            "recovery_rate": null,
-            "reinvestment_price": null,
-            "sda_speed_multiplier": null
-          },
-          "description": "Behavioral assumption overrides."
-        },
         "call_assumption": {
           "anyOf": [
             {
@@ -21718,10 +21549,6 @@
             "$ref": "#/$defs/CoverageTestSpec"
           },
           "type": "array"
-        },
-        "credit_factors": {
-          "$ref": "#/$defs/CreditFactors",
-          "description": "Credit factors impacting default behavior."
         },
         "deal_metadata": {
           "$ref": "#/$defs/Metadata",
@@ -21987,8 +21814,7 @@
         "frequency",
         "discount_curve_id",
         "attributes",
-        "market_conditions",
-        "credit_factors"
+        "market_conditions"
       ],
       "type": "object"
     },
@@ -24492,7 +24318,7 @@
           "pass_through_rate": 0.04,
           "pool_id": "MA1234",
           "pool_type": "generic",
-          "prepayment_model": {
+          "prepayment_spec": {
             "cpr": 0.06,
             "curve": {
               "curve": "psa",
@@ -27042,17 +26868,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "behavior_overrides": {
-            "cdr_annual": null,
-            "cpr_annual": null,
-            "psa_speed_multiplier": null,
-            "recovery_lag_months": null,
-            "recovery_rate": null,
-            "reinvestment_price": null,
-            "sda_speed_multiplier": null
-          },
           "closing_date": "2024-01-01",
-          "credit_factors": {},
           "deal_metadata": {
             "manager_id": null,
             "master_servicer_id": null,
@@ -27083,7 +26899,6 @@
               {
                 "acquisition_date": null,
                 "asset_type": {
-                  "industry": null,
                   "type": "high_yield_bond"
                 },
                 "balance": {
@@ -27224,7 +27039,6 @@
               {
                 "acquisition_date": null,
                 "asset_type": {
-                  "industry": null,
                   "type": "high_yield_bond"
                 },
                 "balance": {
