@@ -3,6 +3,11 @@
     "spec": {
       "attributes": {},
       "id": "INTEREST-RATE-FUTURE-OPTION-EXAMPLE",
+      "instrument_pricing_overrides": {
+        "market_quotes": {
+          "implied_volatility": 0.2
+        }
+      },
       "terms": {
         "contracts": 1.0,
         "currency": "USD",
@@ -22,8 +27,7 @@
         },
         "strike": 100.0,
         "underlying": "UNDERLYING-FUTURE",
-        "underlying_price_change_per_bp": -0.01,
-        "volatility": 0.2
+        "underlying_price_change_per_bp": -0.01
       }
     },
     "type": "interest_rate_future_option"

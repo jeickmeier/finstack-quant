@@ -402,10 +402,6 @@ export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
  */
 export type DEc89Adc17436F33De839 = "black" | "normal";
 /**
- * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
- */
-export type DC472Bf7871F904B44979 = string;
-/**
  * ISO 8601 calendar date string.
  */
 export type Date11 = string;
@@ -417,6 +413,13 @@ export type Date12 = string;
  * Basis used for bond duration, convexity, and DV01-style risk metrics.
  */
 export type DFd618Cd5743Ec18A168F = "bullet_discountable" | "callable_oas";
+/**
+ * Day basis used to convert annual analytic option theta into a per-day amount.
+ *
+ * Applied by the analytic-theta pricers (EquityOption, FxOption,
+ * FxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.
+ */
+export type DD30540Ea90Ce7Eca3Dee = "calendar_365" | "trading_252";
 /**
  * ISO 4217 currency enumeration
  */
@@ -1129,9 +1132,10 @@ export interface D_3D04Dd3Ee2244B29C6F6 {
    */
   draw_stop_dates: Date2[];
   /**
-   * Margin step-up schedule
+   * Margin steps, each a non-negative cumulative bp change effective from
+   * the start of the first interest period on or after its date.
    */
-  margin_stepups: D_5C46E60A928Fce701Cc6[];
+  margin_steps: D_6B755832A11590976F52[];
   /**
    * PIK toggle schedule
    */
@@ -1323,16 +1327,16 @@ export interface Money1 {
     | "ZWL";
 }
 /**
- * Margin step-up event (covenant penalty or scheduled increase).
+ * Dated margin step (covenant penalty, scheduled change or pricing-grid move).
  *
- * Increases the interest margin by a fixed amount at a specified date,
- * typically triggered by covenant breach or scheduled rating migration. A
- * negative `delta_bp` steps the margin down (a leverage-grid improvement).
+ * Shifts the interest margin by `delta_bp` from `date` onward (effective-from
+ * date). Steps are cumulative. A negative `delta_bp` steps the margin down (a
+ * leverage-grid improvement); term loans accept only non-negative steps.
  */
-export interface D_5C46E60A928Fce701Cc6 {
+export interface D_6B755832A11590976F52 {
   date: Date5;
   /**
-   * Increase in margin (basis points)
+   * Change in margin, in basis points (100 = 1%); negative steps down.
    */
   delta_bp: number;
 }
@@ -1389,7 +1393,7 @@ export interface D_6452Ed90Bbd41F2Ff746 {
  *     availability_start: create_date(2025, Month::January, 1)?,
  *     availability_end: create_date(2026, Month::January, 1)?,
  *     draws: vec![],
- *     commitment_step_downs: vec![],
+ *     commitment_steps: vec![],
  *     usage_fee_bp: 50.0,        // 50 bp usage fee
  *     commitment_fee_bp: 25.0,   // 25 bp commitment fee
  *     fee_base: CommitmentFeeBase::Undrawn,
@@ -1409,11 +1413,11 @@ export interface D_9C32Ce6385C1F57509A4 {
   commitment_fee_bp: number;
   commitment_limit: Money2;
   /**
-   * Commitment step-down schedule: strictly increasing dates inside the
-   * availability window, non-increasing `amount`s in the loan currency,
-   * and `fee_bp == 0.0` (term loans carry no reduction fee).
+   * Commitment steps, each effective from its date: strictly increasing
+   * dates inside the availability window, non-increasing `amount`s in the
+   * loan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).
    */
-  commitment_step_downs: DB7E04Bfd47E833688482[];
+  commitment_steps: DB7E04Bfd47E833688482[];
   /**
    * Scheduled or actual draw events
    */
@@ -1616,7 +1620,7 @@ export interface Money2 {
  * balance over the commitment in force, so a stochastic revolving facility
  * books the implied principal change at the step.
  *
- * A delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only
+ * A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
  * non-increasing steps inside its availability window and no reduction fee
  * (`fee_bp` must be `0.0`).
  */
@@ -2006,28 +2010,29 @@ export interface Tenor {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Pricing overrides (quoted price, seed, etc.)
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Market-quoted values (prices, implied vol, spreads, upfront payments).
  */
 export interface DB0A5Fc543381Da6A5722 {
   /**
-   * CDS par-spread quote in basis points (for CDS and CDS index pricers).
+   * CreditDefaultSwap clean par-spread quote in basis points.
+   *
+   * Used only by CreditDefaultSwap risk replay, where it replaces the
+   * matching contractual hazard-curve pillar. It does not drive PV, and no
+   * other instrument (CDSIndex included) reads it.
    */
   cds_quote_bp?: number | null;
   /**
    * Implied volatility (overrides vol surface). When set on surface-driven
-   * pricers, it is used as a flat σ across tenor and strike.
+   * pricers, it is used as a flat σ across tenor and strike. Options on
+   * futures read it as their only volatility input: decimal lognormal for
+   * Black-76, futures-price points per √year for the normal model.
    */
   implied_volatility?: number | null;
   /**
@@ -2035,9 +2040,11 @@ export interface DB0A5Fc543381Da6A5722 {
    */
   quoted_asw_market?: number | null;
   /**
-   * Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).
+   * Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).
+   *
+   * Inflation-linked bonds quote this per 100 of real (unindexed) face.
    */
-  quoted_clean_price?: number | null;
+  quoted_clean_price_pct?: number | null;
   /**
    * Quoted dirty price in the bond's currency units.
    */
@@ -2061,6 +2068,14 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted OAS (option-adjusted spread) in decimal.
    */
   quoted_oas?: number | null;
+  /**
+   * Observed option premium: the total trade PV in the instrument currency
+   * (notional, contract multiplier and position included).
+   *
+   * This is the target every `ImpliedVol` calculator inverts; it does not
+   * drive PV and is not one of the mutually exclusive price-driving fields.
+   */
+  quoted_premium?: number | null;
   /**
    * Quoted yield-to-maturity in decimal (e.g., `0.055` = 5.5%).
    */
@@ -2325,24 +2340,6 @@ export interface D_572Ad1Befb7D94914652 {
    */
   call_friction_cents?: number | null;
   /**
-   * Add one calendar day to *every* Act/360 premium accrual period.
-   *
-   * Used by the CDS option pricer to model the ISDA pre-Big-Bang
-   * option underlying convention (and matches QuantLib's
-   * `Actual360(true)` day-count). The Bloomberg CDSW convention only
-   * treats the *final* coupon period as inclusive of the maturity date,
-   * so this is not the default for production single-name CDS pricing.
-   */
-  cds_act360_include_last_day?: boolean;
-  /**
-   * Apply ISDA half-day accrual-on-default bias.
-   *
-   * Adds half a day of premium accrual in the default-accrual integral.
-   * Used by the CDS option pricer to model the Bloomberg CDSO underlying
-   * convention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).
-   */
-  cds_aod_half_day_bias?: boolean;
-  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -2454,6 +2451,16 @@ export interface D_572Ad1Befb7D94914652 {
    */
   mc_paths?: number | null;
   /**
+   * Optional Monte Carlo seed label.
+   *
+   * Monte Carlo pricers derive their RNG seed as
+   * `derive_seed(instrument_id, label)`, so the same label always replays
+   * the same random streams for the same instrument. `None` seeds with the
+   * pricer's base label. Finite-difference Greeks set a fixed label on the
+   * repriced clone so base and bumped legs share common random numbers.
+   */
+  mc_seed_scenario?: string | null;
+  /**
    * Optional absolute target for the Monte Carlo confidence-interval
    * half-width in instrument currency.
    *
@@ -2466,8 +2473,10 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Merton Monte Carlo configuration for structural credit PIK pricing.
    *
-   * When set (via flat JSON under `pricing_overrides.merton_mc_config` or the
-   * Rust builder), the `MertonMc` pricer in the registry uses this config.
+   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
+   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
+   * model and grid; the path count, antithetic flag and seed label come from
+   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
   merton_mc_config?: DBffef9E684Ff0C351C83 | null;
   /**
@@ -2543,10 +2552,6 @@ export interface DCdb8Fddc0106047270C4 {
  */
 export interface DBffef9E684Ff0C351C83 {
   /**
-   * Whether to use antithetic variates for variance reduction.
-   */
-  antithetic: boolean;
-  /**
    * Barrier-crossing policy used for `BarrierType::FirstPassage`.
    *
    * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
@@ -2571,10 +2576,6 @@ export interface DBffef9E684Ff0C351C83 {
    */
   cashflow_dfs?: [number, number][] | null;
   /**
-   * Default recovery rate used when no `dynamic_recovery` model is set.
-   */
-  default_recovery_rate: number;
-  /**
    * Optional dynamic (notional-dependent) recovery rate model.
    *
    * Recovery on default is evaluated pathwise as
@@ -2591,10 +2592,6 @@ export interface DBffef9E684Ff0C351C83 {
   endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
   merton: DEe4323Acfdb49E4Fe15B;
   /**
-   * Number of Monte Carlo paths.
-   */
-  num_paths: number;
-  /**
    * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
    */
   pik_schedule:
@@ -2605,13 +2602,15 @@ export interface DBffef9E684Ff0C351C83 {
         stepped: [number, D_7F97Be2823A694F2735D][];
       };
   /**
-   * RNG seed for reproducibility.
+   * Recovery on default as a decimal fraction in `[0, 1]`.
+   *
+   * `dynamic_recovery`, when set, takes precedence over this flat rate.
    */
-  seed: number;
+  recovery_rate: number;
   /**
    * Time steps per year for the simulation grid.
    */
-  time_steps_per_year: number;
+  steps_per_year: number;
   /**
    * Optional toggle exercise model for PIK/cash coupon decisions.
    * Active only for coupon dates where [`PikSchedule`] resolves to
@@ -2636,13 +2635,13 @@ export interface DD760Eef55C5Bd7D5B1F6 {
    */
   bracket?: [number, number] | null;
   /**
-   * Number of MC paths used during calibration iterations (low paths).
+   * Number of independent MC estimators used during calibration iterations (low paths).
    */
   low_paths: number;
   /**
    * Maximum bisection iterations.
    */
-  max_iter: number;
+  max_iterations: number;
   /**
    * Which structural parameter to solve for.
    */
@@ -2964,27 +2963,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
   [k: string]: unknown;
 }
 /**
- * Term loan specific overrides for covenants and schedule adjustments.
- */
-export interface D_8Fb25331316C6E4F3Fc7 {
-  /**
-   * Draw stop date (earliest date after which draws are blocked)
-   */
-  draw_stop_date?: DC472Bf7871F904B44979 | null;
-  /**
-   * Extra cash sweeps by date
-   */
-  extra_cash_sweeps: [DC472Bf7871F904B44979, D_1A6C2Ccee66D90A3A469][];
-  /**
-   * Additional margin step-ups by date (bp)
-   */
-  margin_add_bp_by_date: [DC472Bf7871F904B44979, number][];
-  /**
-   * Force PIK toggles by date
-   */
-  pik_toggle_by_date: [DC472Bf7871F904B44979, boolean][];
-}
-/**
  * Metric-time pricing configuration.
  */
 export interface MetricPricingOverrides {
@@ -2998,17 +2976,17 @@ export interface MetricPricingOverrides {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -3081,6 +3059,42 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * structured-credit convexity).
    */
   ytm_bump_bp?: number | null;
+}
+/**
+ * A parsed tenor representing a time period.
+ *
+ * Tenors are commonly used in financial markets to specify maturities,
+ * payment frequencies, and rate fixing periods.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::dates::{Tenor, TenorUnit};
+ * # fn main() -> finstack_quant_core::Result<()> {
+ *
+ * let tenor = Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture");
+ * assert_eq!(tenor.count(), 3);
+ * assert_eq!(tenor.unit(), TenorUnit::Months);
+ *
+ * // Parse from string
+ * let parsed = Tenor::parse("6M")?;
+ * assert_eq!(parsed.count(), 6);
+ * assert_eq!(parsed.unit(), TenorUnit::Months);
+ * # Ok(())
+ * # }
+ * ```
+ */
+export interface D_7Dd9Bdea4C4382F447F9 {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Configuration for VaR calculation.

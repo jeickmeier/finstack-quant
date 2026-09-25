@@ -264,7 +264,7 @@ test('validateInstrumentJson merges metric-pricing overrides before validation',
   );
   const prepared = valuations.instruments.validateInstrumentJson(
     json,
-    '{"theta_period":{"count":1,"unit":"weeks"}}',
+    '{"theta_period":{"count":1,"unit":"weeks"}}'
   );
   assert.deepEqual(JSON.parse(prepared).instrument.spec.metric_pricing_overrides.theta_period, {
     count: 1,

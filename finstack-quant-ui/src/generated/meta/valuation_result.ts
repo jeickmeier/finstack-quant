@@ -563,7 +563,7 @@ export default [
   {
     "path": "#/$defs/d_482fa346c77e25f26a51/properties/num_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StochasticPricingResult/properties/num_paths",
-    "description": "Number of scenario paths",
+    "description": "Number of simulated scenario paths (`2 × pricing_mode.num_paths` for\nantithetic Monte Carlo, prefixes × suffixes for Hybrid).",
     "format": "uint",
     "minimum": 0
   },
@@ -3350,7 +3350,7 @@ export default [
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1",
-    "description": "Monte Carlo pricing with specified number of paths.\n\nThe default, because it is the only mode that can price a deal at a\nrealistic horizon."
+    "description": "Monte Carlo pricing with a specified number of independent estimators.\n\nThe default, because it is the only mode that can price a deal at a\nrealistic horizon."
   },
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1/properties/monte_carlo",
@@ -3359,12 +3359,12 @@ export default [
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1/properties/monte_carlo/properties/antithetic",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1/properties/monte_carlo/properties/antithetic",
-    "description": "Use antithetic variates for variance reduction"
+    "description": "Pair each estimator's path with its sign-flipped mirror."
   },
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1/properties/monte_carlo/properties/num_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1/properties/monte_carlo/properties/num_paths",
-    "description": "Number of simulation paths",
+    "description": "Number of independent estimators. With `antithetic` each estimator\nsimulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`\nscenario paths.",
     "format": "uint",
     "minimum": 0
   },
@@ -3378,9 +3378,9 @@ export default [
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/2/properties/hybrid"
   },
   {
-    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/2/properties/hybrid/properties/mc_paths",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/2/properties/hybrid/properties/mc_paths",
-    "description": "MC paths for tail",
+    "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/2/properties/hybrid/properties/num_paths",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/2/properties/hybrid/properties/num_paths",
+    "description": "Monte Carlo continuation paths per tree prefix",
     "format": "uint",
     "minimum": 0
   },

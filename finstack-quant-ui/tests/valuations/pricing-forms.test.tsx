@@ -135,9 +135,11 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
   await userEvent.click(
     screen.getByRole("button", { name: "Add theta period" }),
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Theta period" }), {
-    target: { value: "1W" },
+  fireEvent.change(screen.getByRole("textbox", { name: "Count" }), {
+    target: { value: "1" },
   });
+  await userEvent.click(screen.getByRole("combobox", { name: "Unit" }));
+  await userEvent.click(await screen.findByRole("option", { name: "weeks" }));
   await waitFor(() =>
     expect(changes.mock.calls.at(-1)?.[0].metricPricingOverrides).toBe(
       '{"theta_period":{"count":1,"unit":"weeks"}}',

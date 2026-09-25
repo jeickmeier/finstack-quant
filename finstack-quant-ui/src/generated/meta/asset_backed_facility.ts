@@ -34,7 +34,6 @@ export default [
                 {
                   "acquisition_date": null,
                   "asset_type": {
-                    "industry": null,
                     "type": "high_yield_bond"
                   },
                   "balance": {
@@ -114,13 +113,8 @@ export default [
               "unit": "months"
             },
             "id": "ABF-EXAMPLE",
-            "instrument_pricing_overrides": {},
             "margin_bp": 600,
             "maturity": "2030-01-15",
-            "metric_pricing_overrides": {
-              "mc_seed_scenario": null,
-              "theta_period": null
-            },
             "payment_calendar_id": "nyse",
             "prepayment_spec": {
               "cpr": 0.2,
@@ -132,7 +126,6 @@ export default [
               "recovery_lag": 12
             },
             "revolving_end": "2026-01-15",
-            "scenario_pricing_overrides": {},
             "term_out": {
               "months": 24
             },

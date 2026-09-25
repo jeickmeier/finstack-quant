@@ -9,17 +9,7 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "behavior_overrides": {
-              "cdr_annual": null,
-              "cpr_annual": null,
-              "psa_speed_multiplier": null,
-              "recovery_lag_months": null,
-              "recovery_rate": null,
-              "reinvestment_price": null,
-              "sda_speed_multiplier": null
-            },
             "closing_date": "2024-01-01",
-            "credit_factors": {},
             "deal_metadata": {
               "manager_id": null,
               "master_servicer_id": null,
@@ -50,7 +40,6 @@ export default [
                 {
                   "acquisition_date": null,
                   "asset_type": {
-                    "industry": null,
                     "type": "high_yield_bond"
                   },
                   "balance": {

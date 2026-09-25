@@ -174,13 +174,6 @@ export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
  */
 export type DEc89Adc17436F33De839 = "black" | "normal";
 /**
- * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_c472bf7871f904b44979".
- */
-export type DC472Bf7871F904B44979 = string;
-/**
  * ISO 8601 calendar date string.
  */
 export type Date1 = string;
@@ -195,6 +188,16 @@ export type Date2 = string;
  * via the `definition` "d_fd618cd5743ec18a168f".
  */
 export type DFd618Cd5743Ec18A168F = "bullet_discountable" | "callable_oas";
+/**
+ * Day basis used to convert annual analytic option theta into a per-day amount.
+ *
+ * Applied by the analytic-theta pricers (EquityOption, FxOption,
+ * FxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "d_d30540ea90ce7eca3dee".
+ */
+export type DD30540Ea90Ce7Eca3Dee = "calendar_365" | "trading_252";
 /**
  * ISO 4217 currency enumeration
  *
@@ -2191,66 +2194,30 @@ export type RecoverySpec =
  */
 export type AssetType =
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "first_lien_loan";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "second_lien_loan";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "revolver_loan";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "bridge_loan";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "mezzanine_loan";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "high_yield_bond";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "investment_grade_bond";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "distressed_bond";
     }
   | {
-      /**
-       * Industry.
-       */
-      industry?: string | null;
       type: "emerging_markets_bond";
     }
   | {
@@ -12011,21 +11978,46 @@ export type Date127 = string;
  */
 export type Id230 = string;
 /**
- * Opaque string identifier.
- */
-export type Id231 = string;
-/**
  * ISO 8601 calendar date string.
  */
 export type Date128 = string;
 /**
- * ISO 8601 calendar date string.
+ * Day-count convention.
  */
-export type Date129 = string;
+export type DayCount58 =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * Opaque string identifier.
+ */
+export type Id231 = string;
 /**
  * Opaque string identifier.
  */
 export type Id232 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id233 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id234 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date129 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -12033,15 +12025,23 @@ export type Date130 = string;
 /**
  * Opaque string identifier.
  */
-export type Id233 = string;
+export type Id235 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date131 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id236 = string;
+/**
  * ISO 8601 calendar date string.
  */
 export type Date132 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date133 = string;
 /**
  * Where the template places a coverage test tier.
  *
@@ -12062,15 +12062,15 @@ export type CoveragePlacement =
 /**
  * Opaque string identifier.
  */
-export type Id234 = string;
+export type Id237 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date133 = string;
+export type Date134 = string;
 /**
  * Opaque string identifier.
  */
-export type Id235 = string;
+export type Id238 = string;
 /**
  * How collateral losses reach the note balances.
  *
@@ -12109,15 +12109,15 @@ export type LossRecognition = "at_default" | "at_liquidation";
 /**
  * ISO 8601 calendar date string.
  */
-export type Date134 = string;
+export type Date135 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date135 = string;
+export type Date136 = string;
 /**
  * Day-count convention.
  */
-export type DayCount58 =
+export type DayCount59 =
   | "one_one"
   | "act_360"
   | "act_365f"
@@ -12134,11 +12134,11 @@ export type DayCount58 =
 /**
  * Opaque string identifier.
  */
-export type Id236 = string;
+export type Id239 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date136 = string;
+export type Date137 = string;
 /**
  * Base currency
  */
@@ -12334,11 +12334,11 @@ export type ManagementFeeType = "senior" | "subordinated" | "incentive";
 /**
  * ISO 8601 calendar date string.
  */
-export type Date137 = string;
+export type Date138 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date138 = string;
+export type Date139 = string;
 /**
  * Target balance of the deal reserve account, re-evaluated every period.
  *
@@ -12400,7 +12400,7 @@ export type StepDownTrigger =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date139 = string;
+export type Date140 = string;
 /**
  * Currency (must match asset currency; financing PV is validated at valuation time).
  */
@@ -12590,15 +12590,15 @@ export type RealEstateFinancing =
 /**
  * Opaque string identifier.
  */
-export type Id237 = string;
+export type Id240 = string;
 /**
  * Opaque string identifier.
  */
-export type Id238 = string;
+export type Id241 = string;
 /**
  * Opaque string identifier.
  */
-export type Id239 = string;
+export type Id242 = string;
 /**
  * Business-day adjustment convention.
  */
@@ -12607,7 +12607,7 @@ export type BusinessDayConvention25 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date140 = string;
+export type Date141 = string;
 /**
  * Currency in which value, P&L, additive risk, and capital are reported.
  */
@@ -12774,11 +12774,11 @@ export type Currency46 =
 /**
  * Opaque string identifier.
  */
-export type Id240 = string;
+export type Id243 = string;
 /**
  * Opaque string identifier.
  */
-export type Id241 = string;
+export type Id244 = string;
 /**
  * Built-in function identifiers.
  *
@@ -12850,15 +12850,15 @@ export type MetricId = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date141 = string;
+export type Date142 = string;
 /**
  * Opaque string identifier.
  */
-export type Id242 = string;
+export type Id245 = string;
 /**
  * Opaque string identifier.
  */
-export type Id243 = string;
+export type Id246 = string;
 /**
  * Base currency of the basket
  */
@@ -13025,11 +13025,11 @@ export type Currency47 =
 /**
  * Opaque string identifier.
  */
-export type Id244 = string;
+export type Id247 = string;
 /**
  * Opaque string identifier.
  */
-export type Id245 = string;
+export type Id248 = string;
 /**
  * Type of asset in the basket
  *
@@ -13306,9 +13306,10 @@ export type CdsConvention = "isda_na" | "isda_eu" | "isda_as" | "custom";
  * Valuation presentation and pricing policy for CDS marks.
  *
  * Each variant bundles a coherent set of choices (premium-leg accrual schedule,
- * clean/dirty NPV, par-spread denominator). Mixing those choices via separate
- * boolean overrides is intentionally not supported — the variants here are the
- * only conventions traded in practice.
+ * Act/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,
+ * par-spread denominator). Mixing those choices via separate boolean
+ * overrides is intentionally not supported — the variants here are the only
+ * conventions traded in practice.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "CdsValuationConvention".
@@ -13475,7 +13476,7 @@ export type ConstituentReference =
          * Type of asset for validation
          */
         asset_type: "equity" | "bond" | "etf" | "cash" | "commodity" | "derivative";
-        price_id: Id243;
+        price_id: Id246;
       };
     };
 /**
@@ -14335,7 +14336,7 @@ export type PayReceive = "pay" | "receive";
 export type PaymentCalculation =
   | {
       fixed_amount: {
-        amount: Money97;
+        amount: Money98;
         /**
          * Rounding convention.
          */
@@ -14416,7 +14417,7 @@ export type PaymentCalculation =
   | "residual_cash"
   | {
       reserve_replenishment: {
-        target_balance: Money98;
+        target_balance: Money99;
       };
     }
   | {
@@ -14437,7 +14438,7 @@ export type PaymentCalculation =
     }
   | {
       net_wac_carryover: {
-        amount: Money99;
+        amount: Money100;
         /**
          * Tranche id.
          */
@@ -14649,7 +14650,7 @@ export type RebalanceRule =
        */
       frequency: "daily" | "weekly" | "monthly" | "quarterly";
       kind: "calendar";
-      start: Date140;
+      start: Date141;
     };
 /**
  * Timing of a knock-out rebate payment.
@@ -15011,13 +15012,6 @@ export type TerminalValueSpec =
       [k: string]: unknown;
     };
 /**
- * Day basis used to convert annual option theta into a per-day amount.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "ThetaDayBasis".
- */
-export type ThetaDayBasis = "calendar_365" | "trading_252";
-/**
  * Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -15151,11 +15145,11 @@ export type WeightingMethod =
       kind: "fixed_quantity";
     }
   | {
-      gross_notional: Money102;
+      gross_notional: Money103;
       kind: "notional_weighted";
     }
   | {
-      anchor_leg_id: Id240;
+      anchor_leg_id: Id243;
       /**
        * Non-zero signed quantity assigned to the anchor leg.
        */
@@ -15171,7 +15165,7 @@ export type WeightingMethod =
       neutralize: boolean;
     }
   | {
-      anchor_leg_id: Id241;
+      anchor_leg_id: Id244;
       /**
        * Non-zero signed quantity assigned to the anchor leg.
        */
@@ -16232,6 +16226,13 @@ export type DDda2192A4245995F4B0A =
  */
 export type DE42076B4D2Ef6E393Ce5 = "debt_barrier" | "asset_vol";
 /**
+ * Unit of a tenor period.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "d_ec4e993309e09fe83294".
+ */
+export type DEc4E993309E09Fe83294 = "days" | "weeks" | "months" | "years";
+/**
  * Linear (first-order) or iterative (full-reprice root-find) solve mode.
  *
  * # Why the two modes disagree
@@ -16379,7 +16380,6 @@ export interface SharedDefs {
   CoverageTestType?: CoverageTestType;
   CoverageTrigger?: CoverageTrigger;
   CreditDefaultSwap?: CreditDefaultSwap;
-  CreditFactors?: CreditFactors1;
   CreditParams?: CreditParams1;
   CreditRating?: CreditRating;
   CreditSpreadProcessSpec?: CreditSpreadProcessSpec;
@@ -16501,7 +16501,7 @@ export interface SharedDefs {
   MakeWholeSpec?: MakeWholeSpec;
   ManagementFeeType?: ManagementFeeType;
   MarginCallTiming?: MarginCallTiming1;
-  MarginStepUp?: MarginStepUp;
+  MarginStep?: MarginStep;
   MarginTenor?: MarginTenor;
   MarketConditions?: MarketConditions1;
   MaturityConstraints?: MaturityConstraints;
@@ -16524,7 +16524,6 @@ export interface SharedDefs {
   OvernightCouponConvention?: OvernightCouponConvention;
   OvernightIndexConstraintApplication?: OvernightIndexConstraintApplication;
   OvernightSpreadCompounding?: OvernightSpreadCompounding;
-  Overrides?: Overrides1;
   PacCollar?: PacCollar;
   ParRateMethod?: ParRateMethod;
   PayReceive?: PayReceive;
@@ -16551,6 +16550,7 @@ export interface SharedDefs {
   QuantoOption?: QuantoOption;
   QuantoSpec?: QuantoSpec;
   RangeAccrual?: RangeAccrual;
+  RangeAccrualTerms?: RangeAccrualTerms1;
   RateAveragingMethod?: RateAveragingMethod;
   RateOptionType?: RateOptionType;
   RateSpec?: RateSpec;
@@ -16620,7 +16620,6 @@ export interface SharedDefs {
   TermLoanCovenantEvents?: TermLoanCovenantEvents;
   TermOutSpec?: TermOutSpec;
   TerminalValueSpec?: TerminalValueSpec;
-  ThetaDayBasis?: ThetaDayBasis;
   TouchType?: TouchType;
   Tranche?: Tranche;
   TrancheCoupon?: TrancheCoupon;
@@ -16833,7 +16832,7 @@ export interface Attributes {
  *     .wam(348)
  *     .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())
  *     .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())
- *     .prepayment_model(PrepaymentModelSpec::psa(1.0))
+ *     .prepayment_spec(PrepaymentModelSpec::psa(1.0))
  *     .discount_curve_id(CurveId::new("USD-OIS"))
  *     .day_count(finstack_quant_core::dates::DayCount::Thirty360)
  *     .build()
@@ -16893,7 +16892,7 @@ export interface AgencyMbsPassthrough {
    * Pool type (generic or specified).
    */
   pool_type?: "generic" | "specified";
-  prepayment_model: PrepaymentModelSpec;
+  prepayment_spec: PrepaymentModelSpec;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Servicing fee rate (annual, as decimal e.g., 0.0025 for 25 bp).
@@ -17104,28 +17103,29 @@ export interface Money {
     | "ZWL";
 }
 /**
- * Pricing overrides (including quoted price for OAS).
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Market-quoted values (prices, implied vol, spreads, upfront payments).
  */
 export interface DB0A5Fc543381Da6A5722 {
   /**
-   * CDS par-spread quote in basis points (for CDS and CDS index pricers).
+   * CreditDefaultSwap clean par-spread quote in basis points.
+   *
+   * Used only by CreditDefaultSwap risk replay, where it replaces the
+   * matching contractual hazard-curve pillar. It does not drive PV, and no
+   * other instrument (CDSIndex included) reads it.
    */
   cds_quote_bp?: number | null;
   /**
    * Implied volatility (overrides vol surface). When set on surface-driven
-   * pricers, it is used as a flat σ across tenor and strike.
+   * pricers, it is used as a flat σ across tenor and strike. Options on
+   * futures read it as their only volatility input: decimal lognormal for
+   * Black-76, futures-price points per √year for the normal model.
    */
   implied_volatility?: number | null;
   /**
@@ -17133,9 +17133,11 @@ export interface DB0A5Fc543381Da6A5722 {
    */
   quoted_asw_market?: number | null;
   /**
-   * Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).
+   * Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).
+   *
+   * Inflation-linked bonds quote this per 100 of real (unindexed) face.
    */
-  quoted_clean_price?: number | null;
+  quoted_clean_price_pct?: number | null;
   /**
    * Quoted dirty price in the bond's currency units.
    */
@@ -17159,6 +17161,14 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted OAS (option-adjusted spread) in decimal.
    */
   quoted_oas?: number | null;
+  /**
+   * Observed option premium: the total trade PV in the instrument currency
+   * (notional, contract multiplier and position included).
+   *
+   * This is the target every `ImpliedVol` calculator inverts; it does not
+   * drive PV and is not one of the mutually exclusive price-driving fields.
+   */
+  quoted_premium?: number | null;
   /**
    * Quoted yield-to-maturity in decimal (e.g., `0.055` = 5.5%).
    */
@@ -17426,24 +17436,6 @@ export interface D_572Ad1Befb7D94914652 {
    */
   call_friction_cents?: number | null;
   /**
-   * Add one calendar day to *every* Act/360 premium accrual period.
-   *
-   * Used by the CDS option pricer to model the ISDA pre-Big-Bang
-   * option underlying convention (and matches QuantLib's
-   * `Actual360(true)` day-count). The Bloomberg CDSW convention only
-   * treats the *final* coupon period as inclusive of the maturity date,
-   * so this is not the default for production single-name CDS pricing.
-   */
-  cds_act360_include_last_day?: boolean;
-  /**
-   * Apply ISDA half-day accrual-on-default bias.
-   *
-   * Adds half a day of premium accrual in the default-accrual integral.
-   * Used by the CDS option pricer to model the Bloomberg CDSO underlying
-   * convention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).
-   */
-  cds_aod_half_day_bias?: boolean;
-  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -17555,6 +17547,16 @@ export interface D_572Ad1Befb7D94914652 {
    */
   mc_paths?: number | null;
   /**
+   * Optional Monte Carlo seed label.
+   *
+   * Monte Carlo pricers derive their RNG seed as
+   * `derive_seed(instrument_id, label)`, so the same label always replays
+   * the same random streams for the same instrument. `None` seeds with the
+   * pricer's base label. Finite-difference Greeks set a fixed label on the
+   * repriced clone so base and bumped legs share common random numbers.
+   */
+  mc_seed_scenario?: string | null;
+  /**
    * Optional absolute target for the Monte Carlo confidence-interval
    * half-width in instrument currency.
    *
@@ -17567,8 +17569,10 @@ export interface D_572Ad1Befb7D94914652 {
   /**
    * Merton Monte Carlo configuration for structural credit PIK pricing.
    *
-   * When set (via flat JSON under `pricing_overrides.merton_mc_config` or the
-   * Rust builder), the `MertonMc` pricer in the registry uses this config.
+   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
+   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
+   * model and grid; the path count, antithetic flag and seed label come from
+   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
   merton_mc_config?: DBffef9E684Ff0C351C83 | null;
   /**
@@ -17647,10 +17651,6 @@ export interface DCdb8Fddc0106047270C4 {
  */
 export interface DBffef9E684Ff0C351C83 {
   /**
-   * Whether to use antithetic variates for variance reduction.
-   */
-  antithetic: boolean;
-  /**
    * Barrier-crossing policy used for `BarrierType::FirstPassage`.
    *
    * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
@@ -17675,10 +17675,6 @@ export interface DBffef9E684Ff0C351C83 {
    */
   cashflow_dfs?: [number, number][] | null;
   /**
-   * Default recovery rate used when no `dynamic_recovery` model is set.
-   */
-  default_recovery_rate: number;
-  /**
    * Optional dynamic (notional-dependent) recovery rate model.
    *
    * Recovery on default is evaluated pathwise as
@@ -17695,10 +17691,6 @@ export interface DBffef9E684Ff0C351C83 {
   endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
   merton: DEe4323Acfdb49E4Fe15B;
   /**
-   * Number of Monte Carlo paths.
-   */
-  num_paths: number;
-  /**
    * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
    */
   pik_schedule:
@@ -17709,13 +17701,15 @@ export interface DBffef9E684Ff0C351C83 {
         stepped: [number, D_7F97Be2823A694F2735D][];
       };
   /**
-   * RNG seed for reproducibility.
+   * Recovery on default as a decimal fraction in `[0, 1]`.
+   *
+   * `dynamic_recovery`, when set, takes precedence over this flat rate.
    */
-  seed: number;
+  recovery_rate: number;
   /**
    * Time steps per year for the simulation grid.
    */
-  time_steps_per_year: number;
+  steps_per_year: number;
   /**
    * Optional toggle exercise model for PIK/cash coupon decisions.
    * Active only for coupon dates where [`PikSchedule`] resolves to
@@ -17743,13 +17737,13 @@ export interface DD760Eef55C5Bd7D5B1F6 {
    */
   bracket?: [number, number] | null;
   /**
-   * Number of MC paths used during calibration iterations (low paths).
+   * Number of independent MC estimators used during calibration iterations (low paths).
    */
   low_paths: number;
   /**
    * Maximum bisection iterations.
    */
-  max_iter: number;
+  max_iterations: number;
   /**
    * Which structural parameter to solve for.
    */
@@ -18086,30 +18080,6 @@ export interface D_8A837E6F142B34E8Cfd4 {
   [k: string]: unknown;
 }
 /**
- * Term loan specific overrides for covenants and schedule adjustments.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_8fb25331316c6e4f3fc7".
- */
-export interface D_8Fb25331316C6E4F3Fc7 {
-  /**
-   * Draw stop date (earliest date after which draws are blocked)
-   */
-  draw_stop_date?: DC472Bf7871F904B44979 | null;
-  /**
-   * Extra cash sweeps by date
-   */
-  extra_cash_sweeps: [DC472Bf7871F904B44979, D_1A6C2Ccee66D90A3A469][];
-  /**
-   * Additional margin step-ups by date (bp)
-   */
-  margin_add_bp_by_date: [DC472Bf7871F904B44979, number][];
-  /**
-   * Force PIK toggles by date
-   */
-  pik_toggle_by_date: [DC472Bf7871F904B44979, boolean][];
-}
-/**
  * Metric-time pricing configuration.
  */
 export interface MetricPricingOverrides {
@@ -18123,17 +18093,17 @@ export interface MetricPricingOverrides {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -18209,6 +18179,45 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * structured-credit convexity).
    */
   ytm_bump_bp?: number | null;
+}
+/**
+ * A parsed tenor representing a time period.
+ *
+ * Tenors are commonly used in financial markets to specify maturities,
+ * payment frequencies, and rate fixing periods.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::dates::{Tenor, TenorUnit};
+ * # fn main() -> finstack_quant_core::Result<()> {
+ *
+ * let tenor = Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture");
+ * assert_eq!(tenor.count(), 3);
+ * assert_eq!(tenor.unit(), TenorUnit::Months);
+ *
+ * // Parse from string
+ * let parsed = Tenor::parse("6M")?;
+ * assert_eq!(parsed.count(), 6);
+ * assert_eq!(parsed.unit(), TenorUnit::Months);
+ * # Ok(())
+ * # }
+ * ```
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "d_7dd9bdea4c4382f447f9".
+ */
+export interface D_7Dd9Bdea4C4382F447F9 {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
 }
 /**
  * Configuration for VaR calculation.
@@ -18456,16 +18465,11 @@ export interface ScenarioPricingOverrides {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Pricing overrides.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides1 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -18481,17 +18485,17 @@ export interface MetricPricingOverrides1 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -19028,7 +19032,7 @@ export interface AgencyTba {
    * own model); `None` uses the embedded generic PSA assumption. Setting it
    * together with `assumed_pool` is rejected.
    */
-  prepayment_model?: PrepaymentModelSpec1 | null;
+  prepayment_spec?: PrepaymentModelSpec1 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides2;
   /**
    * SIFMA settlement class override.
@@ -19084,16 +19088,11 @@ export interface Attributes2 {
   tags?: string[];
 }
 /**
- * Pricing overrides.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides2 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -19109,17 +19108,17 @@ export interface MetricPricingOverrides2 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -19808,18 +19807,14 @@ export interface Attributes3 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
+ * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides3 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
 export interface MetricPricingOverrides3 {
   /**
@@ -19832,17 +19827,17 @@ export interface MetricPricingOverrides3 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -20024,7 +20019,7 @@ export interface Money7 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides3 {
   /**
@@ -20378,66 +20373,30 @@ export interface PoolAsset {
    */
   asset_type:
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "first_lien_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "second_lien_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "revolver_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "bridge_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "mezzanine_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "high_yield_bond";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "investment_grade_bond";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "distressed_bond";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "emerging_markets_bond";
       }
     | {
@@ -20649,8 +20608,9 @@ export interface PoolAsset {
    */
   mdr_override?: number | null;
   /**
-   * Annual net operating income of the property securing the loan, for
-   * the pool debt-service coverage ratio.
+   * Net operating income per annum of the property securing the loan,
+   * in the loan's currency. The only NOI input of the CMBS pool
+   * debt-service coverage ratio.
    */
   noi?: Money6 | null;
   /**
@@ -22262,10 +22222,6 @@ export interface Bond {
    */
   ex_coupon_days?: number;
   /**
-   * Optional forward curve identifier for projected floating or asset-swap legs.
-   */
-  forward_curve_id?: Id9 | null;
-  /**
    * Optional funding/repo curve for carry cost computation.
    */
   funding_curve_id?: Id9 | null;
@@ -23440,10 +23396,6 @@ export interface Money16 {
 export interface InstrumentPricingOverrides4 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -23459,17 +23411,17 @@ export interface MetricPricingOverrides4 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -23920,7 +23872,7 @@ export interface RevolvingCredit {
    * credit must never exceed the commitment in force. A step down pays its
    * `fee_bp` on the reduced amount. Empty by default.
    */
-  commitment_schedule?: CommitmentStep[];
+  commitment_steps?: CommitmentStep[];
   /**
    * Optional credit curve identifier for credit risk modeling.
    *
@@ -23972,7 +23924,7 @@ export interface RevolvingCredit {
    * rate. Dates must be strictly increasing and strictly inside the
    * facility life. Empty by default.
    */
-  margin_steps?: MarginStepUp[];
+  margin_steps?: MarginStep[];
   maturity: Date25;
   metric_pricing_overrides?: MetricPricingOverrides5;
   /**
@@ -24409,7 +24361,7 @@ export interface Money18 {
  * balance over the commitment in force, so a stochastic revolving facility
  * books the implied principal change at the step.
  *
- * A delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only
+ * A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
  * non-increasing steps inside its availability window and no reduction fee
  * (`fee_bp` must be `0.0`).
  *
@@ -24793,19 +24745,17 @@ export interface Money20 {
 /**
  * Specification for stochastic utilization modeling.
  *
- * Defines the stochastic process and simulation parameters for
- * Monte Carlo pricing with uncertain draw/repayment patterns. Credit risk is
- * incorporated via hazard-rate survival weighting (no explicit default events).
+ * Defines the stochastic process for Monte Carlo pricing with uncertain
+ * draw/repayment patterns. Credit risk is incorporated via hazard-rate
+ * survival weighting (no explicit default events). The estimator count,
+ * antithetic flag and seed label are pricing settings, read from
+ * `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,
+ * `mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`].
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "StochasticUtilizationSpec".
  */
 export interface StochasticUtilizationSpec {
-  /**
-   * Use antithetic variance reduction when simulating paths (default: false).
-   * Mutually exclusive with `use_sobol_qmc`; validation rejects the combination.
-   */
-  antithetic?: boolean;
   /**
    * Advanced Monte Carlo configuration (optional).
    *
@@ -24814,20 +24764,9 @@ export interface StochasticUtilizationSpec {
    */
   mc_config?: McConfig | null;
   /**
-   * Number of Monte Carlo paths to simulate.
-   */
-  num_paths: number;
-  /**
-   * Random seed for reproducibility. Simulation is always deterministic:
-   * `None` falls back to a fixed default seed (42). Because the seed is
-   * fixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same
-   * random variates for base and bumped valuations — common random
-   * numbers — so finite-difference Greeks are free of Monte Carlo noise.
-   */
-  seed?: number | null;
-  /**
    * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `antithetic`; validation rejects the combination.
+   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
+   * rejects the combination.
    */
   use_sobol_qmc?: boolean;
   utilization_process: UtilizationProcess;
@@ -25249,16 +25188,11 @@ export interface Tenor5 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Attributes for scenario selection and tagging.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides5 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Letter-of-credit sub-facility of a revolving credit facility.
@@ -25838,19 +25772,19 @@ export interface Money24 {
     | "ZWL";
 }
 /**
- * Margin step-up event (covenant penalty or scheduled increase).
+ * Dated margin step (covenant penalty, scheduled change or pricing-grid move).
  *
- * Increases the interest margin by a fixed amount at a specified date,
- * typically triggered by covenant breach or scheduled rating migration. A
- * negative `delta_bp` steps the margin down (a leverage-grid improvement).
+ * Shifts the interest margin by `delta_bp` from `date` onward (effective-from
+ * date). Steps are cumulative. A negative `delta_bp` steps the margin down (a
+ * leverage-grid improvement); term loans accept only non-negative steps.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "MarginStepUp".
+ * via the `definition` "MarginStep".
  */
-export interface MarginStepUp {
+export interface MarginStep {
   date: Date24;
   /**
-   * Increase in margin (basis points)
+   * Change in margin, in basis points (100 = 1%); negative steps down.
    */
   delta_bp: number;
 }
@@ -25868,17 +25802,17 @@ export interface MetricPricingOverrides5 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -26400,9 +26334,10 @@ export interface TermLoanCovenantEvents {
    */
   draw_stop_dates: Date[];
   /**
-   * Margin step-up schedule
+   * Margin steps, each a non-negative cumulative bp change effective from
+   * the start of the first interest period on or after its date.
    */
-  margin_stepups: MarginStepUp[];
+  margin_steps: MarginStep[];
   /**
    * PIK toggle schedule
    */
@@ -26652,7 +26587,7 @@ export interface PikToggle {
  *     availability_start: create_date(2025, Month::January, 1)?,
  *     availability_end: create_date(2026, Month::January, 1)?,
  *     draws: vec![],
- *     commitment_step_downs: vec![],
+ *     commitment_steps: vec![],
  *     usage_fee_bp: 50.0,        // 50 bp usage fee
  *     commitment_fee_bp: 25.0,   // 25 bp commitment fee
  *     fee_base: CommitmentFeeBase::Undrawn,
@@ -26675,11 +26610,11 @@ export interface DdtlSpec {
   commitment_fee_bp: number;
   commitment_limit: Money27;
   /**
-   * Commitment step-down schedule: strictly increasing dates inside the
-   * availability window, non-increasing `amount`s in the loan currency,
-   * and `fee_bp == 0.0` (term loans carry no reduction fee).
+   * Commitment steps, each effective from its date: strictly increasing
+   * dates inside the availability window, non-increasing `amount`s in the
+   * loan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).
    */
-  commitment_step_downs: CommitmentStep[];
+  commitment_steps: CommitmentStep[];
   /**
    * Scheduled or actual draw events
    */
@@ -27077,16 +27012,11 @@ export interface Tenor6 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Pricing overrides (quoted price, seed, etc.)
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides6 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -27102,17 +27032,17 @@ export interface MetricPricingOverrides6 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -27422,66 +27352,30 @@ export interface RepLine {
    */
   asset_type:
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "first_lien_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "second_lien_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "revolver_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "bridge_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "mezzanine_loan";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "high_yield_bond";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "investment_grade_bond";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "distressed_bond";
       }
     | {
-        /**
-         * Industry.
-         */
-        industry?: string | null;
         type: "emerging_markets_bond";
       }
     | {
@@ -28704,7 +28598,7 @@ export interface DealFees {
    * note coupon.
    */
   subordinated_mgmt_fee_bp: number;
-  trustee_fee_annual: Money35;
+  trustee_fee: Money35;
   /**
    * Special servicer workout fee as a percent of the principal and
    * interest collected on specially serviced loans (`1.0` = 1%), taken
@@ -28923,18 +28817,14 @@ export interface Tenor7 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Instrument-level pricing overrides.
+ * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides7 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-level pricing overrides.
+ * Metric-time pricing configuration.
  */
 export interface MetricPricingOverrides7 {
   /**
@@ -28947,17 +28837,17 @@ export interface MetricPricingOverrides7 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -29001,7 +28891,7 @@ export interface RecoveryModelSpec {
   severity_vector?: number[] | null;
 }
 /**
- * Scenario-level pricing overrides.
+ * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides7 {
   /**
@@ -29301,18 +29191,14 @@ export interface Attributes8 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
+ * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides8 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
 export interface MetricPricingOverrides8 {
   /**
@@ -29325,17 +29211,17 @@ export interface MetricPricingOverrides8 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -29517,7 +29403,7 @@ export interface Money36 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides8 {
   /**
@@ -29825,18 +29711,14 @@ export interface Money37 {
     | "ZWL";
 }
 /**
- * Pricing overrides (manual price, yield, spread)
+ * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides9 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
 export interface MetricPricingOverrides9 {
   /**
@@ -29849,17 +29731,17 @@ export interface MetricPricingOverrides9 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -30041,7 +29923,7 @@ export interface Money38 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides9 {
   /**
@@ -30175,16 +30057,11 @@ export interface Attributes10 {
   tags?: string[];
 }
 /**
- * Pricing overrides for scenario analysis and model configuration.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides10 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -30200,17 +30077,17 @@ export interface MetricPricingOverrides10 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -30693,18 +30570,18 @@ export interface Basket {
    */
   constituents: BasketConstituent[];
   currency: Currency47;
-  discount_curve_id: Id244;
+  discount_curve_id: Id247;
   /**
    * Total expense ratio (as decimal, e.g., 0.0025 = 0.25%)
    * This affects pricing through expense drag calculations
    */
   expense_ratio: number;
-  id: Id245;
-  instrument_pricing_overrides?: InstrumentPricingOverrides76;
-  metric_pricing_overrides?: MetricPricingOverrides76;
-  notional: Money103;
+  id: Id248;
+  instrument_pricing_overrides?: InstrumentPricingOverrides77;
+  metric_pricing_overrides?: MetricPricingOverrides77;
+  notional: Money104;
   pricing_config: BasketPricingConfig;
-  scenario_pricing_overrides?: ScenarioPricingOverrides76;
+  scenario_pricing_overrides?: ScenarioPricingOverrides77;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -30747,7 +30624,7 @@ export interface BasketConstituent {
            * Type of asset for validation
            */
           asset_type: "equity" | "bond" | "etf" | "cash" | "commodity" | "derivative";
-          price_id: Id243;
+          price_id: Id246;
         };
       };
   /**
@@ -30964,16 +30841,11 @@ export interface DilutionEvent {
   shares_outstanding_before: number;
 }
 /**
- * Attributes for selection and tagging.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides11 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -30989,17 +30861,17 @@ export interface MetricPricingOverrides11 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -31290,10 +31162,6 @@ export interface InflationLinkedBond {
   maturity: Date54;
   metric_pricing_overrides?: MetricPricingOverrides12;
   notional: Money41;
-  /**
-   * Quoted clean price (if available)
-   */
-  quoted_clean?: number | null;
   real_coupon: Decimal12;
   scenario_pricing_overrides?: ScenarioPricingOverrides12;
   /**
@@ -31332,16 +31200,11 @@ export interface Tenor9 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Additional attributes
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides12 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -31357,17 +31220,17 @@ export interface MetricPricingOverrides12 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -31689,7 +31552,7 @@ export interface DollarRoll {
    *
    * `None` uses the embedded generic PSA assumption of the TBA legs.
    */
-  prepayment_model?: PrepaymentModelSpec1 | null;
+  prepayment_spec?: PrepaymentModelSpec1 | null;
   /**
    * Optional repo/financing curve identifier (carry-only).
    *
@@ -31738,16 +31601,11 @@ export interface Attributes14 {
   tags?: string[];
 }
 /**
- * Pricing overrides.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides13 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -31763,17 +31621,17 @@ export interface MetricPricingOverrides13 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -32261,16 +32119,11 @@ export interface Tenor11 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Attributes for scenario selection and tagging.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides14 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * OTC derivative margin specification (ISDA CSA compliant).
@@ -33631,17 +33484,17 @@ export interface MetricPricingOverrides14 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -33860,8 +33713,10 @@ export interface ScenarioPricingOverrides14 {
 export interface XccySwap {
   attributes: Attributes16;
   id: Id51;
+  instrument_pricing_overrides?: InstrumentPricingOverrides15;
   leg1: XccySwapLeg;
   leg2: XccySwapLeg1;
+  metric_pricing_overrides?: MetricPricingOverrides15;
   /**
    * Whether and when principal is exchanged.
    */
@@ -33879,6 +33734,7 @@ export interface XccySwap {
         };
       };
   reporting_currency: Currency4;
+  scenario_pricing_overrides?: ScenarioPricingOverrides15;
 }
 /**
  * Attributes for instrument selection and tagging.
@@ -33894,6 +33750,13 @@ export interface Attributes16 {
    * User-defined tags for categorization.
    */
   tags?: string[];
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides15 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
 }
 /**
  * First leg.
@@ -34252,6 +34115,62 @@ export interface XccySwapLeg1 {
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
 /**
+ * Metric-time pricing configuration.
+ */
+export interface MetricPricingOverrides15 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Scenario-only pricing adjustments.
+ */
+export interface ScenarioPricingOverrides15 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
+}
+/**
  * Zero-coupon Inflation Swap instrument.
  *
  * Represents a zero-coupon inflation swap where one party pays a fixed real rate
@@ -34293,7 +34212,7 @@ export interface InflationSwap {
   fixed_rate: Decimal16;
   id: Id55;
   inflation_index_id: Id56;
-  instrument_pricing_overrides?: InstrumentPricingOverrides15;
+  instrument_pricing_overrides?: InstrumentPricingOverrides16;
   /**
    * Contractual monthly reference-index interpolation. Overrides index metadata;
    * without either source the default is monthly step interpolation.
@@ -34304,9 +34223,9 @@ export interface InflationSwap {
    */
   lag_override?: InflationLag | null;
   maturity: Date61;
-  metric_pricing_overrides?: MetricPricingOverrides15;
+  metric_pricing_overrides?: MetricPricingOverrides16;
   notional: Money51;
-  scenario_pricing_overrides?: ScenarioPricingOverrides15;
+  scenario_pricing_overrides?: ScenarioPricingOverrides16;
   /**
    * Trade side
    */
@@ -34329,335 +34248,11 @@ export interface Attributes17 {
   tags?: string[];
 }
 /**
- * Attributes for scenario selection and tagging
- * Instrument-owned pricing inputs.
- */
-export interface InstrumentPricingOverrides15 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
-}
-/**
- * Metric-time pricing configuration.
- */
-export interface MetricPricingOverrides15 {
-  /**
-   * Basis used for bond duration, convexity, and DV01-style risk metrics.
-   */
-  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
-  /**
-   * Breakeven configuration: which parameter to solve for and solve mode.
-   */
-  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
-  bump_config?: D_1D0C1815F8Dd0715Bd12;
-  /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
-   */
-  mc_seed_scenario?: string | null;
-  /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-   */
-  theta_period?: string | null;
-  /**
-   * Historical VaR / Expected Shortfall configuration override.
-   */
-  var_config?: DE49387F97C0F9D510642 | null;
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money51 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Scenario-only pricing adjustments.
- */
-export interface ScenarioPricingOverrides15 {
-  /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
-   *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
-   */
-  scenario_price_shock_pct?: number | null;
-  /**
-   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
-   *
-   * Applied as an additional flat Z-spread during valuation by pricers that
-   * support spread-based revaluation. Currently consumed by `Bond::base_value`
-   * for bonds without embedded options, without an assigned credit curve, and
-   * without a price-pinning quote override other than `quoted_z_spread`
-   * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
-   *
-   * Setting this on an unsupported configuration produces a validation error
-   * at pricing time rather than a silent no-op. For hazard-priced (credit
-   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
-   */
-  scenario_spread_shock_bp?: number | null;
-}
-/**
- * Year-on-year (YoY) Inflation Swap instrument.
- *
- * Pays periodic inflation rates (CPI ratios over each period) versus a fixed rate.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "YoYInflationSwap".
- */
-export interface YoYInflationSwap {
-  attributes: Attributes18;
-  /**
-   * Observed contractual reference CPI at start, with lag and interpolation
-   * already applied. If absent, start CPI must resolve from market observations.
-   */
-  base_cpi?: number | null;
-  business_day_convention?: BusinessDayConvention11;
-  /**
-   * Holiday calendar identifier for payment date adjustment.
-   */
-  calendar_id?: Id9 | null;
-  day_count: DayCount21;
-  discount_curve_id: Id57;
-  fixed_rate: Decimal17;
-  frequency: Tenor13;
-  id: Id58;
-  inflation_index_id: Id59;
-  instrument_pricing_overrides?: InstrumentPricingOverrides16;
-  /**
-   * Contractual monthly reference-index interpolation. Overrides index metadata;
-   * without either source the default is monthly step interpolation.
-   */
-  interpolation_override?: InflationInterpolation | null;
-  /**
-   * Optional contract-level lag override (if set, overrides index lag)
-   */
-  lag_override?: InflationLag | null;
-  maturity: Date63;
-  metric_pricing_overrides?: MetricPricingOverrides16;
-  notional: Money52;
-  scenario_pricing_overrides?: ScenarioPricingOverrides16;
-  /**
-   * Trade side
-   */
-  side: "pay" | "receive";
-  start_date: Date64;
-}
-/**
- * Attributes for scenario selection and tagging
- */
-export interface Attributes18 {
-  /**
-   * Structured metadata associated with the instrument.
-   */
-  meta?: {
-    [k: string]: string;
-  };
-  /**
-   * User-defined tags for categorization.
-   */
-  tags?: string[];
-}
-/**
- * Parsed financial tenor.
- */
-export interface Tenor13 {
-  /**
-   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
-   * rejected because a zero-length period makes schedule generation loop.
-   */
-  count: number;
-  /**
-   * Calendar unit the count is expressed in, such as days, weeks, months,
-   * or years.
-   */
-  unit: "days" | "weeks" | "months" | "years";
-}
-/**
- * Attributes for scenario selection and tagging
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides16 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -34673,17 +34268,17 @@ export interface MetricPricingOverrides16 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -34692,7 +34287,7 @@ export interface MetricPricingOverrides16 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money52 {
+export interface Money51 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -34891,65 +34486,55 @@ export interface ScenarioPricingOverrides16 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * YoY inflation cap/floor instrument.
+ * Year-on-year (YoY) Inflation Swap instrument.
+ *
+ * Pays periodic inflation rates (CPI ratios over each period) versus a fixed rate.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "InflationCapFloor".
+ * via the `definition` "YoYInflationSwap".
  */
-export interface InflationCapFloor {
-  attributes: Attributes19;
-  business_day_convention?: BusinessDayConvention12;
+export interface YoYInflationSwap {
+  attributes: Attributes18;
   /**
-   * Optional holiday calendar identifier.
+   * Observed contractual reference CPI at start, with lag and interpolation
+   * already applied. If absent, start CPI must resolve from market observations.
    */
-  calendar_id?: string | null;
-  day_count: DayCount22;
-  discount_curve_id: Id60;
-  frequency: Tenor14;
-  id: Id61;
-  inflation_index_id: Id62;
+  base_cpi?: number | null;
+  business_day_convention?: BusinessDayConvention11;
   /**
-   * Correlation between the inflation index and the nominal short rate,
-   * used in the YoY convexity/timing adjustment. `None` ⇒ treated as 0
-   * (the timing term vanishes; the pure inflation-vol Jensen convexity
-   * `σ_I²·τ` is still applied).
+   * Holiday calendar identifier for payment date adjustment.
    */
-  inflation_nominal_correlation?: number | null;
+  calendar_id?: Id9 | null;
+  day_count: DayCount21;
+  discount_curve_id: Id57;
+  fixed_rate: Decimal17;
+  frequency: Tenor13;
+  id: Id58;
+  inflation_index_id: Id59;
   instrument_pricing_overrides?: InstrumentPricingOverrides17;
   /**
-   * Contractual monthly CPI interpolation, overriding index metadata.
-   * Defaults to monthly step interpolation when neither source supplies it.
+   * Contractual monthly reference-index interpolation. Overrides index metadata;
+   * without either source the default is monthly step interpolation.
    */
   interpolation_override?: InflationInterpolation | null;
   /**
-   * Optional contract-level lag override.
+   * Optional contract-level lag override (if set, overrides index lag)
    */
   lag_override?: InflationLag | null;
-  maturity: Date65;
+  maturity: Date63;
   metric_pricing_overrides?: MetricPricingOverrides17;
-  /**
-   * Nominal short-rate volatility `σ_n` (annualized, absolute), used in the
-   * YoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.
-   */
-  nominal_rate_volatility?: number | null;
-  notional: Money53;
-  /**
-   * Cap/floor type (cap, floor, caplet, floorlet).
-   */
-  option_type: "cap" | "floor" | "caplet" | "floorlet";
+  notional: Money52;
   scenario_pricing_overrides?: ScenarioPricingOverrides17;
-  start_date: Date66;
-  strike: Decimal18;
   /**
-   * Schedule stub convention.
+   * Trade side
    */
-  stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
-  vol_surface_id: Id63;
+  side: "pay" | "receive";
+  start_date: Date64;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Attributes for scenario selection and tagging
  */
-export interface Attributes19 {
+export interface Attributes18 {
   /**
    * Structured metadata associated with the instrument.
    */
@@ -34964,7 +34549,7 @@ export interface Attributes19 {
 /**
  * Parsed financial tenor.
  */
-export interface Tenor14 {
+export interface Tenor13 {
   /**
    * Number of `unit` periods in the tenor. Must be at least 1; `0` is
    * rejected because a zero-length period makes schedule generation loop.
@@ -34977,16 +34562,11 @@ export interface Tenor14 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Pricing overrides (implied volatility, surface extrapolation).
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides17 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -35002,17 +34582,17 @@ export interface MetricPricingOverrides17 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -35021,7 +34601,7 @@ export interface MetricPricingOverrides17 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money53 {
+export interface Money52 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -35220,70 +34800,65 @@ export interface ScenarioPricingOverrides17 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Forward Rate Agreement instrument.
- *
- * A FRA is a forward contract on an interest rate. The holder receives
- * the difference between the realized rate and the fixed rate, paid at
- * the start of the interest period (FRA convention).
- *
- * # Direction Convention
- *
- * - `side = PayReceive::Receive`: Receive fixed rate, pay floating rate.
- *   When forward rate > fixed rate, PV is negative (you're paying more than receiving).
- * - `side = PayReceive::Pay`: Pay fixed rate, receive floating rate.
- *   When forward rate > fixed rate, PV is positive (you're receiving more than paying).
- *
- * # Side field
- *
- * Use `side` to indicate the fixed leg direction. If omitted in JSON,
- * deserialization defaults to `Pay`.
+ * YoY inflation cap/floor instrument.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "ForwardRateAgreement".
+ * via the `definition` "InflationCapFloor".
  */
-export interface ForwardRateAgreement {
-  attributes: Attributes20;
-  day_count: DayCount23;
-  discount_curve_id: Id64;
-  fixed_rate: Decimal19;
+export interface InflationCapFloor {
+  attributes: Attributes19;
+  business_day_convention?: BusinessDayConvention12;
   /**
-   * Optional business day convention for fixing date adjustment (default: ModifiedFollowing)
+   * Optional holiday calendar identifier.
    */
-  fixing_business_day_convention?: BusinessDayConvention13 | null;
+  calendar_id?: string | null;
+  day_count: DayCount22;
+  discount_curve_id: Id60;
+  frequency: Tenor14;
+  id: Id61;
+  inflation_index_id: Id62;
   /**
-   * Optional fixing calendar identifier for business day adjustment
+   * Correlation between the inflation index and the nominal short rate,
+   * used in the YoY convexity/timing adjustment. `None` ⇒ treated as 0
+   * (the timing term vanishes; the pure inflation-vol Jensen convexity
+   * `σ_I²·τ` is still applied).
    */
-  fixing_calendar_id?: Id9 | null;
-  /**
-   * Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days.
-   */
-  fixing_date?: Date | null;
-  forward_curve_id: Id65;
-  id: Id66;
+  inflation_nominal_correlation?: number | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides18;
-  maturity: Date67;
+  /**
+   * Contractual monthly CPI interpolation, overriding index metadata.
+   * Defaults to monthly step interpolation when neither source supplies it.
+   */
+  interpolation_override?: InflationInterpolation | null;
+  /**
+   * Optional contract-level lag override.
+   */
+  lag_override?: InflationLag | null;
+  maturity: Date65;
   metric_pricing_overrides?: MetricPricingOverrides18;
-  notional: Money54;
   /**
-   * Optional observed fixing (locked rate) when known
+   * Nominal short-rate volatility `σ_n` (annualized, absolute), used in the
+   * YoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.
    */
-  observed_fixing?: number | null;
+  nominal_rate_volatility?: number | null;
+  notional: Money53;
   /**
-   * Reset lag in business days (fixing to value date)
+   * Cap/floor type (cap, floor, caplet, floorlet).
    */
-  reset_lag: number;
+  option_type: "cap" | "floor" | "caplet" | "floorlet";
   scenario_pricing_overrides?: ScenarioPricingOverrides18;
+  start_date: Date66;
+  strike: Decimal18;
   /**
-   * Direction of the FRA: Pay means paying the fixed rate (receiving floating),
-   * Receive means receiving the fixed rate (paying floating).
+   * Schedule stub convention.
    */
-  side?: "pay" | "receive";
-  start_date: Date68;
+  stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
+  vol_surface_id: Id63;
 }
 /**
- * Attributes for scenario selection and tagging
+ * Attributes for scenario selection and tagging.
  */
-export interface Attributes20 {
+export interface Attributes19 {
   /**
    * Structured metadata associated with the instrument.
    */
@@ -35296,15 +34871,26 @@ export interface Attributes20 {
   tags?: string[];
 }
 /**
+ * Parsed financial tenor.
+ */
+export interface Tenor14 {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
+}
+/**
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides18 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -35320,17 +34906,17 @@ export interface MetricPricingOverrides18 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -35339,7 +34925,7 @@ export interface MetricPricingOverrides18 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money54 {
+export interface Money53 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -35538,6 +35124,320 @@ export interface ScenarioPricingOverrides18 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
+ * Forward Rate Agreement instrument.
+ *
+ * A FRA is a forward contract on an interest rate. The holder receives
+ * the difference between the realized rate and the fixed rate, paid at
+ * the start of the interest period (FRA convention).
+ *
+ * # Direction Convention
+ *
+ * - `side = PayReceive::Receive`: Receive fixed rate, pay floating rate.
+ *   When forward rate > fixed rate, PV is negative (you're paying more than receiving).
+ * - `side = PayReceive::Pay`: Pay fixed rate, receive floating rate.
+ *   When forward rate > fixed rate, PV is positive (you're receiving more than paying).
+ *
+ * # Side field
+ *
+ * Use `side` to indicate the fixed leg direction. If omitted in JSON,
+ * deserialization defaults to `Pay`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "ForwardRateAgreement".
+ */
+export interface ForwardRateAgreement {
+  attributes: Attributes20;
+  day_count: DayCount23;
+  discount_curve_id: Id64;
+  fixed_rate: Decimal19;
+  /**
+   * Optional business day convention for fixing date adjustment (default: ModifiedFollowing)
+   */
+  fixing_business_day_convention?: BusinessDayConvention13 | null;
+  /**
+   * Optional fixing calendar identifier for business day adjustment
+   */
+  fixing_calendar_id?: Id9 | null;
+  /**
+   * Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days.
+   */
+  fixing_date?: Date | null;
+  forward_curve_id: Id65;
+  id: Id66;
+  instrument_pricing_overrides?: InstrumentPricingOverrides19;
+  maturity: Date67;
+  metric_pricing_overrides?: MetricPricingOverrides19;
+  notional: Money54;
+  /**
+   * Optional observed fixing (locked rate) when known
+   */
+  observed_fixing?: number | null;
+  /**
+   * Reset lag in business days (fixing to value date)
+   */
+  reset_lag: number;
+  scenario_pricing_overrides?: ScenarioPricingOverrides19;
+  /**
+   * Direction of the FRA: Pay means paying the fixed rate (receiving floating),
+   * Receive means receiving the fixed rate (paying floating).
+   */
+  side?: "pay" | "receive";
+  start_date: Date68;
+}
+/**
+ * Attributes for scenario selection and tagging
+ */
+export interface Attributes20 {
+  /**
+   * Structured metadata associated with the instrument.
+   */
+  meta?: {
+    [k: string]: string;
+  };
+  /**
+   * User-defined tags for categorization.
+   */
+  tags?: string[];
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides19 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Metric-time pricing configuration.
+ */
+export interface MetricPricingOverrides19 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money54 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Scenario-only pricing adjustments.
+ */
+export interface ScenarioPricingOverrides19 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
+}
+/**
  * Swaption instrument
  *
  * # Exercise lifecycle boundary
@@ -35569,8 +35469,8 @@ export interface Swaption {
   exercise_style: "european" | "bermudan" | "american";
   expiry: Date69;
   id: Id67;
-  instrument_pricing_overrides?: InstrumentPricingOverrides19;
-  metric_pricing_overrides?: MetricPricingOverrides19;
+  instrument_pricing_overrides?: InstrumentPricingOverrides20;
+  metric_pricing_overrides?: MetricPricingOverrides20;
   notional: Money55;
   /**
    * Option type (payer or receiver swaption)
@@ -35580,7 +35480,7 @@ export interface Swaption {
    * Optional SABR volatility model parameters
    */
   sabr_params?: SabrParameters | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides19;
+  scenario_pricing_overrides?: ScenarioPricingOverrides20;
   /**
    * Settlement method (physical or cash)
    */
@@ -35609,21 +35509,16 @@ export interface Attributes21 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides19 {
+export interface InstrumentPricingOverrides20 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides19 {
+export interface MetricPricingOverrides20 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -35634,17 +35529,17 @@ export interface MetricPricingOverrides19 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -35856,7 +35751,7 @@ export interface SabrParameters {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides19 {
+export interface ScenarioPricingOverrides20 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -36082,14 +35977,14 @@ export interface BermudanSwaption {
    */
   bermudan_type: "co_terminal" | "non_co_terminal";
   id: Id69;
-  instrument_pricing_overrides?: InstrumentPricingOverrides20;
-  metric_pricing_overrides?: MetricPricingOverrides20;
+  instrument_pricing_overrides?: InstrumentPricingOverrides21;
+  metric_pricing_overrides?: MetricPricingOverrides21;
   notional: Money56;
   /**
    * Option type (payer = Call, receiver = Put)
    */
   option_type: "call" | "put";
-  scenario_pricing_overrides?: ScenarioPricingOverrides20;
+  scenario_pricing_overrides?: ScenarioPricingOverrides21;
   /**
    * Settlement method (physical or cash)
    */
@@ -36133,18 +36028,14 @@ export interface BermudanSchedule {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides20 {
+export interface InstrumentPricingOverrides21 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides20 {
+export interface MetricPricingOverrides21 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -36155,17 +36046,17 @@ export interface MetricPricingOverrides20 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -36349,7 +36240,7 @@ export interface Money56 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides20 {
+export interface ScenarioPricingOverrides21 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -36567,8 +36458,8 @@ export interface InterestRateFuture {
   fixing_index_id?: Id9 | null;
   forward_curve_id: Id72;
   id: Id73;
-  instrument_pricing_overrides?: InstrumentPricingOverrides21;
-  metric_pricing_overrides?: MetricPricingOverrides21;
+  instrument_pricing_overrides?: InstrumentPricingOverrides22;
+  metric_pricing_overrides?: MetricPricingOverrides22;
   notional: Money57;
   /**
    * Rate period end date.
@@ -36594,7 +36485,7 @@ export interface InterestRateFuture {
    * Rate settlement method defined by the exchange contract.
    */
   rate_averaging: "term" | "arithmetic_average" | "compounded_overnight";
-  scenario_pricing_overrides?: ScenarioPricingOverrides21;
+  scenario_pricing_overrides?: ScenarioPricingOverrides22;
   /**
    * Optional official final settlement price in futures price points.
    *
@@ -36662,21 +36553,16 @@ export interface FutureContractSpecs {
   tick_value: number;
 }
 /**
- * Attributes
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides21 {
+export interface InstrumentPricingOverrides22 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides21 {
+export interface MetricPricingOverrides22 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -36687,17 +36573,17 @@ export interface MetricPricingOverrides21 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -36881,7 +36767,7 @@ export interface Money57 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides21 {
+export interface ScenarioPricingOverrides22 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -36917,9 +36803,9 @@ export interface ScenarioPricingOverrides21 {
 export interface InterestRateFutureOption {
   attributes?: Attributes24;
   id: Id74;
-  instrument_pricing_overrides?: InstrumentPricingOverrides22;
-  metric_pricing_overrides?: MetricPricingOverrides22;
-  scenario_pricing_overrides?: ScenarioPricingOverrides22;
+  instrument_pricing_overrides?: InstrumentPricingOverrides23;
+  metric_pricing_overrides?: MetricPricingOverrides23;
+  scenario_pricing_overrides?: ScenarioPricingOverrides23;
   terms: FutureOptionTerms;
 }
 /**
@@ -36938,20 +36824,18 @@ export interface Attributes24 {
   tags?: string[];
 }
 /**
- * Instrument-owned pricing inputs, including optional tree-step overrides.
+ * Instrument-owned pricing inputs: the flat option volatility in
+ * `market_quotes.implied_volatility` (required while live) and optional
+ * tree-step overrides.
  */
-export interface InstrumentPricingOverrides22 {
+export interface InstrumentPricingOverrides23 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides22 {
+export interface MetricPricingOverrides23 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -36962,17 +36846,17 @@ export interface MetricPricingOverrides22 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -36981,7 +36865,7 @@ export interface MetricPricingOverrides22 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides22 {
+export interface ScenarioPricingOverrides23 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -37089,11 +36973,6 @@ export interface FutureOptionTerms {
    * report DV01 without inferring economics from an exchange symbol.
    */
   underlying_price_change_per_bp?: number | null;
-  /**
-   * Annualized volatility. Decimal lognormal units for Black-76; futures-price
-   * points per square-root year for the normal model.
-   */
-  volatility: number;
 }
 /**
  * Exercise or assignment observation for an option on a future.
@@ -37138,9 +37017,9 @@ export interface CapFloor {
   forward_curve_id: Id77;
   frequency: Tenor15;
   id: Id78;
-  instrument_pricing_overrides?: InstrumentPricingOverrides23;
+  instrument_pricing_overrides?: InstrumentPricingOverrides24;
   maturity: Date76;
-  metric_pricing_overrides?: MetricPricingOverrides23;
+  metric_pricing_overrides?: MetricPricingOverrides24;
   notional: Money58;
   /**
    * Optional compounded-overnight coupon terms.
@@ -37165,7 +37044,7 @@ export interface CapFloor {
    * Option type
    */
   rate_option_type: "cap" | "floor" | "caplet" | "floorlet";
-  scenario_pricing_overrides?: ScenarioPricingOverrides23;
+  scenario_pricing_overrides?: ScenarioPricingOverrides24;
   /**
    * Settlement type (defaults to Cash; caps/floors are virtually always cash-settled)
    */
@@ -37237,21 +37116,16 @@ export interface Tenor15 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Additional attributes
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides23 {
+export interface InstrumentPricingOverrides24 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides23 {
+export interface MetricPricingOverrides24 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -37262,17 +37136,17 @@ export interface MetricPricingOverrides23 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -37523,7 +37397,7 @@ export interface OvernightCouponConvention {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides23 {
+export interface ScenarioPricingOverrides24 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -37638,10 +37512,10 @@ export interface CmsSwap {
         [k: string]: unknown;
       };
   id: Id83;
-  instrument_pricing_overrides?: InstrumentPricingOverrides24;
-  metric_pricing_overrides?: MetricPricingOverrides24;
+  instrument_pricing_overrides?: InstrumentPricingOverrides25;
+  metric_pricing_overrides?: MetricPricingOverrides25;
   notional: Money59;
-  scenario_pricing_overrides?: ScenarioPricingOverrides24;
+  scenario_pricing_overrides?: ScenarioPricingOverrides25;
   /**
    * Pay direction: `Pay` means pay CMS leg, receive funding leg.
    */
@@ -37684,337 +37558,11 @@ export interface Attributes26 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread).
- * Instrument-owned pricing inputs.
- */
-export interface InstrumentPricingOverrides24 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
-}
-/**
- * Metric-time pricing configuration.
- */
-export interface MetricPricingOverrides24 {
-  /**
-   * Basis used for bond duration, convexity, and DV01-style risk metrics.
-   */
-  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
-  /**
-   * Breakeven configuration: which parameter to solve for and solve mode.
-   */
-  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
-  bump_config?: D_1D0C1815F8Dd0715Bd12;
-  /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
-   */
-  mc_seed_scenario?: string | null;
-  /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-   */
-  theta_period?: string | null;
-  /**
-   * Historical VaR / Expected Shortfall configuration override.
-   */
-  var_config?: DE49387F97C0F9D510642 | null;
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money59 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Scenario-only pricing adjustments.
- */
-export interface ScenarioPricingOverrides24 {
-  /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
-   *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
-   */
-  scenario_price_shock_pct?: number | null;
-  /**
-   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
-   *
-   * Applied as an additional flat Z-spread during valuation by pricers that
-   * support spread-based revaluation. Currently consumed by `Bond::base_value`
-   * for bonds without embedded options, without an assigned credit curve, and
-   * without a price-pinning quote override other than `quoted_z_spread`
-   * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
-   *
-   * Setting this on an unsupported configuration produces a validation error
-   * at pricing time rather than a silent no-op. For hazard-priced (credit
-   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
-   */
-  scenario_spread_shock_bp?: number | null;
-}
-/**
- * CMS option instrument (cap/floor on CMS rates).
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "CmsOption".
- */
-export interface CmsOption {
-  /**
-   * Accrual fractions for each period
-   */
-  accrual_fractions: number[];
-  attributes?: Attributes27;
-  /**
-   * Tenor of the CMS swap in years (e.g., 10.0 for 10Y)
-   */
-  cms_tenor: number;
-  day_count: DayCount30;
-  discount_curve_id: Id85;
-  /**
-   * Observation/fixing dates for CMS rate
-   */
-  fixing_dates: Date[];
-  forward_curve_id: Id86;
-  id: Id87;
-  instrument_pricing_overrides?: InstrumentPricingOverrides25;
-  metric_pricing_overrides?: MetricPricingOverrides25;
-  notional: Money60;
-  /**
-   * Option type (call or put on CMS rate)
-   */
-  option_type: "call" | "put";
-  /**
-   * Payment dates for each period (usually fixing date + lag or period end)
-   */
-  payment_dates: Date[];
-  scenario_pricing_overrides?: ScenarioPricingOverrides25;
-  strike: Decimal22;
-  /**
-   * IRS convention for the underlying swap (e.g., `UsdSofr`).
-   *
-   * When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
-   * `swap_day_count`, and `swap_float_day_count`. Individual fields still
-   * override the convention when explicitly set.
-   */
-  swap_convention?: IRSConvention | null;
-  /**
-   * Day count convention of the underlying swap fixed leg (overrides convention if set)
-   */
-  swap_day_count?: DayCount5 | null;
-  /**
-   * Fixed leg frequency of the underlying swap (overrides convention if set)
-   */
-  swap_fixed_frequency?: Tenor2 | null;
-  /**
-   * Optional day count convention of the underlying swap floating leg
-   */
-  swap_float_day_count?: DayCount5 | null;
-  /**
-   * Floating leg frequency of the underlying swap (overrides convention if set)
-   */
-  swap_float_frequency?: Tenor2 | null;
-  vol_surface_id: Id88;
-}
-/**
- * Attributes for scenario selection and grouping
- */
-export interface Attributes27 {
-  /**
-   * Structured metadata associated with the instrument.
-   */
-  meta?: {
-    [k: string]: string;
-  };
-  /**
-   * User-defined tags for categorization.
-   */
-  tags?: string[];
-}
-/**
- * Pricing overrides (manual price, yield, spread)
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides25 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -38030,17 +37578,17 @@ export interface MetricPricingOverrides25 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -38049,7 +37597,7 @@ export interface MetricPricingOverrides25 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money60 {
+export interface Money59 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -38248,66 +37796,72 @@ export interface ScenarioPricingOverrides25 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Simple deposit instrument with optional quoted rate.
- *
- * Represents a single-period deposit where principal is exchanged
- * at start and principal plus interest at maturity.
- *
- * # Market Convention Fields
- *
- * The instrument supports optional settlement convention fields for proper
- * business-day adjusted cashflow generation:
- *
- * - `spot_lag_days`: Number of business days from trade date to spot date (default: 2 for USD/EUR/JPY, 0 for GBP)
- * - `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)
- * - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
- *
- * When these fields are set, the effective start date is computed as
- * `start + spot_lag` adjusted by the business day convention. In this case,
- * `start` is treated as the trade date; otherwise it is the accrual start date.
+ * CMS option instrument (cap/floor on CMS rates).
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "Deposit".
+ * via the `definition` "CmsOption".
  */
-export interface Deposit {
-  attributes: Attributes28;
-  business_day_convention?: BusinessDayConvention15;
+export interface CmsOption {
   /**
-   * Optional holiday calendar identifier for business day logic.
-   *
-   * Examples: "nyse", "target", "london", "tokyo".
-   * When set, enables calendar-aware spot date and accrual date adjustments.
+   * Accrual fractions for each period
    */
-  calendar_id?: Id9 | null;
-  day_count: DayCount31;
-  discount_curve_id: Id89;
-  id: Id90;
+  accrual_fractions: number[];
+  attributes?: Attributes27;
+  /**
+   * Tenor of the CMS swap in years (e.g., 10.0 for 10Y)
+   */
+  cms_tenor: number;
+  day_count: DayCount30;
+  discount_curve_id: Id85;
+  /**
+   * Observation/fixing dates for CMS rate
+   */
+  fixing_dates: Date[];
+  forward_curve_id: Id86;
+  id: Id87;
   instrument_pricing_overrides?: InstrumentPricingOverrides26;
-  maturity: Date78;
   metric_pricing_overrides?: MetricPricingOverrides26;
-  notional: Money61;
+  notional: Money60;
   /**
-   * Optional quoted simple rate r (annualised) for the deposit.
-   *
-   * Note: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`
-   * is only appropriate if the caller never requests cashflow generation/PV from
-   * this instrument (e.g., constructing placeholders).
+   * Option type (call or put on CMS rate)
    */
-  quote_rate?: Decimal5 | null;
+  option_type: "call" | "put";
+  /**
+   * Payment dates for each period (usually fixing date + lag or period end)
+   */
+  payment_dates: Date[];
   scenario_pricing_overrides?: ScenarioPricingOverrides26;
+  strike: Decimal22;
   /**
-   * Optional spot lag in business days from trade date to effective start.
+   * IRS convention for the underlying swap (e.g., `UsdSofr`).
    *
-   * Market convention: T+2 for USD/EUR/JPY, T+0 for GBP.
-   * If not set, the raw `start` date is used without adjustment.
+   * When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
+   * `swap_day_count`, and `swap_float_day_count`. Individual fields still
+   * override the convention when explicitly set.
    */
-  spot_lag_days?: number | null;
-  start_date: Date79;
+  swap_convention?: IRSConvention | null;
+  /**
+   * Day count convention of the underlying swap fixed leg (overrides convention if set)
+   */
+  swap_day_count?: DayCount5 | null;
+  /**
+   * Fixed leg frequency of the underlying swap (overrides convention if set)
+   */
+  swap_fixed_frequency?: Tenor2 | null;
+  /**
+   * Optional day count convention of the underlying swap floating leg
+   */
+  swap_float_day_count?: DayCount5 | null;
+  /**
+   * Floating leg frequency of the underlying swap (overrides convention if set)
+   */
+  swap_float_frequency?: Tenor2 | null;
+  vol_surface_id: Id88;
 }
 /**
- * Attributes for scenario selection and tagging
+ * Attributes for scenario selection and grouping
  */
-export interface Attributes28 {
+export interface Attributes27 {
   /**
    * Structured metadata associated with the instrument.
    */
@@ -38320,16 +37874,11 @@ export interface Attributes28 {
   tags?: string[];
 }
 /**
- * Attributes for scenario selection and tagging.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides26 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -38345,17 +37894,17 @@ export interface MetricPricingOverrides26 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -38364,7 +37913,7 @@ export interface MetricPricingOverrides26 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money61 {
+export interface Money60 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -38563,6 +38112,316 @@ export interface ScenarioPricingOverrides26 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
+ * Simple deposit instrument with optional quoted rate.
+ *
+ * Represents a single-period deposit where principal is exchanged
+ * at start and principal plus interest at maturity.
+ *
+ * # Market Convention Fields
+ *
+ * The instrument supports optional settlement convention fields for proper
+ * business-day adjusted cashflow generation:
+ *
+ * - `spot_lag_days`: Number of business days from trade date to spot date (default: 2 for USD/EUR/JPY, 0 for GBP)
+ * - `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)
+ * - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
+ *
+ * When these fields are set, the effective start date is computed as
+ * `start + spot_lag` adjusted by the business day convention. In this case,
+ * `start` is treated as the trade date; otherwise it is the accrual start date.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "Deposit".
+ */
+export interface Deposit {
+  attributes: Attributes28;
+  business_day_convention?: BusinessDayConvention15;
+  /**
+   * Optional holiday calendar identifier for business day logic.
+   *
+   * Examples: "nyse", "target", "london", "tokyo".
+   * When set, enables calendar-aware spot date and accrual date adjustments.
+   */
+  calendar_id?: Id9 | null;
+  day_count: DayCount31;
+  discount_curve_id: Id89;
+  id: Id90;
+  instrument_pricing_overrides?: InstrumentPricingOverrides27;
+  maturity: Date78;
+  metric_pricing_overrides?: MetricPricingOverrides27;
+  notional: Money61;
+  /**
+   * Optional quoted simple rate r (annualised) for the deposit.
+   *
+   * Note: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`
+   * is only appropriate if the caller never requests cashflow generation/PV from
+   * this instrument (e.g., constructing placeholders).
+   */
+  quote_rate?: Decimal5 | null;
+  scenario_pricing_overrides?: ScenarioPricingOverrides27;
+  /**
+   * Optional spot lag in business days from trade date to effective start.
+   *
+   * Market convention: T+2 for USD/EUR/JPY, T+0 for GBP.
+   * If not set, the raw `start` date is used without adjustment.
+   */
+  spot_lag_days?: number | null;
+  start_date: Date79;
+}
+/**
+ * Attributes for scenario selection and tagging
+ */
+export interface Attributes28 {
+  /**
+   * Structured metadata associated with the instrument.
+   */
+  meta?: {
+    [k: string]: string;
+  };
+  /**
+   * User-defined tags for categorization.
+   */
+  tags?: string[];
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides27 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Metric-time pricing configuration.
+ */
+export interface MetricPricingOverrides27 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money61 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Scenario-only pricing adjustments.
+ */
+export interface ScenarioPricingOverrides27 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
+}
+/**
  * Repurchase Agreement instrument.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -38584,7 +38443,7 @@ export interface Repo {
    */
   haircut: number;
   id: Id92;
-  instrument_pricing_overrides?: InstrumentPricingOverrides27;
+  instrument_pricing_overrides?: InstrumentPricingOverrides28;
   /**
    * Optional margin specification for mark-to-market margining.
    *
@@ -38593,13 +38452,13 @@ export interface Repo {
    */
   margin_spec?: RepoMarginSpec | null;
   maturity: Date80;
-  metric_pricing_overrides?: MetricPricingOverrides27;
+  metric_pricing_overrides?: MetricPricingOverrides28;
   repo_rate: Decimal23;
   /**
    * Type of repo
    */
   repo_type: "term" | "open" | "overnight";
-  scenario_pricing_overrides?: ScenarioPricingOverrides27;
+  scenario_pricing_overrides?: ScenarioPricingOverrides28;
   start_date: Date81;
   /**
    * Whether this is a tri-party repo
@@ -38832,16 +38691,11 @@ export interface CollateralSpec {
   quantity: number;
 }
 /**
- * Attributes for scenario selection and tagging
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides27 {
+export interface InstrumentPricingOverrides28 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * GMRA 2011 compliant repo margin specification.
@@ -38974,7 +38828,7 @@ export interface EligibleCollateralSchedule1 {
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides27 {
+export interface MetricPricingOverrides28 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -38985,17 +38839,17 @@ export interface MetricPricingOverrides27 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -39004,7 +38858,7 @@ export interface MetricPricingOverrides27 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides27 {
+export interface ScenarioPricingOverrides28 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -39094,7 +38948,7 @@ export interface CreditDefaultSwap {
    */
   doc_clause?: CdsDocClause | null;
   id: Id93;
-  instrument_pricing_overrides?: InstrumentPricingOverrides28;
+  instrument_pricing_overrides?: InstrumentPricingOverrides29;
   /**
    * Optional OTC margin specification for VM/IM.
    *
@@ -39105,7 +38959,7 @@ export interface CreditDefaultSwap {
    * bucket or the credit non-qualifying risk class.
    */
   margin_spec?: OtcMarginSpec | null;
-  metric_pricing_overrides?: MetricPricingOverrides28;
+  metric_pricing_overrides?: MetricPricingOverrides29;
   notional: Money63;
   premium: PremiumLegSpec;
   protection: ProtectionLegSpec;
@@ -39121,7 +38975,7 @@ export interface CreditDefaultSwap {
    * When `None`, protection starts on the premium leg start date (standard CDS).
    */
   protection_effective_date?: Date | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides28;
+  scenario_pricing_overrides?: ScenarioPricingOverrides29;
   /**
    * Buyer/seller perspective
    */
@@ -39162,20 +39016,16 @@ export interface Attributes30 {
   tags?: string[];
 }
 /**
- * Instrument-owned pricing overrides (including upfront payment).
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides28 {
+export interface InstrumentPricingOverrides29 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides28 {
+export interface MetricPricingOverrides29 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -39186,17 +39036,17 @@ export interface MetricPricingOverrides28 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -39434,9 +39284,9 @@ export interface ProtectionLegSpec {
   settlement_delay: number;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides28 {
+export interface ScenarioPricingOverrides29 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -39484,7 +39334,7 @@ export interface CDSIndex {
    * Index name, e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx Europe"
    */
   index_name: string;
-  instrument_pricing_overrides?: InstrumentPricingOverrides29;
+  instrument_pricing_overrides?: InstrumentPricingOverrides30;
   /**
    * Optional OTC margin specification for VM/IM.
    *
@@ -39495,7 +39345,7 @@ export interface CDSIndex {
    * index name.
    */
   margin_spec?: OtcMarginSpec | null;
-  metric_pricing_overrides?: MetricPricingOverrides29;
+  metric_pricing_overrides?: MetricPricingOverrides30;
   notional: Money64;
   /**
    * Number of reference entities in the index pool.
@@ -39516,7 +39366,7 @@ export interface CDSIndex {
    */
   pricing: "single_curve" | "constituents";
   protection: ProtectionLegSpec1;
-  scenario_pricing_overrides?: ScenarioPricingOverrides29;
+  scenario_pricing_overrides?: ScenarioPricingOverrides30;
   /**
    * Series number (e.g., 42)
    */
@@ -39580,20 +39430,16 @@ export interface CreditParams {
   reference_entity: string;
 }
 /**
- * Instrument-owned pricing overrides (including upfront payment).
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides29 {
+export interface InstrumentPricingOverrides30 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides29 {
+export interface MetricPricingOverrides30 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -39604,17 +39450,17 @@ export interface MetricPricingOverrides29 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -39837,9 +39683,9 @@ export interface ProtectionLegSpec1 {
   settlement_delay: number;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides29 {
+export interface ScenarioPricingOverrides30 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -39900,15 +39746,15 @@ export interface CDSTranche {
    * Index name (e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx EUR")
    */
   index_name: string;
-  instrument_pricing_overrides?: InstrumentPricingOverrides30;
+  instrument_pricing_overrides?: InstrumentPricingOverrides31;
   maturity: Date84;
-  metric_pricing_overrides?: MetricPricingOverrides30;
+  metric_pricing_overrides?: MetricPricingOverrides31;
   notional: Money65;
   /**
    * Running coupon in basis points (e.g., 100 = 1.00%)
    */
   running_coupon_bp: number;
-  scenario_pricing_overrides?: ScenarioPricingOverrides30;
+  scenario_pricing_overrides?: ScenarioPricingOverrides31;
   /**
    * Series number (e.g., 37)
    */
@@ -39964,20 +39810,16 @@ export interface Tenor17 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Instrument-owned pricing overrides.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides30 {
+export interface InstrumentPricingOverrides31 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides30 {
+export interface MetricPricingOverrides31 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -39988,17 +39830,17 @@ export interface MetricPricingOverrides30 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -40180,9 +40022,9 @@ export interface Money65 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides30 {
+export interface ScenarioPricingOverrides31 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -40254,14 +40096,14 @@ export interface CDSOption {
    * to a clean-price strike.
    */
   index_factor?: number | null;
-  instrument_pricing_overrides?: InstrumentPricingOverrides31;
+  instrument_pricing_overrides?: InstrumentPricingOverrides32;
   /**
    * Whether the option knocks out if the underlying defaults before
    * exercise. This is contract-specific; new instruments default to
    * no-knockout and legacy single-name books can opt in explicitly.
    */
   knockout?: boolean;
-  metric_pricing_overrides?: MetricPricingOverrides31;
+  metric_pricing_overrides?: MetricPricingOverrides32;
   notional: Money66;
   /**
    * Option type (Call = right to buy protection, Put = right to sell protection)
@@ -40286,7 +40128,7 @@ export interface CDSOption {
    * Recovery rate assumption
    */
   recovery_rate: number;
-  scenario_pricing_overrides?: ScenarioPricingOverrides31;
+  scenario_pricing_overrides?: ScenarioPricingOverrides32;
   /**
    * Settlement type
    */
@@ -40369,20 +40211,16 @@ export interface Attributes33 {
   tags?: string[];
 }
 /**
- * Instrument-owned pricing overrides (including implied volatility).
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides31 {
+export interface InstrumentPricingOverrides32 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides31 {
+export interface MetricPricingOverrides32 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -40393,17 +40231,17 @@ export interface MetricPricingOverrides31 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -40585,9 +40423,9 @@ export interface Money66 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides31 {
+export interface ScenarioPricingOverrides32 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -40635,8 +40473,8 @@ export interface Equity {
    */
   div_yield_id?: Id9 | null;
   id: Id106;
-  instrument_pricing_overrides?: InstrumentPricingOverrides32;
-  metric_pricing_overrides?: MetricPricingOverrides32;
+  instrument_pricing_overrides?: InstrumentPricingOverrides33;
+  metric_pricing_overrides?: MetricPricingOverrides33;
   /**
    * Explicit scalar identifier used to resolve the spot price.
    */
@@ -40645,7 +40483,7 @@ export interface Equity {
    * Optional price quote (if not provided, will look up from market data)
    */
   price_quote?: number | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides32;
+  scenario_pricing_overrides?: ScenarioPricingOverrides33;
   /**
    * Optional number of shares (defaults to 1 if not specified)
    */
@@ -40671,20 +40509,16 @@ export interface Attributes34 {
   tags?: string[];
 }
 /**
- * Attributes for scenario selection and tagging
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides32 {
+export interface InstrumentPricingOverrides33 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides32 {
+export interface MetricPricingOverrides33 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -40695,26 +40529,26 @@ export interface MetricPricingOverrides32 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides32 {
+export interface ScenarioPricingOverrides33 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -40814,14 +40648,14 @@ export interface EquityOption {
   exercise_style?: "european" | "american" | "bermudan";
   expiry: Date89;
   id: Id108;
-  instrument_pricing_overrides?: InstrumentPricingOverrides33;
-  metric_pricing_overrides?: MetricPricingOverrides33;
+  instrument_pricing_overrides?: InstrumentPricingOverrides34;
+  metric_pricing_overrides?: MetricPricingOverrides34;
   notional: Money67;
   /**
    * Option type (call or put)
    */
   option_type: "call" | "put";
-  scenario_pricing_overrides?: ScenarioPricingOverrides33;
+  scenario_pricing_overrides?: ScenarioPricingOverrides34;
   /**
    * Settlement type (physical or cash)
    */
@@ -40831,13 +40665,6 @@ export interface EquityOption {
    * Strike price
    */
   strike: number;
-  /**
-   * Basis used for the reported per-day theta.
-   *
-   * Defaults to calendar-day theta (`annual theta / 365`). Select
-   * `Trading252` explicitly for a trading-day risk convention.
-   */
-  theta_day_basis?: "calendar_365" | "trading_252";
   /**
    * Underlying equity ticker symbol
    */
@@ -40883,20 +40710,16 @@ export interface EquityOptionExercise {
   spot: number;
 }
 /**
- * Pricing overrides (manual price, yield, spread)
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides33 {
+export interface InstrumentPricingOverrides34 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides33 {
+export interface MetricPricingOverrides34 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -40907,17 +40730,17 @@ export interface MetricPricingOverrides33 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -41099,9 +40922,9 @@ export interface Money67 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides33 {
+export interface ScenarioPricingOverrides34 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -41164,12 +40987,12 @@ export interface LookbackOption {
    */
   expiry_fixing?: Money6 | null;
   id: Id112;
-  instrument_pricing_overrides?: InstrumentPricingOverrides34;
+  instrument_pricing_overrides?: InstrumentPricingOverrides35;
   /**
    * Lookback type (fixed or floating strike)
    */
   lookback_type: "fixed_strike" | "floating_strike";
-  metric_pricing_overrides?: MetricPricingOverrides34;
+  metric_pricing_overrides?: MetricPricingOverrides35;
   notional: Money68;
   /**
    * Observed maximum spot price since inception (required for Floating Put / Fixed Call)
@@ -41183,7 +41006,7 @@ export interface LookbackOption {
    * Option type (call or put)
    */
   option_type: "call" | "put";
-  scenario_pricing_overrides?: ScenarioPricingOverrides34;
+  scenario_pricing_overrides?: ScenarioPricingOverrides35;
   spot_id: Id113;
   /**
    * Strike price (None for floating strike lookbacks)
@@ -41221,20 +41044,16 @@ export interface Attributes36 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides34 {
+export interface InstrumentPricingOverrides35 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides34 {
+export interface MetricPricingOverrides35 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -41245,17 +41064,17 @@ export interface MetricPricingOverrides34 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -41437,9 +41256,9 @@ export interface Money68 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides34 {
+export interface ScenarioPricingOverrides35 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -41524,14 +41343,14 @@ export interface VarianceSwap {
    */
   high_series_id?: string | null;
   id: Id116;
-  instrument_pricing_overrides?: InstrumentPricingOverrides35;
+  instrument_pricing_overrides?: InstrumentPricingOverrides36;
   /**
    * Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
    * Defaults to `underlying_ticker` when absent.
    */
   low_series_id?: string | null;
   maturity: Date91;
-  metric_pricing_overrides?: MetricPricingOverrides35;
+  metric_pricing_overrides?: MetricPricingOverrides36;
   notional: Money69;
   observation_business_day_convention?: BusinessDayConvention19;
   /**
@@ -41561,7 +41380,7 @@ export interface VarianceSwap {
    * Method for calculating realized variance (defaults to CloseToClose)
    */
   realized_var_method?: "close_to_close" | "parkinson" | "garman_klass" | "rogers_satchell" | "yang_zhang";
-  scenario_pricing_overrides?: ScenarioPricingOverrides35;
+  scenario_pricing_overrides?: ScenarioPricingOverrides36;
   /**
    * Optional cash-settlement date. Defaults to the adjusted final observation date.
    */
@@ -41575,6 +41394,15 @@ export interface VarianceSwap {
    * Strike variance (annualized)
    */
   strike_variance: number;
+  /**
+   * Trading days per year used to annualise daily realized variance.
+   *
+   * A contract term of the variance-swap confirmation: daily observations
+   * are annualised by `trading_days_per_year / observation_frequency.count()`.
+   * Must be finite and positive. Defaults to
+   * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+   */
+  trading_days_per_year?: number;
   /**
    * Underlying identifier (equity/index)
    */
@@ -41596,20 +41424,16 @@ export interface Attributes37 {
   tags?: string[];
 }
 /**
- * Attributes for scenario selection
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides35 {
+export interface InstrumentPricingOverrides36 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides35 {
+export interface MetricPricingOverrides36 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -41620,17 +41444,17 @@ export interface MetricPricingOverrides35 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -41827,9 +41651,9 @@ export interface Tenor18 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides35 {
+export interface ScenarioPricingOverrides36 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -41894,8 +41718,8 @@ export interface VolatilityIndexFuture {
   discount_curve_id: Id117;
   expiry: Date93;
   id: Id118;
-  instrument_pricing_overrides?: InstrumentPricingOverrides36;
-  metric_pricing_overrides?: MetricPricingOverrides36;
+  instrument_pricing_overrides?: InstrumentPricingOverrides37;
+  metric_pricing_overrides?: MetricPricingOverrides37;
   notional: Money70;
   /**
    * Position side (Long or Short).
@@ -41905,7 +41729,7 @@ export interface VolatilityIndexFuture {
    * Quoted future price (index points, e.g., 21.50).
    */
   quoted_price: number;
-  scenario_pricing_overrides?: ScenarioPricingOverrides36;
+  scenario_pricing_overrides?: ScenarioPricingOverrides37;
   settlement_date: Date94;
   /**
    * Final settlement/SOQ fixing in index points.
@@ -41953,20 +41777,16 @@ export interface VolIndexContractSpecs {
   tick_value: number;
 }
 /**
- * Attributes for tagging and selection.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides36 {
+export interface InstrumentPricingOverrides37 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides36 {
+export interface MetricPricingOverrides37 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -41977,17 +41797,17 @@ export interface MetricPricingOverrides36 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -42169,9 +41989,9 @@ export interface Money70 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides36 {
+export interface ScenarioPricingOverrides37 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -42203,9 +42023,9 @@ export interface ScenarioPricingOverrides36 {
 export interface VolatilityIndexFutureOption {
   attributes?: Attributes39;
   id: Id120;
-  instrument_pricing_overrides?: InstrumentPricingOverrides37;
-  metric_pricing_overrides?: MetricPricingOverrides37;
-  scenario_pricing_overrides?: ScenarioPricingOverrides37;
+  instrument_pricing_overrides?: InstrumentPricingOverrides38;
+  metric_pricing_overrides?: MetricPricingOverrides38;
+  scenario_pricing_overrides?: ScenarioPricingOverrides38;
   terms: FutureOptionTerms1;
 }
 /**
@@ -42224,20 +42044,18 @@ export interface Attributes39 {
   tags?: string[];
 }
 /**
- * Instrument-owned pricing inputs, including optional tree-step overrides.
+ * Instrument-owned pricing inputs: the flat option volatility in
+ * `market_quotes.implied_volatility` (required while live) and optional
+ * tree-step overrides.
  */
-export interface InstrumentPricingOverrides37 {
+export interface InstrumentPricingOverrides38 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides37 {
+export interface MetricPricingOverrides38 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -42248,17 +42066,17 @@ export interface MetricPricingOverrides37 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -42267,7 +42085,7 @@ export interface MetricPricingOverrides37 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides37 {
+export interface ScenarioPricingOverrides38 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -42375,11 +42193,6 @@ export interface FutureOptionTerms1 {
    * report DV01 without inferring economics from an exchange symbol.
    */
   underlying_price_change_per_bp?: number | null;
-  /**
-   * Annualized volatility. Decimal lognormal units for Black-76; futures-price
-   * points per square-root year for the normal model.
-   */
-  volatility: number;
 }
 /**
  * FX Spot instrument (1 unit of `base` priced in `quote`).
@@ -42424,8 +42237,8 @@ export interface FxSpot {
    */
   discount_curve_id?: Id9 | null;
   id: Id121;
-  instrument_pricing_overrides?: InstrumentPricingOverrides38;
-  metric_pricing_overrides?: MetricPricingOverrides38;
+  instrument_pricing_overrides?: InstrumentPricingOverrides39;
+  metric_pricing_overrides?: MetricPricingOverrides39;
   notional: Money71;
   /**
    * Optional quote currency calendar for joint calendar settlement adjustment.
@@ -42435,7 +42248,7 @@ export interface FxSpot {
    */
   quote_calendar_id?: string | null;
   quote_currency: Currency8;
-  scenario_pricing_overrides?: ScenarioPricingOverrides38;
+  scenario_pricing_overrides?: ScenarioPricingOverrides39;
   /**
    * Optional settlement date (T+2 typically for spot)
    */
@@ -42467,21 +42280,16 @@ export interface Attributes40 {
   tags?: string[];
 }
 /**
- * Per-instrument pricing/sensitivity override knobs.
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides38 {
+export interface InstrumentPricingOverrides39 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides38 {
+export interface MetricPricingOverrides39 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -42492,17 +42300,17 @@ export interface MetricPricingOverrides38 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -42686,7 +42494,7 @@ export interface Money71 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides38 {
+export interface ScenarioPricingOverrides39 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -42731,8 +42539,8 @@ export interface FxSwap {
   far_rate?: number | null;
   foreign_discount_curve_id: Id123;
   id: Id124;
-  instrument_pricing_overrides?: InstrumentPricingOverrides39;
-  metric_pricing_overrides?: MetricPricingOverrides39;
+  instrument_pricing_overrides?: InstrumentPricingOverrides40;
+  metric_pricing_overrides?: MetricPricingOverrides40;
   near_date: Date96;
   /**
    * Optional near leg FX rate (quote per base). If None, source from market.
@@ -42743,7 +42551,7 @@ export interface FxSwap {
    */
   quote_calendar_id?: string | null;
   quote_currency: Currency10;
-  scenario_pricing_overrides?: ScenarioPricingOverrides39;
+  scenario_pricing_overrides?: ScenarioPricingOverrides40;
 }
 /**
  * Attributes for scenario selection and tagging.
@@ -42936,20 +42744,16 @@ export interface Money72 {
     | "ZWL";
 }
 /**
- * Per-instrument pricing/sensitivity override knobs.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides39 {
+export interface InstrumentPricingOverrides40 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides39 {
+export interface MetricPricingOverrides40 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -42960,17 +42764,17 @@ export interface MetricPricingOverrides39 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -42979,7 +42783,7 @@ export interface MetricPricingOverrides39 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides39 {
+export interface ScenarioPricingOverrides40 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -43061,16 +42865,16 @@ export interface FxForward {
   domestic_discount_curve_id: Id125;
   foreign_discount_curve_id: Id126;
   id: Id127;
-  instrument_pricing_overrides?: InstrumentPricingOverrides40;
+  instrument_pricing_overrides?: InstrumentPricingOverrides41;
   maturity: Date97;
-  metric_pricing_overrides?: MetricPricingOverrides40;
+  metric_pricing_overrides?: MetricPricingOverrides41;
   notional: Money73;
   /**
    * Optional quote currency calendar for business day adjustment.
    */
   quote_calendar_id?: string | null;
   quote_currency: Currency12;
-  scenario_pricing_overrides?: ScenarioPricingOverrides40;
+  scenario_pricing_overrides?: ScenarioPricingOverrides41;
   /**
    * Optional spot rate override (quote per base). If None, source from FxMatrix.
    */
@@ -43092,386 +42896,11 @@ export interface Attributes42 {
   tags?: string[];
 }
 /**
- * Per-instrument pricing/sensitivity override knobs.
- */
-export interface InstrumentPricingOverrides40 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
-}
-/**
- * Metric-time pricing configuration.
- */
-export interface MetricPricingOverrides40 {
-  /**
-   * Basis used for bond duration, convexity, and DV01-style risk metrics.
-   */
-  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
-  /**
-   * Breakeven configuration: which parameter to solve for and solve mode.
-   */
-  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
-  bump_config?: D_1D0C1815F8Dd0715Bd12;
-  /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
-   */
-  mc_seed_scenario?: string | null;
-  /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-   */
-  theta_period?: string | null;
-  /**
-   * Historical VaR / Expected Shortfall configuration override.
-   */
-  var_config?: DE49387F97C0F9D510642 | null;
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money73 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Scenario-only pricing adjustments.
- */
-export interface ScenarioPricingOverrides40 {
-  /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
-   *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
-   */
-  scenario_price_shock_pct?: number | null;
-  /**
-   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
-   *
-   * Applied as an additional flat Z-spread during valuation by pricers that
-   * support spread-based revaluation. Currently consumed by `Bond::base_value`
-   * for bonds without embedded options, without an assigned credit curve, and
-   * without a price-pinning quote override other than `quoted_z_spread`
-   * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
-   *
-   * Setting this on an unsupported configuration produces a validation error
-   * at pricing time rather than a silent no-op. For hazard-priced (credit
-   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
-   */
-  scenario_spread_shock_bp?: number | null;
-}
-/**
- * Non-Deliverable Forward (NDF) instrument.
- *
- * Represents a cash-settled forward contract on a restricted currency pair.
- * The position is long base currency (restricted) and short settlement currency.
- *
- * # Quote Convention
- *
- * NDFs support two quote conventions via the `quote_convention` field:
- *
- * - **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)
- * - **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)
- *
- * See [`NdfQuoteConvention`] for details on the settlement formulas.
- *
- * # Pricing
- *
- * ## Pre-Fixing (fixing_rate = None)
- * Forward rate uses the explicit override or covered interest rate parity
- * with both currency curves.
- *
- * ## Post-Fixing (fixing_rate = Some)
- * Uses the observed fixing rate for settlement calculation.
- *
- * The settlement formula depends on `quote_convention`:
- *
- * **BasePerSettlement:**
- * ```text
- * Settlement = Notional_base × (1/F_fixing - 1/F_contract)
- * PV = Settlement × DF_settlement(T)
- * ```
- *
- * **SettlementPerBase:**
- * ```text
- * Settlement = Notional_base × (F_fixing - F_contract)
- * PV = Settlement × DF_settlement(T)
- * ```
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let ndf = Ndf::builder()
- *     .id(InstrumentId::new("USDCNY-NDF-3M"))
- *     .base_currency(Currency::CNY)
- *     .settlement_currency(Currency::USD)
- *     .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())
- *     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
- *     .notional(Money::from((10_000_000_i64, Currency::CNY)))
- *     .contract_rate(7.25)
- *     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
- *     .quote_convention(NdfQuoteConvention::BasePerSettlement)
- *     .build()
- *     .expect("Valid NDF");
- * ```
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "Ndf".
- */
-export interface Ndf {
-  attributes: Attributes43;
-  /**
-   * Optional base currency calendar.
-   */
-  base_calendar_id?: string | null;
-  base_currency: Currency13;
-  /**
-   * Contract forward rate. Interpretation depends on `quote_convention`.
-   */
-  contract_rate: number;
-  domestic_discount_curve_id: Id128;
-  fixing_date: Date98;
-  /**
-   * Observed fixing rate. Interpretation depends on `quote_convention`.
-   */
-  fixing_rate?: number | null;
-  /**
-   * Official fixing source/benchmark enum for type-safe specification.
-   */
-  fixing_source_enum?: NdfFixingSource | null;
-  /**
-   * Optional foreign (base) currency discount curve ID.
-   */
-  foreign_discount_curve_id?: Id9 | null;
-  /**
-   * Explicit pre-fixing forward rate in `quote_convention` units.
-   */
-  forward_rate_override?: number | null;
-  id: Id129;
-  instrument_pricing_overrides?: InstrumentPricingOverrides41;
-  maturity: Date99;
-  metric_pricing_overrides?: MetricPricingOverrides41;
-  notional: Money74;
-  /**
-   * Optional settlement currency calendar.
-   */
-  quote_calendar_id?: string | null;
-  /**
-   * Quote convention for contract_rate and fixing_rate.
-   */
-  quote_convention: "base_per_settlement" | "settlement_per_base";
-  scenario_pricing_overrides?: ScenarioPricingOverrides41;
-  settlement_currency: Currency14;
-  /**
-   * Optional spot rate override for forward rate calculation.
-   */
-  spot_rate_override?: number | null;
-}
-/**
- * Attributes for scenario selection and tagging.
- */
-export interface Attributes43 {
-  /**
-   * Structured metadata associated with the instrument.
-   */
-  meta?: {
-    [k: string]: string;
-  };
-  /**
-   * User-defined tags for categorization.
-   */
-  tags?: string[];
-}
-/**
- * Per-instrument pricing/sensitivity override knobs.
+ * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides41 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -43487,17 +42916,17 @@ export interface MetricPricingOverrides41 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -43506,7 +42935,7 @@ export interface MetricPricingOverrides41 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money74 {
+export interface Money73 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -43705,47 +43134,123 @@ export interface ScenarioPricingOverrides41 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * European FX option with same-day cash settlement at expiry.
+ * Non-Deliverable Forward (NDF) instrument.
  *
- * Physical delivery is intentionally not represented: exercised payoff is a
- * quote-currency cash amount on `expiry`.
+ * Represents a cash-settled forward contract on a restricted currency pair.
+ * The position is long base currency (restricted) and short settlement currency.
+ *
+ * # Quote Convention
+ *
+ * NDFs support two quote conventions via the `quote_convention` field:
+ *
+ * - **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)
+ * - **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)
+ *
+ * See [`NdfQuoteConvention`] for details on the settlement formulas.
+ *
+ * # Pricing
+ *
+ * ## Pre-Fixing (fixing_rate = None)
+ * Forward rate uses the explicit override or covered interest rate parity
+ * with both currency curves.
+ *
+ * ## Post-Fixing (fixing_rate = Some)
+ * Uses the observed fixing rate for settlement calculation.
+ *
+ * The settlement formula depends on `quote_convention`:
+ *
+ * **BasePerSettlement:**
+ * ```text
+ * Settlement = Notional_base × (1/F_fixing - 1/F_contract)
+ * PV = Settlement × DF_settlement(T)
+ * ```
+ *
+ * **SettlementPerBase:**
+ * ```text
+ * Settlement = Notional_base × (F_fixing - F_contract)
+ * PV = Settlement × DF_settlement(T)
+ * ```
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};
+ * use finstack_quant_core::currency::Currency;
+ * use finstack_quant_core::dates::Date;
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::types::{CurveId, InstrumentId};
+ * use time::Month;
+ *
+ * let ndf = Ndf::builder()
+ *     .id(InstrumentId::new("USDCNY-NDF-3M"))
+ *     .base_currency(Currency::CNY)
+ *     .settlement_currency(Currency::USD)
+ *     .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())
+ *     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
+ *     .notional(Money::from((10_000_000_i64, Currency::CNY)))
+ *     .contract_rate(7.25)
+ *     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+ *     .quote_convention(NdfQuoteConvention::BasePerSettlement)
+ *     .build()
+ *     .expect("Valid NDF");
+ * ```
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "FxOption".
+ * via the `definition` "Ndf".
  */
-export interface FxOption {
-  attributes: Attributes44;
-  base_currency: Currency15;
-  day_count?: DayCount38;
-  delta_convention: FxDeltaConvention;
-  domestic_discount_curve_id: Id130;
-  expiry: Date100;
-  foreign_discount_curve_id: Id131;
-  id: Id132;
+export interface Ndf {
+  attributes: Attributes43;
+  /**
+   * Optional base currency calendar.
+   */
+  base_calendar_id?: string | null;
+  base_currency: Currency13;
+  /**
+   * Contract forward rate. Interpretation depends on `quote_convention`.
+   */
+  contract_rate: number;
+  domestic_discount_curve_id: Id128;
+  fixing_date: Date98;
+  /**
+   * Observed fixing rate. Interpretation depends on `quote_convention`.
+   */
+  fixing_rate?: number | null;
+  /**
+   * Official fixing source/benchmark enum for type-safe specification.
+   */
+  fixing_source_enum?: NdfFixingSource | null;
+  /**
+   * Optional foreign (base) currency discount curve ID.
+   */
+  foreign_discount_curve_id?: Id9 | null;
+  /**
+   * Explicit pre-fixing forward rate in `quote_convention` units.
+   */
+  forward_rate_override?: number | null;
+  id: Id129;
   instrument_pricing_overrides?: InstrumentPricingOverrides42;
+  maturity: Date99;
   metric_pricing_overrides?: MetricPricingOverrides42;
-  notional: Money75;
+  notional: Money74;
   /**
-   * Option type (call or put on base currency)
+   * Optional settlement currency calendar.
    */
-  option_type: "call" | "put";
-  quote_currency: Currency17;
+  quote_calendar_id?: string | null;
+  /**
+   * Quote convention for contract_rate and fixing_rate.
+   */
+  quote_convention: "base_per_settlement" | "settlement_per_base";
   scenario_pricing_overrides?: ScenarioPricingOverrides42;
+  settlement_currency: Currency14;
   /**
-   * Strike exchange rate (quote per base).
-   *
-   * **Note on ATM convention**: Professional FX markets define ATM as the
-   * Delta-Neutral Straddle (DNS) strike, not the forward rate. See module
-   * documentation for details. If constructing an "ATM" option, compute
-   * the forward rate or DNS strike externally.
+   * Optional spot rate override for forward rate calculation.
    */
-  strike: number;
-  vol_surface_id: Id133;
+  spot_rate_override?: number | null;
 }
 /**
- * Attributes for scenario selection and grouping
+ * Attributes for scenario selection and tagging.
  */
-export interface Attributes44 {
+export interface Attributes43 {
   /**
    * Structured metadata associated with the instrument.
    */
@@ -43758,30 +43263,11 @@ export interface Attributes44 {
   tags?: string[];
 }
 /**
- * Pair/venue delta convention and premium currency.
- */
-export interface FxDeltaConvention {
-  /**
-   * Delta convention quoted by the venue.
-   */
-  kind: "spot" | "forward" | "premium_adjusted_spot" | "premium_adjusted_forward";
-  premium_currency: Currency16;
-  /**
-   * Non-empty market venue or quoting-source identifier.
-   */
-  venue: string;
-}
-/**
- * Pricing overrides (manual price, yield, spread)
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides42 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -43797,17 +43283,17 @@ export interface MetricPricingOverrides42 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -43816,7 +43302,7 @@ export interface MetricPricingOverrides42 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money75 {
+export interface Money74 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -44015,6 +43501,311 @@ export interface ScenarioPricingOverrides42 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
+ * European FX option with same-day cash settlement at expiry.
+ *
+ * Physical delivery is intentionally not represented: exercised payoff is a
+ * quote-currency cash amount on `expiry`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "FxOption".
+ */
+export interface FxOption {
+  attributes: Attributes44;
+  base_currency: Currency15;
+  day_count?: DayCount38;
+  delta_convention: FxDeltaConvention;
+  domestic_discount_curve_id: Id130;
+  expiry: Date100;
+  foreign_discount_curve_id: Id131;
+  id: Id132;
+  instrument_pricing_overrides?: InstrumentPricingOverrides43;
+  metric_pricing_overrides?: MetricPricingOverrides43;
+  notional: Money75;
+  /**
+   * Option type (call or put on base currency)
+   */
+  option_type: "call" | "put";
+  quote_currency: Currency17;
+  scenario_pricing_overrides?: ScenarioPricingOverrides43;
+  /**
+   * Strike exchange rate (quote per base).
+   *
+   * **Note on ATM convention**: Professional FX markets define ATM as the
+   * Delta-Neutral Straddle (DNS) strike, not the forward rate. See module
+   * documentation for details. If constructing an "ATM" option, compute
+   * the forward rate or DNS strike externally.
+   */
+  strike: number;
+  vol_surface_id: Id133;
+}
+/**
+ * Attributes for scenario selection and grouping
+ */
+export interface Attributes44 {
+  /**
+   * Structured metadata associated with the instrument.
+   */
+  meta?: {
+    [k: string]: string;
+  };
+  /**
+   * User-defined tags for categorization.
+   */
+  tags?: string[];
+}
+/**
+ * Pair/venue delta convention and premium currency.
+ */
+export interface FxDeltaConvention {
+  /**
+   * Delta convention quoted by the venue.
+   */
+  kind: "spot" | "forward" | "premium_adjusted_spot" | "premium_adjusted_forward";
+  premium_currency: Currency16;
+  /**
+   * Non-empty market venue or quoting-source identifier.
+   */
+  venue: string;
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides43 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Metric-time pricing configuration.
+ */
+export interface MetricPricingOverrides43 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money75 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Scenario-only pricing adjustments.
+ */
+export interface ScenarioPricingOverrides43 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
+}
+/**
  * FX digital (binary) option instrument.
  *
  * Pays a fixed cash amount if the option expires in-the-money.
@@ -44048,8 +43839,8 @@ export interface FxDigitalOption {
   expiry: Date101;
   foreign_discount_curve_id: Id135;
   id: Id136;
-  instrument_pricing_overrides?: InstrumentPricingOverrides43;
-  metric_pricing_overrides?: MetricPricingOverrides43;
+  instrument_pricing_overrides?: InstrumentPricingOverrides44;
+  metric_pricing_overrides?: MetricPricingOverrides44;
   notional: Money76;
   /**
    * Option type (call or put on base currency)
@@ -44061,7 +43852,7 @@ export interface FxDigitalOption {
    */
   payout_type: "cash_or_nothing" | "asset_or_nothing";
   quote_currency: Currency19;
-  scenario_pricing_overrides?: ScenarioPricingOverrides43;
+  scenario_pricing_overrides?: ScenarioPricingOverrides44;
   /**
    * Strike exchange rate (quote per base)
    */
@@ -44084,21 +43875,16 @@ export interface Attributes45 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides43 {
+export interface InstrumentPricingOverrides44 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides43 {
+export interface MetricPricingOverrides44 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -44109,17 +43895,17 @@ export interface MetricPricingOverrides43 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -44478,7 +44264,7 @@ export interface Money77 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides43 {
+export interface ScenarioPricingOverrides44 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -44552,8 +44338,8 @@ export interface FxTouchOption {
   expiry: Date102;
   foreign_discount_curve_id: Id139;
   id: Id140;
-  instrument_pricing_overrides?: InstrumentPricingOverrides44;
-  metric_pricing_overrides?: MetricPricingOverrides44;
+  instrument_pricing_overrides?: InstrumentPricingOverrides45;
+  metric_pricing_overrides?: MetricPricingOverrides45;
   /**
    * First date on which barrier monitoring is active. When set, a live
    * valuation after this date requires `observed_touch`.
@@ -44577,7 +44363,7 @@ export interface FxTouchOption {
    */
   payout_timing: "at_hit" | "at_expiry";
   quote_currency: Currency21;
-  scenario_pricing_overrides?: ScenarioPricingOverrides44;
+  scenario_pricing_overrides?: ScenarioPricingOverrides45;
   /**
    * Touch type (one-touch or no-touch)
    */
@@ -44600,363 +44386,11 @@ export interface Attributes46 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
- * Instrument-owned pricing inputs.
- */
-export interface InstrumentPricingOverrides44 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
-}
-/**
- * Metric-time pricing configuration.
- */
-export interface MetricPricingOverrides44 {
-  /**
-   * Basis used for bond duration, convexity, and DV01-style risk metrics.
-   */
-  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
-  /**
-   * Breakeven configuration: which parameter to solve for and solve mode.
-   */
-  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
-  bump_config?: D_1D0C1815F8Dd0715Bd12;
-  /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
-   */
-  mc_seed_scenario?: string | null;
-  /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-   */
-  theta_period?: string | null;
-  /**
-   * Historical VaR / Expected Shortfall configuration override.
-   */
-  var_config?: DE49387F97C0F9D510642 | null;
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money78 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Scenario-only pricing adjustments.
- */
-export interface ScenarioPricingOverrides44 {
-  /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
-   *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
-   */
-  scenario_price_shock_pct?: number | null;
-  /**
-   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
-   *
-   * Applied as an additional flat Z-spread during valuation by pricers that
-   * support spread-based revaluation. Currently consumed by `Bond::base_value`
-   * for bonds without embedded options, without an assigned credit curve, and
-   * without a price-pinning quote override other than `quoted_z_spread`
-   * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
-   *
-   * Setting this on an unsupported configuration produces a validation error
-   * at pricing time rather than a silent no-op. For hazard-priced (credit
-   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
-   */
-  scenario_spread_shock_bp?: number | null;
-}
-/**
- * FX barrier option instrument.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "FxBarrierOption".
- */
-export interface FxBarrierOption {
-  attributes: Attributes47;
-  /**
-   * Barrier level (exchange rate that triggers knock-in/out, dimensionless)
-   */
-  barrier: number;
-  /**
-   * Four-state barrier option classification.
-   */
-  barrier_type: "up_and_out" | "up_and_in" | "down_and_out" | "down_and_in";
-  base_currency: Currency22;
-  day_count?: DayCount41;
-  domestic_discount_curve_id: Id142;
-  expiry: Date103;
-  foreign_discount_curve_id: Id143;
-  /**
-   * Optional FX spot scalar identifier.
-   *
-   * If omitted, pricing falls back to `FxMatrix(base_currency, quote_currency)`.
-   */
-  fx_spot_id?: Id9 | null;
-  id: Id144;
-  instrument_pricing_overrides?: InstrumentPricingOverrides45;
-  metric_pricing_overrides?: MetricPricingOverrides45;
-  /**
-   * Contractual barrier-monitoring convention.
-   *
-   * Continuous monitoring uses the analytical Reiner-Rubinstein pricer by
-   * default. Discrete monitoring requires explicit observation dates and
-   * uses Monte Carlo without interpolating barrier hits between those dates.
-   */
-  monitoring?:
-    | {
-        type: "continuous";
-      }
-    | {
-        /**
-         * Strictly increasing dates on which the barrier level is observed.
-         */
-        observation_dates: Date[];
-        type: "discrete";
-      };
-  /**
-   * First date on which barrier monitoring is active. When set, a live
-   * valuation after this date requires `observed_barrier_breached`.
-   */
-  monitoring_start_date?: Date | null;
-  notional: Money79;
-  /**
-   * Observed barrier state for expired options.
-   *
-   * Historical monitoring must be supplied explicitly for expired contracts.
-   */
-  observed_barrier_breached?: boolean | null;
-  /**
-   * Option type (call or put on foreign currency)
-   */
-  option_type: "call" | "put";
-  quote_currency: Currency23;
-  /**
-   * Optional rebate amount (paid if the barrier condition is met, dimensionless;
-   * see `rebate_timing` for when a knock-out rebate pays)
-   */
-  rebate?: number | null;
-  /**
-   * Timing of the knock-out rebate payment.
-   *
-   * `at_hit` (default, market standard) pays the rebate the moment a
-   * knock-out barrier is breached; `at_expiry` defers payment to expiry.
-   * Knock-in rebates always pay at expiry, so this setting does not affect
-   * them. The analytical pricer values at-hit rebates via the discounted
-   * first-passage closed form. Monte Carlo applies at-hit when
-   * `rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive
-   * defaults to at-expiry.
-   */
-  rebate_timing?: "at_hit" | "at_expiry";
-  scenario_pricing_overrides?: ScenarioPricingOverrides45;
-  /**
-   * Strike exchange rate (quote per base, dimensionless)
-   */
-  strike: number;
-  vol_surface_id: Id145;
-}
-/**
- * Attributes for scenario selection and grouping
- */
-export interface Attributes47 {
-  /**
-   * Structured metadata associated with the instrument.
-   */
-  meta?: {
-    [k: string]: string;
-  };
-  /**
-   * User-defined tags for categorization.
-   */
-  tags?: string[];
-}
-/**
- * Pricing overrides (manual price, yield, spread)
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides45 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -44972,17 +44406,17 @@ export interface MetricPricingOverrides45 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -44991,7 +44425,7 @@ export interface MetricPricingOverrides45 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money79 {
+export interface Money78 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -45190,6 +44624,348 @@ export interface ScenarioPricingOverrides45 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
+ * FX barrier option instrument.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "FxBarrierOption".
+ */
+export interface FxBarrierOption {
+  attributes: Attributes47;
+  /**
+   * Barrier level (exchange rate that triggers knock-in/out, dimensionless)
+   */
+  barrier: number;
+  /**
+   * Four-state barrier option classification.
+   */
+  barrier_type: "up_and_out" | "up_and_in" | "down_and_out" | "down_and_in";
+  base_currency: Currency22;
+  day_count?: DayCount41;
+  domestic_discount_curve_id: Id142;
+  expiry: Date103;
+  foreign_discount_curve_id: Id143;
+  /**
+   * Optional FX spot scalar identifier.
+   *
+   * If omitted, pricing falls back to `FxMatrix(base_currency, quote_currency)`.
+   */
+  fx_spot_id?: Id9 | null;
+  id: Id144;
+  instrument_pricing_overrides?: InstrumentPricingOverrides46;
+  metric_pricing_overrides?: MetricPricingOverrides46;
+  /**
+   * Contractual barrier-monitoring convention.
+   *
+   * Continuous monitoring uses the analytical Reiner-Rubinstein pricer by
+   * default. Discrete monitoring requires explicit observation dates and
+   * uses Monte Carlo without interpolating barrier hits between those dates.
+   */
+  monitoring?:
+    | {
+        type: "continuous";
+      }
+    | {
+        /**
+         * Strictly increasing dates on which the barrier level is observed.
+         */
+        observation_dates: Date[];
+        type: "discrete";
+      };
+  /**
+   * First date on which barrier monitoring is active. When set, a live
+   * valuation after this date requires `observed_barrier_breached`.
+   */
+  monitoring_start_date?: Date | null;
+  notional: Money79;
+  /**
+   * Observed barrier state for expired options.
+   *
+   * Historical monitoring must be supplied explicitly for expired contracts.
+   */
+  observed_barrier_breached?: boolean | null;
+  /**
+   * Option type (call or put on foreign currency)
+   */
+  option_type: "call" | "put";
+  quote_currency: Currency23;
+  /**
+   * Optional rebate amount (paid if the barrier condition is met, dimensionless;
+   * see `rebate_timing` for when a knock-out rebate pays)
+   */
+  rebate?: number | null;
+  /**
+   * Timing of the knock-out rebate payment.
+   *
+   * `at_hit` (default, market standard) pays the rebate the moment a
+   * knock-out barrier is breached; `at_expiry` defers payment to expiry.
+   * Knock-in rebates always pay at expiry, so this setting does not affect
+   * them. The analytical pricer values at-hit rebates via the discounted
+   * first-passage closed form. Monte Carlo applies at-hit when
+   * `rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive
+   * defaults to at-expiry.
+   */
+  rebate_timing?: "at_hit" | "at_expiry";
+  scenario_pricing_overrides?: ScenarioPricingOverrides46;
+  /**
+   * Strike exchange rate (quote per base, dimensionless)
+   */
+  strike: number;
+  vol_surface_id: Id145;
+}
+/**
+ * Attributes for scenario selection and grouping
+ */
+export interface Attributes47 {
+  /**
+   * Structured metadata associated with the instrument.
+   */
+  meta?: {
+    [k: string]: string;
+  };
+  /**
+   * User-defined tags for categorization.
+   */
+  tags?: string[];
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides46 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Metric-time pricing configuration.
+ */
+export interface MetricPricingOverrides46 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money79 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Scenario-only pricing adjustments.
+ */
+export interface ScenarioPricingOverrides46 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
+}
+/**
  * FX variance swap instrument.
  *
  * Payoff: Notional * (Realized Variance - Strike Variance)
@@ -45217,14 +44993,14 @@ export interface FxVarianceSwap {
    */
   high_series_id?: string | null;
   id: Id148;
-  instrument_pricing_overrides?: InstrumentPricingOverrides46;
+  instrument_pricing_overrides?: InstrumentPricingOverrides47;
   /**
    * Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
    * Defaults to `spot_id` (or currency-pair string) when absent.
    */
   low_series_id?: string | null;
   maturity: Date104;
-  metric_pricing_overrides?: MetricPricingOverrides46;
+  metric_pricing_overrides?: MetricPricingOverrides47;
   notional: Money80;
   observation_business_day_convention?: BusinessDayConvention21;
   /**
@@ -45246,7 +45022,7 @@ export interface FxVarianceSwap {
    * Method for calculating realized variance (defaults to CloseToClose)
    */
   realized_var_method?: "close_to_close" | "parkinson" | "garman_klass" | "rogers_satchell" | "yang_zhang";
-  scenario_pricing_overrides?: ScenarioPricingOverrides46;
+  scenario_pricing_overrides?: ScenarioPricingOverrides47;
   /**
    * Optional cash-settlement date. Defaults to the adjusted final observation date.
    */
@@ -45264,6 +45040,15 @@ export interface FxVarianceSwap {
    * Strike variance (annualized)
    */
   strike_variance: number;
+  /**
+   * Trading days per year used to annualise daily realized variance.
+   *
+   * A contract term of the variance-swap confirmation: daily observations
+   * are annualised by `trading_days_per_year / observation_frequency.count()`.
+   * Must be finite and positive. Defaults to
+   * [`crate::constants::TRADING_DAYS_PER_YEAR`] (252).
+   */
+  trading_days_per_year?: number;
   vol_surface_id: Id149;
 }
 /**
@@ -45282,21 +45067,16 @@ export interface Attributes48 {
   tags?: string[];
 }
 /**
- * Attributes for scenario selection
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides46 {
+export interface InstrumentPricingOverrides47 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides46 {
+export interface MetricPricingOverrides47 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -45307,17 +45087,17 @@ export interface MetricPricingOverrides46 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -45516,7 +45296,7 @@ export interface Tenor19 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides46 {
+export interface ScenarioPricingOverrides47 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -45573,8 +45353,8 @@ export interface QuantoOption {
    */
   fx_vol_id?: Id9 | null;
   id: Id152;
-  instrument_pricing_overrides?: InstrumentPricingOverrides47;
-  metric_pricing_overrides?: MetricPricingOverrides47;
+  instrument_pricing_overrides?: InstrumentPricingOverrides48;
+  metric_pricing_overrides?: MetricPricingOverrides48;
   notional: Money82;
   /**
    * Option type (call or put).
@@ -45585,7 +45365,7 @@ export interface QuantoOption {
    */
   payoff_fx_rate?: number | null;
   quote_currency: Currency27;
-  scenario_pricing_overrides?: ScenarioPricingOverrides47;
+  scenario_pricing_overrides?: ScenarioPricingOverrides48;
   spot_id: Id153;
   /**
    * Number of underlying units covered by the option payoff.
@@ -45788,20 +45568,16 @@ export interface Money81 {
     | "ZWL";
 }
 /**
- * Pricing overrides (manual price, yield, spread).
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides47 {
+export interface InstrumentPricingOverrides48 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides47 {
+export interface MetricPricingOverrides48 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -45812,17 +45588,17 @@ export interface MetricPricingOverrides47 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -46006,7 +45782,7 @@ export interface Money82 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides47 {
+export interface ScenarioPricingOverrides48 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -46087,8 +45863,8 @@ export interface CommodityOption {
   expiry: Date107;
   forward_curve_id: Id156;
   id: Id157;
-  instrument_pricing_overrides?: InstrumentPricingOverrides48;
-  metric_pricing_overrides?: MetricPricingOverrides48;
+  instrument_pricing_overrides?: InstrumentPricingOverrides49;
+  metric_pricing_overrides?: MetricPricingOverrides49;
   /**
    * Finite JSON number that is strictly greater than zero.
    *
@@ -46119,7 +45895,7 @@ export interface CommodityOption {
    * Optional quoted forward price (overrides curve lookup).
    */
   quoted_forward?: number | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides48;
+  scenario_pricing_overrides?: ScenarioPricingOverrides49;
   /**
    * Settlement type (physical or cash).
    *
@@ -46166,18 +45942,14 @@ export interface Attributes50 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides48 {
+export interface InstrumentPricingOverrides49 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides48 {
+export interface MetricPricingOverrides49 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -46188,26 +45960,26 @@ export interface MetricPricingOverrides48 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides48 {
+export interface ScenarioPricingOverrides49 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -46279,8 +46051,8 @@ export interface CommodityAsianOption {
   fixing_dates: Date[];
   forward_curve_id: Id160;
   id: Id161;
-  instrument_pricing_overrides?: InstrumentPricingOverrides49;
-  metric_pricing_overrides?: MetricPricingOverrides49;
+  instrument_pricing_overrides?: InstrumentPricingOverrides50;
+  metric_pricing_overrides?: MetricPricingOverrides50;
   /**
    * Option type (call or put).
    */
@@ -46296,7 +46068,7 @@ export interface CommodityAsianOption {
    * Already observed fixings for seasoned options (ex-date, price pairs).
    */
   realized_fixings?: [Date, number][];
-  scenario_pricing_overrides?: ScenarioPricingOverrides49;
+  scenario_pricing_overrides?: ScenarioPricingOverrides50;
   /**
    * Finite JSON number that is strictly greater than zero.
    *
@@ -46333,18 +46105,14 @@ export interface Attributes51 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides49 {
+export interface InstrumentPricingOverrides50 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides49 {
+export interface MetricPricingOverrides50 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -46355,26 +46123,26 @@ export interface MetricPricingOverrides49 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides49 {
+export interface ScenarioPricingOverrides50 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -46500,9 +46268,9 @@ export interface CommodityForward {
   exchange?: string | null;
   forward_curve_id: Id164;
   id: Id165;
-  instrument_pricing_overrides?: InstrumentPricingOverrides50;
+  instrument_pricing_overrides?: InstrumentPricingOverrides51;
   maturity: Date109;
-  metric_pricing_overrides?: MetricPricingOverrides50;
+  metric_pricing_overrides?: MetricPricingOverrides51;
   /**
    * Finite JSON number that is strictly greater than zero.
    *
@@ -46531,7 +46299,7 @@ export interface CommodityForward {
    * Use `contract_price` for the trade entry price K.
    */
   quoted_price?: number | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides50;
+  scenario_pricing_overrides?: ScenarioPricingOverrides51;
   /**
    * Settlement type (physical or cash).
    *
@@ -46599,18 +46367,14 @@ export interface Attributes52 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides50 {
+export interface InstrumentPricingOverrides51 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides50 {
+export interface MetricPricingOverrides51 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -46621,26 +46385,26 @@ export interface MetricPricingOverrides50 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides50 {
+export interface ScenarioPricingOverrides51 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -46729,9 +46493,9 @@ export interface CommoditySwap {
    * business-day adjustment of the shifted window endpoints).
    */
   index_lag_days?: number | null;
-  instrument_pricing_overrides?: InstrumentPricingOverrides51;
+  instrument_pricing_overrides?: InstrumentPricingOverrides52;
   maturity: Date110;
-  metric_pricing_overrides?: MetricPricingOverrides51;
+  metric_pricing_overrides?: MetricPricingOverrides52;
   /**
    * Finite JSON number that is strictly greater than zero.
    *
@@ -46748,7 +46512,7 @@ export interface CommoditySwap {
    * after the valuation date project from the price curve.
    */
   realized_fixings?: [Date, number][];
-  scenario_pricing_overrides?: ScenarioPricingOverrides51;
+  scenario_pricing_overrides?: ScenarioPricingOverrides52;
   /**
    * Direction of the swap: Pay means paying the fixed price leg,
    * Receive means receiving the fixed price leg.
@@ -46797,18 +46561,14 @@ export interface Tenor20 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides51 {
+export interface InstrumentPricingOverrides52 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides51 {
+export interface MetricPricingOverrides52 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -46819,26 +46579,26 @@ export interface MetricPricingOverrides51 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides51 {
+export interface ScenarioPricingOverrides52 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -46929,8 +46689,8 @@ export interface CommoditySwaption {
   fixed_price: number;
   forward_curve_id: Id170;
   id: Id171;
-  instrument_pricing_overrides?: InstrumentPricingOverrides52;
-  metric_pricing_overrides?: MetricPricingOverrides52;
+  instrument_pricing_overrides?: InstrumentPricingOverrides53;
+  metric_pricing_overrides?: MetricPricingOverrides53;
   /**
    * Finite JSON number that is strictly greater than zero.
    *
@@ -46942,7 +46702,7 @@ export interface CommoditySwaption {
    * Option type (call = right to enter pay-fixed swap, put = right to enter receive-fixed swap).
    */
   option_type: "call" | "put";
-  scenario_pricing_overrides?: ScenarioPricingOverrides52;
+  scenario_pricing_overrides?: ScenarioPricingOverrides53;
   swap_end: Date113;
   swap_frequency: Tenor21;
   swap_start: Date114;
@@ -46974,18 +46734,14 @@ export interface Attributes54 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides52 {
+export interface InstrumentPricingOverrides53 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides52 {
+export interface MetricPricingOverrides53 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -46996,26 +46752,26 @@ export interface MetricPricingOverrides52 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides52 {
+export interface ScenarioPricingOverrides53 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -47116,12 +46872,12 @@ export interface CommoditySpreadOption {
   discount_curve_id: Id173;
   expiry: Date115;
   id: Id174;
-  instrument_pricing_overrides?: InstrumentPricingOverrides53;
+  instrument_pricing_overrides?: InstrumentPricingOverrides54;
   leg1_forward_curve_id: Id175;
   leg1_vol_surface_id: Id176;
   leg2_forward_curve_id: Id177;
   leg2_vol_surface_id: Id178;
-  metric_pricing_overrides?: MetricPricingOverrides53;
+  metric_pricing_overrides?: MetricPricingOverrides54;
   /**
    * Finite JSON number that is strictly greater than zero.
    *
@@ -47133,7 +46889,7 @@ export interface CommoditySpreadOption {
    * Option type (call or put on the spread S1 - S2).
    */
   option_type: "call" | "put";
-  scenario_pricing_overrides?: ScenarioPricingOverrides53;
+  scenario_pricing_overrides?: ScenarioPricingOverrides54;
   /**
    * Spread strike price K in the payoff max(S1 - S2 - K, 0).
    */
@@ -47157,18 +46913,14 @@ export interface Attributes55 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides53 {
+export interface InstrumentPricingOverrides54 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides53 {
+export interface MetricPricingOverrides54 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -47179,26 +46931,26 @@ export interface MetricPricingOverrides53 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides53 {
+export interface ScenarioPricingOverrides54 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -47233,10 +46985,10 @@ export interface ScenarioPricingOverrides53 {
 export interface CommodityFuture {
   attributes?: Attributes56;
   id: Id179;
-  instrument_pricing_overrides?: InstrumentPricingOverrides54;
-  metric_pricing_overrides?: MetricPricingOverrides54;
+  instrument_pricing_overrides?: InstrumentPricingOverrides55;
+  metric_pricing_overrides?: MetricPricingOverrides55;
   price_curve_id: Id180;
-  scenario_pricing_overrides?: ScenarioPricingOverrides54;
+  scenario_pricing_overrides?: ScenarioPricingOverrides55;
   /**
    * Official final-settlement observation rule.
    */
@@ -47284,18 +47036,14 @@ export interface Attributes56 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides54 {
+export interface InstrumentPricingOverrides55 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides54 {
+export interface MetricPricingOverrides55 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -47306,17 +47054,17 @@ export interface MetricPricingOverrides54 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -47325,7 +47073,7 @@ export interface MetricPricingOverrides54 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides54 {
+export interface ScenarioPricingOverrides55 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -47408,9 +47156,9 @@ export interface ListedFutureTerms {
 export interface CommodityFutureOption {
   attributes?: Attributes57;
   id: Id181;
-  instrument_pricing_overrides?: InstrumentPricingOverrides55;
-  metric_pricing_overrides?: MetricPricingOverrides55;
-  scenario_pricing_overrides?: ScenarioPricingOverrides55;
+  instrument_pricing_overrides?: InstrumentPricingOverrides56;
+  metric_pricing_overrides?: MetricPricingOverrides56;
+  scenario_pricing_overrides?: ScenarioPricingOverrides56;
   terms: FutureOptionTerms2;
 }
 /**
@@ -47429,20 +47177,18 @@ export interface Attributes57 {
   tags?: string[];
 }
 /**
- * Instrument-owned pricing inputs, including optional tree-step overrides.
+ * Instrument-owned pricing inputs: the flat option volatility in
+ * `market_quotes.implied_volatility` (required while live) and optional
+ * tree-step overrides.
  */
-export interface InstrumentPricingOverrides55 {
+export interface InstrumentPricingOverrides56 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides55 {
+export interface MetricPricingOverrides56 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -47453,17 +47199,17 @@ export interface MetricPricingOverrides55 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -47472,7 +47218,7 @@ export interface MetricPricingOverrides55 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides55 {
+export interface ScenarioPricingOverrides56 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -47580,11 +47326,6 @@ export interface FutureOptionTerms2 {
    * report DV01 without inferring economics from an exchange symbol.
    */
   underlying_price_change_per_bp?: number | null;
-  /**
-   * Annualized volatility. Decimal lognormal units for Black-76; futures-price
-   * points per square-root year for the normal model.
-   */
-  volatility: number;
 }
 /**
  * Exchange-listed future on a deliverable currency pair.
@@ -47608,10 +47349,10 @@ export interface FxFuture {
   domestic_discount_curve_id: Id182;
   foreign_discount_curve_id: Id183;
   id: Id184;
-  instrument_pricing_overrides?: InstrumentPricingOverrides56;
-  metric_pricing_overrides?: MetricPricingOverrides56;
+  instrument_pricing_overrides?: InstrumentPricingOverrides57;
+  metric_pricing_overrides?: MetricPricingOverrides57;
   quote_currency: Currency36;
-  scenario_pricing_overrides?: ScenarioPricingOverrides56;
+  scenario_pricing_overrides?: ScenarioPricingOverrides57;
   /**
    * Optional spot override in quote currency per base currency.
    */
@@ -47636,18 +47377,14 @@ export interface Attributes58 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides56 {
+export interface InstrumentPricingOverrides57 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides56 {
+export interface MetricPricingOverrides57 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -47658,17 +47395,17 @@ export interface MetricPricingOverrides56 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -47677,7 +47414,7 @@ export interface MetricPricingOverrides56 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides56 {
+export interface ScenarioPricingOverrides57 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -47760,9 +47497,9 @@ export interface ListedFutureTerms1 {
 export interface FxFutureOption {
   attributes?: Attributes59;
   id: Id185;
-  instrument_pricing_overrides?: InstrumentPricingOverrides57;
-  metric_pricing_overrides?: MetricPricingOverrides57;
-  scenario_pricing_overrides?: ScenarioPricingOverrides57;
+  instrument_pricing_overrides?: InstrumentPricingOverrides58;
+  metric_pricing_overrides?: MetricPricingOverrides58;
+  scenario_pricing_overrides?: ScenarioPricingOverrides58;
   terms: FutureOptionTerms3;
 }
 /**
@@ -47781,20 +47518,18 @@ export interface Attributes59 {
   tags?: string[];
 }
 /**
- * Instrument-owned pricing inputs, including optional tree-step overrides.
+ * Instrument-owned pricing inputs: the flat option volatility in
+ * `market_quotes.implied_volatility` (required while live) and optional
+ * tree-step overrides.
  */
-export interface InstrumentPricingOverrides57 {
+export interface InstrumentPricingOverrides58 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides57 {
+export interface MetricPricingOverrides58 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -47805,17 +47540,17 @@ export interface MetricPricingOverrides57 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -47824,7 +47559,7 @@ export interface MetricPricingOverrides57 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides57 {
+export interface ScenarioPricingOverrides58 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -47932,11 +47667,6 @@ export interface FutureOptionTerms3 {
    * report DV01 without inferring economics from an exchange symbol.
    */
   underlying_price_change_per_bp?: number | null;
-  /**
-   * Annualized volatility. Decimal lognormal units for Black-76; futures-price
-   * points per square-root year for the normal model.
-   */
-  volatility: number;
 }
 /**
  * Exchange-listed future on an equity, equity index, or fixed-currency quanto index.
@@ -47956,13 +47686,13 @@ export interface EquityFuture {
    */
   div_yield_id?: Id9 | null;
   id: Id187;
-  instrument_pricing_overrides?: InstrumentPricingOverrides58;
-  metric_pricing_overrides?: MetricPricingOverrides58;
+  instrument_pricing_overrides?: InstrumentPricingOverrides59;
+  metric_pricing_overrides?: MetricPricingOverrides59;
   /**
    * Required quanto adjustment when settlement and underlying currencies differ.
    */
   quanto?: EquityFutureQuantoSpec | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides58;
+  scenario_pricing_overrides?: ScenarioPricingOverrides59;
   spot_id: Id192;
   terms: ListedFutureTerms2;
   underlying_currency: Currency37;
@@ -47989,18 +47719,14 @@ export interface Attributes60 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides58 {
+export interface InstrumentPricingOverrides59 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides58 {
+export interface MetricPricingOverrides59 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -48011,17 +47737,17 @@ export interface MetricPricingOverrides58 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -48046,7 +47772,7 @@ export interface EquityFutureQuantoSpec {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides58 {
+export interface ScenarioPricingOverrides59 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -48129,9 +47855,9 @@ export interface ListedFutureTerms2 {
 export interface EquityFutureOption {
   attributes?: Attributes61;
   id: Id193;
-  instrument_pricing_overrides?: InstrumentPricingOverrides59;
-  metric_pricing_overrides?: MetricPricingOverrides59;
-  scenario_pricing_overrides?: ScenarioPricingOverrides59;
+  instrument_pricing_overrides?: InstrumentPricingOverrides60;
+  metric_pricing_overrides?: MetricPricingOverrides60;
+  scenario_pricing_overrides?: ScenarioPricingOverrides60;
   terms: FutureOptionTerms4;
 }
 /**
@@ -48150,20 +47876,18 @@ export interface Attributes61 {
   tags?: string[];
 }
 /**
- * Instrument-owned pricing inputs, including optional tree-step overrides.
+ * Instrument-owned pricing inputs: the flat option volatility in
+ * `market_quotes.implied_volatility` (required while live) and optional
+ * tree-step overrides.
  */
-export interface InstrumentPricingOverrides59 {
+export interface InstrumentPricingOverrides60 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides59 {
+export interface MetricPricingOverrides60 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -48174,17 +47898,17 @@ export interface MetricPricingOverrides59 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -48193,7 +47917,7 @@ export interface MetricPricingOverrides59 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides59 {
+export interface ScenarioPricingOverrides60 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -48301,11 +48025,6 @@ export interface FutureOptionTerms4 {
    * report DV01 without inferring economics from an exchange symbol.
    */
   underlying_price_change_per_bp?: number | null;
-  /**
-   * Annualized volatility. Decimal lognormal units for Black-76; futures-price
-   * points per square-root year for the normal model.
-   */
-  volatility: number;
 }
 /**
  * Exchange-listed equity or index total-return future.
@@ -48322,9 +48041,9 @@ export interface EquityTotalReturnFuture {
   accrued_funding_id: Id195;
   attributes?: Attributes62;
   id: Id196;
-  instrument_pricing_overrides?: InstrumentPricingOverrides60;
-  metric_pricing_overrides?: MetricPricingOverrides60;
-  scenario_pricing_overrides?: ScenarioPricingOverrides60;
+  instrument_pricing_overrides?: InstrumentPricingOverrides61;
+  metric_pricing_overrides?: MetricPricingOverrides61;
+  scenario_pricing_overrides?: ScenarioPricingOverrides61;
   spot_id: Id197;
   spread_basis_points_id: Id198;
   spread_day_count: DayCount48;
@@ -48352,18 +48071,14 @@ export interface Attributes62 {
 /**
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides60 {
+export interface InstrumentPricingOverrides61 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides60 {
+export interface MetricPricingOverrides61 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -48374,17 +48089,17 @@ export interface MetricPricingOverrides60 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -48393,7 +48108,7 @@ export interface MetricPricingOverrides60 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides60 {
+export interface ScenarioPricingOverrides61 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -48506,7 +48221,7 @@ export interface CliquetOption {
    * observations.
    */
   initial_level?: number | null;
-  instrument_pricing_overrides?: InstrumentPricingOverrides61;
+  instrument_pricing_overrides?: InstrumentPricingOverrides62;
   /**
    * Local cap on individual period returns
    */
@@ -48515,7 +48230,7 @@ export interface CliquetOption {
    * Local floor on individual period returns (default 0.0)
    */
   local_floor: number;
-  metric_pricing_overrides?: MetricPricingOverrides61;
+  metric_pricing_overrides?: MetricPricingOverrides62;
   notional: Money83;
   /**
    * Observed underlying fixings for seasoned trades (date, level pairs).
@@ -48538,7 +48253,7 @@ export interface CliquetOption {
    * Reset dates for periodic return locking
    */
   reset_dates: Date[];
-  scenario_pricing_overrides?: ScenarioPricingOverrides61;
+  scenario_pricing_overrides?: ScenarioPricingOverrides62;
   spot_id: Id201;
   /**
    * Underlying asset ticker symbol
@@ -48562,20 +48277,16 @@ export interface Attributes63 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides61 {
+export interface InstrumentPricingOverrides62 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides61 {
+export interface MetricPricingOverrides62 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -48586,17 +48297,17 @@ export interface MetricPricingOverrides61 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -48778,9 +48489,9 @@ export interface Money83 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides61 {
+export interface ScenarioPricingOverrides62 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -48829,8 +48540,9 @@ export interface ScenarioPricingOverrides61 {
  * underlyings only and return a validation error when these fields are set.
  * Price rate-linked range accrual notes through
  * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)
- * (with an empty call schedule for a non-callable note), which models the
- * reference rate under HW1F and reconstructs the term rate per observation.
+ * (whose `range_accrual` field carries these [`RangeAccrualTerms`]), which
+ * models the reference rate under HW1F and reconstructs the term rate per
+ * observation.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "RangeAccrual".
@@ -48853,12 +48565,12 @@ export interface RangeAccrual {
    */
   div_yield_id?: Id9 | null;
   id: Id204;
-  instrument_pricing_overrides?: InstrumentPricingOverrides62;
+  instrument_pricing_overrides?: InstrumentPricingOverrides63;
   /**
    * Lower bound of accrual range (interpretation depends on bounds_type)
    */
   lower_bound: number;
-  metric_pricing_overrides?: MetricPricingOverrides62;
+  metric_pricing_overrides?: MetricPricingOverrides63;
   notional: Money84;
   /**
    * Observation dates for range checking (must be sorted ascending)
@@ -48891,7 +48603,7 @@ export interface RangeAccrual {
    * Contractual tenor of the observed reference rate.
    */
   reference_tenor?: Tenor2 | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides62;
+  scenario_pricing_overrides?: ScenarioPricingOverrides63;
   spot_id: Id208;
   /**
    * Total number of past observations (for mid-life valuations).
@@ -48924,21 +48636,16 @@ export interface Attributes64 {
   tags?: string[];
 }
 /**
- * Pricing overrides (manual price, yield, spread)
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides62 {
+export interface InstrumentPricingOverrides63 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides62 {
+export interface MetricPricingOverrides63 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -48949,17 +48656,17 @@ export interface MetricPricingOverrides62 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -49161,7 +48868,7 @@ export interface QuantoSpec {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides62 {
+export interface ScenarioPricingOverrides63 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -49234,10 +48941,10 @@ export interface Tarn {
   floating_index_id: Id211;
   floating_tenor: Tenor22;
   id: Id212;
-  instrument_pricing_overrides?: InstrumentPricingOverrides63;
-  metric_pricing_overrides?: MetricPricingOverrides63;
+  instrument_pricing_overrides?: InstrumentPricingOverrides64;
+  metric_pricing_overrides?: MetricPricingOverrides64;
   notional: Money85;
-  scenario_pricing_overrides?: ScenarioPricingOverrides63;
+  scenario_pricing_overrides?: ScenarioPricingOverrides64;
   /**
    * Target cumulative coupon level (triggers early redemption).
    *
@@ -49281,397 +48988,11 @@ export interface Tenor22 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
- * Pricing overrides.
- * Instrument-owned pricing inputs.
- */
-export interface InstrumentPricingOverrides63 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
-}
-/**
- * Metric-time pricing configuration.
- */
-export interface MetricPricingOverrides63 {
-  /**
-   * Basis used for bond duration, convexity, and DV01-style risk metrics.
-   */
-  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
-  /**
-   * Breakeven configuration: which parameter to solve for and solve mode.
-   */
-  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
-  bump_config?: D_1D0C1815F8Dd0715Bd12;
-  /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
-   */
-  mc_seed_scenario?: string | null;
-  /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-   */
-  theta_period?: string | null;
-  /**
-   * Historical VaR / Expected Shortfall configuration override.
-   */
-  var_config?: DE49387F97C0F9D510642 | null;
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money85 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
- * Scenario-only pricing adjustments.
- */
-export interface ScenarioPricingOverrides63 {
-  /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
-   *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
-   */
-  scenario_price_shock_pct?: number | null;
-  /**
-   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
-   *
-   * Applied as an additional flat Z-spread during valuation by pricers that
-   * support spread-based revaluation. Currently consumed by `Bond::base_value`
-   * for bonds without embedded options, without an assigned credit curve, and
-   * without a price-pinning quote override other than `quoted_z_spread`
-   * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
-   *
-   * Setting this on an unsupported configuration produces a validation error
-   * at pricing time rather than a silent no-op. For hazard-priced (credit
-   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
-   */
-  scenario_spread_shock_bp?: number | null;
-}
-/**
- * Snowball structured note.
- *
- * The coupon in each period depends on the previous period's coupon,
- * creating a path-dependent "snowball" accumulation:
- *
- * ```text
- * c_i = max(c_{i-1} + fixed_rate - L_i, 0)
- * ```
- *
- * where L_i is the floating rate and c_0 = initial_coupon.
- *
- * If the floating rate stays low, coupons ratchet up over time.
- * If rates spike, the coupon floors at zero and must rebuild.
- *
- * # Variants
- *
- * - **Snowball**: Coupon depends on previous coupon (path-dependent)
- * - **Inverse Floater**: Coupon = fixed_rate - leverage * floating_rate
- *   (simpler, not path-dependent, but often combined with callability)
- *
- * # References
- *
- * - Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "Snowball".
- */
-export interface Snowball {
-  attributes: Attributes66;
-  /**
-   * Optional Bermudan call provision.
-   */
-  callable?: BermudanCallProvision | null;
-  /**
-   * Optional cap on each period coupon.
-   */
-  coupon_cap?: number | null;
-  /**
-   * Coupon payment dates (must be sorted ascending).
-   */
-  coupon_dates: Date[];
-  /**
-   * Floor on each period coupon (typically 0.0).
-   */
-  coupon_floor: number;
-  day_count: DayCount52;
-  discount_curve_id: Id213;
-  /**
-   * Fixed rate component.
-   */
-  fixed_rate: number;
-  floating_index_id: Id214;
-  floating_tenor: Tenor23;
-  id: Id215;
-  /**
-   * Initial coupon for snowball (c_0); ignored for inverse floater.
-   */
-  initial_coupon: number;
-  instrument_pricing_overrides?: InstrumentPricingOverrides64;
-  /**
-   * Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).
-   */
-  leverage: number;
-  metric_pricing_overrides?: MetricPricingOverrides64;
-  notional: Money86;
-  scenario_pricing_overrides?: ScenarioPricingOverrides64;
-  /**
-   * Snowball or inverse floater variant.
-   */
-  variant: "snowball" | "inverse_floater";
-  /**
-   * Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
-   */
-  vol_surface_id?: Id9 | null;
-}
-/**
- * Attributes.
- */
-export interface Attributes66 {
-  /**
-   * Structured metadata associated with the instrument.
-   */
-  meta?: {
-    [k: string]: string;
-  };
-  /**
-   * User-defined tags for categorization.
-   */
-  tags?: string[];
-}
-/**
- * Bermudan call provision for callable exotics.
- *
- * Allows the issuer to terminate the note on specified call dates
- * at a specified call price (typically par). Currently consumed by the
- * Callable Range Accrual note (PRDC is not implemented, and the Snowball
- * pricer rejects callable provisions).
- *
- * # Fields
- *
- * - `call_dates`: Sorted ascending dates on which the issuer may call.
- * - `call_price`: Fraction of notional returned at exercise (1.0 = par).
- * - `lockout_periods`: Number of initial coupon periods during which
- *   the call right cannot be exercised.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "BermudanCallProvision".
- */
-export interface BermudanCallProvision {
-  /**
-   * Dates on which the issuer can call (must be sorted ascending).
-   */
-  call_dates: Date[];
-  /**
-   * Call price (fraction of notional, typically 1.0 = par).
-   */
-  call_price: number;
-  /**
-   * Lockout period in number of coupon periods before first call.
-   */
-  lockout_periods: number;
-}
-/**
- * Parsed financial tenor.
- */
-export interface Tenor23 {
-  /**
-   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
-   * rejected because a zero-length period makes schedule generation loop.
-   */
-  count: number;
-  /**
-   * Calendar unit the count is expressed in, such as days, weeks, months,
-   * or years.
-   */
-  unit: "days" | "weeks" | "months" | "years";
-}
-/**
- * Pricing overrides.
  * Instrument-owned pricing inputs.
  */
 export interface InstrumentPricingOverrides64 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
@@ -49687,17 +49008,17 @@ export interface MetricPricingOverrides64 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -49706,7 +49027,7 @@ export interface MetricPricingOverrides64 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money86 {
+export interface Money85 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -49905,87 +49226,85 @@ export interface ScenarioPricingOverrides64 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * CMS Spread Option.
+ * Snowball structured note.
  *
- * Option on the spread between two CMS rates of different tenors.
+ * The coupon in each period depends on the previous period's coupon,
+ * creating a path-dependent "snowball" accumulation:
  *
  * ```text
- * Payoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]
- * Payoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]
+ * c_i = max(c_{i-1} + fixed_rate - L_i, 0)
  * ```
  *
- * Typically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.
+ * where L_i is the floating rate and c_0 = initial_coupon.
  *
- * # Pricing Approach
+ * If the floating rate stays low, coupons ratchet up over time.
+ * If rates spike, the coupon floors at zero and must rebuild.
  *
- * 1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)
- * 2. Joint distribution via Gaussian copula with rank correlation
- * 3. CMS convexity adjustment applied to each leg via static replication
+ * # Variants
+ *
+ * - **Snowball**: Coupon depends on previous coupon (path-dependent)
+ * - **Inverse Floater**: Coupon = fixed_rate - leverage * floating_rate
+ *   (simpler, not path-dependent, but often combined with callability)
  *
  * # References
  *
- * - Hagan, P. S. (2003). "Convexity Conundrums." *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`
- * - Antonov, A., Konikov, M., & Spector, M. (2013). "SABR Spreads." *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`
+ * - Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "CmsSpreadOption".
+ * via the `definition` "Snowball".
  */
-export interface CmsSpreadOption {
-  attributes: Attributes67;
-  day_count: DayCount53;
-  discount_curve_id: Id216;
-  expiry_date: Date121;
-  forward_curve_id: Id217;
-  id: Id218;
+export interface Snowball {
+  attributes: Attributes66;
+  /**
+   * Optional Bermudan call provision.
+   */
+  callable?: BermudanCallProvision | null;
+  /**
+   * Optional cap on each period coupon.
+   */
+  coupon_cap?: number | null;
+  /**
+   * Coupon payment dates (must be sorted ascending).
+   */
+  coupon_dates: Date[];
+  /**
+   * Floor on each period coupon (typically 0.0).
+   */
+  coupon_floor: number;
+  day_count: DayCount52;
+  discount_curve_id: Id213;
+  /**
+   * Fixed rate component.
+   */
+  fixed_rate: number;
+  floating_index_id: Id214;
+  floating_tenor: Tenor23;
+  id: Id215;
+  /**
+   * Initial coupon for snowball (c_0); ignored for inverse floater.
+   */
+  initial_coupon: number;
   instrument_pricing_overrides?: InstrumentPricingOverrides65;
-  long_cms_tenor: Tenor24;
-  long_vol_surface_id: Id219;
+  /**
+   * Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).
+   */
+  leverage: number;
   metric_pricing_overrides?: MetricPricingOverrides65;
-  notional: Money87;
-  /**
-   * Call or put on the spread.
-   */
-  option_type: "call" | "put";
-  payment_date: Date122;
+  notional: Money86;
   scenario_pricing_overrides?: ScenarioPricingOverrides65;
-  short_cms_tenor: Tenor25;
-  short_vol_surface_id: Id220;
   /**
-   * Rank correlation between the two CMS rates.
+   * Snowball or inverse floater variant.
    */
-  spread_correlation: number;
+  variant: "snowball" | "inverse_floater";
   /**
-   * Strike spread (in decimal, e.g., 0.005 = 50bp).
+   * Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
    */
-  strike: number;
-  /**
-   * IRS convention for the underlying CMS swaps (e.g. `EurEstr`).
-   *
-   * When set, provides default values for the fixed/float frequency and
-   * day count. Individual fields still override the convention when set.
-   */
-  swap_convention?: IRSConvention | null;
-  /**
-   * Fixed leg day count of the underlying CMS swaps (overrides convention).
-   */
-  swap_day_count?: DayCount5 | null;
-  /**
-   * Fixed leg frequency of the underlying CMS swaps (overrides convention).
-   */
-  swap_fixed_frequency?: Tenor2 | null;
-  /**
-   * Floating leg day count of the underlying CMS swaps (overrides convention).
-   */
-  swap_float_day_count?: DayCount5 | null;
-  /**
-   * Floating leg frequency of the underlying CMS swaps (overrides convention).
-   */
-  swap_float_frequency?: Tenor2 | null;
+  vol_surface_id?: Id9 | null;
 }
 /**
  * Attributes.
  */
-export interface Attributes67 {
+export interface Attributes66 {
   /**
    * Structured metadata associated with the instrument.
    */
@@ -49998,21 +49317,41 @@ export interface Attributes67 {
   tags?: string[];
 }
 /**
- * Pricing overrides.
- * Instrument-owned pricing inputs.
+ * Bermudan call provision for callable exotics.
+ *
+ * Allows the issuer to terminate the note on specified call dates
+ * at a specified call price (typically par). Currently consumed by the
+ * Callable Range Accrual note (PRDC is not implemented, and the Snowball
+ * pricer rejects callable provisions).
+ *
+ * # Fields
+ *
+ * - `call_dates`: Sorted ascending dates on which the issuer may call.
+ * - `call_price`: Fraction of notional returned at exercise (1.0 = par).
+ * - `lockout_periods`: Number of initial coupon periods during which
+ *   the call right cannot be exercised.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "BermudanCallProvision".
  */
-export interface InstrumentPricingOverrides65 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
+export interface BermudanCallProvision {
   /**
-   * Term loan specific overrides.
+   * Dates on which the issuer can call (must be sorted ascending).
    */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
+  call_dates: Date[];
+  /**
+   * Call price (fraction of notional, typically 1.0 = par).
+   */
+  call_price: number;
+  /**
+   * Lockout period in number of coupon periods before first call.
+   */
+  lockout_periods: number;
 }
 /**
  * Parsed financial tenor.
  */
-export interface Tenor24 {
+export interface Tenor23 {
   /**
    * Number of `unit` periods in the tenor. Must be at least 1; `0` is
    * rejected because a zero-length period makes schedule generation loop.
@@ -50023,6 +49362,13 @@ export interface Tenor24 {
    * or years.
    */
   unit: "days" | "weeks" | "months" | "years";
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides65 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
 }
 /**
  * Metric-time pricing configuration.
@@ -50038,17 +49384,17 @@ export interface MetricPricingOverrides65 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -50057,7 +49403,7 @@ export interface MetricPricingOverrides65 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money87 {
+export interface Money86 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -50256,6 +49602,352 @@ export interface ScenarioPricingOverrides65 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
+ * CMS Spread Option.
+ *
+ * Option on the spread between two CMS rates of different tenors.
+ *
+ * ```text
+ * Payoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]
+ * Payoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]
+ * ```
+ *
+ * Typically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.
+ *
+ * # Pricing Approach
+ *
+ * 1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)
+ * 2. Joint distribution via Gaussian copula with rank correlation
+ * 3. CMS convexity adjustment applied to each leg via static replication
+ *
+ * # References
+ *
+ * - Hagan, P. S. (2003). "Convexity Conundrums." *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`
+ * - Antonov, A., Konikov, M., & Spector, M. (2013). "SABR Spreads." *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "CmsSpreadOption".
+ */
+export interface CmsSpreadOption {
+  attributes: Attributes67;
+  day_count: DayCount53;
+  discount_curve_id: Id216;
+  expiry_date: Date121;
+  forward_curve_id: Id217;
+  id: Id218;
+  instrument_pricing_overrides?: InstrumentPricingOverrides66;
+  long_cms_tenor: Tenor24;
+  long_vol_surface_id: Id219;
+  metric_pricing_overrides?: MetricPricingOverrides66;
+  notional: Money87;
+  /**
+   * Call or put on the spread.
+   */
+  option_type: "call" | "put";
+  payment_date: Date122;
+  scenario_pricing_overrides?: ScenarioPricingOverrides66;
+  short_cms_tenor: Tenor25;
+  short_vol_surface_id: Id220;
+  /**
+   * Rank correlation between the two CMS rates.
+   */
+  spread_correlation: number;
+  /**
+   * Strike spread (in decimal, e.g., 0.005 = 50bp).
+   */
+  strike: number;
+  /**
+   * IRS convention for the underlying CMS swaps (e.g. `EurEstr`).
+   *
+   * When set, provides default values for the fixed/float frequency and
+   * day count. Individual fields still override the convention when set.
+   */
+  swap_convention?: IRSConvention | null;
+  /**
+   * Fixed leg day count of the underlying CMS swaps (overrides convention).
+   */
+  swap_day_count?: DayCount5 | null;
+  /**
+   * Fixed leg frequency of the underlying CMS swaps (overrides convention).
+   */
+  swap_fixed_frequency?: Tenor2 | null;
+  /**
+   * Floating leg day count of the underlying CMS swaps (overrides convention).
+   */
+  swap_float_day_count?: DayCount5 | null;
+  /**
+   * Floating leg frequency of the underlying CMS swaps (overrides convention).
+   */
+  swap_float_frequency?: Tenor2 | null;
+}
+/**
+ * Attributes.
+ */
+export interface Attributes67 {
+  /**
+   * Structured metadata associated with the instrument.
+   */
+  meta?: {
+    [k: string]: string;
+  };
+  /**
+   * User-defined tags for categorization.
+   */
+  tags?: string[];
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides66 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Parsed financial tenor.
+ */
+export interface Tenor24 {
+  /**
+   * Number of `unit` periods in the tenor. Must be at least 1; `0` is
+   * rejected because a zero-length period makes schedule generation loop.
+   */
+  count: number;
+  /**
+   * Calendar unit the count is expressed in, such as days, weeks, months,
+   * or years.
+   */
+  unit: "days" | "weeks" | "months" | "years";
+}
+/**
+ * Metric-time pricing configuration.
+ */
+export interface MetricPricingOverrides66 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money87 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Scenario-only pricing adjustments.
+ */
+export interface ScenarioPricingOverrides66 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
+}
+/**
  * Parsed financial tenor.
  */
 export interface Tenor25 {
@@ -50362,14 +50054,14 @@ export interface EquityTotalReturnSwap {
    * matching entry exists in `past_fixings`. Future periods use live spot.
    */
   initial_level?: number | null;
-  instrument_pricing_overrides?: InstrumentPricingOverrides66;
+  instrument_pricing_overrides?: InstrumentPricingOverrides67;
   /**
    * Optional OTC margin specification for VM/IM.
    *
    * Equity TRS use SIMM equity bucket for margin calculation.
    */
   margin_spec?: OtcMarginSpec | null;
-  metric_pricing_overrides?: MetricPricingOverrides66;
+  metric_pricing_overrides?: MetricPricingOverrides67;
   notional: Money88;
   /**
    * Observed underlying levels at past reset (period-start) dates.
@@ -50382,7 +50074,7 @@ export interface EquityTotalReturnSwap {
    * Pricing errors when the current period's start level is unavailable.
    */
   past_fixings?: [Date, number][];
-  scenario_pricing_overrides?: ScenarioPricingOverrides66;
+  scenario_pricing_overrides?: ScenarioPricingOverrides67;
   schedule: TrsScheduleSpec;
   /**
    * Trade side (receive/pay total return).
@@ -50424,20 +50116,16 @@ export interface FinancingLegSpec {
   spread_bp: Decimal26;
 }
 /**
- * Attributes for scenario selection and tagging.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides66 {
+export interface InstrumentPricingOverrides67 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides66 {
+export interface MetricPricingOverrides67 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -50448,17 +50136,17 @@ export interface MetricPricingOverrides66 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -50640,9 +50328,9 @@ export interface Money88 {
     | "ZWL";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides66 {
+export interface ScenarioPricingOverrides67 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -50844,16 +50532,16 @@ export interface FIIndexTotalReturnSwap {
    * unseasoned trades. Must be positive and finite when set.
    */
   initial_level?: number | null;
-  instrument_pricing_overrides?: InstrumentPricingOverrides67;
+  instrument_pricing_overrides?: InstrumentPricingOverrides68;
   /**
    * Optional OTC margin specification for VM/IM.
    *
    * Fixed income index TRS use duration-based margin calculations.
    */
   margin_spec?: OtcMarginSpec | null;
-  metric_pricing_overrides?: MetricPricingOverrides67;
+  metric_pricing_overrides?: MetricPricingOverrides68;
   notional: Money89;
-  scenario_pricing_overrides?: ScenarioPricingOverrides67;
+  scenario_pricing_overrides?: ScenarioPricingOverrides68;
   schedule: TrsScheduleSpec1;
   /**
    * Trade side (receive/pay total return).
@@ -50895,21 +50583,16 @@ export interface FinancingLegSpec1 {
   spread_bp: Decimal26;
 }
 /**
- * Attributes for scenario selection and tagging.
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides67 {
+export interface InstrumentPricingOverrides68 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides67 {
+export interface MetricPricingOverrides68 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -50920,17 +50603,17 @@ export interface MetricPricingOverrides67 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -51114,7 +50797,7 @@ export interface Money89 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides67 {
+export interface ScenarioPricingOverrides68 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -51187,9 +50870,9 @@ export interface PrivateMarketsFund {
    */
   events: FundEvent[];
   id: Id227;
-  instrument_pricing_overrides?: InstrumentPricingOverrides68;
-  metric_pricing_overrides?: MetricPricingOverrides68;
-  scenario_pricing_overrides?: ScenarioPricingOverrides68;
+  instrument_pricing_overrides?: InstrumentPricingOverrides69;
+  metric_pricing_overrides?: MetricPricingOverrides69;
+  scenario_pricing_overrides?: ScenarioPricingOverrides69;
   /**
    * Unrealized net asset value attributable to the LP, stated as of the
    * fund's valuation date.
@@ -51419,20 +51102,16 @@ export interface Money90 {
     | "ZWL";
 }
 /**
- * Pricing overrides for scenario analysis and model configuration.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides68 {
+export interface InstrumentPricingOverrides69 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides68 {
+export interface MetricPricingOverrides69 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -51443,26 +51122,26 @@ export interface MetricPricingOverrides68 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides68 {
+export interface ScenarioPricingOverrides69 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -51591,8 +51270,8 @@ export interface RealEstateAsset {
    */
   disposition_costs?: Money6[];
   id: Id228;
-  instrument_pricing_overrides?: InstrumentPricingOverrides69;
-  metric_pricing_overrides?: MetricPricingOverrides69;
+  instrument_pricing_overrides?: InstrumentPricingOverrides70;
+  metric_pricing_overrides?: MetricPricingOverrides70;
   /**
    * Net operating income schedule (date, amount).
    */
@@ -51618,7 +51297,7 @@ export interface RealEstateAsset {
    * When set, this takes precedence over `terminal_cap_rate` for terminal proceeds.
    */
   sale_price?: Money6 | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides69;
+  scenario_pricing_overrides?: ScenarioPricingOverrides70;
   /**
    * Optional stabilized NOI override for direct cap.
    */
@@ -51657,25 +51336,16 @@ export interface Attributes71 {
   tags?: string[];
 }
 /**
- * Discount curve identifier, used for risk attribution only.
- *
- * DCF valuation always discounts at [`discount_rate`](Self::discount_rate)
- * regardless of whether this curve is loaded. Property discount-rate
- * sensitivity is exposed as `real_estate::discount_rate01`.
- * Attributes for tagging and scenarios.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides69 {
+export interface InstrumentPricingOverrides70 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides69 {
+export interface MetricPricingOverrides70 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -51686,26 +51356,26 @@ export interface MetricPricingOverrides69 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides69 {
+export interface ScenarioPricingOverrides70 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -51777,8 +51447,8 @@ export interface DiscountedCashFlow {
    */
   flows: [Date, number][];
   id: Id229;
-  instrument_pricing_overrides?: InstrumentPricingOverrides70;
-  metric_pricing_overrides?: MetricPricingOverrides70;
+  instrument_pricing_overrides?: InstrumentPricingOverrides71;
+  metric_pricing_overrides?: MetricPricingOverrides71;
   /**
    * Discount curve identifier, used for risk attribution only.
    *
@@ -51802,7 +51472,7 @@ export interface DiscountedCashFlow {
    * Ignored when [`equity_bridge`](Self::equity_bridge) is `Some`.
    */
   net_debt: number;
-  scenario_pricing_overrides?: ScenarioPricingOverrides70;
+  scenario_pricing_overrides?: ScenarioPricingOverrides71;
   /**
    * Basic shares outstanding for per-share value calculation.
    */
@@ -51952,20 +51622,16 @@ export interface EquityBridge {
   total_debt?: number;
 }
 /**
- * Attributes for tagging and scenarios.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides70 {
+export interface InstrumentPricingOverrides71 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides70 {
+export interface MetricPricingOverrides71 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -51976,26 +51642,26 @@ export interface MetricPricingOverrides70 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides70 {
+export interface ScenarioPricingOverrides71 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -52074,10 +51740,10 @@ export interface CallableRangeAccrual {
   attributes: Attributes73;
   call_provision: BermudanCallProvision1;
   id: Id230;
-  instrument_pricing_overrides?: InstrumentPricingOverrides71;
-  metric_pricing_overrides?: MetricPricingOverrides71;
-  range_accrual: RangeAccrual1;
-  scenario_pricing_overrides?: ScenarioPricingOverrides71;
+  instrument_pricing_overrides?: InstrumentPricingOverrides72;
+  metric_pricing_overrides?: MetricPricingOverrides72;
+  range_accrual: RangeAccrualTerms;
+  scenario_pricing_overrides?: ScenarioPricingOverrides72;
 }
 /**
  * Attributes.
@@ -52124,21 +51790,16 @@ export interface BermudanCallProvision1 {
   lockout_periods: number;
 }
 /**
- * Pricing overrides.
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides71 {
+export interface InstrumentPricingOverrides72 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides71 {
+export interface MetricPricingOverrides72 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -52149,54 +51810,27 @@ export interface MetricPricingOverrides71 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Range accrual instrument.
- *
- * Range accrual notes pay coupons that accrue only when a reference rate or asset
- * stays within a specified range. The accrual is proportional to the number of
- * observation dates where the underlying is within [lower_bound, upper_bound].
- *
- * # Bounds Interpretation
- *
- * The `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:
- * - `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)
- * - `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)
- *
- * # Historical Fixings
- *
- * For mid-life valuations, use `past_fixings_in_range` to specify how many past
- * observations were in range. The pricer will add this to expected future fixings.
- *
- * # Rate-Linked Underlyings: Pricing Routing
- *
- * The rate-linked fields (`rate_index_id`, `projection_curve_id`,
- * `reference_tenor`) describe the contract but are **not priceable by the
- * standalone `RangeAccrual` pricers**, which support equity/FX (GBM)
- * underlyings only and return a validation error when these fields are set.
- * Price rate-linked range accrual notes through
- * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)
- * (with an empty call schedule for a non-callable note), which models the
- * reference rate under HW1F and reconstructs the term rate per observation.
+ * Range accrual contract terms (no identity, attributes or overrides of their own).
  */
-export interface RangeAccrual1 {
-  accrual_start_date: Date120;
-  attributes: Attributes64;
+export interface RangeAccrualTerms {
+  accrual_start_date: Date128;
   /**
    * How to interpret the range bounds (default: Absolute)
    */
@@ -52205,20 +51839,17 @@ export interface RangeAccrual1 {
    * Coupon rate earned when in range (must be >= 0)
    */
   coupon_rate: number;
-  day_count: DayCount50;
-  discount_curve_id: Id203;
+  day_count: DayCount58;
+  discount_curve_id: Id231;
   /**
    * Optional dividend-yield scalar ID
    */
   div_yield_id?: Id9 | null;
-  id: Id204;
-  instrument_pricing_overrides?: InstrumentPricingOverrides62;
   /**
    * Lower bound of accrual range (interpretation depends on bounds_type)
    */
   lower_bound: number;
-  metric_pricing_overrides?: MetricPricingOverrides62;
-  notional: Money84;
+  notional: Money91;
   /**
    * Observation dates for range checking (must be sorted ascending)
    */
@@ -52250,8 +51881,7 @@ export interface RangeAccrual1 {
    * Contractual tenor of the observed reference rate.
    */
   reference_tenor?: Tenor2 | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides62;
-  spot_id: Id208;
+  spot_id: Id232;
   /**
    * Total number of past observations (for mid-life valuations).
    * Must be provided if `past_fixings_in_range` is set.
@@ -52265,253 +51895,7 @@ export interface RangeAccrual1 {
    * Upper bound of accrual range (must be > lower_bound)
    */
   upper_bound: number;
-  vol_surface_id: Id209;
-}
-/**
- * Scenario-only pricing adjustments.
- */
-export interface ScenarioPricingOverrides71 {
-  /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
-   *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
-   */
-  scenario_price_shock_pct?: number | null;
-  /**
-   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
-   *
-   * Applied as an additional flat Z-spread during valuation by pricers that
-   * support spread-based revaluation. Currently consumed by `Bond::base_value`
-   * for bonds without embedded options, without an assigned credit curve, and
-   * without a price-pinning quote override other than `quoted_z_spread`
-   * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
-   *
-   * Setting this on an unsupported configuration produces a validation error
-   * at pricing time rather than a silent no-op. For hazard-priced (credit
-   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
-   */
-  scenario_spread_shock_bp?: number | null;
-}
-/**
- * Bond future instrument.
- *
- * A standardized contract with a basket of eligible deliverables. The short
- * chooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.
- *
- * # Contract Mechanics
- *
- * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
- * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
- *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
- * - **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but
- *   do not mutate the selected CTD. [`crate::instruments::Instrument::value`]
- *   marks the caller-supplied CTD only; refresh it daily with
- *   [`Self::determine_ctd_by_implied_repo`] when the basket can switch.
- * - **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use finstack_quant_valuations::instruments::fixed_income::bond_future::{
- *     BondFuture, BondFutureSpecs, DeliverableBond,
- * };
- * use finstack_quant_valuations::instruments::{Attributes, Position};
- * use time::macros::date;
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * let future = BondFuture::builder()
- *     .id(InstrumentId::new("TYH5"))
- *     .notional(Money::from((1_000_000_i64, Currency::USD)))
- *     .expiry(date!(2025 - 03 - 20))
- *     .delivery_start(date!(2025 - 03 - 21))
- *     .delivery_end(date!(2025 - 03 - 31))
- *     .quoted_price(125.50)
- *     .position(Position::Long)
- *     .contract_specs(BondFutureSpecs::ust_10y())
- *     .deliverable_basket(vec![DeliverableBond {
- *         bond_id: InstrumentId::new("US912828XG33"),
- *         conversion_factor: 0.8234,
- *     }])
- *     .discount_curve_id(CurveId::new("USD-TREASURY"))
- *     .attributes(Attributes::new())
- *     .build()?;
- * assert_eq!(future.deliverable_basket.len(), 1);
- * # Ok(())
- * # }
- * ```
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "BondFuture".
- */
-export interface BondFuture {
-  attributes: Attributes74;
-  contract_specs: BondFutureSpecs;
-  /**
-   * Optional embedded CTD bond definition.
-   *
-   * Model-price and NPV paths require this definition because
-   * `MarketContext` contains market data, not an instrument registry.
-   * Identifier-only CTD analysis and conversion-factor lookup do not require it.
-   */
-  ctd_bond?: Bond | null;
-  /**
-   * Selected cheapest-to-deliver (CTD) bond identifier.
-   *
-   * Resolution is deterministic: this explicit identifier takes precedence,
-   * followed by `ctd_bond.id`, then the sole basket member. A larger basket
-   * with neither form of selection fails validation. The resolved identifier
-   * must be in `deliverable_basket`; an embedded bond must have the same ID.
-   *
-   * [`Self::determine_ctd`] ranks clean prices by gross basis;
-   * [`Self::determine_ctd_by_implied_repo`] ranks by highest implied
-   * repo after coupon income and time to delivery. These helpers return a
-   * candidate and do not update this field.
-   */
-  ctd_bond_id?: Id9 | null;
-  /**
-   * Basket of deliverable bonds with conversion factors
-   *
-   * @minItems 1
-   */
-  deliverable_basket: [DeliverableBond, ...DeliverableBond[]];
-  delivery_end: Date128;
-  delivery_start: Date129;
-  discount_curve_id: Id232;
-  expiry: Date130;
-  id: Id233;
-  instrument_pricing_overrides?: InstrumentPricingOverrides72;
-  metric_pricing_overrides?: MetricPricingOverrides72;
-  notional: Money91;
-  /**
-   * Position side (Long or Short)
-   */
-  position: "long" | "short";
-  /**
-   * Contract/entry futures price (e.g., 125.50 for 125-16/32).
-   *
-   * Used only for mark-to-market: `base_value` returns model-minus-contract
-   * value for a long position. Basis, implied-repo and invoice helpers take
-   * the current futures price as an explicit argument instead.
-   * Current-settlement variation margin is a separate cash-P&L workflow.
-   */
-  quoted_price: number;
-  /**
-   * Optional repo/financing curve identifier.
-   *
-   * When set, this curve is used for financing/carry calculations instead
-   * of `discount_curve_id`. This allows capturing repo specials, where
-   * specific collateral (e.g., on-the-run Treasuries) trades at rates
-   * different from the general funding curve.
-   *
-   * If `None`, the `discount_curve_id` is used for financing calculations.
-   */
-  repo_curve_id?: Id9 | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides72;
-}
-/**
- * Attributes for scenario selection and tagging
- */
-export interface Attributes74 {
-  /**
-   * Structured metadata associated with the instrument.
-   */
-  meta?: {
-    [k: string]: string;
-  };
-  /**
-   * User-defined tags for categorization.
-   */
-  tags?: string[];
-}
-/**
- * Contract specifications (contract size, standard coupon, repo day count)
- */
-export interface BondFutureSpecs {
-  /**
-   * Face value of a single contract (e.g., $100,000 for UST)
-   */
-  contract_size: number;
-  /**
-   * Day-count convention for implied repo rate annualization.
-   *
-   * Bond-future repo supports `act_360` and `act_365f`.
-   */
-  repo_day_count?: "act_360" | "act_365f";
-  /**
-   * Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)
-   */
-  standard_coupon: number;
-  /**
-   * Standard maturity in years for conversion factor calculation
-   */
-  standard_maturity_years: number;
-}
-/**
- * An eligible deliverable and the conversion factor used by pricing.
- *
- * Pricing and CTD helpers consume the supplied positive factor; they do not
- * recalculate it. Prefer the exchange-published value for the security and
- * delivery month. For CME/CBOT contracts, callers can use
- * [`super::BondFuturePricer::calculate_conversion_factor`] to calculate a
- * factor and store the result here.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "DeliverableBond".
- */
-export interface DeliverableBond {
-  bond_id: Id231;
-  /**
-   * Finite JSON number that is strictly greater than zero.
-   *
-   * This type is used by serde field adapters so runtime deserialization and
-   * generated schemas enforce the same positive-number contract.
-   */
-  conversion_factor: number;
-}
-/**
- * Instrument-owned pricing inputs.
- */
-export interface InstrumentPricingOverrides72 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
-}
-/**
- * Metric-time pricing configuration.
- */
-export interface MetricPricingOverrides72 {
-  /**
-   * Basis used for bond duration, convexity, and DV01-style risk metrics.
-   */
-  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
-  /**
-   * Breakeven configuration: which parameter to solve for and solve mode.
-   */
-  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
-  bump_config?: D_1D0C1815F8Dd0715Bd12;
-  /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
-   */
-  mc_seed_scenario?: string | null;
-  /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-   */
-  theta_period?: string | null;
-  /**
-   * Historical VaR / Expected Shortfall configuration override.
-   */
-  var_config?: DE49387F97C0F9D510642 | null;
+  vol_surface_id: Id233;
 }
 /**
  * Currency-tagged monetary amount.
@@ -52715,6 +52099,423 @@ export interface ScenarioPricingOverrides72 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
+ * Bond future instrument.
+ *
+ * A standardized contract with a basket of eligible deliverables. The short
+ * chooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.
+ *
+ * # Contract Mechanics
+ *
+ * - **Conversion factors**: Supplied per deliverable, preferably from the exchange.
+ * - **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,
+ *   then the sole basket member. A larger basket requires an explicit or embedded CTD.
+ * - **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but
+ *   do not mutate the selected CTD. [`crate::instruments::Instrument::value`]
+ *   marks the caller-supplied CTD only; refresh it daily with
+ *   [`Self::determine_ctd_by_implied_repo`] when the basket can switch.
+ * - **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::currency::Currency;
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::types::{CurveId, InstrumentId};
+ * use finstack_quant_valuations::instruments::fixed_income::bond_future::{
+ *     BondFuture, BondFutureSpecs, DeliverableBond,
+ * };
+ * use finstack_quant_valuations::instruments::{Attributes, Position};
+ * use time::macros::date;
+ *
+ * # fn main() -> finstack_quant_core::Result<()> {
+ * let future = BondFuture::builder()
+ *     .id(InstrumentId::new("TYH5"))
+ *     .notional(Money::from((1_000_000_i64, Currency::USD)))
+ *     .expiry(date!(2025 - 03 - 20))
+ *     .delivery_start(date!(2025 - 03 - 21))
+ *     .delivery_end(date!(2025 - 03 - 31))
+ *     .quoted_price(125.50)
+ *     .position(Position::Long)
+ *     .contract_specs(BondFutureSpecs::ust_10y())
+ *     .deliverable_basket(vec![DeliverableBond {
+ *         bond_id: InstrumentId::new("US912828XG33"),
+ *         conversion_factor: 0.8234,
+ *     }])
+ *     .discount_curve_id(CurveId::new("USD-TREASURY"))
+ *     .attributes(Attributes::new())
+ *     .build()?;
+ * assert_eq!(future.deliverable_basket.len(), 1);
+ * # Ok(())
+ * # }
+ * ```
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "BondFuture".
+ */
+export interface BondFuture {
+  attributes: Attributes74;
+  contract_specs: BondFutureSpecs;
+  /**
+   * Optional embedded CTD bond definition.
+   *
+   * Model-price and NPV paths require this definition because
+   * `MarketContext` contains market data, not an instrument registry.
+   * Identifier-only CTD analysis and conversion-factor lookup do not require it.
+   */
+  ctd_bond?: Bond | null;
+  /**
+   * Selected cheapest-to-deliver (CTD) bond identifier.
+   *
+   * Resolution is deterministic: this explicit identifier takes precedence,
+   * followed by `ctd_bond.id`, then the sole basket member. A larger basket
+   * with neither form of selection fails validation. The resolved identifier
+   * must be in `deliverable_basket`; an embedded bond must have the same ID.
+   *
+   * [`Self::determine_ctd`] ranks clean prices by gross basis;
+   * [`Self::determine_ctd_by_implied_repo`] ranks by highest implied
+   * repo after coupon income and time to delivery. These helpers return a
+   * candidate and do not update this field.
+   */
+  ctd_bond_id?: Id9 | null;
+  /**
+   * Basket of deliverable bonds with conversion factors
+   *
+   * @minItems 1
+   */
+  deliverable_basket: [DeliverableBond, ...DeliverableBond[]];
+  delivery_end: Date129;
+  delivery_start: Date130;
+  discount_curve_id: Id235;
+  expiry: Date131;
+  id: Id236;
+  instrument_pricing_overrides?: InstrumentPricingOverrides73;
+  metric_pricing_overrides?: MetricPricingOverrides73;
+  notional: Money92;
+  /**
+   * Position side (Long or Short)
+   */
+  position: "long" | "short";
+  /**
+   * Contract/entry futures price (e.g., 125.50 for 125-16/32).
+   *
+   * Used only for mark-to-market: `base_value` returns model-minus-contract
+   * value for a long position. Basis, implied-repo and invoice helpers take
+   * the current futures price as an explicit argument instead.
+   * Current-settlement variation margin is a separate cash-P&L workflow.
+   */
+  quoted_price: number;
+  /**
+   * Optional repo/financing curve identifier.
+   *
+   * When set, this curve is used for financing/carry calculations instead
+   * of `discount_curve_id`. This allows capturing repo specials, where
+   * specific collateral (e.g., on-the-run Treasuries) trades at rates
+   * different from the general funding curve.
+   *
+   * If `None`, the `discount_curve_id` is used for financing calculations.
+   */
+  repo_curve_id?: Id9 | null;
+  scenario_pricing_overrides?: ScenarioPricingOverrides73;
+}
+/**
+ * Attributes for scenario selection and tagging
+ */
+export interface Attributes74 {
+  /**
+   * Structured metadata associated with the instrument.
+   */
+  meta?: {
+    [k: string]: string;
+  };
+  /**
+   * User-defined tags for categorization.
+   */
+  tags?: string[];
+}
+/**
+ * Contract specifications (contract size, standard coupon, repo day count)
+ */
+export interface BondFutureSpecs {
+  /**
+   * Face value of a single contract (e.g., $100,000 for UST)
+   */
+  contract_size: number;
+  /**
+   * Day-count convention for implied repo rate annualization.
+   *
+   * Bond-future repo supports `act_360` and `act_365f`.
+   */
+  repo_day_count?: "act_360" | "act_365f";
+  /**
+   * Standard coupon rate for conversion factor calculation (e.g., 0.06 for 6%)
+   */
+  standard_coupon: number;
+  /**
+   * Standard maturity in years for conversion factor calculation
+   */
+  standard_maturity_years: number;
+}
+/**
+ * An eligible deliverable and the conversion factor used by pricing.
+ *
+ * Pricing and CTD helpers consume the supplied positive factor; they do not
+ * recalculate it. Prefer the exchange-published value for the security and
+ * delivery month. For CME/CBOT contracts, callers can use
+ * [`super::BondFuturePricer::calculate_conversion_factor`] to calculate a
+ * factor and store the result here.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "DeliverableBond".
+ */
+export interface DeliverableBond {
+  bond_id: Id234;
+  /**
+   * Finite JSON number that is strictly greater than zero.
+   *
+   * This type is used by serde field adapters so runtime deserialization and
+   * generated schemas enforce the same positive-number contract.
+   */
+  conversion_factor: number;
+}
+/**
+ * Instrument-owned pricing inputs.
+ */
+export interface InstrumentPricingOverrides73 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Metric-time pricing configuration.
+ */
+export interface MetricPricingOverrides73 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Currency-tagged monetary amount.
+ */
+export interface Money92 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
+ * Scenario-only pricing adjustments.
+ */
+export interface ScenarioPricingOverrides73 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
+}
+/**
  * Unified structured credit instrument representation.
  *
  * This single type handles CLO, ABS, CMBS, and RMBS instruments using
@@ -52725,7 +52526,6 @@ export interface ScenarioPricingOverrides72 {
  */
 export interface StructuredCredit {
   attributes: Attributes75;
-  behavior_overrides?: Overrides;
   /**
    * Assumed optional redemption for price-to-call analytics. A deal-scope
    * call liquidates the collateral at [`Self::liquidation_price_pct`] on
@@ -52753,7 +52553,7 @@ export interface StructuredCredit {
    * Set to `None` to disable clean-up call (default).
    */
   cleanup_call_pct?: number | null;
-  closing_date: Date132;
+  closing_date: Date133;
   /**
    * Optional correlation structure for stochastic modeling.
    */
@@ -52798,7 +52598,6 @@ export interface StructuredCredit {
    * carry breach/cure memory and non-diversion consequences.
    */
   coverage_triggers?: CoverageTestSpec[];
-  credit_factors: CreditFactors;
   deal_metadata?: Metadata;
   /**
    * Deal classification (ABS/CLO/CMBS/RMBS).
@@ -52812,7 +52611,7 @@ export interface StructuredCredit {
    * bucket charges off. See [`DelinquencyModel`].
    */
   delinquency?: DelinquencyModel | null;
-  discount_curve_id: Id234;
+  discount_curve_id: Id237;
   /**
    * Senior transaction fees paid ahead of every note.
    *
@@ -52820,7 +52619,7 @@ export interface StructuredCredit {
    * to apply the deal-type calibration from `types/constants.rs`.
    */
   fees?: DealFees | null;
-  first_payment_date: Date133;
+  first_payment_date: Date134;
   frequency: Tenor27;
   /**
    * Interest rate swaps settled through the waterfall: net receipts join
@@ -52828,8 +52627,8 @@ export interface StructuredCredit {
    * [`HedgeSwap`].
    */
   hedge_swaps?: HedgeSwap[];
-  id: Id235;
-  instrument_pricing_overrides?: InstrumentPricingOverrides73;
+  id: Id238;
+  instrument_pricing_overrides?: InstrumentPricingOverrides74;
   /**
    * Price at which the collateral is realized when the deal is called or
    * cleaned up, as a percent of par (`None` = par). The clean-up call is
@@ -52857,8 +52656,8 @@ export interface StructuredCredit {
    */
   loss_recognition?: LossRecognition | null;
   market_conditions: MarketConditions;
-  maturity: Date134;
-  metric_pricing_overrides?: MetricPricingOverrides73;
+  maturity: Date135;
+  metric_pricing_overrides?: MetricPricingOverrides74;
   /**
    * Business day convention for tranche payments (defaults to
    * ModifiedFollowing).
@@ -52889,7 +52688,7 @@ export interface StructuredCredit {
    */
   quote_settlement_date?: Date | null;
   recovery_spec?: RecoveryModelSpec1;
-  scenario_pricing_overrides?: ScenarioPricingOverrides73;
+  scenario_pricing_overrides?: ScenarioPricingOverrides74;
   /**
    * Optional stochastic default model specification.
    */
@@ -52975,41 +52774,6 @@ export interface Attributes75 {
   tags?: string[];
 }
 /**
- * Behavioral assumption overrides.
- */
-export interface Overrides {
-  /**
-   * Override default with constant annual CDR.
-   */
-  cdr_annual?: number | null;
-  /**
-   * Override prepayment with constant annual CPR.
-   */
-  cpr_annual?: number | null;
-  /**
-   * Override prepayment with PSA multiplier.
-   */
-  psa_speed_multiplier?: number | null;
-  /**
-   * Override recovery lag (months).
-   */
-  recovery_lag_months?: number | null;
-  /**
-   * Override recovery with constant rate.
-   */
-  recovery_rate?: number | null;
-  /**
-   * Override the replacement-collateral purchase price during the
-   * reinvestment period, as a percent of par (`97.5` = 97.5); takes
-   * precedence over `ReinvestmentAssumptions::price_pct`.
-   */
-  reinvestment_price?: number | null;
-  /**
-   * Override default with SDA multiplier.
-   */
-  sda_speed_multiplier?: number | null;
-}
-/**
  * Assumed optional redemption on a date at a price.
  *
  * # Examples
@@ -53037,7 +52801,7 @@ export interface CallAssumption {
    * trigger). `None` keeps the scheduled date only.
    */
   after_early_amortization_months?: number | null;
-  date: Date131;
+  date: Date132;
   /**
    * Redemption price as a percent of the notes' current balance
    * (`100.0` = par; above par the premium is paid as interest, below par
@@ -53205,19 +52969,6 @@ export interface CoverageTestSpec {
   trigger_level: number;
 }
 /**
- * Credit factors impacting default behavior.
- */
-export interface CreditFactors {
-  /**
-   * Annual debt service for CMBS collateral, when provided.
-   */
-  annual_debt_service?: Money6 | null;
-  /**
-   * Annual net operating income for CMBS collateral, when provided.
-   */
-  annual_noi?: Money6 | null;
-}
-/**
  * Deal metadata (counterparties, identifiers).
  */
 export interface Metadata {
@@ -53368,16 +53119,11 @@ export interface InterestRateSwap1 {
   side: "pay" | "receive";
 }
 /**
- * Attributes for scenario selection.
  * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides73 {
+export interface InstrumentPricingOverrides74 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Market conditions impacting behavior.
@@ -53391,7 +53137,7 @@ export interface MarketConditions {
 /**
  * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides73 {
+export interface MetricPricingOverrides74 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -53402,17 +53148,17 @@ export interface MetricPricingOverrides73 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -53533,7 +53279,7 @@ export interface RecoveryModelSpec1 {
 /**
  * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides73 {
+export interface ScenarioPricingOverrides74 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -53565,8 +53311,8 @@ export interface ScenarioPricingOverrides73 {
  * via the `definition` "TrancheDraw".
  */
 export interface TrancheDraw {
-  amount: Money92;
-  date: Date135;
+  amount: Money93;
+  date: Date136;
   /**
    * Id of the note drawn.
    */
@@ -53575,7 +53321,7 @@ export interface TrancheDraw {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money92 {
+export interface Money93 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -53756,7 +53502,7 @@ export interface Money92 {
  * via the `definition` "TrancheReadvance".
  */
 export interface TrancheReadvance {
-  commitment: Money93;
+  commitment: Money94;
   /**
    * Id of the note re-advanced.
    */
@@ -53765,7 +53511,7 @@ export interface TrancheReadvance {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money93 {
+export interface Money94 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -53977,9 +53723,9 @@ export interface Tranche {
     | {
         floating: FloatingRateSpec1;
       };
-  current_balance: Money94;
-  day_count: DayCount58;
-  deferred_interest: Money95;
+  current_balance: Money95;
+  day_count: DayCount59;
+  deferred_interest: Money96;
   /**
    * Upper structural boundary as a percent of the capital structure
    * (`100.0` for the most senior class); derived like
@@ -53991,8 +53737,8 @@ export interface Tranche {
    * Interest coverage trigger specification
    */
   ic_trigger?: CoverageTrigger | null;
-  id: Id236;
-  maturity: Date136;
+  id: Id239;
+  maturity: Date137;
   /**
    * Whether the coupon is a non-deferrable claim the template pays from
    * principal proceeds when interest proceeds fall short (and the deal's
@@ -54005,7 +53751,7 @@ export interface Tranche {
    * Coverage test triggers
    */
   oc_trigger?: CoverageTrigger | null;
-  original_balance: Money96;
+  original_balance: Money97;
   /**
    * Whether interest shortfalls capitalize into tranche balance (PIK accretion).
    *
@@ -54043,7 +53789,7 @@ export interface Attributes76 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money94 {
+export interface Money95 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -54218,7 +53964,7 @@ export interface Money94 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money95 {
+export interface Money96 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -54432,7 +54178,7 @@ export interface CoverageTrigger {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money96 {
+export interface Money97 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -54676,7 +54422,7 @@ export interface Recipient {
   calculation:
     | {
         fixed_amount: {
-          amount: Money97;
+          amount: Money98;
           /**
            * Rounding convention.
            */
@@ -54757,7 +54503,7 @@ export interface Recipient {
     | "residual_cash"
     | {
         reserve_replenishment: {
-          target_balance: Money98;
+          target_balance: Money99;
         };
       }
     | {
@@ -54778,7 +54524,7 @@ export interface Recipient {
       }
     | {
         net_wac_carryover: {
-          amount: Money99;
+          amount: Money100;
           /**
            * Tranche id.
            */
@@ -54822,181 +54568,6 @@ export interface Recipient {
    * Weight for pro-rata distribution (None = equal weight)
    */
   weight?: number | null;
-}
-/**
- * Currency-tagged monetary amount.
- */
-export interface Money97 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Currency-tagged monetary amount.
@@ -55349,6 +54920,181 @@ export interface Money99 {
     | "ZWL";
 }
 /**
+ * Currency-tagged monetary amount.
+ */
+export interface Money100 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWL";
+}
+/**
  * Declarative, additively-applied waterfall rules layered onto a deal's base
  * waterfall.
  *
@@ -55425,8 +55171,8 @@ export interface WaterfallRules {
  * via the `definition` "ControlledAccumulationSpec".
  */
 export interface ControlledAccumulationSpec {
-  bullet_date: Date137;
-  start_date: Date138;
+  bullet_date: Date138;
+  start_date: Date139;
 }
 /**
  * Early-amortization specification for revolving (master-trust) deals.
@@ -55470,7 +55216,7 @@ export interface EarlyAmortizationSpec {
  * via the `definition` "ExcessSpreadSpec".
  */
 export interface ExcessSpreadSpec {
-  target_balance: Money100;
+  target_balance: Money101;
   /**
    * Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the
    * original pool) at or above which terminal spread-account cash repays
@@ -55483,7 +55229,7 @@ export interface ExcessSpreadSpec {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money100 {
+export interface Money101 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -55775,7 +55521,7 @@ export interface ShiftingInterestStep {
  * via the `definition` "StepDownSpec".
  */
 export interface StepDownSpec {
-  step_down_date: Date139;
+  step_down_date: Date140;
   /**
    * Performance triggers; all must pass for the step-down to take effect.
    */
@@ -55837,10 +55583,10 @@ export interface LeveredRealEstateEquity {
    * netted from asset PV.
    */
   financing?: RealEstateFinancing[];
-  id: Id237;
-  instrument_pricing_overrides?: InstrumentPricingOverrides74;
-  metric_pricing_overrides?: MetricPricingOverrides74;
-  scenario_pricing_overrides?: ScenarioPricingOverrides74;
+  id: Id240;
+  instrument_pricing_overrides?: InstrumentPricingOverrides75;
+  metric_pricing_overrides?: MetricPricingOverrides75;
+  scenario_pricing_overrides?: ScenarioPricingOverrides75;
 }
 /**
  * Real estate asset valuation instrument.
@@ -55890,8 +55636,8 @@ export interface RealEstateAsset1 {
    */
   disposition_costs?: Money6[];
   id: Id228;
-  instrument_pricing_overrides?: InstrumentPricingOverrides69;
-  metric_pricing_overrides?: MetricPricingOverrides69;
+  instrument_pricing_overrides?: InstrumentPricingOverrides70;
+  metric_pricing_overrides?: MetricPricingOverrides70;
   /**
    * Net operating income schedule (date, amount).
    */
@@ -55917,7 +55663,7 @@ export interface RealEstateAsset1 {
    * When set, this takes precedence over `terminal_cap_rate` for terminal proceeds.
    */
   sale_price?: Money6 | null;
-  scenario_pricing_overrides?: ScenarioPricingOverrides69;
+  scenario_pricing_overrides?: ScenarioPricingOverrides70;
   /**
    * Optional stabilized NOI override for direct cap.
    */
@@ -55957,20 +55703,16 @@ export interface Attributes77 {
   tags?: string[];
 }
 /**
- * Attributes for tagging and scenarios.
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides74 {
+export interface InstrumentPricingOverrides75 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides74 {
+export interface MetricPricingOverrides75 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -55981,26 +55723,26 @@ export interface MetricPricingOverrides74 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides74 {
+export interface ScenarioPricingOverrides75 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -56044,22 +55786,94 @@ export interface ScenarioPricingOverrides74 {
  * via the `definition` "CompositeInstrument".
  */
 export interface CompositeInstrument {
+  instrument_pricing_overrides?: InstrumentPricingOverrides76;
+  metric_pricing_overrides?: MetricPricingOverrides76;
+  scenario_pricing_overrides?: ScenarioPricingOverrides76;
   spec: CompositeSpec;
   state: CompositeState;
+}
+/**
+ * Instrument-owned pricing inputs.
+ *
+ * A composite has no pricing model of its own, so this must stay empty;
+ * set quotes and model inputs on each leg instead.
+ */
+export interface InstrumentPricingOverrides76 {
+  market_quotes?: DB0A5Fc543381Da6A5722;
+  model_config?: D_572Ad1Befb7D94914652;
+}
+/**
+ * Metric-time pricing configuration.
+ *
+ * Also applied to every leg as defaults: a leg's own setting wins, and
+ * `bump_config.adaptive_bumps` is enabled on a leg when either sets it.
+ */
+export interface MetricPricingOverrides76 {
+  /**
+   * Basis used for bond duration, convexity, and DV01-style risk metrics.
+   */
+  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
+  /**
+   * Breakeven configuration: which parameter to solve for and solve mode.
+   */
+  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
+  bump_config?: D_1D0C1815F8Dd0715Bd12;
+  /**
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
+   */
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
+  /**
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
+   */
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
+  /**
+   * Historical VaR / Expected Shortfall configuration override.
+   */
+  var_config?: DE49387F97C0F9D510642 | null;
+}
+/**
+ * Scenario-only pricing adjustments.
+ *
+ * Applied to the composite value after leg aggregation.
+ */
+export interface ScenarioPricingOverrides76 {
+  /**
+   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   *
+   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   */
+  scenario_price_shock_pct?: number | null;
+  /**
+   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+   *
+   * Applied as an additional flat Z-spread during valuation by pricers that
+   * support spread-based revaluation. Currently consumed by `Bond::base_value`
+   * for bonds without embedded options, without an assigned credit curve, and
+   * without a price-pinning quote override other than `quoted_z_spread`
+   * (where the shock is additive on the quoted spread). See
+   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+   *
+   * Setting this on an unsupported configuration produces a validation error
+   * at pricing time rather than a silent no-op. For hazard-priced (credit
+   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+   */
+  scenario_spread_shock_bp?: number | null;
 }
 /**
  * Economic definition and future rebalance policy.
  */
 export interface CompositeSpec {
   attributes: Attributes78;
-  capital: Money101;
-  id: Id238;
-  instrument_pricing_overrides?: InstrumentPricingOverrides75;
+  capital: Money102;
+  id: Id241;
   /**
    * Self-contained underlying instrument definitions.
    */
   legs: CompositeLegSpec[];
-  metric_pricing_overrides?: MetricPricingOverrides75;
   /**
    * Dates on which explicit dynamic resolution becomes eligible.
    */
@@ -56089,10 +55903,9 @@ export interface CompositeSpec {
          */
         frequency: "daily" | "weekly" | "monthly" | "quarterly";
         kind: "calendar";
-        start: Date140;
+        start: Date141;
       };
   reporting_currency: Currency46;
-  scenario_pricing_overrides?: ScenarioPricingOverrides75;
   /**
    * Rule used to resolve quantities at initialization and rebalance.
    */
@@ -56101,11 +55914,11 @@ export interface CompositeSpec {
         kind: "fixed_quantity";
       }
     | {
-        gross_notional: Money102;
+        gross_notional: Money103;
         kind: "notional_weighted";
       }
     | {
-        anchor_leg_id: Id240;
+        anchor_leg_id: Id243;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -56121,7 +55934,7 @@ export interface CompositeSpec {
         neutralize: boolean;
       }
     | {
-        anchor_leg_id: Id241;
+        anchor_leg_id: Id244;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -56178,7 +55991,7 @@ export interface Attributes78 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money101 {
+export interface Money102 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -56349,17 +56162,6 @@ export interface Money101 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
-}
-/**
- * Instrument-level pricing inputs shared with the normal valuation lifecycle.
- */
-export interface InstrumentPricingOverrides75 {
-  market_quotes?: DB0A5Fc543381Da6A5722;
-  model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * One self-contained leg in a composite specification.
@@ -56684,72 +56486,16 @@ export interface CompositeLegSpec {
         spec: CompositeInstrument;
         type: "composite";
       };
-  instrument_id: Id239;
+  instrument_id: Id242;
   /**
    * Signed quantity for fixed weighting or signed target score for dynamic weighting.
    */
   weight: number;
 }
 /**
- * Metric bump and calculation controls.
- */
-export interface MetricPricingOverrides75 {
-  /**
-   * Basis used for bond duration, convexity, and DV01-style risk metrics.
-   */
-  bond_risk_basis?: DFd618Cd5743Ec18A168F | null;
-  /**
-   * Breakeven configuration: which parameter to solve for and solve mode.
-   */
-  breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
-  bump_config?: D_1D0C1815F8Dd0715Bd12;
-  /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
-   */
-  mc_seed_scenario?: string | null;
-  /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
-   */
-  theta_period?: string | null;
-  /**
-   * Historical VaR / Expected Shortfall configuration override.
-   */
-  var_config?: DE49387F97C0F9D510642 | null;
-}
-/**
- * Scenario-only price adjustments applied to the composite after leg aggregation.
- */
-export interface ScenarioPricingOverrides75 {
-  /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
-   *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
-   */
-  scenario_price_shock_pct?: number | null;
-  /**
-   * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
-   *
-   * Applied as an additional flat Z-spread during valuation by pricers that
-   * support spread-based revaluation. Currently consumed by `Bond::base_value`
-   * for bonds without embedded options, without an assigned credit curve, and
-   * without a price-pinning quote override other than `quoted_z_spread`
-   * (where the shock is additive on the quoted spread). See
-   * [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
-   *
-   * Setting this on an unsupported configuration produces a validation error
-   * at pricing time rather than a silent no-op. For hazard-priced (credit
-   * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
-   */
-  scenario_spread_shock_bp?: number | null;
-}
-/**
  * Currency-tagged monetary amount.
  */
-export interface Money102 {
+export interface Money103 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -57379,7 +57125,7 @@ export interface Expr6 {
  * Frozen quantities used for every valuation until explicit rebalance.
  */
 export interface CompositeState {
-  effective_date: Date141;
+  effective_date: Date142;
   /**
    * Resolved top-level quantities in specification order.
    */
@@ -57398,27 +57144,23 @@ export interface CompositeState {
  * via the `definition` "ResolvedCompositeLeg".
  */
 export interface ResolvedCompositeLeg {
-  instrument_id: Id242;
+  instrument_id: Id245;
   /**
    * Signed quantity held from the state's effective date until the next rebalance.
    */
   quantity: number;
 }
 /**
- * Attributes for scenario selection and tagging
+ * Instrument-owned pricing inputs.
  */
-export interface InstrumentPricingOverrides76 {
+export interface InstrumentPricingOverrides77 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
- * Metric-only pricing controls.
+ * Metric-time pricing configuration.
  */
-export interface MetricPricingOverrides76 {
+export interface MetricPricingOverrides77 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -57429,17 +57171,17 @@ export interface MetricPricingOverrides76 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -57448,7 +57190,7 @@ export interface MetricPricingOverrides76 {
 /**
  * Currency-tagged monetary amount.
  */
-export interface Money103 {
+export interface Money104 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with
@@ -57634,9 +57376,9 @@ export interface BasketPricingConfig {
   fx_policy: "cashflow_date" | "period_end" | "period_average";
 }
 /**
- * Scenario-only valuation adjustments.
+ * Scenario-only pricing adjustments.
  */
-export interface ScenarioPricingOverrides76 {
+export interface ScenarioPricingOverrides77 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *
@@ -57845,14 +57587,12 @@ export interface CollateralSpec1 {
  */
 export interface CompositeSpec1 {
   attributes: Attributes78;
-  capital: Money101;
-  id: Id238;
-  instrument_pricing_overrides?: InstrumentPricingOverrides75;
+  capital: Money102;
+  id: Id241;
   /**
    * Self-contained underlying instrument definitions.
    */
   legs: CompositeLegSpec[];
-  metric_pricing_overrides?: MetricPricingOverrides75;
   /**
    * Dates on which explicit dynamic resolution becomes eligible.
    */
@@ -57882,10 +57622,9 @@ export interface CompositeSpec1 {
          */
         frequency: "daily" | "weekly" | "monthly" | "quarterly";
         kind: "calendar";
-        start: Date140;
+        start: Date141;
       };
   reporting_currency: Currency46;
-  scenario_pricing_overrides?: ScenarioPricingOverrides75;
   /**
    * Rule used to resolve quantities at initialization and rebalance.
    */
@@ -57894,11 +57633,11 @@ export interface CompositeSpec1 {
         kind: "fixed_quantity";
       }
     | {
-        gross_notional: Money102;
+        gross_notional: Money103;
         kind: "notional_weighted";
       }
     | {
-        anchor_leg_id: Id240;
+        anchor_leg_id: Id243;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -57914,7 +57653,7 @@ export interface CompositeSpec1 {
         neutralize: boolean;
       }
     | {
-        anchor_leg_id: Id241;
+        anchor_leg_id: Id244;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -57960,7 +57699,7 @@ export interface CompositeSpec1 {
  * via the `definition` "CompositeState".
  */
 export interface CompositeState1 {
-  effective_date: Date141;
+  effective_date: Date142;
   /**
    * Resolved top-level quantities in specification order.
    */
@@ -58043,22 +57782,6 @@ export interface ConversionSpec1 {
    * Conversion ratio (shares per bond). If not provided, derive from price.
    */
   ratio?: number | null;
-}
-/**
- * Optional monetary inputs for CMBS debt-service coverage metrics.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "CreditFactors".
- */
-export interface CreditFactors1 {
-  /**
-   * Annual debt service for CMBS collateral, when provided.
-   */
-  annual_debt_service?: Money6 | null;
-  /**
-   * Annual net operating income for CMBS collateral, when provided.
-   */
-  annual_noi?: Money6 | null;
 }
 /**
  * Credit parameters for CDS instruments
@@ -58518,11 +58241,6 @@ export interface FutureOptionTerms5 {
    * report DV01 without inferring economics from an exchange symbol.
    */
   underlying_price_change_per_bp?: number | null;
-  /**
-   * Annualized volatility. Decimal lognormal units for Black-76; futures-price
-   * points per square-root year for the normal model.
-   */
-  volatility: number;
 }
 /**
  * Explicit venue and premium-currency convention for FX delta reporting.
@@ -58746,44 +58464,6 @@ export interface Notional1 {
   initial: Money16;
 }
 /**
- * Behavioral overrides for prepayment, default, and recovery assumptions.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "Overrides".
- */
-export interface Overrides1 {
-  /**
-   * Override default with constant annual CDR.
-   */
-  cdr_annual?: number | null;
-  /**
-   * Override prepayment with constant annual CPR.
-   */
-  cpr_annual?: number | null;
-  /**
-   * Override prepayment with PSA multiplier.
-   */
-  psa_speed_multiplier?: number | null;
-  /**
-   * Override recovery lag (months).
-   */
-  recovery_lag_months?: number | null;
-  /**
-   * Override recovery with constant rate.
-   */
-  recovery_rate?: number | null;
-  /**
-   * Override the replacement-collateral purchase price during the
-   * reinvestment period, as a percent of par (`97.5` = 97.5); takes
-   * precedence over `ReinvestmentAssumptions::price_pct`.
-   */
-  reinvestment_price?: number | null;
-  /**
-   * Override default with SDA multiplier.
-   */
-  sda_speed_multiplier?: number | null;
-}
-/**
  * Complete waterfall specification.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -58854,6 +58534,85 @@ export interface ProtectionLegSpec2 {
    * Settlement delay in business days
    */
   settlement_delay: number;
+}
+/**
+ * Contract terms of a range accrual note, without identity or pricing overrides.
+ *
+ * [`RangeAccrual`] flattens these terms into its own payload, and
+ * [`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)
+ * nests them under `range_accrual`, so the callable note has exactly one
+ * `id`, one `attributes` map and one set of pricing overrides.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "RangeAccrualTerms".
+ */
+export interface RangeAccrualTerms1 {
+  accrual_start_date: Date128;
+  /**
+   * How to interpret the range bounds (default: Absolute)
+   */
+  bounds_type?: "absolute" | "relative_to_initial_spot";
+  /**
+   * Coupon rate earned when in range (must be >= 0)
+   */
+  coupon_rate: number;
+  day_count: DayCount58;
+  discount_curve_id: Id231;
+  /**
+   * Optional dividend-yield scalar ID
+   */
+  div_yield_id?: Id9 | null;
+  /**
+   * Lower bound of accrual range (interpretation depends on bounds_type)
+   */
+  lower_bound: number;
+  notional: Money91;
+  /**
+   * Observation dates for range checking (must be sorted ascending)
+   */
+  observation_dates: Date[];
+  /**
+   * Number of past observations that were in range (for mid-life valuations).
+   * If None, past observations are not included in the accrual calculation.
+   */
+  past_fixings_in_range?: number | null;
+  /**
+   * Optional payment date (defaults to last observation date)
+   */
+  payment_date?: Date | null;
+  /**
+   * Projection curve for a rate-linked range accrual.
+   */
+  projection_curve_id?: Id9 | null;
+  /**
+   * Optional quanto adjustment parameters. When provided, applies a drift
+   * correction for instruments whose payoff currency differs from the
+   * underlying asset currency.
+   */
+  quanto?: QuantoSpec | null;
+  /**
+   * Explicit rate index for rate-linked range accruals.
+   */
+  rate_index_id?: Id9 | null;
+  /**
+   * Contractual tenor of the observed reference rate.
+   */
+  reference_tenor?: Tenor2 | null;
+  spot_id: Id232;
+  /**
+   * Total number of past observations (for mid-life valuations).
+   * Must be provided if `past_fixings_in_range` is set.
+   */
+  total_past_observations?: number | null;
+  /**
+   * Underlying asset ticker symbol
+   */
+  underlying_ticker: string;
+  /**
+   * Upper bound of accrual range (must be > lower_bound)
+   */
+  upper_bound: number;
+  vol_surface_id: Id233;
 }
 /**
  * Criteria for reinvestment during revolving period
@@ -59189,7 +58948,7 @@ export interface XccySwapLeg2 {
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_00292b2cd9779815232f".
  */
-export interface MetricPricingOverrides77 {
+export interface MetricPricingOverrides78 {
   /**
    * Basis used for bond duration, convexity, and DV01-style risk metrics.
    */
@@ -59200,17 +58959,17 @@ export interface MetricPricingOverrides77 {
   breakeven_config?: DD962Ef8Db4Edf11Dc092 | null;
   bump_config?: D_1D0C1815F8Dd0715Bd12;
   /**
-   * MC seed scenario override for deterministic greek calculations.
-   *
-   * When computing greeks via finite differences, this allows specifying
-   * a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-   * seeds. If `None`, the pricer derives a stable default seed.
+   * Day basis for the per-day analytic option theta (`calendar_365` or
+   * `trading_252`). `None` uses calendar-day theta (annual theta / 365).
    */
-  mc_seed_scenario?: string | null;
+  theta_day_basis?: DD30540Ea90Ce7Eca3Dee | null;
   /**
-   * Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
+   * Theta / carry horizon over which time decay is measured (for example
+   * 1D, 1W, 1M, 3M; wire form `{"count": 1, "unit": "weeks"}`). Day and
+   * week tenors roll a fixed number of days, month and year tenors roll
+   * calendar months (EOM-aware). `None` uses one day.
    */
-  theta_period?: string | null;
+  theta_period?: D_7Dd9Bdea4C4382F447F9 | null;
   /**
    * Historical VaR / Expected Shortfall configuration override.
    */
@@ -59223,10 +58982,6 @@ export interface MetricPricingOverrides77 {
  * via the `definition` "d_10a2b628165f3f3e10e7".
  */
 export interface D_10A2B628165F3F3E10E7 {
-  /**
-   * Whether to use antithetic variates for variance reduction.
-   */
-  antithetic: boolean;
   /**
    * Barrier-crossing policy used for `BarrierType::FirstPassage`.
    *
@@ -59252,10 +59007,6 @@ export interface D_10A2B628165F3F3E10E7 {
    */
   cashflow_dfs?: [number, number][] | null;
   /**
-   * Default recovery rate used when no `dynamic_recovery` model is set.
-   */
-  default_recovery_rate: number;
-  /**
    * Optional dynamic (notional-dependent) recovery rate model.
    *
    * Recovery on default is evaluated pathwise as
@@ -59272,10 +59023,6 @@ export interface D_10A2B628165F3F3E10E7 {
   endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
   merton: DEe4323Acfdb49E4Fe15B;
   /**
-   * Number of Monte Carlo paths.
-   */
-  num_paths: number;
-  /**
    * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
    */
   pik_schedule:
@@ -59286,13 +59033,15 @@ export interface D_10A2B628165F3F3E10E7 {
         stepped: [number, D_7F97Be2823A694F2735D][];
       };
   /**
-   * RNG seed for reproducibility.
+   * Recovery on default as a decimal fraction in `[0, 1]`.
+   *
+   * `dynamic_recovery`, when set, takes precedence over this flat rate.
    */
-  seed: number;
+  recovery_rate: number;
   /**
    * Time steps per year for the simulation grid.
    */
-  time_steps_per_year: number;
+  steps_per_year: number;
   /**
    * Optional toggle exercise model for PIK/cash coupon decisions.
    * Active only for coupon dates where [`PikSchedule`] resolves to
@@ -59475,24 +59224,6 @@ export interface D_572Ad1Befb7D949146521 {
    */
   call_friction_cents?: number | null;
   /**
-   * Add one calendar day to *every* Act/360 premium accrual period.
-   *
-   * Used by the CDS option pricer to model the ISDA pre-Big-Bang
-   * option underlying convention (and matches QuantLib's
-   * `Actual360(true)` day-count). The Bloomberg CDSW convention only
-   * treats the *final* coupon period as inclusive of the maturity date,
-   * so this is not the default for production single-name CDS pricing.
-   */
-  cds_act360_include_last_day?: boolean;
-  /**
-   * Apply ISDA half-day accrual-on-default bias.
-   *
-   * Adds half a day of premium accrual in the default-accrual integral.
-   * Used by the CDS option pricer to model the Bloomberg CDSO underlying
-   * convention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).
-   */
-  cds_aod_half_day_bias?: boolean;
-  /**
    * Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit
    * lattice, annualised.
    *
@@ -59604,6 +59335,16 @@ export interface D_572Ad1Befb7D949146521 {
    */
   mc_paths?: number | null;
   /**
+   * Optional Monte Carlo seed label.
+   *
+   * Monte Carlo pricers derive their RNG seed as
+   * `derive_seed(instrument_id, label)`, so the same label always replays
+   * the same random streams for the same instrument. `None` seeds with the
+   * pricer's base label. Finite-difference Greeks set a fixed label on the
+   * repriced clone so base and bumped legs share common random numbers.
+   */
+  mc_seed_scenario?: string | null;
+  /**
    * Optional absolute target for the Monte Carlo confidence-interval
    * half-width in instrument currency.
    *
@@ -59616,8 +59357,10 @@ export interface D_572Ad1Befb7D949146521 {
   /**
    * Merton Monte Carlo configuration for structural credit PIK pricing.
    *
-   * When set (via flat JSON under `pricing_overrides.merton_mc_config` or the
-   * Rust builder), the `MertonMc` pricer in the registry uses this config.
+   * When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
+   * or via the Rust builder), the `MertonMc` pricer in the registry uses this
+   * model and grid; the path count, antithetic flag and seed label come from
+   * `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
    */
   merton_mc_config?: DBffef9E684Ff0C351C83 | null;
   /**
@@ -59708,7 +59451,7 @@ export interface RecoveryModelSpec2 {
  * Precedence (applied top-to-bottom inside `Bond::base_value`):
  *
  * 1. `quoted_dirty_price_currency` — currency units (bond native currency)
- * 2. `quoted_clean_price` — percentage of par
+ * 2. `quoted_clean_price_pct` — percentage of par
  * 3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)
  * 4. `quoted_ytw` — decimal yield-to-worst
  * 5. `quoted_z_spread` — decimal Z-spread
@@ -59723,12 +59466,18 @@ export interface RecoveryModelSpec2 {
  */
 export interface DB0A5Fc543381Da6A57221 {
   /**
-   * CDS par-spread quote in basis points (for CDS and CDS index pricers).
+   * CreditDefaultSwap clean par-spread quote in basis points.
+   *
+   * Used only by CreditDefaultSwap risk replay, where it replaces the
+   * matching contractual hazard-curve pillar. It does not drive PV, and no
+   * other instrument (CDSIndex included) reads it.
    */
   cds_quote_bp?: number | null;
   /**
    * Implied volatility (overrides vol surface). When set on surface-driven
-   * pricers, it is used as a flat σ across tenor and strike.
+   * pricers, it is used as a flat σ across tenor and strike. Options on
+   * futures read it as their only volatility input: decimal lognormal for
+   * Black-76, futures-price points per √year for the normal model.
    */
   implied_volatility?: number | null;
   /**
@@ -59736,9 +59485,11 @@ export interface DB0A5Fc543381Da6A57221 {
    */
   quoted_asw_market?: number | null;
   /**
-   * Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).
+   * Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).
+   *
+   * Inflation-linked bonds quote this per 100 of real (unindexed) face.
    */
-  quoted_clean_price?: number | null;
+  quoted_clean_price_pct?: number | null;
   /**
    * Quoted dirty price in the bond's currency units.
    */
@@ -59762,6 +59513,14 @@ export interface DB0A5Fc543381Da6A57221 {
    * Quoted OAS (option-adjusted spread) in decimal.
    */
   quoted_oas?: number | null;
+  /**
+   * Observed option premium: the total trade PV in the instrument currency
+   * (notional, contract multiplier and position included).
+   *
+   * This is the target every `ImpliedVol` calculator inverts; it does not
+   * drive PV and is not one of the mutually exclusive price-driving fields.
+   */
+  quoted_premium?: number | null;
   /**
    * Quoted yield-to-maturity in decimal (e.g., `0.055` = 5.5%).
    */
@@ -59810,10 +59569,6 @@ export interface DB0A5Fc543381Da6A57221 {
  */
 export interface D_10A2B628165F3F3E10E71 {
   /**
-   * Whether to use antithetic variates for variance reduction.
-   */
-  antithetic: boolean;
-  /**
    * Barrier-crossing policy used for `BarrierType::FirstPassage`.
    *
    * Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
@@ -59838,10 +59593,6 @@ export interface D_10A2B628165F3F3E10E71 {
    */
   cashflow_dfs?: [number, number][] | null;
   /**
-   * Default recovery rate used when no `dynamic_recovery` model is set.
-   */
-  default_recovery_rate: number;
-  /**
    * Optional dynamic (notional-dependent) recovery rate model.
    *
    * Recovery on default is evaluated pathwise as
@@ -59858,10 +59609,6 @@ export interface D_10A2B628165F3F3E10E71 {
   endogenous_hazard?: DCc8Ed166Abbb10Ad4451 | null;
   merton: DEe4323Acfdb49E4Fe15B;
   /**
-   * Number of Monte Carlo paths.
-   */
-  num_paths: number;
-  /**
    * PIK schedule controlling per-coupon cash/PIK/toggle behavior.
    */
   pik_schedule:
@@ -59872,13 +59619,15 @@ export interface D_10A2B628165F3F3E10E71 {
         stepped: [number, D_7F97Be2823A694F2735D][];
       };
   /**
-   * RNG seed for reproducibility.
+   * Recovery on default as a decimal fraction in `[0, 1]`.
+   *
+   * `dynamic_recovery`, when set, takes precedence over this flat rate.
    */
-  seed: number;
+  recovery_rate: number;
   /**
    * Time steps per year for the simulation grid.
    */
-  time_steps_per_year: number;
+  steps_per_year: number;
   /**
    * Optional toggle exercise model for PIK/cash coupon decisions.
    * Active only for coupon dates where [`PikSchedule`] resolves to
@@ -59892,13 +59641,9 @@ export interface D_10A2B628165F3F3E10E71 {
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_c08279a20372931820e0".
  */
-export interface InstrumentPricingOverrides77 {
+export interface InstrumentPricingOverrides78 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-  /**
-   * Term loan specific overrides.
-   */
-  term_loan?: D_8Fb25331316C6E4F3Fc7 | null;
 }
 /**
  * Cashflow default-model specification.
@@ -60033,7 +59778,7 @@ export interface DEe4323Acfdb49E4Fe15B1 {
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_f80c8a31d359e1cb5dd4".
  */
-export interface ScenarioPricingOverrides77 {
+export interface ScenarioPricingOverrides78 {
   /**
    * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
    *

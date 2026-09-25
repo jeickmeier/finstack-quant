@@ -1,6 +1,6 @@
 {
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-  "instrumentSha256": "4cfa2247f900a7c5dc4f21499ab4983b37b39cd1c7ae426e781a3c1ec63653f2",
+  "instrumentSha256": "a912d2942997206de0404ec2d5c3b91a75d612c17009578108b175774938913f",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
   "marketSha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474",
   "asOf": "2024-01-01",
@@ -29,8 +29,7 @@
                 {
                   "id": "COLLATERAL-1",
                   "asset_type": {
-                    "type": "high_yield_bond",
-                    "industry": null
+                    "type": "high_yield_bond"
                   },
                   "balance": {
                     "amount": "100000000",
@@ -150,22 +149,12 @@
             "market_conditions": {
               "refi_rate": 0.04
             },
-            "credit_factors": {},
             "deal_metadata": {
               "manager_id": null,
               "servicer_id": null,
               "master_servicer_id": null,
               "special_servicer_id": null,
               "trustee_id": null
-            },
-            "behavior_overrides": {
-              "cpr_annual": null,
-              "psa_speed_multiplier": null,
-              "cdr_annual": null,
-              "sda_speed_multiplier": null,
-              "recovery_rate": null,
-              "recovery_lag_months": null,
-              "reinvestment_price": null
             },
             "hedge_swaps": []
           }
@@ -290,8 +279,7 @@
                 {
                   "id": "COLLATERAL-1",
                   "asset_type": {
-                    "type": "high_yield_bond",
-                    "industry": null
+                    "type": "high_yield_bond"
                   },
                   "balance": {
                     "amount": "50000000",
@@ -411,22 +399,12 @@
             "market_conditions": {
               "refi_rate": 0.04
             },
-            "credit_factors": {},
             "deal_metadata": {
               "manager_id": null,
               "servicer_id": null,
               "master_servicer_id": null,
               "special_servicer_id": null,
               "trustee_id": null
-            },
-            "behavior_overrides": {
-              "cpr_annual": null,
-              "psa_speed_multiplier": null,
-              "cdr_annual": null,
-              "sda_speed_multiplier": null,
-              "recovery_rate": null,
-              "recovery_lag_months": null,
-              "reinvestment_price": null
             },
             "hedge_swaps": []
           }

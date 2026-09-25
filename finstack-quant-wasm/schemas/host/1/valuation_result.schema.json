@@ -1639,7 +1639,7 @@
           "description": "Net present value of the deal"
         },
         "num_paths": {
-          "description": "Number of scenario paths",
+          "description": "Number of simulated scenario paths (`2 × pricing_mode.num_paths` for\nantithetic Monte Carlo, prefixes × suffixes for Hybrid).",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -1715,17 +1715,17 @@
         },
         {
           "additionalProperties": false,
-          "description": "Monte Carlo pricing with specified number of paths.\n\nThe default, because it is the only mode that can price a deal at a\nrealistic horizon.",
+          "description": "Monte Carlo pricing with a specified number of independent estimators.\n\nThe default, because it is the only mode that can price a deal at a\nrealistic horizon.",
           "properties": {
             "monte_carlo": {
               "additionalProperties": false,
               "properties": {
                 "antithetic": {
-                  "description": "Use antithetic variates for variance reduction",
+                  "description": "Pair each estimator's path with its sign-flipped mirror.",
                   "type": "boolean"
                 },
                 "num_paths": {
-                  "description": "Number of simulation paths",
+                  "description": "Number of independent estimators. With `antithetic` each estimator\nsimulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`\nscenario paths.",
                   "format": "uint64",
                   "minimum": 0,
                   "type": "integer"
@@ -1750,8 +1750,8 @@
             "hybrid": {
               "additionalProperties": false,
               "properties": {
-                "mc_paths": {
-                  "description": "MC paths for tail",
+                "num_paths": {
+                  "description": "Monte Carlo continuation paths per tree prefix",
                   "format": "uint64",
                   "minimum": 0,
                   "type": "integer"
@@ -1765,7 +1765,7 @@
               },
               "required": [
                 "tree_periods",
-                "mc_paths"
+                "num_paths"
               ],
               "type": "object"
             }

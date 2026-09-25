@@ -87,16 +87,35 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig"
   },
   {
-    "path": "#/$defs/d_00292b2cd9779815232f/properties/mc_seed_scenario",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/mc_seed_scenario",
-    "default": null,
-    "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed."
+    "path": "#/$defs/d_00292b2cd9779815232f/properties/theta_day_basis",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/theta_day_basis",
+    "description": "Day basis for the per-day analytic option theta (`calendar_365` or\n`trading_252`). `None` uses calendar-day theta (annual theta / 365)."
+  },
+  {
+    "path": "#/$defs/d_00292b2cd9779815232f/properties/theta_day_basis/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/theta_day_basis/anyOf/0",
+    "ref": "#/$defs/ThetaDayBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/ThetaDayBasis"
+  },
+  {
+    "path": "#/$defs/d_00292b2cd9779815232f/properties/theta_day_basis/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/theta_day_basis/anyOf/1"
   },
   {
     "path": "#/$defs/d_00292b2cd9779815232f/properties/theta_period",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/theta_period",
     "default": null,
-    "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\")."
+    "description": "Theta / carry horizon over which time decay is measured (for example\n1D, 1W, 1M, 3M; wire form `{\"count\": 1, \"unit\": \"weeks\"}`). Day and\nweek tenors roll a fixed number of days, month and year tenors roll\ncalendar months (EOM-aware). `None` uses one day."
+  },
+  {
+    "path": "#/$defs/d_00292b2cd9779815232f/properties/theta_period/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/theta_period/anyOf/0",
+    "ref": "#/$defs/Tenor",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Tenor"
+  },
+  {
+    "path": "#/$defs/d_00292b2cd9779815232f/properties/theta_period/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/theta_period/anyOf/1"
   },
   {
     "path": "#/$defs/d_00292b2cd9779815232f/properties/var_config",
@@ -153,11 +172,6 @@ export default [
     "description": "Configuration for Monte Carlo PIK bond pricing."
   },
   {
-    "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/antithetic",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/antithetic",
-    "description": "Whether to use antithetic variates for variance reduction."
-  },
-  {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
     "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
@@ -199,12 +213,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/default_recovery_rate",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/default_recovery_rate",
-    "description": "Default recovery rate used when no `dynamic_recovery` model is set.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/dynamic_recovery",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/dynamic_recovery",
     "description": "Optional dynamic (notional-dependent) recovery rate model.\n\nRecovery on default is evaluated pathwise as\n`DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps\nthe result to `[0, base_recovery]`. The clamp introduces a small kink\nin recovery as a function of the accreted notional; paths far into\nthe clamped region all contribute the same (floored/capped) recovery.\nNo smoothed (e.g. logistic) recovery rule is applied."
@@ -242,13 +250,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonModel"
   },
   {
-    "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/num_paths",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/num_paths",
-    "description": "Number of Monte Carlo paths.",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/pik_schedule",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/pik_schedule",
     "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior.",
@@ -256,15 +257,14 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikSchedule"
   },
   {
-    "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/seed",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/seed",
-    "description": "RNG seed for reproducibility.",
-    "format": "uint64",
-    "minimum": 0
+    "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/recovery_rate",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/recovery_rate",
+    "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+    "format": "double"
   },
   {
-    "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/time_steps_per_year",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/time_steps_per_year",
+    "path": "#/$defs/d_10a2b628165f3f3e10e7/properties/steps_per_year",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcConfig/properties/steps_per_year",
     "description": "Time steps per year for the simulation grid.",
     "format": "uint",
     "minimum": 0
@@ -834,18 +834,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/cds_act360_include_last_day",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/cds_act360_include_last_day",
-    "default": false,
-    "description": "Add one calendar day to *every* Act/360 premium accrual period.\n\nUsed by the CDS option pricer to model the ISDA pre-Big-Bang\noption underlying convention (and matches QuantLib's\n`Actual360(true)` day-count). The Bloomberg CDSW convention only\ntreats the *final* coupon period as inclusive of the maturity date,\nso this is not the default for production single-name CDS pricing."
-  },
-  {
-    "path": "#/$defs/d_572ad1befb7d94914652/properties/cds_aod_half_day_bias",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/cds_aod_half_day_bias",
-    "default": false,
-    "description": "Apply ISDA half-day accrual-on-default bias.\n\nAdds half a day of premium accrual in the default-accrual integral.\nUsed by the CDS option pricer to model the Bloomberg CDSO underlying\nconvention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`)."
-  },
-  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/hazard_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/hazard_mean_reversion",
     "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",
@@ -903,6 +891,11 @@ export default [
     "minimum": 0
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/mc_seed_scenario",
+    "description": "Optional Monte Carlo seed label.\n\nMonte Carlo pricers derive their RNG seed as\n`derive_seed(instrument_id, label)`, so the same label always replays\nthe same random streams for the same instrument. `None` seeds with the\npricer's base label. Finite-difference Greeks set a fixed label on the\nrepriced clone so base and bumped legs share common random numbers."
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/mc_target_ci_half_width",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/mc_target_ci_half_width",
     "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
@@ -911,7 +904,7 @@ export default [
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/merton_mc_config",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/merton_mc_config",
-    "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (via flat JSON under `pricing_overrides.merton_mc_config` or the\nRust builder), the `MertonMc` pricer in the registry uses this config."
+    "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
   },
   {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/merton_mc_config/anyOf/0",
@@ -1159,6 +1152,25 @@ export default [
     "description": "Down-and-in: activated when spot touches or falls below the barrier."
   },
   {
+    "path": "#/$defs/d_7dd9bdea4c4382f447f9",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Tenor",
+    "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```"
+  },
+  {
+    "path": "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Tenor/properties/count",
+    "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_7dd9bdea4c4382f447f9/properties/unit",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Tenor/properties/unit",
+    "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years.",
+    "ref": "#/$defs/TenorUnit",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit"
+  },
+  {
     "path": "#/$defs/d_7e19cc4df9954b864180",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/OpenUnitIntervalF64Wire",
     "description": "Finite JSON number in the open interval `(0, 1)`.",
@@ -1262,87 +1274,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json#/$defs/OptionType/oneOf/1",
     "const": "put",
     "description": "Put option."
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides",
-    "description": "Term loan specific overrides for covenants and schedule adjustments."
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/draw_stop_date",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/draw_stop_date",
-    "default": null,
-    "description": "Draw stop date (earliest date after which draws are blocked)"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/draw_stop_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/draw_stop_date/anyOf/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/draw_stop_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/draw_stop_date/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/extra_cash_sweeps",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps",
-    "description": "Extra cash sweeps by date"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/extra_cash_sweeps/items",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps/items"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/extra_cash_sweeps/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps/items/prefixItems/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/extra_cash_sweeps/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps/items/prefixItems/1",
-    "ref": "#/$defs/Money",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Money"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date",
-    "description": "Additional margin step-ups by date (bp)"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date/items",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date/items"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date/items/prefixItems/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/margin_add_bp_by_date/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date/items/prefixItems/1",
-    "format": "int32"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/pik_toggle_by_date",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date",
-    "description": "Force PIK toggles by date"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/pik_toggle_by_date/items",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date/items"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/pik_toggle_by_date/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date/items/prefixItems/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_8fb25331316c6e4f3fc7/properties/pik_toggle_by_date/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date/items/prefixItems/1"
   },
   {
     "path": "#/$defs/d_94cb251104de5cf587b6",
@@ -2468,7 +2399,7 @@ export default [
   {
     "path": "#/$defs/d_9f54e6f1a3c511f443a0/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json#/$defs/FxBarrierOption/properties/instrument_pricing_overrides",
-    "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs.",
+    "description": "Instrument-owned pricing inputs.",
     "ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
@@ -2619,18 +2550,18 @@ export default [
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides",
-    "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)"
+    "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)"
   },
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/implied_volatility",
-    "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
+    "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike. Options on\nfutures read it as their only volatility input: decimal lognormal for\nBlack-76, futures-price points per √year for the normal model.",
     "format": "double"
   },
   {
@@ -2640,9 +2571,9 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_clean_price",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_clean_price",
-    "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
+    "path": "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_clean_price_pct",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_clean_price_pct",
+    "description": "Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).\n\nInflation-linked bonds quote this per 100 of real (unindexed) face.",
     "format": "double"
   },
   {
@@ -2673,6 +2604,12 @@ export default [
     "path": "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_oas",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_oas",
     "description": "Quoted OAS (option-adjusted spread) in decimal.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_premium",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_premium",
+    "description": "Observed option premium: the total trade PV in the instrument currency\n(notional, contract multiplier and position included).\n\nThis is the target every `ImpliedVol` calculator inverts; it does not\ndrive PV and is not one of the mutually exclusive price-driving fields.",
     "format": "double"
   },
   {
@@ -4758,21 +4695,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig"
   },
   {
-    "path": "#/$defs/d_c08279a20372931820e0/properties/term_loan",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/properties/term_loan",
-    "description": "Term loan specific overrides."
-  },
-  {
-    "path": "#/$defs/d_c08279a20372931820e0/properties/term_loan/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/properties/term_loan/anyOf/0",
-    "ref": "#/$defs/TermLoanOverrides",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/TermLoanOverrides"
-  },
-  {
-    "path": "#/$defs/d_c08279a20372931820e0/properties/term_loan/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/properties/term_loan/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_c243aa9b92b503a0bae7",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json#/$defs/fx_barrier_option"
   },
@@ -4786,12 +4708,6 @@ export default [
     "path": "#/$defs/d_c243aa9b92b503a0bae7/properties/type",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json#/$defs/fx_barrier_option/properties/type",
     "const": "fx_barrier_option"
-  },
-  {
-    "path": "#/$defs/d_c472bf7871f904b44979",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DateWire",
-    "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-    "format": "date"
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",
@@ -4841,6 +4757,23 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_d30540ea90ce7eca3dee",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/ThetaDayBasis",
+    "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`."
+  },
+  {
+    "path": "#/$defs/d_d30540ea90ce7eca3dee/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/ThetaDayBasis/oneOf/0",
+    "const": "calendar_365",
+    "description": "Calendar-day theta: annual theta divided by\n[`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365)."
+  },
+  {
+    "path": "#/$defs/d_d30540ea90ce7eca3dee/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/ThetaDayBasis/oneOf/1",
+    "const": "trading_252",
+    "description": "Trading-day theta: annual theta divided by\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252)."
+  },
+  {
     "path": "#/$defs/d_d4ba69c121b73ac48a10",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/BarrierCrossing",
     "description": "Barrier-crossing detection policy for first-passage default simulation.\n\n`Discrete` only checks the barrier at grid points (fast but biased for\ncoarse time steps). `BrownianBridge` uses a Brownian-bridge crossing\nprobability between grid points to approximate continuous monitoring."
@@ -4880,13 +4813,13 @@ export default [
   {
     "path": "#/$defs/d_d760eef55c5bd7d5b1f6/properties/low_paths",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcCalibrationSpec/properties/low_paths",
-    "description": "Number of MC paths used during calibration iterations (low paths).",
+    "description": "Number of independent MC estimators used during calibration iterations (low paths).",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_d760eef55c5bd7d5b1f6/properties/max_iter",
-    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcCalibrationSpec/properties/max_iter",
+    "path": "#/$defs/d_d760eef55c5bd7d5b1f6/properties/max_iterations",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcCalibrationSpec/properties/max_iterations",
     "description": "Maximum bisection iterations.",
     "format": "uint",
     "minimum": 0
@@ -5989,6 +5922,35 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_barrier_option.schema.json#/$defs/InstrumentSchema",
     "const": "finstack_quant.instrument/1",
     "description": "Canonical schema marker for persisted instrument envelopes."
+  },
+  {
+    "path": "#/$defs/d_ec4e993309e09fe83294",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit",
+    "description": "Unit of a tenor period."
+  },
+  {
+    "path": "#/$defs/d_ec4e993309e09fe83294/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/0",
+    "const": "days",
+    "description": "Days (D)"
+  },
+  {
+    "path": "#/$defs/d_ec4e993309e09fe83294/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/1",
+    "const": "weeks",
+    "description": "Weeks (W)"
+  },
+  {
+    "path": "#/$defs/d_ec4e993309e09fe83294/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/2",
+    "const": "months",
+    "description": "Months (M)"
+  },
+  {
+    "path": "#/$defs/d_ec4e993309e09fe83294/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/TenorUnit/oneOf/3",
+    "const": "years",
+    "description": "Years (Y)"
   },
   {
     "path": "#/$defs/d_ec89adc17436f33de839",

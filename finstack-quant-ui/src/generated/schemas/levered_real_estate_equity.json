@@ -98,21 +98,28 @@
           "$ref": "#/$defs/d_1d0c1815f8dd0715bd12",
           "description": "Bump sizes for finite-difference sensitivities."
         },
-        "mc_seed_scenario": {
-          "default": null,
-          "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "theta_day_basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_d30540ea90ce7eca3dee"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Day basis for the per-day analytic option theta (`calendar_365` or\n`trading_252`). `None` uses calendar-day theta (annual theta / 365)."
         },
         "theta_period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_7dd9bdea4c4382f447f9"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Theta / carry horizon over which time decay is measured (for example\n1D, 1W, 1M, 3M; wire form `{\"count\": 1, \"unit\": \"weeks\"}`). Day and\nweek tenors roll a fixed number of days, month and year tenors roll\ncalendar months (EOM-aware). `None` uses one day."
         },
         "var_config": {
           "anyOf": [
@@ -271,10 +278,6 @@
       "additionalProperties": false,
       "description": "Configuration for Monte Carlo PIK bond pricing.",
       "properties": {
-        "antithetic": {
-          "description": "Whether to use antithetic variates for variance reduction.",
-          "type": "boolean"
-        },
         "barrier_crossing": {
           "$ref": "#/$defs/d_d4ba69c121b73ac48a10",
           "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
@@ -312,11 +315,6 @@
             "null"
           ]
         },
-        "default_recovery_rate": {
-          "description": "Default recovery rate used when no `dynamic_recovery` model is set.",
-          "format": "double",
-          "type": "number"
-        },
         "dynamic_recovery": {
           "anyOf": [
             {
@@ -343,23 +341,16 @@
           "$ref": "#/$defs/d_ee4323acfdb49e4fe15b",
           "description": "Merton structural credit model."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
         "pik_schedule": {
           "$ref": "#/$defs/d_10afa2c48803544dc415",
           "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior."
         },
-        "seed": {
-          "description": "RNG seed for reproducibility.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+        "recovery_rate": {
+          "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+          "format": "double",
+          "type": "number"
         },
-        "time_steps_per_year": {
+        "steps_per_year": {
           "description": "Time steps per year for the simulation grid.",
           "format": "uint",
           "minimum": 0,
@@ -380,12 +371,9 @@
       "required": [
         "merton",
         "pik_schedule",
-        "num_paths",
-        "seed",
-        "antithetic",
-        "time_steps_per_year",
+        "steps_per_year",
         "barrier_crossing",
-        "default_recovery_rate"
+        "recovery_rate"
       ],
       "type": "object"
     },
@@ -714,26 +702,6 @@
           ]
         }
       },
-      "type": "object"
-    },
-    "d_1d8890dba33cb08e3fe4": {
-      "additionalProperties": false,
-      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration. A\nnegative `delta_bp` steps the margin down (a leverage-grid improvement).",
-      "properties": {
-        "date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Effective date of margin increase"
-        },
-        "delta_bp": {
-          "description": "Increase in margin (basis points)",
-          "format": "int32",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "date",
-        "delta_bp"
-      ],
       "type": "object"
     },
     "d_22a38114f81489d9874e": {
@@ -1363,6 +1331,26 @@
         }
       ]
     },
+    "d_422736a194bc02f6a66f": {
+      "additionalProperties": false,
+      "description": "Dated margin step (covenant penalty, scheduled change or pricing-grid move).\n\nShifts the interest margin by `delta_bp` from `date` onward (effective-from\ndate). Steps are cumulative. A negative `delta_bp` steps the margin down (a\nleverage-grid improvement); term loans accept only non-negative steps.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Effective-from date of the margin change."
+        },
+        "delta_bp": {
+          "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "date",
+        "delta_bp"
+      ],
+      "type": "object"
+    },
     "d_425b73bda1263db8102f": {
       "additionalProperties": false,
       "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```\nuse finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```",
@@ -1505,15 +1493,14 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Discount curve identifier, used for risk attribution only.\n\nDCF valuation always discounts at [`discount_rate`](Self::discount_rate)\nregardless of whether this curve is loaded. Property discount-rate\nsensitivity is exposed as `real_estate::discount_rate01`.\nAttributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "noi_schedule": {
           "description": "Net operating income schedule (date, amount).",
@@ -1584,7 +1571,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "stabilized_noi": {
           "default": null,
@@ -1766,7 +1753,7 @@
     },
     "d_488d578b2ebcb4b2fc06": {
       "additionalProperties": false,
-      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
       "properties": {
         "amount": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -1925,7 +1912,7 @@
     },
     "d_567a05766e75c7a74f60": {
       "additionalProperties": false,
-      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
+      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_steps: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
       "properties": {
         "availability_end": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -1944,8 +1931,8 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Total commitment limit available for draws"
         },
-        "commitment_step_downs": {
-          "description": "Commitment step-down schedule: strictly increasing dates inside the\navailability window, non-increasing `amount`s in the loan currency,\nand `fee_bp == 0.0` (term loans carry no reduction fee).",
+        "commitment_steps": {
+          "description": "Commitment steps, each effective from its date: strictly increasing\ndates inside the availability window, non-increasing `amount`s in the\nloan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).",
           "items": {
             "$ref": "#/$defs/d_488d578b2ebcb4b2fc06"
           },
@@ -1984,7 +1971,7 @@
         "availability_start",
         "availability_end",
         "draws",
-        "commitment_step_downs",
+        "commitment_steps",
         "usage_fee_bp",
         "commitment_fee_bp",
         "fee_base"
@@ -2022,16 +2009,6 @@
             "number",
             "null"
           ]
-        },
-        "cds_act360_include_last_day": {
-          "default": false,
-          "description": "Add one calendar day to *every* Act/360 premium accrual period.\n\nUsed by the CDS option pricer to model the ISDA pre-Big-Bang\noption underlying convention (and matches QuantLib's\n`Actual360(true)` day-count). The Bloomberg CDSW convention only\ntreats the *final* coupon period as inclusive of the maturity date,\nso this is not the default for production single-name CDS pricing.",
-          "type": "boolean"
-        },
-        "cds_aod_half_day_bias": {
-          "default": false,
-          "description": "Apply ISDA half-day accrual-on-default bias.\n\nAdds half a day of premium accrual in the default-accrual integral.\nUsed by the CDS option pricer to model the Bloomberg CDSO underlying\nconvention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).",
-          "type": "boolean"
         },
         "hazard_mean_reversion": {
           "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",
@@ -2100,6 +2077,13 @@
             "null"
           ]
         },
+        "mc_seed_scenario": {
+          "description": "Optional Monte Carlo seed label.\n\nMonte Carlo pricers derive their RNG seed as\n`derive_seed(instrument_id, label)`, so the same label always replays\nthe same random streams for the same instrument. `None` seeds with the\npricer's base label. Finite-difference Greeks set a fixed label on the\nrepriced clone so base and bumped legs share common random numbers.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "mc_target_ci_half_width": {
           "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
           "format": "double",
@@ -2117,7 +2101,7 @@
               "type": "null"
             }
           ],
-          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (via flat JSON under `pricing_overrides.merton_mc_config` or the\nRust builder), the `MertonMc` pricer in the registry uses this config."
+          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
         },
         "oas_price_basis": {
           "$ref": "#/$defs/d_af1cbfbbe87bff81e3b3",
@@ -2393,7 +2377,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -2628,15 +2612,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -3106,6 +3090,27 @@
       ],
       "type": "object"
     },
+    "d_7dd9bdea4c4382f447f9": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/d_ec4e993309e09fe83294",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
     "d_7e19cc4df9954b864180": {
       "description": "Finite JSON number in the open interval `(0, 1)`.",
       "exclusiveMaximum": 1,
@@ -3245,10 +3250,10 @@
           },
           "type": "array"
         },
-        "margin_stepups": {
-          "description": "Margin step-up schedule",
+        "margin_steps": {
+          "description": "Margin steps, each a non-negative cumulative bp change effective from\nthe start of the first interest period on or after its date.",
           "items": {
-            "$ref": "#/$defs/d_1d8890dba33cb08e3fe4"
+            "$ref": "#/$defs/d_422736a194bc02f6a66f"
           },
           "type": "array"
         },
@@ -3261,7 +3266,7 @@
         }
       },
       "required": [
-        "margin_stepups",
+        "margin_steps",
         "pik_toggles",
         "cash_sweeps",
         "draw_stop_dates"
@@ -3368,82 +3373,6 @@
           "type": "string"
         }
       ]
-    },
-    "d_8fb25331316c6e4f3fc7": {
-      "additionalProperties": false,
-      "description": "Term loan specific overrides for covenants and schedule adjustments.",
-      "properties": {
-        "draw_stop_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_c472bf7871f904b44979"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Draw stop date (earliest date after which draws are blocked)"
-        },
-        "extra_cash_sweeps": {
-          "description": "Extra cash sweeps by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "$ref": "#/$defs/d_1a6c2ccee66d90a3a469"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "margin_add_bp_by_date": {
-          "description": "Additional margin step-ups by date (bp)",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "format": "int32",
-                "type": "integer"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "pik_toggle_by_date": {
-          "description": "Force PIK toggles by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "type": "boolean"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "margin_add_bp_by_date",
-        "pik_toggle_by_date",
-        "extra_cash_sweeps"
-      ],
-      "type": "object"
     },
     "d_9028c5ae285d759c7873": {
       "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    index_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bp spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: Default::default(),\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
@@ -4734,10 +4663,10 @@
     },
     "d_b0a5fc543381da6a5722": {
       "additionalProperties": false,
-      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
+      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
       "properties": {
         "cds_quote_bp": {
-          "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).",
+          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
           "format": "double",
           "type": [
             "number",
@@ -4745,7 +4674,7 @@
           ]
         },
         "implied_volatility": {
-          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
+          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike. Options on\nfutures read it as their only volatility input: decimal lognormal for\nBlack-76, futures-price points per √year for the normal model.",
           "format": "double",
           "type": [
             "number",
@@ -4760,8 +4689,8 @@
             "null"
           ]
         },
-        "quoted_clean_price": {
-          "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
+        "quoted_clean_price_pct": {
+          "description": "Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).\n\nInflation-linked bonds quote this per 100 of real (unindexed) face.",
           "format": "double",
           "type": [
             "number",
@@ -4802,6 +4731,14 @@
         },
         "quoted_oas": {
           "description": "Quoted OAS (option-adjusted spread) in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_premium": {
+          "description": "Observed option premium: the total trade PV in the instrument currency\n(notional, contract multiplier and position included).\n\nThis is the target every `ImpliedVol` calculator inverts; it does not\ndrive PV and is not one of the mutually exclusive price-driving fields.",
           "format": "double",
           "type": [
             "number",
@@ -4941,7 +4878,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -7155,17 +7092,6 @@
           "minimum": 0,
           "type": "integer"
         },
-        "forward_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional forward curve identifier for projected floating or asset-swap legs."
-        },
         "funding_curve_id": {
           "anyOf": [
             {
@@ -7262,13 +7188,13 @@
         },
         "commitment_amount": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_schedule`."
+          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`."
         },
         "commitment_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Date when the facility becomes available."
         },
-        "commitment_schedule": {
+        "commitment_steps": {
           "default": [],
           "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
           "items": {
@@ -7318,7 +7244,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lc": {
           "anyOf": [
@@ -7342,7 +7268,7 @@
           "default": [],
           "description": "Dated margin changes, cumulative from their dates: a leverage or\nratings grid the analyst has forecast, a scheduled step-up or a\ndefault-rate margin. `delta_bp` shifts the floating spread or the fixed\nrate. Dates must be strictly increasing and strictly inside the\nfacility life. Empty by default.",
           "items": {
-            "$ref": "#/$defs/d_1d8890dba33cb08e3fe4"
+            "$ref": "#/$defs/d_422736a194bc02f6a66f"
           },
           "type": "array"
         },
@@ -7516,17 +7442,6 @@
         "model_config": {
           "$ref": "#/$defs/d_572ad1befb7d94914652",
           "description": "Model selection and tree pricing parameters."
-        },
-        "term_loan": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_8fb25331316c6e4f3fc7"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Term loan specific overrides."
         }
       },
       "title": "Instrument Pricing Overrides",
@@ -7636,11 +7551,6 @@
         "calendar_id"
       ],
       "type": "object"
-    },
-    "d_c472bf7871f904b44979": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
     },
     "d_c4af4662fb83082e864a": {
       "additionalProperties": false,
@@ -7934,6 +7844,21 @@
       ],
       "type": "object"
     },
+    "d_d30540ea90ce7eca3dee": {
+      "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.",
+      "oneOf": [
+        {
+          "const": "calendar_365",
+          "description": "Calendar-day theta: annual theta divided by\n[`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365).",
+          "type": "string"
+        },
+        {
+          "const": "trading_252",
+          "description": "Trading-day theta: annual theta divided by\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
+          "type": "string"
+        }
+      ]
+    },
     "d_d4ba69c121b73ac48a10": {
       "description": "Barrier-crossing detection policy for first-passage default simulation.\n\n`Discrete` only checks the barrier at grid points (fast but biased for\ncoarse time steps). `BrownianBridge` uses a Brownian-bridge crossing\nprobability between grid points to approximate continuous monitoring.",
       "oneOf": [
@@ -7973,12 +7898,12 @@
           ]
         },
         "low_paths": {
-          "description": "Number of MC paths used during calibration iterations (low paths).",
+          "description": "Number of independent MC estimators used during calibration iterations (low paths).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
-        "max_iter": {
+        "max_iterations": {
           "description": "Maximum bisection iterations.",
           "format": "uint",
           "minimum": 0,
@@ -8011,7 +7936,7 @@
         "target",
         "parameter",
         "low_paths",
-        "max_iter",
+        "max_iterations",
         "tolerance_pv"
       ],
       "type": "object"
@@ -8117,13 +8042,8 @@
     },
     "d_db361df79c3ba201a17a": {
       "additionalProperties": false,
-      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process and simulation parameters for\nMonte Carlo pricing with uncertain draw/repayment patterns. Credit risk is\nincorporated via hazard-rate survival weighting (no explicit default events).",
+      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process for Monte Carlo pricing with uncertain\ndraw/repayment patterns. Credit risk is incorporated via hazard-rate\nsurvival weighting (no explicit default events). The estimator count,\nantithetic flag and seed label are pricing settings, read from\n`instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,\n`mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`].",
       "properties": {
-        "antithetic": {
-          "default": false,
-          "description": "Use antithetic variance reduction when simulating paths (default: false).\nMutually exclusive with `use_sobol_qmc`; validation rejects the combination.",
-          "type": "boolean"
-        },
         "mc_config": {
           "anyOf": [
             {
@@ -8135,24 +8055,9 @@
           ],
           "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths to simulate.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "seed": {
-          "description": "Random seed for reproducibility. Simulation is always deterministic:\n`None` falls back to a fixed default seed (42). Because the seed is\nfixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same\nrandom variates for base and bumped valuations — common random\nnumbers — so finite-difference Greeks are free of Monte Carlo noise.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "use_sobol_qmc": {
           "default": false,
-          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `antithetic`; validation rejects the combination.",
+          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination.",
           "type": "boolean"
         },
         "utilization_process": {
@@ -8161,8 +8066,7 @@
         }
       },
       "required": [
-        "utilization_process",
-        "num_paths"
+        "utilization_process"
       ],
       "type": "object"
     },
@@ -9145,6 +9049,31 @@
       "const": "finstack_quant.instrument/1",
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
+    },
+    "d_ec4e993309e09fe83294": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
     },
     "d_ec89adc17436f33de839": {
       "description": "Volatility model for option pricing.",

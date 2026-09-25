@@ -359,9 +359,6 @@
     "CreditDefaultSwap": {
       "$ref": "#/$defs/CreditDefaultSwap"
     },
-    "CreditFactors": {
-      "$ref": "#/$defs/CreditFactors"
-    },
     "CreditParams": {
       "$ref": "#/$defs/CreditParams"
     },
@@ -725,8 +722,8 @@
     "MarginCallTiming": {
       "$ref": "#/$defs/MarginCallTiming"
     },
-    "MarginStepUp": {
-      "$ref": "#/$defs/MarginStepUp"
+    "MarginStep": {
+      "$ref": "#/$defs/MarginStep"
     },
     "MarginTenor": {
       "$ref": "#/$defs/MarginTenor"
@@ -793,9 +790,6 @@
     },
     "OvernightSpreadCompounding": {
       "$ref": "#/$defs/OvernightSpreadCompounding"
-    },
-    "Overrides": {
-      "$ref": "#/$defs/Overrides"
     },
     "PacCollar": {
       "$ref": "#/$defs/PacCollar"
@@ -874,6 +868,9 @@
     },
     "RangeAccrual": {
       "$ref": "#/$defs/RangeAccrual"
+    },
+    "RangeAccrualTerms": {
+      "$ref": "#/$defs/RangeAccrualTerms"
     },
     "RateAveragingMethod": {
       "$ref": "#/$defs/RateAveragingMethod"
@@ -1081,9 +1078,6 @@
     },
     "TerminalValueSpec": {
       "$ref": "#/$defs/TerminalValueSpec"
-    },
-    "ThetaDayBasis": {
-      "$ref": "#/$defs/ThetaDayBasis"
     },
     "TouchType": {
       "$ref": "#/$defs/TouchType"
@@ -1348,7 +1342,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -1384,7 +1378,7 @@
     },
     "AgencyMbsPassthrough": {
       "additionalProperties": false,
-      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_model(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
+      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
       "properties": {
         "agency": {
           "$ref": "#/$defs/AgencyProgram",
@@ -1424,7 +1418,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (including quoted price for OAS).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -1476,7 +1470,7 @@
           "default": "generic",
           "description": "Pool type (generic or specified)."
         },
-        "prepayment_model": {
+        "prepayment_spec": {
           "$ref": "#/$defs/d_a1f0b2382a0ae4ef0e72",
           "description": "Prepayment model specification."
         },
@@ -1514,7 +1508,7 @@
         "wam",
         "issue_date",
         "maturity",
-        "prepayment_model",
+        "prepayment_spec",
         "discount_curve_id",
         "day_count"
       ],
@@ -1584,7 +1578,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -1602,7 +1596,7 @@
             "null"
           ]
         },
-        "prepayment_model": {
+        "prepayment_spec": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_a1f0b2382a0ae4ef0e72"
@@ -1961,11 +1955,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -1996,7 +1990,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -2158,8 +2152,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "default": {},
-          "description": "Instrument-level pricing overrides."
+          "description": "Instrument-owned pricing inputs."
         },
         "liquidation_price_pct": {
           "description": "Price the collateral realizes when the term-out ends and the\nremaining collateral is liquidated to repay the facility, as a percent\nof par (`None` = par).",
@@ -2180,11 +2173,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "default": {
-            "mc_seed_scenario": null,
-            "theta_period": null
-          },
-          "description": "Metric-level pricing overrides."
+          "description": "Metric-time pricing configuration."
         },
         "payment_calendar_id": {
           "description": "Holiday calendar for the payment schedule (e.g. `\"nyse\"`); required\nfor pricing.",
@@ -2220,8 +2209,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "default": {},
-          "description": "Scenario-level pricing overrides."
+          "description": "Scenario-only pricing adjustments."
         },
         "stochastic_default_spec": {
           "anyOf": [
@@ -2426,13 +2414,6 @@
           "additionalProperties": false,
           "description": "First lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "first_lien_loan",
               "type": "string"
@@ -2447,13 +2428,6 @@
           "additionalProperties": false,
           "description": "Second lien corporate loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "second_lien_loan",
               "type": "string"
@@ -2468,13 +2442,6 @@
           "additionalProperties": false,
           "description": "Revolving credit facility",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "revolver_loan",
               "type": "string"
@@ -2489,13 +2456,6 @@
           "additionalProperties": false,
           "description": "Bridge loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "bridge_loan",
               "type": "string"
@@ -2510,13 +2470,6 @@
           "additionalProperties": false,
           "description": "Mezzanine loan",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "mezzanine_loan",
               "type": "string"
@@ -2531,13 +2484,6 @@
           "additionalProperties": false,
           "description": "High yield bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "high_yield_bond",
               "type": "string"
@@ -2552,13 +2498,6 @@
           "additionalProperties": false,
           "description": "Investment grade bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "investment_grade_bond",
               "type": "string"
@@ -2573,13 +2512,6 @@
           "additionalProperties": false,
           "description": "Distressed bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "distressed_bond",
               "type": "string"
@@ -2594,13 +2526,6 @@
           "additionalProperties": false,
           "description": "Emerging markets bond",
           "properties": {
-            "industry": {
-              "description": "Industry.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "type": {
               "const": "emerging_markets_bond",
               "type": "string"
@@ -3123,7 +3048,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "memory_coupons": {
           "default": false,
@@ -3133,10 +3058,9 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -3187,7 +3111,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -3360,11 +3284,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "monitoring": {
           "$ref": "#/$defs/Monitoring",
@@ -3406,7 +3330,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -3533,7 +3457,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides for scenario analysis and model configuration.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -3677,11 +3601,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -3693,7 +3617,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -4093,17 +4017,6 @@
           "minimum": 0,
           "type": "integer"
         },
-        "forward_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional forward curve identifier for projected floating or asset-swap legs."
-        },
         "funding_curve_id": {
           "anyOf": [
             {
@@ -4376,15 +4289,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
         "range_accrual": {
-          "$ref": "#/$defs/RangeAccrual",
-          "description": "Underlying range accrual leg."
+          "$ref": "#/$defs/RangeAccrualTerms",
+          "description": "Range accrual contract terms (no identity, attributes or overrides of their own)."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -4635,7 +4548,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Additional attributes\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -5338,7 +5251,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing overrides (including upfront payment)."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -5353,7 +5266,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -5383,7 +5296,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "series": {
           "description": "Series number (e.g., 42)",
@@ -5510,7 +5423,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing overrides (including implied volatility)."
+          "description": "Instrument-owned pricing inputs."
         },
         "knockout": {
           "default": false,
@@ -5519,7 +5432,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -5549,7 +5462,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -5725,7 +5638,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing overrides."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -5733,7 +5646,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -5746,7 +5659,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "series": {
           "description": "Series number (e.g., 37)",
@@ -5803,7 +5716,7 @@
       "type": "object"
     },
     "CdsValuationConvention": {
-      "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nclean/dirty NPV, par-spread denominator). Mixing those choices via separate\nboolean overrides is intentionally not supported — the variants here are the\nonly conventions traded in practice.",
+      "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice.",
       "oneOf": [
         {
           "const": "isda_dirty",
@@ -5822,7 +5735,7 @@
         },
         {
           "const": "quant_lib_isda_parity",
-          "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, and full premium leg in\nthe par-spread denominator. Combine with the QuantLib day-count\npricing overrides (`cds_aod_half_day_bias`,\n`cds_act360_include_last_day`) for full bit-level reproduction.",
+          "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, full premium leg in\nthe par-spread denominator, QuantLib `Actual360(true)` accrual (every\nAct/360 premium period includes its end date) and the `IsdaCdsEngine`\n`HalfDayBias` accrual-on-default adjustment.",
           "type": "string"
         }
       ]
@@ -6094,7 +6007,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "local_cap": {
           "description": "Local cap on individual period returns",
@@ -6109,10 +6022,9 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -6156,7 +6068,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -6369,7 +6281,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -6504,7 +6416,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "long_cms_tenor": {
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
@@ -6722,7 +6634,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -7006,7 +6918,7 @@
     },
     "CommitmentStep": {
       "additionalProperties": false,
-      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
       "properties": {
         "amount": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -7084,7 +6996,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
@@ -7115,7 +7027,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "strike": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7269,7 +7181,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "multiplier": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7295,7 +7207,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -7377,7 +7289,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "price_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -7424,11 +7336,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -7588,7 +7500,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "multiplier": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7621,7 +7533,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -7725,7 +7637,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7737,7 +7649,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "strike": {
           "description": "Spread strike price K in the payoff max(S1 - S2 - K, 0).",
@@ -7832,7 +7744,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "quantity": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7859,7 +7771,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -7959,7 +7871,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/PositiveF64Wire",
@@ -7971,7 +7883,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "swap_end": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -8021,6 +7933,18 @@
       "additionalProperties": false,
       "description": "Priceable composite instrument containing an unresolved policy and immutable state.\n\nValuation and risk use `state` exactly as stored. Call [`Self::rebalance`]\nto obtain a distinct instrument; this type does not mutate in place.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};\n\nlet composite = CompositeInstrument::example()?;\nassert_eq!(composite.id(), \"COMPOSITE-EXAMPLE\");\nassert_eq!(composite.state.resolved_legs.len(), 2);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
+        "instrument_pricing_overrides": {
+          "$ref": "#/$defs/d_c08279a20372931820e0",
+          "description": "Instrument-owned pricing inputs.\n\nA composite has no pricing model of its own, so this must stay empty;\nset quotes and model inputs on each leg instead."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "#/$defs/d_00292b2cd9779815232f",
+          "description": "Metric-time pricing configuration.\n\nAlso applied to every leg as defaults: a leg's own setting wins, and\n`bump_config.adaptive_bumps` is enabled on a leg when either sets it."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "description": "Scenario-only pricing adjustments.\n\nApplied to the composite value after leg aggregation."
+        },
         "spec": {
           "$ref": "#/$defs/CompositeSpec",
           "description": "Economic definition and future rebalance policy."
@@ -8077,20 +8001,12 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Stable composite instrument identifier."
         },
-        "instrument_pricing_overrides": {
-          "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-level pricing inputs shared with the normal valuation lifecycle."
-        },
         "legs": {
           "description": "Self-contained underlying instrument definitions.",
           "items": {
             "$ref": "#/$defs/CompositeLegSpec"
           },
           "type": "array"
-        },
-        "metric_pricing_overrides": {
-          "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric bump and calculation controls."
         },
         "rebalance_rule": {
           "$ref": "#/$defs/RebalanceRule",
@@ -8099,10 +8015,6 @@
         "reporting_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "Currency in which value, P&L, additive risk, and capital are reported."
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only price adjustments applied to the composite after leg aggregation."
         },
         "weighting_method": {
           "$ref": "#/$defs/WeightingMethod",
@@ -8522,7 +8434,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -9049,7 +8961,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing overrides (including upfront payment)."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -9064,7 +8976,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -9091,7 +9003,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -9128,35 +9040,6 @@
         "premium",
         "protection"
       ],
-      "type": "object"
-    },
-    "CreditFactors": {
-      "additionalProperties": false,
-      "description": "Optional monetary inputs for CMBS debt-service coverage metrics.",
-      "properties": {
-        "annual_debt_service": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Annual debt service for CMBS collateral, when provided."
-        },
-        "annual_noi": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Annual net operating income for CMBS collateral, when provided."
-        }
-      },
       "type": "object"
     },
     "CreditParams": {
@@ -9496,21 +9379,28 @@
           "$ref": "#/$defs/d_1d0c1815f8dd0715bd12",
           "description": "Bump sizes for finite-difference sensitivities."
         },
-        "mc_seed_scenario": {
-          "default": null,
-          "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "theta_day_basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_d30540ea90ce7eca3dee"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Day basis for the per-day analytic option theta (`calendar_365` or\n`trading_252`). `None` uses calendar-day theta (annual theta / 365)."
         },
         "theta_period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_7dd9bdea4c4382f447f9"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Theta / carry horizon over which time decay is measured (for example\n1D, 1W, 1M, 3M; wire form `{\"count\": 1, \"unit\": \"weeks\"}`). Day and\nweek tenors roll a fixed number of days, month and year tenors roll\ncalendar months (EOM-aware). `None` uses one day."
         },
         "var_config": {
           "anyOf": [
@@ -9602,10 +9492,6 @@
       "additionalProperties": false,
       "description": "Configuration for Monte Carlo PIK bond pricing.",
       "properties": {
-        "antithetic": {
-          "description": "Whether to use antithetic variates for variance reduction.",
-          "type": "boolean"
-        },
         "barrier_crossing": {
           "$ref": "#/$defs/d_d4ba69c121b73ac48a10",
           "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
@@ -9643,11 +9529,6 @@
             "null"
           ]
         },
-        "default_recovery_rate": {
-          "description": "Default recovery rate used when no `dynamic_recovery` model is set.",
-          "format": "double",
-          "type": "number"
-        },
         "dynamic_recovery": {
           "anyOf": [
             {
@@ -9674,23 +9555,16 @@
           "$ref": "#/$defs/d_ee4323acfdb49e4fe15b",
           "description": "Merton structural credit model."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
         "pik_schedule": {
           "$ref": "#/$defs/d_10afa2c48803544dc415",
           "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior."
         },
-        "seed": {
-          "description": "RNG seed for reproducibility.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+        "recovery_rate": {
+          "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+          "format": "double",
+          "type": "number"
         },
-        "time_steps_per_year": {
+        "steps_per_year": {
           "description": "Time steps per year for the simulation grid.",
           "format": "uint",
           "minimum": 0,
@@ -9711,12 +9585,9 @@
       "required": [
         "merton",
         "pik_schedule",
-        "num_paths",
-        "seed",
-        "antithetic",
-        "time_steps_per_year",
+        "steps_per_year",
         "barrier_crossing",
-        "default_recovery_rate"
+        "recovery_rate"
       ],
       "type": "object"
     },
@@ -10588,16 +10459,6 @@
             "null"
           ]
         },
-        "cds_act360_include_last_day": {
-          "default": false,
-          "description": "Add one calendar day to *every* Act/360 premium accrual period.\n\nUsed by the CDS option pricer to model the ISDA pre-Big-Bang\noption underlying convention (and matches QuantLib's\n`Actual360(true)` day-count). The Bloomberg CDSW convention only\ntreats the *final* coupon period as inclusive of the maturity date,\nso this is not the default for production single-name CDS pricing.",
-          "type": "boolean"
-        },
-        "cds_aod_half_day_bias": {
-          "default": false,
-          "description": "Apply ISDA half-day accrual-on-default bias.\n\nAdds half a day of premium accrual in the default-accrual integral.\nUsed by the CDS option pricer to model the Bloomberg CDSO underlying\nconvention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).",
-          "type": "boolean"
-        },
         "hazard_mean_reversion": {
           "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",
           "format": "double",
@@ -10665,6 +10526,13 @@
             "null"
           ]
         },
+        "mc_seed_scenario": {
+          "description": "Optional Monte Carlo seed label.\n\nMonte Carlo pricers derive their RNG seed as\n`derive_seed(instrument_id, label)`, so the same label always replays\nthe same random streams for the same instrument. `None` seeds with the\npricer's base label. Finite-difference Greeks set a fixed label on the\nrepriced clone so base and bumped legs share common random numbers.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "mc_target_ci_half_width": {
           "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
           "format": "double",
@@ -10682,7 +10550,7 @@
               "type": "null"
             }
           ],
-          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (via flat JSON under `pricing_overrides.merton_mc_config` or the\nRust builder), the `MertonMc` pricer in the registry uses this config."
+          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
         },
         "oas_price_basis": {
           "$ref": "#/$defs/d_af1cbfbbe87bff81e3b3",
@@ -11166,6 +11034,27 @@
         }
       ]
     },
+    "d_7dd9bdea4c4382f447f9": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/d_ec4e993309e09fe83294",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
     "d_7e19cc4df9954b864180": {
       "description": "Finite JSON number in the open interval `(0, 1)`.",
       "exclusiveMaximum": 1,
@@ -11290,82 +11179,6 @@
           "type": "string"
         }
       ]
-    },
-    "d_8fb25331316c6e4f3fc7": {
-      "additionalProperties": false,
-      "description": "Term loan specific overrides for covenants and schedule adjustments.",
-      "properties": {
-        "draw_stop_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_c472bf7871f904b44979"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Draw stop date (earliest date after which draws are blocked)"
-        },
-        "extra_cash_sweeps": {
-          "description": "Extra cash sweeps by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "$ref": "#/$defs/d_1a6c2ccee66d90a3a469"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "margin_add_bp_by_date": {
-          "description": "Additional margin step-ups by date (bp)",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "format": "int32",
-                "type": "integer"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "pik_toggle_by_date": {
-          "description": "Force PIK toggles by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "type": "boolean"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "margin_add_bp_by_date",
-        "pik_toggle_by_date",
-        "extra_cash_sweeps"
-      ],
-      "type": "object"
     },
     "d_94cb251104de5cf587b6": {
       "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
@@ -12392,10 +12205,10 @@
     },
     "d_b0a5fc543381da6a5722": {
       "additionalProperties": false,
-      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
+      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
       "properties": {
         "cds_quote_bp": {
-          "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).",
+          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
           "format": "double",
           "type": [
             "number",
@@ -12403,7 +12216,7 @@
           ]
         },
         "implied_volatility": {
-          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
+          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike. Options on\nfutures read it as their only volatility input: decimal lognormal for\nBlack-76, futures-price points per √year for the normal model.",
           "format": "double",
           "type": [
             "number",
@@ -12418,8 +12231,8 @@
             "null"
           ]
         },
-        "quoted_clean_price": {
-          "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
+        "quoted_clean_price_pct": {
+          "description": "Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).\n\nInflation-linked bonds quote this per 100 of real (unindexed) face.",
           "format": "double",
           "type": [
             "number",
@@ -12460,6 +12273,14 @@
         },
         "quoted_oas": {
           "description": "Quoted OAS (option-adjusted spread) in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_premium": {
+          "description": "Observed option premium: the total trade PV in the instrument currency\n(notional, contract multiplier and position included).\n\nThis is the target every `ImpliedVol` calculator inverts; it does not\ndrive PV and is not one of the mutually exclusive price-driving fields.",
           "format": "double",
           "type": [
             "number",
@@ -14212,17 +14033,6 @@
         "model_config": {
           "$ref": "#/$defs/d_572ad1befb7d94914652",
           "description": "Model selection and tree pricing parameters."
-        },
-        "term_loan": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_8fb25331316c6e4f3fc7"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Term loan specific overrides."
         }
       },
       "title": "Instrument Pricing Overrides",
@@ -14262,11 +14072,6 @@
       ],
       "title": "DefaultModelSpec",
       "type": "object"
-    },
-    "d_c472bf7871f904b44979": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
     },
     "d_cc8ed166abbb10ad4451": {
       "additionalProperties": false,
@@ -14318,6 +14123,21 @@
       ],
       "type": "object"
     },
+    "d_d30540ea90ce7eca3dee": {
+      "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.",
+      "oneOf": [
+        {
+          "const": "calendar_365",
+          "description": "Calendar-day theta: annual theta divided by\n[`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365).",
+          "type": "string"
+        },
+        {
+          "const": "trading_252",
+          "description": "Trading-day theta: annual theta divided by\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
+          "type": "string"
+        }
+      ]
+    },
     "d_d4ba69c121b73ac48a10": {
       "description": "Barrier-crossing detection policy for first-passage default simulation.\n\n`Discrete` only checks the barrier at grid points (fast but biased for\ncoarse time steps). `BrownianBridge` uses a Brownian-bridge crossing\nprobability between grid points to approximate continuous monitoring.",
       "oneOf": [
@@ -14357,12 +14177,12 @@
           ]
         },
         "low_paths": {
-          "description": "Number of MC paths used during calibration iterations (low paths).",
+          "description": "Number of independent MC estimators used during calibration iterations (low paths).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
-        "max_iter": {
+        "max_iterations": {
           "description": "Maximum bisection iterations.",
           "format": "uint",
           "minimum": 0,
@@ -14395,7 +14215,7 @@
         "target",
         "parameter",
         "low_paths",
-        "max_iter",
+        "max_iterations",
         "tolerance_pv"
       ],
       "type": "object"
@@ -15278,6 +15098,31 @@
       },
       "type": "object"
     },
+    "d_ec4e993309e09fe83294": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    },
     "d_ec89adc17436f33de839": {
       "description": "Volatility model for option pricing.",
       "oneOf": [
@@ -15419,7 +15264,7 @@
     },
     "DdtlSpec": {
       "additionalProperties": false,
-      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
+      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_steps: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
       "properties": {
         "availability_end": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -15438,8 +15283,8 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Total commitment limit available for draws"
         },
-        "commitment_step_downs": {
-          "description": "Commitment step-down schedule: strictly increasing dates inside the\navailability window, non-increasing `amount`s in the loan currency,\nand `fee_bp == 0.0` (term loans carry no reduction fee).",
+        "commitment_steps": {
+          "description": "Commitment steps, each effective from its date: strictly increasing\ndates inside the availability window, non-increasing `amount`s in the\nloan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).",
           "items": {
             "$ref": "#/$defs/CommitmentStep"
           },
@@ -15478,7 +15323,7 @@
         "availability_start",
         "availability_end",
         "draws",
-        "commitment_step_downs",
+        "commitment_steps",
         "usage_fee_bp",
         "commitment_fee_bp",
         "fee_base"
@@ -15539,9 +15384,9 @@
           "format": "double",
           "type": "number"
         },
-        "trustee_fee_annual": {
+        "trustee_fee": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Annual trustee fee (fixed amount)"
+          "description": "Fixed trustee fee per annum; the waterfall divides it by the payment\nperiods per year."
         },
         "workout_fee_pct": {
           "description": "Special servicer workout fee as a percent of the principal and\ninterest collected on specially serviced loans (`1.0` = 1%), taken\noff the top of those collections; `None` for no workout fee.",
@@ -15553,7 +15398,7 @@
         }
       },
       "required": [
-        "trustee_fee_annual",
+        "trustee_fee",
         "senior_mgmt_fee_bp",
         "subordinated_mgmt_fee_bp",
         "servicing_fee_bp"
@@ -15870,7 +15715,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -16054,15 +15899,14 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Attributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "mid_year_convention": {
           "default": false,
@@ -16077,7 +15921,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "shares_outstanding": {
           "default": null,
@@ -16254,7 +16098,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -16264,7 +16108,7 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Trade notional (par amount)."
         },
-        "prepayment_model": {
+        "prepayment_spec": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_a1f0b2382a0ae4ef0e72"
@@ -16555,11 +16399,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "price_id": {
           "anyOf": [
@@ -16582,7 +16426,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "shares": {
           "description": "Optional number of shares (defaults to 1 if not specified)",
@@ -16713,7 +16557,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "quanto": {
           "anyOf": [
@@ -16772,11 +16616,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -16911,11 +16755,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -16927,7 +16771,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement": {
           "$ref": "#/$defs/SettlementType",
@@ -16942,11 +16786,6 @@
           "description": "Strike price",
           "format": "double",
           "type": "number"
-        },
-        "theta_day_basis": {
-          "$ref": "#/$defs/ThetaDayBasis",
-          "default": "calendar_365",
-          "description": "Basis used for the reported per-day theta.\n\nDefaults to calendar-day theta (`annual theta / 365`). Select\n`Trading252` explicitly for a trading-day risk convention."
         },
         "underlying_ticker": {
           "description": "Underlying equity ticker symbol",
@@ -17048,7 +16887,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -17143,7 +16982,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -17160,10 +16999,9 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -17191,7 +17029,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "schedule": {
           "$ref": "#/$defs/TrsScheduleSpec",
@@ -17600,7 +17438,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -19034,11 +18872,6 @@
             "number",
             "null"
           ]
-        },
-        "volatility": {
-          "description": "Annualized volatility. Decimal lognormal units for Black-76; futures-price\npoints per square-root year for the normal model.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
@@ -19052,7 +18885,6 @@
         "exercise_style",
         "expiry",
         "settlement",
-        "volatility",
         "model",
         "premium_style",
         "day_count",
@@ -19115,7 +18947,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -19305,7 +19137,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -19407,7 +19239,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -19416,7 +19248,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -19495,7 +19326,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "quote_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -19543,11 +19374,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -19603,7 +19434,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -19694,12 +19525,11 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -19814,12 +19644,11 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -19911,7 +19740,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -20028,7 +19857,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "low_series_id": {
           "default": null,
@@ -20118,6 +19947,12 @@
         },
         "strike_variance": {
           "description": "Strike variance (annualized)",
+          "format": "double",
+          "type": "number"
+        },
+        "trading_days_per_year": {
+          "default": 252,
+          "description": "Trading days per year used to annualise daily realized variance.\n\nA contract term of the variance-swap confirmation: daily observations\nare annualised by `trading_days_per_year / observation_frequency.count()`.\nMust be finite and positive. Defaults to\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
           "format": "double",
           "type": "number"
         },
@@ -20408,7 +20243,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (implied volatility, surface extrapolation).\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [
@@ -20639,7 +20474,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Additional attributes\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -20660,14 +20495,6 @@
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Notional amount (in real terms)"
-        },
-        "quoted_clean": {
-          "description": "Quoted clean price (if available)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "real_coupon": {
           "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
@@ -20756,7 +20583,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [
@@ -22387,7 +22214,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -22486,11 +22313,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -22570,7 +22397,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -22804,15 +22631,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -23108,7 +22935,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Instrument-owned pricing inputs."
         },
         "lookback_type": {
           "$ref": "#/$defs/LookbackType",
@@ -23116,7 +22943,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -23150,7 +22977,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -23319,16 +23146,16 @@
       ],
       "type": "object"
     },
-    "MarginStepUp": {
+    "MarginStep": {
       "additionalProperties": false,
-      "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration. A\nnegative `delta_bp` steps the margin down (a leverage-grid improvement).",
+      "description": "Dated margin step (covenant penalty, scheduled change or pricing-grid move).\n\nShifts the interest margin by `delta_bp` from `date` onward (effective-from\ndate). Steps are cumulative. A negative `delta_bp` steps the margin down (a\nleverage-grid improvement); term loans accept only non-negative steps.",
       "properties": {
         "date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Effective date of margin increase"
+          "description": "Effective-from date of the margin change."
         },
         "delta_bp": {
-          "description": "Increase in margin (basis points)",
+          "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
           "format": "int32",
           "type": "integer"
         }
@@ -23655,7 +23482,7 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Instrument-owned pricing inputs."
         },
         "maturity": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -23664,7 +23491,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -24156,70 +23982,6 @@
           "type": "string"
         }
       ]
-    },
-    "Overrides": {
-      "additionalProperties": false,
-      "description": "Behavioral overrides for prepayment, default, and recovery assumptions.",
-      "properties": {
-        "cdr_annual": {
-          "description": "Override default with constant annual CDR.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "cpr_annual": {
-          "description": "Override prepayment with constant annual CPR.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "psa_speed_multiplier": {
-          "description": "Override prepayment with PSA multiplier.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "recovery_lag_months": {
-          "description": "Override recovery lag (months).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "recovery_rate": {
-          "description": "Override recovery with constant rate.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "reinvestment_price": {
-          "description": "Override the replacement-collateral purchase price during the\nreinvestment period, as a percent of par (`97.5` = 97.5); takes\nprecedence over `ReinvestmentAssumptions::price_pct`.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "sda_speed_multiplier": {
-          "description": "Override default with SDA multiplier.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
     },
     "PacCollar": {
       "additionalProperties": false,
@@ -25020,7 +24782,7 @@
               "type": "null"
             }
           ],
-          "description": "Annual net operating income of the property securing the loan, for\nthe pool debt-service coverage ratio."
+          "description": "Net operating income per annum of the property securing the loan,\nin the loan's currency. The only NOI input of the CMBS pool\ndebt-service coverage ratio."
         },
         "obligor_id": {
           "description": "Optional obligor identifier used for single-name concentration limits.",
@@ -25498,15 +25260,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides for scenario analysis and model configuration."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "unrealized_nav": {
           "anyOf": [
@@ -25781,12 +25543,11 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Pricing overrides (manual price, yield, spread)."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -25894,7 +25655,7 @@
     },
     "RangeAccrual": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(with an empty call schedule for a non-callable note), which models the\nreference rate under HW1F and reconstructs the term rate per observation.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
       "properties": {
         "accrual_start_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -25939,7 +25700,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lower_bound": {
           "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
@@ -26071,6 +25832,166 @@
         "spot_id",
         "vol_surface_id",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "RangeAccrualTerms": {
+      "additionalProperties": false,
+      "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
+      "properties": {
+        "accrual_start_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Contractual accrual-period start date."
+        },
+        "bounds_type": {
+          "$ref": "#/$defs/BoundsType",
+          "default": "absolute",
+          "description": "How to interpret the range bounds (default: Absolute)"
+        },
+        "coupon_rate": {
+          "description": "Coupon rate earned when in range (must be >= 0)",
+          "format": "double",
+          "type": "number"
+        },
+        "day_count": {
+          "$ref": "#/$defs/d_c0401254ec268b317b65",
+          "description": "Day count convention"
+        },
+        "discount_curve_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Discount curve ID for present value calculations"
+        },
+        "div_yield_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional dividend-yield scalar ID"
+        },
+        "lower_bound": {
+          "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
+          "format": "double",
+          "type": "number"
+        },
+        "notional": {
+          "$ref": "#/$defs/d_4ba43030fede59fe5993",
+          "description": "Notional amount"
+        },
+        "observation_dates": {
+          "description": "Observation dates for range checking (must be sorted ascending)",
+          "items": {
+            "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+          },
+          "type": "array"
+        },
+        "past_fixings_in_range": {
+          "description": "Number of past observations that were in range (for mid-life valuations).\nIf None, past observations are not included in the accrual calculation.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "payment_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional payment date (defaults to last observation date)"
+        },
+        "projection_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Projection curve for a rate-linked range accrual."
+        },
+        "quanto": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QuantoSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
+        },
+        "rate_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit rate index for rate-linked range accruals."
+        },
+        "reference_tenor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_47e5e74524615b78a19f"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual tenor of the observed reference rate."
+        },
+        "spot_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Spot price identifier"
+        },
+        "total_past_observations": {
+          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_fixings_in_range` is set.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "underlying_ticker": {
+          "description": "Underlying asset ticker symbol",
+          "type": "string"
+        },
+        "upper_bound": {
+          "description": "Upper bound of accrual range (must be > lower_bound)",
+          "format": "double",
+          "type": "number"
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Volatility surface ID"
+        }
+      },
+      "required": [
+        "underlying_ticker",
+        "observation_dates",
+        "lower_bound",
+        "upper_bound",
+        "coupon_rate",
+        "notional",
+        "day_count",
+        "accrual_start_date",
+        "discount_curve_id",
+        "spot_id",
+        "vol_surface_id"
       ],
       "type": "object"
     },
@@ -26270,15 +26191,14 @@
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "default": {},
-          "description": "Discount curve identifier, used for risk attribution only.\n\nDCF valuation always discounts at [`discount_rate`](Self::discount_rate)\nregardless of whether this curve is loaded. Property discount-rate\nsensitivity is exposed as `real_estate::discount_rate01`.\nAttributes for tagging and scenarios."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "noi_schedule": {
           "description": "Net operating income schedule (date, amount).",
@@ -26349,7 +26269,7 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "default": {},
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "stabilized_noi": {
           "default": null,
@@ -27119,7 +27039,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "margin_spec": {
           "anyOf": [
@@ -27576,13 +27496,13 @@
         },
         "commitment_amount": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_schedule`."
+          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`."
         },
         "commitment_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Date when the facility becomes available."
         },
-        "commitment_schedule": {
+        "commitment_steps": {
           "default": [],
           "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
           "items": {
@@ -27632,7 +27552,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "lc": {
           "anyOf": [
@@ -27656,7 +27576,7 @@
           "default": [],
           "description": "Dated margin changes, cumulative from their dates: a leverage or\nratings grid the analyst has forecast, a scheduled step-up or a\ndefault-rate margin. `delta_bp` shifts the floating spread or the fixed\nrate. Dates must be strictly increasing and strictly inside the\nfacility life. Empty by default.",
           "items": {
-            "$ref": "#/$defs/MarginStepUp"
+            "$ref": "#/$defs/MarginStep"
           },
           "type": "array"
         },
@@ -28174,7 +28094,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "leverage": {
           "description": "Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).",
@@ -28762,13 +28682,8 @@
     },
     "StochasticUtilizationSpec": {
       "additionalProperties": false,
-      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process and simulation parameters for\nMonte Carlo pricing with uncertain draw/repayment patterns. Credit risk is\nincorporated via hazard-rate survival weighting (no explicit default events).",
+      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process for Monte Carlo pricing with uncertain\ndraw/repayment patterns. Credit risk is incorporated via hazard-rate\nsurvival weighting (no explicit default events). The estimator count,\nantithetic flag and seed label are pricing settings, read from\n`instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,\n`mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`].",
       "properties": {
-        "antithetic": {
-          "default": false,
-          "description": "Use antithetic variance reduction when simulating paths (default: false).\nMutually exclusive with `use_sobol_qmc`; validation rejects the combination.",
-          "type": "boolean"
-        },
         "mc_config": {
           "anyOf": [
             {
@@ -28780,24 +28695,9 @@
           ],
           "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths to simulate.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "seed": {
-          "description": "Random seed for reproducibility. Simulation is always deterministic:\n`None` falls back to a fixed default seed (42). Because the seed is\nfixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same\nrandom variates for base and bumped valuations — common random\nnumbers — so finite-difference Greeks are free of Monte Carlo noise.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "use_sobol_qmc": {
           "default": false,
-          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `antithetic`; validation rejects the combination.",
+          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination.",
           "type": "boolean"
         },
         "utilization_process": {
@@ -28806,8 +28706,7 @@
         }
       },
       "required": [
-        "utilization_process",
-        "num_paths"
+        "utilization_process"
       ],
       "type": "object"
     },
@@ -28818,19 +28717,6 @@
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes for scenario selection."
-        },
-        "behavior_overrides": {
-          "$ref": "#/$defs/Overrides",
-          "default": {
-            "cdr_annual": null,
-            "cpr_annual": null,
-            "psa_speed_multiplier": null,
-            "recovery_lag_months": null,
-            "recovery_rate": null,
-            "reinvestment_price": null,
-            "sda_speed_multiplier": null
-          },
-          "description": "Behavioral assumption overrides."
         },
         "call_assumption": {
           "anyOf": [
@@ -28894,10 +28780,6 @@
             "$ref": "#/$defs/CoverageTestSpec"
           },
           "type": "array"
-        },
-        "credit_factors": {
-          "$ref": "#/$defs/CreditFactors",
-          "description": "Credit factors impacting default behavior."
         },
         "deal_metadata": {
           "$ref": "#/$defs/Metadata",
@@ -28970,7 +28852,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "liquidation_price_pct": {
           "description": "Price at which the collateral is realized when the deal is called or\ncleaned up, as a percent of par (`None` = par). The clean-up call is\nonly exercised when the liquidation proceeds, pending recoveries and\nevery cash account together cover the notes' claims.",
@@ -29163,8 +29045,7 @@
         "frequency",
         "discount_curve_id",
         "attributes",
-        "market_conditions",
-        "credit_factors"
+        "market_conditions"
       ],
       "type": "object"
     },
@@ -29267,7 +29148,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -29451,7 +29332,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
@@ -29692,7 +29573,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "issue_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -29898,10 +29779,10 @@
           },
           "type": "array"
         },
-        "margin_stepups": {
-          "description": "Margin step-up schedule",
+        "margin_steps": {
+          "description": "Margin steps, each a non-negative cumulative bp change effective from\nthe start of the first interest period on or after its date.",
           "items": {
-            "$ref": "#/$defs/MarginStepUp"
+            "$ref": "#/$defs/MarginStep"
           },
           "type": "array"
         },
@@ -29914,7 +29795,7 @@
         }
       },
       "required": [
-        "margin_stepups",
+        "margin_steps",
         "pik_toggles",
         "cash_sweeps",
         "draw_stop_dates"
@@ -29936,21 +29817,6 @@
         "months"
       ],
       "type": "object"
-    },
-    "ThetaDayBasis": {
-      "description": "Day basis used to convert annual option theta into a per-day amount.",
-      "oneOf": [
-        {
-          "const": "calendar_365",
-          "description": "Calendar-day theta, annual theta divided by 365.",
-          "type": "string"
-        },
-        {
-          "const": "trading_252",
-          "description": "Trading-day theta, annual theta divided by 252.",
-          "type": "string"
-        }
-      ]
     },
     "TouchType": {
       "description": "Touch type: one-touch (pays if barrier is hit) or no-touch (pays if not hit).",
@@ -30465,7 +30331,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection"
+          "description": "Instrument-owned pricing inputs."
         },
         "low_series_id": {
           "default": null,
@@ -30481,7 +30347,7 @@
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -30524,7 +30390,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
           "anyOf": [
@@ -30548,6 +30414,12 @@
         },
         "strike_variance": {
           "description": "Strike variance (annualized)",
+          "format": "double",
+          "type": "number"
+        },
+        "trading_days_per_year": {
+          "default": 252,
+          "description": "Trading days per year used to annualise daily realized variance.\n\nA contract term of the variance-swap confirmation: daily observations\nare annualised by `trading_days_per_year / observation_frequency.count()`.\nMust be finite and positive. Defaults to\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
           "format": "double",
           "type": "number"
         },
@@ -30646,11 +30518,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for tagging and selection."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -30667,7 +30539,7 @@
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only valuation adjustments."
+          "description": "Scenario-only pricing adjustments."
         },
         "settlement_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -30715,11 +30587,11 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing inputs, including optional tree-step overrides."
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-only pricing controls."
+          "description": "Metric-time pricing configuration."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -31128,6 +31000,10 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique identifier for this instrument."
         },
+        "instrument_pricing_overrides": {
+          "$ref": "#/$defs/d_c08279a20372931820e0",
+          "description": "Instrument-owned pricing inputs."
+        },
         "leg1": {
           "$ref": "#/$defs/XccySwapLeg",
           "description": "First leg."
@@ -31135,6 +31011,10 @@
         "leg2": {
           "$ref": "#/$defs/XccySwapLeg",
           "description": "Second leg."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "#/$defs/d_00292b2cd9779815232f",
+          "description": "Metric-time pricing configuration."
         },
         "notional_exchange": {
           "$ref": "#/$defs/NotionalExchange",
@@ -31144,6 +31024,10 @@
         "reporting_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
           "description": "PV reporting currency (output currency of `value`/`npv`)."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -31313,7 +31197,7 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "interpolation_override": {
           "anyOf": [

@@ -3,6 +3,11 @@
     "spec": {
       "attributes": {},
       "id": "COMMODITY-FUTURE-OPTION-EXAMPLE",
+      "instrument_pricing_overrides": {
+        "market_quotes": {
+          "implied_volatility": 0.2
+        }
+      },
       "terms": {
         "contracts": 1.0,
         "currency": "USD",
@@ -21,8 +26,7 @@
           "type": "cash"
         },
         "strike": 100.0,
-        "underlying": "UNDERLYING-FUTURE",
-        "volatility": 0.2
+        "underlying": "UNDERLYING-FUTURE"
       }
     },
     "type": "commodity_future_option"

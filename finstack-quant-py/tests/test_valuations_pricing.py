@@ -527,7 +527,7 @@ def test_tarn_json_prices_with_hull_white_mc() -> None:
     )
 
     assert result.price > 0
-    assert result.get_metric("mc_num_paths") == 32
+    assert result.get_metric("mc_num_paths") == 64  # mc_paths estimators x 2 antithetic mirrors
 
 
 def test_snowball_json_prices_with_hull_white_mc() -> None:
@@ -539,7 +539,7 @@ def test_snowball_json_prices_with_hull_white_mc() -> None:
     )
 
     assert result.price > 0
-    assert result.get_metric("mc_num_paths") == 32
+    assert result.get_metric("mc_num_paths") == 64  # mc_paths estimators x 2 antithetic mirrors
 
 
 def test_inverse_floater_json_prices_with_discounting() -> None:
@@ -562,7 +562,7 @@ def test_callable_range_accrual_json_prices_with_hull_white_mc() -> None:
     )
 
     assert result.price > 0
-    assert result.get_metric("mc_num_paths") == 8
+    assert result.get_metric("mc_num_paths") == 16  # mc_paths estimators x 2 antithetic mirrors
 
 
 def test_cms_spread_option_json_prices_with_static_replication() -> None:

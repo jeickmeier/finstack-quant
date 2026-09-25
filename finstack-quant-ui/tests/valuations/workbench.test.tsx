@@ -164,9 +164,22 @@ it("embeds the existing components, debounces complete requests and retains edit
   await userEvent.click(
     screen.getByRole("button", { name: "Add theta period" }),
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Theta period" }), {
-    target: { value: "1W" },
-  });
+  fireEvent.change(
+    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+      "textbox",
+      { name: "Count" },
+    ),
+    {
+      target: { value: "1" },
+    },
+  );
+  await userEvent.click(
+    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+      "combobox",
+      { name: "Unit" },
+    ),
+  );
+  await userEvent.click(await screen.findByRole("option", { name: "weeks" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Market history" }), {
     target: { value: history },
   });
@@ -227,15 +240,28 @@ it("retains the completed context during invalid edits, native pricing failure a
   await userEvent.click(
     screen.getByRole("button", { name: "Add theta period" }),
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Theta period" }), {
-    target: { value: "nope" },
-  });
+  fireEvent.change(
+    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+      "textbox",
+      { name: "Count" },
+    ),
+    {
+      target: { value: "0" },
+    },
+  );
+  await userEvent.click(
+    within(screen.getByText("Pricing overrides").parentElement!).getByRole(
+      "combobox",
+      { name: "Unit" },
+    ),
+  );
+  await userEvent.click(await screen.findByRole("option", { name: "weeks" }));
   await waitFor(
     () =>
       expect(
         screen
           .getAllByRole("alert")
-          .some((node) => node.textContent?.includes("Invalid input data")),
+          .some((node) => node.textContent?.includes("Invalid tenor")),
       ).toBe(true),
     { timeout: 3000 },
   );

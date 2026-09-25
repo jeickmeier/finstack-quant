@@ -554,11 +554,13 @@ export type StructuredCreditPricingMode =
   | {
       monte_carlo: {
         /**
-         * Use antithetic variates for variance reduction
+         * Pair each estimator's path with its sign-flipped mirror.
          */
         antithetic: boolean;
         /**
-         * Number of simulation paths
+         * Number of independent estimators. With `antithetic` each estimator
+         * simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
+         * scenario paths.
          */
         num_paths: bigint;
       };
@@ -566,9 +568,9 @@ export type StructuredCreditPricingMode =
   | {
       hybrid: {
         /**
-         * MC paths for tail
+         * Monte Carlo continuation paths per tree prefix
          */
-        mc_paths: bigint;
+        num_paths: bigint;
         /**
          * Tree periods before switching to MC
          */
@@ -3153,7 +3155,8 @@ export interface StochasticPricingResult {
   expected_shortfall: Money10;
   npv: Money11;
   /**
-   * Number of scenario paths
+   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` for
+   * antithetic Monte Carlo, prefixes × suffixes for Hybrid).
    */
   num_paths: bigint;
   /**
@@ -3164,11 +3167,13 @@ export interface StochasticPricingResult {
     | {
         monte_carlo: {
           /**
-           * Use antithetic variates for variance reduction
+           * Pair each estimator's path with its sign-flipped mirror.
            */
           antithetic: boolean;
           /**
-           * Number of simulation paths
+           * Number of independent estimators. With `antithetic` each estimator
+           * simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
+           * scenario paths.
            */
           num_paths: bigint;
         };
@@ -3176,9 +3181,9 @@ export interface StochasticPricingResult {
     | {
         hybrid: {
           /**
-           * MC paths for tail
+           * Monte Carlo continuation paths per tree prefix
            */
-          mc_paths: bigint;
+          num_paths: bigint;
           /**
            * Tree periods before switching to MC
            */

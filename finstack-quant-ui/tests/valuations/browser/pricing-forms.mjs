@@ -58,9 +58,16 @@ try {
   assert(await price.isDisabled());
   await amount.fill("1000000.123456789");
   await page.getByRole("button", { name: "Add theta period" }).click();
-  await page
-    .getByRole("textbox", { name: "Theta period", exact: true })
-    .fill("1W");
+  const overrides = page
+    .getByText("Pricing overrides", { exact: true })
+    .locator("..");
+  const thetaCount = overrides.getByRole("textbox", {
+    name: "Count",
+    exact: true,
+  });
+  await thetaCount.fill("1");
+  await overrides.getByRole("combobox", { name: "Unit", exact: true }).click();
+  await page.getByRole("option", { name: "weeks", exact: true }).click();
   const history = JSON.stringify({
     base_date: "2025-01-01",
     window_days: 2,
@@ -137,11 +144,7 @@ try {
   const actual = JSON.parse(await output.textContent());
   direct.meta.timestamp = actual.meta.timestamp;
   assert.deepEqual(actual, direct);
-  const theta = page.getByRole("textbox", {
-    name: "Theta period",
-    exact: true,
-  });
-  await theta.fill("nope");
+  await thetaCount.fill("0");
   await page.waitForTimeout(400);
   await price.click();
   await page
@@ -155,7 +158,7 @@ try {
         .locator("pre")
         .textContent(),
     ).metricPricingOverrides,
-    '{"theta_period":"nope"}',
+    '{"theta_period":{"count":0,"unit":"weeks"}}',
   );
   assert(
     (
@@ -163,7 +166,7 @@ try {
         .getByRole("region", { name: "Pricing result" })
         .getByRole("alert")
         .textContent()
-    ).includes("Invalid input data"),
+    ).includes("Invalid tenor"),
   );
   await page.getByRole("button", { name: "Omit pricing overrides" }).click();
   await page.getByRole("button", { name: "Load example" }).click();

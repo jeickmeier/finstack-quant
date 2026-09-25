@@ -1832,7 +1832,7 @@ export default [
   {
     "path": "#/$defs/d_3d7928f8797773779aed",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention",
-    "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nclean/dirty NPV, par-spread denominator). Mixing those choices via separate\nboolean overrides is intentionally not supported — the variants here are the\nonly conventions traded in practice."
+    "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nAct/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,\npar-spread denominator). Mixing those choices via separate boolean\noverrides is intentionally not supported — the variants here are the only\nconventions traded in practice."
   },
   {
     "path": "#/$defs/d_3d7928f8797773779aed/oneOf/0",
@@ -1856,7 +1856,7 @@ export default [
     "path": "#/$defs/d_3d7928f8797773779aed/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention/oneOf/3",
     "const": "quant_lib_isda_parity",
-    "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, and full premium leg in\nthe par-spread denominator. Combine with the QuantLib day-count\npricing overrides (`cds_aod_half_day_bias`,\n`cds_act360_include_last_day`) for full bit-level reproduction."
+    "description": "QuantLib `IsdaCdsEngine` parity convention.\n\nReproduces QuantLib's CDS output: dirty PV (no clean add-back),\nbusiness-day-adjusted premium accrual periods, full premium leg in\nthe par-spread denominator, QuantLib `Actual360(true)` accrual (every\nAct/360 premium period includes its end date) and the `IsdaCdsEngine`\n`HalfDayBias` accrual-on-default adjustment."
   },
   {
     "path": "#/$defs/d_41166743d7ec9326bdd4",

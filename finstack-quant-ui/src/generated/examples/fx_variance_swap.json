@@ -31,6 +31,7 @@
       "spot_id": "EURUSD",
       "start_date": "2024-01-02",
       "strike_variance": 0.04,
+      "trading_days_per_year": 252.0,
       "vol_surface_id": "EURUSD-VOL"
     },
     "type": "fx_variance_swap"

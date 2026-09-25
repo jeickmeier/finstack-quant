@@ -19,13 +19,11 @@
           "id": "CALLABLE-RA-SOFR-1Y",
           "range_accrual": {
             "accrual_start_date": "2025-12-31",
-            "attributes": {},
             "bounds_type": "absolute",
             "coupon_rate": 0.065,
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "div_yield_id": null,
-            "id": "CALLABLE-RA-SOFR-1Y-RANGE",
             "lower_bound": 0.04,
             "notional": {
               "amount": "1000000",
@@ -115,21 +113,28 @@
           "$ref": "#/$defs/d_1d0c1815f8dd0715bd12",
           "description": "Bump sizes for finite-difference sensitivities."
         },
-        "mc_seed_scenario": {
-          "default": null,
-          "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "theta_day_basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_d30540ea90ce7eca3dee"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Day basis for the per-day analytic option theta (`calendar_365` or\n`trading_252`). `None` uses calendar-day theta (annual theta / 365)."
         },
         "theta_period": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_7dd9bdea4c4382f447f9"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Theta / carry horizon over which time decay is measured (for example\n1D, 1W, 1M, 3M; wire form `{\"count\": 1, \"unit\": \"weeks\"}`). Day and\nweek tenors roll a fixed number of days, month and year tenors roll\ncalendar months (EOM-aware). `None` uses one day."
         },
         "var_config": {
           "anyOf": [
@@ -180,10 +185,6 @@
       "additionalProperties": false,
       "description": "Configuration for Monte Carlo PIK bond pricing.",
       "properties": {
-        "antithetic": {
-          "description": "Whether to use antithetic variates for variance reduction.",
-          "type": "boolean"
-        },
         "barrier_crossing": {
           "$ref": "#/$defs/d_d4ba69c121b73ac48a10",
           "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
@@ -221,11 +222,6 @@
             "null"
           ]
         },
-        "default_recovery_rate": {
-          "description": "Default recovery rate used when no `dynamic_recovery` model is set.",
-          "format": "double",
-          "type": "number"
-        },
         "dynamic_recovery": {
           "anyOf": [
             {
@@ -252,23 +248,16 @@
           "$ref": "#/$defs/d_ee4323acfdb49e4fe15b",
           "description": "Merton structural credit model."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
         "pik_schedule": {
           "$ref": "#/$defs/d_10afa2c48803544dc415",
           "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior."
         },
-        "seed": {
-          "description": "RNG seed for reproducibility.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+        "recovery_rate": {
+          "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+          "format": "double",
+          "type": "number"
         },
-        "time_steps_per_year": {
+        "steps_per_year": {
           "description": "Time steps per year for the simulation grid.",
           "format": "uint",
           "minimum": 0,
@@ -289,12 +278,9 @@
       "required": [
         "merton",
         "pik_schedule",
-        "num_paths",
-        "seed",
-        "antithetic",
-        "time_steps_per_year",
+        "steps_per_year",
         "barrier_crossing",
-        "default_recovery_rate"
+        "recovery_rate"
       ],
       "type": "object"
     },
@@ -911,15 +897,15 @@
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
+          "description": "Instrument-owned pricing inputs."
         },
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
         "range_accrual": {
-          "$ref": "#/$defs/d_ee40df047e5988f67a53",
-          "description": "Underlying range accrual leg."
+          "$ref": "#/$defs/d_de9dcde9d5fad54ea251",
+          "description": "Range accrual contract terms (no identity, attributes or overrides of their own)."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -965,16 +951,6 @@
             "number",
             "null"
           ]
-        },
-        "cds_act360_include_last_day": {
-          "default": false,
-          "description": "Add one calendar day to *every* Act/360 premium accrual period.\n\nUsed by the CDS option pricer to model the ISDA pre-Big-Bang\noption underlying convention (and matches QuantLib's\n`Actual360(true)` day-count). The Bloomberg CDSW convention only\ntreats the *final* coupon period as inclusive of the maturity date,\nso this is not the default for production single-name CDS pricing.",
-          "type": "boolean"
-        },
-        "cds_aod_half_day_bias": {
-          "default": false,
-          "description": "Apply ISDA half-day accrual-on-default bias.\n\nAdds half a day of premium accrual in the default-accrual integral.\nUsed by the CDS option pricer to model the Bloomberg CDSO underlying\nconvention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).",
-          "type": "boolean"
         },
         "hazard_mean_reversion": {
           "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",
@@ -1043,6 +1019,13 @@
             "null"
           ]
         },
+        "mc_seed_scenario": {
+          "description": "Optional Monte Carlo seed label.\n\nMonte Carlo pricers derive their RNG seed as\n`derive_seed(instrument_id, label)`, so the same label always replays\nthe same random streams for the same instrument. `None` seeds with the\npricer's base label. Finite-difference Greeks set a fixed label on the\nrepriced clone so base and bumped legs share common random numbers.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "mc_target_ci_half_width": {
           "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
           "format": "double",
@@ -1060,7 +1043,7 @@
               "type": "null"
             }
           ],
-          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (via flat JSON under `pricing_overrides.merton_mc_config` or the\nRust builder), the `MertonMc` pricer in the registry uses this config."
+          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
         },
         "oas_price_basis": {
           "$ref": "#/$defs/d_af1cbfbbe87bff81e3b3",
@@ -1304,6 +1287,27 @@
         }
       ]
     },
+    "d_7dd9bdea4c4382f447f9": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/d_ec4e993309e09fe83294",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
     "d_7e19cc4df9954b864180": {
       "description": "Finite JSON number in the open interval `(0, 1)`.",
       "exclusiveMaximum": 1,
@@ -1420,82 +1424,6 @@
         "asset_vol",
         "risk_free_rate",
         "horizon"
-      ],
-      "type": "object"
-    },
-    "d_8fb25331316c6e4f3fc7": {
-      "additionalProperties": false,
-      "description": "Term loan specific overrides for covenants and schedule adjustments.",
-      "properties": {
-        "draw_stop_date": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_c472bf7871f904b44979"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Draw stop date (earliest date after which draws are blocked)"
-        },
-        "extra_cash_sweeps": {
-          "description": "Extra cash sweeps by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "$ref": "#/$defs/d_1a6c2ccee66d90a3a469"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "margin_add_bp_by_date": {
-          "description": "Additional margin step-ups by date (bp)",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "format": "int32",
-                "type": "integer"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        },
-        "pik_toggle_by_date": {
-          "description": "Force PIK toggles by date",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "$ref": "#/$defs/d_c472bf7871f904b44979"
-              },
-              {
-                "type": "boolean"
-              }
-            ],
-            "type": "array"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "margin_add_bp_by_date",
-        "pik_toggle_by_date",
-        "extra_cash_sweeps"
       ],
       "type": "object"
     },
@@ -2446,10 +2374,10 @@
     },
     "d_b0a5fc543381da6a5722": {
       "additionalProperties": false,
-      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
+      "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)",
       "properties": {
         "cds_quote_bp": {
-          "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).",
+          "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
           "format": "double",
           "type": [
             "number",
@@ -2457,7 +2385,7 @@
           ]
         },
         "implied_volatility": {
-          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
+          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike. Options on\nfutures read it as their only volatility input: decimal lognormal for\nBlack-76, futures-price points per √year for the normal model.",
           "format": "double",
           "type": [
             "number",
@@ -2472,8 +2400,8 @@
             "null"
           ]
         },
-        "quoted_clean_price": {
-          "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
+        "quoted_clean_price_pct": {
+          "description": "Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).\n\nInflation-linked bonds quote this per 100 of real (unindexed) face.",
           "format": "double",
           "type": [
             "number",
@@ -2514,6 +2442,14 @@
         },
         "quoted_oas": {
           "description": "Quoted OAS (option-adjusted spread) in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_premium": {
+          "description": "Observed option premium: the total trade PV in the instrument currency\n(notional, contract multiplier and position included).\n\nThis is the target every `ImpliedVol` calculator inverts; it does not\ndrive PV and is not one of the mutually exclusive price-driving fields.",
           "format": "double",
           "type": [
             "number",
@@ -4300,26 +4236,10 @@
         "model_config": {
           "$ref": "#/$defs/d_572ad1befb7d94914652",
           "description": "Model selection and tree pricing parameters."
-        },
-        "term_loan": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_8fb25331316c6e4f3fc7"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Term loan specific overrides."
         }
       },
       "title": "Instrument Pricing Overrides",
       "type": "object"
-    },
-    "d_c472bf7871f904b44979": {
-      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-      "format": "date",
-      "type": "string"
     },
     "d_cc8ed166abbb10ad4451": {
       "additionalProperties": false,
@@ -4371,6 +4291,21 @@
       ],
       "type": "object"
     },
+    "d_d30540ea90ce7eca3dee": {
+      "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`.",
+      "oneOf": [
+        {
+          "const": "calendar_365",
+          "description": "Calendar-day theta: annual theta divided by\n[`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365).",
+          "type": "string"
+        },
+        {
+          "const": "trading_252",
+          "description": "Trading-day theta: annual theta divided by\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252).",
+          "type": "string"
+        }
+      ]
+    },
     "d_d4ba69c121b73ac48a10": {
       "description": "Barrier-crossing detection policy for first-passage default simulation.\n\n`Discrete` only checks the barrier at grid points (fast but biased for\ncoarse time steps). `BrownianBridge` uses a Brownian-bridge crossing\nprobability between grid points to approximate continuous monitoring.",
       "oneOf": [
@@ -4410,12 +4345,12 @@
           ]
         },
         "low_paths": {
-          "description": "Number of MC paths used during calibration iterations (low paths).",
+          "description": "Number of independent MC estimators used during calibration iterations (low paths).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
-        "max_iter": {
+        "max_iterations": {
           "description": "Maximum bisection iterations.",
           "format": "uint",
           "minimum": 0,
@@ -4448,7 +4383,7 @@
         "target",
         "parameter",
         "low_paths",
-        "max_iter",
+        "max_iterations",
         "tolerance_pv"
       ],
       "type": "object"
@@ -5317,91 +5252,13 @@
         }
       ]
     },
-    "d_e42076b4d2ef6e393ce5": {
-      "description": "Which structural parameter to calibrate in the MC engine.",
-      "oneOf": [
-        {
-          "const": "debt_barrier",
-          "description": "Calibrate the debt barrier B.",
-          "type": "string"
-        },
-        {
-          "const": "asset_vol",
-          "description": "Calibrate the asset volatility sigma_V.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_e49387f97c0f9d510642": {
+    "d_de9dcde9d5fad54ea251": {
       "additionalProperties": false,
-      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
-      "properties": {
-        "confidence_level": {
-          "$ref": "#/$defs/d_7e19cc4df9954b864180",
-          "default": 0.95,
-          "description": "Confidence level (e.g., 0.95 for 95% VaR, 0.99 for 99% VaR)"
-        },
-        "method": {
-          "$ref": "#/$defs/d_f80f2b90e7af690c5898",
-          "default": "full_revaluation",
-          "description": "VaR calculation method"
-        },
-        "reporting_currency": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_b556bbeb1ecf96c44c5a"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional reporting currency for portfolio aggregation.\n\nWhen omitted, same-currency portfolios use their natural currency.\nMixed-currency portfolios must set this explicitly."
-        }
-      },
-      "type": "object"
-    },
-    "d_ec89adc17436f33de839": {
-      "description": "Volatility model for option pricing.",
-      "oneOf": [
-        {
-          "const": "black",
-          "description": "Black (lognormal).",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Bachelier / normal model.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ed218c734e46de57eeb9": {
-      "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default.",
-      "oneOf": [
-        {
-          "const": "linear",
-          "description": "`-(carry_total) / sensitivity`, using the sensitivity at `as_of`.\n\nFast, first-order: ignores both convexity and the change in sensitivity\nover the horizon.",
-          "type": "string"
-        },
-        {
-          "const": "iterative",
-          "description": "Brent root-find with a full reprice at the horizon date.\n\nCaptures convexity *and* the horizon change in sensitivity. Not\nsupported for [`BreakevenTarget::BaseCorrelation`], nor for\ncredit-curve instruments under `ZSpread`/`Oas` — see\n[`BreakevenTarget`] and the calculator docs for why.",
-          "type": "string"
-        }
-      ]
-    },
-    "d_ee40df047e5988f67a53": {
-      "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(with an empty call schedule for a non-callable note), which models the\nreference rate under HW1F and reconstructs the term rate per observation.",
+      "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
       "properties": {
         "accrual_start_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Contractual accrual-period start date."
-        },
-        "attributes": {
-          "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "description": "Attributes for scenario selection and grouping"
         },
         "bounds_type": {
           "$ref": "#/$defs/d_f30e208982840b66d83c",
@@ -5432,22 +5289,10 @@
           ],
           "description": "Optional dividend-yield scalar ID"
         },
-        "id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique instrument identifier"
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
-        },
         "lower_bound": {
           "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
           "format": "double",
           "type": "number"
-        },
-        "metric_pricing_overrides": {
-          "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-time pricing configuration."
         },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
@@ -5525,10 +5370,6 @@
           ],
           "description": "Contractual tenor of the observed reference rate."
         },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only pricing adjustments."
-        },
         "spot_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Spot price identifier"
@@ -5557,7 +5398,6 @@
         }
       },
       "required": [
-        "id",
         "underlying_ticker",
         "observation_dates",
         "lower_bound",
@@ -5568,10 +5408,108 @@
         "accrual_start_date",
         "discount_curve_id",
         "spot_id",
-        "vol_surface_id",
-        "attributes"
+        "vol_surface_id"
       ],
       "type": "object"
+    },
+    "d_e42076b4d2ef6e393ce5": {
+      "description": "Which structural parameter to calibrate in the MC engine.",
+      "oneOf": [
+        {
+          "const": "debt_barrier",
+          "description": "Calibrate the debt barrier B.",
+          "type": "string"
+        },
+        {
+          "const": "asset_vol",
+          "description": "Calibrate the asset volatility sigma_V.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_e49387f97c0f9d510642": {
+      "additionalProperties": false,
+      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
+      "properties": {
+        "confidence_level": {
+          "$ref": "#/$defs/d_7e19cc4df9954b864180",
+          "default": 0.95,
+          "description": "Confidence level (e.g., 0.95 for 95% VaR, 0.99 for 99% VaR)"
+        },
+        "method": {
+          "$ref": "#/$defs/d_f80f2b90e7af690c5898",
+          "default": "full_revaluation",
+          "description": "VaR calculation method"
+        },
+        "reporting_currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_b556bbeb1ecf96c44c5a"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional reporting currency for portfolio aggregation.\n\nWhen omitted, same-currency portfolios use their natural currency.\nMixed-currency portfolios must set this explicitly."
+        }
+      },
+      "type": "object"
+    },
+    "d_ec4e993309e09fe83294": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ec89adc17436f33de839": {
+      "description": "Volatility model for option pricing.",
+      "oneOf": [
+        {
+          "const": "black",
+          "description": "Black (lognormal).",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Bachelier / normal model.",
+          "type": "string"
+        }
+      ]
+    },
+    "d_ed218c734e46de57eeb9": {
+      "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.\n\n# Why the two modes disagree\n\nThe gap between them is usually **not** dominated by convexity. `Linear`\ndivides by the sensitivity measured at `as_of`, whereas `Iterative`\nreprices at the horizon date, where the instrument has less remaining time\nand therefore a different sensitivity. On a 5Y bond over a 6M horizon the\ntwo differ by several percent even though convexity over the ~9bp solved\nshift contributes only a fraction of that. The gap grows with horizon\nlength, not just with curvature.\n\n`Iterative` is the more accurate answer where it is supported; `Linear` is\nthe fast approximation and the default.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "`-(carry_total) / sensitivity`, using the sensitivity at `as_of`.\n\nFast, first-order: ignores both convexity and the change in sensitivity\nover the horizon.",
+          "type": "string"
+        },
+        {
+          "const": "iterative",
+          "description": "Brent root-find with a full reprice at the horizon date.\n\nCaptures convexity *and* the horizon change in sensitivity. Not\nsupported for [`BreakevenTarget::BaseCorrelation`], nor for\ncredit-curve instruments under `ZSpread`/`Oas` — see\n[`BreakevenTarget`] and the calculator docs for why.",
+          "type": "string"
+        }
+      ]
     },
     "d_ee4323acfdb49e4fe15b": {
       "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.\n\n# Wire format\n\nDeserialization is routed through [`MertonModel::new_with_dynamics`] via\n[`RawMertonModel`], so a model loaded from JSON satisfies exactly the same\ninvariants as one built in Rust. The serialized field set is unchanged.",

@@ -3119,9 +3119,10 @@ export type Date12 = string;
  * Valuation presentation and pricing policy for CDS marks.
  *
  * Each variant bundles a coherent set of choices (premium-leg accrual schedule,
- * clean/dirty NPV, par-spread denominator). Mixing those choices via separate
- * boolean overrides is intentionally not supported — the variants here are the
- * only conventions traded in practice.
+ * Act/360 accrual day counting, accrual-on-default bias, clean/dirty NPV,
+ * par-spread denominator). Mixing those choices via separate boolean
+ * overrides is intentionally not supported — the variants here are the only
+ * conventions traded in practice.
  */
 export type D_3D7928F8797773779Aed =
   "isda_dirty" | "bloomberg_cdsw_clean" | "bloomberg_cdsw_clean_full_premium" | "quant_lib_isda_parity";

@@ -2072,7 +2072,8 @@ export interface D_482Fa346C77E25F26A51 {
   expected_shortfall: Money9;
   npv: Money10;
   /**
-   * Number of scenario paths
+   * Number of simulated scenario paths (`2 × pricing_mode.num_paths` for
+   * antithetic Monte Carlo, prefixes × suffixes for Hybrid).
    */
   num_paths: number;
   /**
@@ -2083,11 +2084,13 @@ export interface D_482Fa346C77E25F26A51 {
     | {
         monte_carlo: {
           /**
-           * Use antithetic variates for variance reduction
+           * Pair each estimator's path with its sign-flipped mirror.
            */
           antithetic: boolean;
           /**
-           * Number of simulation paths
+           * Number of independent estimators. With `antithetic` each estimator
+           * simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
+           * scenario paths.
            */
           num_paths: number;
         };
@@ -2095,9 +2098,9 @@ export interface D_482Fa346C77E25F26A51 {
     | {
         hybrid: {
           /**
-           * MC paths for tail
+           * Monte Carlo continuation paths per tree prefix
            */
-          mc_paths: number;
+          num_paths: number;
           /**
            * Tree periods before switching to MC
            */

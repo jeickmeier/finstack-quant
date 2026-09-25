@@ -258,7 +258,11 @@ it("preserves real bond wide-integer fields until the generated codec checks the
     calibration,
   };
   spec.instrument_pricing_overrides = {
-    model_config: { mc_paths: 5000, mc_antithetic: true, merton_mc_config: config },
+    model_config: {
+      mc_paths: 5000,
+      mc_antithetic: true,
+      merton_mc_config: config,
+    },
   };
   const validator = structuralValidator(bond);
   const text = bond.codec.stringify(validator.parse(edited));

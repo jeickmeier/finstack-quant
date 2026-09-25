@@ -28,24 +28,6 @@ export default [
     "title": "FinancialModelSpec"
   },
   {
-    "path": "#/$defs/d_00188ecfd7f3f0a33b97",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStepUp",
-    "description": "Margin step-up event (covenant penalty or scheduled increase).\n\nIncreases the interest margin by a fixed amount at a specified date,\ntypically triggered by covenant breach or scheduled rating migration. A\nnegative `delta_bp` steps the margin down (a leverage-grid improvement)."
-  },
-  {
-    "path": "#/$defs/d_00188ecfd7f3f0a33b97/properties/date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStepUp/properties/date",
-    "description": "Effective date of margin increase",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_00188ecfd7f3f0a33b97/properties/delta_bp",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStepUp/properties/delta_bp",
-    "description": "Increase in margin (basis points)",
-    "format": "int32"
-  },
-  {
     "path": "#/$defs/d_0121f6f80c6bfb0be3bc",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashflowRepresentation",
     "description": "Meaning of the emitted schedule relative to pricing and waterfall policy."
@@ -326,21 +308,6 @@ export default [
     "description": "Number of ex-coupon days before coupon date.",
     "format": "uint32",
     "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/forward_curve_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Bond/properties/forward_curve_id",
-    "description": "Optional forward curve identifier for projected floating or asset-swap legs."
-  },
-  {
-    "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/forward_curve_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Bond/properties/forward_curve_id/anyOf/0",
-    "ref": "#/$defs/Id",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Id"
-  },
-  {
-    "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/forward_curve_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Bond/properties/forward_curve_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_0c72f5cb09b10476ecb7/properties/funding_curve_id",
@@ -749,7 +716,7 @@ export default [
   {
     "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond/properties/instrument_pricing_overrides",
-    "description": "Attributes for selection and tagging.\nInstrument-owned pricing inputs.",
+    "description": "Instrument-owned pricing inputs.",
     "ref": "#/$defs/InstrumentPricingOverrides",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides"
   },
@@ -824,18 +791,18 @@ export default [
   {
     "path": "#/$defs/d_1aae7d4b687142dd110c",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides",
-    "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)"
+    "description": "Overrides for market-quoted values (prices, vols, spreads, upfront payments).\n\n# Price-driving fields\n\nThe following fields, when set, override the model PV returned by\n[`Instrument::base_value`](crate::instruments::common_impl::traits::Instrument::base_value)\nfor bonds. At most one may be set at a time — [`Self::validate`] enforces this.\nPrecedence (applied top-to-bottom inside `Bond::base_value`):\n\n1. `quoted_dirty_price_currency` — currency units (bond native currency)\n2. `quoted_clean_price_pct` — percentage of par\n3. `quoted_ytm` — decimal YTM (e.g. `0.055` = 5.5%)\n4. `quoted_ytw` — decimal yield-to-worst\n5. `quoted_z_spread` — decimal Z-spread\n6. `quoted_oas` — decimal OAS\n7. `quoted_discount_margin` — decimal DM (FRNs)\n8. `quoted_i_spread` — decimal I-spread\n9. `quoted_asw_market` — decimal ASW (market convention)\n10. `quoted_japanese_simple_yield` — decimal Tokyo simple yield (単利)"
   },
   {
     "path": "#/$defs/d_1aae7d4b687142dd110c/properties/cds_quote_bp",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/cds_quote_bp",
-    "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).",
+    "description": "CreditDefaultSwap clean par-spread quote in basis points.\n\nUsed only by CreditDefaultSwap risk replay, where it replaces the\nmatching contractual hazard-curve pillar. It does not drive PV, and no\nother instrument (CDSIndex included) reads it.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_1aae7d4b687142dd110c/properties/implied_volatility",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/implied_volatility",
-    "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
+    "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike. Options on\nfutures read it as their only volatility input: decimal lognormal for\nBlack-76, futures-price points per √year for the normal model.",
     "format": "double"
   },
   {
@@ -845,9 +812,9 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1aae7d4b687142dd110c/properties/quoted_clean_price",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_clean_price",
-    "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
+    "path": "#/$defs/d_1aae7d4b687142dd110c/properties/quoted_clean_price_pct",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_clean_price_pct",
+    "description": "Quoted clean price in percent of par (e.g., `99.5` = 99.5% of par).\n\nInflation-linked bonds quote this per 100 of real (unindexed) face.",
     "format": "double"
   },
   {
@@ -878,6 +845,12 @@ export default [
     "path": "#/$defs/d_1aae7d4b687142dd110c/properties/quoted_oas",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_oas",
     "description": "Quoted OAS (option-adjusted spread) in decimal.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1aae7d4b687142dd110c/properties/quoted_premium",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_premium",
+    "description": "Observed option premium: the total trade PV in the instrument currency\n(notional, contract multiplier and position included).\n\nThis is the target every `ImpliedVol` calculator inverts; it does not\ndrive PV and is not one of the mutually exclusive price-driving fields.",
     "format": "double"
   },
   {
@@ -1243,21 +1216,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig"
   },
   {
-    "path": "#/$defs/d_230003e250762a70be53/properties/term_loan",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides/properties/term_loan",
-    "description": "Term loan specific overrides."
-  },
-  {
-    "path": "#/$defs/d_230003e250762a70be53/properties/term_loan/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides/properties/term_loan/anyOf/0",
-    "ref": "#/$defs/TermLoanOverrides",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides"
-  },
-  {
-    "path": "#/$defs/d_230003e250762a70be53/properties/term_loan/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides/properties/term_loan/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_2331411247fb4fdd46dd",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire",
     "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
@@ -1266,7 +1224,7 @@ export default [
   {
     "path": "#/$defs/d_2477996edc1959af8d37",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DdtlSpec",
-    "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_step_downs: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```"
+    "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_steps: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/d_2477996edc1959af8d37/properties/availability_end",
@@ -1296,13 +1254,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
   },
   {
-    "path": "#/$defs/d_2477996edc1959af8d37/properties/commitment_step_downs",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DdtlSpec/properties/commitment_step_downs",
-    "description": "Commitment step-down schedule: strictly increasing dates inside the\navailability window, non-increasing `amount`s in the loan currency,\nand `fee_bp == 0.0` (term loans carry no reduction fee)."
+    "path": "#/$defs/d_2477996edc1959af8d37/properties/commitment_steps",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DdtlSpec/properties/commitment_steps",
+    "description": "Commitment steps, each effective from its date: strictly increasing\ndates inside the availability window, non-increasing `amount`s in the\nloan currency, and `fee_bp == 0.0` (term loans carry no reduction fee)."
   },
   {
-    "path": "#/$defs/d_2477996edc1959af8d37/properties/commitment_step_downs/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DdtlSpec/properties/commitment_step_downs/items",
+    "path": "#/$defs/d_2477996edc1959af8d37/properties/commitment_steps/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DdtlSpec/properties/commitment_steps/items",
     "ref": "#/$defs/CommitmentStep",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CommitmentStep"
   },
@@ -1669,16 +1627,35 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BumpConfig"
   },
   {
-    "path": "#/$defs/d_3883c45b3701884ad50b/properties/mc_seed_scenario",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MetricPricingOverrides/properties/mc_seed_scenario",
-    "default": null,
-    "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed."
+    "path": "#/$defs/d_3883c45b3701884ad50b/properties/theta_day_basis",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MetricPricingOverrides/properties/theta_day_basis",
+    "description": "Day basis for the per-day analytic option theta (`calendar_365` or\n`trading_252`). `None` uses calendar-day theta (annual theta / 365)."
+  },
+  {
+    "path": "#/$defs/d_3883c45b3701884ad50b/properties/theta_day_basis/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MetricPricingOverrides/properties/theta_day_basis/anyOf/0",
+    "ref": "#/$defs/ThetaDayBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ThetaDayBasis"
+  },
+  {
+    "path": "#/$defs/d_3883c45b3701884ad50b/properties/theta_day_basis/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MetricPricingOverrides/properties/theta_day_basis/anyOf/1"
   },
   {
     "path": "#/$defs/d_3883c45b3701884ad50b/properties/theta_period",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MetricPricingOverrides/properties/theta_period",
     "default": null,
-    "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\")."
+    "description": "Theta / carry horizon over which time decay is measured (for example\n1D, 1W, 1M, 3M; wire form `{\"count\": 1, \"unit\": \"weeks\"}`). Day and\nweek tenors roll a fixed number of days, month and year tenors roll\ncalendar months (EOM-aware). `None` uses one day."
+  },
+  {
+    "path": "#/$defs/d_3883c45b3701884ad50b/properties/theta_period/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MetricPricingOverrides/properties/theta_period/anyOf/0",
+    "ref": "#/$defs/Tenor",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Tenor"
+  },
+  {
+    "path": "#/$defs/d_3883c45b3701884ad50b/properties/theta_period/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MetricPricingOverrides/properties/theta_period/anyOf/1"
   },
   {
     "path": "#/$defs/d_3883c45b3701884ad50b/properties/var_config",
@@ -3409,6 +3386,24 @@ export default [
     "description": "Receive the primary leg (fixed rate in IRS, protection premium in CDS, long variance)"
   },
   {
+    "path": "#/$defs/d_540b029baeeb4469863b",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStep",
+    "description": "Dated margin step (covenant penalty, scheduled change or pricing-grid move).\n\nShifts the interest margin by `delta_bp` from `date` onward (effective-from\ndate). Steps are cumulative. A negative `delta_bp` steps the margin down (a\nleverage-grid improvement); term loans accept only non-negative steps."
+  },
+  {
+    "path": "#/$defs/d_540b029baeeb4469863b/properties/date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStep/properties/date",
+    "description": "Effective-from date of the margin change.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_540b029baeeb4469863b/properties/delta_bp",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStep/properties/delta_bp",
+    "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
+    "format": "int32"
+  },
+  {
     "path": "#/$defs/d_54276f30e34c6f41bcca",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ParRateMethod",
     "description": "Method for calculating par rates in swaps"
@@ -3605,18 +3600,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_65b0652ed08913529246/properties/cds_act360_include_last_day",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/cds_act360_include_last_day",
-    "default": false,
-    "description": "Add one calendar day to *every* Act/360 premium accrual period.\n\nUsed by the CDS option pricer to model the ISDA pre-Big-Bang\noption underlying convention (and matches QuantLib's\n`Actual360(true)` day-count). The Bloomberg CDSW convention only\ntreats the *final* coupon period as inclusive of the maturity date,\nso this is not the default for production single-name CDS pricing."
-  },
-  {
-    "path": "#/$defs/d_65b0652ed08913529246/properties/cds_aod_half_day_bias",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/cds_aod_half_day_bias",
-    "default": false,
-    "description": "Apply ISDA half-day accrual-on-default bias.\n\nAdds half a day of premium accrual in the default-accrual integral.\nUsed by the CDS option pricer to model the Bloomberg CDSO underlying\nconvention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`)."
-  },
-  {
     "path": "#/$defs/d_65b0652ed08913529246/properties/hazard_mean_reversion",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/hazard_mean_reversion",
     "description": "Mean-reversion speed of the hazard factor (κ_λ) on the rates-credit\nlattice, annualised.\n\n`None` and `0.0` both mean no reversion. Capped by\n[`KAPPA_MAX`](finstack_quant_models::trees::two_factor_rates_credit::KAPPA_MAX),\nabove which the binomial lattice's conditional variance collapses far\nenough to distort option values. Requires `credit_curve_id`.\n\nNote that mean reversion narrows the feasible correlation range: it\nskews the per-node marginal transition probabilities away from ½, and\ntwo Bernoulli marginals admit only correlations inside their Fréchet\nbounds. At `KAPPA_MAX` on both factors over a five-year lattice the\nfeasible `|ρ|` can fall to around `0.12`. Calibration rejects an\nunattainable correlation and reports the lattice-wide maximum, which is\nalso available up front from\n[`RatesCreditTree::max_feasible_correlation`](finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree::max_feasible_correlation).",
@@ -3674,6 +3657,11 @@ export default [
     "minimum": 0
   },
   {
+    "path": "#/$defs/d_65b0652ed08913529246/properties/mc_seed_scenario",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/mc_seed_scenario",
+    "description": "Optional Monte Carlo seed label.\n\nMonte Carlo pricers derive their RNG seed as\n`derive_seed(instrument_id, label)`, so the same label always replays\nthe same random streams for the same instrument. `None` seeds with the\npricer's base label. Finite-difference Greeks set a fixed label on the\nrepriced clone so base and bumped legs share common random numbers."
+  },
+  {
     "path": "#/$defs/d_65b0652ed08913529246/properties/mc_target_ci_half_width",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/mc_target_ci_half_width",
     "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
@@ -3682,7 +3670,7 @@ export default [
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/merton_mc_config",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ModelConfig/properties/merton_mc_config",
-    "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (via flat JSON under `pricing_overrides.merton_mc_config` or the\nRust builder), the `MertonMc` pricer in the registry uses this config."
+    "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
   },
   {
     "path": "#/$defs/d_65b0652ed08913529246/properties/merton_mc_config/anyOf/0",
@@ -4087,13 +4075,13 @@ export default [
   {
     "path": "#/$defs/d_70be17b53297f903e130/properties/low_paths",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcCalibrationSpec/properties/low_paths",
-    "description": "Number of MC paths used during calibration iterations (low paths).",
+    "description": "Number of independent MC estimators used during calibration iterations (low paths).",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_70be17b53297f903e130/properties/max_iter",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcCalibrationSpec/properties/max_iter",
+    "path": "#/$defs/d_70be17b53297f903e130/properties/max_iterations",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcCalibrationSpec/properties/max_iterations",
     "description": "Maximum bisection iterations.",
     "format": "uint",
     "minimum": 0
@@ -4261,7 +4249,7 @@ export default [
   {
     "path": "#/$defs/d_756aabf913f51b821a96/properties/commitment_amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/commitment_amount",
-    "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_schedule`.",
+    "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`.",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
   },
@@ -4273,14 +4261,14 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
   {
-    "path": "#/$defs/d_756aabf913f51b821a96/properties/commitment_schedule",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/commitment_schedule",
+    "path": "#/$defs/d_756aabf913f51b821a96/properties/commitment_steps",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/commitment_steps",
     "default": [],
     "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default."
   },
   {
-    "path": "#/$defs/d_756aabf913f51b821a96/properties/commitment_schedule/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/commitment_schedule/items",
+    "path": "#/$defs/d_756aabf913f51b821a96/properties/commitment_steps/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/commitment_steps/items",
     "ref": "#/$defs/CommitmentStep",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CommitmentStep"
   },
@@ -4352,7 +4340,7 @@ export default [
   {
     "path": "#/$defs/d_756aabf913f51b821a96/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/instrument_pricing_overrides",
-    "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs.",
+    "description": "Instrument-owned pricing inputs.",
     "ref": "#/$defs/InstrumentPricingOverrides",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides"
   },
@@ -4388,8 +4376,8 @@ export default [
   {
     "path": "#/$defs/d_756aabf913f51b821a96/properties/margin_steps/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/margin_steps/items",
-    "ref": "#/$defs/MarginStepUp",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStepUp"
+    "ref": "#/$defs/MarginStep",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStep"
   },
   {
     "path": "#/$defs/d_756aabf913f51b821a96/properties/maturity",
@@ -5674,7 +5662,7 @@ export default [
   {
     "path": "#/$defs/d_8dd62d29564577ef6f97/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoan/properties/instrument_pricing_overrides",
-    "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs.",
+    "description": "Instrument-owned pricing inputs.",
     "ref": "#/$defs/InstrumentPricingOverrides",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides"
   },
@@ -6956,15 +6944,15 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
   {
-    "path": "#/$defs/d_b3e76292f394d4d38a21/properties/margin_stepups",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanCovenantEvents/properties/margin_stepups",
-    "description": "Margin step-up schedule"
+    "path": "#/$defs/d_b3e76292f394d4d38a21/properties/margin_steps",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanCovenantEvents/properties/margin_steps",
+    "description": "Margin steps, each a non-negative cumulative bp change effective from\nthe start of the first interest period on or after its date."
   },
   {
-    "path": "#/$defs/d_b3e76292f394d4d38a21/properties/margin_stepups/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanCovenantEvents/properties/margin_stepups/items",
-    "ref": "#/$defs/MarginStepUp",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStepUp"
+    "path": "#/$defs/d_b3e76292f394d4d38a21/properties/margin_steps/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanCovenantEvents/properties/margin_steps/items",
+    "ref": "#/$defs/MarginStep",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStep"
   },
   {
     "path": "#/$defs/d_b3e76292f394d4d38a21/properties/pik_toggles",
@@ -7035,87 +7023,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides",
-    "description": "Term loan specific overrides for covenants and schedule adjustments."
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/draw_stop_date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/draw_stop_date",
-    "default": null,
-    "description": "Draw stop date (earliest date after which draws are blocked)"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/draw_stop_date/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/draw_stop_date/anyOf/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/draw_stop_date/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/draw_stop_date/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/extra_cash_sweeps",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps",
-    "description": "Extra cash sweeps by date"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/extra_cash_sweeps/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps/items"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/extra_cash_sweeps/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps/items/prefixItems/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/extra_cash_sweeps/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/extra_cash_sweeps/items/prefixItems/1",
-    "ref": "#/$defs/Money",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/margin_add_bp_by_date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date",
-    "description": "Additional margin step-ups by date (bp)"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/margin_add_bp_by_date/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date/items"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/margin_add_bp_by_date/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date/items/prefixItems/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/margin_add_bp_by_date/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/margin_add_bp_by_date/items/prefixItems/1",
-    "format": "int32"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/pik_toggle_by_date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date",
-    "description": "Force PIK toggles by date"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/pik_toggle_by_date/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date/items"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/pik_toggle_by_date/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date/items/prefixItems/0",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_b5e2bf18a32d5f509edb/properties/pik_toggle_by_date/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoanOverrides/properties/pik_toggle_by_date/items/prefixItems/1"
-  },
-  {
     "path": "#/$defs/d_b5fbe42d95b9dc65bd05",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InterestRateSwap",
     "description": "Interest rate swap with fixed and floating legs.\n\nRepresents a standard interest rate swap where one party pays\na fixed rate and the other pays a floating rate plus spread.\n\n# Market Standards & Citations\n\n## ISDA Definitions\n\nCurrent RFR and term-rate contracts are represented under the **ISDA 2021\nInterest Rate Derivatives Definitions**. Legacy transactions may retain\nterms from the 2006 Definitions, including historical IBOR reset conventions.\nFixed/floating day counts, calendars, lags, compounding, and payment rules\nare explicit leg terms or are resolved from the rate-index convention registry.\n\n## USD Market Convention\n\nThe canonical legacy USD term-index example uses:\n- **Fixed Leg:** Semi-annual, 30/360, Modified Following\n- **Floating Leg:** Quarterly, ACT/360, Modified Following\n- **Reset Lag:** T-2 (2 business days before period start)\n- **Discounting:** OIS curve under the collateral agreement\n\n## Day-Count Convention Notes\n\nThe USD standard uses different day-count conventions for different purposes:\n- **Fixed leg accrual:** 30/360 (Bond Basis)\n- **Floating leg accrual:** ACT/360 (Money Market)\n- **Discount curve:** Typically ACT/365F or ACT/360 depending on construction\n\nThis day-count mismatch between accrual and discounting is market-standard\nand reflects the different conventions used in bond vs money markets.\nThe impact on par rates is typically < 0.5bp for USD swaps.\n\n## Validation\n\nUse [`InterestRateSwap::validate()`] to check swaps constructed via\nthe builder pattern.\n\n## References\n\n- ISDA 2021 Interest Rate Derivatives Definitions (current contract framework) `docs/REFERENCES.md#isda-2021-definitions`\n- ISDA 2006 Definitions (legacy transactions) `docs/REFERENCES.md#isda-2006-definitions`\n- Sadr, A. *Interest Rate Swaps and Their Derivatives*.\n  `docs/REFERENCES.md#sadr-2009-irs`\n- Bloomberg SWPM screen conventions.\n  `docs/REFERENCES.md#bloomberg-swpm`"
@@ -7151,7 +7058,7 @@ export default [
   {
     "path": "#/$defs/d_b5fbe42d95b9dc65bd05/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InterestRateSwap/properties/instrument_pricing_overrides",
-    "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs.",
+    "description": "Instrument-owned pricing inputs.",
     "ref": "#/$defs/InstrumentPricingOverrides",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides"
   },
@@ -7308,7 +7215,7 @@ export default [
   {
     "path": "#/$defs/d_b925ced0cbd67041a76f/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CapFloor/properties/instrument_pricing_overrides",
-    "description": "Additional attributes\nInstrument-owned pricing inputs.",
+    "description": "Instrument-owned pricing inputs.",
     "ref": "#/$defs/InstrumentPricingOverrides",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides"
   },
@@ -7571,6 +7478,23 @@ export default [
     "description": "Brownian-bridge correction for continuous monitoring between steps."
   },
   {
+    "path": "#/$defs/d_c2bf0fda0f87921eb6ab",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ThetaDayBasis",
+    "description": "Day basis used to convert annual analytic option theta into a per-day amount.\n\nApplied by the analytic-theta pricers (EquityOption, FxOption,\nFxDigitalOption) through `metric_pricing_overrides.theta_day_basis`."
+  },
+  {
+    "path": "#/$defs/d_c2bf0fda0f87921eb6ab/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ThetaDayBasis/oneOf/0",
+    "const": "calendar_365",
+    "description": "Calendar-day theta: annual theta divided by\n[`crate::constants::DEFAULT_THETA_DAYS_PER_YEAR`] (365)."
+  },
+  {
+    "path": "#/$defs/d_c2bf0fda0f87921eb6ab/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ThetaDayBasis/oneOf/1",
+    "const": "trading_252",
+    "description": "Trading-day theta: annual theta divided by\n[`crate::constants::TRADING_DAYS_PER_YEAR`] (252)."
+  },
+  {
     "path": "#/$defs/d_c42c718f1562da8096a4",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StubKind",
     "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior"
@@ -7812,7 +7736,7 @@ export default [
   {
     "path": "#/$defs/d_cdcefb52fec44ed9ad4d",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CommitmentStep",
-    "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_step_downs`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`)."
+    "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`)."
   },
   {
     "path": "#/$defs/d_cdcefb52fec44ed9ad4d/properties/amount",
@@ -8000,13 +7924,7 @@ export default [
   {
     "path": "#/$defs/d_d3bbe1a355ec94307b4c",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec",
-    "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process and simulation parameters for\nMonte Carlo pricing with uncertain draw/repayment patterns. Credit risk is\nincorporated via hazard-rate survival weighting (no explicit default events)."
-  },
-  {
-    "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/antithetic",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/antithetic",
-    "default": false,
-    "description": "Use antithetic variance reduction when simulating paths (default: false).\nMutually exclusive with `use_sobol_qmc`; validation rejects the combination."
+    "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process for Monte Carlo pricing with uncertain\ndraw/repayment patterns. Credit risk is incorporated via hazard-rate\nsurvival weighting (no explicit default events). The estimator count,\nantithetic flag and seed label are pricing settings, read from\n`instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,\n`mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`]."
   },
   {
     "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/mc_config",
@@ -8024,24 +7942,10 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/mc_config/anyOf/1"
   },
   {
-    "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/num_paths",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/num_paths",
-    "description": "Number of Monte Carlo paths to simulate.",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/seed",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/seed",
-    "description": "Random seed for reproducibility. Simulation is always deterministic:\n`None` falls back to a fixed default seed (42). Because the seed is\nfixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same\nrandom variates for base and bumped valuations — common random\nnumbers — so finite-difference Greeks are free of Monte Carlo noise.",
-    "format": "uint64",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/use_sobol_qmc",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/use_sobol_qmc",
     "default": false,
-    "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `antithetic`; validation rejects the combination."
+    "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination."
   },
   {
     "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/utilization_process",
@@ -8167,7 +8071,7 @@ export default [
   {
     "path": "#/$defs/d_dcc2738b179dc9ea48c6/properties/instrument_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Swaption/properties/instrument_pricing_overrides",
-    "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs.",
+    "description": "Instrument-owned pricing inputs.",
     "ref": "#/$defs/InstrumentPricingOverrides",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/InstrumentPricingOverrides"
   },
@@ -8883,11 +8787,6 @@ export default [
     "description": "Configuration for Monte Carlo PIK bond pricing."
   },
   {
-    "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/antithetic",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/antithetic",
-    "description": "Whether to use antithetic variates for variance reduction."
-  },
-  {
     "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/barrier_crossing",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/barrier_crossing",
     "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`.",
@@ -8929,12 +8828,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/default_recovery_rate",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/default_recovery_rate",
-    "description": "Default recovery rate used when no `dynamic_recovery` model is set.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/dynamic_recovery",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/dynamic_recovery",
     "description": "Optional dynamic (notional-dependent) recovery rate model.\n\nRecovery on default is evaluated pathwise as\n`DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps\nthe result to `[0, base_recovery]`. The clamp introduces a small kink\nin recovery as a function of the accreted notional; paths far into\nthe clamped region all contribute the same (floored/capped) recovery.\nNo smoothed (e.g. logistic) recovery rule is applied."
@@ -8972,13 +8865,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonModel"
   },
   {
-    "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/num_paths",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/num_paths",
-    "description": "Number of Monte Carlo paths.",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/pik_schedule",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/pik_schedule",
     "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior.",
@@ -8986,15 +8872,14 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikSchedule"
   },
   {
-    "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/seed",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/seed",
-    "description": "RNG seed for reproducibility.",
-    "format": "uint64",
-    "minimum": 0
+    "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/recovery_rate",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/recovery_rate",
+    "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+    "format": "double"
   },
   {
-    "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/time_steps_per_year",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/time_steps_per_year",
+    "path": "#/$defs/d_ff1d6292ff0f5bd76a70/properties/steps_per_year",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MertonMcConfig/properties/steps_per_year",
     "description": "Time steps per year for the simulation grid.",
     "format": "uint",
     "minimum": 0
