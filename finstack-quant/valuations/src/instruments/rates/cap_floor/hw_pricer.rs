@@ -807,7 +807,7 @@ mod tests {
             r0: short_rate,
             event_times,
             config: RateExoticMcConfig {
-                num_paths: if sigma == 0.0 { 2 } else { 32_768 },
+                num_paths: if sigma == 0.0 { 1 } else { 16_384 },
                 seed: 0x5EED_50F5,
                 antithetic: true,
                 min_steps_between_events: 4,

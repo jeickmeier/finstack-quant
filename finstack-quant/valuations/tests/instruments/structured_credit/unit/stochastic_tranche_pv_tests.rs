@@ -455,7 +455,7 @@ fn market_correlated_recovery_moves_equity_pv() {
     );
     let market = fixed_market();
     let mode = PricingMode::MonteCarlo {
-        num_paths: 64,
+        num_paths: 32,
         antithetic: true,
     };
     let price = |deal: &StructuredCredit| {

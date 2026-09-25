@@ -108,5 +108,6 @@ pub use types::{
 };
 
 pub use types::{
-    CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, StochasticUtilizationSpec,
+    CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCreditMcRun,
+    StochasticUtilizationSpec,
 };

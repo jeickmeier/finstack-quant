@@ -276,7 +276,7 @@ fn lmm_bermudan_respects_coterminal_lower_bound() {
     let notional = 1_000_000.0;
     let maturity = 4.0_f64;
     let df0_terminal = (-0.03 * maturity).exp();
-    let num_paths = 60_000;
+    let num_paths = 30_000;
     let seed = 7;
 
     let config = RateExoticMcConfig {

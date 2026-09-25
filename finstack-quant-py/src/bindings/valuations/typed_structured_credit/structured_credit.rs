@@ -364,10 +364,11 @@ impl PyStructuredCredit {
     /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Valuation date.
     /// num_paths : int, optional
-    ///     Number of Monte Carlo paths; defaults to the deal's configured
-    ///     ``mc_paths`` override or 10,000.
+    ///     Number of independent Monte Carlo estimators; defaults to the deal's
+    ///     configured ``mc_paths`` override or 5,000. With ``antithetic`` each
+    ///     estimator simulates a mirrored pair, so ``2 * num_paths`` paths run.
     /// antithetic : bool, default True
-    ///     Use antithetic variates (pairs share random numbers).
+    ///     Pair each estimator's path with its sign-flipped mirror.
     ///
     /// Returns
     /// -------
@@ -400,7 +401,7 @@ impl PyStructuredCredit {
             deal.instrument_pricing_overrides
                 .model_config
                 .mc_paths
-                .unwrap_or(10_000)
+                .unwrap_or(5_000)
         });
         let mode = PricingMode::MonteCarlo {
             num_paths,

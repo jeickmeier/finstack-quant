@@ -47,22 +47,24 @@ pub enum PricingMode {
     /// Bounded to roughly ten periods by the `3^n` node count — see the type
     /// docs. Not the default for that reason.
     Tree,
-    /// Monte Carlo pricing with specified number of paths.
+    /// Monte Carlo pricing with a specified number of independent estimators.
     ///
     /// The default, because it is the only mode that can price a deal at a
     /// realistic horizon.
     MonteCarlo {
-        /// Number of simulation paths
+        /// Number of independent estimators. With `antithetic` each estimator
+        /// simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
+        /// scenario paths.
         num_paths: usize,
-        /// Use antithetic variates for variance reduction
+        /// Pair each estimator's path with its sign-flipped mirror.
         antithetic: bool,
     },
     /// Hybrid: tree for short horizons, MC for long
     Hybrid {
         /// Tree periods before switching to MC
         tree_periods: usize,
-        /// MC paths for tail
-        mc_paths: usize,
+        /// Monte Carlo continuation paths per tree prefix
+        num_paths: usize,
     },
 }
 
@@ -74,13 +76,12 @@ impl Default for PricingMode {
     /// type's own documentation wrong; the only reason nothing broke is that
     /// `price_stochastic` overrode the default before it was used.
     ///
-    /// 10,000 paths with antithetic variates matches what
-    /// `default_stochastic_pricing_mode` already selects, so this changes no
-    /// behaviour on the public entry point — it makes the standalone default
-    /// agree with it.
+    /// 5,000 antithetic estimators (10,000 simulated paths) matches what
+    /// `default_stochastic_pricing_mode` already selects, so the standalone
+    /// default agrees with the public entry point.
     fn default() -> Self {
         PricingMode::MonteCarlo {
-            num_paths: 10_000,
+            num_paths: 5_000,
             antithetic: true,
         }
     }
@@ -92,19 +93,25 @@ impl PricingMode {
         PricingMode::Tree
     }
 
-    /// Create Monte Carlo pricing mode.
+    /// Create an antithetic Monte Carlo pricing mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_paths` - Number of independent antithetic estimators, clamped to
+    ///   at least 50 (100 simulated paths); the engine simulates
+    ///   `2 × num_paths` scenario paths.
     pub fn monte_carlo(num_paths: usize) -> Self {
         PricingMode::MonteCarlo {
-            num_paths: num_paths.max(100),
+            num_paths: num_paths.max(50),
             antithetic: true,
         }
     }
 
     /// Create hybrid pricing mode.
-    pub fn hybrid(tree_periods: usize, mc_paths: usize) -> Self {
+    pub fn hybrid(tree_periods: usize, num_paths: usize) -> Self {
         PricingMode::Hybrid {
             tree_periods: tree_periods.max(6),
-            mc_paths: mc_paths.max(100),
+            num_paths: num_paths.max(100),
         }
     }
 }
@@ -235,7 +242,7 @@ mod tests {
             matches!(
                 mode,
                 PricingMode::MonteCarlo {
-                    num_paths: 10_000,
+                    num_paths: 5_000,
                     antithetic: true
                 }
             ),
@@ -271,11 +278,31 @@ mod tests {
         let tree_config = ScenarioTreeConfig::new(12, 3);
 
         let config = StochasticPricerConfig::new(today, curve, tree_config)
-            .with_pricing_mode(PricingMode::monte_carlo(10000));
+            .with_pricing_mode(PricingMode::monte_carlo(5_000));
 
         assert!(matches!(
             config.pricing_mode,
             PricingMode::MonteCarlo { .. }
         ));
+    }
+
+    #[test]
+    fn hybrid_pricing_mode_uses_num_paths() {
+        // schema-rejection-test: `hybrid.mc_paths`
+        let err = serde_json::from_str::<PricingMode>(
+            r#"{"hybrid": {"tree_periods": 2, "mc_paths": 100}}"#,
+        )
+        .expect_err("retired hybrid.mc_paths must be rejected");
+        assert!(err.to_string().contains("mc_paths"), "{err}");
+        let mode: PricingMode =
+            serde_json::from_str(r#"{"hybrid": {"tree_periods": 2, "num_paths": 100}}"#)
+                .expect("canonical hybrid parses");
+        assert_eq!(
+            mode,
+            PricingMode::Hybrid {
+                tree_periods: 2,
+                num_paths: 100
+            }
+        );
     }
 }

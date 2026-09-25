@@ -17,7 +17,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_models::credit::{BarrierType, MertonModel};
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
-    BarrierCrossing, MertonMcConfig, MertonMcEngine, PikMode, PikSchedule,
+    BarrierCrossing, MertonMcConfig, MertonMcEngine, MertonMcRun, PikMode, PikSchedule,
 };
 use std::hint::black_box;
 
@@ -52,10 +52,12 @@ fn bench_merton_mc_path_count(c: &mut Criterion) {
     let n_paths = 10_000;
     let config = MertonMcConfig::new(reference_merton(), 0.40)
         .expect("0.40 recovery should be valid")
-        .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-        .num_paths(n_paths)
-        .seed(42)
-        .antithetic(true);
+        .pik_schedule(PikSchedule::Uniform(PikMode::Pik));
+    let config_run = MertonMcRun {
+        num_paths: (n_paths) / 2,
+        seed: 42,
+        antithetic: true,
+    };
 
     group.throughput(Throughput::Elements(n_paths as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n_paths), &n_paths, |b, _| {
@@ -66,6 +68,7 @@ fn bench_merton_mc_path_count(c: &mut Criterion) {
                 black_box(5.0),
                 black_box(2),
                 black_box(&config),
+                black_box(&config_run),
                 black_box(0.04),
             )
             .unwrap()
@@ -86,9 +89,12 @@ fn bench_merton_mc_tenor(c: &mut Criterion) {
     let maturity_years = 5.0;
     let config = MertonMcConfig::new(reference_merton(), 0.40)
         .expect("0.40 recovery should be valid")
-        .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-        .num_paths(PATHS)
-        .seed(42);
+        .pik_schedule(PikSchedule::Uniform(PikMode::Pik));
+    let config_run = MertonMcRun {
+        num_paths: (PATHS) / 2,
+        seed: 42,
+        antithetic: true,
+    };
 
     group.bench_with_input(
         BenchmarkId::from_parameter(label),
@@ -101,6 +107,7 @@ fn bench_merton_mc_tenor(c: &mut Criterion) {
                     black_box(mat),
                     black_box(2),
                     black_box(&config),
+                    black_box(&config_run),
                     black_box(0.04),
                 )
                 .unwrap()
@@ -119,17 +126,21 @@ fn bench_merton_mc_antithetic(c: &mut Criterion) {
 
     let config_on = MertonMcConfig::new(reference_merton(), 0.40)
         .expect("0.40 recovery should be valid")
-        .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-        .num_paths(10_000)
-        .seed(42)
-        .antithetic(true);
+        .pik_schedule(PikSchedule::Uniform(PikMode::Pik));
+    let config_on_run = MertonMcRun {
+        num_paths: 5000,
+        seed: 42,
+        antithetic: true,
+    };
 
     let config_off = MertonMcConfig::new(reference_merton(), 0.40)
         .expect("0.40 recovery should be valid")
-        .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-        .num_paths(10_000)
-        .seed(42)
-        .antithetic(false);
+        .pik_schedule(PikSchedule::Uniform(PikMode::Pik));
+    let config_off_run = MertonMcRun {
+        num_paths: 10_000,
+        seed: 42,
+        antithetic: false,
+    };
 
     group.bench_function("antithetic_on", |b| {
         b.iter(|| {
@@ -139,6 +150,7 @@ fn bench_merton_mc_antithetic(c: &mut Criterion) {
                 black_box(5.0),
                 black_box(2),
                 black_box(&config_on),
+                black_box(&config_on_run),
                 black_box(0.04),
             )
             .unwrap()
@@ -154,6 +166,7 @@ fn bench_merton_mc_antithetic(c: &mut Criterion) {
                 black_box(5.0),
                 black_box(2),
                 black_box(&config_off),
+                black_box(&config_off_run),
                 black_box(0.04),
             )
             .unwrap()
@@ -169,22 +182,22 @@ fn bench_merton_mc_antithetic(c: &mut Criterion) {
 fn bench_merton_mc_pik_mode(c: &mut Criterion) {
     let mut group = c.benchmark_group("merton_mc_pik_mode");
 
-    let config_cash = MertonMcConfig::new(reference_merton(), 0.40)
-        .expect("0.40 recovery should be valid")
-        .num_paths(10_000)
-        .seed(42);
+    let config_cash =
+        MertonMcConfig::new(reference_merton(), 0.40).expect("0.40 recovery should be valid");
 
     let config_pik = MertonMcConfig::new(reference_merton(), 0.40)
         .expect("0.40 recovery should be valid")
-        .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-        .num_paths(10_000)
-        .seed(42);
+        .pik_schedule(PikSchedule::Uniform(PikMode::Pik));
 
     let config_toggle = MertonMcConfig::new(reference_merton(), 0.40)
         .expect("0.40 recovery should be valid")
-        .pik_schedule(PikSchedule::Uniform(PikMode::Toggle))
-        .num_paths(10_000)
-        .seed(42);
+        .pik_schedule(PikSchedule::Uniform(PikMode::Toggle));
+
+    let run = MertonMcRun {
+        num_paths: 5_000,
+        seed: 42,
+        antithetic: true,
+    };
 
     for (label, config) in [
         ("cash", &config_cash),
@@ -199,6 +212,7 @@ fn bench_merton_mc_pik_mode(c: &mut Criterion) {
                     black_box(5.0),
                     black_box(2),
                     black_box(config),
+                    black_box(&run),
                     black_box(0.04),
                 )
                 .unwrap()
@@ -218,16 +232,22 @@ fn bench_merton_mc_barrier_type(c: &mut Criterion) {
     let config_terminal = MertonMcConfig::new(reference_merton(), 0.40)
         .expect("0.40 recovery should be valid")
         .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-        .num_paths(10_000)
-        .seed(42)
         .barrier_crossing(BarrierCrossing::Discrete);
+    let config_terminal_run = MertonMcRun {
+        num_paths: 5000,
+        seed: 42,
+        antithetic: true,
+    };
 
     let config_fp = MertonMcConfig::new(first_passage_merton(), 0.40)
         .expect("0.40 recovery should be valid")
         .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-        .num_paths(10_000)
-        .seed(42)
         .barrier_crossing(BarrierCrossing::BrownianBridge);
+    let config_fp_run = MertonMcRun {
+        num_paths: 5000,
+        seed: 42,
+        antithetic: true,
+    };
 
     group.bench_function("terminal_discrete", |b| {
         b.iter(|| {
@@ -237,6 +257,7 @@ fn bench_merton_mc_barrier_type(c: &mut Criterion) {
                 black_box(5.0),
                 black_box(2),
                 black_box(&config_terminal),
+                black_box(&config_terminal_run),
                 black_box(0.04),
             )
             .unwrap()
@@ -252,6 +273,7 @@ fn bench_merton_mc_barrier_type(c: &mut Criterion) {
                 black_box(5.0),
                 black_box(2),
                 black_box(&config_fp),
+                black_box(&config_fp_run),
                 black_box(0.04),
             )
             .unwrap()

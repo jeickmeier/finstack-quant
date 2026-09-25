@@ -34,7 +34,7 @@ pub(crate) use engine::MertonBondTerms;
 pub use engine::MertonMcEngine;
 pub use types::{
     BarrierCrossing, CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, MertonMcResult,
-    PathStatistics, PikMode, PikSchedule,
+    MertonMcRun, PathStatistics, PikMode, PikSchedule,
 };
 
 pub(crate) use pricer::SimpleBondMertonMcPricer;

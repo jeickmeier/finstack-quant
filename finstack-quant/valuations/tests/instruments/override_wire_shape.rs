@@ -34,7 +34,9 @@ where
 fn focused_overrides_use_canonical_wire_shape() {
     let mut bond = Bond::example().expect("bond example");
     bond.instrument_pricing_overrides.model_config.tree_steps = Some(321);
-    bond.metric_pricing_overrides.mc_seed_scenario = Some("dv01_up".to_string());
+    bond.instrument_pricing_overrides
+        .model_config
+        .mc_seed_scenario = Some("dv01_up".to_string());
     bond.scenario_pricing_overrides.scenario_spread_shock_bp = Some(12.5);
     assert_canonical_override_wire(
         &bond,
@@ -44,7 +46,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!(321),
             ),
             (
-                "/metric_pricing_overrides/mc_seed_scenario",
+                "/instrument_pricing_overrides/model_config/mc_seed_scenario",
                 serde_json::json!("dv01_up"),
             ),
             (
@@ -57,7 +59,9 @@ fn focused_overrides_use_canonical_wire_shape() {
 
     let mut cap = CapFloor::example().expect("cap floor example");
     cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
-    cap.metric_pricing_overrides.mc_seed_scenario = Some("vega_up".to_string());
+    cap.instrument_pricing_overrides
+        .model_config
+        .mc_seed_scenario = Some("vega_up".to_string());
     cap.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.04);
     assert_canonical_override_wire(
         &cap,
@@ -67,7 +71,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!(0.012),
             ),
             (
-                "/metric_pricing_overrides/mc_seed_scenario",
+                "/instrument_pricing_overrides/model_config/mc_seed_scenario",
                 serde_json::json!("vega_up"),
             ),
             (
@@ -83,7 +87,10 @@ fn focused_overrides_use_canonical_wire_shape() {
         .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = Some(0.17);
-    forward.metric_pricing_overrides.mc_seed_scenario = Some("rho_up".to_string());
+    forward
+        .instrument_pricing_overrides
+        .model_config
+        .mc_seed_scenario = Some("rho_up".to_string());
     forward.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.03);
     assert_canonical_override_wire(
         &forward,
@@ -93,7 +100,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!(0.17),
             ),
             (
-                "/metric_pricing_overrides/mc_seed_scenario",
+                "/instrument_pricing_overrides/model_config/mc_seed_scenario",
                 serde_json::json!("rho_up"),
             ),
             (
@@ -109,7 +116,10 @@ fn focused_overrides_use_canonical_wire_shape() {
         .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = Some(0.31);
-    option.metric_pricing_overrides.mc_seed_scenario = Some("vega_down".to_string());
+    option
+        .instrument_pricing_overrides
+        .model_config
+        .mc_seed_scenario = Some("vega_down".to_string());
     option.scenario_pricing_overrides.scenario_spread_shock_bp = Some(8.0);
     assert_canonical_override_wire(
         &option,
@@ -119,7 +129,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!(0.31),
             ),
             (
-                "/metric_pricing_overrides/mc_seed_scenario",
+                "/instrument_pricing_overrides/model_config/mc_seed_scenario",
                 serde_json::json!("vega_down"),
             ),
             (
@@ -132,7 +142,10 @@ fn focused_overrides_use_canonical_wire_shape() {
 
     let mut autocall = Autocallable::example().expect("autocallable example");
     autocall.instrument_pricing_overrides.model_config.mc_paths = Some(12_345);
-    autocall.metric_pricing_overrides.mc_seed_scenario = Some("delta_up".to_string());
+    autocall
+        .instrument_pricing_overrides
+        .model_config
+        .mc_seed_scenario = Some("delta_up".to_string());
     autocall.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.08);
     assert_canonical_override_wire(
         &autocall,
@@ -142,7 +155,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!(12_345),
             ),
             (
-                "/metric_pricing_overrides/mc_seed_scenario",
+                "/instrument_pricing_overrides/model_config/mc_seed_scenario",
                 serde_json::json!("delta_up"),
             ),
             (
@@ -158,7 +171,10 @@ fn focused_overrides_use_canonical_wire_shape() {
         .instrument_pricing_overrides
         .market_quotes
         .implied_volatility = Some(0.31);
-    swaption.metric_pricing_overrides.mc_seed_scenario = Some("vega_up".to_string());
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .mc_seed_scenario = Some("vega_up".to_string());
     swaption.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.05);
     assert_canonical_override_wire(
         &swaption,
@@ -168,7 +184,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!(0.31),
             ),
             (
-                "/metric_pricing_overrides/mc_seed_scenario",
+                "/instrument_pricing_overrides/model_config/mc_seed_scenario",
                 serde_json::json!("vega_up"),
             ),
             (

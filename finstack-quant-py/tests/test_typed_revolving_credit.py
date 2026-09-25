@@ -59,9 +59,6 @@ def stochastic_spec(volatility: float, spread: dict[str, object], *, credit: boo
                     "spread_sensitivity": 0.0,
                 }
             },
-            "num_paths": 16,
-            "seed": 42,
-            "antithetic": True,
             "use_sobol_qmc": False,
             "mc_config": {
                 "correlation_matrix": None,
@@ -95,6 +92,15 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
     if credit:
         b = b.credit_curve_id(HAZARD_ID)
     return b
+
+
+def with_sampling(facility: RevolvingCredit, *, mc_paths: int = 8) -> RevolvingCredit:
+    """Price with ``mc_paths`` antithetic estimators (``2 * mc_paths`` simulated paths)."""
+    envelope = json.loads(facility.to_json())
+    envelope["instrument"]["spec"]["instrument_pricing_overrides"] = {
+        "model_config": {"mc_paths": mc_paths, "mc_antithetic": True}
+    }
+    return RevolvingCredit.from_json(json.dumps(envelope))
 
 
 def market_anchored() -> dict[str, object]:
@@ -193,7 +199,7 @@ def test_expected_cashflows_matches_the_json_schedule() -> None:
 
 
 def test_price_with_paths_returns_every_path_and_the_option_cost() -> None:
-    facility = builder(stochastic_spec(0.25, market_anchored(), credit=True), credit=True).build()
+    facility = with_sampling(builder(stochastic_spec(0.25, market_anchored(), credit=True), credit=True).build())
     assert facility.is_stochastic
     ctx = market()
     result = facility.price_with_paths(ctx, AS_OF)
@@ -230,7 +236,7 @@ def test_price_with_paths_returns_every_path_and_the_option_cost() -> None:
 
 
 def test_constant_spread_at_the_margin_has_zero_option_cost() -> None:
-    facility = builder(stochastic_spec(0.25, {"constant": 0.025}, credit=False)).build()
+    facility = with_sampling(builder(stochastic_spec(0.25, {"constant": 0.025}, credit=False)).build())
     result = facility.price_with_paths(market(), AS_OF)
     assert all(cost == 0.0 for cost in result.path_draw_option_costs)
     assert result.draw_option_cost.amount == 0.0

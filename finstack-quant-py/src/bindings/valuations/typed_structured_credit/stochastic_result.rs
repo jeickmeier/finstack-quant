@@ -61,7 +61,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Sto
 /// >>> envelope["instrument"]["spec"]["payment_calendar_id"] = "nyse"
 /// >>> deal = StructuredCredit.from_json(json.dumps(envelope))
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
-/// >>> result = deal.price_stochastic(market, as_of, num_paths=8)
+/// >>> result = deal.price_stochastic(market, as_of, num_paths=4)
 /// >>> (result.num_paths, [t["tranche_id"] for t in result.tranche_results])
 /// (8, ['A'])
 /// >>> result.unfunded_draw_path_fraction
@@ -200,7 +200,7 @@ impl PyStochasticPricingResult {
         self.inner.pv_confidence_interval
     }
 
-    /// Number of scenario paths.
+    /// Number of simulated scenario paths (two per antithetic estimator).
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths

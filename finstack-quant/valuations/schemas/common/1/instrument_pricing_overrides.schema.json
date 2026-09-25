@@ -1400,12 +1400,12 @@
           ]
         },
         "low_paths": {
-          "description": "Number of MC paths used during calibration iterations (low paths).",
+          "description": "Number of independent MC estimators used during calibration iterations (low paths).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
-        "max_iter": {
+        "max_iterations": {
           "description": "Maximum bisection iterations.",
           "format": "uint",
           "minimum": 0,
@@ -1438,7 +1438,7 @@
         "target",
         "parameter",
         "low_paths",
-        "max_iter",
+        "max_iterations",
         "tolerance_pv"
       ],
       "type": "object"
@@ -1447,10 +1447,6 @@
       "additionalProperties": false,
       "description": "Configuration for Monte Carlo PIK bond pricing.",
       "properties": {
-        "antithetic": {
-          "description": "Whether to use antithetic variates for variance reduction.",
-          "type": "boolean"
-        },
         "barrier_crossing": {
           "$ref": "#/$defs/BarrierCrossing",
           "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
@@ -1488,11 +1484,6 @@
             "null"
           ]
         },
-        "default_recovery_rate": {
-          "description": "Default recovery rate used when no `dynamic_recovery` model is set.",
-          "format": "double",
-          "type": "number"
-        },
         "dynamic_recovery": {
           "anyOf": [
             {
@@ -1519,23 +1510,16 @@
           "$ref": "#/$defs/MertonModel",
           "description": "Merton structural credit model."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
         "pik_schedule": {
           "$ref": "#/$defs/PikSchedule",
           "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior."
         },
-        "seed": {
-          "description": "RNG seed for reproducibility.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+        "recovery_rate": {
+          "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+          "format": "double",
+          "type": "number"
         },
-        "time_steps_per_year": {
+        "steps_per_year": {
           "description": "Time steps per year for the simulation grid.",
           "format": "uint",
           "minimum": 0,
@@ -1556,12 +1540,9 @@
       "required": [
         "merton",
         "pik_schedule",
-        "num_paths",
-        "seed",
-        "antithetic",
-        "time_steps_per_year",
+        "steps_per_year",
         "barrier_crossing",
-        "default_recovery_rate"
+        "recovery_rate"
       ],
       "type": "object"
     },
@@ -1726,6 +1707,13 @@
             "null"
           ]
         },
+        "mc_seed_scenario": {
+          "description": "Optional Monte Carlo seed label.\n\nMonte Carlo pricers derive their RNG seed as\n`derive_seed(instrument_id, label)`, so the same label always replays\nthe same random streams for the same instrument. `None` seeds with the\npricer's base label. Finite-difference Greeks set a fixed label on the\nrepriced clone so base and bumped legs share common random numbers.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "mc_target_ci_half_width": {
           "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
           "format": "double",
@@ -1743,7 +1731,7 @@
               "type": "null"
             }
           ],
-          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (via flat JSON under `pricing_overrides.merton_mc_config` or the\nRust builder), the `MertonMc` pricer in the registry uses this config."
+          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
         },
         "oas_price_basis": {
           "$ref": "#/$defs/OasPriceBasis",

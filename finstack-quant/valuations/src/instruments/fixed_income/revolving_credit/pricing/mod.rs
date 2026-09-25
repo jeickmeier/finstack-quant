@@ -114,13 +114,13 @@ mod tests {
                         volatility: 0.1,
                         spread_sensitivity: 0.0,
                     },
-                    num_paths: 100,
-                    seed: Some(42),
-                    antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: Some(mc_config),
                 },
             )))
+            .instrument_pricing_overrides(
+                crate::instruments::InstrumentPricingOverrides::default().with_mc_paths(100),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.4)
             .build()

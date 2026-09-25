@@ -23,7 +23,9 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     RevolvingCredit, RevolvingCreditFees, RevolvingCreditPricer, StochasticUtilizationSpec,
     UtilizationProcess,
 };
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::{
+    Instrument, InstrumentPricingOverrides, PricingOptions,
+};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -61,12 +63,7 @@ fn term_spec(reset: Tenor) -> FloatingRateSpec {
 /// simulated path carries genuine draws/repayments without Monte Carlo noise.
 /// Stochastic utilization spec. Zero volatility freezes utilization (parity
 /// mode); a positive volatility produces genuine simulated draws/repayments.
-fn stochastic(
-    target: f64,
-    volatility: f64,
-    num_paths: usize,
-    mc_config: Option<McConfig>,
-) -> DrawRepaySpec {
+fn stochastic(target: f64, volatility: f64, mc_config: Option<McConfig>) -> DrawRepaySpec {
     DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         utilization_process: UtilizationProcess::MeanReverting {
             target_rate: target,
@@ -74,16 +71,18 @@ fn stochastic(
             volatility,
             spread_sensitivity: 0.0,
         },
-        num_paths,
-        seed: Some(42),
-        antithetic: false,
         use_sobol_qmc: false,
         mc_config,
     }))
 }
 
 fn drifting_stochastic(target: f64, mc_config: Option<McConfig>) -> DrawRepaySpec {
-    stochastic(target, 0.0, 2, mc_config)
+    stochastic(target, 0.0, mc_config)
+}
+
+/// Two independent Monte Carlo estimators: enough for a variance estimate.
+fn two_estimators() -> InstrumentPricingOverrides {
+    InstrumentPricingOverrides::default().with_mc_paths(2)
 }
 
 fn no_credit_config() -> McConfig {
@@ -113,6 +112,7 @@ fn facility(
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(draw_repay)
+        .instrument_pricing_overrides(two_estimators())
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(recovery_rate)
         .build()
@@ -147,13 +147,14 @@ fn seasoned_stochastic_facility_prices_and_conserves_principal() {
     ] {
         // Genuine utilization volatility so every path carries simulated
         // draws and repayments after the valuation date.
-        let f = facility(
+        let mut f = facility(
             "RC-SEASONED",
             drawn,
             BaseRateSpec::Fixed { rate: 0.05 },
-            stochastic(0.6, 0.25, 8, Some(no_credit_config())),
+            stochastic(0.6, 0.25, Some(no_credit_config())),
             0.4,
         );
+        f.instrument_pricing_overrides.model_config.mc_paths = Some(8);
         let result = RevolvingCreditPricer::price_with_paths(&f, &market, as_of)
             .unwrap_or_else(|e| panic!("seasoned stochastic pricing failed at {as_of}: {e}"));
         assert_eq!(result.path_results.len(), 8);
@@ -227,6 +228,7 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(drifting_stochastic(0.6, Some(explicit_cir)))
+        .instrument_pricing_overrides(two_estimators())
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id("BORROWER-HZ".into())
         .recovery_rate(0.4)
@@ -259,6 +261,7 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(drifting_stochastic(0.6, Some(other_curve)))
+        .instrument_pricing_overrides(two_estimators())
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id("BORROWER-HZ".into())
         .recovery_rate(0.4)
@@ -343,6 +346,7 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(drifting_stochastic(1.0, Some(no_credit_config())))
+        .instrument_pricing_overrides(two_estimators())
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.0)
         .build()
@@ -543,7 +547,7 @@ fn stochastic_funding_leg_conserves_cash_for_small_draws() {
         "RC-SMALL-DRAWS",
         drawn,
         BaseRateSpec::Fixed { rate: 0.05 },
-        stochastic(0.300_002, 1e-8, 2, Some(no_credit_config())),
+        stochastic(0.300_002, 1e-8, Some(no_credit_config())),
         0.4,
     );
     let result = RevolvingCreditPricer::price_with_paths(&f, &market, COMMITMENT).expect("price");

@@ -540,19 +540,25 @@ impl RevolvingCredit {
                 }
             }
             DrawRepaySpec::Stochastic(spec) => {
-                validation::require_with(spec.num_paths >= 2, || {
+                let run = super::types::RevolvingCreditMcRun::resolve(
+                    &self.id,
+                    &self.instrument_pricing_overrides.model_config,
+                )?;
+                validation::require_with(run.num_paths >= 2, || {
                     format!(
-                        "RevolvingCredit stochastic num_paths must be at least 2, got {}",
-                        spec.num_paths
+                        "RevolvingCredit stochastic pricing needs at least 2 independent \
+                         estimators (instrument_pricing_overrides.model_config.mc_paths), got {}",
+                        run.num_paths
                     )
                 })?;
                 // Antithetic pairing is defined for pseudorandom draws only;
                 // negating Sobol points destroys the low-discrepancy
                 // structure. Reject the combination rather than silently
                 // dropping the antithetic flag.
-                validation::require_with(!(spec.antithetic && spec.use_sobol_qmc), || {
-                    "RevolvingCredit stochastic spec cannot combine antithetic \
-                     variance reduction with Sobol QMC; disable one of the two flags"
+                validation::require_with(!(run.antithetic && spec.use_sobol_qmc), || {
+                    "RevolvingCredit cannot combine \
+                     instrument_pricing_overrides.model_config.mc_antithetic with \
+                     draw_repay_spec.stochastic.use_sobol_qmc; disable one of the two"
                         .to_string()
                 })?;
                 match &spec.utilization_process {

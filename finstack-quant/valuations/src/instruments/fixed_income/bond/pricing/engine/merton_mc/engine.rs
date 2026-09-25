@@ -1,5 +1,6 @@
 use super::{
-    BarrierCrossing, MertonMcConfig, MertonMcResult, PathStatistics, PikMode, PikSchedule,
+    BarrierCrossing, MertonMcConfig, MertonMcResult, MertonMcRun, PathStatistics, PikMode,
+    PikSchedule,
 };
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_core::{InputError, Result};
@@ -58,7 +59,8 @@ impl MertonMcEngine {
     ///   must be positive
     /// * `coupon_frequency` - Number of coupon periods per year (for example 2 for
     ///   semi-annual); must be at least 1
-    /// * `config` - Monte Carlo configuration including path count and PIK schedule
+    /// * `config` - Structural model, PIK schedule, recovery and time grid
+    /// * `run` - Independent-estimator count, root seed and antithetic flag
     /// * `discount_rate` - Continuous discount rate for Merton drift and the flat-rate
     ///   fallback when `cashflow_dfs` is not set
     ///
@@ -72,6 +74,7 @@ impl MertonMcEngine {
         maturity_years: f64,
         coupon_frequency: usize,
         config: &MertonMcConfig,
+        run: &MertonMcRun,
         discount_rate: f64,
     ) -> Result<MertonMcResult> {
         if coupon_frequency == 0 {
@@ -91,7 +94,7 @@ impl MertonMcEngine {
             coupons,
             accrued: notional * coupon_rate * elapsed,
         };
-        Self::price_terms(&terms, config, discount_rate)
+        Self::price_terms(&terms, config, run, discount_rate)
     }
 
     /// Price explicit bond terms (coupon grid, horizon and accrued).
@@ -101,6 +104,7 @@ impl MertonMcEngine {
     pub(crate) fn price_terms(
         terms: &MertonBondTerms,
         config: &MertonMcConfig,
+        run: &MertonMcRun,
         discount_rate: f64,
     ) -> Result<MertonMcResult> {
         let (notional, coupon_rate, maturity_years) =
@@ -109,13 +113,13 @@ impl MertonMcEngine {
             return Err(InputError::Invalid.into());
         }
         Self::validate_pik_schedule(&config.pik_schedule)?;
-        // A single path has no variance estimate (division by n-1 = 0) and
-        // no meaningful MC statistics.
-        if config.num_paths < 2 {
+        // A single estimator has no variance estimate (division by n-1 = 0)
+        // and no meaningful MC statistics.
+        if run.num_paths < 2 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Merton MC requires num_paths >= 2 (got {}); a single path has \
-                 no variance estimate",
-                config.num_paths
+                "Merton MC requires instrument_pricing_overrides.model_config.mc_paths >= 2 \
+                 independent estimators (got {}); a single estimator has no variance estimate",
+                run.num_paths
             )));
         }
         // A non-positive maturity yields `dt = maturity_years / total_steps <= 0`
@@ -136,12 +140,12 @@ impl MertonMcEngine {
             )));
         }
 
-        let num_paths = config.num_paths;
+        let num_paths = run.num_paths;
         // Size the grid so it ends EXACTLY at maturity: rounding the step
         // count against a fixed dt = 1/steps_per_year left stub maturities
         // with a horizon ≠ maturity (coupons placed beyond the simulated
         // horizon, first-passage defaults triggering after maturity).
-        let total_steps = (maturity_years * config.time_steps_per_year as f64)
+        let total_steps = (maturity_years * config.steps_per_year as f64)
             .ceil()
             .max(1.0) as usize;
         let dt = maturity_years / total_steps as f64;
@@ -170,14 +174,12 @@ impl MertonMcEngine {
             BarrierType::Terminal => (BarrierType::Terminal, 0.0),
         };
 
-        // Determine how many base paths (for antithetic)
-        let n_base = if config.antithetic {
-            num_paths.div_ceil(2)
-        } else {
-            num_paths
-        };
+        // One base path (RNG stream) per independent estimator; antithetic
+        // sampling adds its sign-flipped mirror.
+        let n_base = num_paths;
+        let signs: &[f64] = if run.antithetic { &[1.0, -1.0] } else { &[1.0] };
 
-        let mut path_pvs: Vec<f64> = Vec::with_capacity(num_paths);
+        let mut path_pvs: Vec<f64> = Vec::with_capacity(num_paths * signs.len());
 
         // Accumulators for statistics
         let mut total_defaults: usize = 0;
@@ -232,7 +234,7 @@ impl MertonMcEngine {
             |(normals, uniforms, toggle_uniforms): &mut (Vec<f64>, Vec<f64>, Vec<f64>),
              path_idx| {
                 // Per-path RNG for determinism
-                let mut rng = Pcg64Rng::new_with_stream(config.seed, path_idx as u64);
+                let mut rng = Pcg64Rng::new_with_stream(run.seed, path_idx as u64);
 
                 // Fill per-thread buffers with random draws so that antithetic
                 // pairs share identical randomness (normals are sign-flipped;
@@ -249,17 +251,6 @@ impl MertonMcEngine {
                 for tu in toggle_uniforms.iter_mut() {
                     *tu = rng.uniform();
                 }
-
-                // Antithetic decision derived purely from `path_idx`. With
-                // `n_base = num_paths.div_ceil(2)`, only the final base path
-                // (when `num_paths` is odd) emits a single leg, so the serial
-                // `path_pvs.len() + 1 < num_paths` test is exactly
-                // `2 * path_idx + 1 < num_paths`.
-                let signs: &[f64] = if config.antithetic && 2 * path_idx + 1 < num_paths {
-                    &[1.0, -1.0]
-                } else {
-                    &[1.0]
-                };
 
                 let mut legs: SmallVec<[LegOutcome; 2]> = SmallVec::new();
                 for &sign in signs {
@@ -305,7 +296,7 @@ impl MertonMcEngine {
                                     let recovery_rate = config
                                         .dynamic_recovery
                                         .as_ref()
-                                        .map_or(config.default_recovery_rate, |dr| {
+                                        .map_or(config.recovery_rate, |dr| {
                                             dr.recovery_at_notional(n_current)
                                         });
                                     let recovery_cashflow = recovery_rate * n_current;
@@ -345,7 +336,7 @@ impl MertonMcEngine {
                                     let recovery_rate = config
                                         .dynamic_recovery
                                         .as_ref()
-                                        .map_or(config.default_recovery_rate, |dr| {
+                                        .map_or(config.recovery_rate, |dr| {
                                             dr.recovery_at_notional(n_current)
                                         });
                                     let recovery_cashflow = recovery_rate * n_current;
@@ -495,9 +486,6 @@ impl MertonMcEngine {
             }
         }
 
-        // Trim to exact num_paths in case antithetic generated extras
-        path_pvs.truncate(num_paths);
-
         // Aggregate statistics
         let actual_paths = path_pvs.len() as f64;
         let mean_pv = path_pvs.iter().sum::<f64>() / actual_paths;
@@ -540,7 +528,7 @@ impl MertonMcEngine {
         // negatively correlated by construction, so the i.i.d. samples are
         // the PAIR AVERAGES (adjacent in path order), not the individual
         // legs — treating 2N legs as independent misstates the SE.
-        let standard_error = if config.antithetic {
+        let standard_error = if run.antithetic {
             let pair_means: Vec<f64> = path_pvs
                 .chunks(2)
                 .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
@@ -610,7 +598,7 @@ impl MertonMcEngine {
                 avg_recovery_pct,
                 pik_exercise_rate,
             },
-            num_paths: path_pvs.len(),
+            num_paths,
             standard_error,
         })
     }

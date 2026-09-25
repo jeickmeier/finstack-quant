@@ -298,16 +298,6 @@ impl AsianOptionMcPricer {
         }
     }
 
-    fn merged_path_config(&self, inst: &AsianOption) -> PathDependentPricerConfig {
-        let mut c = self.config.clone();
-        if let Some(n) = inst.instrument_pricing_overrides.model_config.mc_paths {
-            if n > 0 {
-                c.num_paths = n;
-            }
-        }
-        c
-    }
-
     /// Price an Asian option using Monte Carlo.
     fn price_internal(
         &self,
@@ -382,7 +372,10 @@ impl AsianOptionMcPricer {
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params);
 
-        let base_cfg = self.merged_path_config(inst);
+        let base_cfg = crate::instruments::common_impl::helpers::merged_path_config(
+            &self.config,
+            &inst.instrument_pricing_overrides,
+        )?;
 
         // Map fixing dates to time steps, guaranteeing one distinct grid step
         // per fixing (W-04). The grid is refined as needed so no two distinct
@@ -433,7 +426,11 @@ impl AsianOptionMcPricer {
         // Derive deterministic seed from instrument ID and scenario
         use finstack_quant_models::monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst
+            .instrument_pricing_overrides
+            .model_config
+            .mc_seed_scenario
+        {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -1326,6 +1323,84 @@ mod tests {
 
         assert!((pv - expected_money).abs() < 1e-12);
         assert!((pv - kv).abs() < 0.05, "pv {pv} far from Kemna-Vorst {kv}");
+    }
+
+    /// `model_config.mc_antithetic` must reach the Asian Monte Carlo engine
+    /// through the shared `merged_path_config`: toggling it changes the
+    /// simulated streams, so the PV moves, while both estimates stay within
+    /// Monte Carlo noise of the discrete-fixing geometric (Kemna-Vorst) price.
+    ///
+    /// Tolerance: the discounted ATM 1y geometric-Asian payoff has a standard
+    /// deviation below 7, so 20,000 estimators give a standard error below
+    /// 0.05; 0.2 is four standard errors.
+    #[test]
+    fn asian_honours_mc_antithetic() {
+        let as_of = date(2025, 1, 2);
+        let expiry = date(2026, 1, 2);
+        let fixing_dates = vec![
+            date(2025, 4, 2),
+            date(2025, 7, 2),
+            date(2025, 10, 2),
+            date(2026, 1, 2),
+        ];
+        let (spot, strike, vol, rate) = (100.0, 100.0, 0.20, 0.05);
+        let market = market(as_of, spot, vol, rate, 0.0);
+        let mut option = asian_option(
+            AveragingMethod::Geometric,
+            OptionType::Call,
+            expiry,
+            strike,
+            fixing_dates.clone(),
+        );
+        option.instrument_pricing_overrides.model_config.mc_paths = Some(20_000);
+
+        let pv_with = |antithetic: bool| {
+            let mut inst = option.clone();
+            inst.instrument_pricing_overrides.model_config.mc_antithetic = Some(antithetic);
+            AsianOptionMcPricer::new()
+                .price_internal(&inst, &market, as_of)
+                .expect("mc price")
+                .amount()
+        };
+        let plain = pv_with(false);
+        let antithetic = pv_with(true);
+
+        let t = option
+            .day_count
+            .year_fraction(as_of, expiry, DayCountContext::default())
+            .expect("year fraction");
+        let times: Vec<f64> = fixing_dates
+            .iter()
+            .map(|d| {
+                option
+                    .day_count
+                    .year_fraction(as_of, *d, DayCountContext::default())
+                    .expect("year fraction")
+            })
+            .collect();
+        let reference = finstack_quant_models::closed_form::asian::geometric_asian_price_times(
+            spot,
+            strike,
+            t,
+            (-rate * t).exp(),
+            0.0,
+            vol,
+            &times,
+            true,
+        )
+        .expect("valid schedule");
+
+        assert_ne!(
+            plain.to_bits(),
+            antithetic.to_bits(),
+            "mc_antithetic must change the simulated streams"
+        );
+        for pv in [plain, antithetic] {
+            assert!(
+                (pv - reference).abs() < 0.2,
+                "MC geometric Asian {pv} outside 4 standard errors of {reference}"
+            );
+        }
     }
 
     #[test]

@@ -97,7 +97,8 @@ impl BondLsmcConfig {
                 .unwrap_or(true),
             seed: derive_seed(
                 &bond.id,
-                bond.metric_pricing_overrides
+                bond.instrument_pricing_overrides
+                    .model_config
                     .mc_seed_scenario
                     .as_deref()
                     .unwrap_or("bond_hazard_lsmc"),

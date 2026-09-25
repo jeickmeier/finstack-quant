@@ -605,9 +605,12 @@ pub struct DrawRepayEvent {
 
 /// Specification for stochastic utilization modeling.
 ///
-/// Defines the stochastic process and simulation parameters for
-/// Monte Carlo pricing with uncertain draw/repayment patterns. Credit risk is
-/// incorporated via hazard-rate survival weighting (no explicit default events).
+/// Defines the stochastic process for Monte Carlo pricing with uncertain
+/// draw/repayment patterns. Credit risk is incorporated via hazard-rate
+/// survival weighting (no explicit default events). The estimator count,
+/// antithetic flag and seed label are pricing settings, read from
+/// `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,
+/// `mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -615,23 +618,9 @@ pub struct StochasticUtilizationSpec {
     /// Utilization process specification.
     pub utilization_process: UtilizationProcess,
 
-    /// Number of Monte Carlo paths to simulate.
-    pub num_paths: usize,
-
-    /// Random seed for reproducibility. Simulation is always deterministic:
-    /// `None` falls back to a fixed default seed (42). Because the seed is
-    /// fixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same
-    /// random variates for base and bumped valuations — common random
-    /// numbers — so finite-difference Greeks are free of Monte Carlo noise.
-    pub seed: Option<u64>,
-
-    /// Use antithetic variance reduction when simulating paths (default: false).
-    /// Mutually exclusive with `use_sobol_qmc`; validation rejects the combination.
-    #[serde(default)]
-    pub antithetic: bool,
-
     /// Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-    /// Mutually exclusive with `antithetic`; validation rejects the combination.
+    /// Mutually exclusive with `model_config.mc_antithetic = true`; validation
+    /// rejects the combination.
     #[serde(default)]
     pub use_sobol_qmc: bool,
 
@@ -640,6 +629,63 @@ pub struct StochasticUtilizationSpec {
     /// When present, enables multi-factor modeling with credit spread
     /// and interest rate dynamics, correlation, and default modeling.
     pub mc_config: Option<McConfig>,
+}
+
+/// Resolved Monte Carlo sampling settings for a stochastic revolver.
+///
+/// Simulation is always deterministic: the seed is derived from the facility
+/// id and the seed label, so bump-and-reprice sensitivities (DV01/CS01/Theta)
+/// reuse the same random variates for base and bumped valuations (common
+/// random numbers).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RevolvingCreditMcRun {
+    /// Number of independent estimators; antithetic sampling simulates two
+    /// paths per estimator.
+    pub num_paths: usize,
+    /// Root RNG seed; every estimator draws from its own stream of it.
+    pub seed: u64,
+    /// Whether each estimator pairs its path with the sign-flipped mirror.
+    pub antithetic: bool,
+}
+
+impl RevolvingCreditMcRun {
+    /// Resolve sampling settings from a facility's model configuration.
+    ///
+    /// `mc_paths` and `mc_antithetic` fall back to the embedded registry's
+    /// `rust.revolving_credit` defaults. The seed is
+    /// `derive_seed(facility_id, mc_seed_scenario)`, with `"base"` when no
+    /// label is set.
+    ///
+    /// # Arguments
+    ///
+    /// * `facility_id` - Facility identifier hashed into the seed.
+    /// * `model_config` - The facility's
+    ///   `instrument_pricing_overrides.model_config` (`mc_paths`,
+    ///   `mc_antithetic`, `mc_seed_scenario`).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the registry cannot be loaded or
+    /// `mc_paths` exceeds the workspace path cap.
+    pub fn resolve(
+        facility_id: &finstack_quant_core::types::InstrumentId,
+        model_config: &crate::instruments::pricing_overrides::ModelConfig,
+    ) -> finstack_quant_core::Result<Self> {
+        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults()?
+            .rust
+            .revolving_credit;
+        Ok(Self {
+            num_paths: crate::instruments::common_impl::helpers::resolve_mc_paths(
+                model_config.mc_paths,
+                defaults.num_paths,
+            )?,
+            seed: finstack_quant_models::monte_carlo::seed::derive_seed(
+                facility_id,
+                model_config.mc_seed_scenario.as_deref().unwrap_or("base"),
+            ),
+            antithetic: model_config.mc_antithetic.unwrap_or(defaults.antithetic),
+        })
+    }
 }
 
 /// Advanced Monte Carlo configuration for revolving credit facilities.

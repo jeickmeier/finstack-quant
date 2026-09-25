@@ -1158,11 +1158,15 @@ class Bond:
         amortizing cashflow specs raise ``ValueError``. When the config's PIK
         schedule is the default uniform cash mode, the bond's ``CouponType``
         overrides the schedule; otherwise the config schedule takes precedence.
+        The independent-estimator count, antithetic flag and seed label come
+        from this bond's ``instrument_pricing_overrides.model_config``
+        (``mc_paths``, ``mc_antithetic``, ``mc_seed_scenario``), defaulting to
+        5,000 antithetic estimators seeded from the bond id.
 
         Parameters
         ----------
         config : MertonMcConfig
-            Merton MC simulation configuration including the structural model.
+            Structural model, PIK schedule, recovery and time grid.
         discount_rate : float
             Flat continuously compounded risk-free rate as a decimal used to
             discount simulated cashflows (unless term-structure discount factors
@@ -1196,11 +1200,9 @@ class Bond:
         ...     currency="USD",
         ... )
         >>> merton = MertonModel(100.0, 0.25, 80.0, 0.04)
-        >>> config = (
-        ...     MertonMcConfig(merton, 0.40).pik_schedule(PikSchedule.uniform(PikMode.pik())).num_paths(256).seed(42)
-        ... )
+        >>> config = MertonMcConfig(merton, 0.40).pik_schedule(PikSchedule.uniform(PikMode.pik()))
         >>> bond.price_merton_mc(config, 0.04, "2024-01-01").num_paths
-        256
+        5000
         """
         ...
 
@@ -1698,18 +1700,23 @@ class MertonMcConfig:
     """
     Configuration for Merton Monte Carlo PIK bond pricing.
 
+    Carries the structural model, PIK schedule, recovery and time grid. The
+    independent-estimator count, antithetic flag and seed label come from the
+    bond's ``instrument_pricing_overrides.model_config`` (``mc_paths``,
+    ``mc_antithetic``, ``mc_seed_scenario``).
+
     Examples
     --------
     >>> from finstack_quant.valuations.instruments import MertonMcConfig, PikMode, PikSchedule
     >>> from finstack_quant.models.credit import MertonModel
-    >>> config = MertonMcConfig(MertonModel(100.0, 0.25, 80.0, 0.04), 0.40).num_paths(1000)
-    >>> isinstance(config.seed(1).pik_schedule(PikSchedule.uniform(PikMode.cash())), MertonMcConfig)
+    >>> config = MertonMcConfig(MertonModel(100.0, 0.25, 80.0, 0.04), 0.40).steps_per_year(24)
+    >>> isinstance(config.pik_schedule(PikSchedule.uniform(PikMode.cash())), MertonMcConfig)
     True
     """
 
     def __init__(self, merton: MertonModel, recovery_rate: float) -> None:
         """
-        Create a configuration with registry-sourced simulation defaults.
+        Create a configuration with the registry-sourced time grid.
 
         Parameters
         ----------
@@ -1746,69 +1753,7 @@ class MertonMcConfig:
         """
         ...
 
-    def num_paths(self, n: int) -> MertonMcConfig:
-        """
-        Set the number of Monte Carlo paths.
-
-        Parameters
-        ----------
-        n : int
-            Total paths to retain. With antithetic variates on, the mirrors
-            count toward ``n`` rather than doubling it, so the engine draws
-            only ``ceil(n / 2)`` independent normals.
-
-        Returns
-        -------
-        MertonMcConfig
-            Updated configuration (fluent).
-
-        Notes
-        -----
-        This method does not raise; it returns the same instance for chaining.
-        """
-        ...
-
-    def seed(self, s: int) -> MertonMcConfig:
-        """
-        Set the Monte Carlo RNG seed for reproducible paths.
-
-        Parameters
-        ----------
-        s : int
-            Unsigned 64-bit seed.
-
-        Returns
-        -------
-        MertonMcConfig
-            Updated configuration (fluent).
-
-        Notes
-        -----
-        This method does not raise; it returns the same instance for chaining.
-        """
-        ...
-
-    def antithetic(self, a: bool) -> MertonMcConfig:
-        """
-        Enable or disable antithetic variates.
-
-        Parameters
-        ----------
-        a : bool
-            When ``True``, pair each path with its antithetic counterpart.
-
-        Returns
-        -------
-        MertonMcConfig
-            Updated configuration (fluent).
-
-        Notes
-        -----
-        This method does not raise; it returns the same instance for chaining.
-        """
-        ...
-
-    def time_steps_per_year(self, n: int) -> MertonMcConfig:
+    def steps_per_year(self, n: int) -> MertonMcConfig:
         """
         Set simulation grid density.
 
@@ -1848,9 +1793,9 @@ class MertonMcConfig:
         """
         ...
 
-    def default_recovery_rate(self, r: float) -> MertonMcConfig:
+    def recovery_rate(self, r: float) -> MertonMcConfig:
         """
-        Set flat recovery when no dynamic recovery model is configured.
+        Set flat recovery used when no dynamic recovery model is configured.
 
         Parameters
         ----------
@@ -1952,7 +1897,7 @@ class MertonMcConfig:
         --------
         >>> from finstack_quant.valuations.instruments import MertonMcConfig
         >>> from finstack_quant.models.credit import MertonModel
-        >>> config = MertonMcConfig(MertonModel(100.0, 0.25, 80.0, 0.04), 0.40).num_paths(256).seed(42)
+        >>> config = MertonMcConfig(MertonModel(100.0, 0.25, 80.0, 0.04), 0.40).steps_per_year(24)
         >>> MertonMcConfig.from_json(config.to_json()).to_json() == config.to_json()
         True
         """
@@ -1980,7 +1925,7 @@ class MertonMcConfig:
         Returns
         -------
         str
-            ``MertonMcConfig(num_paths=10000, seed=42, antithetic=True, ...)`` text.
+            ``MertonMcConfig(steps_per_year=12, barrier_crossing=..., recovery_rate=0.4, ...)`` text.
         """
         ...
 
@@ -2005,8 +1950,6 @@ class MertonMcResult:
     >>> from finstack_quant.models.credit import MertonModel
     >>> config = (
     ...     MertonMcConfig(MertonModel(100.0, 0.25, 60.0, 0.04), 0.40)
-    ...     .num_paths(64)
-    ...     .seed(7)
     ...     .pik_schedule(PikSchedule.uniform(PikMode.pik()))
     ...     .barrier_crossing(BarrierCrossing.discrete())
     ... )
@@ -2171,14 +2114,14 @@ class MertonMcResult:
     @property
     def num_paths(self) -> int:
         """
-        Number of Monte Carlo paths used.
+        Number of independent Monte Carlo estimators used.
 
         Returns
         -------
         int
-            Paths actually retained, matching the configured
-            ``MertonMcConfig.num_paths``. Antithetic mirrors count toward this
-            total instead of doubling it.
+            The resolved ``model_config.mc_paths`` count. With antithetic
+            sampling each estimator simulates a mirrored pair, so twice as many
+            paths are simulated.
 
         Notes
         -----
@@ -2264,8 +2207,6 @@ class PathStatistics:
     >>> from finstack_quant.models.credit import MertonModel
     >>> config = (
     ...     MertonMcConfig(MertonModel(100.0, 0.25, 60.0, 0.04), 0.40)
-    ...     .num_paths(64)
-    ...     .seed(7)
     ...     .pik_schedule(PikSchedule.uniform(PikMode.pik()))
     ...     .barrier_crossing(BarrierCrossing.discrete())
     ... )
@@ -23093,10 +23034,12 @@ class StructuredCredit:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         num_paths : int, optional
-            Number of Monte Carlo paths; defaults to the deal's configured
-            ``mc_paths`` override or 10,000.
+            Number of independent Monte Carlo estimators; defaults to the
+            deal's configured ``mc_paths`` override or 5,000. With
+            ``antithetic`` each estimator simulates a mirrored pair, so
+            ``2 * num_paths`` paths run.
         antithetic : bool, default True
-            Use antithetic variates (pairs share random numbers).
+            Pair each estimator's path with its sign-flipped mirror.
 
         Returns
         -------
@@ -27790,7 +27733,10 @@ class RevolvingCreditBuilder:
         value : dict[str, Any] | str
             ``DrawRepaySpec`` as a ``dict`` or JSON ``str``:
             ``{"deterministic": [{"date": ..., "amount": Money, "is_draw": bool}, ...]}``
-            or ``{"stochastic": {"utilization_process": {...}, "num_paths": ..., ...}}``.
+            or ``{"stochastic": {"utilization_process": {...}, "use_sobol_qmc": ..., "mc_config": ...}}``.
+            The estimator count, antithetic flag and seed label come from
+            ``instrument_pricing_overrides.model_config`` (``mc_paths``,
+            ``mc_antithetic``, ``mc_seed_scenario``).
 
         Returns
         -------
@@ -28062,13 +28008,12 @@ class EnhancedMonteCarloResult:
     >>> spec["draw_repay_spec"] = {
     ...     "stochastic": {
     ...         "utilization_process": {"mean_reverting": {"target_rate": 0.6, "speed": 1.0, "volatility": 0.25}},
-    ...         "num_paths": 16,
-    ...         "seed": 42,
     ...         "mc_config": {
     ...             "credit_spread_process": {"constant": 0.025},
     ...         },
     ...     }
     ... }
+    >>> spec["instrument_pricing_overrides"] = {"model_config": {"mc_paths": 16}}
     >>> facility = RevolvingCredit.from_json(json.dumps(envelope))
     >>> as_of = datetime.date(2024, 1, 15)
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
@@ -28425,7 +28370,7 @@ class StochasticPricingResult:
     >>> envelope["instrument"]["spec"]["payment_calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
-    >>> result = deal.price_stochastic(market, as_of, num_paths=8)
+    >>> result = deal.price_stochastic(market, as_of, num_paths=4)
     >>> (result.num_paths, [t["tranche_id"] for t in result.tranche_results])
     (8, ['A'])
     >>> result.unfunded_draw_path_fraction
@@ -28672,7 +28617,7 @@ class StochasticPricingResult:
     @property
     def num_paths(self) -> int:
         """
-        Number of scenario paths.
+        Number of simulated scenario paths (two per antithetic estimator).
 
         Returns
         -------
@@ -31210,7 +31155,6 @@ class MetricPricingOverrides:
         self,
         *,
         bump_config: dict[str, Any] | None = None,
-        mc_seed_scenario: str | None = None,
         theta_period: str | None = None,
         breakeven_config: dict[str, Any] | None = None,
         bond_risk_basis: Literal["bullet_discountable", "callable_oas"] | None = None,
@@ -31226,9 +31170,6 @@ class MetricPricingOverrides:
             ``vol_bump_pct`` (absolute vol, ``0.01`` = 1 vol point),
             ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp`` (basis
             points) and ``adaptive_bumps`` (bool). ``None`` keeps the defaults.
-        mc_seed_scenario : str, optional
-            Scenario name used to derive deterministic Monte Carlo seeds for
-            finite-difference Greeks (for example ``"delta_up"``).
         theta_period : str, optional
             Theta / carry horizon as ``<digits><D|W|M|Y>`` (``"1D"``, ``"1W"``,
             ``"1M"``, ``"3M"``); the default horizon is one day.
@@ -31271,22 +31212,6 @@ class MetricPricingOverrides:
         ------
         ValueError
             If the configuration cannot be serialized to a Python object.
-        """
-        ...
-
-    @property
-    def mc_seed_scenario(self) -> str | None:
-        """
-        Monte Carlo seed scenario name.
-
-        Returns
-        -------
-        str or None
-            Scenario name, or ``None`` when the pricer derives its own seed.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 

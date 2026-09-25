@@ -29,13 +29,12 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::Enha
 /// >>> spec["draw_repay_spec"] = {
 /// ...     "stochastic": {
 /// ...         "utilization_process": {"mean_reverting": {"target_rate": 0.6, "speed": 1.0, "volatility": 0.25}},
-/// ...         "num_paths": 16,
-/// ...         "seed": 42,
 /// ...         "mc_config": {
 /// ...             "credit_spread_process": {"constant": 0.025},
 /// ...         },
 /// ...     }
 /// ... }
+/// >>> spec["instrument_pricing_overrides"] = {"model_config": {"mc_paths": 16}}
 /// >>> facility = RevolvingCredit.from_json(json.dumps(envelope))
 /// >>> as_of = datetime.date(2024, 1, 15)
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))

@@ -52,11 +52,8 @@ fn populate_cashflow_dfs_if_needed(
     ctx: &PricingErrorContext,
 ) -> std::result::Result<(), PricingError> {
     if config.cashflow_dfs.is_none() && schedule.maturity_years > 0.0 {
-        let dfs =
-            bond_cashflow_dfs_on_model_grid(disc, as_of, schedule, config.time_steps_per_year)
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(e.to_string(), ctx.clone())
-                })?;
+        let dfs = bond_cashflow_dfs_on_model_grid(disc, as_of, schedule, config.steps_per_year)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
         config.cashflow_dfs = Some(dfs);
     }
     Ok(())
@@ -97,7 +94,7 @@ impl Pricer for SimpleBondMertonMcPricer {
             .as_ref()
             .ok_or_else(|| {
                 PricingError::invalid_input_with_context(
-                    "MertonMc pricer requires merton_mc_config on pricing_overrides",
+                    "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
                     ctx.clone(),
                 )
             })?;
@@ -234,7 +231,7 @@ impl Pricer for SimpleBondMertonMcPricer {
             .as_ref()
             .ok_or_else(|| {
                 PricingError::invalid_input_with_context(
-                    "MertonMc pricer requires merton_mc_config on pricing_overrides",
+                    "MertonMc pricer requires instrument_pricing_overrides.model_config.merton_mc_config",
                     ctx.clone(),
                 )
             })?;
@@ -296,10 +293,7 @@ mod tests {
             0.40,
         )
         .expect("valid Merton MC config")
-        .num_paths(32)
-        .time_steps_per_year(4)
-        .antithetic(false)
-        .seed(7);
+        .steps_per_year(4);
         let mut bond = Bond::fixed(
             "MERTON_OPTION_GUARD",
             Money::from((100_i64, Currency::USD)),
@@ -313,8 +307,58 @@ mod tests {
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc(config.clone());
+            .with_merton_mc(config.clone())
+            .with_mc_paths(32)
+            .with_mc_antithetic(false);
         (bond, config)
+    }
+
+    /// The Merton pricer seeds from `model_config.mc_seed_scenario` through
+    /// `derive_seed(instrument_id, label)` instead of a fixed registry seed.
+    /// Reference: the same estimator run with the former fixed seed (42) must
+    /// agree within four combined standard errors, and a different label must
+    /// select different random streams.
+    #[test]
+    fn merton_seed_comes_from_model_config_scenario() {
+        let (mut bond, config) = test_bond_and_config();
+        bond.instrument_pricing_overrides.model_config.mc_paths = Some(2_000);
+        let as_of = date!(2025 - 01 - 15);
+
+        let base = bond.price_merton_mc(&config, 0.03, as_of).expect("base");
+        let mut relabelled = bond.clone();
+        relabelled
+            .instrument_pricing_overrides
+            .model_config
+            .mc_seed_scenario = Some("alt".to_string());
+        let alt = relabelled
+            .price_merton_mc(&config, 0.03, as_of)
+            .expect("relabelled");
+        assert_ne!(
+            base.clean_price_pct.to_bits(),
+            alt.clean_price_pct.to_bits(),
+            "mc_seed_scenario must select the random streams"
+        );
+
+        let fixed_seed = bond
+            .price_merton_mc_with_run(
+                &config,
+                &super::super::MertonMcRun {
+                    num_paths: 2_000,
+                    seed: 42,
+                    antithetic: false,
+                },
+                0.03,
+                as_of,
+            )
+            .expect("fixed seed");
+        assert_eq!(base.num_paths, 2_000);
+        let tol = 4.0 * base.standard_error.hypot(fixed_seed.standard_error);
+        assert!(
+            (base.clean_price_pct - fixed_seed.clean_price_pct).abs() <= tol,
+            "derived-seed price {} vs fixed-seed price {} exceeds 4 standard errors {tol}",
+            base.clean_price_pct,
+            fixed_seed.clean_price_pct
+        );
     }
 
     fn test_market() -> MarketContext {
@@ -335,10 +379,7 @@ mod tests {
             0.40,
         )
         .expect("valid Merton MC config")
-        .num_paths(8)
-        .time_steps_per_year(12)
-        .antithetic(false)
-        .seed(11)
+        .steps_per_year(12)
     }
 
     fn flat_act365_market(base: finstack_quant_core::dates::Date, rate: f64) -> MarketContext {
@@ -380,7 +421,9 @@ mod tests {
         bond.instrument_pricing_overrides = bond
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc(default_free_config());
+            .with_merton_mc(default_free_config())
+            .with_mc_paths(8)
+            .with_mc_antithetic(false);
 
         let coupon_dates = [
             date!(2025 - 07 - 14),
@@ -449,7 +492,9 @@ mod tests {
         gilt.instrument_pricing_overrides = gilt
             .instrument_pricing_overrides
             .clone()
-            .with_merton_mc(default_free_config());
+            .with_merton_mc(default_free_config())
+            .with_mc_paths(8)
+            .with_mc_antithetic(false);
 
         let merton = standard_pricer_registry()
             .price_with_metrics(

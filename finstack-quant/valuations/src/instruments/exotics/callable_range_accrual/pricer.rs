@@ -266,7 +266,10 @@ impl CallableRangeAccrualPricer {
         self.config.with_instrument_overrides(
             &inst.id,
             inst.instrument_pricing_overrides.model_config.mc_paths,
-            inst.metric_pricing_overrides.mc_seed_scenario.as_deref(),
+            inst.instrument_pricing_overrides
+                .model_config
+                .mc_seed_scenario
+                .as_deref(),
         )
     }
 
@@ -749,6 +752,28 @@ mod tests {
         assert!(
             rel < 0.05,
             "basis change is a regression refinement, not a repricing: deg2={pv_deg2}, deg3={pv_deg3}"
+        );
+    }
+
+    /// `num_paths` counts independent estimators (RNG streams). The registry
+    /// default was halved when it stopped counting antithetic mirrors, so the
+    /// default configuration must replay exactly the same streams: the PV is
+    /// pinned bit-for-bit to the value captured before the change.
+    #[test]
+    fn rate_exotic_default_pv_unchanged() {
+        let as_of = date(2025, Month::January, 1);
+        let curves = market(as_of, 0.02, 0.03);
+        let inst = test_callable(vec![date(2025, Month::July, 1)], 0, 0.06);
+        let estimate = CallableRangeAccrualPricer::with_hw_params(
+            HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw params"),
+        )
+        .price_estimate(&inst, &curves, as_of)
+        .expect("default price");
+        assert_eq!(
+            estimate.mean.amount().to_bits(),
+            0x412e390a43af133a_u64,
+            "pv={}",
+            estimate.mean.amount()
         );
     }
 

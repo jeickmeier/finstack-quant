@@ -250,14 +250,14 @@ where
 {
     let mut seeded = instrument.clone();
     let overrides = seeded
-        .get_metric_pricing_overrides_mut()
+        .get_instrument_pricing_overrides_mut()
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "Instrument {} does not expose metric pricing overrides required for finite-difference common-random-number seeding",
+                "Instrument {} does not expose instrument_pricing_overrides.model_config.mc_seed_scenario required for finite-difference common-random-number seeding",
                 instrument.id()
             ))
         })?;
-    overrides.mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
+    overrides.model_config.mc_seed_scenario = Some(CRN_SEED_SCENARIO.to_string());
     Ok(seeded)
 }
 
@@ -870,6 +870,7 @@ mod tests {
         day_count: DayCount,
         spot_id: PriceId,
         overrides: MetricPricingOverrides,
+        instrument_overrides: crate::instruments::InstrumentPricingOverrides,
         attributes: Attributes,
     }
 
@@ -881,6 +882,7 @@ mod tests {
                 day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
                 overrides: MetricPricingOverrides::default(),
+                instrument_overrides: Default::default(),
                 attributes: Attributes::new(),
             }
         }
@@ -894,6 +896,7 @@ mod tests {
         day_count: DayCount,
         spot_id: PriceId,
         overrides: MetricPricingOverrides,
+        instrument_overrides: crate::instruments::InstrumentPricingOverrides,
         attributes: Attributes,
     }
 
@@ -914,6 +917,7 @@ mod tests {
                 day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
                 overrides: MetricPricingOverrides::default(),
+                instrument_overrides: Default::default(),
                 attributes: Attributes::new(),
             }
         }
@@ -985,6 +989,18 @@ mod tests {
 
         fn attributes_mut(&mut self) -> &mut Attributes {
             &mut self.attributes
+        }
+
+        fn get_instrument_pricing_overrides(
+            &self,
+        ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
+            Some(&self.instrument_overrides)
+        }
+
+        fn get_instrument_pricing_overrides_mut(
+            &mut self,
+        ) -> Option<&mut crate::instruments::InstrumentPricingOverrides> {
+            Some(&mut self.instrument_overrides)
         }
 
         fn get_metric_pricing_overrides(
@@ -1075,6 +1091,18 @@ mod tests {
             &mut self.attributes
         }
 
+        fn get_instrument_pricing_overrides(
+            &self,
+        ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
+            Some(&self.instrument_overrides)
+        }
+
+        fn get_instrument_pricing_overrides_mut(
+            &mut self,
+        ) -> Option<&mut crate::instruments::InstrumentPricingOverrides> {
+            Some(&mut self.instrument_overrides)
+        }
+
         fn get_metric_pricing_overrides(
             &self,
         ) -> Option<&crate::instruments::MetricPricingOverrides> {
@@ -1163,14 +1191,22 @@ mod tests {
     }
 
     #[test]
-    fn crn_seed_uses_canonical_metric_override_accessor() {
+    fn seed_scenario_lives_in_model_config() {
         let instrument = TestFdInstrument::new("FD-SEED", date!(2026 - 01 - 01), "SPOT");
 
-        let seeded = clone_with_crn_seed(&instrument).expect("focused metric overrides");
+        let seeded = clone_with_crn_seed(&instrument).expect("instrument overrides");
 
-        assert!(instrument.overrides.mc_seed_scenario.is_none());
+        assert!(instrument
+            .instrument_overrides
+            .model_config
+            .mc_seed_scenario
+            .is_none());
         assert_eq!(
-            seeded.overrides.mc_seed_scenario.as_deref(),
+            seeded
+                .instrument_overrides
+                .model_config
+                .mc_seed_scenario
+                .as_deref(),
             Some(CRN_SEED_SCENARIO)
         );
     }
@@ -1391,6 +1427,7 @@ mod tests {
         surface_terms: Vec<(String, f64)>,
         multiply_by_spot: bool,
         overrides: MetricPricingOverrides,
+        instrument_overrides: crate::instruments::InstrumentPricingOverrides,
         attributes: Attributes,
     }
 
@@ -1409,6 +1446,7 @@ mod tests {
                 surface_terms: vec![(vol_surface_id.to_string(), slope)],
                 multiply_by_spot: false,
                 overrides: MetricPricingOverrides::default(),
+                instrument_overrides: Default::default(),
                 attributes: Attributes::new(),
             }
         }
@@ -1431,6 +1469,7 @@ mod tests {
                     .collect(),
                 multiply_by_spot,
                 overrides: MetricPricingOverrides::default(),
+                instrument_overrides: Default::default(),
                 attributes: Attributes::new(),
             }
         }
@@ -1513,6 +1552,18 @@ mod tests {
 
         fn attributes_mut(&mut self) -> &mut Attributes {
             &mut self.attributes
+        }
+
+        fn get_instrument_pricing_overrides(
+            &self,
+        ) -> Option<&crate::instruments::InstrumentPricingOverrides> {
+            Some(&self.instrument_overrides)
+        }
+
+        fn get_instrument_pricing_overrides_mut(
+            &mut self,
+        ) -> Option<&mut crate::instruments::InstrumentPricingOverrides> {
+            Some(&mut self.instrument_overrides)
         }
 
         fn get_metric_pricing_overrides(

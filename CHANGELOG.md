@@ -2,6 +2,102 @@
 
 ## [Unreleased]
 
+### Monte Carlo settings (2026-09-24)
+
+Numbers change for Merton structural-credit bond pricing and for explicit
+rate-exotic path counts:
+
+- `num_paths` always counts independent estimators. With antithetic sampling
+  each estimator simulates a mirrored pair, so the engine simulates
+  `2 × num_paths` paths and `MoneyEstimate.num_paths` reports estimators
+  (`num_simulated_paths` reports simulated paths). The HW1F rate exotics
+  (Tarn, Snowball, CallableRangeAccrual), the Bermudan
+  swaption LSMC and the LMM Bermudan engine used to count mirrors in
+  `num_paths`; their defaults were halved (`rust.rate_exotics.num_paths`
+  20000 → 10000, `rust.lmm_bermudan.num_paths` 50000 → 25000,
+  `BermudanSwaptionPricerConfig::DEFAULT_MC.num_paths` 100000 → 50000), so
+  default PVs replay the same streams and stay bit-identical (pinned by
+  `rate_exotic_default_pv_unchanged`, `lmm_default_pv_unchanged` and
+  `lsmc_default_mc_pv_unchanged`). An explicit `model_config.mc_paths = N` on
+  these instruments now simulates `2N` paths instead of `N`; the LMM engine no
+  longer requires an even count.
+- Merton MC (`ModelKey::MertonMc`, `Bond::price_merton_mc`) seeds from
+  `derive_seed(instrument_id, model_config.mc_seed_scenario or "base")`
+  instead of the fixed registry seed 42, and takes its estimator count and
+  antithetic flag from `model_config.mc_paths`/`mc_antithetic` (registry
+  `rust.merton_pik_bond`: 5000 antithetic estimators, the same 10000
+  simulated paths as before). Reference: with the former seed the same
+  estimator agrees within four combined standard errors
+  (`merton_seed_comes_from_model_config_scenario`).
+  `MertonMcCalibrationSpec.low_paths` also counts estimators, so the default
+  low-path calibration (2000) simulates 4000 antithetic paths instead of 2000.
+- AsianOption and LookbackOption Monte Carlo now honour
+  `model_config.mc_antithetic` and the workspace path cap through the shared
+  `merged_path_config`; their private copies applied `mc_paths` only.
+  Geometric Asian MC stays within four standard errors of the discrete-fixing
+  Kemna-Vorst price with either setting (`asian_honours_mc_antithetic`).
+- RevolvingCredit stochastic pricing (`price_with_paths`, the
+  `monte_carlo_three_factor` model, `draw_option_cost`) seeds from
+  `derive_seed(facility_id, model_config.mc_seed_scenario or "base")` instead
+  of the fixed seed 42 (`seed: None`) or the wire `seed`, and counts
+  `model_config.mc_paths` as independent estimators (antithetic estimators
+  simulate two paths). Defaults come from the new registry block
+  `rust.revolving_credit` (10000 estimators, antithetic off). Stochastic PVs
+  move by Monte Carlo noise only. Reference: with the former fixed seed 42
+  the same estimator agrees within four combined standard errors
+  (`revolver_seed_comes_from_model_config_scenario`).
+- StructuredCredit `PricingMode::MonteCarlo.num_paths` counts independent
+  estimators (antithetic estimators simulate two scenario paths). The
+  default halved (10000 → 5000, `PricingMode::monte_carlo` clamp 100 → 50,
+  Python `StructuredCredit.price_stochastic(num_paths=None)` 10000 → 5000), so
+  the default stochastic PV and standard error stay bit-identical (pinned by
+  `default_monte_carlo_pv_is_bit_identical_under_estimator_semantics`). An
+  explicit `num_paths = N` or `model_config.mc_paths = N` with antithetic
+  sampling now simulates `2N` paths; the default mode also honours
+  `model_config.mc_antithetic`. `StochasticPricingResult.num_paths` still
+  reports simulated scenario paths.
+
+#### Changed (BREAKING)
+
+- `MetricPricingOverrides.mc_seed_scenario` (now
+  `InstrumentPricingOverrides.model_config.mc_seed_scenario`, builder
+  `InstrumentPricingOverrides::with_mc_seed_scenario`); Rust, JSON and the
+  Python `MetricPricingOverrides` keyword/getter (removed). Finite-difference
+  Greeks set the common-random-number label on the repriced clone at the new
+  path.
+- `CommodityMcParams.n_paths` / `n_steps` (now `num_paths` / `num_steps`);
+  Rust and JSON.
+- `StructuredCreditPricingMode::Hybrid.mc_paths` (now `num_paths`); Rust and
+  JSON.
+- `MertonMcConfig.time_steps_per_year` (now `steps_per_year`, setter
+  `steps_per_year`), `MertonMcConfig.default_recovery_rate` (now
+  `recovery_rate`, setter `recovery_rate`) and
+  `MertonMcCalibrationSpec.max_iter` (now `max_iterations`); Rust, JSON and the
+  Python `MertonMcConfig` fluent setters. Registry key
+  `rust.merton_pik_bond.time_steps_per_year` (now `steps_per_year`).
+- `MertonMcEngine::price` takes a `MertonMcRun { num_paths, seed, antithetic }`
+  alongside the `MertonMcConfig`; `MertonMcResult.num_paths` reports
+  estimators.
+- `RateExoticMcConfig::effective_path_count` and `raw_stream_count` (now
+  `simulated_path_count`; the stream count is `num_paths`).
+
+#### Removed
+
+- `MertonMcConfig.num_paths`, `seed` and `antithetic` (fields, Rust setters
+  and Python setters) and registry key `rust.merton_pik_bond.seed`: the path
+  count, antithetic flag and seed label come from
+  `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,
+  `mc_seed_scenario`).
+- The private `merged_path_config` copies in the Asian and Lookback option
+  pricers.
+- `StochasticUtilizationSpec.num_paths`, `seed` and `antithetic` (Rust, JSON
+  `draw_repay_spec.stochastic.*`, Python/WASM payloads): the estimator count,
+  antithetic flag and seed label come from
+  `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,
+  `mc_seed_scenario`), resolved by the new `RevolvingCreditMcRun::resolve`.
+  `use_sobol_qmc` stays on the spec and is rejected together with
+  `mc_antithetic = true`.
+
 ### Market-quote overrides (2026-09-24)
 
 Numbers change for `ImpliedVol` on CapFloor, Swaption, FxOption, CDSOption

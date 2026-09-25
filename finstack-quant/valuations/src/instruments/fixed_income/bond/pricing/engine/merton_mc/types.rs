@@ -43,10 +43,10 @@ pub struct MertonMcCalibrationSpec {
     pub target: crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteInput,
     /// Which structural parameter to solve for.
     pub parameter: CalibrationParameter,
-    /// Number of MC paths used during calibration iterations (low paths).
+    /// Number of independent MC estimators used during calibration iterations (low paths).
     pub low_paths: usize,
     /// Maximum bisection iterations.
-    pub max_iter: usize,
+    pub max_iterations: usize,
     /// Absolute tolerance on the **PV residual** (currency units at `as_of`).
     pub tolerance_pv: f64,
     /// Search bracket for the calibrated parameter (low, high).
@@ -62,7 +62,7 @@ impl Default for MertonMcCalibrationSpec {
             target: crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteInput::ZSpread(0.0),
             parameter: CalibrationParameter::DebtBarrier,
             low_paths: 2_000,
-            max_iter: 40,
+            max_iterations: 40,
             tolerance_pv: 1e-4,
             bracket: None,
             seed: None,
@@ -175,21 +175,17 @@ pub struct MertonMcConfig {
     /// Active only for coupon dates where [`PikSchedule`] resolves to
     /// [`PikMode::Toggle`].
     pub toggle_model: Option<ToggleExerciseModel>,
-    /// Number of Monte Carlo paths.
-    pub num_paths: usize,
-    /// RNG seed for reproducibility.
-    pub seed: u64,
-    /// Whether to use antithetic variates for variance reduction.
-    pub antithetic: bool,
     /// Time steps per year for the simulation grid.
-    pub time_steps_per_year: usize,
+    pub steps_per_year: usize,
     /// Barrier-crossing policy used for `BarrierType::FirstPassage`.
     ///
     /// Default: `BrownianBridge` when the Merton model uses `FirstPassage`,
     /// otherwise `Discrete`.
     pub barrier_crossing: BarrierCrossing,
-    /// Default recovery rate used when no `dynamic_recovery` model is set.
-    pub default_recovery_rate: f64,
+    /// Recovery on default as a decimal fraction in `[0, 1]`.
+    ///
+    /// `dynamic_recovery`, when set, takes precedence over this flat rate.
+    pub recovery_rate: f64,
     /// Optional market-calibration specification.
     ///
     /// When set, the pricer first calibrates a structural parameter
@@ -208,8 +204,10 @@ pub struct MertonMcConfig {
 impl MertonMcConfig {
     /// Create a new configuration with default simulation parameters.
     ///
-    /// Simulation defaults are sourced from the embedded Monte Carlo registry;
-    /// recovery is always supplied explicitly by the caller.
+    /// The time-grid density is sourced from the embedded Monte Carlo
+    /// registry; recovery is always supplied explicitly by the caller. Path
+    /// count, antithetic sampling and the seed are resolved separately into a
+    /// [`MertonMcRun`].
     ///
     /// # Arguments
     ///
@@ -237,12 +235,9 @@ impl MertonMcConfig {
             endogenous_hazard: None,
             dynamic_recovery: None,
             toggle_model: None,
-            num_paths: defaults.num_paths,
-            seed: defaults.seed,
-            antithetic: defaults.antithetic,
-            time_steps_per_year: defaults.time_steps_per_year,
+            steps_per_year: defaults.steps_per_year,
             barrier_crossing,
-            default_recovery_rate: recovery_rate,
+            recovery_rate,
             calibration: None,
             cashflow_dfs: None,
         })
@@ -255,31 +250,15 @@ impl MertonMcConfig {
         self
     }
 
-    /// Set the number of Monte Carlo paths.
+    /// Set the simulation time-grid density.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - Time steps per year; the grid is sized to end exactly at
+    ///   maturity.
     #[must_use]
-    pub fn num_paths(mut self, n: usize) -> Self {
-        self.num_paths = n;
-        self
-    }
-
-    /// Set the RNG seed.
-    #[must_use]
-    pub fn seed(mut self, s: u64) -> Self {
-        self.seed = s;
-        self
-    }
-
-    /// Enable or disable antithetic variates.
-    #[must_use]
-    pub fn antithetic(mut self, a: bool) -> Self {
-        self.antithetic = a;
-        self
-    }
-
-    /// Set time steps per year.
-    #[must_use]
-    pub fn time_steps_per_year(mut self, n: usize) -> Self {
-        self.time_steps_per_year = n;
+    pub fn steps_per_year(mut self, n: usize) -> Self {
+        self.steps_per_year = n;
         self
     }
 
@@ -334,12 +313,9 @@ impl MertonMcConfig {
     ///
     /// Returns a validation error when `recovery_rate` is non-finite or lies
     /// outside `[0, 1]`.
-    pub fn default_recovery_rate(
-        mut self,
-        recovery_rate: f64,
-    ) -> finstack_quant_core::Result<Self> {
+    pub fn recovery_rate(mut self, recovery_rate: f64) -> finstack_quant_core::Result<Self> {
         validate_recovery_rate(recovery_rate)?;
-        self.default_recovery_rate = recovery_rate;
+        self.recovery_rate = recovery_rate;
         Ok(self)
     }
 
@@ -360,6 +336,62 @@ fn validate_recovery_rate(recovery_rate: f64) -> finstack_quant_core::Result<()>
             )
         },
     )
+}
+
+/// Monte Carlo sampling settings for one Merton PIK simulation.
+///
+/// These are the per-instrument Monte Carlo controls, resolved from the bond's
+/// `instrument_pricing_overrides.model_config` by [`MertonMcRun::resolve`]; the
+/// wire [`MertonMcConfig`] carries only the model and grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MertonMcRun {
+    /// Number of independent estimators; antithetic sampling simulates two
+    /// paths per estimator.
+    pub num_paths: usize,
+    /// Root RNG seed; every estimator draws from its own stream of it.
+    pub seed: u64,
+    /// Whether each estimator pairs its path with the sign-flipped mirror.
+    pub antithetic: bool,
+}
+
+impl MertonMcRun {
+    /// Resolve sampling settings from an instrument's model configuration.
+    ///
+    /// `mc_paths` and `mc_antithetic` fall back to the embedded registry's
+    /// `rust.merton_pik_bond` defaults. The seed is
+    /// `derive_seed(instrument_id, mc_seed_scenario)`, with `"base"` when no
+    /// label is set.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_id` - Instrument identifier hashed into the seed.
+    /// * `model_config` - The instrument's
+    ///   `instrument_pricing_overrides.model_config` (`mc_paths`,
+    ///   `mc_antithetic`, `mc_seed_scenario`).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the registry cannot be loaded or
+    /// `mc_paths` exceeds the workspace path cap.
+    pub fn resolve(
+        instrument_id: &finstack_quant_core::types::InstrumentId,
+        model_config: &crate::instruments::pricing_overrides::ModelConfig,
+    ) -> finstack_quant_core::Result<Self> {
+        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults()?
+            .rust
+            .merton_pik_bond;
+        Ok(Self {
+            num_paths: crate::instruments::common_impl::helpers::resolve_mc_paths(
+                model_config.mc_paths,
+                defaults.num_paths,
+            )?,
+            seed: finstack_quant_models::monte_carlo::seed::derive_seed(
+                instrument_id,
+                model_config.mc_seed_scenario.as_deref().unwrap_or("base"),
+            ),
+            antithetic: model_config.mc_antithetic.unwrap_or(defaults.antithetic),
+        })
+    }
 }
 
 /// Result from Monte Carlo PIK pricing.
@@ -388,7 +420,7 @@ pub struct MertonMcResult {
     pub effective_spread_bp: f64,
     /// Path-level statistics.
     pub path_statistics: PathStatistics,
-    /// Number of paths used.
+    /// Number of independent estimators used (antithetic pairs count once).
     pub num_paths: usize,
     /// Standard error of the clean price estimate (percentage of par).
     pub standard_error: f64,

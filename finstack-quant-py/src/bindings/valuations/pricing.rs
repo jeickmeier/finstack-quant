@@ -37,9 +37,6 @@ pub(super) fn binding_pricing_options() -> PricingOptions {
 ///     Finite-difference bump sizes (``spot_bump_pct``, ``vol_bump_pct``,
 ///     ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp``,
 ///     ``adaptive_bumps``). ``None`` keeps defaults.
-/// mc_seed_scenario : str | None
-///     Scenario name used to derive deterministic Monte Carlo seeds for
-///     finite-difference Greeks (e.g. ``"delta_up"``).
 /// theta_period : str | None
 ///     Theta / carry horizon such as ``"1D"``, ``"1W"``, ``"1M"``, ``"3M"``.
 /// breakeven_config : dict | None
@@ -90,18 +87,13 @@ fn opt_serde_from_py<T: serde::de::DeserializeOwned + Send>(
 #[pymethods]
 impl PyMetricPricingOverrides {
     #[new]
-    #[pyo3(signature = (*, bump_config=None, mc_seed_scenario=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None))]
+    #[pyo3(signature = (*, bump_config=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None))]
     #[pyo3(
-        text_signature = "(*, bump_config=None, mc_seed_scenario=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None)"
+        text_signature = "(*, bump_config=None, theta_period=None, breakeven_config=None, bond_risk_basis=None, var_config=None)"
     )]
-    // PyO3 binding: the argument list mirrors the Rust struct's public
-    // fields as a keyword API, so it cannot be collapsed into a params struct
-    // without changing that API.
-    #[allow(clippy::too_many_arguments)]
     fn new(
         py: Python<'_>,
         bump_config: Option<&Bound<'_, PyAny>>,
-        mc_seed_scenario: Option<String>,
         theta_period: Option<String>,
         breakeven_config: Option<&Bound<'_, PyAny>>,
         bond_risk_basis: Option<&str>,
@@ -109,7 +101,6 @@ impl PyMetricPricingOverrides {
     ) -> PyResult<Self> {
         let inner = MetricPricingOverrides {
             bump_config: opt_serde_from_py(py, bump_config, "bump_config")?.unwrap_or_default(),
-            mc_seed_scenario,
             theta_period,
             breakeven_config: opt_serde_from_py(py, breakeven_config, "breakeven_config")?,
             bond_risk_basis: bond_risk_basis
@@ -133,12 +124,6 @@ impl PyMetricPricingOverrides {
     #[getter]
     fn bump_config<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.bump_config)
-    }
-
-    /// Monte Carlo seed scenario name, or ``None``.
-    #[getter]
-    fn mc_seed_scenario(&self) -> Option<String> {
-        self.inner.mc_seed_scenario.clone()
     }
 
     /// Theta / carry horizon (``"1D"``, ``"1W"``, ...), or ``None``.
@@ -227,9 +212,8 @@ impl PyMetricPricingOverrides {
                 .to_string()
         };
         Ok(format!(
-            "MetricPricingOverrides(bump_config={}, mc_seed_scenario={}, theta_period={}, breakeven_config={}, bond_risk_basis={}, var_config={})",
+            "MetricPricingOverrides(bump_config={}, theta_period={}, breakeven_config={}, bond_risk_basis={}, var_config={})",
             bump,
-            quoted(&self.inner.mc_seed_scenario),
             quoted(&self.inner.theta_period),
             json_or_none(
                 self.inner

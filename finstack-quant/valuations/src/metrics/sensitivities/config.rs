@@ -284,7 +284,6 @@ mod tests {
         let base = SensitivitiesConfig::default();
         let po = crate::instruments::MetricPricingOverrides {
             bump_config: crate::instruments::BumpConfig::default(),
-            mc_seed_scenario: None,
             theta_period: None,
             breakeven_config: None,
             bond_risk_basis: None,

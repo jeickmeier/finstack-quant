@@ -211,7 +211,11 @@ impl BarrierOptionMcPricer {
 
         use finstack_quant_models::monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst
+            .instrument_pricing_overrides
+            .model_config
+            .mc_seed_scenario
+        {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")

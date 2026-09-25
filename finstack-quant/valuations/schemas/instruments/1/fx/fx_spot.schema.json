@@ -48,7 +48,6 @@
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."

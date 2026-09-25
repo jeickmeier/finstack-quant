@@ -5,9 +5,10 @@
 //!
 //! # Variance Reduction
 //!
-//! Supports antithetic variance reduction when enabled via `StochasticUtilizationSpec.antithetic`.
-//! This mirrors each path with negated random variates, typically reducing variance by ~50%
-//! for smooth payoff functions.
+//! Supports antithetic variance reduction when enabled via
+//! `instrument_pricing_overrides.model_config.mc_antithetic`. Each independent
+//! estimator then simulates its path and the mirror with negated random
+//! variates, typically reducing variance by ~50% for smooth payoff functions.
 //!
 //! # CIR Process Stability
 //!
@@ -35,7 +36,7 @@ use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use super::super::cashflow_engine::ThreeFactorPathData;
 use super::super::types::{
     BaseRateSpec, CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
-    StochasticUtilizationSpec, UtilizationProcess,
+    RevolvingCreditMcRun, StochasticUtilizationSpec, UtilizationProcess,
 };
 
 /// Generate 3-factor MC paths using the existing process infrastructure.
@@ -46,6 +47,8 @@ use super::super::types::{
 /// # Arguments
 ///
 /// * `stoch_spec` - Stochastic specification with utilization process and MC config
+/// * `run` - Resolved estimator count, seed and antithetic flag (see
+///   [`RevolvingCreditMcRun::resolve`])
 /// * `mc_config` - Monte Carlo configuration with correlation and process details
 /// * `facility` - Revolving credit facility
 /// * `market` - Market context for curves
@@ -58,25 +61,29 @@ use super::super::types::{
 ///
 /// # Variance Reduction
 ///
-/// When `stoch_spec.antithetic` is true and Sobol QMC is not used, generates paths
-/// in pairs using antithetic variates (z and -z), reducing variance for smooth payoffs.
+/// When `run.antithetic` is true and Sobol QMC is not used, each estimator
+/// generates a pair of paths using antithetic variates (z and -z), reducing
+/// variance for smooth payoffs.
 ///
 /// # Returns
 ///
-/// Vector of `ThreeFactorPathData`, one per simulated path
+/// Vector of `ThreeFactorPathData`, one per simulated path (`2 × run.num_paths`
+/// when antithetic, with each pair adjacent)
 pub fn generate_three_factor_paths(
     stoch_spec: &StochasticUtilizationSpec,
+    run: &RevolvingCreditMcRun,
     mc_config: &McConfig,
     facility: &RevolvingCredit,
     market: &MarketContext,
     payment_dates: &[Date],
     as_of: Date,
 ) -> Result<Vec<ThreeFactorPathData>> {
-    if stoch_spec.num_paths < 2 {
+    if run.num_paths < 2 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "stochastic revolving-credit pricing requires num_paths >= 2 \
-             (a single path has no variance estimate), got {}",
-            stoch_spec.num_paths
+            "stochastic revolving-credit pricing requires at least 2 independent \
+             estimators (instrument_pricing_overrides.model_config.mc_paths; a single \
+             estimator has no variance estimate), got {}",
+            run.num_paths
         )));
     }
 
@@ -291,7 +298,7 @@ pub fn generate_three_factor_paths(
 
     let disc = RevolvingCreditDiscretization::new(process.correlation())?;
 
-    let num_paths = stoch_spec.num_paths;
+    let num_paths = run.num_paths;
     let num_steps = time_grid.num_steps();
     let num_factors = process.num_factors();
     // Utilization is drawn over the commitment in force at the anchor.
@@ -321,12 +328,16 @@ pub fn generate_three_factor_paths(
         .collect();
     let caps: &[f64] = &utilization_caps;
 
-    let mut paths = Vec::with_capacity(num_paths);
-    let seed = stoch_spec.seed.unwrap_or(42);
+    let seed = run.seed;
     let use_sobol = stoch_spec.use_sobol_qmc;
     // Antithetic is incompatible with Sobol QMC; `RevolvingCredit::validate()`
     // rejects the combination, and this guard covers direct callers.
-    let use_antithetic = stoch_spec.antithetic && !use_sobol;
+    let use_antithetic = run.antithetic && !use_sobol;
+    let mut paths = Vec::with_capacity(if use_antithetic {
+        num_paths.saturating_mul(2)
+    } else {
+        num_paths
+    });
 
     let work_size = disc.work_size(&process);
 
@@ -417,17 +428,13 @@ pub fn generate_three_factor_paths(
             paths.push(simulate_path(&z_path, 1.0, &mut z_step, &mut work));
         }
     } else {
-        // Parallel Philox path generation. Each iteration draws from its own
+        // Parallel Philox path generation. Each estimator draws from its own
         // Philox substream (`stream_id = iter_idx`), so the path at index `i`
         // does not depend on which thread generates it and results are
-        // bit-identical across thread counts. An antithetic iteration yields
+        // bit-identical across thread counts. An antithetic estimator yields
         // the path and its negated partner.
         let paths_per_iteration = if use_antithetic { 2 } else { 1 };
-        let num_iterations = if use_antithetic {
-            num_paths.div_ceil(2)
-        } else {
-            num_paths
-        };
+        let num_iterations = num_paths;
 
         let generate_iteration = |iter_idx: usize| {
             let mut rng = PhiloxRng::with_stream(seed, iter_idx as u64);
@@ -460,7 +467,7 @@ pub fn generate_three_factor_paths(
 
         // Iteration order is preserved by `collect()`, so paths keep the
         // serial order with each antithetic pair adjacent.
-        paths.extend(chunked.into_iter().flatten().take(num_paths));
+        paths.extend(chunked.into_iter().flatten());
     }
 
     Ok(paths)
@@ -872,18 +879,27 @@ mod tests {
                 volatility: 0.1,
                 spread_sensitivity: 0.0,
             },
-            num_paths: 2,
-            seed: Some(7),
-            antithetic: false,
             use_sobol_qmc: false,
             mc_config: Some(config.clone()),
+        };
+        let run = RevolvingCreditMcRun {
+            num_paths: 2,
+            seed: 7,
+            antithetic: false,
         };
         let dates =
             super::super::super::utils::build_accrual_boundary_dates(&facility).expect("dates");
 
-        let paths =
-            generate_three_factor_paths(&stochastic, &config, &facility, &market, &dates, as_of)
-                .expect("paths");
+        let paths = generate_three_factor_paths(
+            &stochastic,
+            &run,
+            &config,
+            &facility,
+            &market,
+            &dates,
+            as_of,
+        )
+        .expect("paths");
 
         let initial_rate = paths[0].short_rate_path[0];
         assert!(

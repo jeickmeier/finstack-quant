@@ -494,7 +494,7 @@ def test_bermudan_swaption_json_validates() -> None:
         {"unknown_override": 1},
         {"instrument": {"rate_bump_bp": 3.0}},
         {"metrics": {"quoted_clean_price_pct": 99.0}},
-        {"scenario": {"mc_seed_scenario": "seed"}},
+        {"scenario": {"mc_paths": 10}},
     ],
 )
 def test_validate_instrument_json_rejects_invalid_override_ownership(

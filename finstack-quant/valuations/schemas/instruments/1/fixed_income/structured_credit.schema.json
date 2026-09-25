@@ -7993,13 +7993,8 @@
     },
     "StochasticUtilizationSpec": {
       "additionalProperties": false,
-      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process and simulation parameters for\nMonte Carlo pricing with uncertain draw/repayment patterns. Credit risk is\nincorporated via hazard-rate survival weighting (no explicit default events).",
+      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process for Monte Carlo pricing with uncertain\ndraw/repayment patterns. Credit risk is incorporated via hazard-rate\nsurvival weighting (no explicit default events). The estimator count,\nantithetic flag and seed label are pricing settings, read from\n`instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,\n`mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`].",
       "properties": {
-        "antithetic": {
-          "default": false,
-          "description": "Use antithetic variance reduction when simulating paths (default: false).\nMutually exclusive with `use_sobol_qmc`; validation rejects the combination.",
-          "type": "boolean"
-        },
         "mc_config": {
           "anyOf": [
             {
@@ -8011,24 +8006,9 @@
           ],
           "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths to simulate.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "seed": {
-          "description": "Random seed for reproducibility. Simulation is always deterministic:\n`None` falls back to a fixed default seed (42). Because the seed is\nfixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same\nrandom variates for base and bumped valuations — common random\nnumbers — so finite-difference Greeks are free of Monte Carlo noise.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "use_sobol_qmc": {
           "default": false,
-          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `antithetic`; validation rejects the combination.",
+          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination.",
           "type": "boolean"
         },
         "utilization_process": {
@@ -8037,8 +8017,7 @@
         }
       },
       "required": [
-        "utilization_process",
-        "num_paths"
+        "utilization_process"
       ],
       "type": "object"
     },

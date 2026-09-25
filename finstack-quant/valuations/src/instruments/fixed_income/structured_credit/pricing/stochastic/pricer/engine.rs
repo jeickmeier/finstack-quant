@@ -199,8 +199,8 @@ impl StochasticPricer {
             } => self.price_monte_carlo(instrument, context, *num_paths, *antithetic, &prepared),
             PricingMode::Hybrid {
                 tree_periods,
-                mc_paths,
-            } => self.price_hybrid(instrument, context, *tree_periods, *mc_paths, &prepared),
+                num_paths,
+            } => self.price_hybrid(instrument, context, *tree_periods, *num_paths, &prepared),
         }
     }
 
@@ -265,22 +265,26 @@ impl StochasticPricer {
     ) -> Result<StochasticPricingResult> {
         if num_paths == 0 {
             return Err(finstack_quant_core::Error::Validation(
-                "Monte Carlo pricing requires at least one simulation path".to_string(),
+                "Monte Carlo pricing requires at least one independent estimator \
+                 (pricing_mode.monte_carlo.num_paths)"
+                    .to_string(),
             ));
         }
 
-        // Antithetic pairing is only effective when `num_paths` is even — an
-        // odd trailing path is drawn independently (see `monte_carlo_path_factors`)
-        // and cannot be paired. Pair-aware std-error therefore requires an even
-        // path count; with an odd count the antithetic flag is dropped so the
-        // collector falls back to the plain i.i.d. estimator.
+        // `num_paths` counts independent estimators; antithetic pairing
+        // simulates each estimator as a `(Z, -Z)` pair of paths.
+        let simulated_paths = num_paths
+            .checked_mul(if antithetic { 2 } else { 1 })
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "Monte Carlo pricing path count overflow".to_string(),
+                )
+            })?;
         self.price_factor_sets(
             instrument,
             context,
-            |path_index| {
-                self.monte_carlo_path_factors(instrument, path_index, num_paths, antithetic)
-            },
-            num_paths,
+            |path_index| self.monte_carlo_path_factors(instrument, path_index, antithetic),
+            simulated_paths,
             PricingMode::MonteCarlo {
                 num_paths,
                 antithetic,
@@ -294,7 +298,7 @@ impl StochasticPricer {
         instrument: &StructuredCredit,
         context: &MarketContext,
         tree_periods: usize,
-        mc_paths: usize,
+        num_paths: usize,
         prepared: &PreparedRun,
     ) -> Result<StochasticPricingResult> {
         if tree_periods == 0 {
@@ -302,7 +306,7 @@ impl StochasticPricer {
                 "Hybrid pricing requires at least one tree prefix period".to_string(),
             ));
         }
-        if mc_paths == 0 {
+        if num_paths == 0 {
             return Err(finstack_quant_core::Error::Validation(
                 "Hybrid pricing requires at least one Monte Carlo suffix path".to_string(),
             ));
@@ -314,7 +318,7 @@ impl StochasticPricer {
             .tree_config
             .terminal_path_count(tree_periods)
             .max(1);
-        let total_paths = prefix_count.checked_mul(mc_paths).ok_or_else(|| {
+        let total_paths = prefix_count.checked_mul(num_paths).ok_or_else(|| {
             finstack_quant_core::Error::Validation("Hybrid pricing path count overflow".to_string())
         })?;
         if total_paths > self.config.max_tree_paths {
@@ -332,13 +336,13 @@ impl StochasticPricer {
         let suffix_months = month_count.saturating_sub(prefix_months);
         let has_stochastic_rates = self.has_stochastic_rates();
 
-        // Path `prefix_index * mc_paths + suffix_index` continues tree prefix
+        // Path `prefix_index * num_paths + suffix_index` continues tree prefix
         // `prefix_index` with Monte Carlo suffix draws from its own Philox
         // substream: `Philox(seed).substream(path_id)` is statistically
         // independent for any pair of distinct path ids, so the hybrid suffix
         // factors carry no inter-path correlation.
         let hybrid_factors = |path_index: usize| {
-            let prefix_index = path_index / mc_paths;
+            let prefix_index = path_index / num_paths;
             let prefix =
                 self.tree_path_factors(prefix_index, prefix_count, branch_count, prefix_months);
             let mut rng = PhiloxRng::new(self.config.tree_config.seed).substream(path_index as u64);
@@ -361,7 +365,7 @@ impl StochasticPricer {
             total_paths,
             PricingMode::Hybrid {
                 tree_periods,
-                mc_paths,
+                num_paths,
             },
             prepared,
         )
@@ -379,19 +383,15 @@ impl StochasticPricer {
         pricing_mode: PricingMode,
         prepared: &PreparedRun,
     ) -> Result<StochasticPricingResult> {
-        // Antithetic pairing is only effective when the path count is even —
-        // an odd trailing path is drawn independently (see
-        // `monte_carlo_path_factors`) and cannot be paired. Pair-aware
-        // std-error therefore requires an even path count; with an odd count
-        // the antithetic flag is dropped so the collector falls back to the
-        // plain i.i.d. estimator. Tree and Hybrid modes draw no pairs.
-        let (num_paths, antithetic) = match &pricing_mode {
+        // Monte Carlo antithetic runs simulate `total_paths = 2 × num_paths`
+        // paths as adjacent `(2k, 2k+1)` pairs. Hybrid mode draws no pairs.
+        let antithetic = matches!(
+            pricing_mode,
             PricingMode::MonteCarlo {
-                num_paths,
-                antithetic,
-            } => (*num_paths, *antithetic && num_paths.is_multiple_of(2)),
-            _ => (total_paths, false),
-        };
+                antithetic: true,
+                ..
+            }
+        );
         let per_name_simulator = self.per_name_simulator()?;
         // `(0..n).into_par_iter()` is an order-preserving
         // `IndexedParallelIterator`: `collect()` returns outputs in path
@@ -436,7 +436,7 @@ impl StochasticPricer {
 
         let mut collector = ScenarioCollector::new(
             instrument,
-            num_paths,
+            total_paths,
             antithetic,
             self.tracks_option_cost(prepared),
         )?;
@@ -453,19 +453,16 @@ impl StochasticPricer {
     /// counter-based substream, so a path's factors do not depend on which
     /// other paths run or in what order. With `antithetic`, path `2k + 1` is
     /// the negation of path `2k`: both members share `substream(k)`, so the
-    /// pair is perfectly correlated while pairs stay independent. A trailing
-    /// unpaired path (odd `num_paths`) and every non-antithetic path draw from
-    /// `substream(path_index)`.
+    /// pair is perfectly correlated while pairs stay independent. Every
+    /// non-antithetic path draws from `substream(path_index)`.
     fn monte_carlo_path_factors(
         &self,
         instrument: &StructuredCredit,
         path_index: usize,
-        num_paths: usize,
         antithetic: bool,
     ) -> Vec<f64> {
         let base_rng = PhiloxRng::new(self.config.tree_config.seed);
-        let paired = antithetic && (path_index % 2 == 1 || path_index + 1 < num_paths);
-        if paired {
+        if antithetic {
             let mut rng = base_rng.substream((path_index / 2) as u64);
             let mut factors = self.random_factors(instrument, &mut rng);
             if path_index % 2 == 1 {
@@ -1829,7 +1826,7 @@ mod tests {
         )
         .with_pricing_mode(PricingMode::Hybrid {
             tree_periods: 3,
-            mc_paths: 100,
+            num_paths: 100,
         });
         let pricer = StochasticPricer::new(config);
 
@@ -1842,7 +1839,7 @@ mod tests {
             result.pricing_mode,
             PricingMode::Hybrid {
                 tree_periods: 3,
-                mc_paths: 100,
+                num_paths: 100,
             }
         );
     }
@@ -2949,7 +2946,7 @@ mod per_name_copula_tests {
                 0.30,
                 36,
                 PoolGranularity::PerName,
-                400, // even ⇒ antithetic pairing is active
+                200, // 200 estimators ⇒ 400 simulated antithetic paths
             ))
             .price(&deal, &market)
             .expect("antithetic per-name pricing")

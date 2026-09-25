@@ -1022,14 +1022,6 @@
       "$ref": "#/$defs/BumpConfig",
       "description": "Bump sizes for finite-difference sensitivities."
     },
-    "mc_seed_scenario": {
-      "default": null,
-      "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
-      "type": [
-        "string",
-        "null"
-      ]
-    },
     "theta_period": {
       "default": null,
       "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",

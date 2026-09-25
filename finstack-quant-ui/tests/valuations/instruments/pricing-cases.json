@@ -182,7 +182,7 @@
       "type": "asset_backed_facility",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json",
-        "sha256": "da7cae09cb59f43fe2bbfde5d846540befb6bb751cb2dda7d18a6b1d23a32c86",
+        "sha256": "1831f869ef379a709785c6eb866897c20e7202fe83912661e5cf66c6832ef9b9",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -229,15 +229,10 @@
           "value": {
             "model_config": {
               "mc_paths": 64,
+              "mc_seed_scenario": "registry-pr020",
               "hw1f_mean_reversion": 0.03,
               "hw1f_sigma": 0.01
             }
-          }
-        },
-        {
-          "path": ["instrument", "spec", "metric_pricing_overrides"],
-          "value": {
-            "mc_seed_scenario": "registry-pr020"
           }
         }
       ],
@@ -547,16 +542,11 @@
           "path": ["instrument", "spec", "instrument_pricing_overrides"],
           "value": {
             "model_config": {
-              "mc_paths": 64,
+              "mc_paths": 32,
+              "mc_seed_scenario": "registry-pr020",
               "hw1f_mean_reversion": 0.03,
               "hw1f_sigma": 0.01
             }
-          }
-        },
-        {
-          "path": ["instrument", "spec", "metric_pricing_overrides"],
-          "value": {
-            "mc_seed_scenario": "registry-pr020"
           }
         }
       ],
@@ -755,15 +745,10 @@
           "value": {
             "model_config": {
               "mc_paths": 64,
+              "mc_seed_scenario": "registry-pr020",
               "hw1f_mean_reversion": 0.03,
               "hw1f_sigma": 0.01
             }
-          }
-        },
-        {
-          "path": ["instrument", "spec", "metric_pricing_overrides"],
-          "value": {
-            "mc_seed_scenario": "registry-pr020"
           }
         }
       ],
@@ -2643,16 +2628,11 @@
           "path": ["instrument", "spec", "instrument_pricing_overrides"],
           "value": {
             "model_config": {
-              "mc_paths": 64,
+              "mc_paths": 32,
+              "mc_seed_scenario": "registry-pr020",
               "hw1f_mean_reversion": 0.03,
               "hw1f_sigma": 0.01
             }
-          }
-        },
-        {
-          "path": ["instrument", "spec", "metric_pricing_overrides"],
-          "value": {
-            "mc_seed_scenario": "registry-pr020"
           }
         }
       ],
@@ -2783,16 +2763,11 @@
           "path": ["instrument", "spec", "instrument_pricing_overrides"],
           "value": {
             "model_config": {
-              "mc_paths": 64,
+              "mc_paths": 32,
+              "mc_seed_scenario": "registry-pr020",
               "hw1f_mean_reversion": 0.03,
               "hw1f_sigma": 0.01
             }
-          }
-        },
-        {
-          "path": ["instrument", "spec", "metric_pricing_overrides"],
-          "value": {
-            "mc_seed_scenario": "registry-pr020"
           }
         }
       ],

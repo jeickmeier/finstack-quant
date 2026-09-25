@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 
 import pytest
 
@@ -36,8 +37,6 @@ def test_merton_mc_bond_price_smoke() -> None:
     merton = MertonModel(100.0, 0.25, 60.0, 0.04)
     config = (
         MertonMcConfig(merton, 0.40)
-        .num_paths(64)
-        .seed(7)
         .pik_schedule(PikSchedule.uniform(PikMode.pik()))
         .barrier_crossing(BarrierCrossing.discrete())
     )
@@ -50,6 +49,11 @@ def test_merton_mc_bond_price_smoke() -> None:
         StubKind.SHORT_FRONT,
         "USD-OIS",
     )
+    # Path count lives on the bond's model_config, not on MertonMcConfig.
+    envelope = json.loads(bond.to_json())
+    spec = envelope["instrument"]["spec"]
+    spec.setdefault("instrument_pricing_overrides", {}).setdefault("model_config", {})["mc_paths"] = 64
+    bond = Bond.from_json(json.dumps(envelope))
     result = bond.price_merton_mc(config, 0.04, datetime.date(2024, 1, 15))
     assert result.num_paths == 64
     assert result.clean_price_pct > 0.0

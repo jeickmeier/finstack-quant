@@ -111,7 +111,6 @@
       "margin_bp": 600.0,
       "maturity": "2030-01-15",
       "metric_pricing_overrides": {
-        "mc_seed_scenario": null,
         "theta_period": null
       },
       "payment_calendar_id": "nyse",

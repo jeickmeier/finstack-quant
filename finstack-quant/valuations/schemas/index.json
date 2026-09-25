@@ -66,7 +66,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
-      "bytes": 84884,
+      "bytes": 85048,
       "kind": "component",
       "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
       "summary": "Instrument-owned market quote and model configuration overrides.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
-      "bytes": 30819,
+      "bytes": 30408,
       "kind": "component",
       "path": "schemas/common/1/metric_pricing_overrides.schema.json",
       "summary": "Metric-time pricing and finite-difference configuration.",
@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1024897,
+      "bytes": 1023690,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -218,7 +218,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/autocallable.schema.json",
-      "bytes": 12726,
+      "bytes": 12688,
       "kind": "input",
       "path": "schemas/instruments/1/equity/autocallable.schema.json",
       "summary": "Structured note that redeems early when a barrier is met.",
@@ -226,7 +226,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json",
-      "bytes": 8827,
+      "bytes": 8789,
       "kind": "input",
       "path": "schemas/instruments/1/equity/cliquet_option.schema.json",
       "summary": "Series of forward-starting options with local and global caps.",
@@ -234,7 +234,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/discounted_cash_flow.schema.json",
-      "bytes": 16160,
+      "bytes": 16122,
       "kind": "input",
       "path": "schemas/instruments/1/equity/discounted_cash_flow.schema.json",
       "summary": "Enterprise DCF valuation with an explicit forecast and terminal value.",
@@ -282,7 +282,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 192512,
+      "bytes": 191685,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -298,7 +298,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/real_estate_asset.schema.json",
-      "bytes": 12295,
+      "bytes": 12257,
       "kind": "input",
       "path": "schemas/instruments/1/equity/real_estate_asset.schema.json",
       "summary": "Direct property asset with rent roll and exit assumptions.",
@@ -306,7 +306,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json",
-      "bytes": 43848,
+      "bytes": 43810,
       "kind": "input",
       "path": "schemas/instruments/1/equity/trs_equity.schema.json",
       "summary": "Equity total-return swap versus a funding leg.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1023864,
+      "bytes": 1022657,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -426,7 +426,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
-      "bytes": 283458,
+      "bytes": 282593,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
       "summary": "Warehouse line against a collateral pool: advance rates, concentration limits, borrowing base.",
@@ -474,7 +474,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json",
-      "bytes": 62010,
+      "bytes": 61221,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/revolving_credit.schema.json",
       "summary": "Committed revolver with drawn/undrawn balances and commitment fees.",
@@ -482,7 +482,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
-      "bytes": 410082,
+      "bytes": 409293,
       "kind": "input",
       "path": "schemas/instruments/1/fixed_income/structured_credit.schema.json",
       "summary": "ABS/CLO/RMBS/CMBS deal: collateral pool, tranches and waterfall.",
@@ -522,7 +522,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_forward.schema.json",
-      "bytes": 6975,
+      "bytes": 6937,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_forward.schema.json",
       "summary": "Outright FX forward.",
@@ -554,7 +554,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
-      "bytes": 6985,
+      "bytes": 6947,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_spot.schema.json",
       "summary": "Spot foreign-exchange trade.",
@@ -562,7 +562,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json",
-      "bytes": 5631,
+      "bytes": 5593,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_swap.schema.json",
       "summary": "Near- and far-leg FX swap.",
@@ -586,7 +586,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
-      "bytes": 14264,
+      "bytes": 14226,
       "kind": "input",
       "path": "schemas/instruments/1/fx/ndf.schema.json",
       "summary": "Non-deliverable forward cash-settled against a fixing.",
@@ -594,7 +594,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json",
-      "bytes": 8028,
+      "bytes": 7990,
       "kind": "input",
       "path": "schemas/instruments/1/fx/quanto_option.schema.json",
       "summary": "Option on a foreign asset settled in the domestic currency at a fixed rate.",
@@ -602,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1114439,
+      "bytes": 1113194,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -754,7 +754,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
-      "bytes": 59395,
+      "bytes": 59683,
       "kind": "output",
       "path": "schemas/results/1/valuation_result.schema.json",
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",

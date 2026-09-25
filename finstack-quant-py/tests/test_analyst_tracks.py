@@ -176,7 +176,7 @@ def test_wrong_way_risk_keeps_marginal_utilization_fixed(tracks: ModuleType) -> 
     conditional = [0.4 + 0.6 * distribution.joint_p11 / 0.10 for distribution in (independent, dependent)]
     assert conditional[0] == pytest.approx(marginal)
     assert conditional[1] > conditional[0]
-    payload = tracks.stochastic_revolver(num_paths=512)
+    payload = tracks.stochastic_revolver(num_paths=256)
     market = tracks.build_market("credit")
     first = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount
     second = price_instrument(json.dumps(payload), market, tracks.AS_OF, model="monte_carlo_three_factor").value.amount

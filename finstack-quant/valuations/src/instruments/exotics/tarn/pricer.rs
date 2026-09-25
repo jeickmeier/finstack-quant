@@ -254,7 +254,10 @@ impl TarnPricer {
         self.config.with_instrument_overrides(
             &inst.id,
             inst.instrument_pricing_overrides.model_config.mc_paths,
-            inst.metric_pricing_overrides.mc_seed_scenario.as_deref(),
+            inst.instrument_pricing_overrides
+                .model_config
+                .mc_seed_scenario
+                .as_deref(),
         )
     }
 
@@ -415,7 +418,7 @@ impl TarnPricer {
         // `r(0) = f(0,0)` reconstruction, so the price has no Monte-Carlo
         // component. Settle the (fully seasoned) schedule directly.
         if event_times.is_empty() {
-            return deterministic_estimate(inst, &events, config.effective_path_count());
+            return deterministic_estimate(inst, &events, &config);
         }
 
         // Final settlement event at maturity (the last payment date): coupons
@@ -484,7 +487,7 @@ impl Default for TarnPricer {
 fn deterministic_estimate(
     inst: &Tarn,
     events: &[CouponEvent],
-    num_paths: usize,
+    config: &RateExoticMcConfig,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
     let mut payoff = TarnPayoff::new(
         inst.fixed_rate,
@@ -500,8 +503,8 @@ fn deterministic_estimate(
         mean: pv,
         stderr: 0.0,
         ci_95: (pv, pv),
-        num_paths,
-        num_simulated_paths: num_paths,
+        num_paths: config.num_paths,
+        num_simulated_paths: config.simulated_path_count(),
         std_dev: Some(0.0),
         median: None,
         percentile_25: None,
@@ -908,6 +911,43 @@ mod tests {
         );
     }
 
+    /// `num_paths` counts independent estimators (RNG streams). The registry
+    /// default was halved when it stopped counting antithetic mirrors, so the
+    /// default configuration must replay exactly the same streams: the PV is
+    /// pinned bit-for-bit to the value captured before the change.
+    #[test]
+    fn rate_exotic_default_pv_unchanged() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let estimate =
+            TarnPricer::with_hw_params(HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"))
+                .price_estimate(&test_tarn(1.0), &market, as_of)
+                .expect("default price");
+        assert_eq!(
+            estimate.mean.amount().to_bits(),
+            0x412e2ae7d383f36a_u64,
+            "pv={}",
+            estimate.mean.amount()
+        );
+    }
+
+    /// `model_config.mc_paths` counts independent estimators: under the
+    /// default antithetic sampling each estimator simulates a mirrored pair,
+    /// so the engine simulates twice as many paths as requested estimators.
+    #[test]
+    fn rate_exotic_mc_paths_counts_independent_estimators() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let mut tarn = test_tarn(1.0);
+        tarn.instrument_pricing_overrides.model_config.mc_paths = Some(64);
+        let estimate =
+            TarnPricer::with_hw_params(HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"))
+                .price_estimate(&tarn, &market, as_of)
+                .expect("price");
+        assert_eq!(estimate.num_paths, 64);
+        assert_eq!(estimate.num_simulated_paths, 128);
+    }
+
     #[test]
     fn higher_path_count_reduces_standard_error() {
         let as_of = date(2025, Month::January, 1);
@@ -917,7 +957,7 @@ mod tests {
         let low =
             TarnPricer::with_hw_params(HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"))
                 .with_config(RateExoticMcConfig {
-                    num_paths: 200,
+                    num_paths: 100,
                     antithetic: true,
                     min_steps_between_events: 1,
                     seed: 7,
@@ -928,7 +968,7 @@ mod tests {
         let high =
             TarnPricer::with_hw_params(HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"))
                 .with_config(RateExoticMcConfig {
-                    num_paths: 2_000,
+                    num_paths: 1000,
                     antithetic: true,
                     min_steps_between_events: 1,
                     seed: 7,

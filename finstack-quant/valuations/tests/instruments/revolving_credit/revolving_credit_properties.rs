@@ -286,7 +286,6 @@ proptest! {
         target_rate in 0.1f64..0.9,
         speed in 0.1f64..5.0,
         volatility in 0.01f64..0.5,
-        num_paths in 100usize..10000,
     ) {
         let process = UtilizationProcess::MeanReverting {
             target_rate,
@@ -297,17 +296,9 @@ proptest! {
 
         let spec = StochasticUtilizationSpec {
             utilization_process: process,
-            num_paths,
-            seed: Some(42),
-            antithetic: false,
             use_sobol_qmc: false,
-
             mc_config: None,
         };
-
-        // Spec should be valid
-        prop_assert!(spec.num_paths > 0, "Number of paths should be positive");
-        prop_assert!(spec.seed.is_some(), "Seed should be set for reproducibility");
 
         match spec.utilization_process {
             UtilizationProcess::MeanReverting { target_rate: t, .. } => {

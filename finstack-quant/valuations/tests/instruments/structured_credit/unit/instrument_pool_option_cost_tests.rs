@@ -69,7 +69,7 @@ fn tranche_cost(result: &StochasticPricingResult, id: &str) -> f64 {
 fn constant_spread_at_the_margin_has_zero_deal_option_cost() {
     let deal = pool_of(Vec::new(), CreditSpreadProcessSpec::Constant(0.025), 0.25);
     let result = deal
-        .price_stochastic_with_mode(&market(), CLOSING, monte_carlo(8))
+        .price_stochastic_with_mode(&market(), CLOSING, monte_carlo(4))
         .expect("pricing");
     assert!(
         result.expected_collateral_draws.amount() > 0.0,
@@ -92,7 +92,7 @@ fn constant_spread_at_the_margin_has_zero_deal_option_cost() {
 #[test]
 fn single_revolver_pool_matches_the_standalone_option_cost() {
     let spread = CreditSpreadProcessSpec::Constant(0.0);
-    let facility = revolver("RCF-POOL", 1e-6, spread.clone(), 4);
+    let facility = revolver("RCF-POOL", 1e-6, spread.clone(), 2);
     let market = market();
     let standalone = RevolvingCreditPricer::price_with_paths(&facility, &market, CLOSING)
         .expect("standalone pricing")
@@ -114,7 +114,7 @@ fn single_revolver_pool_matches_the_standalone_option_cost() {
         }
     }
     let pooled = deal
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(4))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(2))
         .expect("pool pricing");
     let deal_cost = pooled.draw_option_cost.amount();
     assert!(
@@ -145,7 +145,7 @@ fn tranche_option_costs_sum_to_the_deal_cost_and_equity_bears_the_most() {
     deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));
     let market = market().insert(widening_hazard_curve());
     let result = deal
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(200))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(100))
         .expect("pricing");
 
     let deal_cost = result.draw_option_cost.amount();
@@ -179,7 +179,7 @@ fn credit_risky_single_revolver_pool_matches_the_standalone_option_cost_in_expec
         implied_vol: 0.4,
         tenor_years: None,
     };
-    let facility = revolver("RCF-POOL", 0.25, spread.clone(), PATHS);
+    let facility = revolver("RCF-POOL", 0.25, spread.clone(), PATHS / 2);
     let market = market().insert(widening_hazard_curve());
     let standalone = RevolvingCreditPricer::price_with_paths(&facility, &market, CLOSING)
         .expect("standalone pricing")
@@ -192,7 +192,7 @@ fn credit_risky_single_revolver_pool_matches_the_standalone_option_cost_in_expec
         }
     }
     let pooled = deal
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(PATHS))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(PATHS / 2))
         .expect("pool pricing");
     let paths = &pooled.draw_option_cost_paths;
     let n = paths.len() as f64;
@@ -301,7 +301,7 @@ fn senior_coverage_position_diverts_to_the_senior_note_only() {
     }
 
     let result = breached
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(100))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(50))
         .expect("pricing");
     let deal_cost = result.draw_option_cost.amount();
     assert!(deal_cost < 0.0, "deal cost {deal_cost}");

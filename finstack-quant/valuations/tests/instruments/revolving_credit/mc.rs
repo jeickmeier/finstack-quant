@@ -48,13 +48,14 @@ fn test_mc_pricer_stochastic_utilization() {
                     volatility: 0.15, // 15% volatility
                     spread_sensitivity: 0.0,
                 },
-                num_paths: 10000, // 10k paths for reasonable convergence
-                seed: Some(42),   // Fixed seed for reproducibility
-                antithetic: false,
                 use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_mc_paths(10_000),
+        )
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
         .build()
@@ -128,9 +129,6 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                     volatility: 1e-8, // near-zero, but positive to satisfy model constraints
                     spread_sensitivity: 0.0,
                 },
-                num_paths: 5000,
-                seed: Some(42),
-                antithetic: false,
                 use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
@@ -145,6 +143,10 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                 }),
             },
         )))
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_mc_paths(5_000),
+        )
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
         .build()
@@ -172,9 +174,6 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                     volatility: 0.20,
                     spread_sensitivity: 0.0,
                 },
-                num_paths: 5000,
-                seed: Some(42),
-                antithetic: false,
                 use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
@@ -189,6 +188,10 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                 }),
             },
         )))
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_mc_paths(5_000),
+        )
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
         .build()
@@ -225,13 +228,14 @@ fn test_mc_pricer_deterministic_reproducibility() {
                     volatility: 0.10,
                     spread_sensitivity: 0.0,
                 },
-                num_paths: 1000,
-                seed: Some(12345),
-                antithetic: false,
                 use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_mc_paths(1_000),
+        )
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.0)
         .build()
@@ -287,13 +291,14 @@ fn test_mc_pricer_convergence() {
                         volatility: 0.20,
                         spread_sensitivity: 0.0,
                     },
-                    num_paths,
-                    seed: Some(99999),
-                    antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: None,
                 },
             )))
+            .instrument_pricing_overrides(
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                    .with_mc_paths(num_paths),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.0)
             .build()
@@ -343,13 +348,14 @@ fn test_mc_utilization_mean_reversion() {
                     volatility: 0.05, // Low volatility
                     spread_sensitivity: 0.0,
                 },
-                num_paths: 5000,
-                seed: Some(54321),
-                antithetic: false,
                 use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_mc_paths(5_000),
+        )
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.0)
         .build()
@@ -383,13 +389,14 @@ fn test_mc_utilization_mean_reversion() {
                     volatility: 0.05,
                     spread_sensitivity: 0.0,
                 },
-                num_paths: 5000,
-                seed: Some(54321),
-                antithetic: false,
                 use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                .with_mc_paths(5_000),
+        )
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.0)
         .build()
@@ -493,13 +500,14 @@ fn test_mc_stochastic_floating_rate_index_cap() {
                         volatility: 1e-8, // near-zero to keep utilization deterministic
                         spread_sensitivity: 0.0,
                     },
-                    num_paths: 1000,
-                    seed: Some(42),
-                    antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: None,
                 },
             )))
+            .instrument_pricing_overrides(
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                    .with_mc_paths(1_000),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.0)
             .build()
@@ -611,9 +619,6 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                         volatility: 1e-8,
                         spread_sensitivity: 0.0,
                     },
-                    num_paths: 64,
-                    seed: Some(42),
-                    antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: Some(McConfig {
                         correlation_matrix: None,
@@ -628,6 +633,10 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                     }),
                 },
             )))
+            .instrument_pricing_overrides(
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                    .with_mc_paths(64),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.4)
             .build()

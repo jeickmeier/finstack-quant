@@ -1048,7 +1048,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-level pricing overrides."
@@ -2390,7 +2389,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-only pricing controls."
@@ -5861,7 +5859,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-only pricing controls."
@@ -11853,7 +11850,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-only pricing controls."
@@ -13104,7 +13100,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-only pricing controls."
@@ -15940,7 +15935,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -16309,7 +16303,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -16429,7 +16422,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -21306,12 +21298,12 @@
           ]
         },
         "low_paths": {
-          "description": "Number of MC paths used during calibration iterations (low paths).",
+          "description": "Number of independent MC estimators used during calibration iterations (low paths).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
-        "max_iter": {
+        "max_iterations": {
           "description": "Maximum bisection iterations.",
           "format": "uint",
           "minimum": 0,
@@ -21344,7 +21336,7 @@
         "target",
         "parameter",
         "low_paths",
-        "max_iter",
+        "max_iterations",
         "tolerance_pv"
       ],
       "type": "object"
@@ -21353,10 +21345,6 @@
       "additionalProperties": false,
       "description": "Configuration for Monte Carlo PIK bond pricing.",
       "properties": {
-        "antithetic": {
-          "description": "Whether to use antithetic variates for variance reduction.",
-          "type": "boolean"
-        },
         "barrier_crossing": {
           "$ref": "#/$defs/BarrierCrossing",
           "description": "Barrier-crossing policy used for `BarrierType::FirstPassage`.\n\nDefault: `BrownianBridge` when the Merton model uses `FirstPassage`,\notherwise `Discrete`."
@@ -21394,11 +21382,6 @@
             "null"
           ]
         },
-        "default_recovery_rate": {
-          "description": "Default recovery rate used when no `dynamic_recovery` model is set.",
-          "format": "double",
-          "type": "number"
-        },
         "dynamic_recovery": {
           "anyOf": [
             {
@@ -21425,23 +21408,16 @@
           "$ref": "#/$defs/MertonModel",
           "description": "Merton structural credit model."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
         "pik_schedule": {
           "$ref": "#/$defs/PikSchedule",
           "description": "PIK schedule controlling per-coupon cash/PIK/toggle behavior."
         },
-        "seed": {
-          "description": "RNG seed for reproducibility.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+        "recovery_rate": {
+          "description": "Recovery on default as a decimal fraction in `[0, 1]`.\n\n`dynamic_recovery`, when set, takes precedence over this flat rate.",
+          "format": "double",
+          "type": "number"
         },
-        "time_steps_per_year": {
+        "steps_per_year": {
           "description": "Time steps per year for the simulation grid.",
           "format": "uint",
           "minimum": 0,
@@ -21462,12 +21438,9 @@
       "required": [
         "merton",
         "pik_schedule",
-        "num_paths",
-        "seed",
-        "antithetic",
-        "time_steps_per_year",
+        "steps_per_year",
         "barrier_crossing",
-        "default_recovery_rate"
+        "recovery_rate"
       ],
       "type": "object"
     },
@@ -21598,14 +21571,6 @@
         "bump_config": {
           "$ref": "#/$defs/BumpConfig",
           "description": "Bump sizes for finite-difference sensitivities."
-        },
-        "mc_seed_scenario": {
-          "default": null,
-          "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "theta_period": {
           "default": null,
@@ -21738,6 +21703,13 @@
             "null"
           ]
         },
+        "mc_seed_scenario": {
+          "description": "Optional Monte Carlo seed label.\n\nMonte Carlo pricers derive their RNG seed as\n`derive_seed(instrument_id, label)`, so the same label always replays\nthe same random streams for the same instrument. `None` seeds with the\npricer's base label. Finite-difference Greeks set a fixed label on the\nrepriced clone so base and bumped legs share common random numbers.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "mc_target_ci_half_width": {
           "description": "Optional absolute target for the Monte Carlo confidence-interval\nhalf-width in instrument currency.\n\nEngines that support adaptive sampling may stop before `mc_paths` after\ntheir minimum sample count when this positive finite target is reached.\nThe rates-credit bond engine always consumes its fixed estimator budget\nand validates this target against the final 95% confidence interval.",
           "format": "double",
@@ -21755,7 +21727,7 @@
               "type": "null"
             }
           ],
-          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (via flat JSON under `pricing_overrides.merton_mc_config` or the\nRust builder), the `MertonMc` pricer in the registry uses this config."
+          "description": "Merton Monte Carlo configuration for structural credit PIK pricing.\n\nWhen set (at `instrument_pricing_overrides.model_config.merton_mc_config`\nor via the Rust builder), the `MertonMc` pricer in the registry uses this\nmodel and grid; the path count, antithetic flag and seed label come from\n`mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config."
         },
         "oas_price_basis": {
           "$ref": "#/$defs/OasPriceBasis",
@@ -22069,7 +22041,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -24583,7 +24554,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-time pricing configuration."
@@ -25511,7 +25481,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "default": {
-            "mc_seed_scenario": null,
             "theta_period": null
           },
           "description": "Metric-only pricing controls."
@@ -28420,13 +28389,8 @@
     },
     "StochasticUtilizationSpec": {
       "additionalProperties": false,
-      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process and simulation parameters for\nMonte Carlo pricing with uncertain draw/repayment patterns. Credit risk is\nincorporated via hazard-rate survival weighting (no explicit default events).",
+      "description": "Specification for stochastic utilization modeling.\n\nDefines the stochastic process for Monte Carlo pricing with uncertain\ndraw/repayment patterns. Credit risk is incorporated via hazard-rate\nsurvival weighting (no explicit default events). The estimator count,\nantithetic flag and seed label are pricing settings, read from\n`instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,\n`mc_seed_scenario`); see [`RevolvingCreditMcRun::resolve`].",
       "properties": {
-        "antithetic": {
-          "default": false,
-          "description": "Use antithetic variance reduction when simulating paths (default: false).\nMutually exclusive with `use_sobol_qmc`; validation rejects the combination.",
-          "type": "boolean"
-        },
         "mc_config": {
           "anyOf": [
             {
@@ -28438,24 +28402,9 @@
           ],
           "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
         },
-        "num_paths": {
-          "description": "Number of Monte Carlo paths to simulate.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "seed": {
-          "description": "Random seed for reproducibility. Simulation is always deterministic:\n`None` falls back to a fixed default seed (42). Because the seed is\nfixed, bump-and-reprice sensitivities (DV01/CS01/Theta) reuse the same\nrandom variates for base and bumped valuations — common random\nnumbers — so finite-difference Greeks are free of Monte Carlo noise.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "use_sobol_qmc": {
           "default": false,
-          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `antithetic`; validation rejects the combination.",
+          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination.",
           "type": "boolean"
         },
         "utilization_process": {
@@ -28464,8 +28413,7 @@
         }
       },
       "required": [
-        "utilization_process",
-        "num_paths"
+        "utilization_process"
       ],
       "type": "object"
     },

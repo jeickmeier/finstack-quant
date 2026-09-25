@@ -288,12 +288,15 @@ def credit_calibration_envelope(as_of: date = AS_OF) -> dict[str, Any]:
     return envelope
 
 
-def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 4096) -> dict[str, Any]:
+def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 2048) -> dict[str, Any]:
     """Return a seeded utilization/credit Monte Carlo revolver input.
 
     Args:
         correlation: Utilization-credit Brownian correlation in [-1, 1].
-        num_paths: Positive Monte Carlo path count; default 4096.
+        num_paths: Independent antithetic Monte Carlo estimators, at least 2;
+            default 2048 (4096 simulated paths). Stored as
+            ``instrument_pricing_overrides.model_config.mc_paths``; the seed is
+            derived from the facility id.
 
     Returns:
         Fresh canonical facility with observed utilization 40 percent and
@@ -302,18 +305,15 @@ def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 4096) -> d
     Raises:
         ValueError: If the correlation or path count is invalid.
 
-    >>> stochastic_revolver()["instrument"]["spec"]["draw_repay_spec"]["stochastic"]["seed"]
-    20250115
+    >>> stochastic_revolver()["instrument"]["spec"]["instrument_pricing_overrides"]["model_config"]
+    {'mc_paths': 2048, 'mc_antithetic': True}
     """
-    if not -1.0 <= correlation <= 1.0 or num_paths <= 0:
-        raise ValueError("correlation must be in [-1,1] and num_paths must be positive")
+    if not -1.0 <= correlation <= 1.0 or num_paths < 2:
+        raise ValueError("correlation must be in [-1,1] and num_paths must be at least 2")
     payload = credit_extension()["ANALYST-REVOLVER"]
     payload["instrument"]["spec"]["draw_repay_spec"] = {
         "stochastic": {
             "utilization_process": {"mean_reverting": {"target_rate": 0.55, "speed": 1.0, "volatility": 0.10}},
-            "num_paths": num_paths,
-            "seed": 20250115,
-            "antithetic": True,
             "use_sobol_qmc": False,
             "mc_config": {
                 "correlation_matrix": None,
@@ -330,6 +330,8 @@ def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 4096) -> d
             },
         }
     }
+    overrides = payload["instrument"]["spec"].setdefault("instrument_pricing_overrides", {})
+    overrides.setdefault("model_config", {}).update({"mc_paths": num_paths, "mc_antithetic": True})
     return payload
 
 

@@ -66,7 +66,7 @@ Selected **only** when the caller explicitly asks for `ModelKey::MonteCarloGBM`.
 GBM paths with discrete observations; the accrual fraction is the proportion of
 simulated fixings inside the effective bounds.
 
-The `mc_seed_scenario` entry on `metric_pricing_overrides` controls the
+The `instrument_pricing_overrides.model_config.mc_seed_scenario` label controls the
 deterministic random stream *after* Monte Carlo has been selected — it never
 selects the model. Absent, the seed derives from the instrument id and the
 scenario label `"base"`.

@@ -267,12 +267,15 @@ fn bench_revolving_credit_mc(c: &mut Criterion) {
             volatility: 0.2,
             spread_sensitivity: 0.0,
         },
-        num_paths: 512,
-        seed: Some(7),
-        antithetic: true,
         use_sobol_qmc: false,
         mc_config: None,
     }));
+    // 256 antithetic estimators simulate 512 paths.
+    facility.instrument_pricing_overrides = facility
+        .instrument_pricing_overrides
+        .clone()
+        .with_mc_paths(256)
+        .with_mc_antithetic(true);
     let mut group = c.benchmark_group("revolving_credit_mc");
     group.sample_size(20);
     group.bench_function("3Y_512_paths", |b| {

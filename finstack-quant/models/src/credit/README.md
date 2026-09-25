@@ -314,9 +314,9 @@ MertonMcConfig
 ├── endogenous_hazard: Option<EndogenousHazardSpec>
 ├── dynamic_recovery: Option<DynamicRecoverySpec>
 ├── toggle_model: Option<ToggleExerciseModel>      ← consulted only at PikMode::Toggle dates
-├── num_paths, seed, antithetic, time_steps_per_year
+├── steps_per_year
 ├── barrier_crossing: BarrierCrossing              ← Discrete | BrownianBridge
-├── default_recovery_rate                          ← used when dynamic_recovery is None
+├── recovery_rate                                  ← used when dynamic_recovery is None
 ├── calibration: Option<MertonMcCalibrationSpec>
 └── discount factors (optional term structure; otherwise a flat rate)
 ```
@@ -325,7 +325,7 @@ Per path, per time step: evolve the asset value; take the hazard from
 `EndogenousHazardSpec` if present, otherwise from the Merton model; check
 first-passage default against the barrier; at coupon dates evaluate the toggle
 model when `PikMode::Toggle` is active; on default compute recovery through
-`DynamicRecoverySpec` if present, otherwise `default_recovery_rate`.
+`DynamicRecoverySpec` if present, otherwise `recovery_rate`.
 
 `PikMode::Toggle` falls back to `Cash` when no toggle model is set.
 `BarrierCrossing` defaults to `BrownianBridge` when the Merton model uses
@@ -435,8 +435,10 @@ assert!((conv.hazard_volatility - 0.0105).abs() < 1e-12);
 `EndogenousHazardSpec`, `CreditState`, and `ToggleExerciseModel`.
 `MertonMcConfig` and `MertonMcResult` live one namespace over in
 `finstack_quant.valuations.instruments`; `MertonMcConfig` is a fluent builder
-(`MertonMcConfig(merton).num_paths(50_000).seed(42).antithetic(True)`), not a
-keyword constructor.
+(`MertonMcConfig(merton, 0.4).steps_per_year(12)`), not a keyword constructor.
+Path count, antithetic sampling and the seed label come from the bond's
+`instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`,
+`mc_seed_scenario`).
 
 The wire and export surface is not uniform across the eight classes:
 

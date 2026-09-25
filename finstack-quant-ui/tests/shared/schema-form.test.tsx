@@ -231,8 +231,17 @@ it("preserves real bond wide-integer fields until the generated codec checks the
   >;
   const spec = (edited.instrument as { spec: Record<string, unknown> }).spec;
   // Reference model inputs from valuations/benches/merton_mc_pricing.rs; no pricing is run here.
-  const config = {
+  // The calibration seed is the Merton wire's u64 field.
+  const calibration = {
+    target: { clean_price_pct: 99.5 },
+    parameter: "debt_barrier",
+    low_paths: 2000,
+    max_iterations: 40,
+    tolerance_pv: 0.0001,
+    bracket: null,
     seed: "18446744073709551615",
+  };
+  const config = {
     merton: {
       asset_value: 200,
       asset_vol: 0.25,
@@ -243,14 +252,13 @@ it("preserves real bond wide-integer fields until the generated codec checks the
       dynamics: "geometric_brownian",
     },
     pik_schedule: { uniform: "pik" },
-    num_paths: 10000,
-    antithetic: true,
-    time_steps_per_year: 12,
+    steps_per_year: 12,
     barrier_crossing: "discrete",
-    default_recovery_rate: 0.4,
+    recovery_rate: 0.4,
+    calibration,
   };
   spec.instrument_pricing_overrides = {
-    model_config: { merton_mc_config: config },
+    model_config: { mc_paths: 5000, mc_antithetic: true, merton_mc_config: config },
   };
   const validator = structuralValidator(bond);
   const text = bond.codec.stringify(validator.parse(edited));
@@ -258,9 +266,9 @@ it("preserves real bond wide-integer fields until the generated codec checks the
   expect(native.validateInstrumentJson(text)).toContain(
     '"seed":18446744073709551615',
   );
-  config.seed = "18446744073709551616";
+  calibration.seed = "18446744073709551616";
   expect(validator.safeParse(edited).success).toBe(false);
-  config.seed = "18446744073709551615";
+  calibration.seed = "18446744073709551615";
   const submit = vi.fn();
   render(
     <SchemaForm
@@ -268,7 +276,7 @@ it("preserves real bond wide-integer fields until the generated codec checks the
       defaultValues={edited}
       fields={{
         allow: [
-          "instrument.spec.instrument_pricing_overrides.model_config.merton_mc_config.seed",
+          "instrument.spec.instrument_pricing_overrides.model_config.merton_mc_config.calibration.seed",
         ],
       }}
       validate={validate}

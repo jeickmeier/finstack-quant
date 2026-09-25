@@ -83,7 +83,7 @@ fn lsmc_proxy_price_is_nonnegative_and_stable() {
         event_times: vec![1.0, 2.0, 3.0, 4.0],
         exercise_times: vec![1.0, 2.0, 3.0, 4.0],
         config: RateExoticMcConfig {
-            num_paths: 20_000,
+            num_paths: 10_000,
             seed: 7,
             ..Default::default()
         },

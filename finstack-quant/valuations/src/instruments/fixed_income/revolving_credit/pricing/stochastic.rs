@@ -9,7 +9,9 @@ use super::unified::{
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use crate::cashflow::traits::{schedule_from_classified_flows, ScheduleBuildOpts};
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;
-use crate::instruments::fixed_income::revolving_credit::types::{DrawRepaySpec, RevolvingCredit};
+use crate::instruments::fixed_income::revolving_credit::types::{
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditMcRun,
+};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -177,6 +179,27 @@ impl RevolvingCreditPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<EnhancedMonteCarloResult> {
+        let run = RevolvingCreditMcRun::resolve(
+            &facility.id,
+            &facility.instrument_pricing_overrides.model_config,
+        )?;
+        Self::price_monte_carlo_with_run(facility, market, as_of, &run)
+    }
+
+    /// Monte Carlo pricing with explicit sampling settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `facility` - Revolving credit facility with a stochastic draw/repay spec.
+    /// * `market` - Curves used to generate and discount each path.
+    /// * `as_of` - Valuation date for the simulation.
+    /// * `run` - Estimator count, seed and antithetic flag.
+    pub(crate) fn price_monte_carlo_with_run(
+        facility: &RevolvingCredit,
+        market: &MarketContext,
+        as_of: Date,
+        run: &RevolvingCreditMcRun,
+    ) -> Result<EnhancedMonteCarloResult> {
         let stoch_spec = match &facility.draw_repay_spec {
             DrawRepaySpec::Stochastic(spec) => spec.as_ref(),
             DrawRepaySpec::Deterministic(_) => {
@@ -251,6 +274,7 @@ impl RevolvingCreditPricer {
         // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
         let paths = generate_three_factor_paths(
             stoch_spec,
+            run,
             mc_config,
             facility,
             market,
@@ -298,7 +322,7 @@ impl RevolvingCreditPricer {
             .iter()
             .map(|r| r.draw_option_cost.amount())
             .collect();
-        let use_antithetic = stoch_spec.antithetic && !stoch_spec.use_sobol_qmc;
+        let use_antithetic = run.antithetic && !stoch_spec.use_sobol_qmc;
         let currency = facility.commitment_amount.currency();
         let estimate = MoneyEstimate::from_estimate(path_estimate(&pvs, use_antithetic), currency)?;
         let draw_option_cost =

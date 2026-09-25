@@ -96,8 +96,9 @@ impl SwaptionLsmcPricer {
     ///
     /// # Arguments
     ///
-    /// * `config` - Monte Carlo settings; `num_paths` total paths (halved into
-    ///   `(Z, -Z)` pairs when `antithetic` is set), `seed` the Philox root seed.
+    /// * `config` - Monte Carlo settings; `num_paths` independent estimators
+    ///   (each simulated as a `(Z, -Z)` pair when `antithetic` is set), `seed`
+    ///   the Philox root seed.
     /// * `hw_process` - Hull-White 1F process with curve-calibrated θ(t).
     pub fn with_config(config: RateExoticMcConfig, hw_process: HullWhite1FProcess) -> Self {
         Self { config, hw_process }
@@ -156,8 +157,9 @@ impl SwaptionLsmcPricer {
             stats.mean(),
             stats.stderr(),
             stats.confidence_interval(0.05),
-            values.len(),
+            self.config.num_paths,
         )
+        .with_num_simulated_paths(values.len())
         .with_std_dev(stats.std_dev());
 
         MoneyEstimate::from_estimate(estimate, currency)
@@ -232,11 +234,9 @@ impl SwaptionLsmcPricer {
         let rng = PhiloxRng::new(self.config.seed);
         let num_steps = time_grid.num_steps();
 
-        // With antithetic, we need half the random numbers
-        let num_pairs = self.config.num_paths / 2;
-        let mut paths = Vec::with_capacity(self.config.num_paths);
+        let mut paths = Vec::with_capacity(self.config.simulated_path_count());
 
-        for pair_id in 0..num_pairs {
+        for pair_id in 0..self.config.num_paths {
             let mut path_rng = rng.substream(pair_id as u64);
 
             // Generate all random draws for this pair in a single call. The
@@ -281,26 +281,6 @@ impl SwaptionLsmcPricer {
 
             paths.push(rate_path_orig);
             paths.push(rate_path_anti);
-        }
-
-        // Handle odd number of paths
-        if self.config.num_paths % 2 == 1 {
-            let mut path_rng = rng.substream(num_pairs as u64);
-            let mut state = vec![initial_rate];
-            let mut rate_path = Vec::with_capacity(num_steps + 1);
-            rate_path.push(initial_rate);
-
-            let mut z = vec![0.0];
-            let mut work = vec![];
-            for step in 0..num_steps {
-                let t = time_grid.time(step);
-                let dt = time_grid.dt(step);
-
-                path_rng.fill_std_normals(&mut z);
-                disc.step(&self.hw_process, t, dt, &mut state, &z, &mut work);
-                rate_path.push(state[0]);
-            }
-            paths.push(rate_path);
         }
 
         Ok(paths)

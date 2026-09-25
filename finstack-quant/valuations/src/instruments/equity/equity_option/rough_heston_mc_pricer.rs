@@ -192,12 +192,15 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
             .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
         // Derive deterministic seed from instrument id
-        let seed_val =
-            if let Some(ref scenario) = equity_option.metric_pricing_overrides.mc_seed_scenario {
-                finstack_quant_models::monte_carlo::seed::derive_seed(&equity_option.id, scenario)
-            } else {
-                finstack_quant_models::monte_carlo::seed::derive_seed(&equity_option.id, "base")
-            };
+        let seed_val = if let Some(ref scenario) = equity_option
+            .instrument_pricing_overrides
+            .model_config
+            .mc_seed_scenario
+        {
+            finstack_quant_models::monte_carlo::seed::derive_seed(&equity_option.id, scenario)
+        } else {
+            finstack_quant_models::monte_carlo::seed::derive_seed(&equity_option.id, "base")
+        };
 
         // Resolve and cap the path count via the workspace helper before
         // allocating, so a malicious or typo'd `mc_paths` override can't OOM

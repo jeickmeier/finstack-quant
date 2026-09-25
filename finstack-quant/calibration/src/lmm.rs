@@ -521,7 +521,7 @@ mod tests {
 
         let pricing_market = MarketContext::new().insert(curve);
         let pricer = BermudanSwaptionLmmPricer::with_config(RateExoticMcConfig {
-            num_paths: 64,
+            num_paths: 32,
             min_steps_between_events: 1,
             ..RateExoticMcConfig::lmm_bermudan()
         });
@@ -537,7 +537,7 @@ mod tests {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let market = MarketContext::new().insert(test_discount_curve(as_of));
         let pricer = BermudanSwaptionLmmPricer::with_config(RateExoticMcConfig {
-            num_paths: 16,
+            num_paths: 8,
             min_steps_between_events: 1,
             ..RateExoticMcConfig::lmm_bermudan()
         });

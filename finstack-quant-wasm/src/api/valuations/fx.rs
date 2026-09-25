@@ -6,10 +6,10 @@
 //! path-dependent FX products (e.g. barrier / touch options). As with the
 //! generic `priceInstrument` bindings, no explicit RNG-seed parameter is
 //! exposed: the seed is an instrument-level concern. When an instrument's
-//! `pricing_overrides.metrics.mc_seed_scenario` is `None`, the core MC pricers
+//! `instrument_pricing_overrides.model_config.mc_seed_scenario` is `None`, the core MC pricers
 //! derive a stable seed deterministically from the instrument ID, so repricing
 //! the same instrument JSON is bit-reproducible. Callers needing a distinct
-//! deterministic stream set `mc_seed_scenario` inside the instrument JSON.
+//! deterministic stream set that label inside the instrument JSON.
 
 use super::pricing::{
     metric_value_with_context, parse_market_json, parse_pricing_instrument_json,

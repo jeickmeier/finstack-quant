@@ -289,7 +289,7 @@ fn derived_structure_prices_like_the_declared_one() {
     }
 
     let mode = PricingMode::MonteCarlo {
-        num_paths: 16,
+        num_paths: 8,
         antithetic: true,
     };
     let mut declared_deal = deal(declared_structure);

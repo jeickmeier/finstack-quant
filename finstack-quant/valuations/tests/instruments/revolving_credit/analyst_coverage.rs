@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, CreditSpreadProcessSpec, DrawRepayEvent, DrawRepaySpec, McConfig,
     RevolvingCredit, RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
 };
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
 use time::macros::date;
@@ -53,6 +53,7 @@ fn seasoned(draw_repay_spec: DrawRepaySpec) -> RevolvingCredit {
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees"))
         .draw_repay_spec(draw_repay_spec)
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default().with_mc_paths(4))
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
         .build()
@@ -67,9 +68,6 @@ fn zero_vol_stochastic() -> DrawRepaySpec {
             volatility: 0.0,
             spread_sensitivity: 0.0,
         },
-        num_paths: 4,
-        seed: Some(1),
-        antithetic: false,
         use_sobol_qmc: false,
         mc_config: Some(McConfig {
             correlation_matrix: None,
@@ -352,6 +350,7 @@ fn stepped(
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees"))
         .draw_repay_spec(draw_repay_spec)
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default().with_mc_paths(2))
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
         .commitment_schedule(steps)
@@ -466,9 +465,6 @@ fn zero_vol_stochastic_at(target: f64) -> DrawRepaySpec {
             volatility: 0.0,
             spread_sensitivity: 0.0,
         },
-        num_paths: 2,
-        seed: Some(1),
-        antithetic: false,
         use_sobol_qmc: false,
         mc_config: Some(McConfig {
             correlation_matrix: None,
@@ -531,6 +527,7 @@ fn with_steps(
         .frequency(Tenor::quarterly())
         .fees(fees)
         .draw_repay_spec(draw_repay_spec)
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default().with_mc_paths(2))
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
         .margin_steps(margin_steps)
@@ -710,6 +707,7 @@ fn with_lc(
         .frequency(Tenor::quarterly())
         .fees(fees)
         .draw_repay_spec(draw_repay_spec)
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default().with_mc_paths(16))
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id_opt(credit.map(Into::into))
         .recovery_rate(0.4)
@@ -846,9 +844,6 @@ fn stochastic_utilization_is_capped_by_outstanding_letters_of_credit() {
             volatility: 0.3,
             spread_sensitivity: 0.0,
         },
-        num_paths: 16,
-        seed: Some(3),
-        antithetic: false,
         use_sobol_qmc: false,
         mc_config: Some(McConfig {
             correlation_matrix: None,

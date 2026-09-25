@@ -71,15 +71,13 @@ impl StructuredCredit {
         self.apply_stochastic_price_scenario(result)
     }
 
+    /// Monte Carlo with `model_config.mc_paths` independent estimators
+    /// (default 5,000) and `model_config.mc_antithetic` pairing (default on).
     fn default_stochastic_pricing_mode(&self) -> PricingMode {
-        let num_paths = self
-            .instrument_pricing_overrides
-            .model_config
-            .mc_paths
-            .unwrap_or(10_000);
+        let model_config = &self.instrument_pricing_overrides.model_config;
         PricingMode::MonteCarlo {
-            num_paths,
-            antithetic: num_paths > 1,
+            num_paths: model_config.mc_paths.unwrap_or(5_000),
+            antithetic: model_config.mc_antithetic.unwrap_or(true),
         }
     }
 

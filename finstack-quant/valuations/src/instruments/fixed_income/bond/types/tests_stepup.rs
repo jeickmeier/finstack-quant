@@ -275,10 +275,9 @@ fn bond_price_merton_mc_api() {
     )
     .expect("valid corporate bond");
     let merton = MertonModel::new(200.0, 0.25, 100.0, 0.04).expect("valid");
-    let config = MertonMcConfig::new(merton, 0.40)
-        .expect("0.40 recovery should be valid")
-        .num_paths(1000)
-        .seed(42);
+    let config = MertonMcConfig::new(merton, 0.40).expect("0.40 recovery should be valid");
+    let mut bond = bond;
+    bond.instrument_pricing_overrides.model_config.mc_paths = Some(500);
     let result = bond
         .price_merton_mc(&config, 0.04, time::macros::date!(2024 - 01 - 15))
         .expect("ok");
@@ -323,10 +322,7 @@ fn bond_price_merton_mc_rejects_amortizing() {
         .expect("bond builds");
 
     let merton = MertonModel::new(200.0, 0.25, 100.0, 0.04).expect("valid");
-    let config = MertonMcConfig::new(merton, 0.40)
-        .expect("0.40 recovery should be valid")
-        .num_paths(100)
-        .seed(42);
+    let config = MertonMcConfig::new(merton, 0.40).expect("0.40 recovery should be valid");
     let err = bond
         .price_merton_mc(&config, 0.04, issue)
         .expect_err("amortizing bonds must be rejected by Merton MC");

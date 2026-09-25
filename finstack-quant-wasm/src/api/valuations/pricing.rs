@@ -12,13 +12,13 @@
 //! contract, not the pricing call.
 //!
 //! The determinism guarantee is provided by the Rust core, not by these
-//! wrappers: when an instrument's `metric_pricing_overrides.mc_seed_scenario`
+//! wrappers: when an instrument's `instrument_pricing_overrides.model_config.mc_seed_scenario`
 //! is `None`, the core MC pricers derive a **stable** seed deterministically
 //! from the instrument ID (see
 //! `finstack_quant_valuations::instruments::InstrumentPricingOverrides`). Repricing the same
 //! instrument JSON therefore yields bit-identical results without the caller
 //! supplying a seed. Callers who need a distinct deterministic stream set
-//! `mc_seed_scenario` inside the instrument JSON. This contract is verified by
+//! that label inside the instrument JSON. This contract is verified by
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
 use super::market_handle::JsMarket;

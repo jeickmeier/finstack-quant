@@ -1260,12 +1260,15 @@ impl PyBond {
     /// Uses geometric Brownian motion asset dynamics only. Floating-rate and
     /// amortizing cashflow specs are rejected. When the config's PIK schedule
     /// is the default uniform cash mode, the bond's ``CouponType`` overrides
-    /// the schedule; otherwise the config schedule takes precedence.
+    /// the schedule; otherwise the config schedule takes precedence. The
+    /// independent-estimator count, antithetic flag and seed label come from
+    /// this bond's ``instrument_pricing_overrides.model_config`` (``mc_paths``,
+    /// ``mc_antithetic``, ``mc_seed_scenario``).
     ///
     /// Parameters
     /// ----------
     /// config : MertonMcConfig
-    ///     Merton MC simulation configuration including the structural model.
+    ///     Structural model, PIK schedule, recovery and time grid.
     /// discount_rate : float
     ///     Flat continuously compounded risk-free rate as a decimal used to
     ///     discount simulated cashflows (unless term-structure discount

@@ -204,8 +204,8 @@ from finstack_quant.valuations.instruments import MertonMcConfig,PikMode,PikSche
 toggle_bond=Bond.fixed("TOGGLE-BULLET",1_000_000.,.08,AS_OF,date(2030,1,15),"none","USD-OIS",currency="USD")
 toggle_rows=[]
 for asset_value in [900_000.,1_300_000.,1_800_000.]:
-    config=(MertonMcConfig(MertonModel(asset_value,.25,800_000.,.04),.40).num_paths(2048).seed(20250115)
-        .antithetic(True).time_steps_per_year(12).barrier_crossing(BarrierCrossing.discrete())
+    config=(MertonMcConfig(MertonModel(asset_value,.25,800_000.,.04),.40)
+        .steps_per_year(12).barrier_crossing(BarrierCrossing.discrete())
         .pik_schedule(PikSchedule.uniform(PikMode.toggle()))
         .toggle_model(ToggleExerciseModel.threshold("distance_to_default",2.,"below")))
     result=toggle_bond.price_merton_mc(config,.04,AS_OF)

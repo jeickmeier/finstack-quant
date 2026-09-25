@@ -93,10 +93,10 @@ impl RateExoticHw1fMcPricer {
         let disc = ExactHullWhite1F::new();
         let num_steps = grid.num_steps();
         let work_size = disc.work_size(&process);
-        let raw_paths = self.config.raw_stream_count();
+        let raw_paths = self.config.num_paths;
         let base_rng = PhiloxRng::new(self.config.seed);
 
-        let mut path_values = Vec::with_capacity(self.config.effective_path_count());
+        let mut path_values = Vec::with_capacity(self.config.simulated_path_count());
 
         // Per-path scratch buffers hoisted out of the path loop; the
         // discretization step fully overwrites `work` and `z` each step,
@@ -183,7 +183,7 @@ pub(crate) fn money_estimate_from_pairs(
     }
 
     let n = stats.count().max(1) as f64;
-    let aggregated_paths = stats.count() * multiplicity;
+    let estimators = stats.count();
     let mean = stats.mean();
     let stderr = stats.std_dev() / n.sqrt();
     let lo = mean - 1.96 * stderr;
@@ -195,8 +195,8 @@ pub(crate) fn money_estimate_from_pairs(
             finstack_quant_core::money::Money::new(lo, currency)?,
             finstack_quant_core::money::Money::new(hi, currency)?,
         ),
-        num_paths: aggregated_paths,
-        num_simulated_paths: aggregated_paths,
+        num_paths: estimators,
+        num_simulated_paths: estimators * multiplicity,
         std_dev: Some(stats.std_dev()),
         median: None,
         percentile_25: None,
@@ -317,7 +317,7 @@ mod tests {
             r0,
             event_times: vec![1.0],
             config: RateExoticMcConfig {
-                num_paths: 16,
+                num_paths: 8,
                 ..Default::default()
             },
             currency: Currency::USD,
@@ -339,7 +339,7 @@ mod tests {
             r0: 0.03,
             event_times: vec![1.0],
             config: RateExoticMcConfig {
-                num_paths: 200,
+                num_paths: 100,
                 ..Default::default()
             },
             currency: Currency::USD,
@@ -370,21 +370,28 @@ mod tests {
     #[test]
     fn antithetic_pair_stderr_below_iid() {
         let r0 = 0.03;
-        let make = |antithetic: bool| RateExoticHw1fMcPricer {
+        // Equal simulation budget: 2,000 antithetic estimators (4,000
+        // simulated paths) against 4,000 i.i.d. estimators.
+        let make = |num_paths: usize, antithetic: bool| RateExoticHw1fMcPricer {
             process_params: HullWhite1FParams::new(0.05, 0.01, r0)
                 .expect("valid Hull-White parameters"),
             r0,
             event_times: vec![1.0],
             config: RateExoticMcConfig {
-                num_paths: 4_000,
+                num_paths,
                 antithetic,
                 ..Default::default()
             },
             currency: Currency::USD,
         };
-        let anti = make(true).price(PathwiseZcbPayoff::default).expect("ok");
-        let iid = make(false).price(PathwiseZcbPayoff::default).expect("ok");
-        assert_eq!(anti.num_paths, 4_000);
+        let anti = make(2_000, true)
+            .price(PathwiseZcbPayoff::default)
+            .expect("ok");
+        let iid = make(4_000, false)
+            .price(PathwiseZcbPayoff::default)
+            .expect("ok");
+        assert_eq!(anti.num_paths, 2_000);
+        assert_eq!(anti.num_simulated_paths, 4_000);
         assert!(
             anti.stderr <= iid.stderr,
             "antithetic pair stderr {} should not exceed i.i.d. stderr {}",

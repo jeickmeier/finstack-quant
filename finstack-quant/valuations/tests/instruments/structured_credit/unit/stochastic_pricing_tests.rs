@@ -148,7 +148,7 @@ fn monte_carlo_parallel_path_evaluation_is_reproducible() {
     let mut market = MarketContext::new();
     market = market.insert(discount_curve(closing_date()));
     let mode = PricingMode::MonteCarlo {
-        num_paths: 8,
+        num_paths: 4,
         antithetic: true,
     };
 
@@ -302,7 +302,7 @@ fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
             &market,
             closing_date(),
             PricingMode::MonteCarlo {
-                num_paths: 8,
+                num_paths: 4,
                 antithetic: true,
             },
         )
@@ -320,7 +320,7 @@ fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
             &market,
             closing_date(),
             PricingMode::MonteCarlo {
-                num_paths: 8,
+                num_paths: 4,
                 antithetic: true,
             },
         )
@@ -409,7 +409,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
             &market,
             closing_date(),
             PricingMode::MonteCarlo {
-                num_paths: 8,
+                num_paths: 4,
                 antithetic: true,
             },
         )
@@ -787,7 +787,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
             &market,
             close,
             PricingMode::MonteCarlo {
-                num_paths: 16,
+                num_paths: 8,
                 antithetic: true,
             },
         )
@@ -798,7 +798,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
             close,
             PricingMode::Hybrid {
                 tree_periods: 6,
-                mc_paths: 16,
+                num_paths: 16,
             },
         )
         .expect("Hybrid mode must price");
@@ -814,7 +814,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
     assert_eq!(
         mc.pricing_mode,
         PricingMode::MonteCarlo {
-            num_paths: 16,
+            num_paths: 8,
             antithetic: true,
         }
     );
@@ -822,7 +822,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
         hybrid.pricing_mode,
         PricingMode::Hybrid {
             tree_periods: 6,
-            mc_paths: 16,
+            num_paths: 16,
         }
     );
     entries.push(("MonteCarlo", &mc));
@@ -931,7 +931,7 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
             label: "clo_standard_mc_antithetic",
             stochastic: true,
             mode: PricingMode::MonteCarlo {
-                num_paths: 100,
+                num_paths: 50,
                 antithetic: true,
             },
         },
@@ -951,14 +951,14 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
             stochastic: false,
             mode: PricingMode::Hybrid {
                 tree_periods: 6,
-                mc_paths: 100,
+                num_paths: 100,
             },
         },
         Case {
             label: "factor_correlated_mc",
             stochastic: false,
             mode: PricingMode::MonteCarlo {
-                num_paths: 100,
+                num_paths: 50,
                 antithetic: true,
             },
         },
@@ -1096,12 +1096,12 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             let equity_value = (20_000_000.0 - loss).max(0.0);
             let mut modes = vec![
                 PricingMode::MonteCarlo {
-                    num_paths: 8,
+                    num_paths: 4,
                     antithetic: true,
                 },
                 PricingMode::Hybrid {
                     tree_periods: 2,
-                    mc_paths: 8,
+                    num_paths: 8,
                 },
             ];
             // Exact trees branch monthly and intentionally cap terminal paths.
@@ -1144,4 +1144,51 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             }
         }
     }
+}
+
+/// Stochastic CLO-style deal whose factor draws reach the result, so the pin
+/// below is sensitive to the path count and the antithetic pairing.
+fn stochastic_pin_deal() -> StructuredCredit {
+    let mut sc = build_sc("ABS-MC-ESTIMATOR-PIN", 1_000_000.0);
+    sc.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
+        PrepaymentModelSpec::constant_cpr(0.15),
+        0.25,
+        0.15,
+    ));
+    sc.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.03, 0.20));
+    sc.with_correlation(CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("correlation"));
+    sc
+}
+
+/// `PricingMode::MonteCarlo.num_paths` counts independent estimators: with
+/// antithetic pairing the engine simulates two paths per estimator. The
+/// default halved from 10,000 total paths to 5,000 estimators, so the default
+/// PV is unchanged. Reference: bit patterns captured before the change, when
+/// the default simulated 10,000 antithetic paths.
+#[test]
+fn default_monte_carlo_pv_is_bit_identical_under_estimator_semantics() {
+    let sc = stochastic_pin_deal();
+    let market = MarketContext::new().insert(discount_curve(closing_date()));
+
+    let result = sc
+        .price_stochastic(&market, closing_date())
+        .expect("default stochastic price");
+    assert_eq!(
+        result.pricing_mode,
+        PricingMode::MonteCarlo {
+            num_paths: 5_000,
+            antithetic: true
+        }
+    );
+    assert_eq!(result.num_paths, 10_000, "5,000 antithetic estimators");
+    assert_eq!(result.npv.amount().to_bits(), 0x4130_84b6_808a_923b);
+    assert_eq!(result.pv_std_error.to_bits(), 0x4096_ba8e_d92a_aa55);
+
+    // Formerly `monte_carlo(200)` (200 total antithetic paths).
+    let explicit = sc
+        .price_stochastic_with_mode(&market, closing_date(), PricingMode::monte_carlo(100))
+        .expect("explicit stochastic price");
+    assert_eq!(explicit.num_paths, 200);
+    assert_eq!(explicit.npv.amount().to_bits(), 0x4130_b915_f154_110f);
+    assert_eq!(explicit.pv_std_error.to_bits(), 0x40c1_5b2e_4943_154f);
 }

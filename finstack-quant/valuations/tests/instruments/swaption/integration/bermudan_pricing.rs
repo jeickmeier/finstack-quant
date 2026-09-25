@@ -419,7 +419,7 @@ fn test_lsmc_vs_tree_sanity() {
     // Price with LSMC (fewer paths for speed in tests)
     let lsmc_pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 10_000,
+            num_paths: 5000,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -530,7 +530,7 @@ fn test_lsmc_determinism() {
     // Price twice with same seed
     let pricer1 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 5_000,
+            num_paths: 2500,
             seed: 12345,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -542,7 +542,7 @@ fn test_lsmc_determinism() {
 
     let pricer2 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 5_000,
+            num_paths: 2500,
             seed: 12345,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -577,7 +577,7 @@ fn test_lsmc_different_seeds() {
     // Price with different seeds
     let pricer1 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 5_000,
+            num_paths: 2500,
             seed: 111,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -589,7 +589,7 @@ fn test_lsmc_different_seeds() {
 
     let pricer2 = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 5_000,
+            num_paths: 2500,
             seed: 222,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -672,7 +672,7 @@ fn test_lsmc_rejects_partial_hw1f_parameters() {
 
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 1_000,
+            num_paths: 500,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
         ..Default::default()
@@ -703,7 +703,7 @@ fn test_lsmc_uses_prefitted_market_parameters() {
 
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 1_000,
+            num_paths: 500,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -740,7 +740,7 @@ fn test_complete_explicit_hw1f_parameters_price_successfully() {
 
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 1_000,
+            num_paths: 500,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -772,7 +772,7 @@ fn test_require_calibration_accepts_instrument_hw1f_overrides() {
     let market = build_market_context();
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
         mc: RateExoticMcConfig {
-            num_paths: 1_000,
+            num_paths: 500,
             seed: 42,
             ..BermudanSwaptionPricerConfig::DEFAULT_MC
         },
@@ -840,4 +840,25 @@ fn test_registry_default_prices_with_instrument_hw1f_overrides() {
         .price_with_metrics(&market, as_of, &[], PricingOptions::default())
         .expect("default registry Bermudan pricing should accept calibrated HW1F overrides");
     assert!(result.value.amount().is_finite());
+}
+
+/// `num_paths` counts independent estimators (RNG streams). The default LSMC
+/// configuration was halved when it stopped counting antithetic mirrors, so it
+/// must replay exactly the same streams: the default PV is pinned bit-for-bit
+/// to the value captured before the change.
+#[test]
+fn lsmc_default_mc_pv_unchanged() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
+    let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
+    let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("Valid date");
+    let swaption = test_bermudan_swaption(as_of, swap_end, first_exercise, 0.03, OptionType::Call);
+    let result = BermudanSwaptionPricer::lsmc()
+        .price_dyn(&swaption, &build_market_context(), as_of)
+        .expect("default LSMC price");
+    assert_eq!(
+        result.value.amount().to_bits(),
+        0x414581642ecba44e_u64,
+        "pv={}",
+        result.value.amount()
+    );
 }

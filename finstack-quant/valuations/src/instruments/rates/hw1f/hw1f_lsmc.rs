@@ -133,10 +133,10 @@ impl RateExoticHw1fLsmcPricer {
         let disc = ExactHullWhite1F::new();
         let num_steps = grid.num_steps();
         let work_size = disc.work_size(&process);
-        let raw_paths = self.config.raw_stream_count();
+        let raw_paths = self.config.num_paths;
         let split = self.config.split();
         let multiplicity = split.multiplicity;
-        let n_paths = self.config.effective_path_count();
+        let n_paths = self.config.simulated_path_count();
         let n_ex = self.exercise_times.len();
         let base_rng = PhiloxRng::new(self.config.seed);
         let basis_payoff = payoff_factory();
@@ -474,7 +474,7 @@ mod tests {
             event_times: vec![1.0, 2.0],
             exercise_times: vec![1.0, 2.0],
             config: RateExoticMcConfig {
-                num_paths: 2_000,
+                num_paths: 1000,
                 ..Default::default()
             },
             currency: Currency::USD,
@@ -557,7 +557,7 @@ mod tests {
             event_times: vec![1.0, 1.5, 2.0],
             exercise_times: vec![1.5],
             config: RateExoticMcConfig {
-                num_paths: 2_000,
+                num_paths: 1000,
                 ..Default::default()
             },
             currency: Currency::USD,

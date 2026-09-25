@@ -422,7 +422,7 @@ impl PyMertonMcResult {
         PyPathStatistics::from_inner(self.inner.path_statistics.clone())
     }
 
-    /// Number of Monte Carlo paths used.
+    /// Number of independent Monte Carlo estimators (antithetic pairs count once).
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
@@ -503,7 +503,10 @@ impl PyMertonMcResult {
 ///
 /// Built from a structural ``MertonModel`` plus a flat recovery rate; every
 /// setter returns a new configuration (the receiver is unchanged), so calls
-/// chain: ``MertonMcConfig(model, 0.4).num_paths(20_000).seed(7)``.
+/// chain: ``MertonMcConfig(model, 0.4).steps_per_year(24)``. The path count,
+/// antithetic flag and seed label come from the bond's
+/// ``instrument_pricing_overrides.model_config`` (``mc_paths``,
+/// ``mc_antithetic``, ``mc_seed_scenario``).
 ///
 /// Parameters
 /// ----------
@@ -557,51 +560,15 @@ impl PyMertonMcConfig {
         }
     }
 
-    /// Set the number of Monte Carlo paths.
-    ///
-    /// # Arguments
-    ///
-    /// * `n` - Path count (must be at least 2 for meaningful statistics).
-    #[pyo3(text_signature = "($self, n)")]
-    fn num_paths(&self, n: usize) -> Self {
-        Self {
-            inner: self.inner.clone().num_paths(n),
-        }
-    }
-
-    /// Set the RNG seed for reproducibility.
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - Unsigned 64-bit seed passed to the path generator.
-    #[pyo3(text_signature = "($self, s)")]
-    fn seed(&self, s: u64) -> Self {
-        Self {
-            inner: self.inner.clone().seed(s),
-        }
-    }
-
-    /// Enable or disable antithetic variates for variance reduction.
-    ///
-    /// # Arguments
-    ///
-    /// * `a` - When ``True``, pair each path with its antithetic counterpart.
-    #[pyo3(text_signature = "($self, a)")]
-    fn antithetic(&self, a: bool) -> Self {
-        Self {
-            inner: self.inner.clone().antithetic(a),
-        }
-    }
-
     /// Set the number of time steps simulated per year.
     ///
     /// # Arguments
     ///
     /// * `n` - Grid density for asset evolution and barrier monitoring.
     #[pyo3(text_signature = "($self, n)")]
-    fn time_steps_per_year(&self, n: usize) -> Self {
+    fn steps_per_year(&self, n: usize) -> Self {
         Self {
-            inner: self.inner.clone().time_steps_per_year(n),
+            inner: self.inner.clone().steps_per_year(n),
         }
     }
 
@@ -623,13 +590,9 @@ impl PyMertonMcConfig {
     ///
     /// * `r` - Recovery rate as a decimal in ``[0, 1]``.
     #[pyo3(text_signature = "($self, r)")]
-    fn default_recovery_rate(&self, r: f64) -> PyResult<Self> {
+    fn recovery_rate(&self, r: f64) -> PyResult<Self> {
         Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .default_recovery_rate(r)
-                .map_err(core_to_py)?,
+            inner: self.inner.clone().recovery_rate(r).map_err(core_to_py)?,
         })
     }
 
@@ -701,16 +664,13 @@ impl PyMertonMcConfig {
     fn __repr__(&self) -> String {
         let bool_repr = super::convert::bool_repr;
         format!(
-            "MertonMcConfig(num_paths={}, seed={}, antithetic={}, time_steps_per_year={}, barrier_crossing={}, default_recovery_rate={}, pik_schedule={}, endogenous_hazard={}, dynamic_recovery={}, toggle_model={})",
-            self.inner.num_paths,
-            self.inner.seed,
-            bool_repr(self.inner.antithetic),
-            self.inner.time_steps_per_year,
+            "MertonMcConfig(steps_per_year={}, barrier_crossing={}, recovery_rate={}, pik_schedule={}, endogenous_hazard={}, dynamic_recovery={}, toggle_model={})",
+            self.inner.steps_per_year,
             PyBarrierCrossing {
                 inner: self.inner.barrier_crossing
             }
             .__repr__(),
-            self.inner.default_recovery_rate,
+            self.inner.recovery_rate,
             PyPikSchedule {
                 inner: self.inner.pik_schedule.clone()
             }

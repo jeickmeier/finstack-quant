@@ -1174,7 +1174,10 @@ impl PyRevolvingCreditBuilder {
     /// value : dict | str
     ///     ``DrawRepaySpec`` as a ``dict`` or JSON ``str``:
     ///     ``{"deterministic": [{"date": ..., "amount": Money, "is_draw": bool}, ...]}``
-    ///     or ``{"stochastic": {"utilization_process": {...}, "num_paths": ..., ...}}``.
+    ///     or ``{"stochastic": {"utilization_process": {...}, "use_sobol_qmc": ..., "mc_config": ...}}``.
+    ///     The estimator count, antithetic flag and seed label come from
+    ///     ``instrument_pricing_overrides.model_config`` (``mc_paths``,
+    ///     ``mc_antithetic``, ``mc_seed_scenario``).
     ///
     /// Returns
     /// -------

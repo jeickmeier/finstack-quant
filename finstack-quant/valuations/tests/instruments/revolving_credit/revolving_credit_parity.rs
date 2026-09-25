@@ -97,9 +97,6 @@ mod tests {
                 volatility: 0.0, // Zero volatility
                 spread_sensitivity: 0.0,
             },
-            num_paths: 1000, // Use many paths for stable average
-            seed: Some(42),
-            antithetic: false,
             use_sobol_qmc: false,
             mc_config: None,
         })
@@ -146,6 +143,10 @@ mod tests {
             .draw_repay_spec(DrawRepaySpec::Stochastic(
                 create_zero_vol_stochastic(0.5), // 50% utilization
             ))
+            .instrument_pricing_overrides(
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                    .with_mc_paths(1_000),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.0)
             .build()
@@ -249,6 +250,10 @@ mod tests {
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
+            .instrument_pricing_overrides(
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                    .with_mc_paths(1_000),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.0)
             .build()
@@ -317,6 +322,10 @@ mod tests {
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
+            .instrument_pricing_overrides(
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                    .with_mc_paths(1_000),
+            )
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id(CurveId::from("BORROWER-HZ"))
             .recovery_rate(0.4)
@@ -432,6 +441,10 @@ mod tests {
                 .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(
                     utilization,
                 )))
+                .instrument_pricing_overrides(
+                    finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                        .with_mc_paths(1_000),
+                )
                 .discount_curve_id("USD-OIS".into())
                 .recovery_rate(0.0)
                 .build()
@@ -519,6 +532,10 @@ mod tests {
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.45)))
+            .instrument_pricing_overrides(
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                    .with_mc_paths(1_000),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.0)
             .build()
@@ -599,6 +616,10 @@ mod tests {
                 .frequency(frequency)
                 .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
+                .instrument_pricing_overrides(
+                    finstack_quant_valuations::instruments::InstrumentPricingOverrides::default()
+                        .with_mc_paths(1_000),
+                )
                 .discount_curve_id("USD-OIS".into())
                 .recovery_rate(0.0)
                 .build()

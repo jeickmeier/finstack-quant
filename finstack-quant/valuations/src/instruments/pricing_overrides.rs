@@ -451,8 +451,10 @@ pub struct ModelConfig {
     pub tree_steps: Option<usize>,
     /// Merton Monte Carlo configuration for structural credit PIK pricing.
     ///
-    /// When set (via flat JSON under `pricing_overrides.merton_mc_config` or the
-    /// Rust builder), the `MertonMc` pricer in the registry uses this config.
+    /// When set (at `instrument_pricing_overrides.model_config.merton_mc_config`
+    /// or via the Rust builder), the `MertonMc` pricer in the registry uses this
+    /// model and grid; the path count, antithetic flag and seed label come from
+    /// `mc_paths`, `mc_antithetic` and `mc_seed_scenario` on this config.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merton_mc_config: Option<MertonMcOverride>,
     /// Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.
@@ -613,6 +615,15 @@ pub struct ModelConfig {
     /// default to `true`; set `Some(false)` only for controlled diagnostics.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mc_antithetic: Option<bool>,
+    /// Optional Monte Carlo seed label.
+    ///
+    /// Monte Carlo pricers derive their RNG seed as
+    /// `derive_seed(instrument_id, label)`, so the same label always replays
+    /// the same random streams for the same instrument. `None` seeds with the
+    /// pricer's base label. Finite-difference Greeks set a fixed label on the
+    /// repriced clone so base and bumped legs share common random numbers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mc_seed_scenario: Option<String>,
     /// Optional absolute target for the Monte Carlo confidence-interval
     /// half-width in instrument currency.
     ///
@@ -961,6 +972,18 @@ impl InstrumentPricingOverrides {
         self
     }
 
+    /// Set the Monte Carlo seed label.
+    ///
+    /// # Arguments
+    ///
+    /// * `scenario` - Label hashed with the instrument id to derive the RNG
+    ///   seed; the same label replays the same random streams.
+    #[must_use]
+    pub fn with_mc_seed_scenario(mut self, scenario: impl Into<String>) -> Self {
+        self.model_config.mc_seed_scenario = Some(scenario.into());
+        self
+    }
+
     /// Set an absolute Monte Carlo confidence-interval half-width target.
     ///
     /// Rates-credit bond pricing evaluates this requirement only after consuming
@@ -1099,12 +1122,6 @@ pub struct MetricPricingOverrides {
     /// Bump sizes for finite-difference sensitivities.
     #[serde(default, skip_serializing_if = "BumpConfig::is_empty")]
     pub bump_config: BumpConfig,
-    /// MC seed scenario override for deterministic greek calculations.
-    ///
-    /// When computing greeks via finite differences, this allows specifying
-    /// a scenario name (e.g., "delta_up", "vega_down") to derive deterministic
-    /// seeds. If `None`, the pricer derives a stable default seed.
-    pub mc_seed_scenario: Option<String>,
     /// Theta period for time decay calculations (e.g., "1D", "1W", "1M", "3M").
     pub theta_period: Option<String>,
     /// Breakeven configuration: which parameter to solve for and solve mode.
@@ -1204,12 +1221,6 @@ impl MetricPricingOverrides {
     /// Set breakeven configuration.
     pub fn with_breakeven_config(mut self, config: BreakevenConfig) -> Self {
         self.breakeven_config = Some(config);
-        self
-    }
-
-    /// Set MC seed scenario for deterministic greek calculations.
-    pub fn with_mc_seed_scenario(mut self, scenario: impl Into<String>) -> Self {
-        self.mc_seed_scenario = Some(scenario.into());
         self
     }
 
@@ -1613,5 +1624,19 @@ mod tests {
                 .validate()
                 .is_err());
         }
+    }
+
+    #[test]
+    fn seed_scenario_lives_in_model_config() {
+        // schema-rejection-test: `metric_pricing_overrides.mc_seed_scenario`
+        let err = serde_json::from_str::<MetricPricingOverrides>(r#"{"mc_seed_scenario": "x"}"#)
+            .expect_err("retired metric_pricing_overrides.mc_seed_scenario must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+
+        let config: ModelConfig = serde_json::from_str(r#"{"mc_seed_scenario": "stress"}"#)
+            .expect("model_config.mc_seed_scenario parses");
+        assert_eq!(config.mc_seed_scenario.as_deref(), Some("stress"));
+        let overrides = InstrumentPricingOverrides::default().with_mc_seed_scenario("stress");
+        assert_eq!(overrides.model_config, config);
     }
 }

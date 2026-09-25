@@ -57,9 +57,6 @@ fn stochastic_revolver(volatility: f64, spread_sensitivity: f64, credit: bool) -
                     volatility,
                     spread_sensitivity,
                 },
-                num_paths: 2,
-                seed: Some(42),
-                antithetic: false,
                 use_sobol_qmc: false,
                 mc_config,
             },
@@ -181,7 +178,7 @@ fn unfunded_draws_are_recorded_per_path() {
     assert!(err.to_string().contains("exceed the reserve"), "{err}");
 
     let stochastic = deal
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(4))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(2))
         .expect("stochastic pricing records the shortfall");
     assert_eq!(stochastic.unfunded_draw_path_fraction, 1.0);
 }
@@ -225,10 +222,10 @@ fn spread_sensitivity_raises_draws_and_losses_on_stress_paths() {
     let market = market_with_curves(CLOSING).insert(widening_hazard_curve());
 
     let unlinked = build(0.0)
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(400))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(200))
         .expect("unlinked pricing");
     let linked = build(3.0)
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(400))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(200))
         .expect("linked pricing");
 
     assert!(
@@ -279,7 +276,7 @@ fn same_seed_is_bit_identical_across_thread_counts() {
         .insert(HazardCurve::flat(HAZARD_ID, CLOSING, 0.05, 0.4).expect("hazard curve"));
 
     let price = || {
-        deal.price_stochastic_with_mode(&market, CLOSING, monte_carlo(64))
+        deal.price_stochastic_with_mode(&market, CLOSING, monte_carlo(32))
             .expect("pricing")
     };
     let parallel = price();
@@ -371,7 +368,7 @@ fn stochastic_result_money_fields_share_the_pool_currency() {
     let deal = parity_deal(60_000_000.0);
     let market = market_with_curves(CLOSING);
     let result = deal
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(2))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(1))
         .expect("pricing");
     assert_eq!(result.npv.currency(), Currency::USD);
     assert_eq!(result.expected_collateral_draws.currency(), Currency::USD);

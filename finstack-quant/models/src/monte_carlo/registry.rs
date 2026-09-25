@@ -46,6 +46,8 @@ pub struct RustDefaults {
     pub cheyette_rough: CheyetteRoughDefaults,
     /// Merton PIK-bond Monte Carlo defaults.
     pub merton_pik_bond: MertonPikBondDefaults,
+    /// Stochastic revolving-credit Monte Carlo defaults.
+    pub revolving_credit: RevolvingCreditDefaults,
 }
 
 /// Defaults shared by the host bindings and the Rust convenience pricers.
@@ -184,14 +186,28 @@ pub struct CheyetteRoughDefaults {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MertonPikBondDefaults {
-    /// Number of Monte Carlo paths.
+    /// Number of independent Monte Carlo estimators (antithetic sampling
+    /// simulates two paths per estimator). The seed is derived per instrument
+    /// from `model_config.mc_seed_scenario`.
     pub num_paths: usize,
-    /// Root RNG seed.
-    pub seed: u64,
     /// Whether antithetic variance reduction is enabled by default.
     pub antithetic: bool,
     /// Simulation time steps per year.
-    pub time_steps_per_year: usize,
+    pub steps_per_year: usize,
+}
+
+/// Stochastic revolving-credit Monte Carlo defaults.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RevolvingCreditDefaults {
+    /// Number of independent Monte Carlo estimators (antithetic sampling
+    /// simulates two paths per estimator). The seed is derived per facility
+    /// from `model_config.mc_seed_scenario`.
+    pub num_paths: usize,
+    /// Whether antithetic variance reduction is enabled by default. Must stay
+    /// `false` while Sobol facilities (`use_sobol_qmc`) rely on the default,
+    /// because the two are mutually exclusive.
+    pub antithetic: bool,
 }
 
 /// Pricer defaults with default time-grid step count.
@@ -340,6 +356,7 @@ fn validate_file(file: &DefaultsFile) -> Result<()> {
     validate_lmm_bermudan("rust.lmm_bermudan", &file.rust.lmm_bermudan)?;
     validate_cheyette_rough("rust.cheyette_rough", &file.rust.cheyette_rough)?;
     validate_merton_pik_bond("rust.merton_pik_bond", &file.rust.merton_pik_bond)?;
+    validate_revolving_credit("rust.revolving_credit", &file.rust.revolving_credit)?;
     validate_python_lsmc("convenience.lsmc", &file.convenience.lsmc)?;
     validate_python_greeks("convenience.greeks", &file.convenience.greeks)?;
     Ok(())
@@ -432,11 +449,18 @@ fn validate_cheyette_rough(label: &str, defaults: &CheyetteRoughDefaults) -> Res
 
 fn validate_merton_pik_bond(label: &str, defaults: &MertonPikBondDefaults) -> Result<()> {
     validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
-    validate_positive_usize(
-        &format!("{label}.time_steps_per_year"),
-        defaults.time_steps_per_year,
-    )?;
-    let _seed = defaults.seed;
+    validate_positive_usize(&format!("{label}.steps_per_year"), defaults.steps_per_year)?;
+    let _antithetic = defaults.antithetic;
+    Ok(())
+}
+
+fn validate_revolving_credit(label: &str, defaults: &RevolvingCreditDefaults) -> Result<()> {
+    if defaults.num_paths < 2 {
+        return Err(Error::Validation(format!(
+            "{label}.num_paths must be at least 2, got {}",
+            defaults.num_paths
+        )));
+    }
     let _antithetic = defaults.antithetic;
     Ok(())
 }

@@ -54,7 +54,7 @@ impl Pricer for CommodityOptionMcPricer {
         let mut mc_params = self.mc_params.clone();
         if let Some(n) = option.instrument_pricing_overrides.model_config.mc_paths {
             if n > 0 {
-                mc_params.n_paths = n;
+                mc_params.num_paths = n;
             }
         }
 

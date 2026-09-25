@@ -24,10 +24,10 @@ use finstack_quant_models::trees::binomial_tree::BinomialTree;
 pub struct CommodityMcParams {
     /// Pricing model to use for simulation.
     pub model: CommodityPricingModel,
-    /// Number of Monte Carlo paths.
-    pub n_paths: usize,
+    /// Number of independent Monte Carlo paths (estimators).
+    pub num_paths: usize,
     /// Number of time steps per path.
-    pub n_steps: usize,
+    pub num_steps: usize,
     /// Optional random seed for reproducibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
@@ -547,15 +547,15 @@ impl CommodityOption {
                 let df = disc_curve.df_between_dates(as_of, self.expiry)?;
 
                 let seed = mc_params.seed.unwrap_or(42);
-                let time_grid = TimeGrid::uniform(t, mc_params.n_steps)?;
+                let time_grid = TimeGrid::uniform(t, mc_params.num_steps)?;
                 let time_grid_values = time_grid.times().to_vec();
                 let engine_config =
-                    McEngineConfig::new(mc_params.n_paths, time_grid).parallel(true);
+                    McEngineConfig::new(mc_params.num_paths, time_grid).parallel(true);
                 let engine = McEngine::new(engine_config);
 
                 let rng = PhiloxRng::new(seed);
                 let initial_state = process.initial_state().to_vec();
-                let maturity_step = mc_params.n_steps;
+                let maturity_step = mc_params.num_steps;
 
                 // Dispatch on option type (EuropeanCall / EuropeanPut are
                 // distinct concrete types, so we branch here).

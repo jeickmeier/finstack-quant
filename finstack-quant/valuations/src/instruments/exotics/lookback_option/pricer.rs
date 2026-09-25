@@ -33,16 +33,6 @@ impl LookbackOptionMcPricer {
         }
     }
 
-    fn merged_path_config(&self, inst: &LookbackOption) -> PathDependentPricerConfig {
-        let mut c = self.config.clone();
-        if let Some(n) = inst.instrument_pricing_overrides.model_config.mc_paths {
-            if n > 0 {
-                c.num_paths = n;
-            }
-        }
-        c
-    }
-
     /// Price a lookback option using Monte Carlo.
     fn price_internal(
         &self,
@@ -105,7 +95,10 @@ impl LookbackOptionMcPricer {
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params);
 
-        let base_cfg = self.merged_path_config(inst);
+        let base_cfg = crate::instruments::common_impl::helpers::merged_path_config(
+            &self.config,
+            &inst.instrument_pricing_overrides,
+        )?;
 
         let steps_per_year = base_cfg.steps_per_year;
         let num_steps = ((t * steps_per_year).round() as usize).max(base_cfg.min_steps);
@@ -138,7 +131,11 @@ impl LookbackOptionMcPricer {
 
         use finstack_quant_models::monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst
+            .instrument_pricing_overrides
+            .model_config
+            .mc_seed_scenario
+        {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -922,6 +919,33 @@ mod tests {
     /// Note: the 2-step MC (discrete monitoring at 3 points) is naturally below the
     /// analytical continuous-monitoring price (≈ 17.24); both the floor and ceiling
     /// are calibrated to the discrete-monitoring regime, not the continuous formula.
+    /// `model_config.mc_antithetic` must reach the lookback Monte Carlo
+    /// engine through the shared `merged_path_config`; toggling it changes the
+    /// simulated streams and therefore the PV.
+    #[test]
+    fn lookback_honours_mc_antithetic() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2026, 1, 1);
+        let market = market(as_of, 100.0, 0.20, 0.05, 0.0);
+        let mut option = fixed_strike_call(expiry, 100.0, None);
+        option.instrument_pricing_overrides.model_config.mc_paths = Some(2_000);
+
+        let pv_with = |antithetic: bool| {
+            let mut inst = option.clone();
+            inst.instrument_pricing_overrides.model_config.mc_antithetic = Some(antithetic);
+            LookbackOptionMcPricer::new()
+                .price_internal(&inst, &market, as_of)
+                .expect("mc price")
+                .amount()
+        };
+
+        assert_ne!(
+            pv_with(false).to_bits(),
+            pv_with(true).to_bits(),
+            "mc_antithetic must change the simulated streams"
+        );
+    }
+
     #[test]
     fn lookback_mc_includes_terminal_step_in_extremum() {
         use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;

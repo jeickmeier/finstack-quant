@@ -74,7 +74,7 @@ fn short_rate_european_call_matches_analytical() {
         r0,
         event_times: vec![t],
         config: RateExoticMcConfig {
-            num_paths: 200_000,
+            num_paths: 100_000,
             seed: 1,
             ..Default::default()
         },

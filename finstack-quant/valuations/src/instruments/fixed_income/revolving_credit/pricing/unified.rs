@@ -443,9 +443,6 @@ mod tests {
                         volatility: 0.05,
                         spread_sensitivity: 0.0,
                     },
-                    num_paths: 8,
-                    seed: Some(7),
-                    antithetic: false,
                     use_sobol_qmc: true,
                     mc_config: Some(McConfig {
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
@@ -455,6 +452,9 @@ mod tests {
                     }),
                 },
             )))
+            .instrument_pricing_overrides(
+                crate::instruments::InstrumentPricingOverrides::default().with_mc_paths(8),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.4)
             .build()
@@ -629,9 +629,6 @@ mod tests {
                         volatility: 0.05,
                         spread_sensitivity: 0.0,
                     },
-                    num_paths: 8,
-                    seed: Some(7),
-                    antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: Some(McConfig {
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
@@ -641,6 +638,9 @@ mod tests {
                     }),
                 },
             )))
+            .instrument_pricing_overrides(
+                crate::instruments::InstrumentPricingOverrides::default().with_mc_paths(8),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.4)
             .build()
@@ -671,8 +671,8 @@ mod tests {
         assert!(result.mc_result.estimate.max.is_none());
     }
 
-    /// `num_paths < 2` must be rejected: a single path has no variance
-    /// estimate (previously produced NaN std error downstream).
+    /// Fewer than 2 estimators must be rejected: a single estimator has no
+    /// variance estimate (previously produced NaN std error downstream).
     #[test]
     fn single_path_mc_is_rejected() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -696,21 +696,21 @@ mod tests {
                         volatility: 0.05,
                         spread_sensitivity: 0.0,
                     },
-                    num_paths: 1,
-                    seed: Some(7),
-                    antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: None,
                 },
             )))
+            .instrument_pricing_overrides(
+                crate::instruments::InstrumentPricingOverrides::default().with_mc_paths(1),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.4)
             .build();
 
-        let err = result.expect_err("num_paths = 1 must be rejected at construction");
+        let err = result.expect_err("mc_paths = 1 must be rejected at construction");
         assert!(
-            err.to_string().contains("num_paths"),
-            "error should mention num_paths, got: {err}"
+            err.to_string().contains("mc_paths"),
+            "error should mention mc_paths, got: {err}"
         );
     }
 
@@ -741,9 +741,6 @@ mod tests {
                         volatility: 0.0, // zero utilization vol
                         spread_sensitivity: 0.0,
                     },
-                    num_paths: 4,
-                    seed: Some(11),
-                    antithetic: false,
                     use_sobol_qmc: false,
                     mc_config: Some(McConfig {
                         // Genuinely stochastic credit spread.
@@ -759,6 +756,9 @@ mod tests {
                     }),
                 },
             )))
+            .instrument_pricing_overrides(
+                crate::instruments::InstrumentPricingOverrides::default().with_mc_paths(4),
+            )
             .discount_curve_id("USD-OIS".into())
             .recovery_rate(0.4)
             .build()
@@ -862,9 +862,6 @@ mod tests {
                             volatility: 0.05,
                             spread_sensitivity: 0.0,
                         },
-                        num_paths: 64,
-                        seed: Some(123_456_789),
-                        antithetic: true,
                         use_sobol_qmc: false,
                         mc_config: Some(McConfig {
                             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
@@ -874,6 +871,11 @@ mod tests {
                         }),
                     },
                 )))
+                .instrument_pricing_overrides(
+                    crate::instruments::InstrumentPricingOverrides::default()
+                        .with_mc_paths(32)
+                        .with_mc_antithetic(true),
+                )
                 .discount_curve_id("USD-OIS".into())
                 .recovery_rate(0.4)
                 .build()
@@ -938,9 +940,11 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let end = Date::from_calendar_date(2027, Month::January, 1).expect("date");
 
-        let make_facility = |id: &str, mc_config: Option<McConfig>| {
+        // Both facilities share one id, so they share the derived seed and the
+        // comparison runs on common random numbers.
+        let make_facility = |mc_config: Option<McConfig>| {
             RevolvingCredit::builder()
-                .id(id.into())
+                .id("RC-ADVSEL".into())
                 .commitment_amount(Money::from((10_000_000_i64, Currency::USD)))
                 .drawn_amount(Money::from((5_000_000_i64, Currency::USD)))
                 .commitment_date(start)
@@ -957,13 +961,15 @@ mod tests {
                             volatility: 0.25,
                             spread_sensitivity: 0.0,
                         },
-                        num_paths: 4000,
-                        seed: Some(42),
-                        antithetic: true,
                         use_sobol_qmc: false,
                         mc_config,
                     },
                 )))
+                .instrument_pricing_overrides(
+                    crate::instruments::InstrumentPricingOverrides::default()
+                        .with_mc_paths(2_000)
+                        .with_mc_antithetic(true),
+                )
                 .discount_curve_id("USD-OIS".into())
                 .credit_curve_id("BORROWER-HZ".into())
                 .recovery_rate(0.4)
@@ -1001,18 +1007,15 @@ mod tests {
             .expect("hazard");
         let market = MarketContext::new().insert(disc).insert(hz);
 
-        let pv_default = RevolvingCreditPricer::price_with_paths(
-            &make_facility("RC-ADVSEL-DEFAULT", None),
-            &market,
-            start,
-        )
-        .expect("default-config pricing")
-        .mc_result
-        .estimate
-        .mean
-        .amount();
+        let pv_default =
+            RevolvingCreditPricer::price_with_paths(&make_facility(None), &market, start)
+                .expect("default-config pricing")
+                .mc_result
+                .estimate
+                .mean
+                .amount();
         let pv_zero_corr = RevolvingCreditPricer::price_with_paths(
-            &make_facility("RC-ADVSEL-ZERO", Some(zero_corr_config)),
+            &make_facility(Some(zero_corr_config)),
             &market,
             start,
         )
@@ -1030,5 +1033,182 @@ mod tests {
              embed adverse selection and price BELOW the zero-correlation config: \
              default = {pv_default}, zero-corr = {pv_zero_corr}"
         );
+    }
+
+    fn seed_test_facility(
+        model_config: crate::instruments::InstrumentPricingOverrides,
+        use_sobol_qmc: bool,
+    ) -> finstack_quant_core::Result<RevolvingCredit> {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        RevolvingCredit::builder()
+            .id("RC-SEED-LABEL".into())
+            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+            .commitment_date(start)
+            .maturity(end)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .day_count(DayCount::Act360)
+            .frequency(Tenor::quarterly())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
+                StochasticUtilizationSpec {
+                    utilization_process: UtilizationProcess::MeanReverting {
+                        target_rate: 0.5,
+                        speed: 0.75,
+                        volatility: 0.25,
+                        spread_sensitivity: 0.0,
+                    },
+                    use_sobol_qmc,
+                    mc_config: Some(McConfig {
+                        credit_spread_process: CreditSpreadProcessSpec::Constant(0.02),
+                        interest_rate_process: None,
+                        correlation_matrix: None,
+                        util_credit_corr: None,
+                    }),
+                },
+            )))
+            .instrument_pricing_overrides(model_config)
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.4)
+            .build()
+    }
+
+    fn seed_test_market() -> MarketContext {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        MarketContext::new().insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(start)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (5.0, (-0.15f64).exp())])
+                .build()
+                .expect("curve"),
+        )
+    }
+
+    /// The revolver seeds from `model_config.mc_seed_scenario` through
+    /// `derive_seed(facility_id, label)` instead of the former fixed seed 42.
+    /// Reference: the same estimator run with the former fixed seed (42) must
+    /// agree within four combined standard errors, and a different label must
+    /// select different random streams.
+    #[test]
+    fn revolver_seed_comes_from_model_config_scenario() {
+        use crate::instruments::fixed_income::revolving_credit::RevolvingCreditMcRun;
+        use crate::instruments::InstrumentPricingOverrides;
+
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let market = seed_test_market();
+        let overrides = InstrumentPricingOverrides::default().with_mc_paths(2_000);
+        let base_facility = seed_test_facility(overrides.clone(), false).expect("facility");
+        let alt_facility = seed_test_facility(overrides.with_mc_seed_scenario("alt"), false)
+            .expect("relabelled facility");
+
+        let base = RevolvingCreditPricer::price_with_paths(&base_facility, &market, start)
+            .expect("base")
+            .mc_result
+            .estimate;
+        let alt = RevolvingCreditPricer::price_with_paths(&alt_facility, &market, start)
+            .expect("relabelled")
+            .mc_result
+            .estimate;
+        assert_ne!(
+            base.mean.amount().to_bits(),
+            alt.mean.amount().to_bits(),
+            "mc_seed_scenario must select the random streams"
+        );
+
+        let fixed_seed = RevolvingCreditPricer::price_monte_carlo_with_run(
+            &base_facility,
+            &market,
+            start,
+            &RevolvingCreditMcRun {
+                num_paths: 2_000,
+                seed: 42,
+                antithetic: false,
+            },
+        )
+        .expect("fixed seed")
+        .mc_result
+        .estimate;
+        assert_eq!(base.num_paths, 2_000);
+        let tol = 4.0 * base.stderr.hypot(fixed_seed.stderr);
+        assert!(
+            tol > 0.0,
+            "the utilization process must be stochastic for this reference"
+        );
+        assert!(
+            (base.mean.amount() - fixed_seed.mean.amount()).abs() <= tol,
+            "derived-seed PV {} vs fixed-seed PV {} exceeds 4 standard errors {tol}",
+            base.mean.amount(),
+            fixed_seed.mean.amount()
+        );
+    }
+
+    /// `mc_paths` counts independent estimators: an antithetic run simulates
+    /// two mirrored paths per estimator and reports the estimator count.
+    #[test]
+    fn revolver_mc_paths_counts_independent_estimators() {
+        use crate::instruments::InstrumentPricingOverrides;
+
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let facility = seed_test_facility(
+            InstrumentPricingOverrides::default()
+                .with_mc_paths(16)
+                .with_mc_antithetic(true),
+            false,
+        )
+        .expect("facility");
+        let result = RevolvingCreditPricer::price_with_paths(&facility, &seed_test_market(), start)
+            .expect("antithetic price");
+        assert_eq!(result.path_results.len(), 32);
+        assert_eq!(result.mc_result.estimate.num_paths, 16);
+    }
+
+    /// Antithetic pairing through `model_config.mc_antithetic` is rejected for
+    /// Sobol facilities.
+    #[test]
+    fn mc_antithetic_with_sobol_is_rejected() {
+        use crate::instruments::InstrumentPricingOverrides;
+
+        let err = seed_test_facility(
+            InstrumentPricingOverrides::default()
+                .with_mc_paths(8)
+                .with_mc_antithetic(true),
+            true,
+        )
+        .expect_err("antithetic Sobol must be rejected");
+        assert!(err.to_string().contains("mc_antithetic"), "{err}");
+    }
+
+    #[test]
+    fn stochastic_spec_rejects_retired_sampling_keys() {
+        let spec = StochasticUtilizationSpec {
+            utilization_process: UtilizationProcess::MeanReverting {
+                target_rate: 0.5,
+                speed: 0.75,
+                volatility: 0.25,
+                spread_sensitivity: 0.0,
+            },
+            use_sobol_qmc: false,
+            mc_config: None,
+        };
+        let canonical = serde_json::to_value(&spec).expect("serialize");
+        for (key, value) in [
+            // schema-rejection-test: `draw_repay_spec.stochastic.num_paths`
+            ("num_paths", serde_json::json!(1000)),
+            // schema-rejection-test: `draw_repay_spec.stochastic.seed`
+            ("seed", serde_json::json!(42)),
+            // schema-rejection-test: `draw_repay_spec.stochastic.antithetic`
+            ("antithetic", serde_json::json!(true)),
+        ] {
+            let mut retired = canonical.clone();
+            retired
+                .as_object_mut()
+                .expect("object")
+                .insert(key.to_string(), value);
+            let err = serde_json::from_value::<StochasticUtilizationSpec>(retired)
+                .expect_err("retired sampling key must be rejected");
+            assert!(err.to_string().contains(key), "{err}");
+        }
     }
 }

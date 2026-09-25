@@ -1,6 +1,9 @@
 //! Low-path MC calibration loop with common random numbers.
 
-use super::{CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, PikMode, PikSchedule};
+use super::{
+    CalibrationParameter, MertonMcCalibrationSpec, MertonMcConfig, MertonMcRun, PikMode,
+    PikSchedule,
+};
 use crate::cashflow::builder::specs::CouponType;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
     clean_price_from_japanese_simple_yield, price_from_ytm, price_from_ytw, price_from_z_spread,
@@ -136,22 +139,17 @@ fn mc_cash_pv(
     as_of: Date,
     discount_rate: f64,
     base_config: &MertonMcConfig,
-    low_paths: usize,
-    seed_override: Option<u64>,
+    run: &MertonMcRun,
     merton: MertonModel,
 ) -> Result<f64> {
     let cash_schedule = PikSchedule::Stepped(vec![(0.0, PikMode::Cash)]);
 
     let mut cfg = base_config.clone();
     cfg.merton = merton;
-    cfg.num_paths = low_paths;
     cfg.pik_schedule = cash_schedule;
     cfg.calibration = None;
-    if let Some(seed) = seed_override {
-        cfg.seed = seed;
-    }
 
-    let result = bond_cash.price_merton_mc(&cfg, discount_rate, as_of)?;
+    let result = bond_cash.price_merton_mc_with_run(&cfg, run, discount_rate, as_of)?;
     Ok(result.dirty_price_pct / 100.0 * bond_cash.notional.amount())
 }
 
@@ -199,17 +197,17 @@ pub fn calibrate_parameter_to_market(
         return Err(InputError::Invalid.into());
     }
 
+    // Low-path run: the bond's resolved antithetic flag and seed, with the
+    // calibration's own estimator count and optional seed override.
+    let full_run = MertonMcRun::resolve(&bond.id, &bond.instrument_pricing_overrides.model_config)?;
+    let low_run = MertonMcRun {
+        num_paths: spec.low_paths.max(2),
+        seed: spec.seed.unwrap_or(full_run.seed),
+        antithetic: full_run.antithetic,
+    };
     let eval = |x: f64| -> Result<(f64, f64)> {
         let m = with_parameter(base_merton, spec.parameter, x)?;
-        let pv = mc_cash_pv(
-            &bond_cash,
-            as_of,
-            discount_rate,
-            base_config,
-            spec.low_paths.max(2),
-            spec.seed,
-            m,
-        )?;
+        let pv = mc_cash_pv(&bond_cash, as_of, discount_rate, base_config, &low_run, m)?;
         Ok((pv, pv - target_pv))
     };
 
@@ -254,7 +252,7 @@ pub fn calibrate_parameter_to_market(
     let mut f_mid = 0.0;
     let mut converged = false;
 
-    for i in 0..spec.max_iter.max(1) {
+    for i in 0..spec.max_iterations.max(1) {
         iterations = i + 1;
         mid = 0.5 * (lo + hi);
         let (pv, f) = eval(mid)?;

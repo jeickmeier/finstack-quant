@@ -381,7 +381,10 @@ impl SnowballHw1fMcPricer {
         self.config.with_instrument_overrides(
             &inst.id,
             inst.instrument_pricing_overrides.model_config.mc_paths,
-            inst.metric_pricing_overrides.mc_seed_scenario.as_deref(),
+            inst.instrument_pricing_overrides
+                .model_config
+                .mc_seed_scenario
+                .as_deref(),
         )
     }
 
@@ -473,12 +476,7 @@ impl SnowballHw1fMcPricer {
         // `r(0) = f(0,0)` reconstruction, so the price has no Monte-Carlo
         // component. Settle the (fully seasoned) schedule directly.
         if event_times.is_empty() {
-            return deterministic_estimate(
-                spec,
-                inst.notional,
-                &events,
-                config.effective_path_count(),
-            );
+            return deterministic_estimate(spec, inst.notional, &events, &config);
         }
 
         // Final settlement event at maturity (the last payment date): coupons
@@ -731,7 +729,7 @@ fn deterministic_estimate(
     spec: SnowballCouponSpec,
     notional: Money,
     events: &[CouponEvent],
-    num_paths: usize,
+    config: &RateExoticMcConfig,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
     let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec(), false);
     payoff.settle_seasoned_prefix();
@@ -740,8 +738,8 @@ fn deterministic_estimate(
         mean: pv,
         stderr: 0.0,
         ci_95: (pv, pv),
-        num_paths,
-        num_simulated_paths: num_paths,
+        num_paths: config.num_paths,
+        num_simulated_paths: config.simulated_path_count(),
         std_dev: Some(0.0),
         median: None,
         percentile_25: None,
@@ -900,6 +898,27 @@ mod tests {
             min_steps_between_events: 1,
             ..Default::default()
         })
+    }
+
+    /// `num_paths` counts independent estimators (RNG streams). The registry
+    /// default was halved when it stopped counting antithetic mirrors, so the
+    /// default configuration must replay exactly the same streams: the PV is
+    /// pinned bit-for-bit to the value captured before the change.
+    #[test]
+    fn rate_exotic_default_pv_unchanged() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let estimate = SnowballHw1fMcPricer::with_hw_params(
+            HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw params"),
+        )
+        .price_estimate(&test_snowball(), &market, as_of)
+        .expect("default price");
+        assert_eq!(
+            estimate.mean.amount().to_bits(),
+            0x412feb0caef2df97_u64,
+            "pv={}",
+            estimate.mean.amount()
+        );
     }
 
     #[test]
@@ -1133,7 +1152,7 @@ mod tests {
             HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"),
         )
         .with_config(RateExoticMcConfig {
-            num_paths: 200,
+            num_paths: 100,
             antithetic: true,
             min_steps_between_events: 1,
             seed: 7,
@@ -1145,7 +1164,7 @@ mod tests {
             HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw"),
         )
         .with_config(RateExoticMcConfig {
-            num_paths: 2_000,
+            num_paths: 1000,
             antithetic: true,
             min_steps_between_events: 1,
             seed: 7,

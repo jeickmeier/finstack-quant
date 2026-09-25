@@ -13,7 +13,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::equity::autocallable::{Autocallable, FinalPayoffType};
 use finstack_quant_valuations::instruments::Attributes;
-use finstack_quant_valuations::instruments::MetricPricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 
 /// Standard curve IDs
 pub const DISC_ID: &str = "USD_DISC";
@@ -113,10 +113,10 @@ pub fn create_quarterly_autocallable(
         div_yield_id: Some(finstack_quant_core::types::PriceId::new(DIV_ID)),
         initial_level: None,
         past_fixings: vec![],
-        instrument_pricing_overrides: Default::default(),
-        metric_pricing_overrides: seed_scenario
-            .map(|scenario| MetricPricingOverrides::default().with_mc_seed_scenario(scenario))
+        instrument_pricing_overrides: seed_scenario
+            .map(|scenario| InstrumentPricingOverrides::default().with_mc_seed_scenario(scenario))
             .unwrap_or_default(),
+        metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
         attributes: Attributes::new(),
     }

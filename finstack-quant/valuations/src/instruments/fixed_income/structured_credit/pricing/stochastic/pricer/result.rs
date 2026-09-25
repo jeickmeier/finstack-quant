@@ -53,7 +53,8 @@ pub struct StochasticPricingResult {
     /// 95% confidence interval for the mean PV
     pub pv_confidence_interval: (f64, f64),
 
-    /// Number of scenario paths
+    /// Number of simulated scenario paths (`2 × pricing_mode.num_paths` for
+    /// antithetic Monte Carlo, prefixes × suffixes for Hybrid).
     pub num_paths: usize,
 
     /// Pricing mode used.

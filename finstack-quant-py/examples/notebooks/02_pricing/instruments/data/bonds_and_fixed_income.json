@@ -275,10 +275,11 @@
       },
       "instrument_pricing_overrides": {
         "model_config": {
+          "mc_antithetic": true,
+          "mc_paths": 1000,
           "merton_mc_config": {
-          "antithetic": true,
           "barrier_crossing": "brownian_bridge",
-          "default_recovery_rate": 0.4,
+          "recovery_rate": 0.4,
           "merton": {
             "asset_value": 200.0,
             "asset_vol": 0.25,
@@ -292,12 +293,10 @@
             "payout_rate": 0.0,
             "risk_free_rate": 0.04
           },
-          "num_paths": 2000,
           "pik_schedule": {
             "uniform": "pik"
           },
-          "seed": 42,
-          "time_steps_per_year": 50
+          "steps_per_year": 50
           }
         }
       },

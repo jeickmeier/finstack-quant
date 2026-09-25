@@ -57,11 +57,11 @@ const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 /// * `notional` — Swap notional.
 /// * `discount_factor_terminal` — `P(0, T_N)` for the terminal tenor.
 /// * `currency` — Currency used for the result.
-/// * `config` — Monte Carlo configuration. `num_paths` must not exceed
-///   [`MAX_NUM_PATHS`]; antithetic sampling requires an even count, and the
-///   pricer needs at least two independent pricing observations (2 paths for
-///   plain in-sample pricing, 4 with either antithetic or out-of-sample
-///   pricing, 8 with both). `min_steps_between_events` is the minimum number
+/// * `config` — Monte Carlo configuration. `num_paths` counts independent
+///   estimators; the simulated path count (`2 × num_paths` with antithetic
+///   sampling) must not exceed [`MAX_NUM_PATHS`], and the pricer needs at
+///   least two independent pricing observations (2 estimators in-sample, 4
+///   with out-of-sample pricing). `min_steps_between_events` is the minimum number
 ///   of simulation sub-steps between consecutive exercise dates. Use
 ///   [`RateExoticMcConfig::lmm_bermudan`] for the registry defaults.
 ///
@@ -105,12 +105,12 @@ pub fn price_bermudan_lmm(
     let num_steps = time_grid.num_steps();
     let work_size = disc.work_size(&process);
 
-    let raw_paths = config.raw_stream_count();
+    let raw_paths = config.num_paths;
 
     // --- Phase 1: Simulate forward rate paths ---
     //
     // paths[path_idx][step] = Vec<f64> of N forward rates at that step
-    let mut all_paths: Vec<Vec<Vec<f64>>> = Vec::with_capacity(config.num_paths);
+    let mut all_paths: Vec<Vec<Vec<f64>>> = Vec::with_capacity(config.simulated_path_count());
     let base_rng = PhiloxRng::new(config.seed);
 
     for path_id in 0..raw_paths {
@@ -407,32 +407,22 @@ fn validate_exercise_schedule(exercise_times: &[f64], maturity: f64) -> Result<(
 }
 
 fn validate_path_config(config: &RateExoticMcConfig) -> Result<()> {
-    if config.num_paths > MAX_NUM_PATHS {
+    if config.simulated_path_count() > MAX_NUM_PATHS {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "LMM Bermudan num_paths {} exceeds maximum {MAX_NUM_PATHS}",
-            config.num_paths
-        )));
-    }
-    if config.antithetic && !config.num_paths.is_multiple_of(2) {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "LMM Bermudan antithetic sampling requires an even num_paths, got {}",
-            config.num_paths
+            "LMM Bermudan simulated path count {} (num_paths {} with antithetic={}) exceeds maximum {MAX_NUM_PATHS}",
+            config.simulated_path_count(),
+            config.num_paths,
+            config.antithetic
         )));
     }
 
-    let multiplicity = config.split().multiplicity;
-    let raw_streams = config.num_paths / multiplicity;
     let pricing_observations = if config.oos_lsmc {
-        raw_streams / 2
+        config.num_paths / 2
     } else {
-        raw_streams
+        config.num_paths
     };
     if pricing_observations < 2 {
-        let minimum_paths = if config.oos_lsmc {
-            4 * multiplicity
-        } else {
-            2 * multiplicity
-        };
+        let minimum_paths = if config.oos_lsmc { 4 } else { 2 };
         return Err(finstack_quant_core::Error::Validation(format!(
             "LMM Bermudan pricing requires at least two independent pricing observations; num_paths must be at least {minimum_paths} for antithetic={} and oos_lsmc={}, got {}",
             config.antithetic, config.oos_lsmc, config.num_paths
@@ -646,10 +636,12 @@ mod tests {
             (test_config(1, false, false), "at least two"),
             (test_config(2, false, true), "at least two"),
             (test_config(3, false, true), "at least two"),
-            (test_config(2, true, false), "at least two"),
-            (test_config(4, true, true), "at least two"),
-            (test_config(6, true, true), "at least two"),
-            (test_config(3, true, false), "even num_paths"),
+            (test_config(1, true, false), "at least two"),
+            (test_config(3, true, true), "at least two"),
+            (
+                test_config(MAX_NUM_PATHS / 2 + 1, true, false),
+                "exceeds maximum",
+            ),
             (
                 test_config(MAX_NUM_PATHS + 1, false, false),
                 "exceeds maximum",
@@ -661,9 +653,9 @@ mod tests {
 
         for config in [
             test_config(2, false, false),
-            test_config(4, true, false),
+            test_config(2, true, false),
             test_config(4, false, true),
-            test_config(8, true, true),
+            test_config(4, true, true),
         ] {
             assert!(
                 validate_path_config(&config).is_ok(),
@@ -698,7 +690,7 @@ mod tests {
         let strike = 0.025; // ITM payer swaption (forwards ~3-3.6%)
         let df_terminal = (-0.03 * 4.0_f64).exp();
         let config = RateExoticMcConfig {
-            num_paths: 5_000,
+            num_paths: 2500,
             seed: 123,
             basis_degree: 2,
             antithetic: true,
@@ -726,6 +718,32 @@ mod tests {
         );
     }
 
+    /// `num_paths` counts independent estimators; the halved `lmm_bermudan`
+    /// registry default must replay the same streams, so the default PV is
+    /// pinned bit-for-bit to the value captured before the change.
+    #[test]
+    fn lmm_default_pv_unchanged() {
+        let params = test_lmm_params();
+        let df_terminal = (-0.03 * 4.0_f64).exp();
+        let estimate = price_bermudan_lmm(
+            &params,
+            &[1.0, 2.0, 3.0],
+            0.030,
+            true,
+            1_000_000.0,
+            df_terminal,
+            Currency::USD,
+            &RateExoticMcConfig::lmm_bermudan(),
+        )
+        .expect("default price");
+        assert_eq!(
+            estimate.mean.amount().to_bits(),
+            0x40c98c29d93c5d7b_u64,
+            "pv={}",
+            estimate.mean.amount()
+        );
+    }
+
     #[test]
     fn test_bermudan_geq_european() {
         // Bermudan (3 exercise dates) should be >= European (1 exercise date)
@@ -733,7 +751,7 @@ mod tests {
         let strike = 0.030;
         let df_terminal = (-0.03 * 4.0_f64).exp();
         let config = RateExoticMcConfig {
-            num_paths: 10_000,
+            num_paths: 5000,
             seed: 42,
             basis_degree: 2,
             antithetic: true,

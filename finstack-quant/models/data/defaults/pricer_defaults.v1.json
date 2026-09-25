@@ -28,7 +28,7 @@
       "antithetic": true
     },
     "rate_exotics": {
-      "num_paths": 20000,
+      "num_paths": 10000,
       "seed": 42,
       "antithetic": true,
       "min_steps_between_events": 4,
@@ -41,7 +41,7 @@
       "antithetic": true
     },
     "lmm_bermudan": {
-      "num_paths": 50000,
+      "num_paths": 25000,
       "seed": 42,
       "basis_degree": 3,
       "antithetic": true,
@@ -53,10 +53,13 @@
       "basis_degree": 3
     },
     "merton_pik_bond": {
-      "num_paths": 10000,
-      "seed": 42,
+      "num_paths": 5000,
       "antithetic": true,
-      "time_steps_per_year": 12
+      "steps_per_year": 12
+    },
+    "revolving_credit": {
+      "num_paths": 10000,
+      "antithetic": false
     }
   },
   "convenience": {

@@ -13,7 +13,9 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit,
     RevolvingCreditFees, RevolvingCreditPricer, StochasticUtilizationSpec, UtilizationProcess,
 };
-use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
+use finstack_quant_valuations::instruments::{
+    Instrument, InstrumentPricingOverrides, PricingOptions,
+};
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -72,7 +74,8 @@ pub(crate) fn floating_spec() -> FloatingRateSpec {
 
 /// Floating revolver at `MARGIN_BP` over the term index with the given
 /// utilization volatility and spread process; the hazard curve is attached
-/// only for the market-anchored process.
+/// only for the market-anchored process. `num_paths` antithetic estimators
+/// simulate `2 × num_paths` paths.
 pub(crate) fn revolver(
     id: &str,
     utilization_vol: f64,
@@ -98,9 +101,6 @@ pub(crate) fn revolver(
                     volatility: utilization_vol,
                     spread_sensitivity: 0.0,
                 },
-                num_paths,
-                seed: Some(42),
-                antithetic: true,
                 use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
@@ -110,6 +110,11 @@ pub(crate) fn revolver(
                 }),
             },
         )))
+        .instrument_pricing_overrides(
+            InstrumentPricingOverrides::default()
+                .with_mc_paths(num_paths)
+                .with_mc_antithetic(true),
+        )
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4);
     if anchored {
@@ -127,7 +132,7 @@ fn constant_spread_at_any_level_has_zero_option_cost_on_every_path() {
         "RCF-FAIR",
         0.25,
         CreditSpreadProcessSpec::Constant(0.045),
-        16,
+        8,
     );
     let market = market();
     let result = RevolvingCreditPricer::price_with_paths(&facility, &market, AS_OF)
@@ -167,7 +172,7 @@ fn widening_market_anchored_spread_gives_a_negative_option_cost() {
             implied_vol: 0.4,
             tenor_years: None,
         },
-        64,
+        32,
     );
     let market = market().insert(widening_hazard_curve());
     let result = RevolvingCreditPricer::price_with_paths(&facility, &market, AS_OF)
@@ -216,8 +221,9 @@ fn draw_option_cost_is_independent_of_the_margin_level() {
         implied_vol: 0.4,
         tenor_years: None,
     };
-    let tight = revolver("RCF-TIGHT", 0.25, spread(), 32);
-    let mut wide = revolver("RCF-WIDE", 0.25, spread(), 32);
+    // One id for both, so they share the derived seed (common random numbers).
+    let tight = revolver("RCF-MARGIN", 0.25, spread(), 16);
+    let mut wide = revolver("RCF-MARGIN", 0.25, spread(), 16);
     if let BaseRateSpec::Floating(spec) = &mut wide.base_rate_spec {
         spec.spread_bp = rust_decimal::Decimal::from(MARGIN_BP + 400);
     }

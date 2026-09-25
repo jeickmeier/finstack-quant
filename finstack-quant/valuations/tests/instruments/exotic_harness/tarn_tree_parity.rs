@@ -236,7 +236,7 @@ fn tarn_floating_note_mc_matches_hw_tree() {
     // --- Monte-Carlo (M6/M7 path) -------------------------------------------
     let mc_result = TarnPricer::with_hw_params(hw)
         .with_config(RateExoticMcConfig {
-            num_paths: 120_000,
+            num_paths: 60_000,
             antithetic: true,
             min_steps_between_events: 8,
             seed: 20_260_516,

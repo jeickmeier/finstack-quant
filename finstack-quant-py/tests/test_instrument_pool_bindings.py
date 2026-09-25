@@ -187,10 +187,11 @@ def test_stochastic_pool_reports_draws_and_the_option_cost_by_tranche() -> None:
     revolver = builder(stochastic_spec(0.25, market_anchored(), credit=True), credit=True).build()
     deal = pool_deal(revolver, reserve=40_000_000.0)
     ctx = market()
-    result = deal.price_stochastic(ctx, AS_OF, num_paths=32)
+    result = deal.price_stochastic(ctx, AS_OF, num_paths=16)
     assert isinstance(result, StochasticPricingResult)
+    # 16 antithetic estimators simulate 32 mirrored paths.
     assert result.num_paths == 32
-    assert result.pricing_mode == {"monte_carlo": {"num_paths": 32, "antithetic": True}}
+    assert result.pricing_mode == {"monte_carlo": {"num_paths": 16, "antithetic": True}}
     assert result.npv.currency == Currency("USD")
     assert result.expected_collateral_draws.amount > 15_000_000.0
     assert 0.0 <= result.unfunded_draw_path_fraction <= 1.0

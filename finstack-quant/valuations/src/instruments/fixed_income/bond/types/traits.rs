@@ -234,8 +234,12 @@ impl Bond {
     ///
     /// # Arguments
     ///
-    /// * `config` - Structural-credit dynamics, recovery, PIK behavior, path
-    ///   count, seed, and time discretization for this simulation.
+    /// * `config` - Structural-credit dynamics, recovery, PIK behavior and
+    ///   time discretization for this simulation. The independent-estimator
+    ///   count, antithetic flag and seed label come from this bond's
+    ///   `instrument_pricing_overrides.model_config` (`mc_paths`,
+    ///   `mc_antithetic`, `mc_seed_scenario`), with the registry
+    ///   `merton_pik_bond` defaults.
     /// * `discount_rate` - Flat annual continuously compounded risk-free rate
     ///   as a decimal. It drives risk-neutral asset drift and discounts cashflows
     ///   when `config.cashflow_dfs` is absent.
@@ -252,6 +256,25 @@ impl Bond {
     pub fn price_merton_mc(
         &self,
         config: &crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
+        discount_rate: f64,
+        as_of: time::Date,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult,
+    > {
+        let run = crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcRun::resolve(
+            &self.id,
+            &self.instrument_pricing_overrides.model_config,
+        )?;
+        self.price_merton_mc_with_run(config, &run, discount_rate, as_of)
+    }
+
+    /// Merton Monte Carlo price with explicit sampling settings.
+    ///
+    /// Shared by [`Bond::price_merton_mc`] and the low-path market calibration.
+    pub(crate) fn price_merton_mc_with_run(
+        &self,
+        config: &crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
+        run: &crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcRun,
         discount_rate: f64,
         as_of: time::Date,
     ) -> finstack_quant_core::Result<
@@ -329,7 +352,7 @@ impl Bond {
             config
         };
 
-        MertonMcEngine::price_terms(&terms, config_ref, discount_rate)
+        MertonMcEngine::price_terms(&terms, config_ref, run, discount_rate)
     }
 }
 

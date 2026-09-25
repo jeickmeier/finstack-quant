@@ -54,13 +54,14 @@ let result = clo.price_stochastic_with_mode(
     &market,
     as_of,
     PricingMode::MonteCarlo {
-        num_paths: 50_000,
+        num_paths: 25_000, // independent estimators: 50,000 antithetic paths
         antithetic: true,
     },
 )?;
 ```
 
-`PricingMode::default()` uses 10,000 antithetic Monte Carlo paths. Tree mode is
+`PricingMode::default()` uses 5,000 antithetic estimators (10,000 simulated
+paths); `num_paths` always counts independent estimators. Tree mode is
 bounded by its non-recombining node count and is intended only for short
 horizons. `StochasticPricingResult` and `TranchePricingResult` remain
 valuation-owned outputs.

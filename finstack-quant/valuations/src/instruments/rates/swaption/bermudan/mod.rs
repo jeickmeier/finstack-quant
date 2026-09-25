@@ -229,14 +229,15 @@ impl BermudanSwaptionPricerConfig {
     pub const DEFAULT_TREE_STEPS: usize = 100;
     /// Default Monte Carlo settings for LSMC pricing.
     ///
-    /// 100,000 antithetic paths balance accuracy and performance for typical
-    /// Bermudan swaptions (standard errors of ~0.1-0.5% of option value at
-    /// 10M notional). For production pricing requiring tight standard errors
-    /// (<0.05% of option value), increase to 500,000 paths. The regression
+    /// 50,000 independent estimators (100,000 simulated antithetic paths)
+    /// balance accuracy and performance for typical Bermudan swaptions
+    /// (standard errors of ~0.1-0.5% of option value at 10M notional). For
+    /// production pricing requiring tight standard errors (<0.05% of option
+    /// value), increase to 250,000 estimators. The regression
     /// uses a cubic polynomial basis with at least two simulation sub-steps
     /// between exercise dates.
     pub const DEFAULT_MC: RateExoticMcConfig = RateExoticMcConfig {
-        num_paths: 100_000,
+        num_paths: 50_000,
         seed: 42,
         antithetic: true,
         min_steps_between_events: 2,

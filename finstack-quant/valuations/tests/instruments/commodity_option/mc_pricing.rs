@@ -96,8 +96,8 @@ fn test_schwartz_smith_gbm_limit_converges_to_black76() {
             mu_y: -0.5 * sigma_y * sigma_y, // Ito correction for martingale
             lambda_x: 0.0,                  // No risk premium
         },
-        n_paths: 100_000,
-        n_steps: 100,
+        num_paths: 100_000,
+        num_steps: 100,
         seed: Some(42),
     };
 
@@ -136,8 +136,8 @@ fn test_mc_estimates_consistent_across_path_counts() {
     // Price with 10k paths
     let mc_10k = CommodityMcParams {
         model: ss_model.clone(),
-        n_paths: 10_000,
-        n_steps: 50,
+        num_paths: 10_000,
+        num_steps: 50,
         seed: Some(42),
     };
     let pv_10k = call.npv_mc(&mc_10k, &market, as_of).expect("10k paths");
@@ -145,8 +145,8 @@ fn test_mc_estimates_consistent_across_path_counts() {
     // Price with 100k paths
     let mc_100k = CommodityMcParams {
         model: ss_model,
-        n_paths: 100_000,
-        n_steps: 50,
+        num_paths: 100_000,
+        num_steps: 50,
         seed: Some(42),
     };
     let pv_100k = call.npv_mc(&mc_100k, &market, as_of).expect("100k paths");
@@ -201,8 +201,8 @@ fn test_put_call_parity_mc() {
 
     let mc_params = CommodityMcParams {
         model: ss_model,
-        n_paths: 100_000,
-        n_steps: 100,
+        num_paths: 100_000,
+        num_steps: 100,
         seed: Some(42),
     };
 
@@ -252,8 +252,8 @@ fn test_schwartz_smith_positive_option_values() {
             mu_y: 0.0,
             lambda_x: 0.0,
         },
-        n_paths: 50_000,
-        n_steps: 50,
+        num_paths: 50_000,
+        num_steps: 50,
         seed: Some(42),
     };
 
@@ -301,8 +301,8 @@ fn test_mc_black76_fallback() {
 
     let mc_params = CommodityMcParams {
         model: CommodityPricingModel::Black76,
-        n_paths: 1_000, // Should be ignored
-        n_steps: 10,    // Should be ignored
+        num_paths: 1_000, // Should be ignored
+        num_steps: 10,    // Should be ignored
         seed: Some(42),
     };
 
@@ -337,8 +337,8 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
             mu_y: 0.0,
             lambda_x: 0.0,
         },
-        n_paths: 2000,
-        n_steps: 12,
+        num_paths: 2000,
+        num_steps: 12,
         seed: Some(123),
     };
     let pricer = CommodityOptionMcPricer::new(params);
@@ -381,4 +381,23 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
     let wire = serde_json::to_value(&larger).unwrap();
     assert_eq!(wire["details"]["type"], "monte_carlo");
     assert_eq!(wire["details"]["data"]["estimator_paths"], 8000);
+}
+
+#[test]
+fn commodity_mc_params_use_num_paths_and_num_steps() {
+    // schema-rejection-test: `n_paths` / `n_steps`
+    let model = r#"{"schwartz_smith": {"kappa": 2.0, "sigma_x": 0.3, "sigma_y": 0.15, "rho_xy": -0.5, "mu_y": 0.0, "lambda_x": 0.0}}"#;
+    for retired in [
+        format!(r#"{{"model": {model}, "n_paths": 100, "num_steps": 10}}"#),
+        format!(r#"{{"model": {model}, "num_paths": 100, "n_steps": 10}}"#),
+    ] {
+        let err = serde_json::from_str::<CommodityMcParams>(&retired)
+            .expect_err("retired CommodityMcParams key must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+    }
+    let params: CommodityMcParams = serde_json::from_str(&format!(
+        r#"{{"model": {model}, "num_paths": 100, "num_steps": 10}}"#
+    ))
+    .expect("canonical CommodityMcParams parse");
+    assert_eq!((params.num_paths, params.num_steps), (100, 10));
 }
