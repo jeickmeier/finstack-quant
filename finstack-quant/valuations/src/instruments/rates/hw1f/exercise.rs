@@ -19,7 +19,7 @@ pub trait ExerciseBoundaryPayoff: Payoff {
     /// state at that date is `short_rate`.
     ///
     /// The returned amount is the **undiscounted value at the exercise date**
-    /// (e.g. `notional * call_price` for a note callable at par). The LSMC
+    /// (e.g. `notional * price_pct_of_par / 100` for a note callable at par). The LSMC
     /// harness discounts it to time 0 with the pathwise money-market
     /// numeraire `B(t_exercise)` — implementations must NOT pre-discount with
     /// the deterministic curve DF.

@@ -86,7 +86,7 @@ pub(crate) struct VegaCalculator;
 
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
+        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
         let option: &CmsOption = context.instrument_as()?;
         let as_of = context.as_of;
         let base_pv = context.base_value.amount();
@@ -282,7 +282,7 @@ impl MetricCalculator for VolgaCalculator {
             return Ok(0.0);
         }
 
-        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
+        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
 
         let curves_vol_up =
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;

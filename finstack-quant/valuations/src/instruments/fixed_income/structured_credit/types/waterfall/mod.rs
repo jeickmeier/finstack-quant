@@ -165,7 +165,7 @@ pub enum PaymentCalculation {
         /// Carryover balance outstanding at the period's opening.
         amount: Money,
     },
-    /// Manager incentive fee: `share_pct` of the cash reaching this recipient
+    /// Manager incentive fee: `share` of the cash reaching this recipient
     /// that lies above the equity hurdle. The hurdle is tested on the
     /// [`EquityHistory`] in the `WaterfallContext` plus every equity
     /// distribution earlier in the same waterfall run plus this cash; the
@@ -179,7 +179,7 @@ pub enum PaymentCalculation {
         /// Equity IRR hurdle as an annual decimal.
         hurdle_irr: f64,
         /// Share of the residual paid once the hurdle is met, in `[0, 1]`.
-        share_pct: f64,
+        share: f64,
     },
 }
 

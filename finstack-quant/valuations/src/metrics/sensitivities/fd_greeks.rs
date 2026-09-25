@@ -393,7 +393,7 @@ where
         validate_spot(current_spot, "delta")?;
 
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
-        let bump_pct = defaults.spot_bump_pct;
+        let bump_pct = defaults.spot_bump_decimal;
 
         // Use the same effective bump in the market and denominator.
         let bump = effective_spot_bump(current_spot, bump_pct);
@@ -475,7 +475,7 @@ where
         validate_spot(current_spot, "gamma")?;
 
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
-        let bump_pct = defaults.spot_bump_pct;
+        let bump_pct = defaults.spot_bump_decimal;
 
         // Use the same effective bump in the market and denominator.
         let bump = effective_spot_bump(current_spot, bump_pct);
@@ -551,7 +551,7 @@ where
         };
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         // Interpreted as an **absolute** implied vol bump in decimal units (e.g., 0.01 = +1 vol point).
-        let bump_abs = defaults.vol_bump_pct;
+        let bump_abs = defaults.vol_bump_decimal;
 
         let seeded_instrument = clone_with_crn_seed(instrument)?;
         let instrument_id = instrument.id().to_string();
@@ -690,7 +690,7 @@ where
             &context.curves,
             &dependencies,
             &vol_surface_ids,
-            defaults.vol_bump_pct,
+            defaults.vol_bump_decimal,
         )?;
 
         let (base_pv, pv_up, pv_down) = context.with_market_scratch(|context, scratch| {
@@ -781,9 +781,10 @@ where
         validate_spot(current_spot, "vanna")?;
 
         // Bump sizes with minimum floor for numerical stability
-        let (spot_bump_pct, vol_bump_abs) = (defaults.spot_bump_pct, defaults.vol_bump_pct);
+        let (spot_bump_decimal, vol_bump_abs) =
+            (defaults.spot_bump_decimal, defaults.vol_bump_decimal);
 
-        let spot_bump = effective_spot_bump(current_spot, spot_bump_pct);
+        let spot_bump = effective_spot_bump(current_spot, spot_bump_decimal);
         let h_abs = spot_bump.absolute; // absolute spot change
         let k_abs = symmetric_volatility_step(
             instrument,

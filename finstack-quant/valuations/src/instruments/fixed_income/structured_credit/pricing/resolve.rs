@@ -234,7 +234,8 @@ pub(crate) fn apply_shifting_interest<S: std::hash::BuildHasher>(
         ShiftMode::SeniorShare => step,
     };
     let u = unscheduled_fraction.clamp(0.0, 1.0);
-    let senior_pct = (senior_prorata_share * (1.0 - u) + schedule_senior_pct * u).clamp(0.0, 1.0);
+    let senior_decimal =
+        (senior_prorata_share * (1.0 - u) + schedule_senior_pct * u).clamp(0.0, 1.0);
 
     for tier in &mut waterfall.tiers {
         if tier.payment_type != PaymentType::Principal {
@@ -242,7 +243,7 @@ pub(crate) fn apply_shifting_interest<S: std::hash::BuildHasher>(
         }
         tier.allocation_mode = AllocationMode::ProRata;
         // Total current balance of the non-senior principal recipients, used to
-        // split the remaining `(1 − senior_pct)` pro-rata. Falls back to an
+        // split the remaining `(1 − senior_decimal)` pro-rata. Falls back to an
         // equal split when balances are unavailable/zero.
         let other_ids: Vec<String> = tier
             .recipients
@@ -260,12 +261,12 @@ pub(crate) fn apply_shifting_interest<S: std::hash::BuildHasher>(
                 tranche_id_of(recipient, TrancheRecipientScope::PrincipalOnly).map(str::to_string);
             if let Some(id) = id {
                 let weight = if id == si.senior_id {
-                    senior_pct
+                    senior_decimal
                 } else if other_total > 0.0 {
-                    (1.0 - senior_pct) * tranche_balances.get(&id).map_or(0.0, |m| m.amount())
+                    (1.0 - senior_decimal) * tranche_balances.get(&id).map_or(0.0, |m| m.amount())
                         / other_total
                 } else if !other_ids.is_empty() {
-                    (1.0 - senior_pct) / other_ids.len() as f64
+                    (1.0 - senior_decimal) / other_ids.len() as f64
                 } else {
                     0.0
                 };
@@ -439,7 +440,7 @@ pub(crate) fn apply_accumulation_lockout<S: std::hash::BuildHasher>(
     }
 }
 
-/// Senior share in effect at `months`: the `senior_pct` of the schedule step
+/// Senior share in effect at `months`: the `senior_decimal` of the schedule step
 /// with the greatest `months_from_closing` not exceeding `months` (or the
 /// earliest step's share when the deal is younger than every step, defaulting to
 /// full lock-out for an empty schedule).
@@ -454,7 +455,7 @@ fn senior_share(schedule: &[ShiftingInterestStep], months: u32) -> f64 {
         .filter(|s| s.months_from_closing <= months)
         .max_by_key(|s| s.months_from_closing)
         .or_else(|| schedule.iter().min_by_key(|s| s.months_from_closing))
-        .map_or(1.0, |s| s.senior_pct)
+        .map_or(1.0, |s| s.senior_decimal)
 }
 
 #[cfg(test)]

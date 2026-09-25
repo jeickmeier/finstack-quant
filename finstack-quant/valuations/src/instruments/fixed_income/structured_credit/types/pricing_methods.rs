@@ -140,7 +140,7 @@ impl StructuredCredit {
         &self,
         mut result: StochasticPricingResult,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
-        let Some(shock) = self.scenario_pricing_overrides.scenario_price_shock_pct else {
+        let Some(shock) = self.scenario_pricing_overrides.scenario_price_shock_decimal else {
             return Ok(result);
         };
         let factor = 1.0 + shock;

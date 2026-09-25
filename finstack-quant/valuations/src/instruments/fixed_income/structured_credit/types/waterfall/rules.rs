@@ -59,8 +59,8 @@ impl WaterfallRules {
     ///
     /// - `afc.capped_tranches` and `shifting_interest.senior_id` resolve to real
     ///   tranches; `afc.net_wac_fee_bp` is finite and non-negative.
-    /// - Loss/enhancement/share fractions (`trap_loss_pct`,
-    ///   `MaxCumulativeLoss`, `MinCreditEnhancement`, `senior_pct`,
+    /// - Loss/enhancement/share fractions (`trap_loss_decimal`,
+    ///   `MaxCumulativeLoss`, `MinCreditEnhancement`, `senior_decimal`,
     ///   `max_cumulative_loss`) lie in `[0, 1]`; `MinOcRatio` is finite and
     ///   non-negative (a ratio, so it may exceed 1).
     /// - `excess_spread.target_balance` is non-negative.
@@ -112,8 +112,8 @@ impl WaterfallRules {
                     es.target_balance.amount()
                 )));
             }
-            if let Some(trap) = es.trap_loss_pct {
-                unit(trap, "excess_spread.trap_loss_pct")?;
+            if let Some(trap) = es.trap_loss_decimal {
+                unit(trap, "excess_spread.trap_loss_decimal")?;
             }
         }
 
@@ -165,7 +165,7 @@ impl WaterfallRules {
             }
             let mut prev: Option<u32> = None;
             for step in &si.schedule {
-                unit(step.senior_pct, "shifting_interest senior_pct")?;
+                unit(step.senior_decimal, "shifting_interest senior_decimal")?;
                 if let Some(p) = prev {
                     if step.months_from_closing <= p {
                         return Err(invalid(format!(
@@ -248,12 +248,12 @@ pub enum ReserveTarget {
     /// A decimal fraction of the current pool balance (performing collateral
     /// plus any accumulation funding account), so the target amortizes with
     /// the pool.
-    PctOfCurrent(f64),
+    FractionOfCurrent(f64),
     /// A decimal fraction of the original (cut-off) pool balance: a floor
     /// that does not amortize.
-    PctOfOriginal(f64),
-    /// The larger of two targets, typically `PctOfCurrent` with a
-    /// `PctOfOriginal` floor.
+    FractionOfOriginal(f64),
+    /// The larger of two targets, typically `FractionOfCurrent` with a
+    /// `FractionOfOriginal` floor.
     Max(Box<ReserveTarget>, Box<ReserveTarget>),
 }
 
@@ -269,8 +269,8 @@ impl ReserveTarget {
     pub fn resolve(&self, current_pool: f64, original_pool: f64) -> f64 {
         match self {
             Self::Fixed(amount) => amount.amount().max(0.0),
-            Self::PctOfCurrent(pct) => (pct * current_pool).max(0.0),
-            Self::PctOfOriginal(pct) => (pct * original_pool).max(0.0),
+            Self::FractionOfCurrent(pct) => (pct * current_pool).max(0.0),
+            Self::FractionOfOriginal(pct) => (pct * original_pool).max(0.0),
             Self::Max(a, b) => a
                 .resolve(current_pool, original_pool)
                 .max(b.resolve(current_pool, original_pool)),
@@ -287,7 +287,7 @@ impl ReserveTarget {
                     )));
                 }
             }
-            Self::PctOfCurrent(pct) | Self::PctOfOriginal(pct) => {
+            Self::FractionOfCurrent(pct) | Self::FractionOfOriginal(pct) => {
                 if !pct.is_finite() || !(0.0..=1.0).contains(pct) {
                     return Err(invalid(format!(
                         "waterfall_rules: reserve.target fraction must be in [0, 1], got {pct}"
@@ -311,8 +311,8 @@ fn default_true() -> bool {
 ///
 /// Each period the notes are paid down to the amount that leaves the pool's
 /// overcollateralization (`pool − notes`) at the target: the larger of
-/// `pct_of_current` of the pool balance after the period's collections and
-/// `floor_pct_of_original` of the cut-off balance. The required principal
+/// `fraction_of_current` of the pool balance after the period's collections and
+/// `floor_fraction_of_original` of the cut-off balance. The required principal
 /// distribution is `max(0, notes − max(pool − target, 0))`, paid to the
 /// notes by priority from interest proceeds first and principal proceeds
 /// for the rest; the collections above it are released to the residual
@@ -323,11 +323,11 @@ fn default_true() -> bool {
 pub struct TargetOcSpec {
     /// Target overcollateralization as a decimal fraction of the current
     /// pool balance (after the period's collections).
-    pub pct_of_current: f64,
+    pub fraction_of_current: f64,
     /// Floor on the target as a decimal fraction of the original (cut-off)
     /// pool balance; `0.0` for no floor.
     #[serde(default)]
-    pub floor_pct_of_original: f64,
+    pub floor_fraction_of_original: f64,
 }
 
 impl TargetOcSpec {
@@ -339,17 +339,17 @@ impl TargetOcSpec {
     /// * `original_pool` - Original (cut-off) pool balance.
     #[must_use]
     pub fn target(&self, current_pool: f64, original_pool: f64) -> f64 {
-        (self.pct_of_current * current_pool)
-            .max(self.floor_pct_of_original * original_pool)
+        (self.fraction_of_current * current_pool)
+            .max(self.floor_fraction_of_original * original_pool)
             .max(0.0)
     }
 
     fn validate(&self) -> finstack_quant_core::Result<()> {
         for (value, what) in [
-            (self.pct_of_current, "target_oc.pct_of_current"),
+            (self.fraction_of_current, "target_oc.fraction_of_current"),
             (
-                self.floor_pct_of_original,
-                "target_oc.floor_pct_of_original",
+                self.floor_fraction_of_original,
+                "target_oc.floor_fraction_of_original",
             ),
         ] {
             if !value.is_finite() || !(0.0..=1.0).contains(&value) {
@@ -430,7 +430,7 @@ pub struct ExcessSpreadSpec {
     /// holder. `None` releases surplus after deferred coupons without this
     /// interest-to-principal transfer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub trap_loss_pct: Option<f64>,
+    pub trap_loss_decimal: Option<f64>,
 }
 
 /// A single step-down performance trigger.
@@ -502,7 +502,7 @@ pub struct ShiftingInterestStep {
     /// Months from closing at which this senior share takes effect.
     pub months_from_closing: u32,
     /// Senior share of principal (decimal, `1.0` = 100% lockout) from this step.
-    pub senior_pct: f64,
+    pub senior_decimal: f64,
 }
 
 /// How a shifting-interest schedule value is read.
@@ -514,7 +514,7 @@ pub struct ShiftingInterestStep {
 pub enum ShiftMode {
     /// Prospectus form: the schedule value is the share of the subordinates'
     /// pro-rata unscheduled principal that shifts to the senior, so the
-    /// senior's unscheduled share is `senior_pct + value × (1 − senior_pct)`
+    /// senior's unscheduled share is `senior_decimal + value × (1 − senior_decimal)`
     /// on live balances (`1.0` = full lockout, `0.0` = pro-rata).
     #[default]
     ShiftOfSubordinate,
@@ -540,7 +540,7 @@ pub enum ShiftMode {
 pub struct ShiftingInterestSpec {
     /// Id of the senior tranche that receives the shifted principal.
     pub senior_id: String,
-    /// Schedule ascending by `months_from_closing`; each step's `senior_pct`
+    /// Schedule ascending by `months_from_closing`; each step's `senior_decimal`
     /// is read per `mode`.
     pub schedule: Vec<ShiftingInterestStep>,
     /// How the schedule values are read; `ShiftOfSubordinate` by default.

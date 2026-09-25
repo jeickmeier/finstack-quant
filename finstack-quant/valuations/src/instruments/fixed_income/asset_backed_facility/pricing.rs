@@ -185,21 +185,24 @@ impl AssetBackedFacility {
             .amortization_events
             .iter()
             .find_map(|event| match event {
-                AmortizationEvent::CumulativeLoss { max_pct } => Some(*max_pct),
+                AmortizationEvent::CumulativeLoss {
+                    max_cumulative_loss,
+                } => Some(*max_cumulative_loss),
                 _ => None,
             });
         let min_excess_spread = self
             .amortization_events
             .iter()
             .find_map(|event| match event {
-                AmortizationEvent::ExcessSpread { min_3m } => Some(*min_3m),
+                AmortizationEvent::ExcessSpread {
+                    min_excess_spread_3m,
+                } => Some(*min_excess_spread_3m),
                 _ => None,
             });
         let waterfall_rules =
             (max_loss.is_some() || min_excess_spread.is_some()).then(|| WaterfallRules {
                 early_amortization: Some(EarlyAmortizationSpec {
-                    // Percent at the facility boundary, fraction in the engine.
-                    max_cumulative_loss: max_loss.map(|pct| pct / 100.0),
+                    max_cumulative_loss: max_loss,
                     min_excess_spread_3m: min_excess_spread,
                 }),
                 ..WaterfallRules::default()

@@ -202,8 +202,8 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
 
     // Now compute reference gamma/vanna by explicitly bumping the PriceCurve
     // This validates that the Greeks implementation bumps PriceCurve, not spot
-    let bump_pct = 0.01; // Default spot_bump_pct
-    let vol_bump = 0.01; // Default vol_bump_pct
+    let bump_pct = 0.01; // Default spot_bump_decimal
+    let vol_bump = 0.01; // Default vol_bump_decimal
     let forward_price = option.forward_price(&market, as_of)?;
     let bump_size = forward_price * bump_pct;
 

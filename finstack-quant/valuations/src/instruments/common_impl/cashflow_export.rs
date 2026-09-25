@@ -652,7 +652,7 @@ mod tests {
     #[test]
     fn malformed_instrument_precedes_model_and_date_errors() {
         let mut deal = StructuredCredit::example();
-        deal.cleanup_call_pct = Some(-0.5);
+        deal.cleanup_call_decimal = Some(-0.5);
         let json = serde_json::to_string(&InstrumentEnvelope::new(
             InstrumentJson::StructuredCredit(Box::new(deal)),
         ))
@@ -663,7 +663,7 @@ mod tests {
                 .expect_err("instrument validation must win");
 
         assert!(
-            err.to_string().contains("cleanup_call_pct"),
+            err.to_string().contains("cleanup_call_decimal"),
             "unexpected error ordering: {err}"
         );
     }
@@ -816,7 +816,7 @@ mod tests {
         .expect("baseline envelope");
 
         bond.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+            ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
         let shocked: InstrumentCashflowEnvelope = serde_json::from_str(
             &instrument_cashflows_json(
                 &serialize_bond(&bond),

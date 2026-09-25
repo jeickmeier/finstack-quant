@@ -180,6 +180,11 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"behavior_overrides|credit_factors|cpr_annual|cdr_annual|reinvestment_price|"
             r"annual_noi|annual_debt_service|trustee_fee_annual|prepayment_model|"
             r"cds_aod_half_day_bias|cds_act360_include_last_day|recovery_01|real_estate::cap_rate_sensitivity|real_estate::discount_rate_sensitivity|"
+            r"spot_bump_pct|vol_bump_pct|scenario_price_shock_pct|spread_basis_points_id|cleanup_call_pct|"
+            r"share_pct|fixed_allocation_pct|senior_pct|pct_of_current|pct_of_original|floor_pct_of_original|trap_loss_pct|"
+            r"disposition_cost_pct|holdback_pct|avg_recovery_pct|pct_of_commitment|withheld_pct|separate_pct|"
+            r"servicing_fee_rate|guarantee_fee_rate|agency_guarantee_fee_rate|gnma_guarantee_fee_rate|"
+            r"cash_pct|pik_pct|min_3m|max_price|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

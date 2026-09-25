@@ -10,8 +10,8 @@
     }
   ],
   "properties": {
-    "scenario_price_shock_pct": {
-      "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+    "scenario_price_shock_decimal": {
+      "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
       "format": "double",
       "type": [
         "number",

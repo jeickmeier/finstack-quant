@@ -128,15 +128,15 @@ pub(super) fn recycle_reinvestment_principal(
         return Ok(Money::from((0_i64, state.base_currency)));
     };
     let criteria = &period.criteria;
-    if !criteria.max_price.is_finite()
-        || criteria.max_price <= 0.0
+    if !criteria.max_price_pct.is_finite()
+        || criteria.max_price_pct <= 0.0
         || !criteria.min_yield.is_finite()
     {
         return Err(finstack_quant_core::Error::Validation(
             "invalid reinvestment price/yield criteria".into(),
         ));
     }
-    if price_fraction * 100.0 > criteria.max_price || recyclable.amount() <= 0.0 {
+    if price_fraction * 100.0 > criteria.max_price_pct || recyclable.amount() <= 0.0 {
         return Ok(Money::from((0_i64, state.base_currency)));
     }
     if let Some(assumptions) = period.assumptions.clone() {

@@ -1580,7 +1580,7 @@ mod tests {
         shocked_swap
             .get_scenario_pricing_overrides_mut()
             .expect("XccySwap exposes scenario overrides")
-            .scenario_price_shock_pct = Some(-0.05);
+            .scenario_price_shock_decimal = Some(-0.05);
         let shocked = shocked_swap.value(&market, base).expect("shocked value");
         // Reference: ScenarioPricingOverrides scales the PV by (1 + shock). The
         // shock is applied to the raw PV before Money's decimal storage, so the
@@ -1595,7 +1595,7 @@ mod tests {
 
         let json = serde_json::to_value(&shocked_swap).expect("serialize");
         assert_eq!(
-            json["scenario_pricing_overrides"]["scenario_price_shock_pct"],
+            json["scenario_pricing_overrides"]["scenario_price_shock_decimal"],
             -0.05
         );
         let unshocked_json = serde_json::to_value(&swap).expect("serialize");

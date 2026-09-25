@@ -220,14 +220,13 @@ impl AutocallablePayoff {
                 let capped_ratio = (final_spot / self.initial_spot).min(self.cap_level);
                 1.0 + rate * ((capped_ratio - 1.0).max(0.0))
             }
-            FinalPayoffType::KnockInPut { strike } => {
+            FinalPayoffType::KnockInPut { strike_ratio } => {
                 let barrier_level = self.initial_spot * self.final_barrier;
                 if min_spot_observed <= barrier_level {
                     // Knocked in: the note holder is short a down-and-in put, so
                     // they receive principal reduced by the put loss, floored at
                     // zero — NOT the bare put intrinsic. A knocked-in path ending
                     // at-the-money returns full principal (put worth ~0).
-                    let strike_ratio = strike / self.initial_spot;
                     let spot_ratio = final_spot / self.initial_spot;
                     let put_loss = (strike_ratio - spot_ratio).max(0.0);
                     (1.0 - put_loss).max(0.0)
@@ -528,7 +527,7 @@ mod tests {
             vec![0.0],
             false, // memory_coupons
             0.6,
-            FinalPayoffType::KnockInPut { strike: 100.0 },
+            FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
             1.0,
             1.2,
             notional,
@@ -542,13 +541,50 @@ mod tests {
         payoff.on_event(&mut state).expect("valid payoff event");
 
         let value = payoff.value(Currency::USD).expect("valid payoff");
-        // Knocked in at spot=55, strike=100, S0=100: put loss = max(1.0 - 0.55, 0)
+        // Knocked in at spot=55, strike_ratio=1.0, S0=100: put loss = max(1.0 - 0.55, 0)
         // = 0.45, and the note pays principal - put_loss = 1.0 - 0.45 = 0.55.
         let expected = 0.55 * notional;
         assert!(
             (value.amount() - expected).abs() < 1e-6,
             "A 60% final barrier should knock in when spot hits 55 on a 100 initial spot, \
              paying principal minus the put loss (0.55 x notional); got {}",
+            value.amount()
+        );
+    }
+
+    /// `KnockInPut.strike_ratio` is a ratio of the initial level, like
+    /// `final_barrier`: on a 200 initial spot a 1.0 strike ratio puts the
+    /// strike at 200. Reference: the term-sheet payoff
+    /// `1 - max(K/S0 - S_T/S0, 0)` evaluated by hand, 1 - (1.0 - 110/200) =
+    /// 0.55; 1e-9 relative covers the two f64 divisions.
+    #[test]
+    fn knock_in_put_strike_is_a_ratio_of_initial_spot() {
+        let notional = 100_000.0;
+        let mut payoff = AutocallablePayoff::new(
+            vec![1.0],
+            vec![2.0],
+            vec![2.0],
+            vec![0.0],
+            false, // memory_coupons
+            0.6,
+            FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
+            1.0,
+            1.2,
+            notional,
+            200.0,
+            vec![1.0],
+        )
+        .expect("test fixture is well-formed");
+
+        let mut state = PathState::new(100, 1.0);
+        state.set(state_keys::SPOT, 110.0);
+        payoff.on_event(&mut state).expect("valid payoff event");
+
+        let value = payoff.value(Currency::USD).expect("valid payoff");
+        let expected = (1.0 - (1.0 - 110.0 / 200.0)) * notional;
+        assert!(
+            (value.amount() - expected).abs() <= 1e-9 * expected,
+            "strike_ratio 1.0 on S0=200 must strike at 200: got {}, expected {expected}",
             value.amount()
         );
     }
@@ -680,7 +716,7 @@ mod tests {
             coupons,
             false,
             0.6, // 60% knock-in barrier => barrier level = 60.0
-            FinalPayoffType::KnockInPut { strike: 100.0 },
+            FinalPayoffType::KnockInPut { strike_ratio: 1.0 },
             1.0,
             1.5,
             100_000.0,

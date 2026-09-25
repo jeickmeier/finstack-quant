@@ -91,7 +91,7 @@
             "null"
           ]
         },
-        "disposition_cost_pct": {
+        "disposition_cost_decimal": {
           "default": null,
           "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
           "format": "double",

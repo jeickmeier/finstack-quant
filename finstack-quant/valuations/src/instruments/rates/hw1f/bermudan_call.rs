@@ -12,7 +12,8 @@ use finstack_quant_core::dates::Date;
 /// # Fields
 ///
 /// - `call_dates`: Sorted ascending dates on which the issuer may call.
-/// - `call_price`: Fraction of notional returned at exercise (1.0 = par).
+/// - `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,
+///   `102.0` = callable at 102).
 /// - `lockout_periods`: Number of initial coupon periods during which
 ///   the call right cannot be exercised.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -26,8 +27,9 @@ pub struct BermudanCallProvision {
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub call_dates: Vec<Date>,
-    /// Call price (fraction of notional, typically 1.0 = par).
-    pub call_price: f64,
+    /// Redemption price in percent of par (`100.0` = par). The pricer pays
+    /// `notional * price_pct_of_par / 100` at exercise.
+    pub price_pct_of_par: f64,
     /// Lockout period in number of coupon periods before first call.
     pub lockout_periods: usize,
 }
@@ -38,12 +40,13 @@ impl BermudanCallProvision {
     /// # Arguments
     ///
     /// * `call_dates` - Dates on which the issuer can call (must be sorted ascending)
-    /// * `call_price` - Call price as fraction of notional (typically 1.0)
+    /// * `price_pct_of_par` - Redemption price in percent of par (`100.0` =
+    ///   par); must be positive
     /// * `lockout_periods` - Number of initial coupon periods before first call
-    pub fn new(call_dates: Vec<Date>, call_price: f64, lockout_periods: usize) -> Self {
+    pub fn new(call_dates: Vec<Date>, price_pct_of_par: f64, lockout_periods: usize) -> Self {
         Self {
             call_dates,
-            call_price,
+            price_pct_of_par,
             lockout_periods,
         }
     }
@@ -63,10 +66,10 @@ impl BermudanCallProvision {
 
         validation::validate_sorted_strict(&self.call_dates, "BermudanCallProvision call_dates")?;
 
-        validation::require_with(self.call_price > 0.0, || {
+        validation::require_with(self.price_pct_of_par > 0.0, || {
             format!(
-                "BermudanCallProvision call_price ({}) must be positive",
-                self.call_price
+                "call_provision.price_pct_of_par ({}) must be a positive percent of par",
+                self.price_pct_of_par
             )
         })?;
 
@@ -106,27 +109,40 @@ mod tests {
 
     #[test]
     fn valid_call_provision() {
-        let prov = BermudanCallProvision::new(make_dates(), 1.0, 1);
+        let prov = BermudanCallProvision::new(make_dates(), 100.0, 1);
         assert!(prov.validate().is_ok());
     }
 
     #[test]
     fn empty_call_dates_fails() {
-        let prov = BermudanCallProvision::new(vec![], 1.0, 0);
+        let prov = BermudanCallProvision::new(vec![], 100.0, 0);
         assert!(prov.validate().is_err());
     }
 
     #[test]
-    fn negative_call_price_fails() {
-        let prov = BermudanCallProvision::new(make_dates(), -0.5, 0);
+    fn negative_price_pct_of_par_fails() {
+        let prov = BermudanCallProvision::new(make_dates(), -50.0, 0);
         assert!(prov.validate().is_err());
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn retired_call_price_key_is_rejected() {
+        let err = serde_json::from_value::<BermudanCallProvision>(serde_json::json!({
+            "call_dates": ["2026-06-30"],
+            "call_price": 1.0,
+            "price_pct_of_par": 100.0,
+            "lockout_periods": 0
+        }))
+        .expect_err("call_price is retired");
+        assert!(err.to_string().contains("call_price"), "{err}");
     }
 
     #[test]
     fn eligible_dates_respect_lockout() {
         let call_dates = make_dates();
         let coupon_dates = make_dates();
-        let prov = BermudanCallProvision::new(call_dates.clone(), 1.0, 1);
+        let prov = BermudanCallProvision::new(call_dates.clone(), 100.0, 1);
         let eligible = prov.eligible_call_dates(&coupon_dates);
         // Lockout 1 means first eligible coupon is index 1 (2027-06-30)
         assert_eq!(eligible.len(), 2);
@@ -135,7 +151,7 @@ mod tests {
 
     #[test]
     fn lockout_exceeds_coupon_dates_returns_empty() {
-        let prov = BermudanCallProvision::new(make_dates(), 1.0, 10);
+        let prov = BermudanCallProvision::new(make_dates(), 100.0, 10);
         let coupon_dates = make_dates();
         assert!(prov.eligible_call_dates(&coupon_dates).is_empty());
     }

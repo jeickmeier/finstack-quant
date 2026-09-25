@@ -24,7 +24,7 @@ pub struct FxVegaCalculator;
 
 impl MetricCalculator for FxVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let bump = sens_config::resolve(context)?.vol_bump_pct;
+        let bump = sens_config::resolve(context)?.vol_bump_decimal;
         let option: &QuantoOption = context.instrument_as()?;
         let as_of = context.as_of;
 

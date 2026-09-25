@@ -610,7 +610,9 @@ impl AgencyCmo {
                 let defaults = crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry()?
                     .cmo_collateral_defaults();
                 let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
-                let pass_through = wac - defaults.servicing_fee_rate - defaults.guarantee_fee_rate;
+                let pass_through = wac
+                    - defaults.servicing_fee_bp / 10_000.0
+                    - defaults.guarantee_fee_bp / 10_000.0;
                 (pass_through, cmo.waterfall.total_current_face()?.amount())
             }
         };

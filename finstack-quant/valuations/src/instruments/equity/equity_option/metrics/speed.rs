@@ -35,7 +35,7 @@ impl MetricCalculator for SpeedCalculator {
             option.notional.currency(),
         )?;
 
-        let bump_pct = super::spot_bump_pct(context, option, current_spot)?;
+        let bump_pct = super::spot_bump_decimal(context, option, current_spot)?;
         let spot_bump = current_spot * bump_pct;
 
         let curves_up_up = bump_scalar_price(&context.curves, &option.spot_id, 2.0 * bump_pct)?;

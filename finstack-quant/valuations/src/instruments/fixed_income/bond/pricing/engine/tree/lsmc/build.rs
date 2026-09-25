@@ -239,11 +239,14 @@ pub(super) fn coupon_fractions(coupon_type: CouponType) -> Result<(f64, f64)> {
     let (cash, pik) = match coupon_type {
         CouponType::Cash => (1.0, 0.0),
         CouponType::Pik => (0.0, 1.0),
-        CouponType::Split { cash_pct, pik_pct } => (
-            cash_pct.to_f64().ok_or_else(|| {
+        CouponType::Split {
+            cash_fraction,
+            pik_fraction,
+        } => (
+            cash_fraction.to_f64().ok_or_else(|| {
                 Error::Validation("floating cash fraction cannot be represented as f64".to_string())
             })?,
-            pik_pct.to_f64().ok_or_else(|| {
+            pik_fraction.to_f64().ok_or_else(|| {
                 Error::Validation("floating PIK fraction cannot be represented as f64".to_string())
             })?,
         ),

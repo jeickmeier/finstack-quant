@@ -44,7 +44,7 @@ use time::macros::date;
 /// Final payoff type for autocallable products.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum FinalPayoffType {
     /// Capital protection: max(floor, participation * min(S_T/S_0, cap))
     CapitalProtection {
@@ -58,8 +58,10 @@ pub enum FinalPayoffType {
     },
     /// Knock-in put: Put option if barrier breached, otherwise return principal
     KnockInPut {
-        /// Strike price for knock-in put option
-        strike: f64,
+        /// Put strike as a ratio of the initial level (`1.0` = 100%, the same
+        /// units as `final_barrier`); the put loss is
+        /// `max(strike_ratio - S_T / S_0, 0)`.
+        strike_ratio: f64,
     },
 }
 
@@ -498,10 +500,10 @@ impl Autocallable {
                     )));
                 }
             }
-            FinalPayoffType::KnockInPut { strike } => {
-                if !strike.is_finite() || strike <= 0.0 {
+            FinalPayoffType::KnockInPut { strike_ratio } => {
+                if !strike_ratio.is_finite() || strike_ratio <= 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "Autocallable knock-in put strike = {strike} must be finite and positive"
+                        "final_payoff_type.knock_in_put.strike_ratio = {strike_ratio} must be finite and positive"
                     )));
                 }
             }
@@ -700,6 +702,16 @@ mod validation_tests {
     }
 
     #[test]
+    // schema-rejection-test
+    fn retired_knock_in_put_strike_key_is_rejected() {
+        let err = serde_json::from_value::<FinalPayoffType>(serde_json::json!({
+            "knock_in_put": {"strike": 100.0, "strike_ratio": 1.0}
+        }))
+        .expect_err("strike is retired");
+        assert!(err.to_string().contains("strike"), "{err}");
+    }
+
+    #[test]
     fn builder_rejects_invalid_nested_final_payoff_parameters() {
         assert!(base_builder()
             .final_payoff_type(FinalPayoffType::CapitalProtection { floor: -0.1 })
@@ -710,7 +722,7 @@ mod validation_tests {
             .build()
             .is_err());
         assert!(base_builder()
-            .final_payoff_type(FinalPayoffType::KnockInPut { strike: 0.0 })
+            .final_payoff_type(FinalPayoffType::KnockInPut { strike_ratio: 0.0 })
             .build()
             .is_err());
     }

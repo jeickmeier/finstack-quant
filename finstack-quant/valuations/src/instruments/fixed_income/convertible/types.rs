@@ -1006,7 +1006,7 @@ impl ConvertibleBond {
     /// * `as_of` - Valuation date and origin of the ACT/365F equity model clock.
     ///
     /// Bump sizes come from `metric_pricing_overrides.bump_config`
-    /// (`spot_bump_pct`, `vol_bump_pct`, `rate_bump_bp`), defaulting to 1%,
+    /// (`spot_bump_decimal`, `vol_bump_decimal`, `rate_bump_bp`), defaulting to 1%,
     /// 1 vol point and 1bp. Vega is per volatility point and rho per bp.
     pub fn greeks(
         &self,

@@ -207,11 +207,11 @@ fn shifting_interest(deal: &mut StructuredCredit) {
             vec![
                 ShiftingInterestStep {
                     months_from_closing: 0,
-                    senior_pct: 1.0,
+                    senior_decimal: 1.0,
                 },
                 ShiftingInterestStep {
                     months_from_closing: 12,
-                    senior_pct: 0.5,
+                    senior_decimal: 0.5,
                 },
             ],
         )),
@@ -310,8 +310,8 @@ fn afc_binding(deal: &mut StructuredCredit) {
 fn target_oc(deal: &mut StructuredCredit) {
     deal.waterfall_rules = Some(WaterfallRules {
         target_oc: Some(TargetOcSpec {
-            pct_of_current: 0.12,
-            floor_pct_of_original: 0.015,
+            fraction_of_current: 0.12,
+            floor_fraction_of_original: 0.015,
         }),
         ..Default::default()
     });
@@ -385,7 +385,7 @@ fn card_with_seller(deal: &mut StructuredCredit) {
     deal.credit_model.card = Some(
         CardPortfolioSpec::new(0.15, 0.18, 0.05)
             .with_seller_interest(usd(20_000_000.0))
-            .with_fixed_allocation_pct(0.9),
+            .with_fixed_allocation_decimal(0.9),
     );
 }
 
@@ -688,7 +688,7 @@ fn knobs() -> Vec<Knob> {
             change: |d| {
                 fees(d).incentive_fee = Some(IncentiveFeeSpec {
                     hurdle_irr: 0.0,
-                    share_pct: 0.5,
+                    share: 0.5,
                 })
             },
         },
@@ -711,13 +711,13 @@ fn knobs() -> Vec<Knob> {
             // The clean-up factor is current / ORIGINAL: doubling the stated
             // original balance halves the factor and moves the call.
             name: "pool.original_balance",
-            common: |d| d.cleanup_call_pct = Some(0.6),
+            common: |d| d.cleanup_call_decimal = Some(0.6),
             change: |d| d.pool.original_balance = Some(usd(200_000_000.0)),
         },
         Knob {
-            name: "cleanup_call_pct",
+            name: "cleanup_call_decimal",
             common: none,
-            change: |d| d.cleanup_call_pct = Some(0.6),
+            change: |d| d.cleanup_call_decimal = Some(0.6),
         },
         Knob {
             name: "loss_allocation",
@@ -761,14 +761,14 @@ fn knobs() -> Vec<Knob> {
             change: target_oc,
         },
         Knob {
-            name: "waterfall_rules.target_oc.pct_of_current",
+            name: "waterfall_rules.target_oc.fraction_of_current",
             common: target_oc,
-            change: |d| target_oc_spec(d).pct_of_current = 0.25,
+            change: |d| target_oc_spec(d).fraction_of_current = 0.25,
         },
         Knob {
-            name: "waterfall_rules.target_oc.floor_pct_of_original",
+            name: "waterfall_rules.target_oc.floor_fraction_of_original",
             common: target_oc,
-            change: |d| target_oc_spec(d).floor_pct_of_original = 0.5,
+            change: |d| target_oc_spec(d).floor_fraction_of_original = 0.5,
         },
         Knob {
             name: "waterfall_rules.reserve",
@@ -785,7 +785,7 @@ fn knobs() -> Vec<Knob> {
         Knob {
             name: "waterfall_rules.reserve.target",
             common: reserve_rules,
-            change: |d| reserve_spec(d).target = ReserveTarget::PctOfCurrent(0.05),
+            change: |d| reserve_spec(d).target = ReserveTarget::FractionOfCurrent(0.05),
         },
         Knob {
             name: "waterfall_rules.reserve.replenish",
@@ -856,14 +856,14 @@ fn knobs() -> Vec<Knob> {
             },
         },
         Knob {
-            name: "credit_model.card.fixed_allocation_pct",
+            name: "credit_model.card.fixed_allocation_decimal",
             common: card_with_seller,
             change: |d| {
                 d.credit_model
                     .card
                     .as_mut()
                     .expect("card")
-                    .fixed_allocation_pct = Some(0.7)
+                    .fixed_allocation_decimal = Some(0.7)
             },
         },
         Knob {
@@ -892,7 +892,7 @@ fn knobs() -> Vec<Knob> {
         },
         Knob {
             name: "liquidation_price_pct",
-            common: |d| d.cleanup_call_pct = Some(0.6),
+            common: |d| d.cleanup_call_decimal = Some(0.6),
             change: |d| d.liquidation_price_pct = Some(80.0),
         },
         // --- AssetPool ----------------------------------------------------

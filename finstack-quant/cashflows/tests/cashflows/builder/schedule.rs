@@ -317,8 +317,8 @@ fn ordering_invariants_within_date() {
     let init = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Split {
-            cash_pct: Decimal::try_from(0.5).expect("valid"),
-            pik_pct: Decimal::try_from(0.5).expect("valid"),
+            cash_fraction: Decimal::try_from(0.5).expect("valid"),
+            pik_fraction: Decimal::try_from(0.5).expect("valid"),
         },
         rate: Decimal::try_from(0.10).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
@@ -570,8 +570,8 @@ fn outstanding_by_date_dedup_and_values() {
 
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Split {
-            cash_pct: Decimal::try_from(0.5).expect("valid"),
-            pik_pct: Decimal::try_from(0.5).expect("valid"),
+            cash_fraction: Decimal::try_from(0.5).expect("valid"),
+            pik_fraction: Decimal::try_from(0.5).expect("valid"),
         },
         rate: Decimal::try_from(0.12).expect("valid"),
         schedule: finstack_quant_cashflows::builder::ScheduleParams {
@@ -1707,4 +1707,19 @@ fn principal_exchange_none_keeps_amortization_flows() {
             .all(|cf| cf.kind != CFKind::Notional),
         "opt-out must not add a residual notional balloon"
     );
+}
+
+#[test]
+// schema-rejection-test
+fn retired_split_cash_pct_pik_pct_keys_are_rejected() {
+    let err = serde_json::from_value::<CouponType>(serde_json::json!({
+        "split": {"cash_pct": "0.5", "pik_pct": "0.5"}
+    }))
+    .expect_err("cash_pct/pik_pct are retired");
+    assert!(err.to_string().contains("cash_pct"), "{err}");
+    let split: CouponType = serde_json::from_value(serde_json::json!({
+        "split": {"cash_fraction": "0.5", "pik_fraction": "0.5"}
+    }))
+    .expect("canonical split keys parse");
+    assert!(matches!(split, CouponType::Split { .. }));
 }

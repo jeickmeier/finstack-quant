@@ -249,7 +249,7 @@ fn test_ddtl_draws_within_commitment_accepted() {
 // Negative OID percentage validation (n3)
 
 #[test]
-fn test_negative_oid_pct_rejected() {
+fn test_negative_oid_bp_rejected() {
     let result = build_ddtl_loan(DdtlSpec {
         commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
@@ -259,17 +259,17 @@ fn test_negative_oid_pct_rejected() {
         usage_fee_bp: 0.0,
         commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
-        oid_policy: Some(OidPolicy::WithheldPct(-100)),
+        oid_policy: Some(OidPolicy::WithheldBp(-100)),
     });
-    let err = result.expect_err("negative OID percentage should be rejected");
+    let err = result.expect_err("negative OID basis points should be rejected");
     assert!(
-        err.to_string().contains("OID percentage"),
+        err.to_string().contains("ddtl.oid_policy"),
         "unexpected error: {err}"
     );
 }
 
 #[test]
-fn test_zero_oid_pct_accepted() {
+fn test_zero_oid_bp_accepted() {
     let result = build_ddtl_loan(DdtlSpec {
         commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
@@ -279,9 +279,9 @@ fn test_zero_oid_pct_accepted() {
         usage_fee_bp: 0.0,
         commitment_fee_bp: 0.0,
         fee_base: CommitmentFeeBase::Undrawn,
-        oid_policy: Some(OidPolicy::WithheldPct(0)),
+        oid_policy: Some(OidPolicy::WithheldBp(0)),
     });
-    assert!(result.is_ok(), "zero OID percentage should be valid");
+    assert!(result.is_ok(), "zero OID basis points should be valid");
 }
 
 #[test]

@@ -11,7 +11,8 @@ use super::schedule::ScheduleParams;
 ///
 /// - `Cash`: 100% paid in cash.
 /// - `PIK`: 100% capitalized into principal.
-/// - `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.
+/// - `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of
+///   the coupon amount paid in cash and capitalized.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -33,7 +34,7 @@ pub enum CouponType {
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DecimalWire")
         )]
-        cash_pct: Decimal,
+        cash_fraction: Decimal,
         /// Fraction of the coupon capitalized as PIK, expressed as a decimal
         /// share in `[0, 1]`.
         #[serde(with = "finstack_quant_core::wire::decimal")]
@@ -41,7 +42,7 @@ pub enum CouponType {
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DecimalWire")
         )]
-        pik_pct: Decimal,
+        pik_fraction: Decimal,
     },
 }
 
@@ -51,15 +52,18 @@ impl CouponType {
         match self {
             CouponType::Cash => Ok((Decimal::ONE, Decimal::ZERO)),
             CouponType::Pik => Ok((Decimal::ZERO, Decimal::ONE)),
-            CouponType::Split { cash_pct, pik_pct } => {
-                if cash_pct < Decimal::ZERO
-                    || cash_pct > Decimal::ONE
-                    || pik_pct < Decimal::ZERO
-                    || pik_pct > Decimal::ONE
+            CouponType::Split {
+                cash_fraction,
+                pik_fraction,
+            } => {
+                if cash_fraction < Decimal::ZERO
+                    || cash_fraction > Decimal::ONE
+                    || pik_fraction < Decimal::ZERO
+                    || pik_fraction > Decimal::ONE
                 {
                     return Err(InputError::Invalid.into());
                 }
-                let sum = cash_pct + pik_pct;
+                let sum = cash_fraction + pik_fraction;
                 let tol = Decimal::new(1, 9); // 1e-9
                 let diff = if sum >= Decimal::ONE {
                     sum - Decimal::ONE
@@ -67,7 +71,7 @@ impl CouponType {
                     Decimal::ONE - sum
                 };
                 if diff <= tol {
-                    Ok((cash_pct, pik_pct))
+                    Ok((cash_fraction, pik_fraction))
                 } else {
                     Err(InputError::Invalid.into())
                 }

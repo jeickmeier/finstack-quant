@@ -88,7 +88,7 @@ pub struct Snowball {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vol_surface_id: Option<CurveId>,
     /// Optional Bermudan call provision.
-    pub callable: Option<BermudanCallProvision>,
+    pub call_provision: Option<BermudanCallProvision>,
     /// Day count convention.
     pub day_count: DayCount,
     /// Instrument-owned pricing inputs.
@@ -171,7 +171,7 @@ impl Snowball {
             })?;
         }
 
-        if let Some(ref call) = self.callable {
+        if let Some(ref call) = self.call_provision {
             call.validate()?;
         }
 
@@ -207,7 +207,7 @@ impl Snowball {
             floating_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
-            callable: None,
+            call_provision: None,
             day_count: DayCount::Act360,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -243,7 +243,7 @@ impl Snowball {
             floating_tenor: Tenor::quarterly(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
-            callable: None,
+            call_provision: None,
             day_count: DayCount::Act360,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -357,6 +357,17 @@ mod tests {
     fn example_snowball_validates() {
         let s = Snowball::example_snowball();
         assert!(s.validate().is_ok());
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn retired_callable_key_is_rejected() {
+        let mut json = serde_json::to_value(Snowball::example_snowball()).expect("json");
+        let obj = json.as_object_mut().expect("object");
+        let provision = obj.remove("call_provision").expect("call_provision");
+        obj.insert("callable".to_string(), provision);
+        let err = serde_json::from_value::<Snowball>(json).expect_err("callable is retired");
+        assert!(err.to_string().contains("callable"), "{err}");
     }
 
     #[test]

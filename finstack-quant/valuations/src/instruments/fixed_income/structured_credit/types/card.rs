@@ -55,7 +55,7 @@ pub struct CardPortfolioSpec {
     /// allocation at the investor's floating share
     /// `investor_interest / (investor_interest + seller_interest)`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fixed_allocation_pct: Option<f64>,
+    pub fixed_allocation_decimal: Option<f64>,
 }
 
 impl CardPortfolioSpec {
@@ -78,7 +78,7 @@ impl CardPortfolioSpec {
             portfolio_yield,
             charge_off_rate,
             seller_interest: None,
-            fixed_allocation_pct: None,
+            fixed_allocation_decimal: None,
         }
     }
 
@@ -97,10 +97,10 @@ impl CardPortfolioSpec {
     ///
     /// # Arguments
     ///
-    /// * `fixed_allocation_pct` - Investor share of trust collections as a
+    /// * `fixed_allocation_decimal` - Investor share of trust collections as a
     ///   decimal in `(0, 1]`, replacing the floating share at the freeze.
-    pub fn with_fixed_allocation_pct(mut self, fixed_allocation_pct: f64) -> Self {
-        self.fixed_allocation_pct = Some(fixed_allocation_pct);
+    pub fn with_fixed_allocation_decimal(mut self, fixed_allocation_decimal: f64) -> Self {
+        self.fixed_allocation_decimal = Some(fixed_allocation_decimal);
         self
     }
 
@@ -142,7 +142,7 @@ impl CardPortfolioSpec {
             return Ok(balances.to_vec());
         }
         let trust = investor + seller;
-        let allocation = self.fixed_allocation_pct.unwrap_or(investor / trust);
+        let allocation = self.fixed_allocation_decimal.unwrap_or(investor / trust);
         // Each line's share of the level trust receivables times the fixed allocation.
         Ok(balances
             .iter()
@@ -185,10 +185,10 @@ impl CardPortfolioSpec {
                 )));
             }
         }
-        if let Some(pct) = self.fixed_allocation_pct {
+        if let Some(pct) = self.fixed_allocation_decimal {
             if !pct.is_finite() || pct <= 0.0 || pct > 1.0 {
                 return Err(invalid(format!(
-                    "card fixed_allocation_pct ({pct}) must be a decimal in (0, 1]"
+                    "card fixed_allocation_decimal ({pct}) must be a decimal in (0, 1]"
                 )));
             }
         }

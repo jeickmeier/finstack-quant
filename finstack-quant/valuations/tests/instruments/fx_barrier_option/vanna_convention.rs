@@ -94,22 +94,22 @@ fn vanna_is_reported_per_vol_point() -> finstack_quant_core::Result<()> {
         .copied()
         .expect("Volga in measures");
 
-    let spot_bump_pct = 0.01;
+    let spot_bump_decimal = 0.01;
     let vol_bump_abs = 0.01;
 
     let delta_at = |vol_bump: f64| -> finstack_quant_core::Result<f64> {
         let vol_market = bump_surface_vol_absolute(&market, "EURUSD-VOL", vol_bump)?;
         let up = vol_market.clone().insert_price(
             "EURUSD-SPOT",
-            MarketScalar::Unitless(spot * (1.0 + spot_bump_pct)),
+            MarketScalar::Unitless(spot * (1.0 + spot_bump_decimal)),
         );
         let dn = vol_market.insert_price(
             "EURUSD-SPOT",
-            MarketScalar::Unitless(spot * (1.0 - spot_bump_pct)),
+            MarketScalar::Unitless(spot * (1.0 - spot_bump_decimal)),
         );
         let pv_up = option.value(&up, as_of)?.amount();
         let pv_dn = option.value(&dn, as_of)?.amount();
-        Ok((pv_up - pv_dn) / (2.0 * spot * spot_bump_pct))
+        Ok((pv_up - pv_dn) / (2.0 * spot * spot_bump_decimal))
     };
 
     let delta_up = delta_at(vol_bump_abs)?;

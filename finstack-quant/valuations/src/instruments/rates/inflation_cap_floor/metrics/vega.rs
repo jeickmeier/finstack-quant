@@ -31,7 +31,7 @@ pub(crate) struct VegaCalculator;
 
 impl MetricCalculator for VegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
+        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
         let option: &InflationCapFloor = context.instrument_as()?;
         let as_of = context.as_of;
 

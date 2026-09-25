@@ -302,10 +302,10 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
     let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
     let wam = cmo.collateral_wam.unwrap_or(defaults.wam_months);
 
-    // Standard fee assumptions
-    let servicing_fee = defaults.servicing_fee_rate;
-    let guarantee_fee = defaults.guarantee_fee_rate;
-    let pass_through = wac - servicing_fee - guarantee_fee;
+    // Standard fee assumptions (annual bp).
+    let servicing_fee = defaults.servicing_fee_bp;
+    let guarantee_fee = defaults.guarantee_fee_bp;
+    let pass_through = wac - servicing_fee / 10_000.0 - guarantee_fee / 10_000.0;
 
     let maturity = as_of.add_months(wam as i32);
 
@@ -319,8 +319,8 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
         .current_factor(total_face.amount() / original_face.amount())
         .wac(wac)
         .pass_through_rate(pass_through)
-        .servicing_fee_rate(servicing_fee)
-        .guarantee_fee_rate(guarantee_fee)
+        .servicing_fee_bp(servicing_fee)
+        .guarantee_fee_bp(guarantee_fee)
         .wam(wam)
         .issue_date(cmo.issue_date)
         .maturity(maturity)

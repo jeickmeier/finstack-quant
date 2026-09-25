@@ -471,7 +471,7 @@ pub struct ReinvestmentAssumptions {
     /// points when `index_id` is `None`).
     pub spread_bp: f64,
     /// Purchase price as percent of par (`99.0` buys `100/99` of par per unit
-    /// of cash); must not exceed `ReinvestmentCriteria::max_price`.
+    /// of cash); must not exceed `ReinvestmentCriteria::max_price_pct`.
     pub price_pct: f64,
     /// Months from the purchase date to the bullet maturity.
     pub maturity_months: u32,
@@ -488,8 +488,8 @@ pub struct ReinvestmentAssumptions {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ReinvestmentCriteria {
-    /// Maximum purchase price (% of par)
-    pub max_price: f64,
+    /// Maximum purchase price in percent of par (`100.0` = par).
+    pub max_price_pct: f64,
     /// Minimum annual decimal current yield: replacement coupon divided by
     /// purchase-price fraction. Surviving assets below it are skipped when
     /// the pool is replicated pro rata; a synthetic purchase below it is not
@@ -500,7 +500,7 @@ pub struct ReinvestmentCriteria {
 impl Default for ReinvestmentCriteria {
     fn default() -> Self {
         Self {
-            max_price: 100.0, // 100% of par
+            max_price_pct: 100.0, // 100% of par
             min_yield: 0.0,
         }
     }

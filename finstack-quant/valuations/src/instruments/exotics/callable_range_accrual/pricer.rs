@@ -548,7 +548,8 @@ fn build_schedule(
             continue;
         }
         exercise_times.push(t);
-        call_prices.push(inst.call_provision.call_price);
+        // Percent of par on the wire, fraction of notional in the payoff.
+        call_prices.push(inst.call_provision.price_pct_of_par / 100.0);
     }
 
     let future_observations = events.iter().filter(|event| event.is_observation).count();
@@ -653,7 +654,7 @@ mod tests {
                 .total_past_observations_opt(None)
                 .build()
                 .expect("range accrual"),
-            call_provision: BermudanCallProvision::new(call_dates, 1.0, lockout_periods),
+            call_provision: BermudanCallProvision::new(call_dates, 100.0, lockout_periods),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -758,6 +759,43 @@ mod tests {
             "pv={}",
             estimate.mean.amount()
         );
+    }
+
+    /// `BermudanCallProvision.price_pct_of_par` is a percent of par; the pricer
+    /// converts it once (`/ 100`) to the fraction of notional it used before
+    /// the rename. `102.0 / 100.0` is the correctly rounded `1.02`, so the PV
+    /// is pinned bit-for-bit to the value captured with the retired
+    /// fraction-of-notional `call_price = 1.02`.
+    #[test]
+    fn bermudan_call_pct_of_par_is_pv_bit_identical() {
+        let as_of = date(2025, Month::January, 1);
+        let curves = market(as_of, 0.02, 0.03);
+        let mut inst = test_callable(vec![date(2025, Month::July, 1)], 0, 0.06);
+        inst.call_provision.price_pct_of_par = 102.0;
+        let pricer = || {
+            CallableRangeAccrualPricer::with_hw_params(
+                HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw params"),
+            )
+        };
+        let pv = pricer()
+            .price_estimate(&inst, &curves, as_of)
+            .expect("price")
+            .mean
+            .amount();
+        let at_par = pricer()
+            .price_estimate(
+                &test_callable(vec![date(2025, Month::July, 1)], 0, 0.06),
+                &curves,
+                as_of,
+            )
+            .expect("par price")
+            .mean
+            .amount();
+        assert!(
+            (pv - at_par).abs() > 1e-6,
+            "call price must be live: {pv} vs {at_par}"
+        );
+        assert_eq!(pv.to_bits(), 0x412e92d0779f3e97_u64, "pv={pv}");
     }
 
     #[test]

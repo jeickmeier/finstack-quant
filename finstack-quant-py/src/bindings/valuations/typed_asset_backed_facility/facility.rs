@@ -1294,8 +1294,8 @@ impl PyAssetBackedFacilityBuilder {
     /// ----------
     /// value : list[dict] | str
     ///     ``AmortizationEvent`` objects: ``{"kind": "date", "date": ...}``,
-    ///     ``{"kind": "cumulative_loss", "max_pct": ...}`` or
-    ///     ``{"kind": "excess_spread", "min_3m": ...}``.
+    ///     ``{"kind": "cumulative_loss", "max_cumulative_loss": ...}`` or
+    ///     ``{"kind": "excess_spread", "min_excess_spread_3m": ...}``.
     ///
     /// Returns
     /// -------

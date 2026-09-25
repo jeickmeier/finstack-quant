@@ -258,8 +258,8 @@ pub enum PoolType {
 ///     .current_factor(0.95)
 ///     .wac(0.045)
 ///     .pass_through_rate(0.04)
-///     .servicing_fee_rate(0.0025)
-///     .guarantee_fee_rate(0.0025)
+///     .servicing_fee_bp(25.0)
+///     .guarantee_fee_bp(25.0)
 ///     .wam(348)
 ///     .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())
 ///     .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())
@@ -300,18 +300,18 @@ pub struct AgencyMbsPassthrough {
     pub wac: f64,
     /// Pass-through rate (net coupon to investor).
     pub pass_through_rate: f64,
-    /// Servicing fee rate (annual, as decimal e.g., 0.0025 for 25 bp).
+    /// Annual servicing fee in basis points (`25.0` = 0.25%).
     ///
     /// Defaults to `0.0` when omitted.
     #[builder(default)]
     #[serde(default)]
-    pub servicing_fee_rate: f64,
-    /// Guarantee fee rate (annual, as decimal e.g., 0.0025 for 25 bp).
+    pub servicing_fee_bp: f64,
+    /// Annual agency guarantee fee (g-fee) in basis points (`25.0` = 0.25%).
     ///
     /// Defaults to `0.0` when omitted.
     #[builder(default)]
     #[serde(default)]
-    pub guarantee_fee_rate: f64,
+    pub guarantee_fee_bp: f64,
     /// Remaining weighted average maturity in months as of the valuation
     /// date (current WAM, not the original term). Pool age (WALA) for
     /// seasoning ramps is derived separately from `issue_date`.
@@ -401,8 +401,8 @@ impl AgencyMbsPassthrough {
             .current_factor(0.95)
             .wac(0.045)
             .pass_through_rate(0.04)
-            .servicing_fee_rate(0.0025)
-            .guarantee_fee_rate(0.0025)
+            .servicing_fee_bp(25.0)
+            .guarantee_fee_bp(25.0)
             .wam(348)
             .issue_date(date!(2022 - 01 - 01))
             .last_paid_accrual_end_opt(None)
@@ -504,9 +504,10 @@ impl AgencyMbsPassthrough {
 
     /// Calculate net coupon (pass-through rate) from WAC and fees.
     ///
-    /// Should equal: WAC - servicing_fee_rate - guarantee_fee_rate
+    /// Should equal: `wac - (servicing_fee_bp + guarantee_fee_bp) / 10_000`
+    /// (decimal).
     pub fn calculated_net_coupon(&self) -> f64 {
-        self.wac - self.servicing_fee_rate - self.guarantee_fee_rate
+        self.wac - self.servicing_fee_bp / 10_000.0 - self.guarantee_fee_bp / 10_000.0
     }
 
     /// Validate that pass-through rate is consistent with WAC and fees.
@@ -515,11 +516,11 @@ impl AgencyMbsPassthrough {
         let diff = (self.pass_through_rate - calculated).abs();
         if diff > 1e-6 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Pass-through rate {} does not match WAC {} - servicing {} - g-fee {} = {}",
+                "pass_through_rate {} does not match wac {} - servicing_fee_bp {} - guarantee_fee_bp {} (bp) = {}",
                 self.pass_through_rate,
                 self.wac,
-                self.servicing_fee_rate,
-                self.guarantee_fee_rate,
+                self.servicing_fee_bp,
+                self.guarantee_fee_bp,
                 calculated
             )));
         }
@@ -818,6 +819,36 @@ mod tests {
     }
 
     #[test]
+    // schema-rejection-test
+    fn retired_servicing_fee_rate_key_is_rejected() {
+        for retired in ["servicing_fee_rate", "guarantee_fee_rate"] {
+            let mut value = serde_json::to_value(
+                AgencyMbsPassthrough::example().expect("AgencyMbsPassthrough example is valid"),
+            )
+            .expect("serialize");
+            value
+                .as_object_mut()
+                .expect("object")
+                .insert(retired.to_string(), serde_json::json!(0.0025));
+            let err =
+                serde_json::from_value::<AgencyMbsPassthrough>(value).expect_err("retired fee key");
+            assert!(err.to_string().contains(retired), "{err}");
+        }
+    }
+
+    /// Fees are annual bp; the coupon identity converts them once, so 25 bp
+    /// fees reproduce the retired decimal `0.0025` bit-for-bit.
+    #[test]
+    fn fee_bp_coupon_identity_matches_retired_decimal() {
+        let mbs = AgencyMbsPassthrough::example().expect("AgencyMbsPassthrough example is valid");
+        assert_eq!(mbs.servicing_fee_bp, 25.0);
+        assert_eq!(
+            mbs.calculated_net_coupon().to_bits(),
+            (mbs.wac - 0.0025 - 0.0025).to_bits()
+        );
+    }
+
+    #[test]
     fn test_serde_defaults_fee_rates_to_zero_when_omitted() {
         let mut value = serde_json::to_value(
             AgencyMbsPassthrough::example().expect("AgencyMbsPassthrough example is valid"),
@@ -826,12 +857,12 @@ mod tests {
         let obj = value
             .as_object_mut()
             .expect("AgencyMbsPassthrough should serialize to an object");
-        obj.remove("servicing_fee_rate");
-        obj.remove("guarantee_fee_rate");
+        obj.remove("servicing_fee_bp");
+        obj.remove("guarantee_fee_bp");
 
         let mbs: AgencyMbsPassthrough = serde_json::from_value(value).expect("deserialize");
-        assert_eq!(mbs.servicing_fee_rate, 0.0);
-        assert_eq!(mbs.guarantee_fee_rate, 0.0);
+        assert_eq!(mbs.servicing_fee_bp, 0.0);
+        assert_eq!(mbs.guarantee_fee_bp, 0.0);
     }
 }
 

@@ -89,7 +89,7 @@ cashflow helpers used by `LeveredRealEstateEquity`.
   - otherwise → exit cap: `TV = NOI_{N+1} / terminal_cap_rate`, with
     `NOI_{N+1} = NOI_N · (1 + terminal_growth_rate)`. Growth is validated into
     `[-100%, 20%]`.
-  - `disposition_cost_pct` (validated into `[0, 1)`) scales gross proceeds by
+  - `disposition_cost_decimal` (validated into `[0, 1)`) scales gross proceeds by
     `(1 − c)`; `disposition_costs` are dollar line items subtracted afterwards.
 - **CapEx**: `capex_schedule` values are treated as **positive outflows** and
   valued as `NOI − CapEx`.
@@ -104,7 +104,7 @@ cashflow helpers used by `LeveredRealEstateEquity`.
 | DCF | `discount_rate` (required), `terminal_cap_rate`, `terminal_growth_rate` |
 | Direct cap | `cap_rate` (required), `stabilized_noi` |
 | Sale modeling | `sale_date`, `sale_price` |
-| Transaction | `purchase_price`, `acquisition_cost` (scalar) and/or `acquisition_costs` (line items), `disposition_cost_pct` and/or `disposition_costs` |
+| Transaction | `purchase_price`, `acquisition_cost` (scalar) and/or `acquisition_costs` (line items), `disposition_cost_decimal` and/or `disposition_costs` |
 | Cashflow realism | `capex_schedule` |
 | Override | `appraisal_value` |
 

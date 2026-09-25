@@ -371,13 +371,13 @@ pub struct BumpConfig {
     /// Sizes every finite-difference spot greek (delta, gamma, vanna, charm,
     /// speed, color, FX delta). When set it also replaces the adaptive spot
     /// bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
-    pub spot_bump_pct: Option<f64>,
+    pub spot_bump_decimal: Option<f64>,
     /// Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
     ///
     /// Sizes every finite-difference volatility greek (vega, vanna, volga, FX
     /// vega). `None` uses the `valuations.sensitivities.v1` value (default
     /// 1 vol point). Results stay reported per 1 vol point.
-    pub vol_bump_pct: Option<f64>,
+    pub vol_bump_decimal: Option<f64>,
     /// Parallel rate bump in basis points (1.0 = 1bp).
     ///
     /// Sizes DV01, rho, foreign rho and forward PV01. Results stay reported per
@@ -410,8 +410,8 @@ impl BumpConfig {
         // Every bump size must be finite and non-negative.
         check_finite_fields(&[
             (self.ytm_bump_bp, true),
-            (self.spot_bump_pct, true),
-            (self.vol_bump_pct, true),
+            (self.spot_bump_decimal, true),
+            (self.vol_bump_decimal, true),
             (self.rate_bump_bp, true),
             (self.credit_spread_bump_bp, true),
         ])
@@ -1183,8 +1183,8 @@ impl MetricPricingOverrides {
             bump_config:
                 BumpConfig {
                     ytm_bump_bp,
-                    spot_bump_pct,
-                    vol_bump_pct,
+                    spot_bump_decimal,
+                    vol_bump_decimal,
                     rate_bump_bp,
                     credit_spread_bump_bp,
                     adaptive_bumps,
@@ -1197,8 +1197,8 @@ impl MetricPricingOverrides {
         } = defaults;
         let bump = &mut self.bump_config;
         bump.ytm_bump_bp = bump.ytm_bump_bp.or(*ytm_bump_bp);
-        bump.spot_bump_pct = bump.spot_bump_pct.or(*spot_bump_pct);
-        bump.vol_bump_pct = bump.vol_bump_pct.or(*vol_bump_pct);
+        bump.spot_bump_decimal = bump.spot_bump_decimal.or(*spot_bump_decimal);
+        bump.vol_bump_decimal = bump.vol_bump_decimal.or(*vol_bump_decimal);
         bump.rate_bump_bp = bump.rate_bump_bp.or(*rate_bump_bp);
         bump.credit_spread_bump_bp = bump.credit_spread_bump_bp.or(*credit_spread_bump_bp);
         bump.adaptive_bumps |= *adaptive_bumps;
@@ -1224,15 +1224,15 @@ impl MetricPricingOverrides {
         self.bond_risk_basis.unwrap_or_default()
     }
 
-    /// Set custom spot bump size (as percentage, e.g., 0.01 for 1%).
-    pub fn with_spot_bump(mut self, bump_pct: f64) -> Self {
-        self.bump_config.spot_bump_pct = Some(bump_pct);
+    /// Set custom spot bump size (decimal fraction of spot, e.g., 0.01 for 1%).
+    pub fn with_spot_bump(mut self, bump: f64) -> Self {
+        self.bump_config.spot_bump_decimal = Some(bump);
         self
     }
 
     /// Set custom volatility bump size (as absolute vol, e.g., 0.01 for 1% vol).
-    pub fn with_vol_bump(mut self, bump_pct: f64) -> Self {
-        self.bump_config.vol_bump_pct = Some(bump_pct);
+    pub fn with_vol_bump(mut self, bump: f64) -> Self {
+        self.bump_config.vol_bump_decimal = Some(bump);
         self
     }
 
@@ -1312,11 +1312,13 @@ impl MetricPricingOverrides {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct ScenarioPricingOverrides {
-    /// Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+    /// Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+    /// shock).
     ///
-    /// When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+    /// When set, valuation helpers apply it as a multiplier:
+    /// `price * (1 + scenario_price_shock_decimal)`.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub scenario_price_shock_pct: Option<f64>,
+    pub scenario_price_shock_decimal: Option<f64>,
 
     /// Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
     ///
@@ -1340,9 +1342,13 @@ impl ScenarioPricingOverrides {
         self == &Self::default()
     }
 
-    /// Apply a scenario price shock as a decimal percentage.
-    pub fn with_price_shock_pct(mut self, shock_pct: f64) -> Self {
-        self.scenario_price_shock_pct = Some(shock_pct);
+    /// Apply a scenario price shock as a decimal fraction.
+    ///
+    /// # Arguments
+    ///
+    /// * `shock` - Relative price shock as a decimal fraction (`-0.05` = -5%).
+    pub fn with_scenario_price_shock_decimal(mut self, shock: f64) -> Self {
+        self.scenario_price_shock_decimal = Some(shock);
         self
     }
 
@@ -1354,27 +1360,27 @@ impl ScenarioPricingOverrides {
 
     /// Clear all scenario shocks.
     pub fn clear_scenario_shocks(&mut self) {
-        self.scenario_price_shock_pct = None;
+        self.scenario_price_shock_decimal = None;
         self.scenario_spread_shock_bp = None;
     }
 
     /// Return whether any scenario shock is configured.
     pub fn has_scenario_shock(&self) -> bool {
-        self.scenario_price_shock_pct.is_some() || self.scenario_spread_shock_bp.is_some()
+        self.scenario_price_shock_decimal.is_some() || self.scenario_spread_shock_bp.is_some()
     }
 
     /// Validate scenario shocks for finiteness.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         // Shocks may be negative (downside / tightening scenarios) but must be finite.
         check_finite_fields(&[
-            (self.scenario_price_shock_pct, false),
+            (self.scenario_price_shock_decimal, false),
             (self.scenario_spread_shock_bp, false),
         ])
     }
 
     /// Apply the configured price shock to a present value.
     pub fn apply_to_value(&self, value: Money) -> finstack_quant_core::Result<Money> {
-        let Some(shock) = self.scenario_price_shock_pct else {
+        let Some(shock) = self.scenario_price_shock_decimal else {
             return Ok(value);
         };
         Money::new(value.amount() * (1.0 + shock), value.currency())
@@ -1548,7 +1554,13 @@ mod tests {
     #[test]
     fn bump_config_rejects_retired_twin_bump_keys() {
         // schema-rejection-test
-        for retired in ["rho_bump_decimal", "vega_bump_decimal", "ytm_bump_decimal"] {
+        for retired in [
+            "rho_bump_decimal",
+            "vega_bump_decimal",
+            "ytm_bump_decimal",
+            "spot_bump_pct",
+            "vol_bump_pct",
+        ] {
             let json = format!(r#"{{"{retired}": 0.0001}}"#);
             let err = serde_json::from_str::<BumpConfig>(&json)
                 .expect_err("retired bump key must be rejected");
@@ -1572,7 +1584,7 @@ mod tests {
             .with_spot_bump(0.01)
             .with_vol_bump(0.01)
             .with_rate_bump(1.0);
-        let scenario = ScenarioPricingOverrides::default().with_price_shock_pct(-0.05);
+        let scenario = ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.05);
 
         assert!(instrument.validate().is_ok());
         assert!(metrics.validate().is_ok());
@@ -1615,7 +1627,7 @@ mod tests {
             metric_pricing_overrides: MetricPricingOverrides::default()
                 .with_theta_period(finstack_quant_core::dates::Tenor::weekly()),
             scenario_pricing_overrides: ScenarioPricingOverrides::default()
-                .with_price_shock_pct(-0.05),
+                .with_scenario_price_shock_decimal(-0.05),
         };
 
         let value = serde_json::to_value(&fixture).expect("serialize focused fixture");
@@ -1691,6 +1703,20 @@ mod tests {
         assert_eq!(config.mc_seed_scenario.as_deref(), Some("stress"));
         let overrides = InstrumentPricingOverrides::default().with_mc_seed_scenario("stress");
         assert_eq!(overrides.model_config, config);
+    }
+
+    #[test]
+    fn scenario_price_shock_is_a_decimal_key() {
+        // schema-rejection-test: `scenario_pricing_overrides.scenario_price_shock_pct`
+        let err = serde_json::from_str::<ScenarioPricingOverrides>(
+            r#"{"scenario_price_shock_pct": -0.05}"#,
+        )
+        .expect_err("retired scenario_price_shock_pct must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+        let current: ScenarioPricingOverrides =
+            serde_json::from_str(r#"{"scenario_price_shock_decimal": -0.05}"#)
+                .expect("canonical scenario key parses");
+        assert_eq!(current.scenario_price_shock_decimal, Some(-0.05));
     }
 
     #[test]

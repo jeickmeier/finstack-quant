@@ -412,7 +412,7 @@ fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
     let bullet_date = d(2026, 7, 1);
     let spec = card(0.0)
         .with_seller_interest(usd(50_000_000.0))
-        .with_fixed_allocation_pct(0.80);
+        .with_fixed_allocation_decimal(0.80);
     let deal = with_rules(
         trust(spec, revolving_end),
         WaterfallRules {

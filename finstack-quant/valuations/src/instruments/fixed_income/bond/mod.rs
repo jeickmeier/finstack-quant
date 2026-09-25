@@ -1071,7 +1071,7 @@ mod tests {
             .expect("baseline");
         let mut shocked_bond = build_test_bond(InstrumentPricingOverrides::default());
         shocked_bond.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+            ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
         let shocked = shocked_bond.value(&market, as_of).expect("shocked");
 
         let expected = baseline.amount() * 0.9;
@@ -1101,7 +1101,7 @@ mod tests {
             ),
             (
                 InstrumentPricingOverrides::default(),
-                ScenarioPricingOverrides::default().with_price_shock_pct(-0.10),
+                ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10),
             ),
         ] {
             let mut bond = build_test_bond(overrides.clone());

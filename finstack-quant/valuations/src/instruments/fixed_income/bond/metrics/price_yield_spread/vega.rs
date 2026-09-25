@@ -120,7 +120,7 @@ impl MetricCalculator for BondVegaCalculator {
             context.get_config(),
             context.get_metric_overrides(),
         )?;
-        let bump = defaults.vol_bump_pct;
+        let bump = defaults.vol_bump_decimal;
         let (channel, base_vol) = short_rate_sigma(bond, context, model)?;
         let down_vol = (base_vol - bump).max(1e-8);
         let up_vol = base_vol + bump;

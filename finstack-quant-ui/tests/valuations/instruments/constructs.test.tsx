@@ -184,7 +184,7 @@ it("inserts a nullable object and edits a recursive union inside its tuple throu
   });
   const result = await apply(submit);
   expect(result.instrument.spec.waterfall_rules.reserve.target).toEqual({
-    max: [{ pct_of_current: 0.02 }, { pct_of_original: 0.03 }],
+    max: [{ fraction_of_current: 0.02 }, { fraction_of_original: 0.03 }],
   });
 });
 it("edits a union payload inside a native array of tranche objects", async () => {

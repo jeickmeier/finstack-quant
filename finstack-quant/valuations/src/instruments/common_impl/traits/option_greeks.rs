@@ -41,16 +41,16 @@ pub enum OptionGreekKind {
 /// use finstack_quant_valuations::instruments::GreekBumps;
 ///
 /// let bumps = GreekBumps::default();
-/// assert_eq!(bumps.spot_bump_pct, 0.01);
-/// assert_eq!(bumps.vol_bump_pct, 0.01);
+/// assert_eq!(bumps.spot_bump_decimal, 0.01);
+/// assert_eq!(bumps.vol_bump_decimal, 0.01);
 /// assert_eq!(bumps.rate_bump_bp, 1.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GreekBumps {
     /// Relative spot bump as a decimal fraction of spot (0.01 = 1%).
-    pub spot_bump_pct: f64,
+    pub spot_bump_decimal: f64,
     /// Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
-    pub vol_bump_pct: f64,
+    pub vol_bump_decimal: f64,
     /// Parallel rate bump in basis points (1.0 = 1bp).
     pub rate_bump_bp: f64,
 }

@@ -312,7 +312,7 @@ fn bump_config_and_sensitivities_extension_agree() {
     cfg.extensions
         .insert(
             "valuations.sensitivities.v1",
-            serde_json::json!({"spot_bump_pct": 0.02, "vol_bump_pct": 0.02, "rate_bump_bp": 5.0}),
+            serde_json::json!({"spot_bump_decimal": 0.02, "vol_bump_decimal": 0.02, "rate_bump_bp": 5.0}),
         )
         .expect("extension key");
     let via_ext = PricingOptions::default().with_config(&cfg);

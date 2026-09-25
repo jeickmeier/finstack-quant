@@ -13,7 +13,7 @@
 //! wired correctly.
 //!
 //! Architectural note: the Task-5 LSMC harness computes the exercise
-//! value as `call_price * notional` and does NOT invoke
+//! value as `notional * price_pct_of_par / 100` and does NOT invoke
 //! `payoff.intrinsic_at(...)`. The `intrinsic_at` hook is implemented
 //! below for trait conformance only, and is currently unused by the
 //! harness. Products that require path-dependent intrinsic values

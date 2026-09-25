@@ -599,7 +599,7 @@ impl PyConvertibleBond {
     ///     Valuation date.
     ///
     /// Bump sizes come from the bond's ``metric_pricing_overrides.bump_config``
-    /// (``spot_bump_pct``, ``vol_bump_pct``, ``rate_bump_bp``), defaulting to
+    /// (``spot_bump_decimal``, ``vol_bump_decimal``, ``rate_bump_bp``), defaulting to
     /// 1% of spot, 1 vol point and 1bp.
     ///
     /// Returns

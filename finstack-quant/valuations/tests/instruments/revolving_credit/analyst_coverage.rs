@@ -1245,7 +1245,7 @@ fn origination_facility(upfront: Option<UpfrontFee>, fees_bp: f64) -> RevolvingC
 /// A percentage upfront fee prices exactly like the equivalent amount.
 #[test]
 fn percentage_upfront_fee_equals_the_equivalent_amount() {
-    let pct = origination_facility(Some(UpfrontFee::PctOfCommitment(0.02)), 0.0);
+    let pct = origination_facility(Some(UpfrontFee::FractionOfCommitment(0.02)), 0.0);
     let amount = origination_facility(Some(UpfrontFee::Amount(usd(200_000.0))), 0.0);
     let none = origination_facility(None, 0.0);
     let m = market();
@@ -1265,7 +1265,7 @@ fn percentage_upfront_fee_equals_the_equivalent_amount() {
     let json = serde_json::to_string(&pct).expect("json");
     let back: RevolvingCredit = serde_json::from_str(&json).expect("round trip");
     assert!(
-        matches!(back.fees.upfront_fee, Some(UpfrontFee::PctOfCommitment(p)) if (p - 0.02).abs() < 1e-15)
+        matches!(back.fees.upfront_fee, Some(UpfrontFee::FractionOfCommitment(p)) if (p - 0.02).abs() < 1e-15)
     );
 }
 
@@ -1274,7 +1274,7 @@ fn percentage_upfront_fee_equals_the_equivalent_amount() {
 #[test]
 fn oid_effective_rate_exceeds_the_running_rate_with_an_upfront_fee() {
     let m = market();
-    let with_fee = origination_facility(Some(UpfrontFee::PctOfCommitment(0.02)), 0.0);
+    let with_fee = origination_facility(Some(UpfrontFee::FractionOfCommitment(0.02)), 0.0);
     let run = |facility: &RevolvingCredit| {
         standard_pricer_registry()
             .price_with_metrics(

@@ -3,9 +3,9 @@
 //! Both use bump-and-reprice (central finite difference) since there are no
 //! closed-form analytical greeks for arithmetic Asian options.
 //!
-//! - **Delta**: Bumps the forward price curve (PriceCurve) by ±`spot_bump_pct`
+//! - **Delta**: Bumps the forward price curve (PriceCurve) by ±`spot_bump_decimal`
 //!   (default 1%) parallel and computes the central difference.
-//! - **Vega**: Bumps the vol surface by ±`vol_bump_pct` (default 1 vol point,
+//! - **Vega**: Bumps the vol surface by ±`vol_bump_decimal` (default 1 vol point,
 //!   absolute) and reports the central difference per 1 vol point.
 //!
 //! Bump sizes resolve from `metric_pricing_overrides.bump_config` and the
@@ -44,7 +44,7 @@ impl MetricCalculator for AsianDeltaCalculator {
             return Ok(0.0);
         }
 
-        let bump_pct = sens_config::resolve(context)?.spot_bump_pct;
+        let bump_pct = sens_config::resolve(context)?.spot_bump_decimal;
 
         let (fwd_sum, fwd_count) = asian.future_forwards(&context.curves, context.as_of)?;
         if fwd_count == 0 {
@@ -108,7 +108,7 @@ impl MetricCalculator for AsianVegaCalculator {
             return Ok(0.0);
         }
 
-        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
+        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
 
         // Bump vol surface up
         let market_up = crate::metrics::bump_surface_vol_absolute(

@@ -24,7 +24,7 @@ fn append_residual_principal(
                 .equity_history()?
                 .hurdle_shortfall(date, amount, spec.hurdle_irr)
                 .amount();
-            let fee = (amount.amount() - shortfall).max(0.0) * spec.share_pct;
+            let fee = (amount.amount() - shortfall).max(0.0) * spec.share;
             if fee > 0.0 {
                 let fee = Money::new(fee, state.base_currency)?;
                 if let Some(last) = state.period_diagnostics.last_mut() {
@@ -60,7 +60,7 @@ fn release_spread_account(
         .waterfall_rules
         .as_ref()
         .and_then(|rules| rules.excess_spread.as_ref())
-        .and_then(|spec| spec.trap_loss_pct)
+        .and_then(|spec| spec.trap_loss_decimal)
         .is_some_and(|threshold| {
             state.original_pool_balance.amount() > 0.0
                 && state.cumulative_realized_loss / state.original_pool_balance.amount()
@@ -642,7 +642,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                     });
                 pay_date >= call.date || after_event
             });
-        let cleanup = instrument.cleanup_call_pct.is_some_and(|threshold| {
+        let cleanup = instrument.cleanup_call_decimal.is_some_and(|threshold| {
             let pool_factor = if state.original_pool_balance.amount() > 0.0 {
                 state.pool_outstanding.amount() / state.original_pool_balance.amount()
             } else {

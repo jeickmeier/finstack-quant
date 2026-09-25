@@ -34,8 +34,8 @@ There is **no `prelude` module** — import the names you need directly.
 | `LossRecognition` | When a loss is booked: `AtDefault` (CLO/CBO/ABS/card default; expected net loss on the default date) or `AtLiquidation` (RMBS/CMBS default; defaulted par less recovery when the claim settles after the recovery lag). Drives write-downs and every cumulative-loss trigger; override with `StructuredCredit.loss_recognition`. |
 | `EarlyAmortizationSpec`, `ControlledAccumulationSpec`, `ExcessSpreadSpec` | ABS/credit-card structural features. `EarlyAmortizationSpec { max_cumulative_loss: Option<fraction>, min_excess_spread_3m }`: either test ends the revolving period; the event's payment date is reported as `SimulationDiagnostics::early_amortization_date`. |
 | `TrancheDraw`, `TrancheReadvance` | Lender draws on a note after closing (`StructuredCredit::tranche_draws`, ascending by date) and a per-period re-advance up to `min(commitment, borrowing base)` while revolving (`tranche_readvance`, needs `coverage_rules.borrowing_base`): the note's balance rises and the cash joins principal proceeds; every draw is reported in `SimulationDiagnostics::tranche_draws`. |
-| `TargetOcSpec` | Targeted-overcollateralization amortization on `WaterfallRules.target_oc`: notes paid down each period to hold `pool − notes` at `max(pct_of_current × pool, floor_pct_of_original × original)`, from interest first, with the excess released to the residual — see [Targeted OC amortization](#targeted-oc-amortization). |
-| `ReserveAccountSpec`, `ReserveTarget` | Reserve account rules on `WaterfallRules.reserve`: per-period target (`Fixed`, `PctOfCurrent`, `PctOfOriginal`, `Max`), replenishment from interest after the note coupons and junior fees, excess release into interest proceeds, draws for fees and coupons, and note principal cover at legal final — see [Reserve account rules](#reserve-account-rules). |
+| `TargetOcSpec` | Targeted-overcollateralization amortization on `WaterfallRules.target_oc`: notes paid down each period to hold `pool − notes` at `max(fraction_of_current × pool, floor_fraction_of_original × original)`, from interest first, with the excess released to the residual — see [Targeted OC amortization](#targeted-oc-amortization). |
+| `ReserveAccountSpec`, `ReserveTarget` | Reserve account rules on `WaterfallRules.reserve`: per-period target (`Fixed`, `FractionOfCurrent`, `FractionOfOriginal`, `Max`), replenishment from interest after the note coupons and junior fees, excess release into interest proceeds, draws for fees and coupons, and note principal cover at legal final — see [Reserve account rules](#reserve-account-rules). |
 | `CardPortfolioSpec`, `DelinquencyModel`, `AdvancingPolicy`, `ModificationSpec` | Card master-trust portfolio model and roll-rate delinquency with servicer advancing — see [Behavioral models](#behavioral-models). |
 | `BalloonSpec`, `PrepaymentPenalty`, `SpecialServicingSpec` | Commercial-mortgage loan terms on `PoolAsset` — see [CMBS collateral terms](#cmbs-collateral-terms). |
 | `LiquidationSpec` | NPL/RPL resolution timeline on `PoolAsset.liquidation` — see [NPL / RPL resolution](#npl--rpl-resolution). |
@@ -271,10 +271,10 @@ swap's own notional.
 Fees (`DealFees`, `TemplateFees`): the trustee, senior management and
 servicing fees form the leading `fees` tier; `subordinated_mgmt_fee_bp` forms a
 `junior_fees` tier after every note coupon and ahead of principal; and
-`incentive_fee` (`IncentiveFeeSpec { hurdle_irr, share_pct }`, 12% / 20% in the
+`incentive_fee` (`IncentiveFeeSpec { hurdle_irr, share }`, 12% / 20% in the
 standard CLO registry) places a `PaymentCalculation::IncentiveFee` recipient
 in the principal tier ahead of `equity_principal` and in an `incentive_fee`
-tier ahead of the residual. Each pays `share_pct` of the cash reaching equity
+tier ahead of the residual. Each pays `share` of the cash reaching equity
 above its hurdle: the equity IRR to date (`WaterfallContext::equity_history`,
 capital at closing against every equity distribution, plus what equity has
 already received in the same run) is solved for the cash that lifts it
@@ -296,7 +296,7 @@ pro-rata. The schedule is read per `ShiftingInterestSpec.mode`: under
 `ShiftMode::ShiftOfSubordinate` (the default, the prospectus form) each step
 is the share of the subordinates' pro-rata unscheduled principal that shifts
 to the senior, so the senior's unscheduled share is
-`senior_pct + step × (1 − senior_pct)` on live balances (`1.0` lockout,
+`senior_decimal + step × (1 − senior_decimal)` on live balances (`1.0` lockout,
 `0.7`/`0.6`/... release, `0.0` pro-rata); under `SeniorShare` each step is
 the senior's share outright. `triggers` (the `StepDownTrigger` tests) gate
 the schedule: while any fails the shift reverts to the full lockout.
@@ -317,11 +317,11 @@ numerator or the excess-spread sizing.
 
 ### Targeted OC amortization
 
-`WaterfallRules.target_oc: Option<TargetOcSpec { pct_of_current,
-floor_pct_of_original }>` is the auto/consumer ABS principal convention. Each
+`WaterfallRules.target_oc: Option<TargetOcSpec { fraction_of_current,
+floor_fraction_of_original }>` is the auto/consumer ABS principal convention. Each
 period the required principal distribution is
 `max(0, notes − max(pool − target, 0))` with
-`target = max(pct_of_current × pool, floor_pct_of_original × original)` on
+`target = max(fraction_of_current × pool, floor_fraction_of_original × original)` on
 the pool balance after the period's collections. The notes receive exactly
 that amount by priority — from interest proceeds first, then principal, so a
 requirement above the period's collections turbos from excess spread — and
@@ -333,9 +333,9 @@ controlled accumulation holds principal in the funding account.
 
 `WaterfallRules.reserve: Option<ReserveAccountSpec>` turns the deal reserve
 (`AssetPool::reserve_account` at the start) into a rules-driven account. Every
-period the engine resolves `target` (`ReserveTarget::{Fixed, PctOfCurrent,
-PctOfOriginal, Max}`; `PctOfCurrent` uses the performing pool plus any
-accumulation funding account, `PctOfOriginal` the cut-off balance) and then:
+period the engine resolves `target` (`ReserveTarget::{Fixed, FractionOfCurrent,
+FractionOfOriginal, Max}`; `FractionOfCurrent` uses the performing pool plus any
+accumulation funding account, `FractionOfOriginal` the cut-off balance) and then:
 
 - releases any balance above the target into the period's interest proceeds
   (`release_excess`, default on), so it flows down the waterfall to the
@@ -546,7 +546,7 @@ the receivables and the spec replaces the collateral's behavioral inputs:
 | `portfolio_yield` | asset coupons | Interest collections are the annual yield (finance charges and fees) on the performing receivables. |
 | `charge_off_rate` | default model | Annual charge-offs (an asset `mdr_override` still wins); recoveries follow `recovery_spec`. |
 | `seller_interest` | — | Seller's share of the trust receivables at the valuation date (pool currency); `None` = no seller interest. |
-| `fixed_allocation_pct` | — | Investor allocation of trust collections fixed at the end of the revolving period; `None` freezes the floating share `investor / (investor + seller)`. |
+| `fixed_allocation_decimal` | — | Investor allocation of trust collections fixed at the end of the revolving period; `None` freezes the floating share `investor / (investor + seller)`. |
 
 `EarlyAmortizationSpec::min_excess_spread_3m` adds the excess-spread test:
 every period the engine records the annualized excess spread realized on the
@@ -687,7 +687,7 @@ and the modified coupon.
 - `liquidation_price_pct` (percent of par, `None` = par) is the price the
   collateral realizes in a deal call or clean-up call. Proceeds are the
   liquidated pool plus pending recoveries and every cash account (funding,
-  reserve, spread, undistributed). The clean-up call (`cleanup_call_pct`) is
+  reserve, spread, undistributed). The clean-up call (`cleanup_call_decimal`) is
   exercised only when those proceeds cover the debt notes' claims; a call
   assumption redeems regardless, bounded by the proceeds.
 
@@ -813,7 +813,7 @@ Both bindings expose structured credit under their `instruments` namespace:
 - **Python** (`finstack_quant.valuations.instruments`): typed
   `StructuredCredit`, `StructuredCreditBuilder` (one setter per settable Rust
   field: credit model specs, `delinquency`, `card`, `coverage_triggers`,
-  `coverage_rules`, `call_assumption`, `cleanup_call_pct`,
+  `coverage_rules`, `call_assumption`, `cleanup_call_decimal`,
   `liquidation_price_pct`, `loss_allocation`,
   `principal_covers_senior_interest`, `waterfall`, `hedge_swaps`, `fees`,
   `waterfall_rules`, `attributes` ...), `AssetPool`
@@ -907,7 +907,7 @@ including credit-quality weights, maturities, and level payments. With
 coupon_floor }`, each period's purchases are booked as a synthetic `REINVEST-{n}`
 first-lien bullet row (ACT/360, maturity capped at legal final) at the stated
 terms, so the replacement spread, price and tenor drive WAS, par build and
-excess spread. `max_price` is percent of par; `min_yield` is annual decimal current
+excess spread. `max_price_pct` is percent of par; `min_yield` is annual decimal current
 yield (coupon divided by price fraction). Floating replacement coupons use the
 current projection. No unspecified eligibility filter is assumed.
 Without `assumptions`, surviving collateral is replicated pro rata at par.

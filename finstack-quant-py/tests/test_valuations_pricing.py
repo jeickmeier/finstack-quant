@@ -313,7 +313,7 @@ def _snowball_json() -> str:
             "floating_index_id": "USD-SOFR-6M",
             "floating_tenor": {"count": 6, "unit": "months"},
             "discount_curve_id": "USD-OIS",
-            "callable": None,
+            "call_provision": None,
             "day_count": "act_365f",
             "instrument_pricing_overrides": {
                 "market_quotes": {"implied_volatility": 1e-12},
@@ -349,7 +349,7 @@ def _inverse_floater_json() -> str:
             "floating_index_id": "USD-SOFR-6M",
             "floating_tenor": {"count": 6, "unit": "months"},
             "discount_curve_id": "USD-OIS",
-            "callable": None,
+            "call_provision": None,
             "day_count": "act_365f",
             "attributes": {},
         },
@@ -389,7 +389,7 @@ def _callable_range_accrual_json() -> str:
             },
             "call_provision": {
                 "call_dates": ["2025-07-01"],
-                "call_price": 1.0,
+                "price_pct_of_par": 100.0,
                 "lockout_periods": 0,
             },
             "instrument_pricing_overrides": {
@@ -509,13 +509,13 @@ def test_validate_instrument_json_accepts_focused_nested_overrides() -> None:
     spec = instrument["instrument"]["spec"]
     spec["instrument_pricing_overrides"] = {"model_config": {"mc_paths": 2}}
     spec["metric_pricing_overrides"] = {"bump_config": {"rate_bump_bp": 3.0}}
-    spec["scenario_pricing_overrides"] = {"scenario_price_shock_pct": -0.05}
+    spec["scenario_pricing_overrides"] = {"scenario_price_shock_decimal": -0.05}
 
     canonical = json.loads(validate_instrument_json(json.dumps(instrument)))
     canonical_spec = canonical["instrument"]["spec"]
     assert canonical_spec["instrument_pricing_overrides"]["model_config"]["mc_paths"] == 2
     assert canonical_spec["metric_pricing_overrides"]["bump_config"]["rate_bump_bp"] == 3.0
-    assert canonical_spec["scenario_pricing_overrides"]["scenario_price_shock_pct"] == -0.05
+    assert canonical_spec["scenario_pricing_overrides"]["scenario_price_shock_decimal"] == -0.05
 
 
 def test_tarn_json_prices_with_hull_white_mc() -> None:
@@ -607,7 +607,7 @@ def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:
 
 def test_python_pricing_routes_validate_instrument_before_other_inputs() -> None:
     payload = json.loads(_structured_credit_json())
-    payload["instrument"]["spec"]["cleanup_call_pct"] = -0.5
+    payload["instrument"]["spec"]["cleanup_call_decimal"] = -0.5
     invalid = json.dumps(payload)
     market = "not-market-json"
 
@@ -629,7 +629,7 @@ def test_python_pricing_routes_validate_instrument_before_other_inputs() -> None
     ]
 
     for call in calls:
-        with pytest.raises(ValueError, match="cleanup_call_pct"):
+        with pytest.raises(ValueError, match="cleanup_call_decimal"):
             call()
 
 

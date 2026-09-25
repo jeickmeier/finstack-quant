@@ -267,7 +267,7 @@ fn cleanup_call_needs_liquidation_proceeds_to_cover_the_notes() {
     let cleanup = |liquidation: Option<f64>, reserve: f64| {
         let mut deal = clo(0.30);
         deal.pool.reinvestment_period = None;
-        deal.cleanup_call_pct = Some(0.30);
+        deal.cleanup_call_decimal = Some(0.30);
         deal.liquidation_price_pct = liquidation;
         deal.pool.reserve_account = usd(reserve);
         deal

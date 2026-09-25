@@ -919,7 +919,7 @@ impl PyRevolvingCreditBuilder {
     /// value : dict | str
     ///     ``RevolvingCreditFees`` as a ``dict`` or JSON ``str``
     ///     (``upfront_fee`` as ``None``, ``{"amount": Money-dict}`` or
-    ///     ``{"pct_of_commitment": 0.02}``; ``commitment_fee_tiers``,
+    ///     ``{"fraction_of_commitment": 0.02}``; ``commitment_fee_tiers``,
     ///     ``usage_fee_tiers``, ``facility_fee_bp`` and the dated ``steps`` list of
     ///     ``{"date", "commitment_delta_bp", "usage_delta_bp",
     ///     "facility_delta_bp"}`` rows).

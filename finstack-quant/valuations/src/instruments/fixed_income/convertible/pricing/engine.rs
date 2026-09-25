@@ -473,10 +473,10 @@ pub(crate) fn price_bond_floor(
 ///
 /// # Greek Definitions
 ///
-/// - **Delta**: `(P(S+h) - P(S-h)) / (2h)` where `h = spot_bump_pct * S`
+/// - **Delta**: `(P(S+h) - P(S-h)) / (2h)` where `h = spot_bump_decimal * S`
 /// - **Gamma**: `(P(S+h) - 2*P(S) + P(S-h)) / h^2`
 /// - **Vega**: `(P(σ+δσ) - P(σ-δσ)) / (vol_up - vol_down) * 0.01` with
-///   `δσ = vol_bump_pct` — per 1% absolute vol move
+///   `δσ = vol_bump_decimal` — per 1% absolute vol move
 ///   Uses a forward difference when the lower quote is outside the selected
 ///   lattice's admissible volatility range.
 /// - **Rho**: `(P(r+δr) - P(r-δr)) / (2·rate_bump_bp)` — per 1bp parallel shift of the
@@ -514,8 +514,8 @@ pub fn calculate_convertible_greeks(
     bond.validate_for_pricing()?;
     tree_steps(bond)?;
     for (name, value) in [
-        ("spot_bump_pct", bumps.spot_bump_pct),
-        ("vol_bump_pct", bumps.vol_bump_pct),
+        ("spot_bump_decimal", bumps.spot_bump_decimal),
+        ("vol_bump_decimal", bumps.vol_bump_decimal),
         ("rate_bump_bp", bumps.rate_bump_bp),
     ] {
         if !value.is_finite() || value <= 0.0 {
@@ -524,7 +524,7 @@ pub fn calculate_convertible_greeks(
             )));
         }
     }
-    let bump_pct = bumps.spot_bump_pct;
+    let bump_pct = bumps.spot_bump_decimal;
 
     // Resolve market data and compute base price in one pass.
     // The base price is computed inline to avoid a second prepare_for_pricing call
@@ -573,7 +573,7 @@ pub fn calculate_convertible_greeks(
 
     // ---- Vega: bump volatility (B1: central differences) ----
     {
-        let h_vol = bumps.vol_bump_pct; // absolute vol
+        let h_vol = bumps.vol_bump_decimal; // absolute vol
         let mut vol_down = (inputs.volatility - h_vol).max(1e-6);
         let vol_up = inputs.volatility + h_vol;
 

@@ -344,8 +344,8 @@ impl CashFlowBuilder {
     /// let payment_steps = [
     ///     (Date::from_calendar_date(2027, Month::January, 1)?, CouponType::Pik),
     ///     (Date::from_calendar_date(2029, Month::January, 1)?, CouponType::Split {
-    ///         cash_pct: dec!(0.5),
-    ///         pik_pct: dec!(0.5)
+    ///         cash_fraction: dec!(0.5),
+    ///         pik_fraction: dec!(0.5)
     ///     }),
     ///     (maturity, CouponType::Cash),
     /// ];

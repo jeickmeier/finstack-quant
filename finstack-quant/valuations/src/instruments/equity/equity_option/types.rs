@@ -651,13 +651,13 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
-        // Spot bump: ±`spot_bump_pct` (relative, on the spot scalar).
-        // Vol bump: ±`vol_bump_pct` (absolute, parallel surface bump).
+        // Spot bump: ±`spot_bump_decimal` (relative, on the spot scalar).
+        // Vol bump: ±`vol_bump_decimal` (absolute, parallel surface bump).
         let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
             market.get_price(&self.spot_id)?,
             self.notional.currency(),
         )?;
-        let spot_bump_abs = spot * bumps.spot_bump_pct;
+        let spot_bump_abs = spot * bumps.spot_bump_decimal;
         if spot_bump_abs <= 0.0 {
             return Ok(Some(0.0));
         }
@@ -666,8 +666,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility
-            .map_or(bumps.vol_bump_pct, |volatility| {
-                bumps.vol_bump_pct.min(volatility * 0.5)
+            .map_or(bumps.vol_bump_decimal, |volatility| {
+                bumps.vol_bump_decimal.min(volatility * 0.5)
             });
 
         let (up, curves_vol_up) = crate::metrics::bump_active_volatility(
@@ -689,7 +689,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_up,
                     &self.spot_id,
-                    bumps.spot_bump_pct,
+                    bumps.spot_bump_decimal,
                 )?,
                 as_of,
             )?
@@ -699,7 +699,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_up,
                     &self.spot_id,
-                    -bumps.spot_bump_pct,
+                    -bumps.spot_bump_decimal,
                 )?,
                 as_of,
             )?
@@ -712,7 +712,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_dn,
                     &self.spot_id,
-                    bumps.spot_bump_pct,
+                    bumps.spot_bump_decimal,
                 )?,
                 as_of,
             )?
@@ -722,7 +722,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
                 &crate::metrics::bump_scalar_price(
                     &curves_vol_dn,
                     &self.spot_id,
-                    -bumps.spot_bump_pct,
+                    -bumps.spot_bump_decimal,
                 )?,
                 as_of,
             )?
@@ -749,8 +749,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility
-            .map_or(bumps.vol_bump_pct, |volatility| {
-                bumps.vol_bump_pct.min(volatility * 0.5)
+            .map_or(bumps.vol_bump_decimal, |volatility| {
+                bumps.vol_bump_decimal.min(volatility * 0.5)
             });
         let (up, curves_vol_up) = crate::metrics::bump_active_volatility(
             self,

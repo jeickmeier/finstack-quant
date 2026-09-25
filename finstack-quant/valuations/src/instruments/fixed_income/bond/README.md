@@ -236,7 +236,7 @@ active right on `as_of` and rights on the terminal date.
 ### PIK bonds
 
 PIK coupons accrete to notional instead of paying cash. Set
-`CouponType::Pik` (or `Split { cash_pct, pik_pct }`) on `FixedCouponSpec` /
+`CouponType::Pik` (or `Split { cash_fraction, pik_fraction }`) on `FixedCouponSpec` /
 `FloatingCouponSpec`. Hazard-rate pricing replays the accreted balance, and
 the stochastic rates-credit path evaluates floating PIK coupons pathwise.
 `ModelKey::MertonMc` remains available for structural-credit pricing.

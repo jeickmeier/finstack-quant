@@ -7,8 +7,8 @@
 //! `CoverageTestType::BorrowingBase` test enforces the borrowing base every
 //! period, whose reinvestment period is the revolving period, and whose
 //! early-amortization rules carry the loss / excess-spread amortization
-//! events (`CumulativeLoss { max_pct }` is a percent here and a fraction in
-//! the engine). A loss or excess-spread event starts the term-out clock on
+//! events (`CumulativeLoss { max_cumulative_loss }` is the same decimal
+//! fraction of the original pool the engine uses). A loss or excess-spread event starts the term-out clock on
 //! its payment date, `fees` reach the waterfall ahead of the facility's
 //! interest, `draw_schedule` and `readvance_to_borrowing_base` lift the
 //! facility balance after closing, and the unused-commitment fee accrues only

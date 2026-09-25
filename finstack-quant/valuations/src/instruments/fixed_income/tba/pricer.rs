@@ -39,9 +39,9 @@ struct TbaAssumptions {
 #[serde(deny_unknown_fields)]
 pub(crate) struct AssumedPoolAssumptions {
     pub(crate) default_pool_factor: f64,
-    pub(crate) servicing_fee_rate: f64,
-    pub(crate) agency_guarantee_fee_rate: f64,
-    pub(crate) gnma_guarantee_fee_rate: f64,
+    pub(crate) servicing_fee_bp: f64,
+    pub(crate) agency_guarantee_fee_bp: f64,
+    pub(crate) gnma_guarantee_fee_bp: f64,
     pub(crate) psa_multiplier: f64,
 }
 
@@ -58,12 +58,9 @@ pub(crate) fn assumed_pool_assumptions() -> Result<AssumedPoolAssumptions> {
             let assumed = defaults.assumed_pool;
             for (label, value) in [
                 ("default_pool_factor", assumed.default_pool_factor),
-                ("servicing_fee_rate", assumed.servicing_fee_rate),
-                (
-                    "agency_guarantee_fee_rate",
-                    assumed.agency_guarantee_fee_rate,
-                ),
-                ("gnma_guarantee_fee_rate", assumed.gnma_guarantee_fee_rate),
+                ("servicing_fee_bp", assumed.servicing_fee_bp),
+                ("agency_guarantee_fee_bp", assumed.agency_guarantee_fee_bp),
+                ("gnma_guarantee_fee_bp", assumed.gnma_guarantee_fee_bp),
                 ("psa_multiplier", assumed.psa_multiplier),
             ] {
                 if !(value.is_finite() && value > 0.0) {
@@ -110,15 +107,15 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthroug
     let maturity = issue_date.add_months(term_months as i32);
 
     // Standard servicing and g-fee assumptions
-    let servicing_fee = defaults.servicing_fee_rate;
+    let servicing_fee = defaults.servicing_fee_bp;
     let guarantee_fee = if tba.agency.is_gnma() {
-        defaults.gnma_guarantee_fee_rate
+        defaults.gnma_guarantee_fee_bp
     } else {
-        defaults.agency_guarantee_fee_rate
+        defaults.agency_guarantee_fee_bp
     };
 
-    // WAC = pass-through + fees
-    let wac = tba.coupon + servicing_fee + guarantee_fee;
+    // WAC = pass-through + fees (fees are annual bp).
+    let wac = tba.coupon + servicing_fee / 10_000.0 + guarantee_fee / 10_000.0;
 
     AgencyMbsPassthrough::builder()
         .id(InstrumentId::new(format!("{}-ASSUMED", tba.id.as_str())))
@@ -135,8 +132,8 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthroug
         .current_factor(factor)
         .wac(wac)
         .pass_through_rate(tba.coupon)
-        .servicing_fee_rate(servicing_fee)
-        .guarantee_fee_rate(guarantee_fee)
+        .servicing_fee_bp(servicing_fee)
+        .guarantee_fee_bp(guarantee_fee)
         .wam(term_months)
         .issue_date(issue_date)
         .maturity(maturity)
@@ -283,10 +280,10 @@ mod tests {
     fn assumed_pool_guarantee_fee_follows_agency_family() {
         let defaults = assumed_pool_assumptions().expect("embedded TBA assumptions");
         let cases = [
-            (AgencyProgram::Fnma, defaults.agency_guarantee_fee_rate),
-            (AgencyProgram::Fhlmc, defaults.agency_guarantee_fee_rate),
-            (AgencyProgram::GnmaI, defaults.gnma_guarantee_fee_rate),
-            (AgencyProgram::GnmaII, defaults.gnma_guarantee_fee_rate),
+            (AgencyProgram::Fnma, defaults.agency_guarantee_fee_bp),
+            (AgencyProgram::Fhlmc, defaults.agency_guarantee_fee_bp),
+            (AgencyProgram::GnmaI, defaults.gnma_guarantee_fee_bp),
+            (AgencyProgram::GnmaII, defaults.gnma_guarantee_fee_bp),
         ];
 
         for (agency, expected_fee) in cases {
@@ -294,10 +291,10 @@ mod tests {
             tba.agency = agency;
 
             let pool = create_assumed_pool(&tba).expect("should create pool");
-            assert_eq!(pool.guarantee_fee_rate, expected_fee);
+            assert_eq!(pool.guarantee_fee_bp, expected_fee);
             assert_eq!(
                 pool.wac,
-                tba.coupon + defaults.servicing_fee_rate + expected_fee
+                tba.coupon + defaults.servicing_fee_bp / 10_000.0 + expected_fee / 10_000.0
             );
         }
     }

@@ -288,12 +288,12 @@ pub(crate) fn emit_fixed_coupons_on(
                 let coupon_total_dec = base_out * spec.rate * yf_dec;
                 let coupon_total = decimal_to_f64(coupon_total_dec)?;
 
-                let (cash_pct, pik_pct) = spec.coupon_type.split_parts()?;
-                let cash_pct_f64 = decimal_to_f64(cash_pct)?;
-                let pik_pct_f64 = decimal_to_f64(pik_pct)?;
+                let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
+                let cash_fraction_f64 = decimal_to_f64(cash_fraction)?;
+                let pik_fraction_f64 = decimal_to_f64(pik_fraction)?;
 
-                let cash_amt = coupon_total * cash_pct_f64;
-                let pik_amt = coupon_total * pik_pct_f64;
+                let cash_amt = coupon_total * cash_fraction_f64;
+                let pik_amt = coupon_total * pik_fraction_f64;
 
                 let rate_f64 = decimal_to_f64(spec.rate)?;
                 let accrual = CashFlowAccrual {
@@ -307,7 +307,7 @@ pub(crate) fn emit_fixed_coupons_on(
                 };
 
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
-                if cash_pct_f64 > 0.0 {
+                if cash_fraction_f64 > 0.0 {
                     let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
                     out_flows.push(
                         CashFlow::new(
@@ -450,9 +450,9 @@ pub(crate) fn emit_float_coupons_on(
                 let runtime_spec = &schedule.runtime_spec;
                 let params = &runtime_spec.params;
                 let spread_bp = params.spread_bp;
-                let (cash_pct, pik_pct) = spec.coupon_type.split_parts()?;
-                let cash_pct_f64 = decimal_to_f64(cash_pct)?;
-                let pik_pct_f64 = decimal_to_f64(pik_pct)?;
+                let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
+                let cash_fraction_f64 = decimal_to_f64(cash_fraction)?;
+                let pik_fraction_f64 = decimal_to_f64(pik_fraction)?;
                 let base_out_f64 = decimal_to_f64(base_out)?;
 
                 let observation = if let Some(method) = spec.rate_spec.overnight_compounding {
@@ -518,8 +518,8 @@ pub(crate) fn emit_float_coupons_on(
                         accrual_factor: yf,
                     },
                     FloatingCouponEconomics {
-                        cash_fraction: cash_pct_f64,
-                        pik_fraction: pik_pct_f64,
+                        cash_fraction: cash_fraction_f64,
+                        pik_fraction: pik_fraction_f64,
                         rate_params: settlement_params,
                     },
                     observation,
@@ -707,7 +707,7 @@ pub(crate) fn emit_float_coupons_on(
                     projected_index_rate: Some(settlement.projected_index_rate),
                 };
 
-                if cash_pct_f64 > 0.0 {
+                if cash_fraction_f64 > 0.0 {
                     out_flows.push(
                         CashFlow::new(
                             d,

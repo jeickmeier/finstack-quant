@@ -333,7 +333,8 @@ pub struct StructuredCredit {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub coverage_triggers: Vec<CoverageTestSpec>,
 
-    /// Clean-up call pool factor threshold (percentage of original balance).
+    /// Clean-up call pool factor threshold as a decimal fraction of the
+    /// original balance (`0.10` = 10%).
     ///
     /// When the pool factor (current balance / original balance) drops below
     /// this threshold, the deal is optionally redeemed and all outstanding
@@ -342,7 +343,7 @@ pub struct StructuredCredit {
     /// Set to `None` to disable clean-up call (default).
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cleanup_call_pct: Option<f64>,
+    pub cleanup_call_decimal: Option<f64>,
 
     /// Assumed optional redemption for price-to-call analytics. A deal-scope
     /// call liquidates the collateral at [`Self::liquidation_price_pct`] on

@@ -254,7 +254,7 @@ fn p2a_step_down_loss_trigger_uses_original_pool_balance() {
 #[test]
 fn p2b_cleanup_call_factor_uses_original_pool_balance() {
     let (mut deal, close) = seasoned_abs(8_000_000.0, 92_000_000.0, 0.0, 0.0, 0.0);
-    deal.cleanup_call_pct = Some(0.10);
+    deal.cleanup_call_decimal = Some(0.10);
     let results = run_simulation(&deal, &market(close), close).expect("run");
     let sr = &results["SR"];
     let first_date = sr.cashflows.first().map(|(dt, _)| *dt).expect("first date");
@@ -879,7 +879,7 @@ fn cleanup_call_feasibility_counts_the_stub_collections() {
         StructuredCredit::new_clo("CLEANUP", pool, tranches, close, legal, "USD-OIS"),
         0.0,
     );
-    deal.cleanup_call_pct = Some(0.10);
+    deal.cleanup_call_decimal = Some(0.10);
     let results = run_simulation(&deal, &market(close), close).expect("run");
     let a = &results["A"];
     let first_date = a.cashflows.first().map(|(dt, _)| *dt).expect("first date");

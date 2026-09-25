@@ -106,7 +106,7 @@
             "null"
           ]
         },
-        "spot_bump_pct": {
+        "spot_bump_decimal": {
           "default": null,
           "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
           "format": "double",
@@ -115,7 +115,7 @@
             "null"
           ]
         },
-        "vol_bump_pct": {
+        "vol_bump_decimal": {
           "default": null,
           "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
           "format": "double",

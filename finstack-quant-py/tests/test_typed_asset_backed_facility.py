@@ -125,7 +125,7 @@ def test_amortization_events_pull_the_revolving_end_forward() -> None:
         .payment_calendar_id("nyse")
         .amortization_events([
             {"kind": "date", "date": "2025-01-15"},
-            {"kind": "cumulative_loss", "max_pct": 5.0},
+            {"kind": "cumulative_loss", "max_cumulative_loss": 0.05},
         ])
         .discount_curve_id("USD-OIS")
         .build()
@@ -197,11 +197,11 @@ def test_facility_metrics_are_registered() -> None:
 
 
 def test_every_amortization_event_kind_projects_with_documented_units() -> None:
-    """Percent loss thresholds, an excess-spread floor and a dated event all project."""
+    """Decimal loss thresholds, an excess-spread floor and a dated event all project."""
     base = _facility()
     for events in (
-        [{"kind": "cumulative_loss", "max_pct": 4.0}],
-        [{"kind": "excess_spread", "min_3m": 0.01}],
+        [{"kind": "cumulative_loss", "max_cumulative_loss": 0.04}],
+        [{"kind": "excess_spread", "min_excess_spread_3m": 0.01}],
         [{"kind": "date", "date": "2025-01-15"}],
     ):
         facility = (

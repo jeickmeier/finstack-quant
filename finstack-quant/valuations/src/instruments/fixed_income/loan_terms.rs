@@ -164,7 +164,7 @@ pub enum UpfrontFee {
     /// Absolute amount in the facility currency.
     Amount(Money),
     /// Fraction of the opening commitment, as a decimal (`0.02` = 2%).
-    PctOfCommitment(f64),
+    FractionOfCommitment(f64),
 }
 
 impl UpfrontFee {
@@ -172,12 +172,12 @@ impl UpfrontFee {
     ///
     /// # Arguments
     ///
-    /// * `commitment` - Opening commitment the percentage form is applied to;
+    /// * `commitment` - Opening commitment the fractional form is applied to;
     ///   the absolute form ignores it.
     pub fn amount(&self, commitment: Money) -> Money {
         match self {
             Self::Amount(money) => *money,
-            Self::PctOfCommitment(pct) => commitment * *pct,
+            Self::FractionOfCommitment(fraction) => commitment * *fraction,
         }
     }
 }
@@ -242,9 +242,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
 
     #[test]
-    fn upfront_fee_percentage_scales_with_the_commitment() {
+    fn upfront_fee_fraction_scales_with_the_commitment() {
         let commitment = Money::new(50_000_000.0, Currency::USD).expect("money");
-        let pct = UpfrontFee::PctOfCommitment(0.02).amount(commitment);
+        let pct = UpfrontFee::FractionOfCommitment(0.02).amount(commitment);
         assert!((pct.amount() - 1_000_000.0).abs() < 1e-9);
         let abs = UpfrontFee::Amount(Money::new(250_000.0, Currency::USD).expect("money"))
             .amount(commitment);
@@ -253,7 +253,14 @@ mod tests {
 
     #[test]
     fn upfront_fee_wire_shape_is_tagged_snake_case() {
-        let json = serde_json::to_value(UpfrontFee::PctOfCommitment(0.02)).expect("json");
-        assert_eq!(json, serde_json::json!({"pct_of_commitment": 0.02}));
+        let json = serde_json::to_value(UpfrontFee::FractionOfCommitment(0.02)).expect("json");
+        assert_eq!(json, serde_json::json!({"fraction_of_commitment": 0.02}));
+    }
+
+    #[test]
+    // schema-rejection-test
+    fn retired_pct_of_commitment_key_is_rejected() {
+        serde_json::from_value::<UpfrontFee>(serde_json::json!({"pct_of_commitment": 0.02}))
+            .expect_err("pct_of_commitment is retired");
     }
 }

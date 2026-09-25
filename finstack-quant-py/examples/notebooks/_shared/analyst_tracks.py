@@ -134,7 +134,7 @@ def complex_bond() -> dict[str, Any]:
     schedule = spec["cashflow_spec"]["fixed"]
     schedule.pop("rate")
     schedule.update({
-        "coupon_type": {"split": {"cash_pct": "0.75", "pik_pct": "0.25"}},
+        "coupon_type": {"split": {"cash_fraction": "0.75", "pik_fraction": "0.25"}},
         "frequency": {"count": 3, "unit": "months"},
         "initial_rate": "0.08",
         "step_schedule": [["2029-01-15", "0.0825"]],

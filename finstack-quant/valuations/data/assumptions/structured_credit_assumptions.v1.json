@@ -12,8 +12,8 @@
   "cmo_collateral_defaults": {
     "wac": 0.045,
     "wam_months": 360,
-    "servicing_fee_rate": 0.0025,
-    "guarantee_fee_rate": 0.0025,
+    "servicing_fee_bp": 25.0,
+    "guarantee_fee_bp": 25.0,
     "psa_multiplier": 1.0
   },
   "scenario_grids": {
@@ -142,7 +142,7 @@
         "special_servicer_fee_bp": null,
         "incentive_fee": {
           "hurdle_irr": 0.12,
-          "share_pct": 0.2
+          "share": 0.2
         }
       },
       "constructor": {

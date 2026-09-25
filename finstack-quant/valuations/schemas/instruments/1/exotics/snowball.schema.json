@@ -2,7 +2,7 @@
   "$defs": {
     "BermudanCallProvision": {
       "additionalProperties": false,
-      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
+      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
       "properties": {
         "call_dates": {
           "description": "Dates on which the issuer can call (must be sorted ascending).",
@@ -11,21 +11,21 @@
           },
           "type": "array"
         },
-        "call_price": {
-          "description": "Call price (fraction of notional, typically 1.0 = par).",
-          "format": "double",
-          "type": "number"
-        },
         "lockout_periods": {
           "description": "Lockout period in number of coupon periods before first call.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "price_pct_of_par": {
+          "description": "Redemption price in percent of par (`100.0` = par). The pricer pays\n`notional * price_pct_of_par / 100` at exercise.",
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [
         "call_dates",
-        "call_price",
+        "price_pct_of_par",
         "lockout_periods"
       ],
       "type": "object"
@@ -43,7 +43,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes."
         },
-        "callable": {
+        "call_provision": {
           "anyOf": [
             {
               "$ref": "#/$defs/BermudanCallProvision"
@@ -200,7 +200,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "callable": null,
+          "call_provision": null,
           "coupon_cap": null,
           "coupon_dates": [
             "2026-06-30",

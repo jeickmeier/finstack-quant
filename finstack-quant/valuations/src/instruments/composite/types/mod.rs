@@ -536,7 +536,7 @@ mod tests {
         composite.metric_pricing_overrides.theta_period = Some(Tenor::weekly());
         composite
             .scenario_pricing_overrides
-            .scenario_price_shock_pct = Some(-0.1);
+            .scenario_price_shock_decimal = Some(-0.1);
         let value =
             serde_json::to_value(&composite).map_err(|error| Error::Internal(error.to_string()))?;
         assert_eq!(

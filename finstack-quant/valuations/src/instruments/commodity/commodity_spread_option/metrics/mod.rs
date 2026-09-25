@@ -29,7 +29,7 @@ impl MetricCalculator for SpreadDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let inst: &CommoditySpreadOption = context.instrument_as()?;
 
-        let bump_pct = sens_config::resolve(context)?.spot_bump_pct;
+        let bump_pct = sens_config::resolve(context)?.spot_bump_decimal;
 
         let (curve_id, forward) = match self.leg {
             1 => (
@@ -89,7 +89,7 @@ impl MetricCalculator for SpreadVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let inst: &CommoditySpreadOption = context.instrument_as()?;
 
-        let vol_bump = sens_config::resolve(context)?.vol_bump_pct;
+        let vol_bump = sens_config::resolve(context)?.vol_bump_decimal;
 
         let bump_market = |amount: f64| -> Result<_> {
             match self.leg {

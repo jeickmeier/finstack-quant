@@ -35,7 +35,7 @@ pub(super) fn binding_pricing_options() -> PricingOptions {
 /// Parameters
 /// ----------
 /// bump_config : dict | None
-///     Finite-difference bump sizes (``spot_bump_pct``, ``vol_bump_pct``,
+///     Finite-difference bump sizes (``spot_bump_decimal``, ``vol_bump_decimal``,
 ///     ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp``,
 ///     ``adaptive_bumps``). ``None`` keeps defaults.
 /// theta_period : Tenor | str | None

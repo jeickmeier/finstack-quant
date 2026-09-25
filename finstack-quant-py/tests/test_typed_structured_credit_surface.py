@@ -112,7 +112,7 @@ def _clo() -> StructuredCredit:
         .coverage_triggers([{"id": "OC_A", "tranche_id": "A", "kind": "oc", "trigger_level": 1.2}])
         .coverage_rules(CoverageRules.clo_standard())
         .call_assumption(CallAssumption(datetime.date(2028, 1, 1), 100.0))
-        .cleanup_call_pct(0.1)
+        .cleanup_call_decimal(0.1)
         .liquidation_price_pct(99.0)
         .loss_allocation("par_preserving")
         .principal_covers_senior_interest(True)
@@ -260,7 +260,7 @@ def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
     assert spec["coverage_triggers"][0]["kind"] == "oc"
     assert spec["coverage_rules"]["ccc_bucket"]["threshold_pct"] == 7.5
     assert spec["call_assumption"] == {"date": "2028-01-01", "price_pct": 100.0, "scope": "deal"}
-    assert spec["cleanup_call_pct"] == 0.1
+    assert spec["cleanup_call_decimal"] == 0.1
     assert spec["liquidation_price_pct"] == 99.0
     assert spec["loss_allocation"] == "par_preserving"
     assert spec["principal_covers_senior_interest"] is True
@@ -276,7 +276,7 @@ def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
     assert deal.call_assumption.tranche_id is None
     assert deal.coverage_rules.discount_obligation["price_threshold_pct"] == 80.0
     assert deal.coverage_triggers[0]["tranche_id"] == "A"
-    assert deal.cleanup_call_pct == 0.1
+    assert deal.cleanup_call_decimal == 0.1
     assert deal.liquidation_price_pct == 99.0
     assert deal.loss_allocation == "par_preserving"
     assert deal.principal_covers_senior_interest is True

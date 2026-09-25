@@ -125,7 +125,7 @@ fn structured_credit_instrument_json() -> String {
 fn invalid_structured_credit_instrument_json() -> String {
     let mut value: serde_json::Value =
         serde_json::from_str(&structured_credit_instrument_json()).unwrap();
-    value["instrument"]["spec"]["cleanup_call_pct"] = serde_json::json!(-0.5);
+    value["instrument"]["spec"]["cleanup_call_decimal"] = serde_json::json!(-0.5);
     serde_json::to_string(&value).unwrap()
 }
 
@@ -315,7 +315,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
     for error in errors {
         let message = error_message(error);
         assert!(
-            message.contains("cleanup_call_pct"),
+            message.contains("cleanup_call_decimal"),
             "instrument validation should win over malformed market input: {message}"
         );
     }
@@ -333,7 +333,7 @@ fn fx_price_with_metrics_validates_merged_overrides_before_market() {
             "not-a-date",
             Some("not-a-model".to_string()),
             Some(metrics),
-            Some(r#"{"bump_config":{"vol_bump_pct":-0.20}}"#.to_string()),
+            Some(r#"{"bump_config":{"vol_bump_decimal":-0.20}}"#.to_string()),
             None,
         )
         .unwrap_err();

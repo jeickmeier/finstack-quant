@@ -38,8 +38,8 @@
           "description": "Whether clawback is enabled",
           "type": "boolean"
         },
-        "holdback_pct": {
-          "description": "Optional percentage of GP carry held back until settlement",
+        "holdback_decimal": {
+          "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
           "format": "double",
           "type": [
             "number",

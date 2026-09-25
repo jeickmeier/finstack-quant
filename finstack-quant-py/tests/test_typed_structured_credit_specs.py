@@ -62,7 +62,7 @@ def usd(amount: float) -> Money:
         ),
         TermOutSpec(24),
         AmortizationEvent.date(datetime.date(2025, 6, 1)),
-        AmortizationEvent.cumulative_loss(4.0),
+        AmortizationEvent.cumulative_loss(0.04),
         AmortizationEvent.excess_spread(0.01),
     ],
 )
@@ -89,8 +89,10 @@ def test_typed_specs_validate_their_inputs() -> None:
         AdvanceRate("commercial_mortgage", 1.5)
     with pytest.raises(ValueError, match="advance"):
         BorrowingBaseRules([])
-    with pytest.raises(ValueError, match="max_pct"):
+    with pytest.raises(ValueError, match="max_cumulative_loss"):
         AmortizationEvent.cumulative_loss(-1.0)
+    with pytest.raises(ValueError, match="max_cumulative_loss"):
+        AmortizationEvent.cumulative_loss(4.0)
 
 
 def test_penalty_and_event_accessors_follow_the_kind() -> None:
@@ -105,9 +107,9 @@ def test_penalty_and_event_accessors_follow_the_kind() -> None:
     assert ym.to_dict()["kind"] == "yield_maintenance"
     event = AmortizationEvent.excess_spread(0.01)
     assert event.kind == "excess_spread"
-    assert event.max_pct is None
+    assert event.max_cumulative_loss is None
     assert event.date_value is None
-    assert event.min_3m == 0.01
+    assert event.min_excess_spread_3m == 0.01
 
 
 def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
@@ -202,7 +204,7 @@ def test_typed_facility_terms_are_accepted_by_the_facility_builder() -> None:
         .frequency("3M")
         .payment_calendar_id("nyse")
         .term_out(TermOutSpec(24).months)
-        .amortization_events([AmortizationEvent.cumulative_loss(4.0), AmortizationEvent.excess_spread(0.01)])
+        .amortization_events([AmortizationEvent.cumulative_loss(0.04), AmortizationEvent.excess_spread(0.01)])
         .discount_curve_id("USD-OIS")
         .build()
     )

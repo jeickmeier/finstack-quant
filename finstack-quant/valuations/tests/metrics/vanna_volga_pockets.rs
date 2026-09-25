@@ -89,11 +89,11 @@ fn equity_delta_fd(
     opt: &EquityOption,
     curves: &MarketContext,
     as_of: Date,
-    spot_bump_pct: f64,
+    spot_bump_decimal: f64,
 ) -> finstack_quant_core::Result<f64> {
     // Central delta via bump-and-reprice.
-    let curves_up = bump_scalar_price(curves, &opt.spot_id, spot_bump_pct)?;
-    let curves_dn = bump_scalar_price(curves, &opt.spot_id, -spot_bump_pct)?;
+    let curves_up = bump_scalar_price(curves, &opt.spot_id, spot_bump_decimal)?;
+    let curves_dn = bump_scalar_price(curves, &opt.spot_id, -spot_bump_decimal)?;
     let pv_up = opt.value(&curves_up, as_of)?.amount();
     let pv_dn = opt.value(&curves_dn, as_of)?.amount();
 
@@ -102,7 +102,7 @@ fn equity_delta_fd(
         MarketScalar::Unitless(v) => *v,
         MarketScalar::Price(m) => m.amount(),
     };
-    let h = spot * spot_bump_pct;
+    let h = spot * spot_bump_decimal;
     Ok((pv_up - pv_dn) / (2.0 * h))
 }
 
@@ -144,9 +144,9 @@ fn equity_vanna_and_volga_match_reference_fd() -> finstack_quant_core::Result<()
     let curves_vol_dn =
         bump_surface_vol_absolute(&market, opt.vol_surface_id.as_str(), -vol_bump_abs)?;
 
-    let spot_bump_pct = SPOT_BUMP_PCT;
-    let delta_up = equity_delta_fd(&opt, &curves_vol_up, as_of, spot_bump_pct)?;
-    let delta_dn = equity_delta_fd(&opt, &curves_vol_dn, as_of, spot_bump_pct)?;
+    let spot_bump_decimal = SPOT_BUMP_PCT;
+    let delta_up = equity_delta_fd(&opt, &curves_vol_up, as_of, spot_bump_decimal)?;
+    let delta_dn = equity_delta_fd(&opt, &curves_vol_dn, as_of, spot_bump_decimal)?;
     // Vanna is reported per **vol point** on the σ axis (consistent with
     // Vega), so normalize by the bump width expressed in vol points.
     let vanna_ref = (delta_up - delta_dn) / (2.0 * delta_sigma * 100.0);

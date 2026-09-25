@@ -273,11 +273,11 @@ fn writedown_non_negative_and_bounded() {
 
 #[test]
 fn cleanup_call_triggers_when_pool_factor_below_threshold() {
-    // With high CPR, pool factor drops quickly. Set cleanup_call_pct = 0.30 (30%)
+    // With high CPR, pool factor drops quickly. Set cleanup_call_decimal = 0.30 (30%)
     // so the call triggers while there's still meaningful balance.
     let market = flat_market();
     let mut clo = build_clo(0.40, 0.0, 0.40, 6); // Very high CPR
-    clo.cleanup_call_pct = Some(0.30); // Trigger at 30% pool factor
+    clo.cleanup_call_decimal = Some(0.30); // Trigger at 30% pool factor
 
     let results = run_simulation(&clo, &market, as_of()).unwrap();
 
@@ -303,10 +303,10 @@ fn cleanup_call_produces_fewer_periods_than_no_call() {
     let market = flat_market();
 
     let mut clo_no_call = build_clo(0.30, 0.0, 0.40, 6);
-    clo_no_call.cleanup_call_pct = None;
+    clo_no_call.cleanup_call_decimal = None;
 
     let mut clo_with_call = build_clo(0.30, 0.0, 0.40, 6);
-    clo_with_call.cleanup_call_pct = Some(0.20); // 20% threshold
+    clo_with_call.cleanup_call_decimal = Some(0.20); // 20% threshold
 
     let res_no = run_simulation(&clo_no_call, &market, as_of()).unwrap();
     let res_yes = run_simulation(&clo_with_call, &market, as_of()).unwrap();
@@ -324,10 +324,10 @@ fn cleanup_call_produces_fewer_periods_than_no_call() {
 
 #[test]
 fn cleanup_call_disabled_by_default() {
-    // Without setting cleanup_call_pct, it should be None.
+    // Without setting cleanup_call_decimal, it should be None.
     let clo = build_clo(0.10, 0.0, 0.40, 6);
     assert!(
-        clo.cleanup_call_pct.is_none(),
+        clo.cleanup_call_decimal.is_none(),
         "Cleanup call should be disabled by default",
     );
 }
@@ -337,7 +337,7 @@ fn cleanup_call_does_not_trigger_for_low_cpr() {
     // With low CPR, pool factor stays high and cleanup call doesn't trigger.
     let market = flat_market();
     let mut clo = build_clo(0.02, 0.0, 0.40, 6);
-    clo.cleanup_call_pct = Some(0.10); // 10% threshold
+    clo.cleanup_call_decimal = Some(0.10); // 10% threshold
 
     let results = run_simulation(&clo, &market, as_of()).unwrap();
 
@@ -675,7 +675,7 @@ mod excess_spread_tests {
         let trapped = run_simulation(
             &deal(Some(ExcessSpreadSpec {
                 target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
-                trap_loss_pct: Some(0.01),
+                trap_loss_decimal: Some(0.01),
             })),
             &market(),
             closing(),
@@ -696,11 +696,11 @@ mod excess_spread_tests {
     fn terminal_trap_releases_surplus_after_senior_is_repaid() {
         let trapped = equity_cash(&deal(Some(ExcessSpreadSpec {
             target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
-            trap_loss_pct: Some(0.01),
+            trap_loss_decimal: Some(0.01),
         })));
         let released = equity_cash(&deal(Some(ExcessSpreadSpec {
             target_balance: Money::new(20_000.0, Currency::USD).unwrap(),
-            trap_loss_pct: None,
+            trap_loss_decimal: None,
         })));
         assert!(
             (released - trapped).abs() < 1e-6,
@@ -810,7 +810,7 @@ mod excess_spread_tests {
                 excess_spread: Some(ExcessSpreadSpec {
                     target_balance: Money::new(1_000_000.0, Currency::USD)
                         .expect("valid money fixture"),
-                    trap_loss_pct: None,
+                    trap_loss_decimal: None,
                 }),
                 step_down: None,
                 shifting_interest: None,
@@ -1229,11 +1229,11 @@ mod shifting_interest_tests {
             vec![
                 ShiftingInterestStep {
                     months_from_closing: 0,
-                    senior_pct: 1.0,
+                    senior_decimal: 1.0,
                 },
                 ShiftingInterestStep {
                     months_from_closing: 24,
-                    senior_pct: 0.5,
+                    senior_decimal: 0.5,
                 },
             ],
         )));
@@ -1355,7 +1355,7 @@ mod shifting_interest_tests {
             "SR",
             vec![ShiftingInterestStep {
                 months_from_closing: 0,
-                senior_pct: 1.0,
+                senior_decimal: 1.0,
             }],
         )));
         let sub_scheduled = sub_principal_amortizing(&locked, release_date());
@@ -1430,7 +1430,7 @@ mod shifting_interest_tests {
                 "SR",
                 vec![ShiftingInterestStep {
                     months_from_closing: 0,
-                    senior_pct: 0.4,
+                    senior_decimal: 0.4,
                 }],
             )),
             ..Default::default()

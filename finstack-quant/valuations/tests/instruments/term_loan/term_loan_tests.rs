@@ -68,7 +68,7 @@ fn term_loan_fixed_with_draws_and_fees() {
             usage_fee_bp: 10.0,
             commitment_fee_bp: 25.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
-            oid_policy: Some(OidPolicy::WithheldPct(100)), // 1% withheld OID on draws
+            oid_policy: Some(OidPolicy::WithheldBp(100)), // 1% withheld OID on draws
         }))
         .covenants_opt(None)
         .attributes(Default::default())
@@ -270,7 +270,7 @@ fn term_loan_oid_eir_amortization_schedule() {
             usage_fee_bp: 0.0,
             commitment_fee_bp: 0.0,
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
-            oid_policy: Some(OidPolicy::WithheldPct(200)),
+            oid_policy: Some(OidPolicy::WithheldBp(200)),
         }))
         .covenants_opt(None)
         .oid_eir_opt(Some(OidEirSpec::default()))
@@ -644,4 +644,19 @@ fn revolving_credit_rejects_retired_commitment_schedule_key() {
         serde_json::json!([]),
     );
     assert_envelope_rejects(&json, "commitment_schedule");
+}
+
+#[test]
+// schema-rejection-test
+fn retired_oid_withheld_pct_and_separate_pct_keys_are_rejected() {
+    for retired in [
+        serde_json::json!({"withheld_pct": 200}),
+        serde_json::json!({"separate_pct": 200}),
+    ] {
+        serde_json::from_value::<OidPolicy>(retired.clone())
+            .expect_err(&format!("{retired} uses a retired key"));
+    }
+    let bp: OidPolicy =
+        serde_json::from_value(serde_json::json!({"withheld_bp": 200})).expect("withheld_bp");
+    assert!(matches!(bp, OidPolicy::WithheldBp(200)));
 }

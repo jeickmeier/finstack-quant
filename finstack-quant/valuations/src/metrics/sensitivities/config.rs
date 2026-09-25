@@ -65,11 +65,11 @@ pub(crate) fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, s
 }
 
 /// Default relative spot bump: 1% of spot (0.01).
-const DEFAULT_SPOT_BUMP_PCT: f64 = 0.01;
+const DEFAULT_SPOT_BUMP_DECIMAL: f64 = 0.01;
 
 /// Default volatility bump: **absolute** 1 vol point (0.01), e.g. 20% → 21%.
 /// It is an additive shift of implied volatility, not a 1% relative scaling.
-const DEFAULT_VOL_BUMP_PCT: f64 = 0.01;
+const DEFAULT_VOL_BUMP_DECIMAL: f64 = 0.01;
 
 /// Default parallel rate and credit-spread bump: 1bp (1.0 in bp units).
 const DEFAULT_BUMP_BP: f64 = 1.0;
@@ -82,9 +82,9 @@ pub(crate) struct SensitivitiesConfig {
     /// Credit spread bump size in basis points (e.g., 1.0 = 1bp).
     pub(crate) credit_spread_bump_bp: f64,
     /// Spot bump size as a decimal fraction of spot (e.g., 0.01 = 1%).
-    pub(crate) spot_bump_pct: f64,
+    pub(crate) spot_bump_decimal: f64,
     /// Vol bump size (absolute) in decimal volatility (e.g., 0.01 = 1 vol point).
-    pub(crate) vol_bump_pct: f64,
+    pub(crate) vol_bump_decimal: f64,
     /// Yield bump in basis points for numerical yield duration/convexity, when
     /// set by `metric_pricing_overrides.bump_config.ytm_bump_bp`. `None` lets
     /// each calculator keep its own default shock.
@@ -100,8 +100,8 @@ impl Default for SensitivitiesConfig {
         Self {
             rate_bump_bp: DEFAULT_BUMP_BP,
             credit_spread_bump_bp: DEFAULT_BUMP_BP,
-            spot_bump_pct: DEFAULT_SPOT_BUMP_PCT,
-            vol_bump_pct: DEFAULT_VOL_BUMP_PCT,
+            spot_bump_decimal: DEFAULT_SPOT_BUMP_DECIMAL,
+            vol_bump_decimal: DEFAULT_VOL_BUMP_DECIMAL,
             ytm_bump_bp: None,
             dv01_buckets_years: STANDARD_BUCKETS_YEARS.to_vec(),
             cs01_buckets_years: STANDARD_BUCKETS_YEARS.to_vec(),
@@ -112,8 +112,8 @@ impl Default for SensitivitiesConfig {
 impl From<&SensitivitiesConfig> for crate::instruments::GreekBumps {
     fn from(cfg: &SensitivitiesConfig) -> Self {
         Self {
-            spot_bump_pct: cfg.spot_bump_pct,
-            vol_bump_pct: cfg.vol_bump_pct,
+            spot_bump_decimal: cfg.spot_bump_decimal,
+            vol_bump_decimal: cfg.vol_bump_decimal,
             rate_bump_bp: cfg.rate_bump_bp,
         }
     }
@@ -140,9 +140,9 @@ pub(crate) struct SensitivitiesOverrides {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) credit_spread_bump_bp: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) spot_bump_pct: Option<f64>,
+    pub(crate) spot_bump_decimal: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) vol_bump_pct: Option<f64>,
+    pub(crate) vol_bump_decimal: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) dv01_buckets_years: Option<Vec<f64>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -207,13 +207,13 @@ pub(crate) fn from_finstack_config_or_default(
             ensure_finite_positive("credit_spread_bump_bp", v)?;
             base.credit_spread_bump_bp = v;
         }
-        if let Some(v) = overrides.spot_bump_pct {
-            ensure_finite_positive("spot_bump_pct", v)?;
-            base.spot_bump_pct = v;
+        if let Some(v) = overrides.spot_bump_decimal {
+            ensure_finite_positive("spot_bump_decimal", v)?;
+            base.spot_bump_decimal = v;
         }
-        if let Some(v) = overrides.vol_bump_pct {
-            ensure_finite_positive("vol_bump_pct", v)?;
-            base.vol_bump_pct = v;
+        if let Some(v) = overrides.vol_bump_decimal {
+            ensure_finite_positive("vol_bump_decimal", v)?;
+            base.vol_bump_decimal = v;
         }
         if let Some(v) = overrides.dv01_buckets_years {
             ensure_bucket_grid("dv01_buckets_years", &v)?;
@@ -258,13 +258,13 @@ pub(crate) fn apply_pricing_overrides(
         )?;
         base.credit_spread_bump_bp = v;
     }
-    if let Some(v) = bumps.spot_bump_pct {
-        ensure_finite_positive("metric_pricing_overrides.bump_config.spot_bump_pct", v)?;
-        base.spot_bump_pct = v;
+    if let Some(v) = bumps.spot_bump_decimal {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.spot_bump_decimal", v)?;
+        base.spot_bump_decimal = v;
     }
-    if let Some(v) = bumps.vol_bump_pct {
-        ensure_finite_positive("metric_pricing_overrides.bump_config.vol_bump_pct", v)?;
-        base.vol_bump_pct = v;
+    if let Some(v) = bumps.vol_bump_decimal {
+        ensure_finite_positive("metric_pricing_overrides.bump_config.vol_bump_decimal", v)?;
+        base.vol_bump_decimal = v;
     }
     if let Some(v) = bumps.ytm_bump_bp {
         ensure_finite_positive("metric_pricing_overrides.bump_config.ytm_bump_bp", v)?;
@@ -298,8 +298,8 @@ mod tests {
         let resolved = apply_pricing_overrides(base, Some(&po)).expect("valid overrides");
         assert_eq!(resolved.rate_bump_bp, 2.0);
         assert_eq!(resolved.credit_spread_bump_bp, 3.0);
-        assert_eq!(resolved.spot_bump_pct, 0.02);
-        assert_eq!(resolved.vol_bump_pct, 0.03);
+        assert_eq!(resolved.spot_bump_decimal, 0.02);
+        assert_eq!(resolved.vol_bump_decimal, 0.03);
     }
 
     #[test]
@@ -315,8 +315,8 @@ mod tests {
     fn greek_bumps_default_matches_resolved_default_config() {
         let bumps = crate::instruments::GreekBumps::from(&SensitivitiesConfig::default());
         assert_eq!(bumps, crate::instruments::GreekBumps::default());
-        assert_eq!(bumps.spot_bump_pct, 0.01);
-        assert_eq!(bumps.vol_bump_pct, 0.01);
+        assert_eq!(bumps.spot_bump_decimal, 0.01);
+        assert_eq!(bumps.vol_bump_decimal, 0.01);
         assert_eq!(bumps.rate_bump_bp, 1.0);
     }
 
@@ -362,8 +362,8 @@ mod tests {
                 json!({
                     "rate_bump_bp": 2.5,
                     "credit_spread_bump_bp": 3.0,
-                    "spot_bump_pct": 0.02,
-                    "vol_bump_pct": 0.03,
+                    "spot_bump_decimal": 0.02,
+                    "vol_bump_decimal": 0.03,
                     "dv01_buckets_years": [0.5, 1.0, 5.0],
                     "cs01_buckets_years": [1.0, 3.0, 7.0]
                 }),
@@ -373,8 +373,8 @@ mod tests {
         let resolved = from_finstack_config_or_default(&cfg).expect("overrides should parse");
         assert_eq!(resolved.rate_bump_bp, 2.5);
         assert_eq!(resolved.credit_spread_bump_bp, 3.0);
-        assert_eq!(resolved.spot_bump_pct, 0.02);
-        assert_eq!(resolved.vol_bump_pct, 0.03);
+        assert_eq!(resolved.spot_bump_decimal, 0.02);
+        assert_eq!(resolved.vol_bump_decimal, 0.03);
         assert_eq!(resolved.dv01_buckets_years, vec![0.5, 1.0, 5.0]);
         assert_eq!(resolved.cs01_buckets_years, vec![1.0, 3.0, 7.0]);
     }
@@ -427,6 +427,19 @@ mod tests {
     }
 
     #[test]
+    fn sensitivities_extension_rejects_retired_pct_bump_keys() {
+        // schema-rejection-test: `valuations.sensitivities.v1` retired keys
+        for retired in ["spot_bump_pct", "vol_bump_pct"] {
+            let mut cfg = FinstackConfig::default();
+            cfg.extensions
+                .insert(SENSITIVITIES_CONFIG_KEY_V1, json!({ retired: 0.01 }))
+                .expect("valid extension key");
+            from_finstack_config_or_default(&cfg)
+                .expect_err("retired sensitivities.v1 bump key must be rejected");
+        }
+    }
+
+    #[test]
     fn from_context_or_default_layers_metric_overrides_on_top_of_config() {
         let mut cfg = FinstackConfig::default();
         cfg.extensions
@@ -434,7 +447,7 @@ mod tests {
                 SENSITIVITIES_CONFIG_KEY_V1,
                 json!({
                     "rate_bump_bp": 2.5,
-                    "vol_bump_pct": 0.03
+                    "vol_bump_decimal": 0.03
                 }),
             )
             .expect("valid extension key");
@@ -445,7 +458,7 @@ mod tests {
         let resolved = from_context_or_default(&cfg, Some(&pricing_overrides))
             .expect("layered config should parse");
         assert_eq!(resolved.rate_bump_bp, 4.0);
-        assert_eq!(resolved.vol_bump_pct, 0.05);
+        assert_eq!(resolved.vol_bump_decimal, 0.05);
         assert_eq!(resolved.credit_spread_bump_bp, 1.0);
     }
 

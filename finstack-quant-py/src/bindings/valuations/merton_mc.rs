@@ -330,10 +330,10 @@ impl PyPathStatistics {
         self.inner.avg_terminal_notional
     }
 
-    /// Average recovery percentage among defaulted paths.
+    /// Average recovery rate (decimal fraction) among defaulted paths.
     #[getter]
-    fn avg_recovery_pct(&self) -> f64 {
-        self.inner.avg_recovery_pct
+    fn avg_recovery_rate(&self) -> f64 {
+        self.inner.avg_recovery_rate
     }
 
     /// Fraction of coupon dates where PIK was elected.
@@ -348,8 +348,8 @@ impl PyPathStatistics {
     /// rendered directly.
     fn __repr__(&self) -> String {
         format!(
-            "PathStatistics(default_rate={}, avg_recovery_pct={}, pik_exercise_rate={})",
-            self.inner.default_rate, self.inner.avg_recovery_pct, self.inner.pik_exercise_rate
+            "PathStatistics(default_rate={}, avg_recovery_rate={}, pik_exercise_rate={})",
+            self.inner.default_rate, self.inner.avg_recovery_rate, self.inner.pik_exercise_rate
         )
     }
 }
@@ -440,7 +440,7 @@ impl PyMertonMcResult {
     /// ``unexpected_loss``, ``expected_shortfall_95``, ``average_pik_fraction``,
     /// ``effective_spread_bp``, ``num_paths``, ``standard_error``,
     /// ``default_rate``, ``avg_default_time``, ``avg_terminal_notional``,
-    /// ``avg_recovery_pct``, ``pik_exercise_rate``.
+    /// ``avg_recovery_rate``, ``pik_exercise_rate``.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let stats = &self.inner.path_statistics;
@@ -457,7 +457,7 @@ impl PyMertonMcResult {
             "default_rate": stats.default_rate,
             "avg_default_time": stats.avg_default_time,
             "avg_terminal_notional": stats.avg_terminal_notional,
-            "avg_recovery_pct": stats.avg_recovery_pct,
+            "avg_recovery_rate": stats.avg_recovery_rate,
             "pik_exercise_rate": stats.pik_exercise_rate,
         });
         crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema(
@@ -476,7 +476,7 @@ impl PyMertonMcResult {
                 "default_rate",
                 "avg_default_time",
                 "avg_terminal_notional",
-                "avg_recovery_pct",
+                "avg_recovery_rate",
                 "pik_exercise_rate",
             ],
         )

@@ -109,7 +109,7 @@ enum ShockKind {
 impl ShockKind {
     fn meta_key(self) -> &'static str {
         match self {
-            ShockKind::Price => "scenario_price_shock_pct",
+            ShockKind::Price => "scenario_price_shock_decimal",
             ShockKind::Spread => "scenario_spread_shock_bp",
         }
     }
@@ -210,8 +210,8 @@ fn apply_shock_to_matching_instrument(
     match kind {
         ShockKind::Price => {
             if let Some(overrides) = instrument.get_scenario_pricing_overrides_mut() {
-                overrides.scenario_price_shock_pct = Some(accumulate_optional_shock(
-                    overrides.scenario_price_shock_pct,
+                overrides.scenario_price_shock_decimal = Some(accumulate_optional_shock(
+                    overrides.scenario_price_shock_decimal,
                     delta,
                     kind,
                 ));
@@ -361,13 +361,13 @@ mod tests {
         let overrides = instruments[0]
             .get_scenario_pricing_overrides()
             .expect("overrides");
-        let shock = overrides.scenario_price_shock_pct.expect("price shock");
+        let shock = overrides.scenario_price_shock_decimal.expect("price shock");
         assert!((100.0 * (1.0 + shock) - 16.0).abs() < 1e-12);
         assert_eq!(overrides.scenario_spread_shock_bp, Some(50.0));
         let mut attrs = Attributes::new();
         accumulate_meta_shock(&mut attrs, ShockKind::Price, -0.6);
         accumulate_meta_shock(&mut attrs, ShockKind::Price, -0.6);
-        let stored: f64 = attrs.meta["scenario_price_shock_pct"]
+        let stored: f64 = attrs.meta["scenario_price_shock_decimal"]
             .parse()
             .expect("stored shock");
         assert!((100.0 * (1.0 + stored) - 16.0).abs() < 1e-12);
@@ -410,7 +410,7 @@ mod tests {
             assert_eq!(
                 child
                     .get_scenario_pricing_overrides()
-                    .and_then(|overrides| overrides.scenario_price_shock_pct),
+                    .and_then(|overrides| overrides.scenario_price_shock_decimal),
                 Some(0.1)
             );
         }
@@ -431,7 +431,7 @@ mod tests {
         assert_eq!(
             shocked
                 .get_scenario_pricing_overrides()
-                .and_then(|overrides| overrides.scenario_price_shock_pct),
+                .and_then(|overrides| overrides.scenario_price_shock_decimal),
             Some(0.1)
         );
         for leg in &shocked.spec.legs {
@@ -444,7 +444,7 @@ mod tests {
             assert_eq!(
                 child
                     .get_scenario_pricing_overrides()
-                    .and_then(|overrides| overrides.scenario_price_shock_pct),
+                    .and_then(|overrides| overrides.scenario_price_shock_decimal),
                 None
             );
         }

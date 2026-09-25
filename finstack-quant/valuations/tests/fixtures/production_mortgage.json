@@ -84,7 +84,7 @@
           "current_factor": 0.6,
           "day_count": "30_360",
           "discount_curve_id": "USD-OIS",
-          "guarantee_fee_rate": 0.0025,
+          "guarantee_fee_bp": 25.0,
           "id": "FN-MA1234",
           "issue_date": "2026-03-01",
           "maturity": "2026-04-01",
@@ -98,7 +98,7 @@
           "prepayment_spec": {
             "cpr": 0.0
           },
-          "servicing_fee_rate": 0.0025,
+          "servicing_fee_bp": 25.0,
           "wac": 0.045,
           "wam": 1
         }
@@ -178,7 +178,7 @@
           "current_factor": 0.6,
           "day_count": "30_360",
           "discount_curve_id": "USD-OIS",
-          "guarantee_fee_rate": 0.0025,
+          "guarantee_fee_bp": 25.0,
           "id": "FN-MA1234",
           "issue_date": "2026-03-01",
           "maturity": "2026-04-01",
@@ -192,7 +192,7 @@
           "prepayment_spec": {
             "cpr": 0.0
           },
-          "servicing_fee_rate": 0.0025,
+          "servicing_fee_bp": 25.0,
           "wac": 0.045,
           "wam": 1
         }
@@ -221,7 +221,7 @@
         "current_factor": 0.6,
         "day_count": "30_360",
         "discount_curve_id": "USD-OIS",
-        "guarantee_fee_rate": 0.0025,
+        "guarantee_fee_bp": 25.0,
         "id": "FN-MA1234",
         "issue_date": "2026-03-01",
         "maturity": "2026-04-01",
@@ -235,7 +235,7 @@
         "prepayment_spec": {
           "cpr": 0.0
         },
-        "servicing_fee_rate": 0.0025,
+        "servicing_fee_bp": 25.0,
         "wac": 0.045,
         "wam": 1
       },

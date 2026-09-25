@@ -331,9 +331,12 @@ impl Bond {
             let bond_mode = match coupon_type {
                 CouponType::Cash => PikMode::Cash,
                 CouponType::Pik => PikMode::Pik,
-                CouponType::Split { cash_pct, pik_pct } => PikMode::Split {
-                    cash_fraction: cash_pct.to_f64().unwrap_or(1.0),
-                    pik_fraction: pik_pct.to_f64().unwrap_or(0.0),
+                CouponType::Split {
+                    cash_fraction,
+                    pik_fraction,
+                } => PikMode::Split {
+                    cash_fraction: cash_fraction.to_f64().unwrap_or(1.0),
+                    pik_fraction: pik_fraction.to_f64().unwrap_or(0.0),
                 },
             };
             if !matches!(bond_mode, PikMode::Cash) {

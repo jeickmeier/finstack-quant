@@ -256,7 +256,7 @@ mod tests {
 
         let mut shocked = baseline;
         shocked.scenario_pricing_overrides =
-            ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+            ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
         let shocked_result = shocked
             .price_with_metrics(
                 &market,

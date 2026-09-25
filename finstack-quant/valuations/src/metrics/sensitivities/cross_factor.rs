@@ -371,7 +371,7 @@ pub(crate) fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn 
         vol_surface_ids,
         vol_scalar_ids,
         override_volatility,
-        bump_abs: defaults.vol_bump_pct,
+        bump_abs: defaults.vol_bump_decimal,
     })))
 }
 
@@ -386,7 +386,7 @@ pub(crate) fn make_spot_bumper(context: &MetricContext) -> Result<Option<Box<dyn
         sens_config::from_context_or_default(context.get_config(), context.get_metric_overrides())?;
     Ok(Some(Box::new(SpotBumper {
         price_id: price_id.clone(),
-        bump_pct: defaults.spot_bump_pct,
+        bump_pct: defaults.spot_bump_decimal,
     })))
 }
 
@@ -401,7 +401,7 @@ pub(crate) fn make_fx_bumper(context: &MetricContext) -> Result<Option<Box<dyn F
         sens_config::from_context_or_default(context.get_config(), context.get_metric_overrides())?;
     Ok(Some(Box::new(FxBumper {
         pairs: deps.fx_pairs,
-        bump_pct: defaults.spot_bump_pct,
+        bump_pct: defaults.spot_bump_decimal,
     })))
 }
 

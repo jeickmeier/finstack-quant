@@ -185,7 +185,7 @@ impl MertonMcEngine {
         let mut total_defaults: usize = 0;
         let mut total_default_time: f64 = 0.0;
         let mut total_terminal_notional: f64 = 0.0;
-        let mut total_recovery_pct: f64 = 0.0;
+        let mut total_recovery_rate: f64 = 0.0;
         let mut total_pik_elections: usize = 0;
         let mut total_coupon_periods: usize = 0;
         let mut surviving_paths: usize = 0;
@@ -216,7 +216,7 @@ impl MertonMcEngine {
         struct LegOutcome {
             pv: f64,
             defaulted_at: Option<f64>,
-            recovery_pct: f64,
+            recovery_rate: f64,
             survived: bool,
             terminal_notional: f64,
             pik_elections: usize,
@@ -304,7 +304,7 @@ impl MertonMcEngine {
                                     path_pv += recovery_cashflow * df;
                                     defaulted = true;
                                     leg.defaulted_at = Some(t);
-                                    leg.recovery_pct = recovery_rate;
+                                    leg.recovery_rate = recovery_rate;
                                     break;
                                 }
                             }
@@ -344,7 +344,7 @@ impl MertonMcEngine {
                                     path_pv += recovery_cashflow * df;
                                     defaulted = true;
                                     leg.defaulted_at = Some(t);
-                                    leg.recovery_pct = recovery_rate;
+                                    leg.recovery_rate = recovery_rate;
                                     break;
                                 }
                             }
@@ -474,7 +474,7 @@ impl MertonMcEngine {
                 if let Some(t) = leg.defaulted_at {
                     total_defaults += 1;
                     total_default_time += t;
-                    total_recovery_pct += leg.recovery_pct;
+                    total_recovery_rate += leg.recovery_rate;
                 }
                 if leg.survived {
                     surviving_paths += 1;
@@ -576,8 +576,8 @@ impl MertonMcEngine {
         } else {
             notional
         };
-        let avg_recovery_pct = if total_defaults > 0 {
-            total_recovery_pct / total_defaults as f64
+        let avg_recovery_rate = if total_defaults > 0 {
+            total_recovery_rate / total_defaults as f64
         } else {
             0.0
         };
@@ -595,7 +595,7 @@ impl MertonMcEngine {
                 default_rate,
                 avg_default_time,
                 avg_terminal_notional,
-                avg_recovery_pct,
+                avg_recovery_rate,
                 pik_exercise_rate,
             },
             num_paths,

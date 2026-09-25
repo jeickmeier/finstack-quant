@@ -96,8 +96,8 @@ fn auto_abs(senior: f64) -> StructuredCredit {
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
     deal.waterfall_rules = Some(WaterfallRules {
         target_oc: Some(TargetOcSpec {
-            pct_of_current: 0.12,
-            floor_pct_of_original: 0.015,
+            fraction_of_current: 0.12,
+            floor_fraction_of_original: 0.015,
         }),
         ..Default::default()
     });

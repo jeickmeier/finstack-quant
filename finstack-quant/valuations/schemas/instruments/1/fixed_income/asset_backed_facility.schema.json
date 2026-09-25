@@ -112,33 +112,33 @@
         },
         {
           "additionalProperties": false,
-          "description": "Cumulative collateral losses above `max_pct` percent of the original\ncollateral end revolving.",
+          "description": "Cumulative collateral losses above `max_cumulative_loss` of the\noriginal collateral end revolving.",
           "properties": {
             "kind": {
               "const": "cumulative_loss",
               "type": "string"
             },
-            "max_pct": {
-              "description": "Loss threshold in percent of original collateral (`4.0` = 4%).",
+            "max_cumulative_loss": {
+              "description": "Loss threshold as a decimal fraction of the original collateral\n(`0.04` = 4%), in `(0, 1]`.",
               "format": "double",
               "type": "number"
             }
           },
           "required": [
             "kind",
-            "max_pct"
+            "max_cumulative_loss"
           ],
           "type": "object"
         },
         {
           "additionalProperties": false,
-          "description": "A three-period average excess spread below `min_3m` (annual decimal)\nends revolving.",
+          "description": "A three-period average excess spread below `min_excess_spread_3m`\n(annual decimal) ends revolving.",
           "properties": {
             "kind": {
               "const": "excess_spread",
               "type": "string"
             },
-            "min_3m": {
+            "min_excess_spread_3m": {
               "description": "Excess-spread floor as an annual decimal (`0.01` = 1%).",
               "format": "double",
               "type": "number"
@@ -146,7 +146,7 @@
           },
           "required": [
             "kind",
-            "min_3m"
+            "min_excess_spread_3m"
           ],
           "type": "object"
         }
@@ -283,7 +283,7 @@
     },
     "AssetBackedFacility": {
       "additionalProperties": false,
-      "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); percentages are\npercent values (`max_pct`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are\npercent values (`20.0` = 20%) and loss thresholds are decimal fractions\n(`max_cumulative_loss`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
         "amortization_events": {
           "description": "Events that end revolving early.",
@@ -1740,7 +1740,7 @@
           "format": "double",
           "type": "number"
         },
-        "fixed_allocation_pct": {
+        "fixed_allocation_decimal": {
           "description": "Investor allocation of trust collections fixed at the end of the\nrevolving period, as a decimal in `(0, 1]`. `None` freezes the\nallocation at the investor's floating share\n`investor_interest / (investor_interest + seller_interest)`.",
           "format": "double",
           "type": [
@@ -2368,7 +2368,7 @@
       ]
     },
     "CouponType": {
-      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
       "oneOf": [
         {
           "const": "cash",
@@ -2387,18 +2387,18 @@
             "split": {
               "additionalProperties": false,
               "properties": {
-                "cash_pct": {
+                "cash_fraction": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
                 },
-                "pik_pct": {
+                "pik_fraction": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
                 }
               },
               "required": [
-                "cash_pct",
-                "pik_pct"
+                "cash_fraction",
+                "pik_fraction"
               ],
               "type": "object"
             }
@@ -3391,14 +3391,14 @@
     },
     "IncentiveFeeSpec": {
       "additionalProperties": false,
-      "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share_pct`\nof the residual interest proceeds ahead of equity.",
+      "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share`\nof the residual interest proceeds ahead of equity.",
       "properties": {
         "hurdle_irr": {
           "description": "Equity IRR hurdle as an annual decimal (`0.12` = 12%).",
           "format": "double",
           "type": "number"
         },
-        "share_pct": {
+        "share": {
           "description": "Share of the residual paid to the manager once the hurdle is met, as\na decimal fraction in `[0, 1]`.",
           "format": "double",
           "type": "number"
@@ -3406,7 +3406,7 @@
       },
       "required": [
         "hurdle_irr",
-        "share_pct"
+        "share"
       ],
       "type": "object"
     },
@@ -3931,19 +3931,19 @@
       "type": "object"
     },
     "OidPolicy": {
-      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldPct`: Discount as percentage withheld from each funded draw\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparatePct`: Percentage of each draw tracked separately, not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
+      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Discount as percentage (basis points) withheld from each funded draw",
+          "description": "Discount in basis points of each funded draw (`200` = 2%), withheld\nfrom proceeds",
           "properties": {
-            "withheld_pct": {
+            "withheld_bp": {
               "format": "int32",
               "type": "integer"
             }
           },
           "required": [
-            "withheld_pct"
+            "withheld_bp"
           ],
           "type": "object"
         },
@@ -3962,15 +3962,15 @@
         },
         {
           "additionalProperties": false,
-          "description": "Discount as percentage of each draw tracked separately for amortization",
+          "description": "Discount in basis points of each draw (`200` = 2%), tracked\nseparately for amortization",
           "properties": {
-            "separate_pct": {
+            "separate_bp": {
               "format": "int32",
               "type": "integer"
             }
           },
           "required": [
-            "separate_pct"
+            "separate_bp"
           ],
           "type": "object"
         },
@@ -4915,7 +4915,7 @@
           "type": "integer"
         },
         "price_pct": {
-          "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price`.",
+          "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price_pct`.",
           "format": "double",
           "type": "number"
         },
@@ -4936,8 +4936,8 @@
       "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
       "properties": {
-        "max_price": {
-          "description": "Maximum purchase price (% of par)",
+        "max_price_pct": {
+          "description": "Maximum purchase price in percent of par (`100.0` = par).",
           "format": "double",
           "type": "number"
         },
@@ -4948,7 +4948,7 @@
         }
       },
       "required": [
-        "max_price",
+        "max_price_pct",
         "min_yield"
       ],
       "type": "object"
@@ -6342,13 +6342,13 @@
           "additionalProperties": false,
           "description": "Fraction of the opening commitment, as a decimal (`0.02` = 2%).",
           "properties": {
-            "pct_of_commitment": {
+            "fraction_of_commitment": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_commitment"
+            "fraction_of_commitment"
           ],
           "type": "object"
         }

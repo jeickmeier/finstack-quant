@@ -591,7 +591,7 @@ impl Pricer for SnowballHw1fMcPricer {
 }
 
 fn ensure_not_callable(inst: &Snowball) -> Result<()> {
-    if inst.callable.is_some() {
+    if inst.call_provision.is_some() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Snowball {} has a Bermudan call provision; callable snowball pricing requires \
              a dedicated LSMC exercise pricer and is not handled by the discounting/HW1F MC pricers",
@@ -784,7 +784,7 @@ mod tests {
             floating_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
-            callable: None,
+            call_provision: None,
             day_count: DayCount::Act365F,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -1090,9 +1090,9 @@ mod tests {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.02, 0.03);
         let mut inst = test_snowball();
-        inst.callable = Some(BermudanCallProvision::new(
+        inst.call_provision = Some(BermudanCallProvision::new(
             vec![date(2026, Month::January, 1)],
-            1.0,
+            100.0,
             1,
         ));
 

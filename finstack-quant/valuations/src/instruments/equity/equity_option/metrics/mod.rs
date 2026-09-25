@@ -19,18 +19,18 @@ use crate::metrics::{MetricContext, MetricRegistry};
 /// Starts from the resolved spot bump (`valuations.sensitivities.v1` layered
 /// with `metric_pricing_overrides.bump_config`). When
 /// `bump_config.adaptive_bumps` is set and no explicit
-/// `bump_config.spot_bump_pct` is given, the bump widens with moneyness,
+/// `bump_config.spot_bump_decimal` is given, the bump widens with moneyness,
 /// capped at 5× the resolved bump, so deep ITM/OTM stencils stay out of the
 /// noise floor.
-fn spot_bump_pct(
+fn spot_bump_decimal(
     context: &MetricContext,
     option: &EquityOption,
     spot: f64,
 ) -> finstack_quant_core::Result<f64> {
-    let resolved = sens_config::resolve(context)?.spot_bump_pct;
-    let adaptive = context
-        .get_metric_overrides()
-        .is_some_and(|po| po.bump_config.adaptive_bumps && po.bump_config.spot_bump_pct.is_none());
+    let resolved = sens_config::resolve(context)?.spot_bump_decimal;
+    let adaptive = context.get_metric_overrides().is_some_and(|po| {
+        po.bump_config.adaptive_bumps && po.bump_config.spot_bump_decimal.is_none()
+    });
     if adaptive {
         let moneyness = (spot - option.strike).abs() / option.strike;
         Ok(resolved * (1.0 + 2.0 * moneyness).min(5.0))

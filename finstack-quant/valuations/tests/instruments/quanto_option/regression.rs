@@ -281,7 +281,7 @@ fn vanna_is_reported_per_vol_point() {
         .expect("Vanna in measures");
 
     let spot = 35_000.0;
-    let spot_bump_pct = 0.01;
+    let spot_bump_decimal = 0.01;
     let vol_bump_abs = 0.01;
 
     // Flat surfaces: rebuilding at `equity_vol ± bump` equals a parallel
@@ -290,15 +290,15 @@ fn vanna_is_reported_per_vol_point() {
         let base = build_market(vol_level, fx_vol);
         let up = base.clone().insert_price(
             "NKY-SPOT",
-            MarketScalar::Unitless(spot * (1.0 + spot_bump_pct)),
+            MarketScalar::Unitless(spot * (1.0 + spot_bump_decimal)),
         );
         let dn = base.insert_price(
             "NKY-SPOT",
-            MarketScalar::Unitless(spot * (1.0 - spot_bump_pct)),
+            MarketScalar::Unitless(spot * (1.0 - spot_bump_decimal)),
         );
         let pv_up = option.value(&up, AS_OF).expect("pv spot up").amount();
         let pv_dn = option.value(&dn, AS_OF).expect("pv spot dn").amount();
-        (pv_up - pv_dn) / (2.0 * spot * spot_bump_pct)
+        (pv_up - pv_dn) / (2.0 * spot * spot_bump_decimal)
     };
 
     let delta_up = delta_at(equity_vol + vol_bump_abs);

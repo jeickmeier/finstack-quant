@@ -124,7 +124,7 @@ where
 {
     instrument
         .get_scenario_pricing_overrides()
-        .and_then(|overrides| overrides.scenario_price_shock_pct)
+        .and_then(|overrides| overrides.scenario_price_shock_decimal)
         .map_or(base_value, |shock| base_value * (1.0 + shock))
 }
 
@@ -913,7 +913,7 @@ mod tests {
         let mut instrument = StubInstrument::new("STUB-SHOCK");
         instrument.scenario_pricing_overrides = instrument
             .scenario_pricing_overrides
-            .with_price_shock_pct(-0.10);
+            .with_scenario_price_shock_decimal(-0.10);
 
         let market = MarketContext::new();
         let result = instrument.price_with_metrics(
@@ -935,7 +935,7 @@ mod tests {
         let mut instrument = StubInstrument::new("STUB-VALUE");
         instrument.scenario_pricing_overrides = instrument
             .scenario_pricing_overrides
-            .with_price_shock_pct(-0.10);
+            .with_scenario_price_shock_decimal(-0.10);
 
         let market = MarketContext::new();
         let as_of = date!(2024 - 01 - 01);
@@ -961,7 +961,7 @@ mod tests {
         let mut instrument = StubInstrument::new("STUB-BASE");
         instrument.scenario_pricing_overrides = instrument
             .scenario_pricing_overrides
-            .with_price_shock_pct(-0.10);
+            .with_scenario_price_shock_decimal(-0.10);
 
         let market = MarketContext::new();
         let base = instrument.base_value(&market, date!(2024 - 01 - 01))?;

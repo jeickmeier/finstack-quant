@@ -16,6 +16,8 @@ mod common;
 mod registry_coverage;
 #[path = "instruments/serde_skip_guard.rs"]
 mod serde_skip_guard;
+#[path = "instruments/unit_suffix_wire_keys.rs"]
+mod unit_suffix_wire_keys;
 
 #[path = "support/mod.rs"]
 #[allow(dead_code, unused_imports)]

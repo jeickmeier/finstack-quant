@@ -2126,7 +2126,7 @@ class MertonMcResult:
             ``unexpected_loss``, ``expected_shortfall_95``,
             ``average_pik_fraction``, ``effective_spread_bp``, ``num_paths``,
             ``standard_error``, ``default_rate``, ``avg_default_time``,
-            ``avg_terminal_notional``, ``avg_recovery_pct`` and
+            ``avg_terminal_notional``, ``avg_recovery_rate`` and
             ``pik_exercise_rate``.
 
         Raises
@@ -2244,14 +2244,14 @@ class PathStatistics:
         ...
 
     @property
-    def avg_recovery_pct(self) -> float:
+    def avg_recovery_rate(self) -> float:
         """
-        Average recovery percentage among defaulted paths.
+        Average recovery rate among defaulted paths.
 
         Returns
         -------
         float
-            Decimal fraction despite the ``_pct`` name: ``0.40`` means 40%
+            Decimal fraction: ``0.40`` means 40%
             recovery on the notional accreted up to the default time,
             averaged over defaulted paths. Exactly ``0.0`` when no path
             defaulted.
@@ -11224,7 +11224,7 @@ class ConvertibleBond:
         with the default tree).
 
         Bump sizes come from the bond's ``metric_pricing_overrides.bump_config``
-        (``spot_bump_pct``, ``vol_bump_pct``, ``rate_bump_bp``), defaulting to
+        (``spot_bump_decimal``, ``vol_bump_decimal``, ``rate_bump_bp``), defaulting to
         1% of spot, 1 vol point and 1bp.
 
         Parameters
@@ -15994,7 +15994,7 @@ class AssetPool:
         value : dict[str, Any] | str
             ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
             string: ISO ``end_date`` (inclusive), ``is_active``, ``criteria``
-            (``max_price`` percent of par, ``min_yield`` annual decimal current
+            (``max_price_pct`` percent of par, ``min_yield`` annual decimal current
             yield below which a surviving asset is skipped), optional
             ``amortizing_tranches`` (note ids paid down inside the window) and
             optional ``assumptions`` (``spread_bp``, ``price_pct``,
@@ -16023,7 +16023,7 @@ class AssetPool:
         ...     "end_date": "2028-01-01",
         ...     "is_active": True,
         ...     "criteria": {
-        ...         "max_price": 100.0,
+        ...         "max_price_pct": 100.0,
         ...         "min_yield": 0.0,
         ...     },
         ...     "amortizing_tranches": ["A"],
@@ -22555,7 +22555,7 @@ class StructuredCredit:
         ...
 
     @property
-    def cleanup_call_pct(self) -> float | None:
+    def cleanup_call_decimal(self) -> float | None:
         """
         Clean-up call pool-factor threshold (decimal).
 
@@ -23568,7 +23568,7 @@ class StructuredCreditBuilder:
             ``CardPortfolioSpec`` serde object: ``monthly_payment_rate``,
             ``portfolio_yield`` and ``charge_off_rate`` (annual decimals),
             plus the optional ``seller_interest`` (``Money`` serde object in
-            the pool currency) and ``fixed_allocation_pct`` (decimal in
+            the pool currency) and ``fixed_allocation_decimal`` (decimal in
             ``(0, 1]``) that fix the investor allocation of trust collections
             once the revolving period ends.
         Returns
@@ -23695,7 +23695,7 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def cleanup_call_pct(self, value: float) -> StructuredCreditBuilder:
+    def cleanup_call_decimal(self, value: float) -> StructuredCreditBuilder:
         """
         Set the clean-up call pool-factor threshold.
 
@@ -24564,15 +24564,16 @@ class AmortizationEvent:
     An event that ends a facility's revolving period early.
 
     Built through :meth:`date` (a fixed date), :meth:`cumulative_loss` (a
-    cumulative-loss threshold in percent of the original collateral) or
+    cumulative-loss threshold as a decimal fraction of the original
+    collateral) or
     :meth:`excess_spread` (a trailing three-month excess-spread floor).
 
     Examples
     --------
     >>> import datetime
     >>> from finstack_quant.valuations.instruments import AmortizationEvent
-    >>> AmortizationEvent.cumulative_loss(4.0).max_pct
-    4.0
+    >>> AmortizationEvent.cumulative_loss(0.04).max_cumulative_loss
+    0.04
     >>> AmortizationEvent.date(datetime.date(2025, 1, 15)).kind
     'date'
     """
@@ -24607,15 +24608,15 @@ class AmortizationEvent:
         ...
 
     @staticmethod
-    def cumulative_loss(max_pct: float) -> AmortizationEvent:
+    def cumulative_loss(max_cumulative_loss: float) -> AmortizationEvent:
         """
         The revolving period ends once cumulative losses reach a threshold.
 
         Parameters
         ----------
-        max_pct : float
-            Cumulative net loss as a percent of the original collateral
-            balance (``4.0`` = 4%).
+        max_cumulative_loss : float
+            Cumulative net loss as a decimal fraction of the original
+            collateral balance (``0.04`` = 4%), in ``(0, 1]``.
 
         Returns
         -------
@@ -24625,25 +24626,25 @@ class AmortizationEvent:
         Raises
         ------
         ValueError
-            If ``max_pct`` is negative or not finite.
+            If ``max_cumulative_loss`` is not finite or outside ``(0, 1]``.
 
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import AmortizationEvent
-        >>> AmortizationEvent.cumulative_loss(4.0).kind
+        >>> AmortizationEvent.cumulative_loss(0.04).kind
         'cumulative_loss'
         """
         ...
 
     @staticmethod
-    def excess_spread(min_3m: float) -> AmortizationEvent:
+    def excess_spread(min_excess_spread_3m: float) -> AmortizationEvent:
         """
         The revolving period ends once trailing excess spread falls below a
         floor.
 
         Parameters
         ----------
-        min_3m : float
+        min_excess_spread_3m : float
             Minimum trailing three-month annualized excess spread as a decimal
             (``0.01`` = 1%).
 
@@ -24655,12 +24656,12 @@ class AmortizationEvent:
         Raises
         ------
         ValueError
-            If ``min_3m`` is not finite.
+            If ``min_excess_spread_3m`` is not finite.
 
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import AmortizationEvent
-        >>> AmortizationEvent.excess_spread(0.01).min_3m
+        >>> AmortizationEvent.excess_spread(0.01).min_excess_spread_3m
         0.01
         """
         ...
@@ -24789,14 +24790,14 @@ class AmortizationEvent:
         ...
 
     @property
-    def max_pct(self) -> float | None:
+    def max_cumulative_loss(self) -> float | None:
         """
         Cumulative-loss threshold.
 
         Returns
         -------
         float | None
-            Percent, or ``None``.
+            Decimal fraction of the original collateral, or ``None``.
 
         Notes
         -----
@@ -24805,7 +24806,7 @@ class AmortizationEvent:
         ...
 
     @property
-    def min_3m(self) -> float | None:
+    def min_excess_spread_3m(self) -> float | None:
         """
         Excess-spread floor.
 
@@ -25432,8 +25433,8 @@ class AssetBackedFacility:
         -------
         list[dict[str, Any]]
             Each ``{"kind": "date", "date": ...}``,
-            ``{"kind": "cumulative_loss", "max_pct": ...}`` or
-            ``{"kind": "excess_spread", "min_3m": ...}``.
+            ``{"kind": "cumulative_loss", "max_cumulative_loss": ...}`` or
+            ``{"kind": "excess_spread", "min_excess_spread_3m": ...}``.
 
         Raises
         ------
@@ -25982,8 +25983,8 @@ class AssetBackedFacilityBuilder:
         ----------
         value : list[dict[str, Any]] | str
             ``AmortizationEvent`` objects: ``{"kind": "date", "date": ...}``,
-            ``{"kind": "cumulative_loss", "max_pct": ...}`` or
-            ``{"kind": "excess_spread", "min_3m": ...}``.
+            ``{"kind": "cumulative_loss", "max_cumulative_loss": ...}`` or
+            ``{"kind": "excess_spread", "min_excess_spread_3m": ...}``.
 
         Returns
         -------
@@ -27426,7 +27427,7 @@ class RevolvingCreditBuilder:
         value : dict[str, Any] | str
             ``RevolvingCreditFees`` as a ``dict`` or JSON ``str``
             (``upfront_fee`` as ``None``, ``{"amount": Money-dict}`` or
-            ``{"pct_of_commitment": 0.02}``; ``commitment_fee_tiers``,
+            ``{"fraction_of_commitment": 0.02}``; ``commitment_fee_tiers``,
             ``usage_fee_tiers``, ``facility_fee_bp`` and the dated ``steps`` list of
             ``{"date", "commitment_delta_bp", "usage_delta_bp",
             "facility_delta_bp"}`` rows).
@@ -31035,8 +31036,8 @@ class MetricPricingOverrides:
         Parameters
         ----------
         bump_config : dict[str, Any], optional
-            Finite-difference bump sizes: ``spot_bump_pct`` (``0.01`` = 1%),
-            ``vol_bump_pct`` (absolute vol, ``0.01`` = 1 vol point),
+            Finite-difference bump sizes: ``spot_bump_decimal`` (``0.01`` = 1%),
+            ``vol_bump_decimal`` (absolute vol, ``0.01`` = 1 vol point),
             ``rate_bump_bp``, ``credit_spread_bump_bp``, ``ytm_bump_bp`` (basis
             points) and ``adaptive_bumps`` (bool). ``None`` keeps the defaults.
         theta_period : Tenor | str, optional

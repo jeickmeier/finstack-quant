@@ -93,8 +93,8 @@ for instrument_id,envelope in credit_extension.items():
 print(pd.DataFrame(extension_rows).to_string(index=False))
 print(pd.Series({'as_of':AS_OF.isoformat(),'id':complex_terms['id'],
     'maturity':complex_terms['maturity'],'initial_coupon_decimal':coupon_terms['initial_rate'],
-    'cash_share':coupon_terms['coupon_type']['split']['cash_pct'],
-    'PIK_share':coupon_terms['coupon_type']['split']['pik_pct'],
+    'cash_share':coupon_terms['coupon_type']['split']['cash_fraction'],
+    'PIK_share':coupon_terms['coupon_type']['split']['pik_fraction'],
     'step':coupon_terms['step_schedule'][0],
     'amortization_payments':len(amortization_items),
     'first_call_start':first_call['start_date'],'first_call_price_pct':first_call['price_pct_of_par']}))
@@ -236,7 +236,7 @@ coupon.update({"initial_rate":"0.08","step_schedule":[["2029-01-15","0.0825"]],
     "frequency":{"count":3,"unit":"months"},"day_count":"30_360",
     "business_day_convention":"following","calendar_id":"weekends_only","stub":"none",
     "end_of_month":False,"payment_lag_days":0,
-    "coupon_type":{"split":{"cash_pct":"0.75","pik_pct":"0.25"}}})
+    "coupon_type":{"split":{"cash_fraction":"0.75","pik_fraction":"0.25"}}})
 amort_dates=[f"{year}-{month:02d}-15" for year in [2030,2031,2032]
              for month in [1,4,7,10] if (year,month)>(2030,1)]
 a["cashflow_spec"]={"amortizing":{"base":{"step_up":coupon},"schedule":{

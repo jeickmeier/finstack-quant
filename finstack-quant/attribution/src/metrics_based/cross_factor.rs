@@ -48,7 +48,7 @@ pub(super) fn apply(
     // UNIT CONTRACT for Spot cross-gamma metrics:
     // `CrossGammaSpotVol` and `CrossGammaSpotCredit` are produced by
     // `CrossFactorCalculator` using percentage-point–normalised finite
-    // differences: the spot bump denominator is `spot_bump_pct × 100`
+    // differences: the spot bump denominator is `spot_bump_decimal × 100`
     // (e.g. 1.0 for a 1 % bump) and the vol/credit denominator is
     // similarly in percentage-point units.  Therefore the attribution
     // below must multiply by `avg_spot_shift_pct` (percentage-point spot

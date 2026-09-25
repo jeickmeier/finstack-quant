@@ -176,7 +176,7 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
         let shock = returned
             .get_scenario_pricing_overrides()
             .unwrap()
-            .scenario_price_shock_pct
+            .scenario_price_shock_decimal
             .unwrap();
         assert!((100.0 * (1.0 + shock) - 16.0).abs() < 1e-12);
     }

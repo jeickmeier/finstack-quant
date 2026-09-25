@@ -205,7 +205,7 @@ The fees are emitted as `CFKind::LcFee` and `CFKind::FrontingFee`.
 ### Upfront fee, scheduled fees and the effective rate
 
 `fees.upfront_fee` is `UpfrontFee::Amount(Money)` or
-`UpfrontFee::PctOfCommitment(0.02)`, paid on the commitment date; it enters
+`UpfrontFee::FractionOfCommitment(0.02)`, paid on the commitment date; it enters
 the present value only while that date lies after the valuation date.
 `scheduled_fees: Vec<ScheduledFee { date, amount }>` are dated fixed fees
 (amendment, waiver, extension, consent) emitted as `CFKind::Fee`.

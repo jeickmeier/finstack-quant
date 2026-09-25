@@ -972,7 +972,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             ));
         };
 
-        let bump_pct = bumps.spot_bump_pct;
+        let bump_pct = bumps.spot_bump_decimal;
         let forward_price = self.forward_price(market, as_of)?;
         let bump_size = forward_price * bump_pct;
         if bump_size <= 0.0 {
@@ -1071,8 +1071,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             ));
         };
 
-        let fwd_bump_pct = bumps.spot_bump_pct;
-        let vol_bump = bumps.vol_bump_pct;
+        let fwd_bump_pct = bumps.spot_bump_decimal;
+        let vol_bump = bumps.vol_bump_decimal;
 
         let forward_price = self.forward_price(market, as_of)?;
         let fwd_bump_size = forward_price * fwd_bump_pct;
@@ -1159,7 +1159,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             ));
         }
 
-        let vol_bump = bumps.vol_bump_pct;
+        let vol_bump = bumps.vol_bump_decimal;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),

@@ -46,17 +46,18 @@ pub enum AmortizationEvent {
         )]
         date: Date,
     },
-    /// Cumulative collateral losses above `max_pct` percent of the original
-    /// collateral end revolving.
+    /// Cumulative collateral losses above `max_cumulative_loss` of the
+    /// original collateral end revolving.
     CumulativeLoss {
-        /// Loss threshold in percent of original collateral (`4.0` = 4%).
-        max_pct: f64,
+        /// Loss threshold as a decimal fraction of the original collateral
+        /// (`0.04` = 4%), in `(0, 1]`.
+        max_cumulative_loss: f64,
     },
-    /// A three-period average excess spread below `min_3m` (annual decimal)
-    /// ends revolving.
+    /// A three-period average excess spread below `min_excess_spread_3m`
+    /// (annual decimal) ends revolving.
     ExcessSpread {
         /// Excess-spread floor as an annual decimal (`0.01` = 1%).
-        min_3m: f64,
+        min_excess_spread_3m: f64,
     },
 }
 
@@ -85,8 +86,9 @@ pub struct TermOutSpec {
 /// accrues `unused_fee_bp`, and the residual keeps what is left. See
 /// [`Self::synthesized_deal`] for the exact mapping.
 ///
-/// Rates are decimals (`rate`) or basis points (`*_bp`); percentages are
-/// percent values (`max_pct`).
+/// Rates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are
+/// percent values (`20.0` = 20%) and loss thresholds are decimal fractions
+/// (`max_cumulative_loss`).
 ///
 /// # Examples
 ///
@@ -414,17 +416,26 @@ impl AssetBackedFacility {
                         )));
                     }
                 }
-                AmortizationEvent::CumulativeLoss { max_pct } => {
-                    if !max_pct.is_finite() || *max_pct <= 0.0 || *max_pct > 100.0 {
+                AmortizationEvent::CumulativeLoss {
+                    max_cumulative_loss,
+                } => {
+                    if !max_cumulative_loss.is_finite()
+                        || *max_cumulative_loss <= 0.0
+                        || *max_cumulative_loss > 1.0
+                    {
                         return Err(invalid(format!(
-                            "cumulative-loss event max_pct ({max_pct}) must be a percent in (0, 100]"
+                            "amortization_events.cumulative_loss.max_cumulative_loss \
+                             ({max_cumulative_loss}) must be a decimal fraction in (0, 1]"
                         )));
                     }
                 }
-                AmortizationEvent::ExcessSpread { min_3m } => {
-                    if !min_3m.is_finite() {
+                AmortizationEvent::ExcessSpread {
+                    min_excess_spread_3m,
+                } => {
+                    if !min_excess_spread_3m.is_finite() {
                         return Err(invalid(
-                            "excess-spread event min_3m must be finite".to_string(),
+                            "amortization_events.excess_spread.min_excess_spread_3m must be finite"
+                                .to_string(),
                         ));
                     }
                 }

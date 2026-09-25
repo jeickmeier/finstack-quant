@@ -1482,10 +1482,7 @@ fn calculate_payment_amount(
 
         PaymentCalculation::NetWacCarryover { amount, .. } => (amount.amount().max(0.0), None),
 
-        PaymentCalculation::IncentiveFee {
-            hurdle_irr,
-            share_pct,
-        } => {
+        PaymentCalculation::IncentiveFee { hurdle_irr, share } => {
             // The hurdle is tested on equity's cash to date plus what it has
             // already received earlier in this run plus this cash; the share
             // applies only to the part of this cash above the hurdle, so the
@@ -1498,7 +1495,7 @@ fn calculate_payment_amount(
                         .amount();
                     let excess = (total.amount() - shortfall.max(equity_paid_in_period.amount()))
                         .clamp(0.0, available.amount());
-                    excess * share_pct
+                    excess * share
                 }
                 None => 0.0,
             };

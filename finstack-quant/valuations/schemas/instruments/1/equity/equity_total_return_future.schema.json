@@ -37,7 +37,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Current underlying close or exchange-prescribed reference level."
         },
-        "spread_basis_points_id": {
+        "spread_bp_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Current annualized TRF spread scalar expressed in basis points."
         },
@@ -61,7 +61,7 @@
         "spot_id",
         "accrued_distributions_id",
         "accrued_funding_id",
-        "spread_basis_points_id",
+        "spread_bp_id",
         "spread_day_count"
       ],
       "type": "object"
@@ -231,7 +231,7 @@
           "attributes": {},
           "id": "EUREX-TESX-DEC27",
           "spot_id": "SX5E-CLOSE",
-          "spread_basis_points_id": "TESX-SPREAD-BPS",
+          "spread_bp_id": "TESX-SPREAD-BPS",
           "spread_day_count": "act_360",
           "terms": {
             "contracts": 100.0,

@@ -666,7 +666,7 @@ for (const [endDate, periodDays] of [
         end_date: endDate,
         is_active: true,
         criteria: {
-          max_price: maxPrice,
+          max_price_pct: maxPrice,
           min_yield: minYield,
         },
       };

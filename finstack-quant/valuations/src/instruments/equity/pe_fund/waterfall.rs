@@ -126,8 +126,9 @@ pub enum ClawbackSettle {
 pub struct ClawbackSpec {
     /// Whether clawback is enabled
     pub enable: bool,
-    /// Optional percentage of GP carry held back until settlement
-    pub holdback_pct: Option<f64>,
+    /// Optional share of GP carry held back until settlement, as a decimal
+    /// fraction in `[0, 1]` (`0.2` = 20%)
+    pub holdback_decimal: Option<f64>,
     /// When to settle clawback
     pub settle_on: ClawbackSettle,
 }
@@ -136,7 +137,7 @@ impl Default for ClawbackSpec {
     fn default() -> Self {
         Self {
             enable: false,
-            holdback_pct: None,
+            holdback_decimal: None,
             settle_on: ClawbackSettle::FundEnd,
         }
     }
@@ -235,10 +236,10 @@ impl WaterfallSpec {
             }
         }
 
-        if let Some(holdback_pct) = self.clawback.as_ref().and_then(|c| c.holdback_pct) {
-            if !holdback_pct.is_finite() || !(0.0..=1.0).contains(&holdback_pct) {
+        if let Some(holdback_decimal) = self.clawback.as_ref().and_then(|c| c.holdback_decimal) {
+            if !holdback_decimal.is_finite() || !(0.0..=1.0).contains(&holdback_decimal) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "clawback holdback percentage must be in [0, 1], got {holdback_pct}"
+                    "clawback holdback percentage must be in [0, 1], got {holdback_decimal}"
                 )));
             }
         }
@@ -847,8 +848,8 @@ impl<'a> EquityWaterfallEngine<'a> {
             self.lp_net_history(params.all_events, params.prior_rows, params.allocation_date)?;
 
         // Precompute holdback percent (0.0 if none or clawback disabled)
-        let holdback_pct: f64 = (match &self.spec.clawback {
-            Some(c) if c.enable => c.holdback_pct.unwrap_or(0.0),
+        let holdback_decimal: f64 = (match &self.spec.clawback {
+            Some(c) if c.enable => c.holdback_decimal.unwrap_or(0.0),
             _ => 0.0,
         })
         .clamp(0.0, 1.0);
@@ -947,7 +948,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     // (allowed = from-scratch no-holdback waterfall replay)
                     // and pays the difference (positive δ → GP receives the
                     // accumulated holdback; negative δ → clawback from GP).
-                    let to_gp_paid = to_gp_gross * (1.0 - holdback_pct);
+                    let to_gp_paid = to_gp_gross * (1.0 - holdback_decimal);
                     gp_carry_cum += to_gp_gross;
                     remaining_amount -= to_gp_gross;
                     (0.0, to_gp_paid, Arc::from("Catch-Up"), gp_carry_cum)
@@ -1007,7 +1008,7 @@ impl<'a> EquityWaterfallEngine<'a> {
 
                     let to_lp_split = split_amount * lp_share;
                     let to_gp_gross = split_amount * gp_share;
-                    let to_gp_paid = to_gp_gross * (1.0 - holdback_pct);
+                    let to_gp_paid = to_gp_gross * (1.0 - holdback_decimal);
                     gp_carry_cum += to_gp_gross;
                     remaining_amount -= split_amount;
                     lp_allocated_in_call_so_far += to_lp_split;
@@ -2017,7 +2018,7 @@ mod tests {
     fn clawback_fund_end_overdistribution() {
         let claw = ClawbackSpec {
             enable: true,
-            holdback_pct: None,
+            holdback_decimal: None,
             settle_on: ClawbackSettle::FundEnd,
         };
 
@@ -2063,7 +2064,7 @@ mod tests {
         // catch-up-aware replay releases only (50 − pref) × 0.2.
         let claw = ClawbackSpec {
             enable: true,
-            holdback_pct: Some(1.0), // all carry held back until settlement
+            holdback_decimal: Some(1.0), // all carry held back until settlement
             settle_on: ClawbackSettle::FundEnd,
         };
 
@@ -2119,7 +2120,7 @@ mod tests {
         // profit × promote-share figure the old settlement formula used.
         let claw = ClawbackSpec {
             enable: true,
-            holdback_pct: Some(1.0),
+            holdback_decimal: Some(1.0),
             settle_on: ClawbackSettle::FundEnd,
         };
 
@@ -2248,7 +2249,7 @@ mod tests {
     fn period_support_clawback_settlement() {
         let claw = ClawbackSpec {
             enable: true,
-            holdback_pct: Some(0.1),
+            holdback_decimal: Some(0.1),
             settle_on: ClawbackSettle::FundEnd,
         };
 
@@ -2291,7 +2292,7 @@ mod tests {
     fn periodic_clawback_overdistribution() {
         let claw = ClawbackSpec {
             enable: true,
-            holdback_pct: None,
+            holdback_decimal: None,
             settle_on: ClawbackSettle::Periodic,
         };
 
@@ -2477,7 +2478,7 @@ mod tests {
                 .promote_tier(0.0, 0.8, 0.2)
                 .clawback(ClawbackSpec {
                     enable: true,
-                    holdback_pct: Some(bad),
+                    holdback_decimal: Some(bad),
                     settle_on: ClawbackSettle::FundEnd,
                 })
                 .build();

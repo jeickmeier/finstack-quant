@@ -23,7 +23,8 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 ///
 /// - **LSMC**: Simulate paths with HW1F short rate model. At each call
 ///   date, compute continuation value via regression. Exercise if
-///   call_price < continuation_value.
+///   the call amount `notional * price_pct_of_par / 100` is below the
+///   continuation value.
 /// - **HW Tree**: Build trinomial tree, attach range accrual cashflows
 ///   at each node, apply backward induction with call decision.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -134,7 +135,7 @@ impl CallableRangeAccrual {
                 .total_past_observations_opt(None)
                 .build()
                 .expect("example range accrual terms should build"),
-            call_provision: BermudanCallProvision::new(call_dates, 1.0, 1),
+            call_provision: BermudanCallProvision::new(call_dates, 100.0, 1),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -252,7 +253,7 @@ mod tests {
             (
                 // schema-rejection-test
                 "scenario_pricing_overrides",
-                serde_json::json!({"scenario_price_shock_pct": 0.01}),
+                serde_json::json!({"scenario_price_shock_decimal": 0.01}),
             ),
         ] {
             let mut value =

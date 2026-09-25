@@ -397,7 +397,7 @@ fn test_scenario_price_shock_scales_structured_credit_pv_and_dollar_risk_once() 
 
     let mut shocked = baseline;
     shocked.scenario_pricing_overrides =
-        ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+        ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
     let shocked_result = shocked
         .price_with_metrics(
             &market,

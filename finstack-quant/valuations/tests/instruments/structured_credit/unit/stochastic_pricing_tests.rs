@@ -278,7 +278,8 @@ fn standalone_pricing_applies_scenario_price_shock_once() {
         .expect("baseline standalone pricing")
         .value
         .amount();
-    sc.scenario_pricing_overrides = ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+    sc.scenario_pricing_overrides =
+        ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
 
     let shocked = sc
         .price_with_metrics_standalone(&market, closing_date(), &[])
@@ -310,7 +311,7 @@ fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
 
     let mut shocked = baseline;
     shocked.scenario_pricing_overrides =
-        ScenarioPricingOverrides::default().with_price_shock_pct(-0.10);
+        ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
     let shocked_tranche = shocked
         .value_tranche("SENIOR", &market, closing_date())
         .expect("shocked tranche value")
@@ -343,7 +344,7 @@ fn tranche_and_stochastic_pricing_apply_scenario_price_shock_once() {
 #[test]
 fn structured_credit_pricing_conveniences_validate_before_market_access() {
     let mut sc = build_sc("ABS-INVALID", 1_000_000.0);
-    sc.cleanup_call_pct = Some(-0.5);
+    sc.cleanup_call_decimal = Some(-0.5);
     let market = MarketContext::new();
 
     let grid = ScenarioGrid {
@@ -419,7 +420,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
 
     for message in errors {
         assert!(
-            message.contains("cleanup_call_pct"),
+            message.contains("cleanup_call_decimal"),
             "unexpected error ordering: {message}"
         );
     }

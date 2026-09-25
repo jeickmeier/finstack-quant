@@ -393,7 +393,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             market,
             as_of,
             &self.spot_id,
-            bumps.spot_bump_pct,
+            bumps.spot_bump_decimal,
         )?))
     }
 
@@ -418,14 +418,15 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
 
         let spot_scalar = market.get_price(&self.spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
-        let bump_size = current_spot * bumps.spot_bump_pct;
+        let bump_size = current_spot * bumps.spot_bump_decimal;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let up = crate::metrics::bump_scalar_price(market, &self.spot_id, bumps.spot_bump_pct)?;
+        let up = crate::metrics::bump_scalar_price(market, &self.spot_id, bumps.spot_bump_decimal)?;
         let pv_up = self.value(&up, as_of)?.amount();
-        let dn = crate::metrics::bump_scalar_price(market, &self.spot_id, -bumps.spot_bump_pct)?;
+        let dn =
+            crate::metrics::bump_scalar_price(market, &self.spot_id, -bumps.spot_bump_decimal)?;
         let pv_dn = self.value(&dn, as_of)?.amount();
 
         Ok(Some(
@@ -454,10 +455,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         let bumped = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),
-            bumps.vol_bump_pct,
+            bumps.vol_bump_decimal,
         )?;
         let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some((pv_bumped - base_pv) / bumps.vol_bump_pct))
+        Ok(Some((pv_bumped - base_pv) / bumps.vol_bump_decimal))
     }
 
     fn option_rho_bp(
@@ -535,11 +536,11 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
 
         let spot_scalar = market.get_price(&self.spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
-        let spot_bump = current_spot * bumps.spot_bump_pct;
+        let spot_bump = current_spot * bumps.spot_bump_decimal;
         if spot_bump <= 0.0 {
             return Ok(Some(0.0));
         }
-        let vol_bump = bumps.vol_bump_pct;
+        let vol_bump = bumps.vol_bump_decimal;
 
         // Delta at vol_up
         let vol_up = crate::metrics::bump_surface_vol_absolute(
@@ -547,8 +548,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             self.vol_surface_id.as_str(),
             vol_bump,
         )?;
-        let up = crate::metrics::bump_scalar_price(&vol_up, &self.spot_id, bumps.spot_bump_pct)?;
-        let dn = crate::metrics::bump_scalar_price(&vol_up, &self.spot_id, -bumps.spot_bump_pct)?;
+        let up =
+            crate::metrics::bump_scalar_price(&vol_up, &self.spot_id, bumps.spot_bump_decimal)?;
+        let dn =
+            crate::metrics::bump_scalar_price(&vol_up, &self.spot_id, -bumps.spot_bump_decimal)?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
         let delta_up = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -559,8 +562,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             self.vol_surface_id.as_str(),
             -vol_bump,
         )?;
-        let up = crate::metrics::bump_scalar_price(&vol_dn, &self.spot_id, bumps.spot_bump_pct)?;
-        let dn = crate::metrics::bump_scalar_price(&vol_dn, &self.spot_id, -bumps.spot_bump_pct)?;
+        let up =
+            crate::metrics::bump_scalar_price(&vol_dn, &self.spot_id, bumps.spot_bump_decimal)?;
+        let dn =
+            crate::metrics::bump_scalar_price(&vol_dn, &self.spot_id, -bumps.spot_bump_decimal)?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
         let delta_dn = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -590,7 +595,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             return Ok(Some(0.0));
         }
 
-        let vol_bump = bumps.vol_bump_pct;
+        let vol_bump = bumps.vol_bump_decimal;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),

@@ -834,8 +834,8 @@ impl PyStructuredCredit {
 
     /// Clean-up call pool-factor threshold (decimal), or ``None``.
     #[getter]
-    fn cleanup_call_pct(&self) -> Option<f64> {
-        self.inner.cleanup_call_pct
+    fn cleanup_call_decimal(&self) -> Option<f64> {
+        self.inner.cleanup_call_decimal
     }
 
     /// Assumed optional redemption, or ``None``.
@@ -1733,7 +1733,7 @@ impl PyStructuredCreditBuilder {
     ///     ``CardPortfolioSpec`` serde object: ``monthly_payment_rate``,
     ///     ``portfolio_yield`` and ``charge_off_rate`` (annual decimals),
     ///     plus the optional ``seller_interest`` (``Money`` serde object in
-    ///     the pool currency) and ``fixed_allocation_pct`` (decimal in
+    ///     the pool currency) and ``fixed_allocation_decimal`` (decimal in
     ///     ``(0, 1]``) that fix the investor allocation of trust collections
     ///     once the revolving period ends.
     ///
@@ -1949,12 +1949,12 @@ impl PyStructuredCreditBuilder {
     ///     If ``value`` does not match the expected shape or this builder
     ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
-    fn cleanup_call_pct<'py>(
+    fn cleanup_call_decimal<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_sc(&mut slf)?;
-        slf.inner = Some(b.cleanup_call_pct(value));
+        slf.inner = Some(b.cleanup_call_decimal(value));
         Ok(slf)
     }
 

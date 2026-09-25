@@ -378,9 +378,9 @@ fn test_real_estate_terminal_only_sale_price_is_allowed() {
     let sale_date = date(2025, 6, 1);
 
     let sale_price = Money::new(1_000.0, Currency::USD).expect("valid money fixture");
-    let disposition_cost_pct = 0.10; // 10%
+    let disposition_cost_decimal = 0.10; // 10%
     let disposition_costs = vec![Money::new(50.0, Currency::USD).expect("valid money fixture")];
-    let net_sale = sale_price.amount() * (1.0 - disposition_cost_pct) - 50.0;
+    let net_sale = sale_price.amount() * (1.0 - disposition_cost_decimal) - 50.0;
 
     let asset = RealEstateAsset::builder()
         .id(InstrumentId::new("RE-TERMINAL-ONLY"))
@@ -391,7 +391,7 @@ fn test_real_estate_terminal_only_sale_price_is_allowed() {
         .discount_rate_opt(Some(0.10))
         .sale_date_opt(Some(sale_date))
         .sale_price_opt(Some(sale_price))
-        .disposition_cost_pct_opt(Some(disposition_cost_pct))
+        .disposition_cost_decimal_opt(Some(disposition_cost_decimal))
         .disposition_costs(disposition_costs)
         .day_count(DayCount::Act365F)
         .attributes(Attributes::new())

@@ -215,7 +215,7 @@ fn incentive_fee_starts_once_equity_earns_the_hurdle() {
         fees.subordinated_mgmt_fee_bp = 0.0;
         fees.incentive_fee = Some(IncentiveFeeSpec {
             hurdle_irr: hurdle,
-            share_pct: 0.20,
+            share: 0.20,
         });
     }));
     let without = simulate(&clo(|fees| {
@@ -321,7 +321,7 @@ fn incentive_fee_shares_principal_proceeds_above_the_hurdle() {
         fees.subordinated_mgmt_fee_bp = 0.0;
         fees.incentive_fee = Some(IncentiveFeeSpec {
             hurdle_irr: 0.04,
-            share_pct: 0.20,
+            share: 0.20,
         });
     });
     let run = finstack_quant_valuations::instruments::fixed_income::structured_credit::run_simulation_with_diagnostics(
@@ -352,7 +352,7 @@ fn incentive_fee_shares_principal_proceeds_above_the_hurdle() {
         fees.subordinated_mgmt_fee_bp = 0.0;
         fees.incentive_fee = Some(IncentiveFeeSpec {
             hurdle_irr: 0.0,
-            share_pct: 0.20,
+            share: 0.20,
         });
     });
     revolving.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);

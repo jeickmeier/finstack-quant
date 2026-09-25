@@ -507,7 +507,7 @@
             "is_active": true,
             "amortizing_tranches": ["SENIOR"],
             "criteria": {
-              "max_price": 102.5,
+              "max_price_pct": 102.5,
               "min_yield": 0.04
             }
           },

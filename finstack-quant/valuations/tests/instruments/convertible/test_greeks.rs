@@ -357,7 +357,7 @@ fn test_greeks_with_different_bump_sizes() {
             &market,
             ConvertibleTreeType::Binomial,
             GreekBumps {
-                spot_bump_pct: bump,
+                spot_bump_decimal: bump,
                 ..GreekBumps::default()
             },
             dates::base_date(),

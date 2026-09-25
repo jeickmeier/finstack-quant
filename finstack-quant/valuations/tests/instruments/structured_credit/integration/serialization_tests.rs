@@ -274,7 +274,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         amortizing_tranches: Vec::new(),
         assumptions: None,
         criteria: ReinvestmentCriteria {
-            max_price: 102.5,
+            max_price_pct: 102.5,
             min_yield: 0.04,
         },
     });

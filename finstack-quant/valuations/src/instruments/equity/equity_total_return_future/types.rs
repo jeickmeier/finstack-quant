@@ -37,7 +37,7 @@ pub struct EquityTotalReturnFuture {
     /// Cumulative funding points published by the exchange.
     pub accrued_funding_id: PriceId,
     /// Current annualized TRF spread scalar expressed in basis points.
-    pub spread_basis_points_id: PriceId,
+    pub spread_bp_id: PriceId,
     /// Day-count basis used to convert the annualized spread into index points.
     pub spread_day_count: DayCount,
     /// Instrument-owned pricing inputs.
@@ -72,7 +72,7 @@ pub struct EquityTotalReturnFuture {
 struct TrfProjection {
     price: f64,
     spot_derivative: f64,
-    spread_basis_points_derivative: f64,
+    spread_bp_derivative: f64,
 }
 
 impl EquityTotalReturnFuture {
@@ -108,7 +108,7 @@ impl EquityTotalReturnFuture {
             .spot_id(PriceId::new("SX5E-CLOSE"))
             .accrued_distributions_id(PriceId::new("TESX-ACCRUED-DISTRIBUTIONS"))
             .accrued_funding_id(PriceId::new("TESX-ACCRUED-FUNDING"))
-            .spread_basis_points_id(PriceId::new("TESX-SPREAD-BPS"))
+            .spread_bp_id(PriceId::new("TESX-SPREAD-BPS"))
             .spread_day_count(DayCount::Act360)
             .attributes(Attributes::new())
             .build()
@@ -173,7 +173,7 @@ impl EquityTotalReturnFuture {
         )?;
         let funding = self.point_scalar(market, &self.accrued_funding_id, "accrued funding")?;
         let spread_basis_points =
-            Self::unitless_scalar(market, &self.spread_basis_points_id, "spread basis points")?;
+            Self::unitless_scalar(market, &self.spread_bp_id, "spread basis points")?;
         let year_fraction = self
             .spread_day_count
             .year_fraction(
@@ -186,7 +186,7 @@ impl EquityTotalReturnFuture {
         Ok(TrfProjection {
             price: spot + distributions - funding + spot * spread_decimal * year_fraction,
             spot_derivative: 1.0 + spread_decimal * year_fraction,
-            spread_basis_points_derivative: spot * 1.0e-4 * year_fraction,
+            spread_bp_derivative: spot * 1.0e-4 * year_fraction,
         })
     }
 
@@ -255,10 +255,7 @@ impl EquityTotalReturnFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        Ok(self.terms.point_delta()?
-            * self
-                .projection(market, as_of)?
-                .spread_basis_points_derivative)
+        Ok(self.terms.point_delta()? * self.projection(market, as_of)?.spread_bp_derivative)
     }
 
     /// P&L sensitivity to one accrued distribution index point.
@@ -286,7 +283,7 @@ impl crate::instruments::Instrument for EquityTotalReturnFuture {
         dependencies.add_market_scalar_id(self.spot_id.as_str());
         dependencies.add_market_scalar_id(self.accrued_distributions_id.as_str());
         dependencies.add_market_scalar_id(self.accrued_funding_id.as_str());
-        dependencies.add_market_scalar_id(self.spread_basis_points_id.as_str());
+        dependencies.add_market_scalar_id(self.spread_bp_id.as_str());
         Ok(dependencies)
     }
 
@@ -349,7 +346,7 @@ mod tests {
             .spot_id(PriceId::new("SPOT"))
             .accrued_distributions_id(PriceId::new("DIST"))
             .accrued_funding_id(PriceId::new("FUND"))
-            .spread_basis_points_id(PriceId::new("SPREAD"))
+            .spread_bp_id(PriceId::new("SPREAD"))
             .spread_day_count(DayCount::Act365F)
             .attributes(Attributes::new())
             .build()

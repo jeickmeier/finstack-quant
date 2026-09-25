@@ -224,7 +224,7 @@ mod cases {
             amortizing_tranches: Vec::new(),
             assumptions: None,
             criteria: ReinvestmentCriteria {
-                max_price: 99.0,
+                max_price_pct: 99.0,
                 ..Default::default()
             },
         });
@@ -1747,7 +1747,7 @@ mod cases {
         deal.waterfall_rules = Some(WaterfallRules {
             excess_spread: Some(ExcessSpreadSpec {
                 target_balance: Money::from((10_000_000_i64, Currency::USD)),
-                trap_loss_pct: None,
+                trap_loss_decimal: None,
             }),
             ..Default::default()
         });
@@ -1818,7 +1818,7 @@ mod cases {
             deal.waterfall_rules = Some(WaterfallRules {
                 excess_spread: Some(ExcessSpreadSpec {
                     target_balance: Money::from((10_000_000_i64, Currency::USD)),
-                    trap_loss_pct: None,
+                    trap_loss_decimal: None,
                 }),
                 ..Default::default()
             });

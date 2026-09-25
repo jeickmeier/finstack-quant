@@ -163,7 +163,7 @@ fee_deal["instrument"]["spec"]["fees"]={"trustee_fee":{"amount":"50000","currenc
     "master_servicer_fee_bp":None,"special_servicer_fee_bp":None}
 reinvest=deepcopy(fee_deal);reinvest["instrument"]["spec"]["reinvestment_end_date"]="2027-01-15"
 reinvest["instrument"]["spec"]["pool"]["reinvestment_period"]={"end_date":"2027-01-15","is_active":True,
-    "criteria":{"max_price":100.,"min_yield":0.,"maintain_credit_quality":True,"maintain_wal":True,"apply_eligibility_criteria":True}}
+    "criteria":{"max_price_pct":100.,"min_yield":0.,"maintain_credit_quality":True,"maintain_wal":True,"apply_eligibility_criteria":True}}
 for payload in [fee_deal,reinvest]:
     payload["instrument"]["spec"]["prepayment_spec"]={"cpr":.15,"curve":None}
     payload["instrument"]["spec"]["default_assumptions"]["base_cpr_annual"]=.15
@@ -358,8 +358,8 @@ rmbs=deepcopy(presets["rmbs"])
 rmbs["instrument"]["spec"]["prepayment_spec"]=json.loads(PrepaymentModelSpec.psa(2).to_json())
 shifted=deepcopy(rmbs)
 shifted["instrument"]["spec"]["waterfall_rules"]={"shifting_interest":{"senior_id":"AAA","schedule":[
-    {"months_from_closing":0,"senior_pct":1.0},{"months_from_closing":24,"senior_pct":.80},
-    {"months_from_closing":36,"senior_pct":.65}]}}
+    {"months_from_closing":0,"senior_decimal":1.0},{"months_from_closing":24,"senior_decimal":.80},
+    {"months_from_closing":36,"senior_decimal":.65}]}}
 rmbs_rows=[]
 for name,payload in [("sequential",rmbs),("shifting_interest",shifted)]:
     out=structured_credit_tranche_metrics(json.dumps(payload),"AAA",market,AS_OF)

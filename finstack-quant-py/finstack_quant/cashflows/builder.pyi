@@ -1618,17 +1618,17 @@ class CouponType:
     """100% capitalized into principal."""
 
     @staticmethod
-    def split(cash_pct: Decimal | float, pik_pct: Decimal | float) -> CouponType:
+    def split(cash_fraction: Decimal | float, pik_fraction: Decimal | float) -> CouponType:
         """
         Split settlement with explicit cash and PIK fractions.
 
         Parameters
         ----------
-        cash_pct : decimal.Decimal | float
+        cash_fraction : decimal.Decimal | float
             Fraction of the coupon paid in cash, in ``[0, 1]``.
-        pik_pct : decimal.Decimal | float
+        pik_fraction : decimal.Decimal | float
             Fraction of the coupon capitalized as PIK, in ``[0, 1]``;
-            ``cash_pct + pik_pct`` must sum to ``1``.
+            ``cash_fraction + pik_fraction`` must sum to ``1``.
 
         Returns
         -------
@@ -1654,7 +1654,7 @@ class CouponType:
         ...
 
     @property
-    def cash_pct(self) -> Decimal:
+    def cash_fraction(self) -> Decimal:
         """
         Cash fraction: ``1`` for CASH, ``0`` for PIK, the split value otherwise.
 
@@ -1670,7 +1670,7 @@ class CouponType:
         ...
 
     @property
-    def pik_pct(self) -> Decimal:
+    def pik_fraction(self) -> Decimal:
         """
         PIK fraction: ``0`` for CASH, ``1`` for PIK, the split value otherwise.
 

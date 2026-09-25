@@ -276,12 +276,12 @@ impl PyPrincipalExchange {
 }
 
 /// Coupon settlement type: ``CouponType.CASH``, ``CouponType.PIK`` or
-/// ``CouponType.split(cash_pct, pik_pct)``.
+/// ``CouponType.split(cash_fraction, pik_fraction)``.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows.builder import CouponType
-/// >>> CouponType.split(0.5, 0.5).cash_pct
+/// >>> CouponType.split(0.5, 0.5).cash_fraction
 /// Decimal('0.5')
 #[pyclass(
     name = "CouponType",
@@ -314,39 +314,39 @@ impl PyCouponType {
     ///
     /// Parameters
     /// ----------
-    /// cash_pct : Decimal, float or str
+    /// cash_fraction : Decimal, float or str
     ///     Fraction of the coupon paid in cash.
-    /// pik_pct : Decimal, float or str
+    /// pik_fraction : Decimal, float or str
     ///     Fraction of the coupon capitalized.
     #[staticmethod]
-    #[pyo3(text_signature = "(cash_pct, pik_pct)")]
-    fn split(cash_pct: &Bound<'_, PyAny>, pik_pct: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(text_signature = "(cash_fraction, pik_fraction)")]
+    fn split(cash_fraction: &Bound<'_, PyAny>, pik_fraction: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             inner: CouponType::Split {
-                cash_pct: decimal_from_any(cash_pct)?,
-                pik_pct: decimal_from_any(pik_pct)?,
+                cash_fraction: decimal_from_any(cash_fraction)?,
+                pik_fraction: decimal_from_any(pik_fraction)?,
             },
         })
     }
 
     /// Cash fraction: ``1`` for CASH, ``0`` for PIK, the split value otherwise.
     #[getter]
-    fn cash_pct<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn cash_fraction<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let value = match self.inner {
             CouponType::Cash => Decimal::ONE,
             CouponType::Pik => Decimal::ZERO,
-            CouponType::Split { cash_pct, .. } => cash_pct,
+            CouponType::Split { cash_fraction, .. } => cash_fraction,
         };
         decimal_to_py(py, value)
     }
 
     /// PIK fraction: ``0`` for CASH, ``1`` for PIK, the split value otherwise.
     #[getter]
-    fn pik_pct<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn pik_fraction<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let value = match self.inner {
             CouponType::Cash => Decimal::ZERO,
             CouponType::Pik => Decimal::ONE,
-            CouponType::Split { pik_pct, .. } => pik_pct,
+            CouponType::Split { pik_fraction, .. } => pik_fraction,
         };
         decimal_to_py(py, value)
     }

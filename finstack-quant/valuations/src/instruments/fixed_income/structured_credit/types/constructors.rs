@@ -196,7 +196,7 @@ impl StructuredCredit {
             deal_metadata: config.deal_metadata,
             // Hedge swaps default to empty
             hedge_swaps: Vec::new(),
-            cleanup_call_pct: None,
+            cleanup_call_decimal: None,
             // Deal-type market convention; see `LossAllocationPolicy::default_for`.
             loss_allocation: None,
             loss_recognition: None,

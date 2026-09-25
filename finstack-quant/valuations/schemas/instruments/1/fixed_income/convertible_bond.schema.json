@@ -407,7 +407,7 @@
       "type": "object"
     },
     "CouponType": {
-      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
       "oneOf": [
         {
           "const": "cash",
@@ -426,18 +426,18 @@
             "split": {
               "additionalProperties": false,
               "properties": {
-                "cash_pct": {
+                "cash_fraction": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
                 },
-                "pik_pct": {
+                "pik_fraction": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
                 }
               },
               "required": [
-                "cash_pct",
-                "pik_pct"
+                "cash_fraction",
+                "pik_fraction"
               ],
               "type": "object"
             }

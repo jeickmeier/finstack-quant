@@ -36,7 +36,7 @@ impl MetricCalculator for ColorCalculator {
             option.notional.currency(),
         )?;
 
-        let bump_pct = super::spot_bump_pct(context, option, current_spot)?;
+        let bump_pct = super::spot_bump_decimal(context, option, current_spot)?;
         let spot_bump = current_spot * bump_pct;
 
         // Guard near-expiry: avoid time bumps when T < 2 days.

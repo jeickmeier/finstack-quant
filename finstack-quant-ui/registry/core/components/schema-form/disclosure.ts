@@ -77,7 +77,7 @@ const SPEC_GROUPS: Readonly<Record<string, Readonly<Record<string, string>>>> =
       liquidation_price_pct: "Deal structure",
       card: "Deal structure",
       call_assumption: "Deal structure",
-      cleanup_call_pct: "Deal structure",
+      cleanup_call_decimal: "Deal structure",
       stochastic_default_spec: "Deal structure",
       stochastic_prepay_spec: "Deal structure",
       stochastic_recovery_spec: "Deal structure",

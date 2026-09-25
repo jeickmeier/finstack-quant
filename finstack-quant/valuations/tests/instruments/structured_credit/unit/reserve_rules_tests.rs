@@ -112,8 +112,8 @@ fn simulate(deal: &StructuredCredit) -> SimulationRun {
 
 fn two_pct_of_current_with_one_pct_floor() -> ReserveTarget {
     ReserveTarget::Max(
-        Box::new(ReserveTarget::PctOfCurrent(0.02)),
-        Box::new(ReserveTarget::PctOfOriginal(0.01)),
+        Box::new(ReserveTarget::FractionOfCurrent(0.02)),
+        Box::new(ReserveTarget::FractionOfOriginal(0.01)),
     )
 }
 
@@ -266,4 +266,21 @@ fn final_date_principal_shortfall_is_covered_by_the_reserve() {
         (e_released - e_covered - 200_000.0).abs() < 1.0,
         "without the cover the reserve reaches the residual holder: {e_released} vs {e_covered}"
     );
+}
+
+#[test]
+// schema-rejection-test
+fn retired_reserve_target_pct_keys_are_rejected() {
+    for retired in [
+        serde_json::json!({"pct_of_current": 0.02}),
+        serde_json::json!({"pct_of_original": 0.01}),
+    ] {
+        serde_json::from_value::<ReserveTarget>(retired.clone())
+            .expect_err(&format!("{retired} uses a retired key"));
+    }
+    let target: ReserveTarget = serde_json::from_value(serde_json::json!({
+        "max": [{"fraction_of_current": 0.02}, {"fraction_of_original": 0.01}]
+    }))
+    .expect("canonical reserve target keys parse");
+    assert!(matches!(target, ReserveTarget::Max(..)));
 }

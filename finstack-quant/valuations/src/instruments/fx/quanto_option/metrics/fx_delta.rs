@@ -16,7 +16,7 @@ pub struct FxDeltaCalculator;
 
 impl MetricCalculator for FxDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let spot_bump = sens_config::resolve(context)?.spot_bump_pct;
+        let spot_bump = sens_config::resolve(context)?.spot_bump_decimal;
         let option: &QuantoOption = context.instrument_as()?;
         let as_of = context.as_of;
 

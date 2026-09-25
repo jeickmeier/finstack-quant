@@ -161,7 +161,7 @@ pub struct RealEstateAsset {
     /// A value of `0.02` represents 2% selling costs. Must be in \([0, 1)\).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub disposition_cost_pct: Option<f64>,
+    pub disposition_cost_decimal: Option<f64>,
     /// Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -288,7 +288,7 @@ struct RealEstateAssetUnchecked {
     ///
     /// A value of `0.02` represents 2% selling costs. Must be in \([0, 1)\).
     #[serde(default)]
-    disposition_cost_pct: Option<f64>,
+    disposition_cost_decimal: Option<f64>,
     /// Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.
     #[serde(default)]
     disposition_costs: Vec<Money>,
@@ -333,7 +333,7 @@ impl TryFrom<RealEstateAssetUnchecked> for RealEstateAsset {
             purchase_price: value.purchase_price,
             acquisition_cost: value.acquisition_cost,
             acquisition_costs: value.acquisition_costs,
-            disposition_cost_pct: value.disposition_cost_pct,
+            disposition_cost_decimal: value.disposition_cost_decimal,
             disposition_costs: value.disposition_costs,
             appraisal_value: value.appraisal_value,
             day_count: value.day_count,
@@ -365,7 +365,7 @@ impl RealEstateAsset {
     ///   produce negative valuations)
     /// - `terminal_growth_rate` is set but outside `[-1.0, 0.20]` (sanity band:
     ///   prevents `1 + g <= 0` and unreasonably high terminal growth)
-    /// - `disposition_cost_pct` is set but outside `[0.0, 1.0)`
+    /// - `disposition_cost_decimal` is set but outside `[0.0, 1.0)`
     /// - `acquisition_cost` is set but non-finite or negative, or any
     ///   `acquisition_costs` / `disposition_costs` line item is non-finite or
     ///   negative (all cost inputs are magnitude-positive outflows; the pricer
@@ -479,10 +479,10 @@ impl RealEstateAsset {
                 )));
             }
         }
-        if let Some(pct) = self.disposition_cost_pct {
+        if let Some(pct) = self.disposition_cost_decimal {
             if !pct.is_finite() || !(0.0..1.0).contains(&pct) {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "RealEstateAsset '{}' disposition_cost_pct must be in [0.0, 1.0), got {}",
+                    "RealEstateAsset '{}' disposition_cost_decimal must be in [0.0, 1.0), got {}",
                     self.id.as_str(),
                     pct
                 )));
@@ -600,7 +600,7 @@ impl RealEstateAsset {
     ///   with NOI taken as the last schedule entry on/before `exit_date`.
     ///
     /// Then apply:
-    /// - `disposition_cost_pct` (pct of gross proceeds), and
+    /// - `disposition_cost_decimal` (pct of gross proceeds), and
     /// - `disposition_costs` (dollar line items).
     pub(crate) fn sale_proceeds_at(
         &self,
@@ -632,7 +632,7 @@ impl RealEstateAsset {
     /// Compute net sale proceeds at the terminal date (undiscounted), if configured.
     ///
     /// Uses the exit-cap convention `TV = NOI_{N+1} / cap_rate_exit`, optionally applying
-    /// `disposition_cost_pct`.
+    /// `disposition_cost_decimal`.
     pub(crate) fn terminal_sale_proceeds(
         &self,
         as_of: Date,
@@ -841,7 +841,7 @@ mod tests {
     #[test]
     fn validate_rejects_disposition_cost_pct_at_one() {
         let mut asset = build_dcf_asset();
-        asset.disposition_cost_pct = Some(1.0);
+        asset.disposition_cost_decimal = Some(1.0);
         assert!(asset.validate().is_err());
     }
 

@@ -1528,7 +1528,7 @@
           "format": "double",
           "type": "number"
         },
-        "fixed_allocation_pct": {
+        "fixed_allocation_decimal": {
           "description": "Investor allocation of trust collections fixed at the end of the\nrevolving period, as a decimal in `(0, 1]`. `None` freezes the\nallocation at the investor's floating share\n`investor_interest / (investor_interest + seller_interest)`.",
           "format": "double",
           "type": [
@@ -2330,7 +2330,7 @@
       ]
     },
     "CouponType": {
-      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
       "oneOf": [
         {
           "const": "cash",
@@ -2349,18 +2349,18 @@
             "split": {
               "additionalProperties": false,
               "properties": {
-                "cash_pct": {
+                "cash_fraction": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
                 },
-                "pik_pct": {
+                "pik_fraction": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
                 }
               },
               "required": [
-                "cash_pct",
-                "pik_pct"
+                "cash_fraction",
+                "pik_fraction"
               ],
               "type": "object"
             }
@@ -3440,7 +3440,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Target funded balance of the spread account (currency units)."
         },
-        "trap_loss_pct": {
+        "trap_loss_decimal": {
           "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which terminal spread-account cash repays\ndebt principal after deferred coupons. Any surplus reaches the residual\nholder. `None` releases surplus after deferred coupons without this\ninterest-to-principal transfer.",
           "format": "double",
           "type": [
@@ -4104,14 +4104,14 @@
     },
     "IncentiveFeeSpec": {
       "additionalProperties": false,
-      "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share_pct`\nof the residual interest proceeds ahead of equity.",
+      "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share`\nof the residual interest proceeds ahead of equity.",
       "properties": {
         "hurdle_irr": {
           "description": "Equity IRR hurdle as an annual decimal (`0.12` = 12%).",
           "format": "double",
           "type": "number"
         },
-        "share_pct": {
+        "share": {
           "description": "Share of the residual paid to the manager once the hurdle is met, as\na decimal fraction in `[0, 1]`.",
           "format": "double",
           "type": "number"
@@ -4119,7 +4119,7 @@
       },
       "required": [
         "hurdle_irr",
-        "share_pct"
+        "share"
       ],
       "type": "object"
     },
@@ -4906,19 +4906,19 @@
       "type": "object"
     },
     "OidPolicy": {
-      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldPct`: Discount as percentage withheld from each funded draw\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparatePct`: Percentage of each draw tracked separately, not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
+      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Discount as percentage (basis points) withheld from each funded draw",
+          "description": "Discount in basis points of each funded draw (`200` = 2%), withheld\nfrom proceeds",
           "properties": {
-            "withheld_pct": {
+            "withheld_bp": {
               "format": "int32",
               "type": "integer"
             }
           },
           "required": [
-            "withheld_pct"
+            "withheld_bp"
           ],
           "type": "object"
         },
@@ -4937,15 +4937,15 @@
         },
         {
           "additionalProperties": false,
-          "description": "Discount as percentage of each draw tracked separately for amortization",
+          "description": "Discount in basis points of each draw (`200` = 2%), tracked\nseparately for amortization",
           "properties": {
-            "separate_pct": {
+            "separate_bp": {
               "format": "int32",
               "type": "integer"
             }
           },
           "required": [
-            "separate_pct"
+            "separate_bp"
           ],
           "type": "object"
         },
@@ -5462,7 +5462,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Manager incentive fee: `share_pct` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual.",
+          "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual.",
           "properties": {
             "incentive_fee": {
               "additionalProperties": false,
@@ -5472,7 +5472,7 @@
                   "format": "double",
                   "type": "number"
                 },
-                "share_pct": {
+                "share": {
                   "description": "Share of the residual paid once the hurdle is met, in `[0, 1]`.",
                   "format": "double",
                   "type": "number"
@@ -5480,7 +5480,7 @@
               },
               "required": [
                 "hurdle_irr",
-                "share_pct"
+                "share"
               ],
               "type": "object"
             }
@@ -6437,7 +6437,7 @@
           "type": "integer"
         },
         "price_pct": {
-          "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price`.",
+          "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price_pct`.",
           "format": "double",
           "type": "number"
         },
@@ -6458,8 +6458,8 @@
       "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
       "properties": {
-        "max_price": {
-          "description": "Maximum purchase price (% of par)",
+        "max_price_pct": {
+          "description": "Maximum purchase price in percent of par (`100.0` = par).",
           "format": "double",
           "type": "number"
         },
@@ -6470,7 +6470,7 @@
         }
       },
       "required": [
-        "max_price",
+        "max_price_pct",
         "min_yield"
       ],
       "type": "object"
@@ -6743,13 +6743,13 @@
           "additionalProperties": false,
           "description": "A decimal fraction of the current pool balance (performing collateral\nplus any accumulation funding account), so the target amortizes with\nthe pool.",
           "properties": {
-            "pct_of_current": {
+            "fraction_of_current": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_current"
+            "fraction_of_current"
           ],
           "type": "object"
         },
@@ -6757,19 +6757,19 @@
           "additionalProperties": false,
           "description": "A decimal fraction of the original (cut-off) pool balance: a floor\nthat does not amortize.",
           "properties": {
-            "pct_of_original": {
+            "fraction_of_original": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_original"
+            "fraction_of_original"
           ],
           "type": "object"
         },
         {
           "additionalProperties": false,
-          "description": "The larger of two targets, typically `PctOfCurrent` with a\n`PctOfOriginal` floor.",
+          "description": "The larger of two targets, typically `FractionOfCurrent` with a\n`FractionOfOriginal` floor.",
           "properties": {
             "max": {
               "maxItems": 2,
@@ -7160,7 +7160,7 @@
       "oneOf": [
         {
           "const": "shift_of_subordinate",
-          "description": "Prospectus form: the schedule value is the share of the subordinates'\npro-rata unscheduled principal that shifts to the senior, so the\nsenior's unscheduled share is `senior_pct + value × (1 − senior_pct)`\non live balances (`1.0` = full lockout, `0.0` = pro-rata).",
+          "description": "Prospectus form: the schedule value is the share of the subordinates'\npro-rata unscheduled principal that shifts to the senior, so the\nsenior's unscheduled share is `senior_decimal + value × (1 − senior_decimal)`\non live balances (`1.0` = full lockout, `0.0` = pro-rata).",
           "type": "string"
         },
         {
@@ -7180,7 +7180,7 @@
           "description": "How the schedule values are read; `ShiftOfSubordinate` by default."
         },
         "schedule": {
-          "description": "Schedule ascending by `months_from_closing`; each step's `senior_pct`\nis read per `mode`.",
+          "description": "Schedule ascending by `months_from_closing`; each step's `senior_decimal`\nis read per `mode`.",
           "items": {
             "$ref": "#/$defs/ShiftingInterestStep"
           },
@@ -7214,7 +7214,7 @@
           "minimum": 0,
           "type": "integer"
         },
-        "senior_pct": {
+        "senior_decimal": {
           "description": "Senior share of principal (decimal, `1.0` = 100% lockout) from this step.",
           "format": "double",
           "type": "number"
@@ -7222,7 +7222,7 @@
       },
       "required": [
         "months_from_closing",
-        "senior_pct"
+        "senior_decimal"
       ],
       "type": "object"
     },
@@ -7884,8 +7884,8 @@
           ],
           "description": "Optional credit-card master-trust portfolio model. Asset and rep-line\npools only: the pool is the investor interest in the receivables, the\nspec's payment rate, portfolio yield and charge-off rate replace the\nprepayment, coupon and default assumptions. See [`CardPortfolioSpec`]."
         },
-        "cleanup_call_pct": {
-          "description": "Clean-up call pool factor threshold (percentage of original balance).\n\nWhen the pool factor (current balance / original balance) drops below\nthis threshold, the deal is optionally redeemed and all outstanding\ntranche balances are returned. Industry standard: typically 10%.\n\nSet to `None` to disable clean-up call (default).",
+        "cleanup_call_decimal": {
+          "description": "Clean-up call pool factor threshold as a decimal fraction of the\noriginal balance (`0.10` = 10%).\n\nWhen the pool factor (current balance / original balance) drops below\nthis threshold, the deal is optionally redeemed and all outstanding\ntranche balances are returned. Industry standard: typically 10%.\n\nSet to `None` to disable clean-up call (default).",
           "format": "double",
           "type": [
             "number",
@@ -8268,22 +8268,22 @@
     },
     "TargetOcSpec": {
       "additionalProperties": false,
-      "description": "Targeted overcollateralization amortization (auto and consumer ABS).\n\nEach period the notes are paid down to the amount that leaves the pool's\novercollateralization (`pool − notes`) at the target: the larger of\n`pct_of_current` of the pool balance after the period's collections and\n`floor_pct_of_original` of the cut-off balance. The required principal\ndistribution is `max(0, notes − max(pool − target, 0))`, paid to the\nnotes by priority from interest proceeds first and principal proceeds\nfor the rest; the collections above it are released to the residual\nholder.",
+      "description": "Targeted overcollateralization amortization (auto and consumer ABS).\n\nEach period the notes are paid down to the amount that leaves the pool's\novercollateralization (`pool − notes`) at the target: the larger of\n`fraction_of_current` of the pool balance after the period's collections and\n`floor_fraction_of_original` of the cut-off balance. The required principal\ndistribution is `max(0, notes − max(pool − target, 0))`, paid to the\nnotes by priority from interest proceeds first and principal proceeds\nfor the rest; the collections above it are released to the residual\nholder.",
       "properties": {
-        "floor_pct_of_original": {
+        "floor_fraction_of_original": {
           "default": 0.0,
           "description": "Floor on the target as a decimal fraction of the original (cut-off)\npool balance; `0.0` for no floor.",
           "format": "double",
           "type": "number"
         },
-        "pct_of_current": {
+        "fraction_of_current": {
           "description": "Target overcollateralization as a decimal fraction of the current\npool balance (after the period's collections).",
           "format": "double",
           "type": "number"
         }
       },
       "required": [
-        "pct_of_current"
+        "fraction_of_current"
       ],
       "type": "object"
     },
@@ -8903,13 +8903,13 @@
           "additionalProperties": false,
           "description": "Fraction of the opening commitment, as a decimal (`0.02` = 2%).",
           "properties": {
-            "pct_of_commitment": {
+            "fraction_of_commitment": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_commitment"
+            "fraction_of_commitment"
           ],
           "type": "object"
         }

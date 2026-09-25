@@ -61,8 +61,8 @@ impl StructuredCreditAssumptionRegistry {
         CmoCollateralDefaults {
             wac: self.cmo_collateral_defaults.wac,
             wam_months: self.cmo_collateral_defaults.wam_months,
-            servicing_fee_rate: self.cmo_collateral_defaults.servicing_fee_rate,
-            guarantee_fee_rate: self.cmo_collateral_defaults.guarantee_fee_rate,
+            servicing_fee_bp: self.cmo_collateral_defaults.servicing_fee_bp,
+            guarantee_fee_bp: self.cmo_collateral_defaults.guarantee_fee_bp,
             psa_multiplier: self.cmo_collateral_defaults.psa_multiplier,
         }
     }
@@ -249,13 +249,13 @@ impl StructuredCreditAssumptionRegistry {
             self.cmo_collateral_defaults.wam_months,
             "CMO collateral WAM",
         )?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.cmo_collateral_defaults.servicing_fee_rate,
-            "CMO collateral servicing fee rate",
+        validate_nonnegative_finite(
+            self.cmo_collateral_defaults.servicing_fee_bp,
+            "cmo_collateral_defaults.servicing_fee_bp",
         )?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.cmo_collateral_defaults.guarantee_fee_rate,
-            "CMO collateral guarantee fee rate",
+        validate_nonnegative_finite(
+            self.cmo_collateral_defaults.guarantee_fee_bp,
+            "cmo_collateral_defaults.guarantee_fee_bp",
         )?;
         validate_nonnegative_finite(
             self.cmo_collateral_defaults.psa_multiplier,
@@ -402,8 +402,8 @@ pub(crate) struct ConcentrationLimits {
 pub(crate) struct CmoCollateralDefaults {
     pub(crate) wac: f64,
     pub(crate) wam_months: u32,
-    pub(crate) servicing_fee_rate: f64,
-    pub(crate) guarantee_fee_rate: f64,
+    pub(crate) servicing_fee_bp: f64,
+    pub(crate) guarantee_fee_bp: f64,
     pub(crate) psa_multiplier: f64,
 }
 
@@ -427,8 +427,8 @@ struct CreditModelDefaultsRecord {
 struct CmoCollateralDefaultsRecord {
     wac: f64,
     wam_months: u32,
-    servicing_fee_rate: f64,
-    guarantee_fee_rate: f64,
+    servicing_fee_bp: f64,
+    guarantee_fee_bp: f64,
     psa_multiplier: f64,
 }
 
@@ -776,8 +776,8 @@ fn validate_fee_record(record: &FeeRecord) -> Result<()> {
     }
     if let Some(incentive) = record.incentive_fee {
         if !incentive.hurdle_irr.is_finite()
-            || !incentive.share_pct.is_finite()
-            || !(0.0..=1.0).contains(&incentive.share_pct)
+            || !incentive.share.is_finite()
+            || !(0.0..=1.0).contains(&incentive.share)
         {
             return Err(finstack_quant_core::Error::Validation(
                 "incentive fee needs a finite hurdle IRR and a share in [0, 1]".into(),

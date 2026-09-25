@@ -294,7 +294,7 @@ def test_builder_accepts_a_letter_of_credit_sublimit() -> None:
 
 def test_builder_accepts_percentage_upfront_scheduled_fees_and_oid_switch() -> None:
     fees = {
-        "upfront_fee": {"pct_of_commitment": 0.02},
+        "upfront_fee": {"fraction_of_commitment": 0.02},
         "commitment_fee_tiers": [{"threshold": "0", "bp": "50"}],
         "usage_fee_tiers": [],
         "facility_fee_bp": 0.0,
@@ -307,7 +307,7 @@ def test_builder_accepts_percentage_upfront_scheduled_fees_and_oid_switch() -> N
         .oid_eir({"include_fees": False})
         .build()
     )
-    assert facility.fees["upfront_fee"] == {"pct_of_commitment": 0.02}
+    assert facility.fees["upfront_fee"] == {"fraction_of_commitment": 0.02}
     assert facility.scheduled_fees[0]["amount"]["amount"] == "100000"
     assert facility.oid_eir == {"include_fees": False}
     assert builder().oid_eir(None).build().oid_eir is None

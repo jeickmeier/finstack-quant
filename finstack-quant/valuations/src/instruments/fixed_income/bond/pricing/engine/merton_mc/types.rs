@@ -435,8 +435,8 @@ pub struct PathStatistics {
     pub avg_default_time: f64,
     /// Average terminal notional (reflects PIK accrual).
     pub avg_terminal_notional: f64,
-    /// Average recovery percentage among defaulted paths.
-    pub avg_recovery_pct: f64,
+    /// Average recovery rate (decimal fraction) among defaulted paths.
+    pub avg_recovery_rate: f64,
     /// Fraction of coupon dates where PIK was elected.
     pub pik_exercise_rate: f64,
 }

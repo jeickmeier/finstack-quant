@@ -501,7 +501,9 @@ fn a_non_performing_loan_is_ineligible_until_it_resolves() {
 fn an_amortization_event_starts_the_term_out_clock() {
     let mut facility = facility(60_000_000.0, 100_000_000.0);
     // A floor no deal can meet fails after three periods.
-    facility.amortization_events = vec![AmortizationEvent::ExcessSpread { min_3m: 1.0 }];
+    facility.amortization_events = vec![AmortizationEvent::ExcessSpread {
+        min_excess_spread_3m: 1.0,
+    }];
     facility.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
     let projection = facility.project(&market(), close()).expect("projection");
     let event = projection

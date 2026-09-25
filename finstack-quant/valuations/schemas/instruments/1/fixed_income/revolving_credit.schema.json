@@ -1085,13 +1085,13 @@
           "additionalProperties": false,
           "description": "Fraction of the opening commitment, as a decimal (`0.02` = 2%).",
           "properties": {
-            "pct_of_commitment": {
+            "fraction_of_commitment": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_commitment"
+            "fraction_of_commitment"
           ],
           "type": "object"
         }

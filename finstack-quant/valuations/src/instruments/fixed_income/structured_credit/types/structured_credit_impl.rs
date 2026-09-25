@@ -97,10 +97,10 @@ impl StructuredCredit {
     pub fn with_cleanup_call(mut self, threshold: f64) -> finstack_quant_core::Result<Self> {
         if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "cleanup_call_pct must be finite and in (0, 1), got {threshold}"
+                "cleanup_call_decimal must be finite and in (0, 1), got {threshold}"
             )));
         }
-        self.cleanup_call_pct = Some(threshold);
+        self.cleanup_call_decimal = Some(threshold);
         Ok(self)
     }
 
@@ -246,7 +246,7 @@ impl StructuredCredit {
                 RecipientType::ManagerFee(super::ManagementFeeType::Incentive),
                 PaymentCalculation::IncentiveFee {
                     hurdle_irr: spec.hurdle_irr,
-                    share_pct: spec.share_pct,
+                    share: spec.share,
                 },
             )
         });

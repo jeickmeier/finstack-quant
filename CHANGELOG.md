@@ -2,6 +2,85 @@
 
 ## [Unreleased]
 
+### `_pct`/`_decimal`/`_bp` pass (2026-09-24)
+
+`_pct` now means percent points only (`100.0` = 100%). Decimal-valued fields
+carry `_decimal`, a ratio noun (`share`, `fraction`, `ratio`) or `_rate`, and
+basis-point values carry `_bp`. Where a field changed scale its input is
+converted once, so the documented equivalent input prices bit-for-bit as
+before.
+
+#### Changed (BREAKING)
+
+- `BumpConfig.spot_bump_pct` / `vol_bump_pct` (now `spot_bump_decimal` /
+  `vol_bump_decimal`), also the `valuations.sensitivities.v1` extension keys
+  and `GreekBumps` fields. Rust, Python, WASM, JSON.
+- `ScenarioPricingOverrides.scenario_price_shock_pct` (now
+  `scenario_price_shock_decimal`) and `with_price_shock_pct` (now
+  `with_scenario_price_shock_decimal`); the scenario adapter's
+  `attributes.meta` key follows. Rust, Python, WASM, JSON.
+- `BermudanCallProvision.call_price` (now `price_pct_of_par`, percent of par:
+  `100.0` = par, was the fraction `1.0`). CallableRangeAccrual pays
+  `notional * price_pct_of_par / 100`. Rust, JSON, WASM test fixture.
+- `Snowball.callable` (now `call_provision`). Rust, JSON.
+- `AgencyMbsPassthrough.servicing_fee_rate` / `guarantee_fee_rate` (now
+  `servicing_fee_bp` / `guarantee_fee_bp`, annual bp: `25.0` was `0.0025`);
+  the embedded TBA and structured-credit CMO assumption registries rename
+  `servicing_fee_rate`, `guarantee_fee_rate`, `agency_guarantee_fee_rate` and
+  `gnma_guarantee_fee_rate` to `*_bp` with bp values. Rust, JSON.
+- `EquityTotalReturnFuture.spread_basis_points_id` (now `spread_bp_id`). Rust,
+  JSON.
+- `CouponType::Split { cash_pct, pik_pct }` (now
+  `{ cash_fraction, pik_fraction }`) and Python `CouponType.split(cash_pct,
+  pik_pct)` / `.cash_pct` / `.pik_pct` (now `cash_fraction` / `pik_fraction`).
+  Rust, Python, JSON.
+- `AmortizationEvent::CumulativeLoss { max_pct }` (now
+  `{ max_cumulative_loss }`, a decimal fraction of the original collateral in
+  `(0, 1]`: `0.04` was `4.0`) and `ExcessSpread { min_3m }` (now
+  `{ min_excess_spread_3m }`) on AssetBackedFacility; Python
+  `AmortizationEvent.cumulative_loss(max_cumulative_loss)` /
+  `.max_cumulative_loss` / `.excess_spread(min_excess_spread_3m)` /
+  `.min_excess_spread_3m`. Rust, Python, JSON.
+- `FinalPayoffType::KnockInPut { strike }` (now `{ strike_ratio }`, a ratio of
+  the initial level like `final_barrier`: `1.0` was `strike = initial_level`).
+  `FinalPayoffType` now denies unknown fields. Rust, JSON.
+- Structured credit decimal fields: `cleanup_call_pct` (now
+  `cleanup_call_decimal`, Python builder/getter too), `IncentiveFeeSpec.share_pct`
+  (now `share`), `CardPortfolioSpec.fixed_allocation_pct` (now
+  `fixed_allocation_decimal`, `with_fixed_allocation_decimal`),
+  `ShiftingInterestStep.senior_pct` (now `senior_decimal`),
+  `TargetOcSpec.pct_of_current` / `floor_pct_of_original` (now
+  `fraction_of_current` / `floor_fraction_of_original`),
+  `ExcessSpreadSpec.trap_loss_pct` (now `trap_loss_decimal`) and
+  `ReserveTarget::PctOfCurrent` / `PctOfOriginal` (now `FractionOfCurrent` /
+  `FractionOfOriginal`, wire `fraction_of_current` / `fraction_of_original`).
+  Rust, Python, JSON.
+- `ReinvestmentCriteria.max_price` (now `max_price_pct`, percent of par; the
+  value is unchanged). Rust, Python docs, JSON.
+- `RealEstateAsset.disposition_cost_pct` (now `disposition_cost_decimal`) and
+  `ClawbackSpec.holdback_pct` (now `holdback_decimal`). Rust, JSON.
+- `UpfrontFee::PctOfCommitment` (now `FractionOfCommitment`, wire
+  `fraction_of_commitment`). Rust, Python, JSON.
+- `OidPolicy::WithheldPct` / `SeparatePct` (now `WithheldBp` / `SeparateBp`,
+  wire `withheld_bp` / `separate_bp`; the value was already basis points).
+  Rust, JSON.
+- Merton MC `PathStatistics.avg_recovery_pct` (now `avg_recovery_rate`, a
+  decimal fraction). Rust, Python.
+
+#### Numbers change
+
+- Only the input scale moves: `price_pct_of_par` is percent (was fraction),
+  MBS/TBA/CMO servicing and guarantee fees are bp (were decimals),
+  `max_cumulative_loss` is a fraction (was percent), and `strike_ratio` is a
+  ratio of the initial level (was an absolute price, divided by the initial
+  level in the payoff). Each is converted once at the point of use, so the
+  converted input reproduces the old result bit-for-bit: the CallableRangeAccrual
+  PV at `102.0` equals the pinned PV at the retired `1.02`, the MBS coupon
+  identity at 25 bp equals the retired `0.0025`, and the ABF engine threshold
+  at `0.005` equals the retired `0.5 / 100`. A knock-in put strike on an
+  underlying whose initial level is not 100 now reads as a ratio, which is
+  checked against the term-sheet payoff `1 - max(K/S0 - S_T/S0, 0)`.
+
 ### Sensitivity units (2026-09-24)
 
 Every `<factor>01` sensitivity and EquityOption rho now report the currency

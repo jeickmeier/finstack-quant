@@ -267,7 +267,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             market,
             as_of,
             spot_id,
-            bumps.spot_bump_pct,
+            bumps.spot_bump_decimal,
         )?))
     }
 
@@ -298,14 +298,14 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         })?;
         let spot_scalar = market.get_price(spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
-        let bump_size = current_spot * bumps.spot_bump_pct;
+        let bump_size = current_spot * bumps.spot_bump_decimal;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let up = crate::metrics::bump_scalar_price(market, spot_id, bumps.spot_bump_pct)?;
+        let up = crate::metrics::bump_scalar_price(market, spot_id, bumps.spot_bump_decimal)?;
         let pv_up = self.value(&up, as_of)?.amount();
-        let down = crate::metrics::bump_scalar_price(market, spot_id, -bumps.spot_bump_pct)?;
+        let down = crate::metrics::bump_scalar_price(market, spot_id, -bumps.spot_bump_decimal)?;
         let pv_down = self.value(&down, as_of)?.amount();
 
         Ok(Some(
@@ -330,7 +330,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             return Ok(Some(0.0));
         }
 
-        let vol_bump = bumps.vol_bump_pct;
+        let vol_bump = bumps.vol_bump_decimal;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),
@@ -401,11 +401,11 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         let spot_scalar = market.get_price(spot_id)?;
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
 
-        let spot_bump = current_spot * bumps.spot_bump_pct;
+        let spot_bump = current_spot * bumps.spot_bump_decimal;
         if spot_bump <= 0.0 {
             return Ok(Some(0.0));
         }
-        let vol_bump = bumps.vol_bump_pct;
+        let vol_bump = bumps.vol_bump_decimal;
 
         // Delta at vol_up (central diff in spot)
         let curves_vol_up = crate::metrics::bump_surface_vol_absolute(
@@ -414,9 +414,9 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             vol_bump,
         )?;
         let curves_up =
-            crate::metrics::bump_scalar_price(&curves_vol_up, spot_id, bumps.spot_bump_pct)?;
+            crate::metrics::bump_scalar_price(&curves_vol_up, spot_id, bumps.spot_bump_decimal)?;
         let curves_dn =
-            crate::metrics::bump_scalar_price(&curves_vol_up, spot_id, -bumps.spot_bump_pct)?;
+            crate::metrics::bump_scalar_price(&curves_vol_up, spot_id, -bumps.spot_bump_decimal)?;
         let pv_up = self.value(&curves_up, as_of)?.amount();
         let pv_dn = self.value(&curves_dn, as_of)?.amount();
         let delta_vol_up = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -428,9 +428,9 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             -vol_bump,
         )?;
         let curves_up =
-            crate::metrics::bump_scalar_price(&curves_vol_dn, spot_id, bumps.spot_bump_pct)?;
+            crate::metrics::bump_scalar_price(&curves_vol_dn, spot_id, bumps.spot_bump_decimal)?;
         let curves_dn =
-            crate::metrics::bump_scalar_price(&curves_vol_dn, spot_id, -bumps.spot_bump_pct)?;
+            crate::metrics::bump_scalar_price(&curves_vol_dn, spot_id, -bumps.spot_bump_decimal)?;
         let pv_up = self.value(&curves_up, as_of)?.amount();
         let pv_dn = self.value(&curves_dn, as_of)?.amount();
         let delta_vol_dn = (pv_up - pv_dn) / (2.0 * spot_bump);
@@ -460,7 +460,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             return Ok(Some(0.0));
         }
 
-        let vol_bump = bumps.vol_bump_pct;
+        let vol_bump = bumps.vol_bump_decimal;
         let up = crate::metrics::bump_surface_vol_absolute(
             market,
             self.vol_surface_id.as_str(),

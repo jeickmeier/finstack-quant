@@ -72,7 +72,7 @@ pub(crate) fn generate_cashflows(
             let mut cash_inflow = ev.amount;
             if let Some(oid) = &ddtl.oid_policy {
                 match oid {
-                    super::spec::OidPolicy::WithheldPct(bp) => {
+                    super::spec::OidPolicy::WithheldBp(bp) => {
                         let pct = f64::from(*bp) * 1e-4;
                         cash_inflow =
                             Money::new(ev.amount.amount() * (1.0 - pct), ev.amount.currency())?;
@@ -82,7 +82,7 @@ pub(crate) fn generate_cashflows(
                             .amount
                             .checked_sub(Money::new(m.amount() * draw_share, m.currency())?)?;
                     }
-                    super::spec::OidPolicy::SeparatePct(bp) => {
+                    super::spec::OidPolicy::SeparateBp(bp) => {
                         let pct = f64::from(*bp) * 1e-4;
                         let fee_amt = Money::new(ev.amount.amount() * pct, ev.amount.currency())?;
                         if fee_amt.amount() > 0.0 {

@@ -73,7 +73,7 @@ fn full_waterfall_with_clawback() -> WaterfallSpec {
         .promote_tier(0.0, 0.80, 0.20)
         .clawback(ClawbackSpec {
             enable: true,
-            holdback_pct: Some(0.20),
+            holdback_decimal: Some(0.20),
             settle_on: ClawbackSettle::FundEnd,
         })
         .build()

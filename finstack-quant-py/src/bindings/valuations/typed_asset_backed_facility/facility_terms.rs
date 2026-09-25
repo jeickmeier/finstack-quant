@@ -63,15 +63,16 @@ impl PyTermOutSpec {
 /// An event that ends a facility's revolving period early.
 ///
 /// Built through :meth:`date` (a fixed date), :meth:`cumulative_loss` (a
-/// cumulative-loss threshold in percent of the original collateral) or
+/// cumulative-loss threshold as a decimal fraction of the original
+/// collateral) or
 /// :meth:`excess_spread` (a trailing three-month excess-spread floor).
 ///
 /// Examples
 /// --------
 /// >>> import datetime
 /// >>> from finstack_quant.valuations.instruments import AmortizationEvent
-/// >>> AmortizationEvent.cumulative_loss(4.0).max_pct
-/// 4.0
+/// >>> AmortizationEvent.cumulative_loss(0.04).max_cumulative_loss
+/// 0.04
 /// >>> AmortizationEvent.date(datetime.date(2025, 1, 15)).kind
 /// 'date'
 #[pyclass(
@@ -127,9 +128,9 @@ impl PyAmortizationEvent {
     ///
     /// Parameters
     /// ----------
-    /// max_pct : float
-    ///     Cumulative net loss as a percent of the original collateral
-    ///     balance (``4.0`` = 4%).
+    /// max_cumulative_loss : float
+    ///     Cumulative net loss as a decimal fraction of the original
+    ///     collateral balance (``0.04`` = 4%), in ``(0, 1]``.
     ///
     /// Returns
     /// -------
@@ -139,23 +140,28 @@ impl PyAmortizationEvent {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``max_pct`` is negative or not finite.
+    ///     If ``max_cumulative_loss`` is not finite or outside ``(0, 1]``.
     ///
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import AmortizationEvent
-    /// >>> AmortizationEvent.cumulative_loss(4.0).kind
+    /// >>> AmortizationEvent.cumulative_loss(0.04).kind
     /// 'cumulative_loss'
     #[staticmethod]
-    #[pyo3(text_signature = "(max_pct)")]
-    fn cumulative_loss(max_pct: f64) -> PyResult<Self> {
-        if !max_pct.is_finite() || max_pct < 0.0 {
+    #[pyo3(text_signature = "(max_cumulative_loss)")]
+    fn cumulative_loss(max_cumulative_loss: f64) -> PyResult<Self> {
+        if !(max_cumulative_loss.is_finite()
+            && max_cumulative_loss > 0.0
+            && max_cumulative_loss <= 1.0)
+        {
             return Err(crate::errors::value_error(format!(
-                "cumulative loss max_pct ({max_pct}) must be a finite non-negative percent"
+                "cumulative loss max_cumulative_loss ({max_cumulative_loss}) must be a decimal fraction in (0, 1]"
             )));
         }
         Ok(Self {
-            inner: AmortizationEvent::CumulativeLoss { max_pct },
+            inner: AmortizationEvent::CumulativeLoss {
+                max_cumulative_loss,
+            },
         })
     }
 
@@ -164,7 +170,7 @@ impl PyAmortizationEvent {
     ///
     /// Parameters
     /// ----------
-    /// min_3m : float
+    /// min_excess_spread_3m : float
     ///     Minimum trailing three-month annualized excess spread as a
     ///     decimal (``0.01`` = 1%).
     ///
@@ -176,23 +182,25 @@ impl PyAmortizationEvent {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``min_3m`` is not finite.
+    ///     If ``min_excess_spread_3m`` is not finite.
     ///
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import AmortizationEvent
-    /// >>> AmortizationEvent.excess_spread(0.01).min_3m
+    /// >>> AmortizationEvent.excess_spread(0.01).min_excess_spread_3m
     /// 0.01
     #[staticmethod]
-    #[pyo3(text_signature = "(min_3m)")]
-    fn excess_spread(min_3m: f64) -> PyResult<Self> {
-        if !min_3m.is_finite() {
+    #[pyo3(text_signature = "(min_excess_spread_3m)")]
+    fn excess_spread(min_excess_spread_3m: f64) -> PyResult<Self> {
+        if !min_excess_spread_3m.is_finite() {
             return Err(crate::errors::value_error(format!(
-                "excess spread min_3m ({min_3m}) must be finite"
+                "excess spread min_excess_spread_3m ({min_excess_spread_3m}) must be finite"
             )));
         }
         Ok(Self {
-            inner: AmortizationEvent::ExcessSpread { min_3m },
+            inner: AmortizationEvent::ExcessSpread {
+                min_excess_spread_3m,
+            },
         })
     }
 
@@ -215,20 +223,24 @@ impl PyAmortizationEvent {
         }
     }
 
-    /// Cumulative-loss threshold in percent, else ``None``.
+    /// Cumulative-loss threshold as a decimal fraction, else ``None``.
     #[getter]
-    fn max_pct(&self) -> Option<f64> {
+    fn max_cumulative_loss(&self) -> Option<f64> {
         match self.inner {
-            AmortizationEvent::CumulativeLoss { max_pct } => Some(max_pct),
+            AmortizationEvent::CumulativeLoss {
+                max_cumulative_loss,
+            } => Some(max_cumulative_loss),
             _ => None,
         }
     }
 
     /// Excess-spread floor (decimal), else ``None``.
     #[getter]
-    fn min_3m(&self) -> Option<f64> {
+    fn min_excess_spread_3m(&self) -> Option<f64> {
         match self.inner {
-            AmortizationEvent::ExcessSpread { min_3m } => Some(min_3m),
+            AmortizationEvent::ExcessSpread {
+                min_excess_spread_3m,
+            } => Some(min_excess_spread_3m),
             _ => None,
         }
     }

@@ -370,7 +370,7 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
         assert restored.instruments is not None
         assert len(restored.instruments) == 1
         payload = json.loads(restored.instruments[0])
-        shock = payload["instrument"]["spec"]["scenario_pricing_overrides"]["scenario_price_shock_pct"]
+        shock = payload["instrument"]["spec"]["scenario_pricing_overrides"]["scenario_price_shock_decimal"]
         assert 100.0 * (1.0 + shock) == pytest.approx(16.0)
         next_result = apply_scenario_to_market(
             ScenarioSpec("half", [OperationSpec.instrument_price_pct_by_type(["bond"], -50.0)]),
@@ -380,7 +380,7 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
         )
         assert next_result.instruments is not None
         next_shock = json.loads(next_result.instruments[0])["instrument"]["spec"]["scenario_pricing_overrides"][
-            "scenario_price_shock_pct"
+            "scenario_price_shock_decimal"
         ]
         assert 100.0 * (1.0 + next_shock) == pytest.approx(8.0)
     assert "instruments" in json.loads(result.to_json())

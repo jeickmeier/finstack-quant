@@ -62,7 +62,7 @@ fn focused_overrides_use_canonical_wire_shape() {
     cap.instrument_pricing_overrides
         .model_config
         .mc_seed_scenario = Some("vega_up".to_string());
-    cap.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.04);
+    cap.scenario_pricing_overrides.scenario_price_shock_decimal = Some(-0.04);
     assert_canonical_override_wire(
         &cap,
         &[
@@ -75,7 +75,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!("vega_up"),
             ),
             (
-                "/scenario_pricing_overrides/scenario_price_shock_pct",
+                "/scenario_pricing_overrides/scenario_price_shock_decimal",
                 serde_json::json!(-0.04),
             ),
         ],
@@ -91,7 +91,9 @@ fn focused_overrides_use_canonical_wire_shape() {
         .instrument_pricing_overrides
         .model_config
         .mc_seed_scenario = Some("rho_up".to_string());
-    forward.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.03);
+    forward
+        .scenario_pricing_overrides
+        .scenario_price_shock_decimal = Some(-0.03);
     assert_canonical_override_wire(
         &forward,
         &[
@@ -104,7 +106,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!("rho_up"),
             ),
             (
-                "/scenario_pricing_overrides/scenario_price_shock_pct",
+                "/scenario_pricing_overrides/scenario_price_shock_decimal",
                 serde_json::json!(-0.03),
             ),
         ],
@@ -146,7 +148,9 @@ fn focused_overrides_use_canonical_wire_shape() {
         .instrument_pricing_overrides
         .model_config
         .mc_seed_scenario = Some("delta_up".to_string());
-    autocall.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.08);
+    autocall
+        .scenario_pricing_overrides
+        .scenario_price_shock_decimal = Some(-0.08);
     assert_canonical_override_wire(
         &autocall,
         &[
@@ -159,7 +163,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!("delta_up"),
             ),
             (
-                "/scenario_pricing_overrides/scenario_price_shock_pct",
+                "/scenario_pricing_overrides/scenario_price_shock_decimal",
                 serde_json::json!(-0.08),
             ),
         ],
@@ -175,7 +179,9 @@ fn focused_overrides_use_canonical_wire_shape() {
         .instrument_pricing_overrides
         .model_config
         .mc_seed_scenario = Some("vega_up".to_string());
-    swaption.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.05);
+    swaption
+        .scenario_pricing_overrides
+        .scenario_price_shock_decimal = Some(-0.05);
     assert_canonical_override_wire(
         &swaption,
         &[
@@ -188,7 +194,7 @@ fn focused_overrides_use_canonical_wire_shape() {
                 serde_json::json!("vega_up"),
             ),
             (
-                "/scenario_pricing_overrides/scenario_price_shock_pct",
+                "/scenario_pricing_overrides/scenario_price_shock_decimal",
                 serde_json::json!(-0.05),
             ),
         ],

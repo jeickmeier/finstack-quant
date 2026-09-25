@@ -104,8 +104,8 @@ fn test_bond_builder_with_custom_cashflows() {
         .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Split {
-                cash_pct: Decimal::try_from(0.5).expect("valid"),
-                pik_pct: Decimal::try_from(0.5).expect("valid"),
+                cash_fraction: Decimal::try_from(0.5).expect("valid"),
+                pik_fraction: Decimal::try_from(0.5).expect("valid"),
             },
             rate: Decimal::try_from(0.06).expect("valid"),
             schedule: finstack_quant_cashflows::builder::ScheduleParams {

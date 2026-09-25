@@ -90,11 +90,11 @@ fn rmbs(step: f64, mode: ShiftMode, triggers: Vec<StepDownTrigger>) -> Structure
                 vec![
                     ShiftingInterestStep {
                         months_from_closing: 0,
-                        senior_pct: 1.0,
+                        senior_decimal: 1.0,
                     },
                     ShiftingInterestStep {
                         months_from_closing: 36,
-                        senior_pct: step,
+                        senior_decimal: step,
                     },
                 ],
             )
@@ -143,7 +143,7 @@ fn month_37(run: &SimulationRun) -> (f64, f64, f64) {
 
 /// Prospectus reading: a 70% step shifts 70% of the subordinate's pro-rata
 /// share to the senior, so A's month-37 principal is
-/// `(senior_pct + 0.7 × (1 − senior_pct)) × prepayment` on live balances
+/// `(senior_decimal + 0.7 × (1 − senior_decimal)) × prepayment` on live balances
 /// (about `0.805 + 0.7 × 0.195` after three years of full lockout).
 #[test]
 fn shift_of_subordinate_reads_the_step_as_the_shifted_share() {

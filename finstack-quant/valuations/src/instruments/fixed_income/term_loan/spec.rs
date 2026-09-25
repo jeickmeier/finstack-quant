@@ -68,10 +68,12 @@ pub use super::super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 ///
 /// # Variants
 ///
-/// - `WithheldPct`: Discount as percentage withheld from each funded draw
+/// - `WithheldBp`: Discount in basis points of each funded draw, withheld
+///   from proceeds
 /// - `WithheldAmount`: Fixed facility-level amount withheld from funded
 ///   proceeds, pro-rated across draws by draw size
-/// - `SeparatePct`: Percentage of each draw tracked separately, not withheld
+/// - `SeparateBp`: Discount in basis points of each draw, tracked
+///   separately and not withheld
 /// - `SeparateAmount`: Fixed facility-level amount tracked separately,
 ///   pro-rated across draws by draw size
 ///
@@ -83,7 +85,7 @@ pub use super::super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 /// use finstack_quant_core::currency::Currency;
 ///
 /// // 2% OID withheld from proceeds
-/// let oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%
+/// let oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%
 ///
 /// // $50,000 fixed OID
 /// let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
@@ -93,13 +95,15 @@ pub use super::super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
 pub enum OidPolicy {
-    /// Discount as percentage (basis points) withheld from each funded draw
-    WithheldPct(i32),
+    /// Discount in basis points of each funded draw (`200` = 2%), withheld
+    /// from proceeds
+    WithheldBp(i32),
     /// Fixed facility-level discount amount withheld from funded proceeds,
     /// pro-rated across draws by draw size
     WithheldAmount(Money),
-    /// Discount as percentage of each draw tracked separately for amortization
-    SeparatePct(i32),
+    /// Discount in basis points of each draw (`200` = 2%), tracked
+    /// separately for amortization
+    SeparateBp(i32),
     /// Fixed facility-level discount amount tracked separately for
     /// amortization, pro-rated across draws by draw size
     SeparateAmount(Money),

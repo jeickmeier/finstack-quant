@@ -193,10 +193,10 @@ fn test_speed_equals_gamma_convexity() {
     let option = create_test_option(expiry, strike, OptionType::Call);
     let market = create_market_context(as_of, spot, 0.25, 0.05, 0.02);
 
-    let spot_bump_pct = SPOT_BUMP_PCT;
+    let spot_bump_decimal = SPOT_BUMP_PCT;
 
     // Compute gamma at spot + bump
-    let spot_bump = spot * spot_bump_pct;
+    let spot_bump = spot * spot_bump_decimal;
     let market_up = market.clone().insert_price(
         "AAPL",
         MarketScalar::Price(

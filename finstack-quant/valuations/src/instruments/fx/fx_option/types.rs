@@ -591,7 +591,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
         if sigma <= 0.0 {
             return Ok(Some(0.0));
         }
-        let delta_sigma = bumps.vol_bump_pct.min(sigma * 0.5);
+        let delta_sigma = bumps.vol_bump_decimal.min(sigma * 0.5);
         let (up, curves_up) = crate::metrics::bump_active_volatility(
             self,
             market,
@@ -652,7 +652,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
         if sigma <= 0.0 {
             return Ok(Some(0.0));
         }
-        let delta_sigma = bumps.vol_bump_pct.min(sigma * 0.5);
+        let delta_sigma = bumps.vol_bump_decimal.min(sigma * 0.5);
         let (up, curves_up) = crate::metrics::bump_active_volatility(
             self,
             market,

@@ -86,8 +86,8 @@ impl StructuredCredit {
         if let Some(period) = &pool.reinvestment_period {
             if period.end_date < self.closing_date
                 || period.end_date > self.maturity
-                || !period.criteria.max_price.is_finite()
-                || period.criteria.max_price <= 0.0
+                || !period.criteria.max_price_pct.is_finite()
+                || period.criteria.max_price_pct <= 0.0
                 || !period.criteria.min_yield.is_finite()
             {
                 return Err(finstack_quant_core::Error::Validation(
@@ -113,7 +113,7 @@ impl StructuredCredit {
                 if !assumptions.spread_bp.is_finite()
                     || !assumptions.price_pct.is_finite()
                     || assumptions.price_pct <= 0.0
-                    || assumptions.price_pct > period.criteria.max_price
+                    || assumptions.price_pct > period.criteria.max_price_pct
                     || assumptions.maturity_months == 0
                     || assumptions
                         .coupon_floor

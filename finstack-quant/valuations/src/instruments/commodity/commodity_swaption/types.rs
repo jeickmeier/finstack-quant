@@ -625,7 +625,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             return Ok(Some(0.0));
         }
 
-        let bump_pct = bumps.spot_bump_pct;
+        let bump_pct = bumps.spot_bump_decimal;
         let inputs = self.black76_inputs(market, as_of)?;
         if inputs.time <= 0.0 || inputs.sigma <= 0.0 {
             return Ok(Some(0.0));

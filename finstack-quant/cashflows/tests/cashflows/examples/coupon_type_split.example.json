@@ -2,8 +2,8 @@
   "schema": "finstack_quant.cashflow/1",
   "coupon_type": {
     "split": {
-      "cash_pct": "0.7",
-      "pik_pct": "0.3"
+      "cash_fraction": "0.7",
+      "pik_fraction": "0.3"
     }
   }
 }

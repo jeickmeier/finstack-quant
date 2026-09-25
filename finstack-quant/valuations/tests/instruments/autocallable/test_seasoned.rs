@@ -211,7 +211,7 @@ fn all_past_observations_give_deterministic_payoff() {
     // Knock-in put variant: min past fixing 85 > 60 barrier => not knocked
     // in => principal back. Same expected value.
     let mut ki = inst.clone();
-    ki.final_payoff_type = FinalPayoffType::KnockInPut { strike: 100.0 };
+    ki.final_payoff_type = FinalPayoffType::KnockInPut { strike_ratio: 1.0 };
     let pv_ki = ki.value(&market, as_of).expect("ki pv");
     assert!(
         (pv_ki.amount() - expected).abs() / expected < 1e-3,
@@ -223,7 +223,7 @@ fn all_past_observations_give_deterministic_payoff() {
     // against strike 100 => put loss 8% of initial.
     let mut ki_hit = inst;
     ki_hit.final_barrier = 0.9;
-    ki_hit.final_payoff_type = FinalPayoffType::KnockInPut { strike: 100.0 };
+    ki_hit.final_payoff_type = FinalPayoffType::KnockInPut { strike_ratio: 1.0 };
     let pv_hit = ki_hit.value(&market, as_of).expect("ki hit pv");
     let expected_hit = 100_000.0 * (1.0 - 0.08) * df;
     assert!(

@@ -1097,12 +1097,12 @@ mod tests {
     #[test]
     fn validate_instrument_json_rejects_invalid_cleanup_call_threshold() {
         let mut deal = StructuredCredit::example();
-        deal.cleanup_call_pct = Some(-0.5);
+        deal.cleanup_call_decimal = Some(-0.5);
         let json = envelope_json(InstrumentJson::StructuredCredit(Box::new(deal)));
 
         let err = validate_instrument_json(&json, None)
             .expect_err("cleanup-call threshold outside (0, 1) must be rejected");
-        assert!(err.to_string().contains("cleanup_call_pct"));
+        assert!(err.to_string().contains("cleanup_call_decimal"));
     }
 
     #[test]

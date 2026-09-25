@@ -51,7 +51,7 @@ pub struct DealFees {
 
 /// Manager incentive fee: once the equity IRR to date (invested capital at
 /// closing against every distribution to date, including the residual on the
-/// current payment date) reaches `hurdle_irr`, the manager takes `share_pct`
+/// current payment date) reaches `hurdle_irr`, the manager takes `share`
 /// of the residual interest proceeds ahead of equity.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -61,7 +61,7 @@ pub struct IncentiveFeeSpec {
     pub hurdle_irr: f64,
     /// Share of the residual paid to the manager once the hurdle is met, as
     /// a decimal fraction in `[0, 1]`.
-    pub share_pct: f64,
+    pub share: f64,
 }
 
 impl DealFees {
@@ -105,6 +105,6 @@ mod tests {
         assert!(fees.senior_mgmt_fee_bp < fees.subordinated_mgmt_fee_bp);
         let incentive = fees.incentive_fee.expect("standard CLO incentive fee");
         assert_eq!(incentive.hurdle_irr, 0.12);
-        assert_eq!(incentive.share_pct, 0.2);
+        assert_eq!(incentive.share, 0.2);
     }
 }

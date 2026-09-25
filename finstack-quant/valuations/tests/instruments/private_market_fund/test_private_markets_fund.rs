@@ -456,7 +456,7 @@ fn test_waterfall_spec_serde_stability() {
         .promote_tier(0.0, 0.8, 0.2)
         .clawback(ClawbackSpec {
             enable: true,
-            holdback_pct: Some(0.1),
+            holdback_decimal: Some(0.1),
             settle_on: ClawbackSettle::FundEnd,
         })
         .build()

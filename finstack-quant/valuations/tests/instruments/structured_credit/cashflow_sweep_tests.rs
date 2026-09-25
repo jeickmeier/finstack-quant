@@ -406,7 +406,7 @@ fn sweep_recovery_rate_affects_equity_more_than_senior() {
 
     assert!(
         eq_pct_change >= sr_pct_change,
-        "Equity should be more sensitive to recovery changes: equity_pct={}%, senior_pct={}%",
+        "Equity should be more sensitive to recovery changes: equity_pct={}%, senior_decimal={}%",
         eq_pct_change * 100.0,
         sr_pct_change * 100.0,
     );

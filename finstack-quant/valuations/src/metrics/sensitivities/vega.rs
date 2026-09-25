@@ -83,7 +83,7 @@ where
 
         let as_of = context.as_of;
 
-        let bump_pct = defaults.vol_bump_pct;
+        let bump_pct = defaults.vol_bump_decimal;
 
         // Use already-computed Vega when available to keep totals consistent
         let target_total = if let Some(existing) = context.computed.get(&MetricId::Vega) {

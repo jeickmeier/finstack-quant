@@ -344,7 +344,7 @@ impl PyAssetPool {
     /// value : dict[str, Any] | str
     ///     ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
     ///     string: ISO ``end_date`` (inclusive), ``is_active``, ``criteria``
-    ///     (``max_price`` percent of par, ``min_yield`` annual decimal current
+    ///     (``max_price_pct`` percent of par, ``min_yield`` annual decimal current
     ///     yield below which a surviving asset is skipped), optional
     ///     ``amortizing_tranches`` (note ids paid down inside the window) and
     ///     optional ``assumptions`` (``spread_bp``, ``price_pct``,
@@ -371,7 +371,7 @@ impl PyAssetPool {
     /// >>> from finstack_quant.valuations.instruments import AssetPool
     /// >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reinvestment_period({
     /// ...     "end_date": "2028-01-01", "is_active": True,
-    /// ...     "criteria": {"max_price": 100.0, "min_yield": 0.0},
+    /// ...     "criteria": {"max_price_pct": 100.0, "min_yield": 0.0},
     /// ...     "amortizing_tranches": ["A"],
     /// ... })
     /// >>> pool.reinvestment_period["amortizing_tranches"]

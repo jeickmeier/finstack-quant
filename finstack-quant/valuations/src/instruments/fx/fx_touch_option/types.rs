@@ -394,7 +394,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
                 as_of,
             ))?
             .rate;
-        let bump_size = current_spot * bumps.spot_bump_pct;
+        let bump_size = current_spot * bumps.spot_bump_decimal;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
@@ -411,7 +411,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_up.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 + bumps.spot_bump_pct),
+                current_spot * (1.0 + bumps.spot_bump_decimal),
             )?;
             market.clone().insert_fx(fx_up)
         };
@@ -420,7 +420,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_dn.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 - bumps.spot_bump_pct),
+                current_spot * (1.0 - bumps.spot_bump_decimal),
             )?;
             market.clone().insert_fx(fx_dn)
         };
@@ -462,7 +462,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
                 as_of,
             ))?
             .rate;
-        let bump_size = current_spot * bumps.spot_bump_pct;
+        let bump_size = current_spot * bumps.spot_bump_decimal;
         if bump_size <= 0.0 {
             return Ok(Some(0.0));
         }
@@ -474,7 +474,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_up.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 + bumps.spot_bump_pct),
+                current_spot * (1.0 + bumps.spot_bump_decimal),
             )?;
             market.clone().insert_fx(fx_up)
         };
@@ -483,7 +483,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             fx_dn.set_quote(
                 self.base_currency,
                 self.quote_currency,
-                current_spot * (1.0 - bumps.spot_bump_pct),
+                current_spot * (1.0 - bumps.spot_bump_decimal),
             )?;
             market.clone().insert_fx(fx_dn)
         };
@@ -519,7 +519,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             .implied_volatility
             == Some(0.0)
         {
-            let bump = bumps.vol_bump_pct;
+            let bump = bumps.vol_bump_decimal;
             let (up, market_up) = crate::metrics::bump_active_volatility(
                 self,
                 market,
@@ -536,8 +536,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility
-            .map_or(bumps.vol_bump_pct, |volatility| {
-                bumps.vol_bump_pct.min(volatility * 0.5)
+            .map_or(bumps.vol_bump_decimal, |volatility| {
+                bumps.vol_bump_decimal.min(volatility * 0.5)
             });
         let (up, market_up) = crate::metrics::bump_active_volatility(
             self,

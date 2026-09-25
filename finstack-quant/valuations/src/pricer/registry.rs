@@ -1032,7 +1032,7 @@ mod tests {
             effective_as_of,
             raw_calls: Arc::clone(&raw_calls),
             scenario: crate::instruments::ScenarioPricingOverrides::default()
-                .with_price_shock_pct(-0.10),
+                .with_scenario_price_shock_decimal(-0.10),
         };
         let market = Market::new();
         let mut registry = PricerRegistry::new();

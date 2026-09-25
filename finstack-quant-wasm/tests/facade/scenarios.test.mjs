@@ -41,7 +41,7 @@ test('scenario facade returns reusable shocked instrument copies', () => {
   assert.equal(bond.toJson(), original);
   assert.equal(result.instruments.length, 1);
   const shock =
-    result.instruments[0].instrument.spec.scenario_pricing_overrides.scenario_price_shock_pct;
+    result.instruments[0].instrument.spec.scenario_pricing_overrides.scenario_price_shock_decimal;
   assert.ok(Math.abs(100 * (1 + shock) - 16) < 1e-12);
   const restored = valuations.instruments.Bond.fromJson(JSON.stringify(result.instruments[0]));
   assert.equal(restored.id, 'BOND');
@@ -53,6 +53,6 @@ test('scenario facade returns reusable shocked instrument copies', () => {
     JSON.stringify(result.instruments)
   );
   const nextShock =
-    next.instruments[0].instrument.spec.scenario_pricing_overrides.scenario_price_shock_pct;
+    next.instruments[0].instrument.spec.scenario_pricing_overrides.scenario_price_shock_decimal;
   assert.ok(Math.abs(100 * (1 + nextShock) - 8) < 1e-12);
 });

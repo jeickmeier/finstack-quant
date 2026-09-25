@@ -113,7 +113,7 @@ def test_structured_note_redemption_profiles_through_supported_json_route() -> N
         contracts = (
             ({"capital_protection": {"floor": 1.0}}, max(1.0, min(ratio, 1.5))),
             ({"participation": {"rate": 0.5}}, 1.0 + 0.5 * max(min(ratio, 1.5) - 1.0, 0.0)),
-            ({"knock_in_put": {"strike": 100.0}}, ratio if ratio <= 0.7 else 1.0),
+            ({"knock_in_put": {"strike_ratio": 1.0}}, ratio if ratio <= 0.7 else 1.0),
         )
         for payoff_type, expected_redemption in contracts:
             spec["final_payoff_type"] = payoff_type
@@ -121,7 +121,7 @@ def test_structured_note_redemption_profiles_through_supported_json_route() -> N
             assert result.price == pytest.approx(1000.0 * expected_redemption, abs=1e-10)
 
     # A prior knock-in with full spot recovery returns principal, not put intrinsic.
-    spec["final_payoff_type"] = {"knock_in_put": {"strike": 100.0}}
+    spec["final_payoff_type"] = {"knock_in_put": {"strike_ratio": 1.0}}
     spec["past_fixings"] = [["2025-12-30", 50.0], ["2025-12-31", 100.0]]
     assert price_instrument(json.dumps(envelope), market, as_of).price == pytest.approx(1000.0)
 

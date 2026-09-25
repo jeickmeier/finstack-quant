@@ -383,13 +383,16 @@ impl RevolvingCredit {
                     )
                 })?;
             }
-            Some(UpfrontFee::PctOfCommitment(pct)) => {
-                validation::require_with(pct.is_finite() && (0.0..=1.0).contains(pct), || {
-                    format!(
-                        "RevolvingCredit upfront_fee percentage must be a finite decimal in \
-                         [0, 1], got {pct}"
-                    )
-                })?;
+            Some(UpfrontFee::FractionOfCommitment(fraction)) => {
+                validation::require_with(
+                    fraction.is_finite() && (0.0..=1.0).contains(fraction),
+                    || {
+                        format!(
+                            "fees.upfront_fee.fraction_of_commitment must be a finite decimal in \
+                         [0, 1], got {fraction}"
+                        )
+                    },
+                )?;
             }
             None => {}
         }

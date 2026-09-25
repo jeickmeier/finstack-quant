@@ -297,10 +297,10 @@ pub(crate) fn sale_proceeds_at(
     };
 
     let mut net = gross;
-    if let Some(pct) = asset.disposition_cost_pct {
+    if let Some(pct) = asset.disposition_cost_decimal {
         if !(0.0..1.0).contains(&pct) {
             return Err(CoreError::Validation(
-                "disposition_cost_pct must be in [0, 1)".into(),
+                "disposition_cost_decimal must be in [0, 1)".into(),
             ));
         }
         net *= 1.0 - pct;

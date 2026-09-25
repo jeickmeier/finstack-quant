@@ -344,12 +344,16 @@ impl TermLoan {
                 )));
             }
         }
-        if let CouponType::Split { cash_pct, pik_pct } = self.coupon_type {
-            if cash_pct < rust_decimal::Decimal::ZERO
-                || pik_pct < rust_decimal::Decimal::ZERO
-                || cash_pct > rust_decimal::Decimal::ONE
-                || pik_pct > rust_decimal::Decimal::ONE
-                || (cash_pct + pik_pct - rust_decimal::Decimal::ONE).abs()
+        if let CouponType::Split {
+            cash_fraction,
+            pik_fraction,
+        } = self.coupon_type
+        {
+            if cash_fraction < rust_decimal::Decimal::ZERO
+                || pik_fraction < rust_decimal::Decimal::ZERO
+                || cash_fraction > rust_decimal::Decimal::ONE
+                || pik_fraction > rust_decimal::Decimal::ONE
+                || (cash_fraction + pik_fraction - rust_decimal::Decimal::ONE).abs()
                     > rust_decimal::Decimal::new(1, 9)
             {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -568,10 +572,10 @@ impl TermLoan {
         }
         match &ddtl.oid_policy {
             Some(
-                super::spec::OidPolicy::WithheldPct(bp) | super::spec::OidPolicy::SeparatePct(bp),
+                super::spec::OidPolicy::WithheldBp(bp) | super::spec::OidPolicy::SeparateBp(bp),
             ) if !(0..=10_000).contains(bp) => {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} DDTL OID percentage must be in [0, 10000] bp"
+                    "{context} ddtl.oid_policy basis points must be in [0, 10000]"
                 )));
             }
             Some(
