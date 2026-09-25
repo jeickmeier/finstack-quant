@@ -26,7 +26,7 @@ function baseline(request) {
         request.asOf,
         request.model,
         request.metrics,
-        request.pricingOptions,
+        request.metricPricingOverrides,
         request.marketHistory,
       ),
     };

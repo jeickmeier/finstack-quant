@@ -48,7 +48,7 @@ it("records full pricing inputs and the supported raw and typed routes", () => {
     "asOf",
     "model",
     "metrics",
-    "pricingOptions",
+    "metricPricingOverrides",
     "marketHistory",
   ]);
   expect(

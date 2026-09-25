@@ -255,7 +255,7 @@ const parameterDescriptions = new Map([
     "Optional metric identifiers to compute with this call; omit, null, or empty follows that callable's documented default.",
   ],
   [
-    'pricingOptions',
+    'metricPricingOverrides',
     'Optional JSON metric-pricing overrides merged into the instrument envelope before validation.',
   ],
   [

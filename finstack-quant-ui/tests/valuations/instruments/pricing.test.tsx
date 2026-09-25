@@ -78,7 +78,7 @@ function direct(request: PriceRequest) {
     request.asOf,
     request.model ?? undefined,
     request.metrics ? [...request.metrics] : undefined,
-    request.pricingOptions ?? undefined,
+    request.metricPricingOverrides ?? undefined,
     request.marketHistory ?? undefined,
   );
 }

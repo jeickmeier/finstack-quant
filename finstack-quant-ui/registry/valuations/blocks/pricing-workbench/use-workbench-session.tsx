@@ -98,7 +98,7 @@ export function useWorkbenchSession({
     asOf: initial.asOf,
     model: initial.model,
     metrics: initial.metrics,
-    pricingOptions: initial.pricingOptions,
+    metricPricingOverrides: initial.metricPricingOverrides,
     marketHistory: initial.marketHistory,
   }));
   const [request, setRequest] = useState<PriceRequest | null>(null);
@@ -122,7 +122,7 @@ export function useWorkbenchSession({
           asOf: example.asOf,
           model: example.model,
           metrics: example.metrics,
-          pricingOptions: example.pricingOptions,
+          metricPricingOverrides: example.metricPricingOverrides,
           marketHistory: example.marketHistory,
         });
         setRequest(null);
@@ -194,7 +194,7 @@ export function useWorkbenchSession({
       instrument &&
       marketReady &&
       market &&
-      !jsonError(params.pricingOptions) &&
+      !jsonError(params.metricPricingOverrides) &&
       !jsonError(params.marketHistory)
         ? {
             instrumentJson: instrument,

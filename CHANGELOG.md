@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Python kwargs for metric overrides (2026-09-24)
+
+Binding-layer only; no JSON wire field or number changes. `pricing_options`
+now names only the Rust `PricingOptions` service bundle.
+
+#### Changed (BREAKING)
+
+- `price_instrument(pricing_options=...)`, every typed `<Instrument>.price(pricing_options=...)`
+  and `validate_instrument_json(json, pricing_options=...)` (now
+  `metric_pricing_overrides`). Python; passing `pricing_options` raises
+  `TypeError`.
+- WASM `priceInstrument`, `priceInstrumentWithMarket`, `validateInstrumentJson`
+  and the typed FX `.price` parameter `pricingOptions` (now
+  `metricPricingOverrides`). WASM `index.d.ts`.
+- Rust `pricer::validate_instrument_json` / `parse_boxed_instrument_from_json`
+  parameter `pricing_options` (now `metric_pricing_overrides`); the parse error
+  reads `invalid metric_pricing_overrides JSON` (was `invalid pricing options JSON`).
+  Rust, Python and WASM error text.
+- Python typed `.price()` and `validate_instrument_json` now accept
+  `MetricPricingOverrides | dict | str | None` for `metric_pricing_overrides`,
+  and typed `.price()` accepts `MarketHistory | dict | str | None` for
+  `market_history` (was a JSON `str` only), matching `price_instrument`.
+- UI `PriceRequest.pricingOptions` and `PricingParams.pricingOptions` (now
+  `metricPricingOverrides`), matching the facade parameter. finstack-quant-ui
+  registry contract, workbench and pricing-params form, the
+  `tests/valuations/instruments/pricing-cases.json` request fixtures and the
+  gallery examples.
+
+#### Removed
+
+- The duplicate Python binding helpers `pricing_options_json` (two copies) and
+  `price_envelope`; every Python pricing entry point goes through one
+  `metric_pricing_overrides_json` coercion and one `price_typed_envelope` path.
+
 ### Instrument fields that duplicate overrides (2026-09-24)
 
 Numbers do not change for inputs that were already canonical. They change

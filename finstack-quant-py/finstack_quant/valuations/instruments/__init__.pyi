@@ -698,8 +698,8 @@ class Bond:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this bond and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -721,11 +721,12 @@ class Bond:
             call, put, and return-floor rights jointly with credit risk.
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -2766,8 +2767,8 @@ class TermLoan:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this term loan and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -2784,11 +2785,12 @@ class TermLoan:
             Model key (``"discounting"``, ``"hazard_rate"``, ``"tree"``).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -5281,8 +5283,8 @@ class InterestRateSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this swap and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -5299,11 +5301,12 @@ class InterestRateSwap:
             Model key (``"discounting"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -5893,8 +5896,8 @@ class Swaption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this swaption and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -5911,11 +5914,12 @@ class Swaption:
             Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -6775,8 +6779,8 @@ class CapFloor:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this cap/floor and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -6793,11 +6797,12 @@ class CapFloor:
             Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, ...).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -7875,8 +7880,8 @@ class CreditDefaultSwap:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -7893,11 +7898,12 @@ class CreditDefaultSwap:
             Model key (``"hazard_rate"`` is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -8732,8 +8738,8 @@ class CDSIndex:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -8750,11 +8756,12 @@ class CDSIndex:
             Model key (``"hazard_rate"`` is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -9790,8 +9797,8 @@ class CDSTranche:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -9808,11 +9815,12 @@ class CDSTranche:
             Model key (the copula tranche pricer is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -10956,8 +10964,8 @@ class ConvertibleBond:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -10974,11 +10982,12 @@ class ConvertibleBond:
             Model key (the convertible tree pricer is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -11980,8 +11989,8 @@ class FxForward:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -11998,11 +12007,12 @@ class FxForward:
             Model key (``"discounting"`` is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -12933,8 +12943,8 @@ class FxOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -12951,11 +12961,12 @@ class FxOption:
             Model key (``"black76"`` (Garman–Kohlhagen) is the native model).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -14118,8 +14129,8 @@ class EquityOption:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -14136,11 +14147,12 @@ class EquityOption:
             Model key (``"black76"`` (European) or ``"tree"``).
         metrics : list[str], optional
             Metric identifiers to compute (see :func:`list_standard_metrics`).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
             (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -23964,7 +23976,10 @@ def bond_from_cashflows_json(
     """
     ...
 
-def validate_instrument_json(json: str, pricing_options: str | None = None) -> str:
+def validate_instrument_json(
+    json: str,
+    metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+) -> str:
     """
     Validate a canonical instrument envelope and return canonical JSON.
 
@@ -23973,10 +23988,10 @@ def validate_instrument_json(json: str, pricing_options: str | None = None) -> s
     json : str
         A ``finstack_quant.instrument/1`` envelope. Bare instrument payloads
         are rejected.
-    pricing_options : str or None, optional
-        Optional metric-pricing override JSON merged by the canonical pricing
-        path before instrument validation; ``None`` (the default) retains the
-        envelope configuration.
+    metric_pricing_overrides : MetricPricingOverrides or dict or str, optional
+        Metric-time overrides merged into
+        ``instrument.spec.metric_pricing_overrides`` before instrument
+        validation; ``None`` (the default) retains the envelope configuration.
 
     Returns
     -------
@@ -23987,8 +24002,8 @@ def validate_instrument_json(json: str, pricing_options: str | None = None) -> s
     Raises
     ------
     ValueError
-        If the JSON is malformed, ``pricing_options`` is invalid override
-        JSON, the merged payload has an unknown instrument tag, or
+        If the JSON is malformed, ``metric_pricing_overrides`` is invalid
+        override JSON, the merged payload has an unknown instrument tag, or
         instrument-specific validation fails.
 
     Examples
@@ -24086,7 +24101,7 @@ def price_instrument(
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
     model: str = "default",
     metrics: list[str] | None = None,
-    pricing_options: MetricPricingOverrides | dict[str, Any] | str | None = None,
+    metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
     market_history: MarketHistory | dict[str, Any] | str | None = None,
 ) -> ValuationResult:
     """
@@ -24128,9 +24143,9 @@ def price_instrument(
         Roll specialness is in basis points against the forward curve
         ``repo_curve_id``, or the discount curve when absent; implied
         financing is an ACT/360 decimal rate.
-    pricing_options : MetricPricingOverrides or dict or str, optional
-        Metric-time overrides merged into the instrument's own
-        ``pricing_overrides`` before pricing: ``theta_period`` (a tenor; in
+    metric_pricing_overrides : MetricPricingOverrides or dict or str, optional
+        Metric-time overrides merged into
+        ``instrument.spec.metric_pricing_overrides`` before pricing: ``theta_period`` (a tenor; in
         dict/JSON form ``{"count": 1, "unit": "weeks"}``), ``breakeven_config``
         (``{"target": "z_spread", "mode": "linear"}``), ``bump_config``,
         ``bond_risk_basis``, ``theta_day_basis``, ``var_config``. A dict or
@@ -24956,8 +24971,8 @@ class AssetBackedFacility:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price the lender's projected flows (interest, principal and unused fees) and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -24977,10 +24992,11 @@ class AssetBackedFacility:
             Metric identifiers to compute alongside the value (for example
             ``"abf_borrowing_base_cushion"``, ``"abf_facility_irr"`` or
             ``"dv01"``).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides.
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing.
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -26596,8 +26612,8 @@ class RevolvingCredit:
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         model: str = "default",
         metrics: list[str] | None = None,
-        pricing_options: dict[str, object] | str | None = None,
-        market_history: str | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
         Price this facility and return a :class:`~finstack_quant.valuations.ValuationResult`.
@@ -26617,10 +26633,11 @@ class RevolvingCredit:
         metrics : list[str], optional
             Metric identifiers to compute (for example ``"dv01"`` or
             ``"draw_option_cost"``).
-        pricing_options : dict[str, object] | str, optional
-            ``MetricPricingOverrides`` merged into the instrument's own overrides.
-        market_history : str, optional
-            JSON ``MarketHistory`` scenarios required by ``hvar`` /
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing.
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
             ``expected_shortfall``.
 
         Returns
@@ -30986,8 +31003,9 @@ class MetricPricingOverrides:
     """
     Metric-time pricing overrides merged into an instrument before pricing.
 
-    Typed twin of the ``pricing_options`` JSON accepted by
-    :func:`price_instrument`. Every field mirrors the Rust
+    Typed twin of the ``metric_pricing_overrides`` JSON accepted by
+    :func:`price_instrument`, typed ``.price()`` and
+    :func:`validate_instrument_json`. Every field mirrors the Rust
     ``MetricPricingOverrides`` struct; omitted fields keep the instrument's
     own overrides. Instances are immutable and compare by value.
 
@@ -31195,7 +31213,7 @@ class MetricPricingOverrides:
         -------
         str
             JSON document accepted by :meth:`from_json` and by the
-            ``pricing_options`` argument of :func:`price_instrument`.
+            ``metric_pricing_overrides`` argument of :func:`price_instrument`.
 
         Raises
         ------

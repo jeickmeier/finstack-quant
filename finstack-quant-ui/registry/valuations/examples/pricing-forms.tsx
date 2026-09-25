@@ -62,7 +62,8 @@ function Forms() {
           !instrument ||
           type !== "bond" ||
           Boolean(
-            jsonError(params.pricingOptions) || jsonError(params.marketHistory),
+            jsonError(params.metricPricingOverrides) ||
+            jsonError(params.marketHistory),
           )
         }
         onClick={() =>

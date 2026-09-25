@@ -54,7 +54,7 @@ function direct(request) {
         request.asOf,
         request.model,
         request.metrics,
-        request.pricingOptions,
+        request.metricPricingOverrides,
         request.marketHistory,
       ),
     };
@@ -108,7 +108,10 @@ it("keys every pricing input, preserves snapshots, and forwards native history",
     { ...requests.bond, asOf: "2025-01-02" },
     { ...requests.bond, model: "hazard_rate" },
     { ...requests.bond, metrics: ["dv01"] },
-    { ...requests.bond, pricingOptions: '{"theta_period":{"count":1,"unit":"weeks"}}' },
+    {
+      ...requests.bond,
+      metricPricingOverrides: '{"theta_period":{"count":1,"unit":"weeks"}}',
+    },
     { ...requests.bond, marketHistory: history },
     { ...requests.bond, metrics: ["hvar"], marketHistory: history },
     { ...requests.bond, model: undefined },
@@ -279,7 +282,7 @@ it("keeps native instrument and override validation ahead of market errors", asy
   for (const request of [
     { ...requests.bond, instrumentJson: "{", marketJson: "{" },
     { ...requests.bond, instrumentJson: "{}", marketJson: "{" },
-    { ...requests.bond, pricingOptions: "{", marketJson: "{" },
+    { ...requests.bond, metricPricingOverrides: "{", marketJson: "{" },
   ])
     same(await proxy.price(request), direct(request));
   const document = JSON.parse(requests.bond.instrumentJson);
@@ -289,7 +292,7 @@ it("keeps native instrument and override validation ahead of market errors", asy
   const request = {
     ...requests.bond,
     instrumentJson: JSON.stringify(document),
-    pricingOptions: '{"theta_period":{"count":1,"unit":"weeks"}}',
+    metricPricingOverrides: '{"theta_period":{"count":1,"unit":"weeks"}}',
   };
   same(await proxy.price(request), direct(request));
   const bad = { ...requests.bond, instrumentJson: "{", marketJson: "{" };

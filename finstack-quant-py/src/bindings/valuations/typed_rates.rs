@@ -28,8 +28,8 @@ use super::convert::{
 use super::instruments::{
     builder_repr, decimal_from_f64, enum_from_str, instrument_default_model, instrument_expiry,
     instrument_market_dependencies, json_field, metric_typed_envelope, money_repr, opt_serde_to_py,
-    parse_typed_instrument_json, price_typed_envelope, pricing_options_json,
-    serialize_typed_instrument_json, spec_from_py, stub_kind_from_py,
+    parse_typed_instrument_json, price_typed_envelope, serialize_typed_instrument_json,
+    spec_from_py, stub_kind_from_py,
 };
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
 use super::PyValuationResult;
@@ -298,10 +298,11 @@ impl PyInterestRateSwap {
     ///     Model key.
     /// metrics : list[str], optional
     ///     Metric identifiers to compute (e.g. ``["dv01", "par_rate"]``).
-    /// pricing_options : dict | str, optional
-    ///     ``MetricPricingOverrides`` merged into the instrument's overrides.
-    /// market_history : str, optional
-    ///     JSON ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
+    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
+    ///     Metric-time overrides merged into
+    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+    /// market_history : MarketHistory | dict | str, optional
+    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
     ///
     /// Returns
     /// -------
@@ -318,9 +319,9 @@ impl PyInterestRateSwap {
     ///     If a required curve or metric is missing.
     /// RuntimeError
     ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
+    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
     #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)"
+        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -331,10 +332,9 @@ impl PyInterestRateSwap {
         as_of: &Bound<'_, PyAny>,
         model: &str,
         metrics: Option<Vec<String>>,
-        pricing_options: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&str>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        let options = pricing_options_json(py, pricing_options)?;
         price_typed_envelope(
             py,
             self.envelope_json()?,
@@ -342,7 +342,7 @@ impl PyInterestRateSwap {
             as_of,
             model,
             metrics,
-            options,
+            metric_pricing_overrides,
             market_history,
         )
     }
@@ -876,10 +876,11 @@ impl PySwaption {
     ///     Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, …).
     /// metrics : list[str], optional
     ///     Metric identifiers to compute.
-    /// pricing_options : dict | str, optional
-    ///     ``MetricPricingOverrides`` merged into the instrument's overrides.
-    /// market_history : str, optional
-    ///     JSON ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
+    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
+    ///     Metric-time overrides merged into
+    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+    /// market_history : MarketHistory | dict | str, optional
+    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
     ///
     /// Returns
     /// -------
@@ -894,9 +895,9 @@ impl PySwaption {
     ///     If a required curve, vol surface or metric is missing.
     /// RuntimeError
     ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
+    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
     #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)"
+        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -907,10 +908,9 @@ impl PySwaption {
         as_of: &Bound<'_, PyAny>,
         model: &str,
         metrics: Option<Vec<String>>,
-        pricing_options: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&str>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        let options = pricing_options_json(py, pricing_options)?;
         price_typed_envelope(
             py,
             self.envelope_json()?,
@@ -918,7 +918,7 @@ impl PySwaption {
             as_of,
             model,
             metrics,
-            options,
+            metric_pricing_overrides,
             market_history,
         )
     }
@@ -1715,10 +1715,11 @@ impl PyCapFloor {
     ///     Model key (``"black76"``, ``"normal"``, ``"hull_white_1f"``, …).
     /// metrics : list[str], optional
     ///     Metric identifiers to compute.
-    /// pricing_options : dict | str, optional
-    ///     ``MetricPricingOverrides`` merged into the instrument's overrides.
-    /// market_history : str, optional
-    ///     JSON ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
+    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
+    ///     Metric-time overrides merged into
+    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+    /// market_history : MarketHistory | dict | str, optional
+    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
     ///
     /// Returns
     /// -------
@@ -1733,9 +1734,9 @@ impl PyCapFloor {
     ///     If a required curve, vol surface or metric is missing.
     /// RuntimeError
     ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
+    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
     #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)"
+        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -1746,10 +1747,9 @@ impl PyCapFloor {
         as_of: &Bound<'_, PyAny>,
         model: &str,
         metrics: Option<Vec<String>>,
-        pricing_options: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&str>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        let options = pricing_options_json(py, pricing_options)?;
         price_typed_envelope(
             py,
             self.envelope_json()?,
@@ -1757,7 +1757,7 @@ impl PyCapFloor {
             as_of,
             model,
             metrics,
-            options,
+            metric_pricing_overrides,
             market_history,
         )
     }

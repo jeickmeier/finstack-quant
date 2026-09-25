@@ -2,7 +2,7 @@
 //! Mirrors the `PyInterestRateSwap` pattern in `typed_rates.rs`.
 //!
 //! This module also hosts the pricing helpers shared by every typed
-//! instrument wrapper (`price_envelope`, `envelope_metric_value`,
+//! instrument wrapper (`envelope_metric_value`,
 //! `envelope_option_greeks`) and the `instrument_pricing_methods!` macro that
 //! stamps the common `price` / `metric` / `market_dependencies` /
 //! `default_model` / `attributes` / `to_dict` surface onto a wrapper.
@@ -27,58 +27,6 @@ use super::convert::{
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
 use super::pricing::binding_pricing_options;
-use super::PyValuationResult;
-
-/// Price a typed instrument envelope through the canonical Rust pricer.
-///
-/// # Arguments
-///
-/// * `py` - GIL token; the pricer runs with the GIL released.
-/// * `envelope_json` - Canonical `finstack_quant.instrument/1` envelope.
-/// * `market` - `MarketContext` object or market-context JSON string.
-/// * `as_of` - Valuation date (date-like or ISO string).
-/// * `model` - Model key (`"default"` selects the instrument-native model).
-/// * `metrics` - Metric identifiers to compute alongside the valuation.
-/// * `pricing_options` - Optional `MetricPricingOverrides` JSON.
-/// * `market_history` - Optional `MarketHistory` JSON for historical metrics.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn price_envelope(
-    py: Python<'_>,
-    envelope_json: String,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-    metrics: Vec<String>,
-    pricing_options: Option<&str>,
-    market_history: Option<&str>,
-) -> PyResult<PyValuationResult> {
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    let pricing_options = pricing_options.map(str::to_owned);
-    let market_history = market_history.map(str::to_owned);
-    let instrument = py.detach(move || {
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-            &envelope_json,
-            pricing_options.as_deref(),
-        )
-        .map_err(core_to_py)
-    })?;
-    let inner = py
-        .detach(move || {
-            finstack_quant_valuations::pricer::price_instrument(
-                &instrument,
-                &market,
-                &as_of,
-                &model,
-                &metrics,
-                market_history.as_deref(),
-                binding_pricing_options(),
-            )
-        })
-        .map_err(core_to_py)?;
-    Ok(PyValuationResult { inner })
-}
 
 /// Compute one scalar metric for a typed instrument envelope.
 ///
@@ -164,27 +112,6 @@ pub(crate) fn envelope_option_greeks<'py>(
     Ok(out)
 }
 
-/// Coerce an optional `dict | str` of `MetricPricingOverrides` to JSON.
-///
-/// # Arguments
-///
-/// * `py` - GIL token used for `json.dumps` on dict inputs.
-/// * `obj` - `None`, a JSON string, or a dict of override fields.
-pub(crate) fn pricing_options_json(
-    py: Python<'_>,
-    obj: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Option<String>> {
-    match obj {
-        None => Ok(None),
-        Some(value) if value.is_none() => Ok(None),
-        Some(value) => Ok(Some(crate::bindings::module_utils::py_to_json_string(
-            py,
-            value,
-            "pricing_options",
-        )?)),
-    }
-}
-
 /// Stamp the pricing surface shared by every typed instrument wrapper.
 ///
 /// Expands to a `#[pymethods]` block (the crate enables
@@ -211,11 +138,11 @@ macro_rules! instrument_pricing_methods {
             /// metrics : list[str], optional
             ///     Metric identifiers to compute (e.g. ``["dv01", "theta"]``).
             ///     Empty or omitted means valuation only.
-            /// pricing_options : dict | str | None
-            ///     Optional ``MetricPricingOverrides`` (dict or JSON string) merged
-            ///     into the instrument's ``pricing_overrides`` before pricing.
-            /// market_history : str | None
-            ///     Optional JSON ``MarketHistory`` scenarios required by ``hvar`` and
+            /// metric_pricing_overrides : MetricPricingOverrides | dict | str | None
+            ///     Metric-time overrides merged into
+            ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+            /// market_history : MarketHistory | dict | str | None
+            ///     Historical ``MarketHistory`` scenarios required by ``hvar`` and
             ///     ``expected_shortfall`` metrics.
             ///
             /// Returns
@@ -233,8 +160,8 @@ macro_rules! instrument_pricing_methods {
             ///     missing from ``market``.
             /// RuntimeError
             ///     If the pricer or a requested metric fails numerically.
-            #[pyo3(signature = (market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
-            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)")]
+            #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
+            #[pyo3(text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)")]
             #[allow(clippy::too_many_arguments)]
             fn price(
                 &self,
@@ -243,19 +170,17 @@ macro_rules! instrument_pricing_methods {
                 as_of: &Bound<'_, PyAny>,
                 model: &str,
                 metrics: Option<Vec<String>>,
-                pricing_options: Option<&Bound<'_, PyAny>>,
-                market_history: Option<&str>,
+                metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+                market_history: Option<&Bound<'_, PyAny>>,
             ) -> PyResult<$crate::bindings::valuations::PyValuationResult> {
-                let pricing_options =
-                    $crate::bindings::valuations::typed_fx::pricing_options_json(py, pricing_options)?;
-                $crate::bindings::valuations::typed_fx::price_envelope(
+                $crate::bindings::valuations::instruments::price_typed_envelope(
                     py,
                     self.envelope_json()?,
                     market,
                     as_of,
                     model,
-                    metrics.unwrap_or_default(),
-                    pricing_options.as_deref(),
+                    metrics,
+                    metric_pricing_overrides,
                     market_history,
                 )
             }

@@ -34,7 +34,8 @@ export function workbenchStatus({
       candidate.model !== completed.request.model ||
       JSON.stringify(candidate.metrics) !==
         JSON.stringify(completed.request.metrics) ||
-      candidate.pricingOptions !== completed.request.pricingOptions ||
+      candidate.metricPricingOverrides !==
+        completed.request.metricPricingOverrides ||
       candidate.marketHistory !== completed.request.marketHistory);
   const status =
     workerStatus !== "ready"

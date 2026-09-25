@@ -5777,10 +5777,10 @@ export interface ValuationInstrumentsNamespace {
    * Bare instrument payloads are rejected. Returns canonical re-serialized JSON.
    * @returns Canonical instrument envelope JSON after schema validation.
    * @param json - Required `finstack_quant.instrument/1` envelope.
-   * @param pricingOptions - Serialized metric-pricing override object merged before native instrument validation; `None` (omitted or null in JavaScript) retains the envelope configuration.
+   * @param metricPricingOverrides - Serialized metric-pricing override object merged before native instrument validation; `None` (omitted or null in JavaScript) retains the envelope configuration.
    * @throws Error - Throws a JavaScript exception if the instrument or override JSON is malformed, the merged payload is not a canonical v1 instrument envelope, instrument validation fails, or the envelope cannot be canonically serialized.
    */
-  validateInstrumentJson(json: string, pricingOptions?: string | null): string;
+  validateInstrumentJson(json: string, metricPricingOverrides?: string | null): string;
   /**
    * Price an instrument from its canonical envelope and return a `ValuationResult` object.
    *
@@ -5798,10 +5798,10 @@ export interface ValuationInstrumentsNamespace {
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit for the instrument-native model.
    * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.
-   * @param pricingOptions - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
+   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
    * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).
-   * @throws Error - Throws a JavaScript exception if an instrument, market, pricing-option, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if an instrument, market, metric-pricing-override, or market-history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
    */
   priceInstrument(
     instrumentJson: string,
@@ -5809,7 +5809,7 @@ export interface ValuationInstrumentsNamespace {
     asOf: string,
     model?: string | null,
     metrics?: string[] | null,
-    pricingOptions?: string | null,
+    metricPricingOverrides?: string | null,
     marketHistory?: string | null
   ): ValuationResult;
   /**
@@ -5828,10 +5828,10 @@ export interface ValuationInstrumentsNamespace {
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Pricing-model identifier; use `"default"` for the instrument-native model when supported.
    * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result.
-   * @param pricingOptions - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
+   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
    * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).
-   * @throws Error - Throws a JavaScript exception if an instrument, pricing-option, or market- history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if an instrument, metric-pricing-override, or market- history payload is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to a JavaScript value.
    */
   priceInstrumentWithMarket(
     instrumentJson: string,
@@ -5839,7 +5839,7 @@ export interface ValuationInstrumentsNamespace {
     asOf: string,
     model: string,
     metrics?: string[] | null,
-    pricingOptions?: string | null,
+    metricPricingOverrides?: string | null,
     marketHistory?: string | null
   ): ValuationResult;
   /**
@@ -6238,17 +6238,17 @@ export interface FxInstrument extends WasmOwned {
    * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @param metrics - Optional canonical metric IDs such as `"delta"`, `"vega"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result.
-   * @param pricingOptions - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
+   * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
    * @returns Structured `ValuationResult` for the selected model.
-   * @throws Error - Throws a JavaScript exception if the instrument, market, pricing-option, or market-history JSON is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to JavaScript.
+   * @throws Error - Throws a JavaScript exception if the instrument, market, metric-pricing-override, or market-history JSON is invalid; `metrics` is not a string array; `asOf`, `model`, or a metric identifier is invalid; required market data is missing; pricing or a metric calculation fails; or the valuation cannot be converted to JavaScript.
    */
   price(
     marketJson: string,
     asOf: string,
     model?: string | null,
     metrics?: string[] | null,
-    pricingOptions?: string | null,
+    metricPricingOverrides?: string | null,
     marketHistory?: string | null
   ): ValuationResult;
 }

@@ -48,7 +48,7 @@ const cases = inputs.map(({ type, request }) => {
     request.asOf,
     request.model,
     request.metrics,
-    request.pricingOptions,
+    request.metricPricingOverrides,
     request.marketHistory,
   );
   let cashflows = null,

@@ -17,7 +17,7 @@ use crate::bindings::valuations::convert::{
 };
 use crate::bindings::valuations::instruments::{
     instrument_default_model, instrument_expiry, instrument_market_dependencies,
-    metric_typed_envelope, parse_typed_instrument_json, price_typed_envelope, pricing_options_json,
+    metric_typed_envelope, parse_typed_instrument_json, price_typed_envelope,
     serialize_typed_instrument_json, stub_kind_from_py,
 };
 use crate::bindings::valuations::PyValuationResult;
@@ -225,10 +225,11 @@ impl PyRevolvingCredit {
     /// metrics : list[str], optional
     ///     Metric identifiers to compute (for example ``"dv01"`` or
     ///     ``"draw_option_cost"``).
-    /// pricing_options : dict | str, optional
-    ///     ``MetricPricingOverrides`` merged into the instrument's overrides.
-    /// market_history : str, optional
-    ///     JSON ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
+    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
+    ///     Metric-time overrides merged into
+    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+    /// market_history : MarketHistory | dict | str, optional
+    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
     ///
     /// Returns
     /// -------
@@ -243,9 +244,9 @@ impl PyRevolvingCredit {
     ///     If a required curve or metric is missing.
     /// RuntimeError
     ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
+    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
     #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)"
+        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -256,10 +257,9 @@ impl PyRevolvingCredit {
         as_of: &Bound<'_, PyAny>,
         model: &str,
         metrics: Option<Vec<String>>,
-        pricing_options: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&str>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        let options = pricing_options_json(py, pricing_options)?;
         price_typed_envelope(
             py,
             self.envelope_json()?,
@@ -267,7 +267,7 @@ impl PyRevolvingCredit {
             as_of,
             model,
             metrics,
-            options,
+            metric_pricing_overrides,
             market_history,
         )
     }

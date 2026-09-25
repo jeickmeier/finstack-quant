@@ -243,7 +243,7 @@ release packaging slice. An optional `wasmUrl` selects a matching web artifact;
 reset or changing that URL creates a fresh worker and query session.
 
 `usePriceInstrument` requires the complete immutable request (`instrumentJson`,
-`marketJson`, `asOf`, `model`, `metrics`, `pricingOptions`, `marketHistory`). JSON
+`marketJson`, `asOf`, `model`, `metrics`, `metricPricingOverrides`, `marketHistory`). JSON
 strings remain unchanged, including wide integer tokens. Results are structured
 clone values; export through the worker's `exportResult` method for native
 canonical JSON. `useCashflows` (the individual `use-cashflows` item) returns original native JSON

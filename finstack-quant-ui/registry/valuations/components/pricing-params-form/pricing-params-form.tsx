@@ -103,7 +103,7 @@ export interface PricingParams {
   asOf: string;
   model?: string | null;
   metrics?: readonly string[] | null;
-  pricingOptions?: string | null;
+  metricPricingOverrides?: string | null;
   marketHistory?: string | null;
 }
 /** Syntax validation only. Native pricing owns override and history domain rules. */
@@ -178,9 +178,9 @@ function PricingOverrides({
         onSubmit={() => {}}
         onInputJson={(json) => {
           if (json == null) return;
-          const pricingOptions = compactOverrides(json);
-          if ((value ?? undefined) === pricingOptions) return;
-          onValueChange(pricingOptions);
+          const metricPricingOverrides = compactOverrides(json);
+          if ((value ?? undefined) === metricPricingOverrides) return;
+          onValueChange(metricPricingOverrides);
         }}
       />
       <Button
@@ -287,9 +287,9 @@ export function PricingParamsForm({
       {sections.includes("advanced") && (
         <div className="finstack-pricing-advanced">
           <PricingOverrides
-            value={value.pricingOptions}
-            onValueChange={(pricingOptions) =>
-              onValueChange({ ...value, pricingOptions })
+            value={value.metricPricingOverrides}
+            onValueChange={(metricPricingOverrides) =>
+              onValueChange({ ...value, metricPricingOverrides })
             }
           />
           {marketHistorySlot ?? (

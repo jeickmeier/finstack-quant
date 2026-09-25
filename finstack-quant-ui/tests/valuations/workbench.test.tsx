@@ -98,7 +98,7 @@ beforeEach(() => {
             request.asOf,
             request.model,
             request.metrics,
-            request.pricingOptions,
+            request.metricPricingOverrides,
             request.marketHistory,
           );
         } catch (error) {
@@ -173,7 +173,9 @@ it("embeds the existing components, debounces complete requests and retains edit
   await waitFor(
     () => {
       const latest = prices().at(-1);
-      expect(latest?.pricingOptions).toBe('{"theta_period":{"count":1,"unit":"weeks"}}');
+      expect(latest?.metricPricingOverrides).toBe(
+        '{"theta_period":{"count":1,"unit":"weeks"}}',
+      );
       expect(latest?.marketHistory).toBe(history);
       expect(latest?.instrumentJson).toContain('"amount":"1000000.123456789"');
     },

@@ -280,20 +280,23 @@ def test_price_instrument_keyword_and_typed_options() -> None:
     assert pickle.loads(pickle.dumps(opts)) == opts  # noqa: S301
     assert "theta_period='1W'" in repr(opts)
 
-    typed = price_instrument(_bond(), market, AS_OF, metrics=["theta"], pricing_options=opts)
+    typed = price_instrument(_bond(), market, AS_OF, metrics=["theta"], metric_pricing_overrides=opts)
     as_dict = price_instrument(
         _bond(),
         market,
         AS_OF,
         metrics=["theta"],
-        pricing_options={"theta_period": {"count": 1, "unit": "weeks"}, "theta_day_basis": "trading_252"},
+        metric_pricing_overrides={"theta_period": {"count": 1, "unit": "weeks"}, "theta_day_basis": "trading_252"},
     )
     as_str = price_instrument(
         _bond(),
         market,
         AS_OF,
         metrics=["theta"],
-        pricing_options=json.dumps({"theta_period": {"count": 1, "unit": "weeks"}, "theta_day_basis": "trading_252"}),
+        metric_pricing_overrides=json.dumps({
+            "theta_period": {"count": 1, "unit": "weeks"},
+            "theta_day_basis": "trading_252",
+        }),
     )
     assert typed["theta"] == as_dict["theta"] == as_str["theta"]
     assert typed["theta"] != by_keyword["theta"]
@@ -399,11 +402,39 @@ def test_validate_instrument_json_merges_overrides_before_validation() -> None:
 
     with pytest.raises(ValueError):
         validate_instrument_json(raw)
-    prepared = validate_instrument_json(raw, pricing_options='{"theta_period":{"count":1,"unit":"weeks"}}')
+    prepared = validate_instrument_json(raw, metric_pricing_overrides='{"theta_period":{"count":1,"unit":"weeks"}}')
     assert json.loads(prepared)["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == {
         "count": 1,
         "unit": "weeks",
     }
     assert validate_instrument_json(prepared) == prepared
-    with pytest.raises(ValueError, match="invalid pricing options JSON"):
-        validate_instrument_json(raw, pricing_options="{")
+    with pytest.raises(ValueError, match="invalid metric_pricing_overrides JSON"):
+        validate_instrument_json(raw, metric_pricing_overrides="{")
+
+
+def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_types() -> None:
+    """``price_instrument``, typed ``.price()`` and ``validate_instrument_json`` share one coercion."""
+    market = _market()
+    bond = _bond()
+    typed = MetricPricingOverrides(theta_period="1W")
+    as_dict = {"theta_period": {"count": 1, "unit": "weeks"}}
+    expected = price_instrument(bond, market, AS_OF, metrics=["theta"], metric_pricing_overrides=typed)["theta"]
+    for value in (typed, as_dict, json.dumps(as_dict)):
+        assert bond.price(market, AS_OF, metrics=["theta"], metric_pricing_overrides=value)["theta"] == expected
+        prepared = json.loads(validate_instrument_json(bond.to_json(), metric_pricing_overrides=value))
+        assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == as_dict["theta_period"]
+
+
+def test_pricing_entry_points_reject_retired_pricing_options_keyword() -> None:
+    market = _market()
+    bond = _bond()
+    with pytest.raises(TypeError):
+        bond.price(market, AS_OF, pricing_options={})  # schema-rejection-test: retired kwarg pricing_options
+    with pytest.raises(TypeError):
+        price_instrument(
+            bond, market, AS_OF, pricing_options={}
+        )  # schema-rejection-test: retired kwarg pricing_options
+    with pytest.raises(TypeError):
+        validate_instrument_json(
+            bond.to_json(), pricing_options="{}"
+        )  # schema-rejection-test: retired kwarg pricing_options

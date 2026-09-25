@@ -45,11 +45,11 @@ pub(super) fn parse_market_json(market_json: &str) -> Result<MarketContext, JsVa
 
 pub(super) fn parse_pricing_instrument_json(
     instrument_json: &str,
-    pricing_options: Option<&str>,
+    metric_pricing_overrides: Option<&str>,
 ) -> Result<finstack_quant_valuations::pricer::ParsedInstrument, JsValue> {
     finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
         instrument_json,
-        pricing_options,
+        metric_pricing_overrides,
     )
     .map_err(to_js_err)
 }
@@ -97,10 +97,10 @@ fn price_instrument_with_context(
     as_of: &str,
     model: &str,
     metrics: Vec<String>,
-    pricing_options: Option<&str>,
+    metric_pricing_overrides: Option<&str>,
     market_history_json: Option<&str>,
 ) -> Result<String, JsValue> {
-    let instrument = parse_pricing_instrument_json(instrument_json, pricing_options)?;
+    let instrument = parse_pricing_instrument_json(instrument_json, metric_pricing_overrides)?;
     valuation_result_json(price_result_with_context(
         &instrument,
         market,
@@ -193,7 +193,7 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
 /// # Arguments
 ///
 /// * `json` - Required `finstack_quant.instrument/1` envelope.
-/// * `pricing_options` - Serialized metric-pricing override object merged before
+/// * `metric_pricing_overrides` - Serialized metric-pricing override object merged before
 ///   native instrument validation; `None` (omitted or null in JavaScript) retains
 ///   the envelope configuration.
 ///
@@ -206,10 +206,13 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
 #[wasm_bindgen(js_name = validateInstrumentJson)]
 pub fn validate_instrument_json(
     json: &str,
-    pricing_options: Option<String>,
+    metric_pricing_overrides: Option<String>,
 ) -> Result<String, JsValue> {
-    finstack_quant_valuations::pricer::validate_instrument_json(json, pricing_options.as_deref())
-        .map_err(to_js_err)
+    finstack_quant_valuations::pricer::validate_instrument_json(
+        json,
+        metric_pricing_overrides.as_deref(),
+    )
+    .map_err(to_js_err)
 }
 
 /// Construct a canonical bond instrument envelope from a cashflow schedule.
@@ -269,7 +272,7 @@ pub fn bond_from_cashflows_json(
 /// FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years.
 /// Roll specialness is in basis points versus `repo_curve_id` (a forward curve),
 /// or the discount curve when omitted; implied financing is an ACT/360 decimal.
-/// @param pricing_options - Optional JSON metric-pricing overrides merged into
+/// @param metric_pricing_overrides - Optional JSON metric-pricing overrides merged into
 /// the envelope before validation. Omit, `null`, or `undefined` to use the
 /// envelope as-is.
 /// @param market_history - Optional serialized market-history JSON required by
@@ -279,7 +282,7 @@ pub fn bond_from_cashflows_json(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if an instrument, market, pricing-option, or
+/// Throws a JavaScript exception if an instrument, market, metric-pricing-override, or
 /// market-history payload is invalid; `metrics` is not a string array; `asOf`,
 /// `model`, or a metric identifier is invalid; required market data is missing;
 /// pricing or a metric calculation fails; or the valuation cannot be converted
@@ -291,10 +294,11 @@ pub fn price_instrument(
     as_of: &str,
     model: Option<String>,
     metrics: Option<JsValue>,
-    pricing_options: Option<String>,
+    metric_pricing_overrides: Option<String>,
     market_history: Option<String>,
 ) -> Result<JsValue, JsValue> {
-    let instrument = parse_pricing_instrument_json(instrument_json, pricing_options.as_deref())?;
+    let instrument =
+        parse_pricing_instrument_json(instrument_json, metric_pricing_overrides.as_deref())?;
     let market = parse_market_json(market_json)?;
     let model = model.as_deref().unwrap_or("default");
     let metric_strs: Vec<String> = match metrics {
@@ -467,7 +471,7 @@ pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsVal
 /// @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`,
 /// `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a
 /// valuation-only result.
-/// @param pricing_options - Optional JSON metric-pricing overrides merged into
+/// @param metric_pricing_overrides - Optional JSON metric-pricing overrides merged into
 /// the envelope before validation. Omit, `null`, or `undefined` to use the
 /// envelope as-is.
 /// @param market_history - Optional serialized market-history JSON required by
@@ -477,7 +481,7 @@ pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsVal
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if an instrument, pricing-option, or market-
+/// Throws a JavaScript exception if an instrument, metric-pricing-override, or market-
 /// history payload is invalid; `metrics` is not a string array; `asOf`, `model`,
 /// or a metric identifier is invalid; required market data is missing; pricing
 /// or a metric calculation fails; or the valuation cannot be converted to a
@@ -489,10 +493,11 @@ pub fn price_instrument_with_market(
     as_of: &str,
     model: &str,
     metrics: Option<JsValue>,
-    pricing_options: Option<String>,
+    metric_pricing_overrides: Option<String>,
     market_history: Option<String>,
 ) -> Result<JsValue, JsValue> {
-    let instrument = parse_pricing_instrument_json(instrument_json, pricing_options.as_deref())?;
+    let instrument =
+        parse_pricing_instrument_json(instrument_json, metric_pricing_overrides.as_deref())?;
     let metric_strs: Vec<String> = match metrics {
         None => Vec::new(),
         Some(value) if value.is_undefined() || value.is_null() => Vec::new(),

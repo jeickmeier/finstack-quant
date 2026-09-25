@@ -34,7 +34,7 @@ from finstack_quant.valuations.instruments import (
 )
 
 # Rust-only by design (mirrors the other typed instrument builders): the three
-# pricing-override bags are supplied through ``pricing_options`` on pricing.
+# pricing-override bags are supplied through ``metric_pricing_overrides`` on pricing.
 RUST_ONLY_DEAL_FIELDS = {
     "instrument_pricing_overrides",
     "metric_pricing_overrides",

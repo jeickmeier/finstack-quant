@@ -29,7 +29,7 @@ use super::convert::{
     attributes_from_py, attributes_to_py, bps_from_py, enum_to_py_string, money_from_py,
     money_to_py, opt_repr, rate_decimal_from_py,
 };
-use super::pricing::binding_pricing_options;
+use super::pricing::{binding_pricing_options, market_history_json, metric_pricing_overrides_json};
 use super::PyValuationResult;
 
 /// Parse a canonical typed-instrument envelope through the shared Rust path.
@@ -145,22 +145,24 @@ pub(crate) fn bps_value_from_py(
     Ok(finstack_quant_core::types::Bps::new(rounded as i32))
 }
 
-/// Coerce an optional pricing-options object (`dict | str | None`) to JSON.
-pub(crate) fn pricing_options_json(
-    py: Python<'_>,
-    obj: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Option<String>> {
-    match obj {
-        Some(obj) if !obj.is_none() => {
-            crate::bindings::module_utils::py_to_json_string(py, obj, "pricing_options").map(Some)
-        }
-        _ => Ok(None),
-    }
-}
-
-/// Price a typed instrument envelope through the canonical Rust pricer.
+/// Price an instrument envelope through the canonical Rust pricer.
 ///
-/// Mirrors `price_instrument`; `pricing_options` is already JSON.
+/// Shared by `price_instrument` and every typed wrapper's `.price()`, so all
+/// Python pricing entry points coerce their options identically.
+///
+/// # Arguments
+///
+/// * `py` - GIL token; parsing and pricing run with the GIL released.
+/// * `envelope_json` - Canonical `finstack_quant.instrument/1` envelope.
+/// * `market` - `MarketContext` object or market-context JSON string.
+/// * `as_of` - Valuation date (date-like or ISO 8601 string).
+/// * `model` - Model key (`"default"` selects the instrument-native model).
+/// * `metrics` - Metric identifiers to compute; `None` means valuation only.
+/// * `metric_pricing_overrides` - Optional `MetricPricingOverrides | dict |
+///   str` merged into `instrument.spec.metric_pricing_overrides` before
+///   validation; `None` keeps the instrument's own overrides.
+/// * `market_history` - Optional `MarketHistory | dict | str` scenarios for
+///   the historical risk metrics (`hvar`, `expected_shortfall`).
 // PyO3 binding helper: mirrors the keyword surface of `price_instrument`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn price_typed_envelope(
@@ -170,21 +172,22 @@ pub(crate) fn price_typed_envelope(
     as_of: &Bound<'_, PyAny>,
     model: &str,
     metrics: Option<Vec<String>>,
-    pricing_options: Option<String>,
-    market_history: Option<&str>,
+    metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+    market_history: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyValuationResult> {
+    let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
+    let instrument = py.detach(move || {
+        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
+            &envelope_json,
+            overrides.as_deref(),
+        )
+        .map_err(core_to_py)
+    })?;
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();
     let metrics = metrics.unwrap_or_default();
-    let market_history = market_history.map(str::to_owned);
-    let instrument = py.detach(move || {
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-            &envelope_json,
-            pricing_options.as_deref(),
-        )
-        .map_err(core_to_py)
-    })?;
+    let market_history = market_history_json(py, market_history)?;
     let inner = py
         .detach(move || {
             finstack_quant_valuations::pricer::price_instrument(
@@ -959,10 +962,11 @@ impl PyBond {
     ///     call, put, and return-floor rights jointly with credit risk.
     /// metrics : list[str], optional
     ///     Metric identifiers to compute (e.g. ``["ytm", "dv01"]``).
-    /// pricing_options : dict | str, optional
-    ///     ``MetricPricingOverrides`` merged into the instrument's overrides.
-    /// market_history : str, optional
-    ///     JSON ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
+    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
+    ///     Metric-time overrides merged into
+    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+    /// market_history : MarketHistory | dict | str, optional
+    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
     ///
     /// Returns
     /// -------
@@ -980,9 +984,9 @@ impl PyBond {
     ///     If a required curve or metric is missing.
     /// RuntimeError
     ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
+    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
     #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)"
+        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -993,10 +997,9 @@ impl PyBond {
         as_of: &Bound<'_, PyAny>,
         model: &str,
         metrics: Option<Vec<String>>,
-        pricing_options: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&str>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        let options = pricing_options_json(py, pricing_options)?;
         price_typed_envelope(
             py,
             self.envelope_json()?,
@@ -1004,7 +1007,7 @@ impl PyBond {
             as_of,
             model,
             metrics,
-            options,
+            metric_pricing_overrides,
             market_history,
         )
     }
@@ -1928,10 +1931,11 @@ impl PyTermLoan {
     ///     Model key.
     /// metrics : list[str], optional
     ///     Metric identifiers to compute.
-    /// pricing_options : dict | str, optional
-    ///     ``MetricPricingOverrides`` merged into the instrument's overrides.
-    /// market_history : str, optional
-    ///     JSON ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
+    /// metric_pricing_overrides : MetricPricingOverrides | dict | str, optional
+    ///     Metric-time overrides merged into
+    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+    /// market_history : MarketHistory | dict | str, optional
+    ///     ``MarketHistory`` scenarios for ``hvar`` / ``expected_shortfall``.
     ///
     /// Returns
     /// -------
@@ -1946,9 +1950,9 @@ impl PyTermLoan {
     ///     If a required curve or metric is missing.
     /// RuntimeError
     ///     If pricing or a metric computation fails.
-    #[pyo3(signature = (market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
+    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
     #[pyo3(
-        text_signature = "($self, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)"
+        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -1959,10 +1963,9 @@ impl PyTermLoan {
         as_of: &Bound<'_, PyAny>,
         model: &str,
         metrics: Option<Vec<String>>,
-        pricing_options: Option<&Bound<'_, PyAny>>,
-        market_history: Option<&str>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        let options = pricing_options_json(py, pricing_options)?;
         price_typed_envelope(
             py,
             self.envelope_json()?,
@@ -1970,7 +1973,7 @@ impl PyTermLoan {
             as_of,
             model,
             metrics,
-            options,
+            metric_pricing_overrides,
             market_history,
         )
     }

@@ -475,10 +475,10 @@ impl PyValuationResult {
 /// json : str
 ///     A ``finstack_quant.instrument/1`` envelope. Bare instrument payloads
 ///     are rejected.
-/// pricing_options : str or None, optional
-///     Optional metric-pricing override JSON merged by the canonical pricing
-///     path before instrument validation; ``None`` (the default) retains the
-///     envelope configuration.
+/// metric_pricing_overrides : MetricPricingOverrides | dict | str | None, optional
+///     Metric-time overrides merged into
+///     ``instrument.spec.metric_pricing_overrides`` before instrument
+///     validation; ``None`` (the default) retains the envelope configuration.
 ///
 /// Returns
 /// -------
@@ -490,13 +490,18 @@ impl PyValuationResult {
 /// KeyError
 ///     If the envelope references an identifier that cannot be resolved.
 /// ValueError
-///     If ``json`` or ``pricing_options`` is malformed, the merged payload is
-///     not a canonical v1 envelope, or instrument validation fails.
+///     If ``json`` or ``metric_pricing_overrides`` is malformed, the merged
+///     payload is not a canonical v1 envelope, or instrument validation fails.
 #[pyfunction]
-#[pyo3(signature = (json, pricing_options=None))]
-#[pyo3(text_signature = "(json, pricing_options=None)")]
-fn validate_instrument_json(json: &str, pricing_options: Option<&str>) -> PyResult<String> {
-    finstack_quant_valuations::pricer::validate_instrument_json(json, pricing_options)
+#[pyo3(signature = (json, metric_pricing_overrides=None))]
+#[pyo3(text_signature = "(json, metric_pricing_overrides=None)")]
+fn validate_instrument_json(
+    py: Python<'_>,
+    json: &str,
+    metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+) -> PyResult<String> {
+    let overrides = pricing::metric_pricing_overrides_json(py, metric_pricing_overrides)?;
+    finstack_quant_valuations::pricer::validate_instrument_json(json, overrides.as_deref())
         .map_err(crate::errors::core_to_py)
 }
 

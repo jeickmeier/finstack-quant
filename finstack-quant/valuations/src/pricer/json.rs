@@ -162,7 +162,8 @@ pub fn validate_typed_instrument_json(
 /// # Arguments
 ///
 /// * `json` - Required canonical v1 instrument envelope.
-/// * `pricing_options` - Optional metric-pricing override JSON merged by the
+/// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
+///   into `instrument.spec.metric_pricing_overrides` by the
 ///   canonical pricing path before instrument validation; `None` retains the
 ///   envelope configuration.
 ///
@@ -172,9 +173,9 @@ pub fn validate_typed_instrument_json(
 /// instrument validation, or canonical serialization fails.
 pub fn validate_instrument_json(
     json: &str,
-    pricing_options: Option<&str>,
+    metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<String> {
-    let effective_json = instrument_json_for_pricing(json, pricing_options)?;
+    let effective_json = instrument_json_for_pricing(json, metric_pricing_overrides)?;
     let instrument = parse_instrument_from_json(effective_json.as_ref())?;
     serde_json::to_string(&InstrumentEnvelope::new(instrument))
         .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
@@ -316,8 +317,8 @@ pub fn list_models_grouped() -> BTreeMap<String, Vec<String>> {
 /// # Arguments
 ///
 /// * `instrument_json` - Required canonical v1 instrument envelope.
-/// * `pricing_options` - Optional JSON overrides merged into the instrument's
-///   metric-pricing configuration before validation.
+/// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
+///   into `instrument.spec.metric_pricing_overrides` before validation.
 ///
 /// # Errors
 ///
@@ -325,9 +326,9 @@ pub fn list_models_grouped() -> BTreeMap<String, Vec<String>> {
 /// override cannot be merged, or the resulting instrument is invalid.
 pub fn parse_boxed_instrument_from_json(
     instrument_json: &str,
-    pricing_options: Option<&str>,
+    metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<ParsedInstrument> {
-    let effective_json = instrument_json_for_pricing(instrument_json, pricing_options)?;
+    let effective_json = instrument_json_for_pricing(instrument_json, metric_pricing_overrides)?;
     let instrument = parse_instrument_from_json(effective_json.as_ref())?;
     Ok(ParsedInstrument::new(
         instrument.into_boxed_assuming_validated()?,
@@ -607,28 +608,27 @@ fn with_id_suffix(message: String, id: Option<&str>) -> String {
 
 fn instrument_json_for_pricing<'a>(
     instrument_json: &'a str,
-    pricing_options: Option<&str>,
+    metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<Cow<'a, str>> {
-    let Some(pricing_options_json) = pricing_options else {
+    let Some(overrides_json) = metric_pricing_overrides else {
         return Ok(Cow::Borrowed(instrument_json));
     };
 
     let instrument_id = extract_spec_id_lossy(instrument_json);
     let id = instrument_id.as_deref();
 
-    let pricing_options: MetricPricingOverrides = serde_json::from_str(pricing_options_json)
-        .map_err(|e| {
-            Error::Validation(with_id_suffix(
-                format!("invalid pricing options JSON: {e}"),
-                id,
-            ))
-        })?;
+    let overrides: MetricPricingOverrides = serde_json::from_str(overrides_json).map_err(|e| {
+        Error::Validation(with_id_suffix(
+            format!("invalid metric_pricing_overrides JSON: {e}"),
+            id,
+        ))
+    })?;
     let mut document: Value = serde_json::from_str(instrument_json).map_err(|e| {
         Error::Validation(with_id_suffix(format!("invalid instrument JSON: {e}"), id))
     })?;
-    let pricing_patch = serde_json::to_value(&pricing_options).map_err(|e| {
+    let pricing_patch = serde_json::to_value(&overrides).map_err(|e| {
         Error::Validation(with_id_suffix(
-            format!("invalid pricing options JSON: {e}"),
+            format!("invalid metric_pricing_overrides JSON: {e}"),
             id,
         ))
     })?;
@@ -697,11 +697,11 @@ mod tests {
         as_of: &str,
         model: &str,
         metrics: &[String],
-        instrument_pricing_overrides_json: Option<&str>,
+        metric_pricing_overrides_json: Option<&str>,
         market_history_json: Option<&str>,
     ) -> finstack_quant_core::Result<ValuationResult> {
         let instrument =
-            parse_boxed_instrument_from_json(instrument_json, instrument_pricing_overrides_json)?;
+            parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json)?;
         price_instrument(
             &instrument,
             market,
@@ -908,14 +908,14 @@ mod tests {
 
     #[test]
     fn instrument_json_for_pricing_error_includes_instrument_id() {
-        // Malformed pricing options on a well-formed instrument JSON.
+        // Malformed metric_pricing_overrides on a well-formed instrument JSON.
         let json = bond_instrument_json();
         let err = instrument_json_for_pricing(&json, Some("not-valid-json"))
-            .expect_err("malformed pricing options must error");
+            .expect_err("malformed metric_pricing_overrides must error");
         let msg = err.to_string();
         assert!(
-            msg.contains("invalid pricing options JSON"),
-            "expected pricing options error, got: {msg}"
+            msg.contains("invalid metric_pricing_overrides JSON"),
+            "expected metric_pricing_overrides error, got: {msg}"
         );
         assert!(
             msg.contains("[instrument=TEST-BOND]"),
@@ -959,7 +959,7 @@ mod tests {
     }
 
     #[test]
-    fn composite_pricing_options_merge_into_root_metric_overrides() {
+    fn composite_metric_pricing_overrides_merge_into_root() {
         let composite =
             crate::instruments::CompositeInstrument::example().expect("composite example");
         let json = envelope_json(InstrumentJson::Composite(Box::new(composite)));
@@ -1151,7 +1151,7 @@ mod tests {
         assert!(validate_instrument_json(&json, Some("{"))
             .expect_err("bad options")
             .to_string()
-            .contains("invalid pricing options JSON"));
+            .contains("invalid metric_pricing_overrides JSON"));
     }
 
     #[test]
@@ -1313,7 +1313,7 @@ mod tests {
     }
 
     #[test]
-    fn price_instrument_from_json_accepts_pricing_options() {
+    fn price_instrument_from_json_accepts_metric_pricing_overrides() {
         let result = price_instrument_from_json(
             &bond_instrument_json(),
             &market_context(),

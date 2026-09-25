@@ -276,6 +276,6 @@ test('validateInstrumentJson merges metric-pricing overrides before validation',
     (error) =>
       error.name === 'FinstackError' &&
       error.kind === 'validation' &&
-      error.message.includes('invalid pricing options JSON')
+      error.message.includes('invalid metric_pricing_overrides JSON')
   );
 });

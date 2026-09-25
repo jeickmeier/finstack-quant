@@ -112,7 +112,10 @@ try {
       .locator("pre")
       .textContent(),
   );
-  assert.equal(submitted.pricingOptions, '{"theta_period":{"count":1,"unit":"weeks"}}');
+  assert.equal(
+    submitted.metricPricingOverrides,
+    '{"theta_period":{"count":1,"unit":"weeks"}}',
+  );
   assert.equal(submitted.marketHistory, history);
   assert.equal(
     JSON.parse(submitted.instrumentJson).instrument.spec.notional.amount,
@@ -128,7 +131,7 @@ try {
     submitted.asOf,
     submitted.model,
     submitted.metrics,
-    submitted.pricingOptions,
+    submitted.metricPricingOverrides,
     submitted.marketHistory,
   );
   const actual = JSON.parse(await output.textContent());
@@ -151,7 +154,7 @@ try {
         .getByRole("region", { name: "Submitted request" })
         .locator("pre")
         .textContent(),
-    ).pricingOptions,
+    ).metricPricingOverrides,
     '{"theta_period":"nope"}',
   );
   assert(

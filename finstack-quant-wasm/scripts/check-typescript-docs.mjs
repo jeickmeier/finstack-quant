@@ -141,7 +141,7 @@ function checkDocumentedNode(node, label, options = {}) {
     ['WebAssembly values.', 'generic constructor-interface boilerplate'],
     [
       'Pricing options that select calculation behavior',
-      'generic pricingOptions @param boilerplate',
+      'generic metricPricingOverrides @param boilerplate',
     ],
     [
       'Chronological market snapshots used to project or backtest',

@@ -139,7 +139,7 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
     target: { value: "1W" },
   });
   await waitFor(() =>
-    expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBe(
+    expect(changes.mock.calls.at(-1)?.[0].metricPricingOverrides).toBe(
       '{"theta_period":{"count":1,"unit":"weeks"}}',
     ),
   );
@@ -158,7 +158,7 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
   await userEvent.click(screen.getByRole("checkbox", { name: /dv01/ }));
   expect(changes.mock.calls.at(-1)?.[0].metrics).toEqual([]);
   expect(changes.mock.calls.at(-1)?.[0].marketHistory).toBe(history);
-  expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBe(
+  expect(changes.mock.calls.at(-1)?.[0].metricPricingOverrides).toBe(
     '{"theta_period":{"count":1,"unit":"weeks"}}',
   );
   const historyField = screen.getByRole("textbox", { name: "Market history" });
@@ -169,7 +169,7 @@ it("preserves exact optional JSON, omission versus empty selection, hidden selec
   await userEvent.click(
     screen.getByRole("button", { name: "Omit pricing overrides" }),
   );
-  expect(changes.mock.calls.at(-1)?.[0].pricingOptions).toBeUndefined();
+  expect(changes.mock.calls.at(-1)?.[0].metricPricingOverrides).toBeUndefined();
   await userEvent.click(screen.getByText("View market history"));
   await userEvent.click(
     within(

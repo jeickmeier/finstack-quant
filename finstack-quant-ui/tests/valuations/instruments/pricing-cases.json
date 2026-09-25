@@ -38,7 +38,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -76,7 +76,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -120,7 +120,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -158,7 +158,7 @@
         "asOf": "2023-12-28",
         "model": "asian_turnbull_wakeman",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -196,7 +196,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -246,7 +246,7 @@
         "asOf": "2023-12-28",
         "model": "monte_carlo_gbm",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -284,7 +284,7 @@
         "asOf": "2023-12-28",
         "model": "barrier_bs_continuous",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -322,7 +322,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -360,7 +360,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -398,7 +398,7 @@
         "asOf": "2025-01-01",
         "model": "hull_white_1f",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -436,7 +436,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": ["theta", "hvar"],
-        "pricingOptions": "{\"theta_period\":{\"count\":1,\"unit\":\"weeks\"}}",
+        "metricPricingOverrides": "{\"theta_period\":{\"count\":1,\"unit\":\"weeks\"}}",
         "marketHistory": "{\"base_date\":\"2023-12-28\",\"window_days\":2,\"scenarios\":[{\"date\":\"2023-12-26\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1},\"shift\":0.001}]},{\"date\":\"2023-12-27\",\"shifts\":[{\"factor\":{\"type\":\"discount_rate\",\"curve_id\":\"USD-TREASURY\",\"tenor_years\":1},\"shift\":-0.0005}]}]}"
       },
       "edit": {
@@ -510,7 +510,7 @@
         "asOf": "2023-12-28",
         "model": "bond_future_clean_price_proxy",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -560,7 +560,7 @@
         "asOf": "2023-12-28",
         "model": "monte_carlo_hull_white_1f",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -598,7 +598,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -636,7 +636,7 @@
         "asOf": "2023-12-28",
         "model": "hazard_rate",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -674,7 +674,7 @@
         "asOf": "2023-12-28",
         "model": "bloomberg_cdso",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -712,7 +712,7 @@
         "asOf": "2025-01-01",
         "model": "hazard_rate",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -762,7 +762,7 @@
         "asOf": "2023-12-28",
         "model": "monte_carlo_gbm",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -800,7 +800,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -838,7 +838,7 @@
         "asOf": "2023-12-28",
         "model": "static_replication",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -876,7 +876,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -914,7 +914,7 @@
         "asOf": "2023-12-28",
         "model": "asian_turnbull_wakeman",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -957,7 +957,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -995,7 +995,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1033,7 +1033,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1071,7 +1071,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1109,7 +1109,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1147,7 +1147,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1185,7 +1185,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1223,7 +1223,7 @@
         "asOf": "2025-01-01",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1261,7 +1261,7 @@
         "asOf": "2025-04-01",
         "model": "tree",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1299,7 +1299,7 @@
         "asOf": "2023-12-28",
         "model": "hazard_rate",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1337,7 +1337,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1375,7 +1375,7 @@
         "asOf": "2025-01-01",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1413,7 +1413,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1451,7 +1451,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1489,7 +1489,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1527,7 +1527,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1565,7 +1565,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1603,7 +1603,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1641,7 +1641,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1679,7 +1679,7 @@
         "asOf": "2024-01-01",
         "model": "fx_barrier_bs_continuous",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1717,7 +1717,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1755,7 +1755,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1793,7 +1793,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1831,7 +1831,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1869,7 +1869,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1907,7 +1907,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1945,7 +1945,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -1983,7 +1983,7 @@
         "asOf": "2024-01-01",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2021,7 +2021,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2059,7 +2059,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2102,7 +2102,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2140,7 +2140,7 @@
         "asOf": "2025-01-15",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2178,7 +2178,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2216,7 +2216,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2254,7 +2254,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2292,7 +2292,7 @@
         "asOf": "2025-01-01",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2330,7 +2330,7 @@
         "asOf": "2023-12-28",
         "model": "lookback_bs_continuous",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2368,7 +2368,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2406,7 +2406,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2444,7 +2444,7 @@
         "asOf": "2023-12-28",
         "model": "quanto_bs",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2482,7 +2482,7 @@
         "asOf": "2023-12-28",
         "model": "static_replication",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2520,7 +2520,7 @@
         "asOf": "2025-01-01",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2558,7 +2558,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2596,7 +2596,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2646,7 +2646,7 @@
         "asOf": "2023-12-28",
         "model": "monte_carlo_hull_white_1f",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2684,7 +2684,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2731,7 +2731,7 @@
         "asOf": "2023-12-28",
         "model": "black76",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2781,7 +2781,7 @@
         "asOf": "2023-12-28",
         "model": "monte_carlo_hull_white_1f",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2819,7 +2819,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2857,7 +2857,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2895,7 +2895,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2933,7 +2933,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -2971,7 +2971,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -3009,7 +3009,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -3047,7 +3047,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {
@@ -3085,7 +3085,7 @@
         "asOf": "2023-12-28",
         "model": "discounting",
         "metrics": [],
-        "pricingOptions": null,
+        "metricPricingOverrides": null,
         "marketHistory": null
       },
       "edit": {

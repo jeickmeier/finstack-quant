@@ -92,7 +92,7 @@ it("pins authoritative fixture sources and exact current native exports", () => 
         r.asOf,
         r.model,
         r.metrics,
-        r.pricingOptions,
+        r.metricPricingOverrides,
         r.marketHistory,
       ).value,
     ).toEqual(entry.pricedValue);

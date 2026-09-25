@@ -204,7 +204,7 @@ fn price_instrument_returns_result() {
 }
 
 #[wasm_bindgen_test]
-fn price_instrument_accepts_pricing_options() {
+fn price_instrument_accepts_metric_pricing_overrides() {
     let inst = bond_instrument_json();
     let mkt = market_context_json();
     let metrics = serde_wasm_bindgen::to_value(&vec!["dirty_price".to_string()]).unwrap();
@@ -341,7 +341,7 @@ fn fx_price_with_metrics_validates_merged_overrides_before_market() {
 
     assert!(
         message.contains("NegativeValue") || message.contains("negative"),
-        "merged pricing-option validation should win over malformed market input: {message}"
+        "merged metric_pricing_overrides validation should win over malformed market input: {message}"
     );
 }
 

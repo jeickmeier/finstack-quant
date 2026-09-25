@@ -53,7 +53,7 @@ export async function pricingCases() {
     asOf: "2025-01-01",
     model: "discounting",
     metrics: [],
-    pricingOptions: undefined,
+    metricPricingOverrides: undefined,
     marketHistory: undefined,
   };
   const bad = structuredClone(bond);

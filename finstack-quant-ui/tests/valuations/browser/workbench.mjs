@@ -103,7 +103,7 @@ try {
     request.asOf,
     request.model,
     request.metrics,
-    request.pricingOptions,
+    request.metricPricingOverrides,
     request.marketHistory,
   );
   await results
@@ -224,7 +224,7 @@ try {
           priced.asOf,
           priced.model,
           priced.metrics,
-          priced.pricingOptions,
+          priced.metricPricingOverrides,
           priced.marketHistory,
         );
         await results

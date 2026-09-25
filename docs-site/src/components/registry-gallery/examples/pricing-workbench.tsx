@@ -45,7 +45,7 @@ export const exampleRequests: Record<string, PriceRequest> = {
     asOf: "2023-12-28",
     model: "discounting",
     metrics: ["par_rate", "dv01"],
-    pricingOptions: null,
+    metricPricingOverrides: null,
     marketHistory: null,
   },
   equity_option: {

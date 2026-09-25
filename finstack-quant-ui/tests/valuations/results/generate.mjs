@@ -14,7 +14,7 @@ const result = native.priceInstrument(
   request.asOf,
   request.model,
   request.metrics,
-  request.pricingOptions,
+  request.metricPricingOverrides,
   request.marketHistory,
 );
 const root = new URL("../../../src/fixtures/results/", import.meta.url);

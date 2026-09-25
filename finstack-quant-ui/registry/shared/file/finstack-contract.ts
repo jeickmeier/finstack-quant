@@ -17,7 +17,7 @@ export interface PriceRequest {
   readonly asOf: string;
   readonly model?: string | null;
   readonly metrics?: readonly string[] | null;
-  readonly pricingOptions?: string | null;
+  readonly metricPricingOverrides?: string | null;
   readonly marketHistory?: string | null;
 }
 /** Exact source amount plus the returned rounding stamp; both are snapshotted verbatim and never recomputed. */

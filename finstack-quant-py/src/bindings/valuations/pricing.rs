@@ -27,7 +27,8 @@ pub(super) fn binding_pricing_options() -> PricingOptions {
 
 /// Metric-time pricing overrides merged into an instrument before pricing.
 ///
-/// Typed twin of the ``pricing_options`` JSON accepted by ``price_instrument``.
+/// Typed twin of the ``metric_pricing_overrides`` JSON accepted by
+/// ``price_instrument``, typed ``.price()`` and ``validate_instrument_json``.
 /// Every field mirrors the Rust ``MetricPricingOverrides`` struct; omitted
 /// fields keep the instrument's own overrides.
 ///
@@ -466,9 +467,19 @@ impl PyMarketHistory {
     }
 }
 
-/// Coerce ``dict | str | MetricPricingOverrides | None`` into the JSON the
-/// Rust pricing entry point accepts.
-pub(crate) fn pricing_overrides_json(
+/// Coerce ``MetricPricingOverrides | dict | str | None`` into the JSON the
+/// Rust pricing entry points accept.
+///
+/// The single conversion path for the ``metric_pricing_overrides`` keyword of
+/// ``price_instrument``, every typed ``.price()`` and
+/// ``validate_instrument_json``.
+///
+/// # Arguments
+///
+/// * `py` - GIL token used for ``json.dumps`` on dict inputs.
+/// * `obj` - ``None``, a typed ``MetricPricingOverrides``, a JSON string, or a
+///   dict of override fields.
+pub(crate) fn metric_pricing_overrides_json(
     py: Python<'_>,
     obj: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Option<String>> {
@@ -484,7 +495,7 @@ pub(crate) fn pricing_overrides_json(
     if let Ok(text) = obj.cast::<PyString>() {
         return Ok(Some(text.to_str()?.to_owned()));
     }
-    py_to_json_string(py, obj, "pricing_options").map(Some)
+    py_to_json_string(py, obj, "metric_pricing_overrides").map(Some)
 }
 
 /// Coerce ``dict | str | MarketHistory | None`` into the JSON the Rust
@@ -541,9 +552,9 @@ pub(crate) fn market_history_json(
 ///     its finite signed duration scalar in years. Roll specialness is in
 ///     basis points against ``repo_curve_id`` (a forward curve), or the
 ///     discount curve when absent; implied financing is an ACT/360 decimal.
-/// pricing_options : MetricPricingOverrides | dict | str | None
-///     Metric-time overrides merged into the instrument's ``pricing_overrides``
-///     before pricing: ``theta_period`` (a tenor; in dict/JSON form
+/// metric_pricing_overrides : MetricPricingOverrides | dict | str | None
+///     Metric-time overrides merged into
+///     ``instrument.spec.metric_pricing_overrides`` before pricing: ``theta_period`` (a tenor; in dict/JSON form
 ///     ``{"count": 1, "unit": "weeks"}``, or ``MetricPricingOverrides(theta_period="1W")``),
 ///     ``breakeven_config`` (``{"target": "z_spread", "mode": "linear"}``),
 ///     ``bump_config``, ``bond_risk_basis``, ``theta_day_basis``, ``var_config``,
@@ -597,9 +608,9 @@ pub(crate) fn market_history_json(
 /// JSON that ``ValuationResult.from_json`` accepts, for pipelines that
 /// serialize results.
 #[pyfunction]
-#[pyo3(signature = (instrument, market, as_of, model="default", metrics=None, pricing_options=None, market_history=None))]
+#[pyo3(signature = (instrument, market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
 #[pyo3(
-    text_signature = "(instrument, market, as_of, model='default', metrics=None, pricing_options=None, market_history=None)"
+    text_signature = "(instrument, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
 )]
 // PyO3 binding: the argument list mirrors the Python keyword-argument API, so
 // it cannot be collapsed into a parameter struct without changing that API.
@@ -611,38 +622,19 @@ fn price_instrument(
     as_of: &Bound<'_, PyAny>,
     model: &str,
     metrics: Option<Vec<String>>,
-    pricing_options: Option<&Bound<'_, PyAny>>,
+    metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
     market_history: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyValuationResult> {
-    let instrument_json = extract_instrument_json(instrument)?;
-    let pricing_options = pricing_overrides_json(py, pricing_options)?;
-    let instrument = py.detach(move || {
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-            &instrument_json,
-            pricing_options.as_deref(),
-        )
-        .map_err(core_to_py)
-    })?;
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    let metrics = metrics.unwrap_or_default();
-    let market_history = market_history_json(py, market_history)?;
-
-    let inner = py
-        .detach(move || {
-            finstack_quant_valuations::pricer::price_instrument(
-                &instrument,
-                &market,
-                &as_of,
-                &model,
-                &metrics,
-                market_history.as_deref(),
-                binding_pricing_options(),
-            )
-        })
-        .map_err(core_to_py)?;
-    Ok(PyValuationResult { inner })
+    super::instruments::price_typed_envelope(
+        py,
+        extract_instrument_json(instrument)?,
+        market,
+        as_of,
+        model,
+        metrics,
+        metric_pricing_overrides,
+        market_history,
+    )
 }
 
 /// List all metric IDs in the standard metric registry.

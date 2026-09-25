@@ -109,7 +109,7 @@ export function createService(native: {
       return result(() => {
         const instrument = instruments.validateInstrumentJson(
           request.instrumentJson,
-          request.pricingOptions,
+          request.metricPricingOverrides,
         );
         return instruments.priceInstrumentWithMarket(
           instrument,

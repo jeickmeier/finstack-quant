@@ -18,11 +18,11 @@ fn price_instrument_from_json(
     as_of: &str,
     model: &str,
     metrics: &[String],
-    instrument_pricing_overrides_json: Option<&str>,
+    metric_pricing_overrides_json: Option<&str>,
     market_history_json: Option<&str>,
 ) -> finstack_quant_core::Result<finstack_quant_valuations::results::ValuationResult> {
     let instrument =
-        parse_boxed_instrument_from_json(instrument_json, instrument_pricing_overrides_json)?;
+        parse_boxed_instrument_from_json(instrument_json, metric_pricing_overrides_json)?;
     price_instrument(
         &instrument,
         market,

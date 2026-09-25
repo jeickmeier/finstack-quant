@@ -491,7 +491,10 @@ def test_bond_getters_and_pricing_helpers() -> None:
     assert bond.default_model == "discounting"
     assert "curves" in bond.market_dependencies()
     result = bond.price(
-        _market(), AS_OF, metrics=["ytm", "dv01"], pricing_options={"theta_period": {"count": 1, "unit": "days"}}
+        _market(),
+        AS_OF,
+        metrics=["ytm", "dv01"],
+        metric_pricing_overrides={"theta_period": {"count": 1, "unit": "days"}},
     )
     assert result.get_metric("ytm") is not None
     assert bond.metric(_market(), AS_OF, "ytm") == pytest.approx(result.get_metric("ytm"))

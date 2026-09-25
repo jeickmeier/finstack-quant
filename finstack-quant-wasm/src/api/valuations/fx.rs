@@ -55,10 +55,10 @@ fn price_payload(
     as_of: &str,
     model: Option<String>,
     metrics: Option<JsValue>,
-    pricing_options: Option<String>,
+    metric_pricing_overrides: Option<String>,
     market_history: Option<String>,
 ) -> Result<JsValue, JsValue> {
-    let instrument = parse_pricing_instrument_json(json, pricing_options.as_deref())?;
+    let instrument = parse_pricing_instrument_json(json, metric_pricing_overrides.as_deref())?;
     let market = parse_market_json(market_json)?;
     let metrics: Vec<String> = match metrics {
         None => Vec::new(),
@@ -221,7 +221,7 @@ macro_rules! fx_class {
             /// @param metrics - Optional canonical metric IDs such as `"delta"`,
             /// `"vega"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or
             /// `undefined` for a valuation-only result.
-            /// @param pricing_options - Optional JSON metric-pricing overrides
+            /// @param metric_pricing_overrides - Optional JSON metric-pricing overrides
             /// merged into the envelope before validation. Omit, `null`, or
             /// `undefined` to use the envelope as-is.
             /// @param market_history - Optional serialized market-history JSON
@@ -230,8 +230,8 @@ macro_rules! fx_class {
             ///
             /// # Errors
             ///
-            /// Throws a JavaScript exception if an instrument, market, pricing-
-            /// option, or market-history payload is invalid; `metrics` is not a
+            /// Throws a JavaScript exception if an instrument, market,
+            /// metric-pricing-override, or market-history payload is invalid; `metrics` is not a
             /// string array; `asOf`, `model`, or a metric identifier is invalid;
             /// required market data is missing; pricing or a metric fails; or the
             /// valuation cannot be converted to JavaScript.
@@ -241,7 +241,7 @@ macro_rules! fx_class {
                 as_of: &str,
                 model: Option<String>,
                 metrics: Option<JsValue>,
-                pricing_options: Option<String>,
+                metric_pricing_overrides: Option<String>,
                 market_history: Option<String>,
             ) -> Result<JsValue, JsValue> {
                 price_payload(
@@ -250,7 +250,7 @@ macro_rules! fx_class {
                     as_of,
                     model,
                     metrics,
-                    pricing_options,
+                    metric_pricing_overrides,
                     market_history,
                 )
             }
