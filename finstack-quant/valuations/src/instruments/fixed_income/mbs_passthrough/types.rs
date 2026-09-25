@@ -191,7 +191,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AgencyMbsPassthrough {
             crate::instruments::fixed_income::mbs_passthrough::pricer::build_projected_schedule(
                 self,
                 as_of,
-                Some(self.wam + 12),
+                Some(self.wam_months + 12),
             )?;
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
@@ -255,12 +255,11 @@ pub enum PoolType {
 ///     .pool_type(PoolType::Generic)
 ///     .original_face(Money::from((1_000_000_i64, Currency::USD)))
 ///     .current_face(Money::from((950_000_i64, Currency::USD)))
-///     .current_factor(0.95)
 ///     .wac(0.045)
-///     .pass_through_rate(0.04)
+///     .coupon(0.04)
 ///     .servicing_fee_bp(25.0)
 ///     .guarantee_fee_bp(25.0)
-///     .wam(348)
+///     .wam_months(348)
 ///     .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())
 ///     .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())
 ///     .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -294,12 +293,11 @@ pub struct AgencyMbsPassthrough {
     pub original_face: Money,
     /// Current face amount (remaining principal balance).
     pub current_face: Money,
-    /// Current pool factor (current_face / original_face).
-    pub current_factor: f64,
     /// Weighted average coupon (gross rate on underlying mortgages).
     pub wac: f64,
-    /// Pass-through rate (net coupon to investor).
-    pub pass_through_rate: f64,
+    /// Net pass-through coupon paid to the investor, as an annual decimal
+    /// (`0.04` = 4%): `wac` less the servicing and guarantee fees.
+    pub coupon: f64,
     /// Annual servicing fee in basis points (`25.0` = 0.25%).
     ///
     /// Defaults to `0.0` when omitted.
@@ -315,7 +313,7 @@ pub struct AgencyMbsPassthrough {
     /// Remaining weighted average maturity in months as of the valuation
     /// date (current WAM, not the original term). Pool age (WALA) for
     /// seasoning ramps is derived separately from `issue_date`.
-    pub wam: u32,
+    pub wam_months: u32,
     /// Issue date of the pool.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -398,12 +396,11 @@ impl AgencyMbsPassthrough {
             .pool_type(PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((950_000_i64, Currency::USD)))
-            .current_factor(0.95)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(348)
+            .wam_months(348)
             .issue_date(date!(2022 - 01 - 01))
             .last_paid_accrual_end_opt(None)
             .maturity(date!(2052 - 01 - 01))
@@ -502,7 +499,20 @@ impl AgencyMbsPassthrough {
         self.prepayment_spec.smm(seasoning)
     }
 
-    /// Calculate net coupon (pass-through rate) from WAC and fees.
+    /// Pool factor: `current_face / original_face`.
+    ///
+    /// Derived from the two faces rather than stored, so it cannot disagree
+    /// with them. Returns `0.0` for a zero original face instead of dividing
+    /// by zero.
+    pub fn factor(&self) -> f64 {
+        let original = self.original_face.amount();
+        if original == 0.0 {
+            return 0.0;
+        }
+        self.current_face.amount() / original
+    }
+
+    /// Calculate the net pass-through coupon from WAC and fees.
     ///
     /// Should equal: `wac - (servicing_fee_bp + guarantee_fee_bp) / 10_000`
     /// (decimal).
@@ -513,11 +523,11 @@ impl AgencyMbsPassthrough {
     /// Validate that pass-through rate is consistent with WAC and fees.
     pub fn validate_coupon_consistency(&self) -> Result<()> {
         let calculated = self.calculated_net_coupon();
-        let diff = (self.pass_through_rate - calculated).abs();
+        let diff = (self.coupon - calculated).abs();
         if diff > 1e-6 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "pass_through_rate {} does not match wac {} - servicing_fee_bp {} - guarantee_fee_bp {} (bp) = {}",
-                self.pass_through_rate,
+                "coupon {} does not match wac {} - servicing_fee_bp {} - guarantee_fee_bp {} (bp) = {}",
+                self.coupon,
                 self.wac,
                 self.servicing_fee_bp,
                 self.guarantee_fee_bp,
@@ -738,7 +748,7 @@ mod tests {
         assert_eq!(mbs.id.as_str(), "FN-MA1234");
         assert_eq!(mbs.agency, AgencyProgram::Fnma);
         assert_eq!(mbs.pool_type, PoolType::Generic);
-        assert!((mbs.current_factor - 0.95).abs() < 1e-10);
+        assert!((mbs.factor() - 0.95).abs() < 1e-10);
         assert!(mbs.attributes.has_tag("mbs"));
     }
 
@@ -797,7 +807,7 @@ mod tests {
         assert!(mbs.validate_coupon_consistency().is_ok());
 
         let mut bad_mbs = mbs;
-        bad_mbs.pass_through_rate = 0.05;
+        bad_mbs.coupon = 0.05;
         assert!(bad_mbs.validate_coupon_consistency().is_err());
     }
 
@@ -906,5 +916,42 @@ mod production_mortgage_audit {
         let err = serde_json::from_value::<AgencyMbsPassthrough>(value)
             .expect_err("retired prepayment_model key must be rejected");
         assert!(err.to_string().contains("prepayment_model"), "{err}");
+    }
+
+    #[test]
+    fn factor_is_derived_from_the_faces() {
+        let mbs = AgencyMbsPassthrough::example().expect("example");
+        // Example faces are 950,000 / 1,000,000: one correctly rounded division.
+        assert_eq!(
+            mbs.factor().to_bits(),
+            (950_000.0_f64 / 1_000_000.0).to_bits()
+        );
+        let mut empty = mbs;
+        empty.original_face = Money::from((0_i64, Currency::USD));
+        assert_eq!(empty.factor(), 0.0);
+    }
+
+    #[test]
+    // schema-rejection-test: pass_through_rate (now coupon), current_factor (now factor()), wam (now wam_months)
+    fn rejects_retired_pool_term_keys() {
+        let mbs = AgencyMbsPassthrough::example().expect("example");
+        let base = serde_json::to_value(&mbs).expect("serialize");
+        for (retired, value) in [
+            ("pass_through_rate", serde_json::json!(0.04)),
+            ("current_factor", serde_json::json!(0.95)),
+            ("wam", serde_json::json!(348)),
+        ] {
+            let mut value_map = base.clone();
+            value_map
+                .as_object_mut()
+                .expect("object")
+                .insert(retired.into(), value);
+            let err = serde_json::from_value::<AgencyMbsPassthrough>(value_map)
+                .expect_err("retired pool-term key must be rejected");
+            assert!(
+                err.to_string().contains("unknown field"),
+                "{retired}: {err}"
+            );
+        }
     }
 }

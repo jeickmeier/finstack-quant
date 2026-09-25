@@ -446,7 +446,7 @@ fn bench_cmo_waterfall_pv(c: &mut Criterion) {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("T0".to_string())
             .collateral_wac(0.045)
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .unwrap();

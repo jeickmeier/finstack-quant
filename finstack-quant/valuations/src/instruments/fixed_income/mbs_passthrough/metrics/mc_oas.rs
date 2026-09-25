@@ -287,7 +287,7 @@ fn price_on_path(
     let mut pv = 0.0;
     let mut cumulative_df = 1.0;
 
-    let wam = mbs.wam as usize;
+    let wam = mbs.wam_months as usize;
     let num_steps = path.rates.len().saturating_sub(1).min(wam).min(steps.len());
 
     for month in 0..num_steps {
@@ -311,15 +311,15 @@ fn price_on_path(
         // Rate-adjusted SMM
         let smm = rate_adjusted_smm(base_smm, current_rate, base_rate, prepay_sensitivity);
 
-        // `wam` is the remaining WAM at `as_of`, so at projection step `month`
-        // (0-based) there are `wam − month` level payments left, including
+        // `wam_months` is the remaining WAM at `as_of`, so at projection step `month`
+        // (0-based) there are `wam_months − month` level payments left, including
         // the current one (same convention as the deterministic pricer).
         let step = pool_month_step(
             balance,
             wam.saturating_sub(month) as u32,
             mbs.wac,
             smm,
-            mbs.pass_through_rate,
+            mbs.coupon,
             steps.accrual_fractions[month],
         );
         let (scheduled_principal, prepayment, interest) =
@@ -393,7 +393,7 @@ pub(crate) fn calculate_mc_oas(
         + settlement_accrued_interest(mbs, as_of)?;
 
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
-    let num_steps = config.num_steps.unwrap_or(mbs.wam as usize);
+    let num_steps = config.num_steps.unwrap_or(mbs.wam_months as usize);
 
     // Fit the HW1F model to the initial discount curve: r(0) from the curve's
     // instantaneous forward and a piecewise-constant θ(t) bootstrap, so the
@@ -489,12 +489,11 @@ mod tests {
             .pool_type(PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((1_000_000_i64, Currency::USD)))
-            .current_factor(1.0)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(360)
+            .wam_months(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -583,7 +582,7 @@ mod tests {
         // post-amortization SMM.
         mbs.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.80);
 
-        let wam = mbs.wam as usize;
+        let wam = mbs.wam_months as usize;
         let path = RatePath {
             rates: vec![base_rate; wam + 1],
         };
@@ -792,12 +791,11 @@ mod tests {
             .pool_type(PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((1_000_000_i64, Currency::USD)))
-            .current_factor(1.0)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(360)
+            .wam_months(360)
             .issue_date(fresh_issue)
             .maturity(Date::from_calendar_date(2056, Month::January, 1).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -816,12 +814,11 @@ mod tests {
             .pool_type(PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((1_000_000_i64, Currency::USD)))
-            .current_factor(1.0)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(360)
+            .wam_months(360)
             .issue_date(seasoned_issue)
             .maturity(Date::from_calendar_date(2051, Month::January, 1).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -877,7 +874,7 @@ mod tests {
     /// deterministic pricer for an Act/360 seasoned pool valued mid-month.
     ///
     /// Two historical divergences are exercised at once:
-    /// - interest accrual: the MC path used a flat `pass_through_rate / 12`
+    /// - interest accrual: the MC path used a flat `coupon / 12`
     ///   while the deterministic pricer day-counts the actual month
     ///   (materially different under Act/360);
     /// - projection start: the MC path started at
@@ -907,12 +904,11 @@ mod tests {
             .pool_type(PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((850_000_i64, Currency::USD)))
-            .current_factor(0.85)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(300)
+            .wam_months(300)
             .issue_date(Date::from_calendar_date(2021, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2051, Month::January, 1).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -934,7 +930,7 @@ mod tests {
         let det_pv = price_mbs(&mbs, &market, as_of).expect("det pv").amount();
 
         // Zero-vol limit: a single flat short-rate path at the curve rate.
-        let wam = mbs.wam as usize;
+        let wam = mbs.wam_months as usize;
         let flat_path = RatePath {
             rates: vec![flat_rate; wam + 1],
         };
@@ -1008,7 +1004,7 @@ mod production_mortgage_audit {
         let as_of = date!(2024 - 01 - 15);
         let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
         mbs.issue_date = date!(2024 - 01 - 01);
-        mbs.wam = 12;
+        mbs.wam_months = 12;
         mbs.maturity = date!(2025 - 01 - 01);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("USD-OIS")
@@ -1022,7 +1018,7 @@ mod production_mortgage_audit {
             .iter()
             .map(|cf| cf.total)
             .sum::<f64>();
-        let accrued = mbs.current_face.amount() * mbs.pass_through_rate * 14.0 / 360.0;
+        let accrued = mbs.current_face.amount() * mbs.coupon * 14.0 / 360.0;
         let clean = (dirty - accrued) / mbs.current_face.amount() * 100.0;
         let config = McOasConfig {
             num_paths: 2,
@@ -1050,7 +1046,7 @@ mod production_mortgage_audit {
         let mut mbs = AgencyMbsPassthrough::example().expect("mbs");
         mbs.issue_date = date!(2023 - 01 - 01);
         mbs.maturity = date!(2053 - 01 - 01);
-        mbs.wam = 347;
+        mbs.wam_months = 347;
         let flat = 0.04_f64;
         let quote = 99.5;
         let config = McOasConfig {

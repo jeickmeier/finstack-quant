@@ -28328,7 +28328,7 @@ class StochasticPricingResult:
         ``price_pct`` (percent of the tranche's current balance),
         ``expected_loss``, ``unexpected_loss``, ``expected_shortfall``
         (currency units),
-        ``attachment``, ``detachment`` (decimal), ``average_life`` (years, over
+        ``attachment``, ``detachment`` (decimal), ``wal`` (years, over
         the paths that returned principal), ``paths_with_principal``,
         ``credit_duration`` and ``draw_option_cost`` (currency units).
 
@@ -28733,7 +28733,7 @@ class SimulationDiagnostics:
         Returns
         -------
         list[dict[str, Any]]
-            ``payment_date``, ``pool_balance``, ``pool_factor``, ``weighted_avg_coupon``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread`` and the ``coverage_tests`` the executor evaluated.
+            ``payment_date``, ``pool_balance``, ``pool_factor``, ``wac``, ``weighted_avg_spread_bp``, ``warf``, the period's collections, defaults, recoveries, reinvested par, fees paid, the cash-account balances, ``delinquent_balance``, ``servicer_advances_outstanding``, ``excess_spread`` and the ``coverage_tests`` the executor evaluated.
 
         Raises
         ------
@@ -28747,7 +28747,7 @@ class SimulationDiagnostics:
         One row per simulated period as a pandas ``DataFrame``.
 
         Columns: ``date`` (ISO 8601 string), ``pool_balance``, ``pool_factor``,
-        ``weighted_avg_coupon`` (decimal), ``weighted_avg_spread_bp``, ``warf``,
+        ``wac`` (decimal), ``weighted_avg_spread_bp``, ``warf``,
         ``interest_collections``, ``principal_collections``, ``defaults``,
         ``recoveries``, ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
         ``reserve_interest``, ``spread_account``, ``funding_account``,

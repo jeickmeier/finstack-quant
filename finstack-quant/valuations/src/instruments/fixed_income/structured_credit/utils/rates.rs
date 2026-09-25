@@ -125,7 +125,7 @@ pub fn clamped_mdr_to_cdr(mdr: f64) -> f64 {
 ///
 /// # Arguments
 ///
-/// * `psa_speed` - PSA speed multiplier (e.g., 1.0 for 100% PSA, 1.5 for 150% PSA).
+/// * `speed_multiplier` - PSA speed multiplier (e.g., 1.0 for 100% PSA, 1.5 for 150% PSA).
 ///   Negative values are clamped to 0.
 /// * `month` - Month number (1-indexed, i.e., month 1 is the first month)
 ///
@@ -144,8 +144,8 @@ pub fn clamped_mdr_to_cdr(mdr: f64) -> f64 {
 ///
 /// PSA speeds scale this curve linearly. For example, 150% PSA at month 30 = 9% CPR.
 /// The curve is the canonical [`finstack_quant_cashflows::builder::psa_cpr`].
-pub fn psa_to_cpr(psa_speed: f64, month: u32) -> f64 {
-    finstack_quant_cashflows::builder::psa_cpr(psa_speed.max(0.0), month).min(1.0)
+pub fn psa_to_cpr(speed_multiplier: f64, month: u32) -> f64 {
+    finstack_quant_cashflows::builder::psa_cpr(speed_multiplier.max(0.0), month).min(1.0)
 }
 
 /// Calculate periods per year from a payment frequency.

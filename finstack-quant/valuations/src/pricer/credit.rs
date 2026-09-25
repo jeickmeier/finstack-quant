@@ -167,7 +167,7 @@ fn stochastic_summary_measures(result: &StochasticPricingResult) -> IndexMap<Met
                 &MetricId::custom("tranche_wal"),
                 &[tranche.tranche_id.as_str()],
             ),
-            tranche.average_life,
+            tranche.wal,
         );
     }
 

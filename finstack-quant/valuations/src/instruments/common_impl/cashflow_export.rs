@@ -319,7 +319,7 @@ fn build_envelope(
     // --- Build one schedule, retaining MBS diagnostics from the same projection. ---
     let (schedule, mbs_state) =
         if let Some(mbs) = instrument.as_any().downcast_ref::<AgencyMbsPassthrough>() {
-            let projection = project_mbs_cashflows(mbs, as_of_date, Some(mbs.wam + 12))?;
+            let projection = project_mbs_cashflows(mbs, as_of_date, Some(mbs.wam_months + 12))?;
             let states: std::collections::HashMap<Date, MbsState> = projection
                 .diagnostics
                 .into_iter()

@@ -77,12 +77,12 @@ fn test_pool_stats_weighted_spread_and_coupon() {
     // from WAS (no rate × 10⁴ fallback): only L1's 400bps contributes.
     let expected_was = 400.0;
     assert!(
-        (stats.weighted_avg_spread - expected_was).abs() < 1e-6,
+        (stats.weighted_avg_spread_bp - expected_was).abs() < 1e-6,
         "Weighted avg spread should match balance-weighted spreads over \
          assets that carry a spread"
     );
     assert!(
-        stats.weighted_avg_coupon > 0.0,
+        stats.wac > 0.0,
         "Weighted avg coupon should be positive for fixed/floating assets"
     );
 }
@@ -110,7 +110,7 @@ fn test_pool_stats_default_rate() {
 
     let stats = calculate_pool_stats(&pool, maturity_date()).expect("stats");
     assert!(
-        (stats.cumulative_default_rate - 33.333333).abs() < 1e-3,
+        (stats.defaulted_balance_pct - 33.333333).abs() < 1e-3,
         "Default rate should reflect defaulted balance share"
     );
 }

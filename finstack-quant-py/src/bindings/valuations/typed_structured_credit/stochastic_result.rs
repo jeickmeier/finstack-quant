@@ -252,7 +252,7 @@ impl PyStochasticPricingResult {
     ///
     /// Columns: ``tranche_id``, ``seniority``, ``npv``, ``expected_loss``,
     /// ``unexpected_loss``, ``expected_shortfall`` (currency units),
-    /// ``attachment``, ``detachment`` (decimal), ``average_life`` (years, over
+    /// ``attachment``, ``detachment`` (decimal), ``wal`` (years, over
     /// the paths that returned principal), ``paths_with_principal``,
     /// ``credit_duration`` and ``draw_option_cost`` (currency units).
     ///
@@ -282,7 +282,7 @@ impl PyStochasticPricingResult {
                     "expected_shortfall": tranche.expected_shortfall.amount(),
                     "attachment": tranche.attachment,
                     "detachment": tranche.detachment,
-                    "average_life": tranche.average_life,
+                    "wal": tranche.wal,
                     "paths_with_principal": tranche.paths_with_principal,
                     "credit_duration": tranche.credit_duration,
                     "draw_option_cost": tranche.draw_option_cost.amount(),
@@ -302,7 +302,7 @@ impl PyStochasticPricingResult {
                 ("expected_shortfall", "float64"),
                 ("attachment", "float64"),
                 ("detachment", "float64"),
-                ("average_life", "float64"),
+                ("wal", "float64"),
                 ("paths_with_principal", "int64"),
                 ("credit_duration", "float64"),
                 ("draw_option_cost", "float64"),

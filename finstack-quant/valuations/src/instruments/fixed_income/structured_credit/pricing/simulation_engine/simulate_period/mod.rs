@@ -71,7 +71,8 @@ pub(super) fn simulate_period(
     // from asset acquisition dates) plus the months elapsed since closing.
     // Seasoned collateral therefore enters the ramp partway up instead of
     // restarting at month zero on the deal closing date.
-    let seasoning_months = state.pool_wala_months + state.closing_date.months_until(pay_date);
+    let seasoning_months =
+        state.closing_seasoning_months + state.closing_date.months_until(pay_date);
 
     // Capture period start before updating prev_date (for accrual calculations)
     let period_start = state.prev_date.unwrap_or(state.closing_date);
@@ -586,8 +587,7 @@ pub(super) fn simulate_period(
             }
         })
         .collect();
-    let (weighted_avg_coupon, weighted_avg_spread_bp, warf) =
-        super::state::pool_composition(state)?;
+    let (wac, weighted_avg_spread_bp, warf) = super::state::pool_composition(state)?;
     let delinquent: f64 = state
         .pool_state
         .delinquent
@@ -600,7 +600,7 @@ pub(super) fn simulate_period(
             payment_date: pay_date,
             pool_balance: state.pool_outstanding,
             pool_factor,
-            weighted_avg_coupon,
+            wac,
             weighted_avg_spread_bp,
             warf,
             interest_collections: pool_flows.interest,

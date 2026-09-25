@@ -51,18 +51,27 @@ impl std::fmt::Display for CmoTrancheType {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PacCollar {
-    /// Lower PSA bound
-    pub lower_psa: f64,
-    /// Upper PSA bound
-    pub upper_psa: f64,
+    /// Lower collar speed as a multiple of the standard PSA curve (`1.0` =
+    /// 100% PSA).
+    pub lower_speed_multiplier: f64,
+    /// Upper collar speed as a multiple of the standard PSA curve (`3.0` =
+    /// 300% PSA).
+    pub upper_speed_multiplier: f64,
 }
 
 impl PacCollar {
-    /// Create a standard PAC collar.
-    pub fn new(lower_psa: f64, upper_psa: f64) -> Self {
+    /// Create a PAC collar from its two PSA speed multiples.
+    ///
+    /// # Arguments
+    ///
+    /// * `lower_speed_multiplier` - Lower collar speed as a multiple of the
+    ///   standard PSA curve (`1.0` = 100% PSA).
+    /// * `upper_speed_multiplier` - Upper collar speed as a multiple of the
+    ///   standard PSA curve; at least `lower_speed_multiplier`.
+    pub fn new(lower_speed_multiplier: f64, upper_speed_multiplier: f64) -> Self {
         Self {
-            lower_psa,
-            upper_psa,
+            lower_speed_multiplier,
+            upper_speed_multiplier,
         }
     }
 
@@ -296,10 +305,10 @@ pub struct AgencyCmo {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collateral_wac: Option<f64>,
-    /// Collateral WAM (if no explicit collateral)
+    /// Remaining collateral WAM in months (if no explicit collateral).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub collateral_wam: Option<u32>,
+    pub collateral_wam_months: Option<u32>,
     /// Discount curve identifier.
     pub discount_curve_id: CurveId,
     /// Instrument-owned pricing inputs.
@@ -396,10 +405,10 @@ impl AgencyCmo {
             }
             match (&tranche.tranche_type, &tranche.pac_collar) {
                 (CmoTrancheType::Pac, Some(collar))
-                    if collar.lower_psa.is_finite()
-                        && collar.upper_psa.is_finite()
-                        && collar.lower_psa >= 0.0
-                        && collar.lower_psa <= collar.upper_psa => {}
+                    if collar.lower_speed_multiplier.is_finite()
+                        && collar.upper_speed_multiplier.is_finite()
+                        && collar.lower_speed_multiplier >= 0.0
+                        && collar.lower_speed_multiplier <= collar.upper_speed_multiplier => {}
                 (CmoTrancheType::Pac, _) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "{context} PAC tranche '{}' requires a finite ordered non-negative collar",
@@ -435,9 +444,9 @@ impl AgencyCmo {
                 "{context} collateral_wac must be a finite decimal rate in [0, 1]"
             )));
         }
-        if self.collateral_wam == Some(0) {
+        if self.collateral_wam_months == Some(0) {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} collateral_wam must be positive"
+                "{context} collateral_wam_months must be positive"
             )));
         }
         if let Some(pool) = &self.collateral {
@@ -482,7 +491,7 @@ impl AgencyCmo {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("A".to_string())
             .collateral_wac(0.045)
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(
                 Attributes::new()
@@ -514,7 +523,7 @@ impl AgencyCmo {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("Z".to_string())
             .collateral_wac(0.045)
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
     }
@@ -541,7 +550,7 @@ impl AgencyCmo {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("PAC".to_string())
             .collateral_wac(0.045)
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
     }
@@ -563,7 +572,7 @@ impl AgencyCmo {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("IO".to_string())
             .collateral_wac(0.04)
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
     }
@@ -595,16 +604,16 @@ impl AgencyCmo {
     ///    same `coupon <= net pass-through` bound applies.
     /// 2. **Aggregate (t=0)**: total annual coupon demand across all
     ///    interest-bearing tranches (including IO strips) must not exceed
-    ///    `pass_through_rate × collateral face`.
+    ///    `coupon × collateral face`.
     ///
     /// # Errors
     ///
     /// Returns a validation error when any principal-bearing tranche coupon
     /// exceeds the net pass-through coupon, or when aggregate annual coupon
-    /// demand exceeds `pass_through_rate × collateral face`.
+    /// demand exceeds `coupon × collateral face`.
     fn validate_interest_coverage(cmo: &AgencyCmo) -> finstack_quant_core::Result<()> {
         let (pass_through, collateral_face) = match &cmo.collateral {
-            Some(pool) => (pool.pass_through_rate, pool.current_face.amount()),
+            Some(pool) => (pool.coupon, pool.current_face.amount()),
             None => {
                 // Mirror the assumed-collateral construction in the pricer.
                 let defaults = crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry()?
@@ -817,7 +826,7 @@ mod tests {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("A".to_string())
             .collateral_wac(0.045) // pass-through 4.0% < 4.45% demand
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build();
 
@@ -853,7 +862,7 @@ mod tests {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("A".to_string())
             .collateral_wac(0.045) // net pass-through 4.0% < Z's 4.5% coupon
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build();
 
@@ -895,7 +904,7 @@ mod tests {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("Z".to_string())
             .collateral_wac(0.045) // net pass-through 4.0% < Z's 4.5% coupon
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build();
 
@@ -925,7 +934,7 @@ mod tests {
             .waterfall(CmoWaterfall::new(tranches))
             .reference_tranche_id("Z".to_string())
             .collateral_wac(0.045)
-            .collateral_wam(360)
+            .collateral_wam_months(360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build();
 
@@ -934,5 +943,37 @@ mod tests {
             err.to_string().contains("positive priority"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    // schema-rejection-test: collateral_wam (now collateral_wam_months)
+    fn rejects_retired_collateral_wam_key() {
+        let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
+        let mut value = serde_json::to_value(&cmo).expect("serialize");
+        value
+            .as_object_mut()
+            .expect("object")
+            .insert("collateral_wam".into(), serde_json::json!(360));
+        let err = serde_json::from_value::<AgencyCmo>(value)
+            .expect_err("retired collateral_wam key must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+    }
+
+    #[test]
+    // schema-rejection-test: lower_psa / upper_psa (now lower_/upper_speed_multiplier)
+    fn rejects_retired_pac_collar_psa_keys() {
+        let err = serde_json::from_value::<PacCollar>(serde_json::json!({
+            "lower_psa": 1.0,
+            "upper_psa": 3.0
+        }))
+        .expect_err("retired PacCollar keys must be rejected");
+        assert!(err.to_string().contains("unknown field"), "{err}");
+        let collar: PacCollar = serde_json::from_value(serde_json::json!({
+            "lower_speed_multiplier": 1.0,
+            "upper_speed_multiplier": 3.0
+        }))
+        .expect("canonical PacCollar keys");
+        assert_eq!(collar.lower_speed_multiplier, 1.0);
+        assert_eq!(collar.upper_speed_multiplier, 3.0);
     }
 }

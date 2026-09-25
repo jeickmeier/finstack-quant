@@ -507,10 +507,10 @@ fn average_life_counts_only_paths_that_return_principal() {
     let senior = by_id("SR");
     let equity = by_id("EQ");
     assert_eq!(senior.paths_with_principal, 4);
-    assert!(senior.average_life > 0.0);
+    assert!(senior.wal > 0.0);
     assert_eq!(
         equity.paths_with_principal, 0,
         "the equity is wiped out on every path"
     );
-    assert_eq!(equity.average_life, 0.0);
+    assert_eq!(equity.wal, 0.0);
 }

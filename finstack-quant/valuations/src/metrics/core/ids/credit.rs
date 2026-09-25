@@ -143,11 +143,8 @@ impl MetricId {
     /// Weighted Average Rating Factor
     pub const CloWarf: Self = Self(Cow::Borrowed("clo_warf"));
 
-    /// Weighted Average Spread
+    /// Weighted average spread of the performing collateral, in basis points.
     pub const CloWas: Self = Self(Cow::Borrowed("clo_was"));
-
-    /// Weighted Average Coupon
-    pub const CloWac: Self = Self(Cow::Borrowed("clo_wac"));
 
     /// Portfolio diversity score
     pub const CloDiversity: Self = Self(Cow::Borrowed("clo_diversity"));

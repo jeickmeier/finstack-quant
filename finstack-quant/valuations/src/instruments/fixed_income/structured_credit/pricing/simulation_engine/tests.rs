@@ -800,6 +800,59 @@ mod cases {
         assert!((rate_6m - old_shared_6m).abs() > 1e-6);
     }
 
+    /// `AssetPool::wac` and the simulated `PeriodDiagnostics::wac` average
+    /// one population (performing fixed-rate collateral), so on the closing
+    /// state they agree bit for bit. Independent reference: the hand WAC of
+    /// the two performing fixed rows, (10·6% + 20·9%) / 30 = 8%. The floating
+    /// row (400 bp) and the defaulted 12% row are outside the population; the
+    /// pre-unification `AssetPool` WAC averaged all four rows over the full
+    /// 65-unit balance instead (≈ 5.815%).
+    #[test]
+    fn pool_wac_matches_period_diagnostics_population() {
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("maturity");
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("base");
+        let usd = |amount: i64| Money::from((amount, Currency::USD));
+        let mut pool = AssetPool::new("WAC", DealType::Clo, Currency::USD);
+        for (id, balance, rate) in [("F1", 10, 0.06), ("F2", 20, 0.09)] {
+            pool.assets.push(PoolAsset::fixed_rate_bond(
+                id,
+                usd(balance),
+                rate,
+                maturity,
+                DayCount::Thirty360,
+            ));
+        }
+        pool.assets.push(PoolAsset::floating_rate_loan(
+            "L1",
+            usd(30),
+            "USD-3M",
+            400.0,
+            maturity,
+            DayCount::Act360,
+        ));
+        let mut defaulted =
+            PoolAsset::fixed_rate_bond("D1", usd(5), 0.12, maturity, DayCount::Thirty360);
+        defaulted.is_defaulted = true;
+        pool.assets.push(defaulted);
+        let tranche = Tranche::new(
+            "AAA",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            usd(60),
+            TrancheCoupon::Fixed { rate: 0.0 },
+            maturity,
+        )
+        .expect("tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("tranche structure");
+        let state = SimulationState::new(&pool, &tranches, base, base, 0).expect("state");
+
+        let (diagnostics_wac, _, _) = state::pool_composition(&state).expect("composition");
+        // Rounding only: two products and one division on exact inputs.
+        assert!((pool.wac() - 0.08).abs() < 1e-15, "{}", pool.wac());
+        assert_eq!(pool.wac().to_bits(), diagnostics_wac.to_bits());
+    }
+
     #[test]
     fn reinvestment_par_build_scales_inversely_with_price() {
         // At par, $1 of cash buys $1 of par.

@@ -2,6 +2,73 @@
 
 ## [Unreleased]
 
+### Pool statistics (2026-09-24)
+
+Collateral pool statistics use the market acronym with a unit suffix unless
+the value is a decimal or in years (`wac`, `wal`, `weighted_avg_spread_bp`,
+`wam_months`, `speed_multiplier`), and the agency pass-through coupon and
+factor share their siblings' names.
+
+#### Changed (BREAKING)
+
+- `AssetPool::weighted_avg_coupon()` / `PoolStats.weighted_avg_coupon` (now
+  `wac()` / `wac`) and `PeriodDiagnostics.weighted_avg_coupon` (now `wac`,
+  also the Python `SimulationDiagnostics` period record key and DataFrame
+  column). Rust, Python, JSON.
+- `AssetPool::weighted_avg_spread()` / `PoolStats.weighted_avg_spread` (now
+  `weighted_avg_spread_bp()` / `weighted_avg_spread_bp`). Rust.
+- `PoolStats.cumulative_default_rate` (now `defaulted_balance_pct`, percent
+  points of the current balance; `DefaultModelSpec::timing`'s decimal
+  `cumulative_default_rate` is unchanged). Rust.
+- `StructuredCredit::calculate_prepayment_rate` (now `calculate_smm`; it
+  returns the monthly SMM). Rust.
+- `TranchePricingResult.average_life` / `with_average_life` (now `wal` /
+  `with_wal`), also the stochastic `tranche_results[].wal` result key and the
+  Python tranche DataFrame column. Rust, Python, WASM result schema, JSON.
+- `AssetPool::weighted_avg_life_from_cashflows` (now `wal_from_cashflows`).
+  Rust.
+- `AgencyMbsPassthrough.pass_through_rate` (now `coupon`) and `.wam` (now
+  `wam_months`); `AgencyCmo.collateral_wam` (now `collateral_wam_months`).
+  Rust, JSON (agency MBS, TBA, dollar-roll and CMO payloads).
+- `PacCollar.lower_psa` / `upper_psa` (now `lower_speed_multiplier` /
+  `upper_speed_multiplier`, `1.0` = 100% PSA). Rust, JSON.
+- The embedded TBA and structured-credit CMO assumption registries rename
+  `psa_multiplier` to `speed_multiplier`; `psa_to_cpr(psa_speed, ..)` takes
+  `speed_multiplier`. Rust, embedded JSON.
+- Internal seasoning names converge on `seasoning_months`
+  (`PacSchedule::generate(collateral_age_months)`,
+  `ScenarioTreeConfig.initial_seasoning`, `AssetPool` weighted seasoning).
+  Rust.
+
+#### Removed
+
+- `AgencyMbsPassthrough.current_factor`: the pool factor is now derived by
+  `AgencyMbsPassthrough::factor()` (`current_face / original_face`), so it
+  cannot disagree with the faces. Rust, JSON.
+- The always-zero `PoolStats.weighted_avg_rating_factor`, `recovery_rate` and
+  `prepayment_rate` stubs (use the `clo_warf` / `cpr` metrics). Rust.
+- `MetricId::CloWac` (`clo_wac`), which had no calculator. Rust, Python,
+  WASM metric metadata.
+
+#### Fixed
+
+- `clo_was` is reported in the basis-points unit group (it was tagged
+  Decimal while its value is in bp). Metric metadata only.
+
+#### Numbers change
+
+- `AssetPool::wac()` (and so `PoolStats.wac`) is now the indenture WAC: the
+  balance-weighted coupon of the performing, positive-balance, fixed-rate
+  collateral, the same population as the simulated `PeriodDiagnostics.wac`.
+  It previously averaged every row, including defaulted assets and floating
+  rows at their spread, over the full pool balance. Example: 10M at 6%, 20M
+  at 9%, a 30M floater at 400 bp and a defaulted 5M at 12% gave ≈6.462%; it
+  is now 8.000% (hand WAC of the two performing fixed rows). Reference: the
+  hand calculation, and bit-equality with `PeriodDiagnostics.wac` on the
+  closing state. The stochastic RMBS refinancing incentive reads this WAC, so
+  stochastic RMBS prepayment moves only for pools with defaulted or floating
+  collateral; no pinned value in the test suite or goldens moved.
+
 ### `_pct`/`_decimal`/`_bp` pass (2026-09-24)
 
 `_pct` now means percent points only (`100.0` = 100%). Decimal-valued fields

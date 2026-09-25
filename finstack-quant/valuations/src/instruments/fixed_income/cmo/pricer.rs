@@ -81,7 +81,7 @@ fn build_pac_context(
     let schedule = PacSchedule::generate(
         collateral_balance,
         pac_balance,
-        collateral.wam,
+        collateral.wam_months,
         collateral.wac,
         // Anchor the PSA seasoning ramp at the pool's current age (WALA);
         // a seasoned pool must not restart the 30-month ramp at age 0.
@@ -300,7 +300,7 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
         total_face.currency(),
     )?;
     let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
-    let wam = cmo.collateral_wam.unwrap_or(defaults.wam_months);
+    let wam = cmo.collateral_wam_months.unwrap_or(defaults.wam_months);
 
     // Standard fee assumptions (annual bp).
     let servicing_fee = defaults.servicing_fee_bp;
@@ -316,15 +316,14 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
         .pool_type(PoolType::Generic)
         .original_face(original_face)
         .current_face(total_face)
-        .current_factor(total_face.amount() / original_face.amount())
         .wac(wac)
-        .pass_through_rate(pass_through)
+        .coupon(pass_through)
         .servicing_fee_bp(servicing_fee)
         .guarantee_fee_bp(guarantee_fee)
-        .wam(wam)
+        .wam_months(wam)
         .issue_date(cmo.issue_date)
         .maturity(maturity)
-        .prepayment_spec(PrepaymentModelSpec::psa(defaults.psa_multiplier))
+        .prepayment_spec(PrepaymentModelSpec::psa(defaults.speed_multiplier))
         .discount_curve_id(cmo.discount_curve_id.clone())
         .day_count(DayCount::Thirty360)
         .build()
@@ -500,7 +499,7 @@ mod tests {
         let schedule = super::PacSchedule::generate(
             collateral.current_face.amount(),
             pac_tranche.current_face.amount(),
-            collateral.wam,
+            collateral.wam_months,
             collateral.wac,
             collateral.seasoning_months(as_of),
             pac_tranche.pac_collar.clone().expect("PAC has a collar"),
@@ -809,10 +808,9 @@ mod production_mortgage_audit {
         let mut pool = AgencyMbsPassthrough::example().expect("pool");
         pool.original_face = Money::new(100_000_000.0, Currency::USD).expect("money");
         pool.current_face = Money::new(70_000_000.0, Currency::USD).expect("money");
-        pool.current_factor = 0.7;
         pool.issue_date = date!(2024 - 01 - 01);
         pool.maturity = date!(2054 - 01 - 01);
-        pool.wam = 360;
+        pool.wam_months = 360;
         let notional = Money::new(70_000_000.0, Currency::USD).expect("money");
         let mut cmo = AgencyCmo::example_io_po().expect("cmo");
         cmo.waterfall.tranches = vec![
@@ -861,7 +859,6 @@ mod production_mortgage_audit {
         let mut pool = AgencyMbsPassthrough::example().expect("pool");
         pool.original_face = Money::new(100_000_000.0, Currency::USD).expect("money");
         pool.current_face = Money::new(90_000_000.0, Currency::USD).expect("money");
-        pool.current_factor = 0.9;
         let mut cmo = AgencyCmo::example_io_po().expect("cmo");
         cmo.collateral = Some(Box::new(pool));
         let err = cmo

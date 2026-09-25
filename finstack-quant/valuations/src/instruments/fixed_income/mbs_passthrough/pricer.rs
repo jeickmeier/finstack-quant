@@ -72,13 +72,13 @@ pub fn generate_cashflows(
 ) -> Result<Vec<MbsCashflow>> {
     use time::Duration;
 
-    if mbs.wam == 0 {
+    if mbs.wam_months == 0 {
         return Err(finstack_quant_core::Error::Validation(
             "WAM must be positive".to_string(),
         ));
     }
 
-    let cap = max_periods.unwrap_or(mbs.wam) as usize;
+    let cap = max_periods.unwrap_or(mbs.wam_months) as usize;
     let mut cashflows = Vec::with_capacity(cap);
     let mut balance = mbs.current_face.amount();
 
@@ -92,7 +92,7 @@ pub fn generate_cashflows(
             .unwrap_or(period_start);
     }
 
-    let max_periods = max_periods.unwrap_or(mbs.wam);
+    let max_periods = max_periods.unwrap_or(mbs.wam_months);
 
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("usny")?;
     let mut projected_count: u32 = 0;
@@ -122,11 +122,11 @@ pub fn generate_cashflows(
         }
         let smm = raw_smm;
 
-        // `wam` is the *remaining* WAM at the valuation date, so the level-pay
+        // `wam_months` is the *remaining* WAM at the valuation date, so the level-pay
         // amortization horizon shrinks by one per projected period — not by
         // the pool's seasoning, which would double-count the age already
         // netted out of a remaining WAM (matching the MC-OAS pricer).
-        let remaining_months = mbs.wam.saturating_sub(projected_count - 1);
+        let remaining_months = mbs.wam_months.saturating_sub(projected_count - 1);
         // Investor interest accrues at the pass-through rate over the actual
         // accrual-period day-count fraction, not a flat 1/12. The accrual
         // period is the full calendar month `[period_start, next_month_start)`.
@@ -144,7 +144,7 @@ pub fn generate_cashflows(
             remaining_months,
             mbs.wac,
             smm,
-            mbs.pass_through_rate,
+            mbs.coupon,
             period_yf,
         );
         let (scheduled_principal, prepayment, interest, ending_balance) = (
@@ -208,7 +208,7 @@ pub(crate) struct PoolMonth {
 ///   retires the whole balance.
 /// * `wac` - Gross weighted-average mortgage coupon, annual decimal.
 /// * `smm` - Single monthly mortality for the month, decimal in `[0, 1]`.
-/// * `pass_through_rate` - Net investor coupon, annual decimal.
+/// * `coupon` - Net investor coupon, annual decimal.
 /// * `accrual_fraction` - Year fraction of the accrual month on the pool day
 ///   count (1/12 on 30/360).
 pub(crate) fn pool_month_step(
@@ -216,7 +216,7 @@ pub(crate) fn pool_month_step(
     remaining_months: u32,
     wac: f64,
     smm: f64,
-    pass_through_rate: f64,
+    coupon: f64,
     accrual_fraction: f64,
 ) -> PoolMonth {
     let monthly_rate = wac / 12.0;
@@ -233,7 +233,7 @@ pub(crate) fn pool_month_step(
     PoolMonth {
         scheduled_principal,
         prepayment,
-        interest: balance * pass_through_rate * accrual_fraction,
+        interest: balance * coupon * accrual_fraction,
         ending_balance: (balance - (scheduled_principal + prepayment)).max(0.0),
     }
 }
@@ -275,7 +275,7 @@ fn schedule_from_projection(
                 Money::new(cf.interest, mbs.current_face.currency())?,
                 CFKind::Fixed,
                 0.0,
-                Some(mbs.pass_through_rate),
+                Some(mbs.coupon),
             ));
         }
         if cf.scheduled_principal.abs() > f64::EPSILON {
@@ -343,7 +343,7 @@ pub(crate) fn settlement_accrued_interest(
     let start = Date::from_calendar_date(settlement.year(), settlement.month(), 1)
         .map_err(|err| finstack_quant_core::Error::Validation(err.to_string()))?;
     Ok(mbs.current_face.amount()
-        * mbs.pass_through_rate
+        * mbs.coupon
         * mbs
             .day_count
             .year_fraction(start, settlement, DayCountContext::default())?)
@@ -469,7 +469,7 @@ pub(crate) fn price_mbs(
     market: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    let schedule = build_projected_schedule(mbs, as_of, Some(mbs.wam + 12))?;
+    let schedule = build_projected_schedule(mbs, as_of, Some(mbs.wam_months + 12))?;
 
     if schedule.get_flows().is_empty() {
         return Ok(Money::from((0_i64, mbs.current_face.currency())));
@@ -491,7 +491,7 @@ pub(crate) fn price_with_spread(
     as_of: Date,
     spread: f64,
 ) -> Result<f64> {
-    let schedule = build_projected_schedule(mbs, as_of, Some(mbs.wam + 12))?;
+    let schedule = build_projected_schedule(mbs, as_of, Some(mbs.wam_months + 12))?;
 
     if schedule.get_flows().is_empty() {
         return Ok(0.0);
@@ -521,12 +521,11 @@ mod tests {
             .pool_type(super::super::PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((1_000_000_i64, Currency::USD)))
-            .current_factor(1.0)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(360)
+            .wam_months(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -634,8 +633,8 @@ mod tests {
         let expected_yf = DayCount::Act360
             .year_fraction(first.period_start, accrual_end, DayCountContext::default())
             .expect("yf");
-        let expected_interest = balance * mbs.pass_through_rate * expected_yf;
-        let flat_twelfth = balance * mbs.pass_through_rate / 12.0;
+        let expected_interest = balance * mbs.coupon * expected_yf;
+        let flat_twelfth = balance * mbs.coupon / 12.0;
 
         assert!(
             (first.interest - expected_interest).abs() < 1e-6,
@@ -651,12 +650,12 @@ mod tests {
         );
     }
 
-    /// Finding 15 regression: `wam` is the *remaining* WAM at the valuation
+    /// Finding 15 regression: `wam_months` is the *remaining* WAM at the valuation
     /// date. A seasoned pool (issued 60 months before `as_of`) with a
     /// remaining WAM of 240 must amortize over 240 projected months — not
-    /// `wam − seasoning = 180`, which double-counts the age already netted
+    /// `wam_months − seasoning = 180`, which double-counts the age already netted
     /// out of a remaining WAM. This matches the MC-OAS projection horizon
-    /// (`wam − projection_step`).
+    /// (`wam_months − projection_step`).
     #[test]
     fn seasoned_pool_amortizes_over_remaining_wam_not_wam_minus_seasoning() {
         let wam: u32 = 240;
@@ -667,12 +666,11 @@ mod tests {
             .pool_type(super::super::PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((850_000_i64, Currency::USD)))
-            .current_factor(0.85)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(wam)
+            .wam_months(wam)
             // Issued 5 years (60 months) before the valuation date.
             .issue_date(Date::from_calendar_date(2019, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2044, Month::January, 1).expect("valid"))
@@ -735,12 +733,11 @@ mod tests {
             .pool_type(super::super::PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((1_000_000_i64, Currency::USD)))
-            .current_factor(1.0)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(360)
+            .wam_months(360)
             .issue_date(future_issue)
             .maturity(Date::from_calendar_date(2054, Month::March, 20).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(1.0))

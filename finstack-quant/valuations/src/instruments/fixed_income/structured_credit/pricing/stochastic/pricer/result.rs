@@ -170,12 +170,12 @@ pub struct TranchePricingResult {
     /// Detachment point (percentage)
     pub detachment: f64,
 
-    /// Average life (years) over the paths on which the tranche received
-    /// principal; `0.0` when it never did.
-    pub average_life: f64,
+    /// Weighted-average life (WAL, years) averaged over the paths on which
+    /// the tranche received principal; `0.0` when it never did.
+    pub wal: f64,
 
     /// Number of simulated paths on which the tranche received any
-    /// principal (the paths `average_life` averages over).
+    /// principal (the paths `wal` averages over).
     #[serde(default)]
     pub paths_with_principal: usize,
 
@@ -209,7 +209,7 @@ impl TranchePricingResult {
             expected_shortfall: Money::from((0_i64, currency)),
             attachment: 0.0,
             detachment: 1.0,
-            average_life: 0.0,
+            wal: 0.0,
             paths_with_principal: 0,
             credit_duration: 0.0,
             draw_option_cost: Money::from((0_i64, currency)),
@@ -252,9 +252,14 @@ impl TranchePricingResult {
         self
     }
 
-    /// Set average life.
-    pub fn with_average_life(mut self, wal: f64) -> Self {
-        self.average_life = wal;
+    /// Set the weighted-average life.
+    ///
+    /// # Arguments
+    ///
+    /// * `wal` - Weighted-average life in years, averaged over the paths on
+    ///   which the tranche received principal (`0.0` when none did).
+    pub fn with_wal(mut self, wal: f64) -> Self {
+        self.wal = wal;
         self
     }
 

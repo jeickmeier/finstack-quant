@@ -58,7 +58,7 @@ pub(crate) fn rate_risk_pool(
     bumped: &MarketContext,
     as_of: Date,
 ) -> Result<AgencyMbsPassthrough> {
-    let end = as_of.add_months(mbs.wam as i32);
+    let end = as_of.add_months(mbs.wam_months as i32);
     let base_curve = base.get_discount(&mbs.discount_curve_id)?;
     let bumped_curve = bumped.get_discount(&mbs.discount_curve_id)?;
     let horizon = base_curve
@@ -173,12 +173,11 @@ mod tests {
             .pool_type(PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((1_000_000_i64, Currency::USD)))
-            .current_factor(1.0)
             .wac(0.045)
-            .pass_through_rate(0.04)
+            .coupon(0.04)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(360)
+            .wam_months(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -276,12 +275,11 @@ mod tests {
             .pool_type(PoolType::Generic)
             .original_face(Money::from((1_000_000_i64, Currency::USD)))
             .current_face(Money::from((1_000_000_i64, Currency::USD)))
-            .current_factor(1.0)
             .wac(0.075)
-            .pass_through_rate(0.07)
+            .coupon(0.07)
             .servicing_fee_bp(25.0)
             .guarantee_fee_bp(25.0)
-            .wam(360)
+            .wam_months(360)
             .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
             .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
             .prepayment_spec(PrepaymentModelSpec::psa(2.0))

@@ -96,7 +96,7 @@ pub(super) struct SimulationState<'a> {
     /// are keyed off LOAN age, not deal age, so seasoned collateral must
     /// start partway up the ramp. Assets without an `acquisition_date`
     /// contribute zero age (collateral assumed new at closing).
-    pub(super) pool_wala_months: u32,
+    pub(super) closing_seasoning_months: u32,
     /// Current reserve account balance.
     pub(super) reserve_balance: Money,
     /// Current excess-spread (spread-account) balance. Carries period to period:
@@ -166,8 +166,9 @@ pub struct PeriodDiagnostics {
     /// `pool_balance` divided by the original (cut-off) pool balance
     /// (`AssetPool::original_balance_or_reconstructed`).
     pub pool_factor: f64,
-    /// Balance-weighted coupon of the fixed-rate collateral (decimal).
-    pub weighted_avg_coupon: f64,
+    /// Weighted-average coupon (annual decimal) of the performing fixed-rate
+    /// collateral at period end: the same population as `AssetPool::wac`.
+    pub wac: f64,
     /// Balance-weighted spread of the floating-rate collateral (basis points).
     pub weighted_avg_spread_bp: f64,
     /// Balance-weighted Moody's rating factor of the collateral.
@@ -313,7 +314,7 @@ pub(crate) struct StateTemplate {
     tranche_recipient_keys: Vec<RecipientType>,
     pool_state: PoolState,
     loss_alloc_order: Vec<usize>,
-    pool_wala_months: u32,
+    closing_seasoning_months: u32,
     base_currency: Currency,
     total_pool_balance: Money,
     original_pool_balance: Money,
@@ -408,7 +409,7 @@ impl StateTemplate {
                 .cmp(&tranches.tranches[a].payment_priority)
         });
 
-        let pool_wala_months = pool.weighted_average_seasoning(closing_date, closing_date);
+        let closing_seasoning_months = pool.seasoning_months(closing_date, closing_date);
 
         Ok(Self {
             results,
@@ -417,7 +418,7 @@ impl StateTemplate {
             tranche_recipient_keys,
             pool_state,
             loss_alloc_order,
-            pool_wala_months,
+            closing_seasoning_months,
             base_currency,
             total_pool_balance,
             original_pool_balance,
@@ -498,7 +499,7 @@ impl<'a> SimulationState<'a> {
             original_pool_balance: template.original_pool_balance,
             performing_pool_balance: template.performing_pool_balance,
             loss_alloc_order: template.loss_alloc_order.clone(),
-            pool_wala_months: template.pool_wala_months,
+            closing_seasoning_months: template.closing_seasoning_months,
             reserve_balance: pool.reserve_account,
             spread_account: pool.excess_spread_account,
             principal_funding_account: Money::from((0_i64, template.base_currency)),

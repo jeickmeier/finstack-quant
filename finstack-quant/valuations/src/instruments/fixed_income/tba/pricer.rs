@@ -42,7 +42,7 @@ pub(crate) struct AssumedPoolAssumptions {
     pub(crate) servicing_fee_bp: f64,
     pub(crate) agency_guarantee_fee_bp: f64,
     pub(crate) gnma_guarantee_fee_bp: f64,
-    pub(crate) psa_multiplier: f64,
+    pub(crate) speed_multiplier: f64,
 }
 
 /// Load and validate the embedded generic-pool assumptions.
@@ -61,7 +61,7 @@ pub(crate) fn assumed_pool_assumptions() -> Result<AssumedPoolAssumptions> {
                 ("servicing_fee_bp", assumed.servicing_fee_bp),
                 ("agency_guarantee_fee_bp", assumed.agency_guarantee_fee_bp),
                 ("gnma_guarantee_fee_bp", assumed.gnma_guarantee_fee_bp),
-                ("psa_multiplier", assumed.psa_multiplier),
+                ("speed_multiplier", assumed.speed_multiplier),
             ] {
                 if !(value.is_finite() && value > 0.0) {
                     return Err(Error::Validation(format!(
@@ -129,18 +129,17 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthroug
             tba.notional.currency(),
         )?)
         .current_face(tba.notional)
-        .current_factor(factor)
         .wac(wac)
-        .pass_through_rate(tba.coupon)
+        .coupon(tba.coupon)
         .servicing_fee_bp(servicing_fee)
         .guarantee_fee_bp(guarantee_fee)
-        .wam(term_months)
+        .wam_months(term_months)
         .issue_date(issue_date)
         .maturity(maturity)
         .prepayment_spec(
             tba.prepayment_spec
                 .clone()
-                .unwrap_or_else(|| PrepaymentModelSpec::psa(defaults.psa_multiplier)),
+                .unwrap_or_else(|| PrepaymentModelSpec::psa(defaults.speed_multiplier)),
         )
         .discount_curve_id(tba.discount_curve_id.clone())
         .day_count(DayCount::Thirty360)
@@ -153,16 +152,16 @@ pub(crate) fn resolve_assumed_pool(tba: &AgencyTba) -> Result<AgencyMbsPassthrou
         crate::instruments::Instrument::validate_invariants(pool.as_ref())?;
         if tba
             .pool_factor
-            .is_some_and(|factor| (factor - pool.current_factor).abs() > 1e-12)
+            .is_some_and(|factor| (factor - pool.factor()).abs() > 1e-12)
         {
             return Err(finstack_quant_core::Error::Validation(
                 "TBA pool_factor must agree with the explicitly supplied pool".into(),
             ));
         }
-        if (pool.pass_through_rate - tba.coupon).abs() > 1e-12 {
+        if (pool.coupon - tba.coupon).abs() > 1e-12 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "TBA delivered pool pass-through coupon {} must equal the TBA coupon {}",
-                pool.pass_through_rate, tba.coupon
+                pool.coupon, tba.coupon
             )));
         }
         if !delivers_into(pool.agency, tba.agency) {
@@ -272,8 +271,8 @@ mod tests {
         let pool = create_assumed_pool(&tba).expect("should create pool");
 
         assert_eq!(pool.agency, tba.agency);
-        assert!((pool.pass_through_rate - tba.coupon).abs() < 1e-10);
-        assert!((pool.current_factor - 1.0).abs() < 1e-10);
+        assert!((pool.coupon - tba.coupon).abs() < 1e-10);
+        assert!((pool.factor() - 1.0).abs() < 1e-10);
     }
 
     #[test]
@@ -407,7 +406,7 @@ mod production_mortgage_audit {
         let mut pool = create_assumed_pool(&tba).expect("pool");
         // A 4.5% pool is not good delivery into a 4.0% TBA. The pool itself
         // stays internally consistent (WAC = coupon + servicing + g-fee).
-        pool.pass_through_rate = tba.coupon + 0.005;
+        pool.coupon = tba.coupon + 0.005;
         pool.wac += 0.005;
         crate::instruments::Instrument::validate_invariants(&pool).expect("pool is valid");
         tba.assumed_pool = Some(Box::new(pool));
@@ -452,7 +451,6 @@ mod production_mortgage_audit {
             Money::new(tba.notional.amount() * 2.0 / 0.6, tba.notional.currency()).expect("money");
         pool.current_face =
             Money::new(tba.notional.amount() * 2.0, tba.notional.currency()).expect("money");
-        pool.current_factor = 0.6;
         tba.assumed_pool = Some(Box::new(pool));
         let resolved = resolve_assumed_pool(&tba).expect("resolve");
         assert_eq!(resolved.current_face, tba.notional);

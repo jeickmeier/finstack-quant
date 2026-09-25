@@ -139,14 +139,14 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "tracking_error"
         | "utilization"
         | "premium_discount"
-        | "clo_was"
-        | "clo_wac"
         | "variance_expected"
         | "variance_realized" => Decimal,
         // Basis points.
-        "par_spread" | "basis_par_spread" | "incremental_par_spread" | "roll_specialness" => {
-            BasisPoints
-        }
+        "par_spread"
+        | "basis_par_spread"
+        | "incremental_par_spread"
+        | "roll_specialness"
+        | "clo_was" => BasisPoints,
         // Years.
         "duration_mac"
         | "duration_mod"

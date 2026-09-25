@@ -29,8 +29,9 @@ pub(crate) struct ScenarioTreeConfig {
     /// Random seed for reproducibility.
     pub seed: u64,
 
-    /// Initial pool seasoning in months.
-    pub initial_seasoning: u32,
+    /// Balance-weighted pool seasoning (loan age) at the valuation date, in
+    /// months.
+    pub seasoning_months: u32,
 
     /// Asset correlation from an explicit deal
     /// [`CorrelationStructure`](finstack_quant_models::credit::pool::CorrelationStructure).
@@ -55,7 +56,7 @@ impl ScenarioTreeConfig {
             default_spec: StochasticDefaultSpec::default(),
             recovery_spec: RecoverySpec::default(),
             seed: 42,
-            initial_seasoning: 0,
+            seasoning_months: 0,
             market_refi_rate: 0.045,
             asset_correlation_override: None,
         }

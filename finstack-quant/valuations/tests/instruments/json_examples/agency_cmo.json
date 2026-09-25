@@ -12,7 +12,7 @@
         ]
       },
       "collateral_wac": 0.045,
-      "collateral_wam": 360,
+      "collateral_wam_months": 360,
       "deal_name": "FNR 2024-1",
       "discount_curve_id": "USD-OIS",
       "id": "FNR-2024-1-A",

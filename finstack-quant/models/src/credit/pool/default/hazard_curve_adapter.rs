@@ -81,7 +81,7 @@ pub(crate) struct HazardCurveDefault {
     correlation: f64,
     /// Pool seasoning at the valuation date, in months.
     ///
-    /// The engines pass `seasoning = initial_seasoning + months_from_valuation`
+    /// The engines pass `seasoning = seasoning_months + months_from_valuation`
     /// (loan age), but the hazard curve is anchored at the VALUATION date —
     /// CDS-calibrated hazards at `t` years mean `t` years from today, not
     /// from loan origination. The adapter subtracts this offset so the curve

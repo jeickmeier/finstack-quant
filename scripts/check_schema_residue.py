@@ -184,6 +184,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"share_pct|fixed_allocation_pct|senior_pct|pct_of_current|pct_of_original|floor_pct_of_original|trap_loss_pct|"
             r"disposition_cost_pct|holdback_pct|avg_recovery_pct|pct_of_commitment|withheld_pct|separate_pct|"
             r"servicing_fee_rate|guarantee_fee_rate|agency_guarantee_fee_rate|gnma_guarantee_fee_rate|"
+            r"pass_through_rate|current_factor|collateral_wam|lower_psa|upper_psa|psa_multiplier|average_life|weighted_avg_coupon|weighted_avg_rating_factor|"
             r"cash_pct|pik_pct|min_3m|max_price|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'

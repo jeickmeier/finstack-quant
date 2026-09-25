@@ -872,7 +872,7 @@ fn hash_tranche(state: &mut u64, tranche: &TranchePricingResult) {
         tranche.expected_shortfall.amount(),
         tranche.attachment,
         tranche.detachment,
-        tranche.average_life,
+        tranche.wal,
         tranche.paths_with_principal as f64,
         tranche.credit_duration,
     ] {

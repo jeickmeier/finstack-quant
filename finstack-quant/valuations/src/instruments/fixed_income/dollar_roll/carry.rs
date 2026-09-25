@@ -86,7 +86,7 @@ pub fn implied_financing_rate(roll: &DollarRoll) -> Result<CarryResult> {
         let end = boundary.min(back_settle);
         if end > start {
             coupon_income += cf.beginning_balance
-                * pool.pass_through_rate
+                * pool.coupon
                 * pool.day_count.year_fraction(
                     start,
                     end,

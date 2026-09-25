@@ -82,7 +82,7 @@ impl StructuredCredit {
             DealType::Rmbs => (
                 // Pool WAC is the coupon side of the Richard-Roll incentive;
                 // market rate arrives via `tree_config.market_refi_rate`.
-                rmbs_prepay_spec(self.pool.weighted_avg_coupon()),
+                rmbs_prepay_spec(self.pool.wac()),
                 rmbs_default_spec(),
                 rmbs_correlation_structure()?,
             ),

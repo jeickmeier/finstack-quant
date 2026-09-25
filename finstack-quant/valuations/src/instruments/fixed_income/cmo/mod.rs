@@ -58,7 +58,7 @@
 //!     .waterfall(CmoWaterfall::new(tranches))
 //!     .reference_tranche_id("A".to_string())
 //!     .collateral_wac(0.045)
-//!     .collateral_wam(360)
+//!     .collateral_wam_months(360)
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
 //!     .build()
 //!     .expect("Valid CMO");
@@ -94,7 +94,7 @@
 //!     .waterfall(CmoWaterfall::new(tranches))
 //!     .reference_tranche_id("Z".to_string())
 //!     .collateral_wac(0.045)
-//!     .collateral_wam(360)
+//!     .collateral_wam_months(360)
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
 //!     .build()
 //!     .expect("Valid Z CMO");

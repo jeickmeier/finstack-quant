@@ -1989,11 +1989,6 @@
           "format": "double",
           "type": "number"
         },
-        "average_life": {
-          "description": "Average life (years) over the paths on which the tranche received\nprincipal; `0.0` when it never did.",
-          "format": "double",
-          "type": "number"
-        },
         "credit_duration": {
           "description": "Credit duration (price sensitivity to credit spread)",
           "format": "double",
@@ -2022,7 +2017,7 @@
         },
         "paths_with_principal": {
           "default": 0,
-          "description": "Number of simulated paths on which the tranche received any\nprincipal (the paths `average_life` averages over).",
+          "description": "Number of simulated paths on which the tranche received any\nprincipal (the paths `wal` averages over).",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
@@ -2043,6 +2038,11 @@
         "unexpected_loss": {
           "$ref": "#/$defs/Money",
           "description": "Unexpected loss"
+        },
+        "wal": {
+          "description": "Weighted-average life (WAL, years) averaged over the paths on which\nthe tranche received principal; `0.0` when it never did.",
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [
@@ -2055,7 +2055,7 @@
         "expected_shortfall",
         "attachment",
         "detachment",
-        "average_life",
+        "wal",
         "credit_duration",
         "draw_option_cost"
       ],

@@ -88,7 +88,7 @@ pub(crate) struct StochasticPricer {
 pub(crate) struct PreparedRun {
     /// Default model from
     /// [`build_with_seasoning_offset`](StochasticDefaultSpec::build_with_seasoning_offset)
-    /// on the run's constant `initial_seasoning`. Gates the pool-wide MDR
+    /// on the run's constant `seasoning_months`. Gates the pool-wide MDR
     /// channel and sources the copula marginal-PD plan.
     pub(crate) default_model: Option<Box<dyn StochasticDefault>>,
     /// Prepayment model from [`StochasticPrepaySpec::build`]. Gates the
@@ -139,7 +139,7 @@ impl StochasticPricer {
             .config
             .tree_config
             .default_spec
-            .build_with_seasoning_offset(self.config.tree_config.initial_seasoning)?;
+            .build_with_seasoning_offset(self.config.tree_config.seasoning_months)?;
         // Prepare the loop-invariant deal simulation once. A `None` here
         // (exhausted pool) yields no tranche results, which the collector
         // reports as a missing-tranche validation error; raise it here with
@@ -1038,7 +1038,7 @@ impl StochasticPricer {
             let seasoning = self
                 .config
                 .tree_config
-                .initial_seasoning
+                .seasoning_months
                 .saturating_add(start_month)
                 .saturating_add(offset + 1);
             survival *= 1.0 - model.expected_mdr(seasoning).clamp(0.0, 1.0);
@@ -1121,7 +1121,7 @@ impl StochasticPricer {
         let seasoning = self
             .config
             .tree_config
-            .initial_seasoning
+            .seasoning_months
             .saturating_add(month_offset);
         let factor_path = [factor];
         let prepay_factors = [prepay_factor];
@@ -1419,7 +1419,7 @@ impl TrancheScenarioStats {
             Money::new(loss_std, currency)?,
             Money::new(es, currency)?,
         )
-        .with_average_life(if self.paths_with_principal > 0 {
+        .with_wal(if self.paths_with_principal > 0 {
             self.wal_sum / self.paths_with_principal as f64
         } else {
             0.0

@@ -11,11 +11,11 @@
           "mbs"
         ]
       },
+      "coupon": 0.04,
       "current_face": {
         "amount": "950000",
         "currency": "USD"
       },
-      "current_factor": 0.95,
       "day_count": "30_360",
       "discount_curve_id": "USD-OIS",
       "guarantee_fee_bp": 25.0,
@@ -26,7 +26,6 @@
         "amount": "1000000",
         "currency": "USD"
       },
-      "pass_through_rate": 0.04,
       "pool_id": "MA1234",
       "pool_type": "generic",
       "prepayment_spec": {
@@ -38,7 +37,7 @@
       },
       "servicing_fee_bp": 25.0,
       "wac": 0.045,
-      "wam": 348
+      "wam_months": 348
     },
     "type": "agency_mbs_passthrough"
   },

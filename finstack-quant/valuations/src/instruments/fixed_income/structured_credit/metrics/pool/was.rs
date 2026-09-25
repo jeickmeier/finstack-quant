@@ -7,9 +7,9 @@ use crate::metrics::MetricContext;
 /// Market standard: WAS uses the **spread component only**, not the all-in
 /// coupon, over **performing** assets only. Fixed-rate assets without an
 /// explicit `spread_bp` are excluded (no all-in-rate fallback), as are
-/// defaulted assets — see [`AssetPool::weighted_avg_spread`].
+/// defaulted assets — see [`AssetPool::weighted_avg_spread_bp`].
 ///
-/// [`AssetPool::weighted_avg_spread`]: crate::instruments::fixed_income::structured_credit::types::AssetPool::weighted_avg_spread
+/// [`AssetPool::weighted_avg_spread_bp`]: crate::instruments::fixed_income::structured_credit::types::AssetPool::weighted_avg_spread_bp
 pub struct CloWasCalculator;
 
 impl crate::metrics::MetricCalculator for CloWasCalculator {
@@ -18,6 +18,6 @@ impl crate::metrics::MetricCalculator for CloWasCalculator {
             .instrument_as::<crate::instruments::fixed_income::structured_credit::StructuredCredit>(
             )?;
 
-        Ok(clo.pool.weighted_avg_spread())
+        Ok(clo.pool.weighted_avg_spread_bp())
     }
 }

@@ -12,7 +12,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_pool_stats, AssetPool, AssetType, DealType, PoolAsset,
+    calculate_pool_stats, AssetPool, AssetType, DealType, PoolAsset, PoolStats,
 };
 use time::Month;
 
@@ -285,7 +285,7 @@ fn test_pool_weighted_avg_coupon_single_asset() {
     ));
 
     // Act
-    let wac = pool.weighted_avg_coupon();
+    let wac = pool.wac();
 
     // Assert
     assert_eq!(wac, 0.06);
@@ -311,7 +311,7 @@ fn test_pool_weighted_avg_coupon_multiple_assets() {
     ));
 
     // Act
-    let wac = pool.weighted_avg_coupon();
+    let wac = pool.wac();
 
     // Assert: (10M * 6% + 20M * 9%) / 30M = (0.6M + 1.8M) / 30M = 8%
     assert!((wac - 0.08).abs() < 0.0001);
@@ -323,7 +323,7 @@ fn test_pool_weighted_avg_coupon_empty_pool() {
     let pool = AssetPool::new("EMPTY", DealType::Clo, Currency::USD);
 
     // Act
-    let wac = pool.weighted_avg_coupon();
+    let wac = pool.wac();
 
     // Assert
     assert_eq!(wac, 0.0);
@@ -351,7 +351,7 @@ fn test_pool_weighted_avg_spread_floating_rate_assets() {
     ));
 
     // Act
-    let was = pool.weighted_avg_spread();
+    let was = pool.weighted_avg_spread_bp();
 
     // Assert: (10M * 400 + 20M * 500) / 30M = (4,000M + 10,000M) / 30M = 466.67bps
     assert!((was - 466.666667).abs() < 0.01);
@@ -383,7 +383,7 @@ fn test_pool_weighted_avg_spread_mixed_assets() {
     ));
 
     // Act
-    let was = pool.weighted_avg_spread();
+    let was = pool.weighted_avg_spread_bp();
 
     // Assert: only the floating-rate loan contributes → 450bps
     assert!((was - 450.0).abs() < 0.01);
@@ -413,7 +413,7 @@ fn test_pool_weighted_avg_spread_excludes_defaulted() {
     pool.assets.push(defaulted);
 
     // Defaulted assets are excluded from numerator AND denominator.
-    let was = pool.weighted_avg_spread();
+    let was = pool.weighted_avg_spread_bp();
     assert!((was - 400.0).abs() < 0.01);
 }
 
@@ -701,12 +701,14 @@ fn test_calculate_pool_stats_comprehensive() {
     let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
 
     // Assert
-    assert!(stats.weighted_avg_coupon > 0.0);
-    assert!(stats.weighted_avg_spread > 0.0);
+    // Indenture WAC: only the performing fixed-rate B1 (7%) is in the
+    // population; the floating L1 is reported through the spread instead.
+    assert!((stats.wac - 0.07).abs() < 1e-15, "{}", stats.wac);
+    assert!(stats.weighted_avg_spread_bp > 0.0);
     assert!(stats.weighted_avg_maturity > 0.0);
     assert_eq!(stats.num_obligors, 2);
     assert_eq!(stats.num_industries, 2);
-    assert_eq!(stats.cumulative_default_rate, 0.0); // No defaults
+    assert_eq!(stats.defaulted_balance_pct, 0.0); // No defaults
 }
 
 #[test]
@@ -743,7 +745,7 @@ fn test_calculate_pool_stats_with_defaults() {
     let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
 
     // Assert: 1M / 10M = 10% default rate
-    assert!((stats.cumulative_default_rate - 10.0).abs() < 0.01);
+    assert!((stats.defaulted_balance_pct - 10.0).abs() < 0.01);
 }
 
 // Edge Cases and Boundary Conditions
@@ -761,8 +763,8 @@ fn test_pool_zero_balance_asset() {
     ));
 
     // Act
-    let wac = pool.weighted_avg_coupon();
-    let was = pool.weighted_avg_spread();
+    let wac = pool.wac();
+    let was = pool.weighted_avg_spread_bp();
 
     // Assert: Should handle gracefully
     assert_eq!(wac, 0.0);
@@ -828,4 +830,76 @@ fn test_pool_asset_type_classification() {
     // Assert
     assert_eq!(first_lien.asset_type, AssetType::FirstLienLoan {});
     assert_eq!(first_lien.industry.as_deref(), Some("Technology"));
+}
+
+#[test]
+fn test_pool_wac_excludes_floating_and_defaulted_collateral() {
+    // Independent reference: hand WAC of the performing fixed rows,
+    // (10M × 6% + 20M × 9%) / 30M = 8%. The pre-unification definition
+    // averaged every row (floating rows at `spread_bp / 1e4`, defaulted rows
+    // included) over the full 65M balance: (0.6M + 1.8M + 30M × 4% +
+    // 5M × 12%) / 65M ≈ 6.462%.
+    let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    for (id, balance, rate) in [("B1", 10_000_000.0, 0.06), ("B2", 20_000_000.0, 0.09)] {
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            id,
+            Money::new(balance, Currency::USD).expect("valid money fixture"),
+            rate,
+            maturity_date(),
+            finstack_quant_core::dates::DayCount::Thirty360,
+        ));
+    }
+    pool.assets.push(PoolAsset::floating_rate_loan(
+        "L1",
+        Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
+        "SOFR-3M",
+        400.0,
+        maturity_date(),
+        finstack_quant_core::dates::DayCount::Act360,
+    ));
+    let mut defaulted = PoolAsset::fixed_rate_bond(
+        "D1",
+        Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
+        0.12,
+        maturity_date(),
+        finstack_quant_core::dates::DayCount::Thirty360,
+    );
+    defaulted.is_defaulted = true;
+    pool.assets.push(defaulted);
+
+    // Rounding only: two products, one sum and one division.
+    assert!((pool.wac() - 0.08).abs() < 1e-15, "{}", pool.wac());
+    let stats = calculate_pool_stats(&pool, test_date()).expect("stats");
+    assert_eq!(stats.wac.to_bits(), pool.wac().to_bits());
+    assert_eq!(stats.weighted_avg_spread_bp, 400.0);
+    // 5M of 65M carried as defaulted, in percent points.
+    assert!((stats.defaulted_balance_pct - 5.0 / 65.0 * 100.0).abs() < 1e-12);
+}
+
+#[test]
+// schema-rejection-test: PoolStats weighted_avg_coupon (now wac), weighted_avg_spread (now weighted_avg_spread_bp), cumulative_default_rate (now defaulted_balance_pct), removed stubs weighted_avg_rating_factor / recovery_rate / prepayment_rate
+fn test_pool_stats_rejects_retired_keys() {
+    let pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    let base = serde_json::to_value(calculate_pool_stats(&pool, test_date()).expect("stats"))
+        .expect("serialize");
+    for retired in [
+        "weighted_avg_coupon",
+        "weighted_avg_spread",
+        "cumulative_default_rate",
+        "weighted_avg_rating_factor",
+        "recovery_rate",
+        "prepayment_rate",
+    ] {
+        let mut value = base.clone();
+        value
+            .as_object_mut()
+            .expect("object")
+            .insert(retired.into(), serde_json::json!(0.0));
+        let err = serde_json::from_value::<PoolStats>(value)
+            .expect_err("retired PoolStats key must be rejected");
+        assert!(
+            err.to_string().contains("unknown field"),
+            "{retired}: {err}"
+        );
+    }
 }

@@ -230,7 +230,7 @@ impl PySimulationDiagnostics {
 
     /// Per-period deal record as ``PeriodDiagnostics`` serde dicts:
     /// ``payment_date``, ``pool_balance``, ``pool_factor``,
-    /// ``weighted_avg_coupon``, ``weighted_avg_spread_bp``, ``warf``, the
+    /// ``wac``, ``weighted_avg_spread_bp``, ``warf``, the
     /// period's collections, defaults, recoveries, reinvested par, fees paid,
     /// the cash-account balances, ``delinquent_balance``,
     /// ``servicer_advances_outstanding``, ``excess_spread``
@@ -243,7 +243,7 @@ impl PySimulationDiagnostics {
     /// One row per simulated period as a pandas ``DataFrame``.
     ///
     /// Columns: ``date`` (ISO 8601 string), ``pool_balance``,
-    /// ``pool_factor``, ``weighted_avg_coupon`` (decimal),
+    /// ``pool_factor``, ``wac`` (decimal),
     /// ``weighted_avg_spread_bp``, ``warf``, ``interest_collections``,
     /// ``principal_collections``, ``defaults``, ``recoveries``,
     /// ``reinvested_par``, ``fees_paid``, ``reserve_balance``,
@@ -278,7 +278,7 @@ impl PySimulationDiagnostics {
                     "date": period.payment_date.to_string(),
                     "pool_balance": period.pool_balance.amount(),
                     "pool_factor": period.pool_factor,
-                    "weighted_avg_coupon": period.weighted_avg_coupon,
+                    "wac": period.wac,
                     "weighted_avg_spread_bp": period.weighted_avg_spread_bp,
                     "warf": period.warf,
                     "interest_collections": period.interest_collections.amount(),
@@ -304,7 +304,7 @@ impl PySimulationDiagnostics {
                 ("date", "str"),
                 ("pool_balance", "float64"),
                 ("pool_factor", "float64"),
-                ("weighted_avg_coupon", "float64"),
+                ("wac", "float64"),
                 ("weighted_avg_spread_bp", "float64"),
                 ("warf", "float64"),
                 ("interest_collections", "float64"),

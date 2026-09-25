@@ -671,7 +671,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
         if redemption_due {
             let redemption_price_pct = deal_call.map_or(100.0, |call| call.price_pct);
             let seasoning_months =
-                state.pool_wala_months + state.closing_date.months_until(pay_date);
+                state.closing_seasoning_months + state.closing_date.months_until(pay_date);
             let proceeds = liquidation_value(
                 &state,
                 instrument.liquidation_price_pct.unwrap_or(100.0) / 100.0,

@@ -511,29 +511,28 @@ impl Default for ReinvestmentCriteria {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PoolStats {
-    /// Weighted average coupon
-    pub weighted_avg_coupon: f64,
-    /// Weighted average spread
-    pub weighted_avg_spread: f64,
+    /// Weighted-average coupon (annual decimal) of the performing fixed-rate
+    /// collateral; see [`AssetPool::wac`].
+    pub wac: f64,
+    /// Weighted-average spread in basis points of the performing collateral
+    /// that carries an explicit `spread_bp`; see
+    /// [`AssetPool::weighted_avg_spread_bp`].
+    pub weighted_avg_spread_bp: f64,
     /// Weighted average maturity (WAM) in years.
     ///
     /// For weighted average life use
-    /// [`AssetPool::weighted_avg_life_from_cashflows`].
+    /// [`AssetPool::wal_from_cashflows`].
     pub weighted_avg_maturity: f64,
-    /// Weighted average rating factor
-    pub weighted_avg_rating_factor: f64,
     /// Diversity score (Moody's methodology)
     pub diversity_score: f64,
     /// Number of obligors
     pub num_obligors: usize,
     /// Number of industries
     pub num_industries: usize,
-    /// Cumulative default rate
-    pub cumulative_default_rate: f64,
-    /// Recovery rate on defaults
-    pub recovery_rate: f64,
-    /// Prepayment rate (annualized)
-    pub prepayment_rate: f64,
+    /// Balance of assets currently carried as defaulted, in percent points
+    /// of the current total pool balance (defaulted assets included in the
+    /// denominator; `10.0` = 10%).
+    pub defaulted_balance_pct: f64,
     /// Undrawn commitment across revolving and delayed-draw collateral
     /// (`commitment − balance`, performing assets only).
     #[serde(default)]
@@ -1001,7 +1000,7 @@ impl AssetPool {
     /// Balance-weighted collateral age from each asset's origination date
     /// (acquisition when origination is unknown); undated assets are new at
     /// closing.
-    pub(crate) fn weighted_average_seasoning(&self, date: Date, closing_date: Date) -> u32 {
+    pub(crate) fn seasoning_months(&self, date: Date, closing_date: Date) -> u32 {
         let mut weighted = 0.0;
         let mut total = 0.0;
         for asset in &self.assets {
@@ -1112,30 +1111,46 @@ impl AssetPool {
         )
     }
 
-    /// Calculate weighted average coupon
-    pub fn weighted_avg_coupon(&self) -> f64 {
-        let total_balance = match self.total_balance() {
-            Ok(b) => b.amount(),
-            Err(_) => return 0.0,
+    /// Weighted-average coupon (WAC) of the collateral, as an annual decimal.
+    ///
+    /// Indenture WAC: the balance-weighted all-in coupon (`rate`) over the
+    /// performing (non-defaulted, positive-balance) fixed-rate collateral,
+    /// asset rows and rep lines alike. A row is floating-rate, and so left
+    /// out, when it carries both an `index_id` and a `spread_bp`; its spread
+    /// is reported by [`Self::weighted_avg_spread_bp`] instead. This is the
+    /// same population as the simulated `PeriodDiagnostics::wac`.
+    ///
+    /// # Returns
+    ///
+    /// The WAC as a decimal (`0.08` = 8%), or `0.0` when no performing
+    /// fixed-rate balance remains.
+    pub fn wac(&self) -> f64 {
+        let is_fixed = |index_id: &Option<String>, spread_bp: Option<f64>| {
+            index_id.is_none() || spread_bp.is_none()
         };
-
-        if total_balance == 0.0 {
-            return 0.0;
+        let mut weighted = 0.0;
+        let mut included = 0.0;
+        for asset in &self.assets {
+            let balance = asset.balance.amount();
+            if asset.is_defaulted || balance <= 0.0 || !is_fixed(&asset.index_id, asset.spread_bp) {
+                continue;
+            }
+            weighted += asset.rate * balance;
+            included += balance;
         }
-
-        let weighted_sum = self
-            .assets
-            .iter()
-            .map(|a| a.rate * a.balance.amount())
-            .chain(
-                self.rep_lines
-                    .iter()
-                    .flatten()
-                    .map(|line| line.rate * line.balance.amount()),
-            )
-            .sum::<f64>();
-
-        weighted_sum / total_balance
+        for line in self.rep_lines.iter().flatten() {
+            let balance = line.balance.amount();
+            if balance <= 0.0 || !is_fixed(&line.index_id, line.spread_bp) {
+                continue;
+            }
+            weighted += line.rate * balance;
+            included += balance;
+        }
+        if included > 0.0 {
+            weighted / included
+        } else {
+            0.0
+        }
     }
 
     /// Calculate weighted average maturity (WAM)
@@ -1194,7 +1209,7 @@ impl AssetPool {
     ///   each amount as principal.
     /// * `as_of` - Origin date for the year-fraction clock. Payments on or
     ///   before this date do not contribute to WAL.
-    pub fn weighted_avg_life_from_cashflows(
+    pub fn wal_from_cashflows(
         &self,
         cashflows: &[(Date, Money)],
         as_of: Date,
@@ -1298,7 +1313,7 @@ impl AssetPool {
     ///
     /// The denominator is the balance of the INCLUDED assets, so a pool of
     /// only fixed-rate or defaulted assets returns 0.
-    pub fn weighted_avg_spread(&self) -> f64 {
+    pub fn weighted_avg_spread_bp(&self) -> f64 {
         let mut weighted_spread = 0.0;
         let mut included_balance = 0.0;
         for asset in &self.assets {
@@ -1367,24 +1382,20 @@ pub fn calculate_pool_stats(
         .map(|a| a.balance.amount())
         .sum();
 
-    let cumulative_default_rate = if total_balance > 0.0 {
+    let defaulted_balance_pct = if total_balance > 0.0 {
         defaulted_balance / total_balance * 100.0
     } else {
         0.0
     };
 
     Ok(PoolStats {
-        weighted_avg_coupon: pool.weighted_avg_coupon(),
-        weighted_avg_spread: pool.weighted_avg_spread(),
-        // Maintain historical behavior: WAL field carries WAM proxy unless cashflows provided externally
+        wac: pool.wac(),
+        weighted_avg_spread_bp: pool.weighted_avg_spread_bp(),
         weighted_avg_maturity: pool.weighted_avg_maturity(as_of)?,
-        weighted_avg_rating_factor: 0.0, // Computed separately if needed
         diversity_score: pool.diversity_score(),
         num_obligors: obligors.len(),
         num_industries: industries.len(),
-        cumulative_default_rate,
-        recovery_rate: 0.0,   // Computed separately if needed
-        prepayment_rate: 0.0, // Computed separately if needed
+        defaulted_balance_pct,
         undrawn_commitment: pool
             .assets
             .iter()

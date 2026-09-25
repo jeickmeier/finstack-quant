@@ -192,8 +192,8 @@
             "null"
           ]
         },
-        "collateral_wam": {
-          "description": "Collateral WAM (if no explicit collateral)",
+        "collateral_wam_months": {
+          "description": "Remaining collateral WAM in months (if no explicit collateral).",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -251,7 +251,7 @@
     },
     "AgencyMbsPassthrough": {
       "additionalProperties": false,
-      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_bp(25.0)\n    .guarantee_fee_bp(25.0)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
+      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .wac(0.045)\n    .coupon(0.04)\n    .servicing_fee_bp(25.0)\n    .guarantee_fee_bp(25.0)\n    .wam_months(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
       "properties": {
         "agency": {
           "$ref": "#/$defs/AgencyProgram",
@@ -262,14 +262,14 @@
           "default": {},
           "description": "Attributes for scenario selection and tagging.\nAttributes for scenario selection and tagging"
         },
+        "coupon": {
+          "description": "Net pass-through coupon paid to the investor, as an annual decimal\n(`0.04` = 4%): `wac` less the servicing and guarantee fees.",
+          "format": "double",
+          "type": "number"
+        },
         "current_face": {
           "$ref": "#/$defs/Money",
           "description": "Current face amount (remaining principal balance)."
-        },
-        "current_factor": {
-          "description": "Current pool factor (current_face / original_face).",
-          "format": "double",
-          "type": "number"
         },
         "day_count": {
           "$ref": "#/$defs/DayCount",
@@ -320,11 +320,6 @@
           "$ref": "#/$defs/Money",
           "description": "Original face amount (initial principal balance)."
         },
-        "pass_through_rate": {
-          "description": "Pass-through rate (net coupon to investor).",
-          "format": "double",
-          "type": "number"
-        },
         "payment_lag_days": {
           "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
           "format": "uint32",
@@ -362,7 +357,7 @@
           "format": "double",
           "type": "number"
         },
-        "wam": {
+        "wam_months": {
           "description": "Remaining weighted average maturity in months as of the valuation\ndate (current WAM, not the original term). Pool age (WALA) for\nseasoning ramps is derived separately from `issue_date`.",
           "format": "uint32",
           "minimum": 0,
@@ -375,10 +370,9 @@
         "agency",
         "original_face",
         "current_face",
-        "current_factor",
         "wac",
-        "pass_through_rate",
-        "wam",
+        "coupon",
+        "wam_months",
         "issue_date",
         "maturity",
         "prepayment_spec",
@@ -22594,20 +22588,20 @@
       "additionalProperties": false,
       "description": "PAC collar boundaries.",
       "properties": {
-        "lower_psa": {
-          "description": "Lower PSA bound",
+        "lower_speed_multiplier": {
+          "description": "Lower collar speed as a multiple of the standard PSA curve (`1.0` =\n100% PSA).",
           "format": "double",
           "type": "number"
         },
-        "upper_psa": {
-          "description": "Upper PSA bound",
+        "upper_speed_multiplier": {
+          "description": "Upper collar speed as a multiple of the standard PSA curve (`3.0` =\n300% PSA).",
           "format": "double",
           "type": "number"
         }
       },
       "required": [
-        "lower_psa",
-        "upper_psa"
+        "lower_speed_multiplier",
+        "upper_speed_multiplier"
       ],
       "type": "object"
     },

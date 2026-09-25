@@ -124,7 +124,7 @@ fn period_diagnostics_carry_the_executor_coverage_ratios_and_pool_path() {
     assert_eq!(oc.trigger_level, 1.20);
     assert!((oc.cushion - (100.0 / 60.0 - 1.20)).abs() < 1e-9);
     assert!(oc.passing);
-    assert!((first.weighted_avg_coupon - 0.08).abs() < 1e-12);
+    assert!((first.wac - 0.08).abs() < 1e-12);
     assert_eq!(first.defaults.amount(), 0.0);
     assert!(first.interest_collections.amount() > 0.0);
 

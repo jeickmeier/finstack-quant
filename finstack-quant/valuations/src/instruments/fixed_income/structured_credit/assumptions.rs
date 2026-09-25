@@ -63,7 +63,7 @@ impl StructuredCreditAssumptionRegistry {
             wam_months: self.cmo_collateral_defaults.wam_months,
             servicing_fee_bp: self.cmo_collateral_defaults.servicing_fee_bp,
             guarantee_fee_bp: self.cmo_collateral_defaults.guarantee_fee_bp,
-            psa_multiplier: self.cmo_collateral_defaults.psa_multiplier,
+            speed_multiplier: self.cmo_collateral_defaults.speed_multiplier,
         }
     }
 
@@ -258,7 +258,7 @@ impl StructuredCreditAssumptionRegistry {
             "cmo_collateral_defaults.guarantee_fee_bp",
         )?;
         validate_nonnegative_finite(
-            self.cmo_collateral_defaults.psa_multiplier,
+            self.cmo_collateral_defaults.speed_multiplier,
             "CMO collateral PSA multiplier",
         )?;
         validate_nonnegative_finite(
@@ -404,7 +404,7 @@ pub(crate) struct CmoCollateralDefaults {
     pub(crate) wam_months: u32,
     pub(crate) servicing_fee_bp: f64,
     pub(crate) guarantee_fee_bp: f64,
-    pub(crate) psa_multiplier: f64,
+    pub(crate) speed_multiplier: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -429,7 +429,7 @@ struct CmoCollateralDefaultsRecord {
     wam_months: u32,
     servicing_fee_bp: f64,
     guarantee_fee_bp: f64,
-    psa_multiplier: f64,
+    speed_multiplier: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

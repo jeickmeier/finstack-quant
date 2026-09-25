@@ -28,10 +28,7 @@ impl StructuredCredit {
     /// # Arguments
     ///
     /// * `seasoning_months` - Collateral age in months, including age at closing.
-    pub fn calculate_prepayment_rate(
-        &self,
-        seasoning_months: u32,
-    ) -> finstack_quant_core::Result<f64> {
+    pub fn calculate_smm(&self, seasoning_months: u32) -> finstack_quant_core::Result<f64> {
         self.validated_credit_model()?
             .prepayment_spec
             .smm(seasoning_months)
@@ -234,9 +231,7 @@ impl StructuredCredit {
             ));
         }
         tree_config.market_refi_rate = self.market_conditions.refi_rate;
-        tree_config.initial_seasoning = self
-            .pool
-            .weighted_average_seasoning(as_of, self.closing_date);
+        tree_config.seasoning_months = self.pool.seasoning_months(as_of, self.closing_date);
         tree_config.seed = self.derive_seed(as_of);
         Ok(tree_config)
     }
@@ -601,9 +596,7 @@ mod production_structured_assumptions {
             panic!("deterministic default model");
         };
         assert!(
-            (prepay.smm(12).expect("SMM")
-                - deal.calculate_prepayment_rate(12).expect("resolved SMM"))
-            .abs()
+            (prepay.smm(12).expect("SMM") - deal.calculate_smm(12).expect("resolved SMM")).abs()
                 < 1e-14
         );
         assert!(
@@ -624,6 +617,6 @@ mod production_structured_assumptions {
         let config = deal
             .build_scenario_tree_config(date!(2024 - 07 - 01))
             .expect("config");
-        assert_eq!(config.initial_seasoning, 30);
+        assert_eq!(config.seasoning_months, 30);
     }
 }

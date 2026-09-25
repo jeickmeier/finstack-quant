@@ -202,7 +202,6 @@ impl MetricId {
         MetricId::AbsPaymentRate,
         MetricId::CloWarf,
         MetricId::CloWas,
-        MetricId::CloWac,
         MetricId::CloDiversity,
         MetricId::CloOcRatio,
         MetricId::CloIcRatio,

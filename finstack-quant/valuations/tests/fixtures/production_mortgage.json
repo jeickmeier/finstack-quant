@@ -81,7 +81,6 @@
             "amount": "60000",
             "currency": "USD"
           },
-          "current_factor": 0.6,
           "day_count": "30_360",
           "discount_curve_id": "USD-OIS",
           "guarantee_fee_bp": 25.0,
@@ -92,7 +91,7 @@
             "amount": "100000",
             "currency": "USD"
           },
-          "pass_through_rate": 0.04,
+          "coupon": 0.04,
           "pool_id": "MA1234",
           "pool_type": "generic",
           "prepayment_spec": {
@@ -100,7 +99,7 @@
           },
           "servicing_fee_bp": 25.0,
           "wac": 0.045,
-          "wam": 1
+          "wam_months": 1
         }
       },
       "type": "agency_tba"
@@ -121,7 +120,7 @@
           ]
         },
         "collateral_wac": 0.045,
-        "collateral_wam": 1,
+        "collateral_wam_months": 1,
         "deal_name": "FNR 2024-1",
         "discount_curve_id": "USD-OIS",
         "id": "FNR-2024-1-A",
@@ -175,7 +174,6 @@
             "amount": "60000",
             "currency": "USD"
           },
-          "current_factor": 0.6,
           "day_count": "30_360",
           "discount_curve_id": "USD-OIS",
           "guarantee_fee_bp": 25.0,
@@ -186,7 +184,7 @@
             "amount": "100000",
             "currency": "USD"
           },
-          "pass_through_rate": 0.04,
+          "coupon": 0.04,
           "pool_id": "MA1234",
           "pool_type": "generic",
           "prepayment_spec": {
@@ -194,7 +192,7 @@
           },
           "servicing_fee_bp": 25.0,
           "wac": 0.045,
-          "wam": 1
+          "wam_months": 1
         }
       },
       "type": "agency_cmo"
@@ -218,7 +216,6 @@
           "amount": "60000",
           "currency": "USD"
         },
-        "current_factor": 0.6,
         "day_count": "30_360",
         "discount_curve_id": "USD-OIS",
         "guarantee_fee_bp": 25.0,
@@ -229,7 +226,7 @@
           "amount": "100000",
           "currency": "USD"
         },
-        "pass_through_rate": 0.04,
+        "coupon": 0.04,
         "pool_id": "MA1234",
         "pool_type": "generic",
         "prepayment_spec": {
@@ -237,7 +234,7 @@
         },
         "servicing_fee_bp": 25.0,
         "wac": 0.045,
-        "wam": 1
+        "wam_months": 1
       },
       "type": "agency_mbs_passthrough"
     },

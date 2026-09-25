@@ -150,18 +150,18 @@ fn test_prepayment_spec_shapes_drive_monthly_rates() {
     );
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::abs(0.02);
-    let abs_rate = sc.calculate_prepayment_rate(1).unwrap();
+    let abs_rate = sc.calculate_smm(1).unwrap();
     assert!((abs_rate - 0.02).abs() < 1e-12);
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.12);
-    let cpr_rate = sc.calculate_prepayment_rate(1).unwrap();
+    let cpr_rate = sc.calculate_smm(1).unwrap();
     assert!((cpr_rate - clamped_cpr_to_smm(0.12)).abs() < 1e-12);
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(2.0);
     let seasoning = 3;
     let base_cpr = (seasoning as f64 / psa_ramp_months() as f64) * psa_terminal_cpr();
     let expected = clamped_cpr_to_smm(base_cpr * 2.0);
-    let psa_rate = sc.calculate_prepayment_rate(seasoning).unwrap();
+    let psa_rate = sc.calculate_smm(seasoning).unwrap();
     assert!((psa_rate - expected).abs() < 1e-12);
 }
 

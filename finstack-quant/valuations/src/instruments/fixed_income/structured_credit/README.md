@@ -582,7 +582,7 @@ Commercial mortgages carry their terms on the `PoolAsset`:
   balance-weighted average; undated rows fall back to `acquisition_date`,
   then to the closing date (new collateral) and the pool-level rate.
   Cumulative-loss and timing default curves stay pool-level. The pool WALA
-  (`weighted_average_seasoning`) uses the same anchor.
+  (`seasoning_months`) uses the same anchor.
 - `amortization_term_months: Option<u32>` — schedule length in months from
   origination (`origination_date`, else `acquisition_date`, else closing):
   the level payment is sized

@@ -74,11 +74,13 @@ pub(crate) fn collateral_asset_rate_for_period(
 }
 
 /// Live collateral weighted-average coupon from the *current* pool state:
-/// balance-weighted `rate` over performing (non-defaulted, positive-balance)
-/// assets. Mirrors [`crate::instruments::fixed_income::structured_credit::AssetPool::weighted_avg_coupon`]
-/// but on the current balances, so a net-WAC cap tracks collateral that has
-/// amortized, prepaid or defaulted heterogeneously instead of being frozen at
-/// closing. Returns `0.0` for an empty/exhausted performing pool.
+/// balance-weighted all-in coupon over every performing (non-defaulted,
+/// positive-balance) asset, floating rows at their projected index-plus-spread
+/// rate. Unlike [`crate::instruments::fixed_income::structured_credit::AssetPool::wac`]
+/// (fixed-rate collateral only) this is the net-WAC cap base, so it tracks
+/// collateral that has amortized, prepaid or defaulted heterogeneously instead
+/// of being frozen at closing. Returns `0.0` for an empty/exhausted performing
+/// pool.
 pub(super) fn current_collateral_wac(
     state: &SimulationState,
     context: &MarketContext,

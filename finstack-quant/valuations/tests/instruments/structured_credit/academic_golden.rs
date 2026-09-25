@@ -309,9 +309,7 @@ fn test_wal_golden_uniform_amortization() {
         ), // Year 4
     ];
 
-    let wal = pool
-        .weighted_avg_life_from_cashflows(&cashflows, as_of)
-        .expect("WAL");
+    let wal = pool.wal_from_cashflows(&cashflows, as_of).expect("WAL");
 
     // Expected WAL = (1 + 2 + 3 + 4) / 4 = 2.5 years
     let expected_wal = 2.5;
@@ -351,9 +349,7 @@ fn test_wal_golden_front_loaded() {
         ), // Year 3: 10%
     ];
 
-    let wal = pool
-        .weighted_avg_life_from_cashflows(&cashflows, as_of)
-        .expect("WAL");
+    let wal = pool.wal_from_cashflows(&cashflows, as_of).expect("WAL");
 
     // Expected WAL = 0.70 × 1 + 0.20 × 2 + 0.10 × 3 = 1.4 years
     let expected_wal = 0.70 * 1.0 + 0.20 * 2.0 + 0.10 * 3.0;
@@ -393,9 +389,7 @@ fn test_wal_golden_back_loaded() {
         ), // Year 3: 70%
     ];
 
-    let wal = pool
-        .weighted_avg_life_from_cashflows(&cashflows, as_of)
-        .expect("WAL");
+    let wal = pool.wal_from_cashflows(&cashflows, as_of).expect("WAL");
 
     // Expected WAL = 0.10 × 1 + 0.20 × 2 + 0.70 × 3 = 2.6 years
     let expected_wal = 0.10 * 1.0 + 0.20 * 2.0 + 0.70 * 3.0;
@@ -463,7 +457,7 @@ fn test_was_golden_calculation() {
         .with_rating(CreditRating::B),
     );
 
-    let was = pool.weighted_avg_spread();
+    let was = pool.weighted_avg_spread_bp();
 
     // Expected WAS = (50×400 + 30×450 + 20×500) / 100 = 435 bp
     let expected_was =

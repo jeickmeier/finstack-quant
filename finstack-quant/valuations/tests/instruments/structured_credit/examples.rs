@@ -63,7 +63,7 @@ mod tests {
         pool.assets.push(bond1);
 
         // Calculate WAS - spread component only, over assets that carry one.
-        let was = pool.weighted_avg_spread();
+        let was = pool.weighted_avg_spread_bp();
 
         // Expected WAS calculation (market convention):
         // Loan1: 10M × 425bps = 4,250M·bp
@@ -201,9 +201,7 @@ mod tests {
         let pool = AssetPool::new("DEMO_POOL", DealType::Clo, Currency::USD);
 
         // Calculate WAL using market-standard cashflow-based method
-        let wal = pool
-            .weighted_avg_life_from_cashflows(&cashflows, as_of)
-            .expect("WAL");
+        let wal = pool.wal_from_cashflows(&cashflows, as_of).expect("WAL");
 
         // Expected WAL:
         // (20M×1 + 30M×2 + 30M×3 + 20M×4) / 100M
@@ -271,7 +269,7 @@ mod tests {
         // 3. Calculate pool metrics using market-standard methods
 
         // WAS - now correctly uses spread only
-        let was = pool.weighted_avg_spread();
+        let was = pool.weighted_avg_spread_bp();
         // Expected: (15M×425 + 20M×450 + 15M×500) / 50M
         //         = (6,375 + 9,000 + 7,500) / 50
         //         = 22,875 / 50 = 457.5 bp
@@ -299,7 +297,7 @@ mod tests {
         assert!((warf - 2309.0).abs() < 0.1);
 
         // WAC - unchanged
-        let _wac = pool.weighted_avg_coupon();
+        let _wac = pool.wac();
         // Would be calculated from all-in rates after index fixing
 
         // WAM (not WAL)
@@ -342,7 +340,7 @@ mod tests {
 
         // Calculate true WAL from cashflows
         let wal = pool
-            .weighted_avg_life_from_cashflows(&amortizing_cashflows, as_of)
+            .wal_from_cashflows(&amortizing_cashflows, as_of)
             .expect("WAL");
 
         // Expected WAL:
