@@ -701,15 +701,15 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_decimal",
     "default": null,
     "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_decimal",
     "default": null,
     "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
     "format": "double"
@@ -3199,16 +3199,16 @@ export default [
   {
     "path": "#/$defs/d_ab52c59e8dd68406ea31",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/OidPolicy",
-    "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldPct`: Discount as percentage withheld from each funded draw\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparatePct`: Percentage of each draw tracked separately, not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```"
+    "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```"
   },
   {
     "path": "#/$defs/d_ab52c59e8dd68406ea31/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/OidPolicy/oneOf/0",
-    "description": "Discount as percentage (basis points) withheld from each funded draw"
+    "description": "Discount in basis points of each funded draw (`200` = 2%), withheld\nfrom proceeds"
   },
   {
-    "path": "#/$defs/d_ab52c59e8dd68406ea31/oneOf/0/properties/withheld_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/OidPolicy/oneOf/0/properties/withheld_pct",
+    "path": "#/$defs/d_ab52c59e8dd68406ea31/oneOf/0/properties/withheld_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/OidPolicy/oneOf/0/properties/withheld_bp",
     "format": "int32"
   },
   {
@@ -3225,11 +3225,11 @@ export default [
   {
     "path": "#/$defs/d_ab52c59e8dd68406ea31/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/OidPolicy/oneOf/2",
-    "description": "Discount as percentage of each draw tracked separately for amortization"
+    "description": "Discount in basis points of each draw (`200` = 2%), tracked\nseparately for amortization"
   },
   {
-    "path": "#/$defs/d_ab52c59e8dd68406ea31/oneOf/2/properties/separate_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/OidPolicy/oneOf/2/properties/separate_pct",
+    "path": "#/$defs/d_ab52c59e8dd68406ea31/oneOf/2/properties/separate_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/OidPolicy/oneOf/2/properties/separate_bp",
     "format": "int32"
   },
   {
@@ -5586,7 +5586,7 @@ export default [
   {
     "path": "#/$defs/d_c35eb82ebede5e9fd461",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/CouponType",
-    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount."
+    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized."
   },
   {
     "path": "#/$defs/d_c35eb82ebede5e9fd461/oneOf/0",
@@ -5610,15 +5610,15 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/CouponType/oneOf/2/properties/split"
   },
   {
-    "path": "#/$defs/d_c35eb82ebede5e9fd461/oneOf/2/properties/split/properties/cash_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_pct",
+    "path": "#/$defs/d_c35eb82ebede5e9fd461/oneOf/2/properties/split/properties/cash_fraction",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_fraction",
     "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/d_c35eb82ebede5e9fd461/oneOf/2/properties/split/properties/pik_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_pct",
+    "path": "#/$defs/d_c35eb82ebede5e9fd461/oneOf/2/properties/split/properties/pik_fraction",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_fraction",
     "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
@@ -6967,9 +6967,9 @@ export default [
     "title": "Scenario Pricing Overrides"
   },
   {
-    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_pct",
-    "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
     "format": "double"
   },
   {

@@ -348,7 +348,7 @@ export interface D_34C7523897E1E79A3D8C {
   /**
    * Optional Bermudan call provision.
    */
-  callable?: D_97331C606D553B2E79D9 | null;
+  call_provision?: D_97331C606D553B2E79D9 | null;
   /**
    * Optional cap on each period coupon.
    */
@@ -417,7 +417,8 @@ export interface Attributes {
  * # Fields
  *
  * - `call_dates`: Sorted ascending dates on which the issuer may call.
- * - `call_price`: Fraction of notional returned at exercise (1.0 = par).
+ * - `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,
+ *   `102.0` = callable at 102).
  * - `lockout_periods`: Number of initial coupon periods during which
  *   the call right cannot be exercised.
  */
@@ -427,13 +428,14 @@ export interface D_97331C606D553B2E79D9 {
    */
   call_dates: Date[];
   /**
-   * Call price (fraction of notional, typically 1.0 = par).
-   */
-  call_price: number;
-  /**
    * Lockout period in number of coupon periods before first call.
    */
   lockout_periods: number;
+  /**
+   * Redemption price in percent of par (`100.0` = par). The pricer pays
+   * `notional * price_pct_of_par / 100` at exercise.
+   */
+  price_pct_of_par: number;
 }
 /**
  * Floating rate tenor.
@@ -1482,7 +1484,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * speed, color, FX delta). When set it also replaces the adaptive spot
    * bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
    */
-  spot_bump_pct?: number | null;
+  spot_bump_decimal?: number | null;
   /**
    * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
    *
@@ -1490,7 +1492,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * vega). `None` uses the `valuations.sensitivities.v1` value (default
    * 1 vol point). Results stay reported per 1 vol point.
    */
-  vol_bump_pct?: number | null;
+  vol_bump_decimal?: number | null;
   /**
    * Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
    * convexity: InflationLinkedBond `RealDuration` and structured-credit
@@ -1740,11 +1742,13 @@ export interface Money {
  */
 export interface ScenarioPricingOverrides {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *

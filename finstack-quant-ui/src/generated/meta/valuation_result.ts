@@ -3209,12 +3209,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_d845b68d12fbaca7791f/properties/average_life",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/average_life",
-    "description": "Average life (years) over the paths on which the tranche received\nprincipal; `0.0` when it never did.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_d845b68d12fbaca7791f/properties/credit_duration",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/credit_duration",
     "description": "Credit duration (price sensitivity to credit spread)",
@@ -3258,7 +3252,7 @@ export default [
     "path": "#/$defs/d_d845b68d12fbaca7791f/properties/paths_with_principal",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/paths_with_principal",
     "default": 0,
-    "description": "Number of simulated paths on which the tranche received any\nprincipal (the paths `average_life` averages over).",
+    "description": "Number of simulated paths on which the tranche received any\nprincipal (the paths `wal` averages over).",
     "format": "uint",
     "minimum": 0
   },
@@ -3286,6 +3280,12 @@ export default [
     "description": "Unexpected loss",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d845b68d12fbaca7791f/properties/wal",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/wal",
+    "description": "Weighted-average life (WAL, years) averaged over the paths on which\nthe tranche received principal; `0.0` when it never did.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_ea44f9fc62fb5d9eee49",

@@ -637,7 +637,7 @@
             "null"
           ]
         },
-        "spot_bump_pct": {
+        "spot_bump_decimal": {
           "default": null,
           "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
           "format": "double",
@@ -646,7 +646,7 @@
             "null"
           ]
         },
-        "vol_bump_pct": {
+        "vol_bump_decimal": {
           "default": null,
           "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
           "format": "double",
@@ -3001,7 +3001,7 @@
       "type": "string"
     },
     "d_a561434dff1275f40d83": {
-      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
       "oneOf": [
         {
           "const": "cash",
@@ -3020,18 +3020,18 @@
             "split": {
               "additionalProperties": false,
               "properties": {
-                "cash_pct": {
+                "cash_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
                 },
-                "pik_pct": {
+                "pik_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
                 }
               },
               "required": [
-                "cash_pct",
-                "pik_pct"
+                "cash_fraction",
+                "pik_fraction"
               ],
               "type": "object"
             }
@@ -4296,7 +4296,7 @@
       "type": "object"
     },
     "d_cdd9cb6ed505205e6ebe": {
-      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
       "oneOf": [
         {
           "const": "cash",
@@ -4315,18 +4315,18 @@
             "split": {
               "additionalProperties": false,
               "properties": {
-                "cash_pct": {
+                "cash_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
                 },
-                "pik_pct": {
+                "pik_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
                 }
               },
               "required": [
-                "cash_pct",
-                "pik_pct"
+                "cash_fraction",
+                "pik_fraction"
               ],
               "type": "object"
             }
@@ -5616,8 +5616,8 @@
         }
       ],
       "properties": {
-        "scenario_price_shock_pct": {
-          "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+        "scenario_price_shock_decimal": {
+          "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
           "format": "double",
           "type": [
             "number",

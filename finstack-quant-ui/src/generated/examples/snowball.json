@@ -2,7 +2,7 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "callable": null,
+      "call_provision": null,
       "coupon_cap": null,
       "coupon_dates": [
         "2026-06-30",

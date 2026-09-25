@@ -1319,8 +1319,8 @@
             "null"
           ]
         },
-        "collateral_wam": {
-          "description": "Collateral WAM (if no explicit collateral)",
+        "collateral_wam_months": {
+          "description": "Remaining collateral WAM in months (if no explicit collateral).",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -1378,7 +1378,7 @@
     },
     "AgencyMbsPassthrough": {
       "additionalProperties": false,
-      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
+      "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .wac(0.045)\n    .coupon(0.04)\n    .servicing_fee_bp(25.0)\n    .guarantee_fee_bp(25.0)\n    .wam_months(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
       "properties": {
         "agency": {
           "$ref": "#/$defs/AgencyProgram",
@@ -1389,14 +1389,14 @@
           "default": {},
           "description": "Attributes for scenario selection and tagging.\nAttributes for scenario selection and tagging"
         },
+        "coupon": {
+          "description": "Net pass-through coupon paid to the investor, as an annual decimal\n(`0.04` = 4%): `wac` less the servicing and guarantee fees.",
+          "format": "double",
+          "type": "number"
+        },
         "current_face": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Current face amount (remaining principal balance)."
-        },
-        "current_factor": {
-          "description": "Current pool factor (current_face / original_face).",
-          "format": "double",
-          "type": "number"
         },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
@@ -1406,9 +1406,9 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve identifier for pricing."
         },
-        "guarantee_fee_rate": {
+        "guarantee_fee_bp": {
           "default": 0,
-          "description": "Guarantee fee rate (annual, as decimal e.g., 0.0025 for 25 bp).\n\nDefaults to `0.0` when omitted.",
+          "description": "Annual agency guarantee fee (g-fee) in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
           "format": "double",
           "type": "number"
         },
@@ -1447,11 +1447,6 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Original face amount (initial principal balance)."
         },
-        "pass_through_rate": {
-          "description": "Pass-through rate (net coupon to investor).",
-          "format": "double",
-          "type": "number"
-        },
         "payment_lag_days": {
           "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
           "format": "uint32",
@@ -1478,9 +1473,9 @@
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
         },
-        "servicing_fee_rate": {
+        "servicing_fee_bp": {
           "default": 0,
-          "description": "Servicing fee rate (annual, as decimal e.g., 0.0025 for 25 bp).\n\nDefaults to `0.0` when omitted.",
+          "description": "Annual servicing fee in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
           "format": "double",
           "type": "number"
         },
@@ -1489,7 +1484,7 @@
           "format": "double",
           "type": "number"
         },
-        "wam": {
+        "wam_months": {
           "description": "Remaining weighted average maturity in months as of the valuation\ndate (current WAM, not the original term). Pool age (WALA) for\nseasoning ramps is derived separately from `issue_date`.",
           "format": "uint32",
           "minimum": 0,
@@ -1502,10 +1497,9 @@
         "agency",
         "original_face",
         "current_face",
-        "current_factor",
         "wac",
-        "pass_through_rate",
-        "wam",
+        "coupon",
+        "wam_months",
         "issue_date",
         "maturity",
         "prepayment_spec",
@@ -1718,33 +1712,33 @@
         },
         {
           "additionalProperties": false,
-          "description": "Cumulative collateral losses above `max_pct` percent of the original\ncollateral end revolving.",
+          "description": "Cumulative collateral losses above `max_cumulative_loss` of the\noriginal collateral end revolving.",
           "properties": {
             "kind": {
               "const": "cumulative_loss",
               "type": "string"
             },
-            "max_pct": {
-              "description": "Loss threshold in percent of original collateral (`4.0` = 4%).",
+            "max_cumulative_loss": {
+              "description": "Loss threshold as a decimal fraction of the original collateral\n(`0.04` = 4%), in `(0, 1]`.",
               "format": "double",
               "type": "number"
             }
           },
           "required": [
             "kind",
-            "max_pct"
+            "max_cumulative_loss"
           ],
           "type": "object"
         },
         {
           "additionalProperties": false,
-          "description": "A three-period average excess spread below `min_3m` (annual decimal)\nends revolving.",
+          "description": "A three-period average excess spread below `min_excess_spread_3m`\n(annual decimal) ends revolving.",
           "properties": {
             "kind": {
               "const": "excess_spread",
               "type": "string"
             },
-            "min_3m": {
+            "min_excess_spread_3m": {
               "description": "Excess-spread floor as an annual decimal (`0.01` = 1%).",
               "format": "double",
               "type": "number"
@@ -1752,7 +1746,7 @@
           },
           "required": [
             "kind",
-            "min_3m"
+            "min_excess_spread_3m"
           ],
           "type": "object"
         }
@@ -2029,7 +2023,7 @@
     },
     "AssetBackedFacility": {
       "additionalProperties": false,
-      "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); percentages are\npercent values (`max_pct`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are\npercent values (`20.0` = 20%) and loss thresholds are decimal fractions\n(`max_cumulative_loss`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
         "amortization_events": {
           "description": "Events that end revolving early.",
@@ -3729,7 +3723,7 @@
     },
     "BermudanCallProvision": {
       "additionalProperties": false,
-      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
+      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
       "properties": {
         "call_dates": {
           "description": "Dates on which the issuer can call (must be sorted ascending).",
@@ -3738,21 +3732,21 @@
           },
           "type": "array"
         },
-        "call_price": {
-          "description": "Call price (fraction of notional, typically 1.0 = par).",
-          "format": "double",
-          "type": "number"
-        },
         "lockout_periods": {
           "description": "Lockout period in number of coupon periods before first call.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "price_pct_of_par": {
+          "description": "Redemption price in percent of par (`100.0` = par). The pricer pays\n`notional * price_pct_of_par / 100` at exercise.",
+          "format": "double",
+          "type": "number"
         }
       },
       "required": [
         "call_dates",
-        "call_price",
+        "price_pct_of_par",
         "lockout_periods"
       ],
       "type": "object"
@@ -4273,7 +4267,7 @@
     },
     "CallableRangeAccrual": {
       "additionalProperties": false,
-      "description": "Callable Range Accrual.\n\nExtends the existing range accrual concept with a Bermudan call provision\nallowing the issuer to terminate early on specified call dates.\n\nThe call decision interacts with the range accrual feature: the issuer\nwill call when the expected future value of remaining range accrual\ncoupons exceeds the call price (par). Pricing requires backward\ninduction (LSMC or HW tree) combined with forward range accrual\ncoupon simulation.\n\n# Pricing\n\n- **LSMC**: Simulate paths with HW1F short rate model. At each call\n  date, compute continuation value via regression. Exercise if\n  call_price < continuation_value.\n- **HW Tree**: Build trinomial tree, attach range accrual cashflows\n  at each node, apply backward induction with call decision.",
+      "description": "Callable Range Accrual.\n\nExtends the existing range accrual concept with a Bermudan call provision\nallowing the issuer to terminate early on specified call dates.\n\nThe call decision interacts with the range accrual feature: the issuer\nwill call when the expected future value of remaining range accrual\ncoupons exceeds the call price (par). Pricing requires backward\ninduction (LSMC or HW tree) combined with forward range accrual\ncoupon simulation.\n\n# Pricing\n\n- **LSMC**: Simulate paths with HW1F short rate model. At each call\n  date, compute continuation value via regression. Exercise if\n  the call amount `notional * price_pct_of_par / 100` is below the\n  continuation value.\n- **HW Tree**: Build trinomial tree, attach range accrual cashflows\n  at each node, apply backward induction with call decision.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -4686,7 +4680,7 @@
           "format": "double",
           "type": "number"
         },
-        "fixed_allocation_pct": {
+        "fixed_allocation_decimal": {
           "description": "Investor allocation of trust collections fixed at the end of the\nrevolving period, as a decimal in `(0, 1]`. `None` freezes the\nallocation at the investor's floating share\n`investor_interest / (investor_interest + seller_interest)`.",
           "format": "double",
           "type": [
@@ -5898,8 +5892,8 @@
           "description": "Whether clawback is enabled",
           "type": "boolean"
         },
-        "holdback_pct": {
-          "description": "Optional percentage of GP carry held back until settlement",
+        "holdback_decimal": {
+          "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
           "format": "double",
           "type": [
             "number",
@@ -8668,7 +8662,7 @@
       "type": "number"
     },
     "CouponType": {
-      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
       "oneOf": [
         {
           "const": "cash",
@@ -8687,18 +8681,18 @@
             "split": {
               "additionalProperties": false,
               "properties": {
-                "cash_pct": {
+                "cash_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
                 },
-                "pik_pct": {
+                "pik_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
                 }
               },
               "required": [
-                "cash_pct",
-                "pik_pct"
+                "cash_fraction",
+                "pik_fraction"
               ],
               "type": "object"
             }
@@ -9800,7 +9794,7 @@
             "null"
           ]
         },
-        "spot_bump_pct": {
+        "spot_bump_decimal": {
           "default": null,
           "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
           "format": "double",
@@ -9809,7 +9803,7 @@
             "null"
           ]
         },
-        "vol_bump_pct": {
+        "vol_bump_decimal": {
           "default": null,
           "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
           "format": "double",
@@ -12116,7 +12110,7 @@
       "type": "object"
     },
     "d_a561434dff1275f40d83": {
-      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount.",
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
       "oneOf": [
         {
           "const": "cash",
@@ -12135,18 +12129,18 @@
             "split": {
               "additionalProperties": false,
               "properties": {
-                "cash_pct": {
+                "cash_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
                 },
-                "pik_pct": {
+                "pik_fraction": {
                   "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
                 }
               },
               "required": [
-                "cash_pct",
-                "pik_pct"
+                "cash_fraction",
+                "pik_fraction"
               ],
               "type": "object"
             }
@@ -15212,8 +15206,8 @@
         }
       ],
       "properties": {
-        "scenario_price_shock_pct": {
-          "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+        "scenario_price_shock_decimal": {
+          "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
           "format": "double",
           "type": [
             "number",
@@ -16897,7 +16891,7 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Current underlying close or exchange-prescribed reference level."
         },
-        "spread_basis_points_id": {
+        "spread_bp_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Current annualized TRF spread scalar expressed in basis points."
         },
@@ -16921,7 +16915,7 @@
         "spot_id",
         "accrued_distributions_id",
         "accrued_funding_id",
-        "spread_basis_points_id",
+        "spread_bp_id",
         "spread_day_count"
       ],
       "type": "object"
@@ -17105,7 +17099,7 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Target funded balance of the spread account (currency units)."
         },
-        "trap_loss_pct": {
+        "trap_loss_decimal": {
           "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which terminal spread-account cash repays\ndebt principal after deferred coupons. Any surplus reaches the residual\nholder. `None` releases surplus after deferred coupons without this\ninterest-to-principal transfer.",
           "format": "double",
           "type": [
@@ -17495,6 +17489,7 @@
           "description": "Capital protection: max(floor, participation * min(S_T/S_0, cap))",
           "properties": {
             "capital_protection": {
+              "additionalProperties": false,
               "properties": {
                 "floor": {
                   "description": "Minimum return floor (e.g., 1.0 for 100% protection)",
@@ -17518,6 +17513,7 @@
           "description": "Participation: 1 + participation_rate * max(0, S_T/S_0 - 1)",
           "properties": {
             "participation": {
+              "additionalProperties": false,
               "properties": {
                 "rate": {
                   "description": "Participation rate in upside (e.g., 1.0 for 100% participation)",
@@ -17541,15 +17537,16 @@
           "description": "Knock-in put: Put option if barrier breached, otherwise return principal",
           "properties": {
             "knock_in_put": {
+              "additionalProperties": false,
               "properties": {
-                "strike": {
-                  "description": "Strike price for knock-in put option",
+                "strike_ratio": {
+                  "description": "Put strike as a ratio of the initial level (`1.0` = 100%, the same\nunits as `final_barrier`); the put loss is\n`max(strike_ratio - S_T / S_0, 0)`.",
                   "format": "double",
                   "type": "number"
                 }
               },
               "required": [
-                "strike"
+                "strike_ratio"
               ],
               "type": "object"
             }
@@ -20096,14 +20093,14 @@
     },
     "IncentiveFeeSpec": {
       "additionalProperties": false,
-      "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share_pct`\nof the residual interest proceeds ahead of equity.",
+      "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share`\nof the residual interest proceeds ahead of equity.",
       "properties": {
         "hurdle_irr": {
           "description": "Equity IRR hurdle as an annual decimal (`0.12` = 12%).",
           "format": "double",
           "type": "number"
         },
-        "share_pct": {
+        "share": {
           "description": "Share of the residual paid to the manager once the hurdle is met, as\na decimal fraction in `[0, 1]`.",
           "format": "double",
           "type": "number"
@@ -20111,7 +20108,7 @@
       },
       "required": [
         "hurdle_irr",
-        "share_pct"
+        "share"
       ],
       "type": "object"
     },
@@ -23694,19 +23691,19 @@
       "type": "object"
     },
     "OidPolicy": {
-      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldPct`: Discount as percentage withheld from each funded draw\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparatePct`: Percentage of each draw tracked separately, not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
+      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Discount as percentage (basis points) withheld from each funded draw",
+          "description": "Discount in basis points of each funded draw (`200` = 2%), withheld\nfrom proceeds",
           "properties": {
-            "withheld_pct": {
+            "withheld_bp": {
               "format": "int32",
               "type": "integer"
             }
           },
           "required": [
-            "withheld_pct"
+            "withheld_bp"
           ],
           "type": "object"
         },
@@ -23725,15 +23722,15 @@
         },
         {
           "additionalProperties": false,
-          "description": "Discount as percentage of each draw tracked separately for amortization",
+          "description": "Discount in basis points of each draw (`200` = 2%), tracked\nseparately for amortization",
           "properties": {
-            "separate_pct": {
+            "separate_bp": {
               "format": "int32",
               "type": "integer"
             }
           },
           "required": [
-            "separate_pct"
+            "separate_bp"
           ],
           "type": "object"
         },
@@ -23987,20 +23984,20 @@
       "additionalProperties": false,
       "description": "PAC collar boundaries.",
       "properties": {
-        "lower_psa": {
-          "description": "Lower PSA bound",
+        "lower_speed_multiplier": {
+          "description": "Lower collar speed as a multiple of the standard PSA curve (`1.0` =\n100% PSA).",
           "format": "double",
           "type": "number"
         },
-        "upper_psa": {
-          "description": "Upper PSA bound",
+        "upper_speed_multiplier": {
+          "description": "Upper collar speed as a multiple of the standard PSA curve (`3.0` =\n300% PSA).",
           "format": "double",
           "type": "number"
         }
       },
       "required": [
-        "lower_psa",
-        "upper_psa"
+        "lower_speed_multiplier",
+        "upper_speed_multiplier"
       ],
       "type": "object"
     },
@@ -24335,7 +24332,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Manager incentive fee: `share_pct` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual.",
+          "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual.",
           "properties": {
             "incentive_fee": {
               "additionalProperties": false,
@@ -24345,7 +24342,7 @@
                   "format": "double",
                   "type": "number"
                 },
-                "share_pct": {
+                "share": {
                   "description": "Share of the residual paid once the hurdle is met, in `[0, 1]`.",
                   "format": "double",
                   "type": "number"
@@ -24353,7 +24350,7 @@
               },
               "required": [
                 "hurdle_irr",
-                "share_pct"
+                "share"
               ],
               "type": "object"
             }
@@ -26167,7 +26164,7 @@
             "null"
           ]
         },
-        "disposition_cost_pct": {
+        "disposition_cost_decimal": {
           "default": null,
           "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
           "format": "double",
@@ -26783,7 +26780,7 @@
           "type": "integer"
         },
         "price_pct": {
-          "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price`.",
+          "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price_pct`.",
           "format": "double",
           "type": "number"
         },
@@ -26804,8 +26801,8 @@
       "additionalProperties": false,
       "description": "Criteria for reinvestment during revolving period",
       "properties": {
-        "max_price": {
-          "description": "Maximum purchase price (% of par)",
+        "max_price_pct": {
+          "description": "Maximum purchase price in percent of par (`100.0` = par).",
           "format": "double",
           "type": "number"
         },
@@ -26816,7 +26813,7 @@
         }
       },
       "required": [
-        "max_price",
+        "max_price_pct",
         "min_yield"
       ],
       "type": "object"
@@ -27317,13 +27314,13 @@
           "additionalProperties": false,
           "description": "A decimal fraction of the current pool balance (performing collateral\nplus any accumulation funding account), so the target amortizes with\nthe pool.",
           "properties": {
-            "pct_of_current": {
+            "fraction_of_current": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_current"
+            "fraction_of_current"
           ],
           "type": "object"
         },
@@ -27331,19 +27328,19 @@
           "additionalProperties": false,
           "description": "A decimal fraction of the original (cut-off) pool balance: a floor\nthat does not amortize.",
           "properties": {
-            "pct_of_original": {
+            "fraction_of_original": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_original"
+            "fraction_of_original"
           ],
           "type": "object"
         },
         {
           "additionalProperties": false,
-          "description": "The larger of two targets, typically `PctOfCurrent` with a\n`PctOfOriginal` floor.",
+          "description": "The larger of two targets, typically `FractionOfCurrent` with a\n`FractionOfOriginal` floor.",
           "properties": {
             "max": {
               "maxItems": 2,
@@ -27829,7 +27826,7 @@
           "description": "How the schedule values are read; `ShiftOfSubordinate` by default."
         },
         "schedule": {
-          "description": "Schedule ascending by `months_from_closing`; each step's `senior_pct`\nis read per `mode`.",
+          "description": "Schedule ascending by `months_from_closing`; each step's `senior_decimal`\nis read per `mode`.",
           "items": {
             "$ref": "#/$defs/ShiftingInterestStep"
           },
@@ -27863,7 +27860,7 @@
           "minimum": 0,
           "type": "integer"
         },
-        "senior_pct": {
+        "senior_decimal": {
           "description": "Senior share of principal (decimal, `1.0` = 100% lockout) from this step.",
           "format": "double",
           "type": "number"
@@ -27871,7 +27868,7 @@
       },
       "required": [
         "months_from_closing",
-        "senior_pct"
+        "senior_decimal"
       ],
       "type": "object"
     },
@@ -27880,7 +27877,7 @@
       "oneOf": [
         {
           "const": "shift_of_subordinate",
-          "description": "Prospectus form: the schedule value is the share of the subordinates'\npro-rata unscheduled principal that shifts to the senior, so the\nsenior's unscheduled share is `senior_pct + value × (1 − senior_pct)`\non live balances (`1.0` = full lockout, `0.0` = pro-rata).",
+          "description": "Prospectus form: the schedule value is the share of the subordinates'\npro-rata unscheduled principal that shifts to the senior, so the\nsenior's unscheduled share is `senior_decimal + value × (1 − senior_decimal)`\non live balances (`1.0` = full lockout, `0.0` = pro-rata).",
           "type": "string"
         },
         {
@@ -28031,7 +28028,7 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes."
         },
-        "callable": {
+        "call_provision": {
           "anyOf": [
             {
               "$ref": "#/$defs/BermudanCallProvision"
@@ -28740,8 +28737,8 @@
           ],
           "description": "Optional credit-card master-trust portfolio model. Asset and rep-line\npools only: the pool is the investor interest in the receivables, the\nspec's payment rate, portfolio yield and charge-off rate replace the\nprepayment, coupon and default assumptions. See [`CardPortfolioSpec`]."
         },
-        "cleanup_call_pct": {
-          "description": "Clean-up call pool factor threshold (percentage of original balance).\n\nWhen the pool factor (current balance / original balance) drops below\nthis threshold, the deal is optionally redeemed and all outstanding\ntranche balances are returned. Industry standard: typically 10%.\n\nSet to `None` to disable clean-up call (default).",
+        "cleanup_call_decimal": {
+          "description": "Clean-up call pool factor threshold as a decimal fraction of the\noriginal balance (`0.10` = 10%).\n\nWhen the pool factor (current balance / original balance) drops below\nthis threshold, the deal is optionally redeemed and all outstanding\ntranche balances are returned. Industry standard: typically 10%.\n\nSet to `None` to disable clean-up call (default).",
           "format": "double",
           "type": [
             "number",
@@ -29266,22 +29263,22 @@
     },
     "TargetOcSpec": {
       "additionalProperties": false,
-      "description": "Targeted overcollateralization amortization (auto and consumer ABS).\n\nEach period the notes are paid down to the amount that leaves the pool's\novercollateralization (`pool − notes`) at the target: the larger of\n`pct_of_current` of the pool balance after the period's collections and\n`floor_pct_of_original` of the cut-off balance. The required principal\ndistribution is `max(0, notes − max(pool − target, 0))`, paid to the\nnotes by priority from interest proceeds first and principal proceeds\nfor the rest; the collections above it are released to the residual\nholder.",
+      "description": "Targeted overcollateralization amortization (auto and consumer ABS).\n\nEach period the notes are paid down to the amount that leaves the pool's\novercollateralization (`pool − notes`) at the target: the larger of\n`fraction_of_current` of the pool balance after the period's collections and\n`floor_fraction_of_original` of the cut-off balance. The required principal\ndistribution is `max(0, notes − max(pool − target, 0))`, paid to the\nnotes by priority from interest proceeds first and principal proceeds\nfor the rest; the collections above it are released to the residual\nholder.",
       "properties": {
-        "floor_pct_of_original": {
+        "floor_fraction_of_original": {
           "default": 0,
           "description": "Floor on the target as a decimal fraction of the original (cut-off)\npool balance; `0.0` for no floor.",
           "format": "double",
           "type": "number"
         },
-        "pct_of_current": {
+        "fraction_of_current": {
           "description": "Target overcollateralization as a decimal fraction of the current\npool balance (after the period's collections).",
           "format": "double",
           "type": "number"
         }
       },
       "required": [
-        "pct_of_current"
+        "fraction_of_current"
       ],
       "type": "object"
     },
@@ -30209,13 +30206,13 @@
           "additionalProperties": false,
           "description": "Fraction of the opening commitment, as a decimal (`0.02` = 2%).",
           "properties": {
-            "pct_of_commitment": {
+            "fraction_of_commitment": {
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "pct_of_commitment"
+            "fraction_of_commitment"
           ],
           "type": "object"
         }

@@ -4111,11 +4111,6 @@ export interface TranchePricingResult {
    */
   attachment: number;
   /**
-   * Average life (years) over the paths on which the tranche received
-   * principal; `0.0` when it never did.
-   */
-  average_life: number;
-  /**
    * Credit duration (price sensitivity to credit spread)
    */
   credit_duration: number;
@@ -4129,7 +4124,7 @@ export interface TranchePricingResult {
   npv: Money15;
   /**
    * Number of simulated paths on which the tranche received any
-   * principal (the paths `average_life` averages over).
+   * principal (the paths `wal` averages over).
    */
   paths_with_principal?: bigint;
   /**
@@ -4146,6 +4141,11 @@ export interface TranchePricingResult {
    */
   tranche_id: string;
   unexpected_loss: Money16;
+  /**
+   * Weighted-average life (WAL, years) averaged over the paths on which
+   * the tranche received principal; `0.0` when it never did.
+   */
+  wal: number;
   [k: string]: unknown;
 }
 /**

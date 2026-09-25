@@ -603,7 +603,7 @@
             "null"
           ]
         },
-        "spot_bump_pct": {
+        "spot_bump_decimal": {
           "default": null,
           "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
           "format": "double",
@@ -612,7 +612,7 @@
             "null"
           ]
         },
-        "vol_bump_pct": {
+        "vol_bump_decimal": {
           "default": null,
           "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
           "format": "double",
@@ -641,6 +641,7 @@
           "description": "Capital protection: max(floor, participation * min(S_T/S_0, cap))",
           "properties": {
             "capital_protection": {
+              "additionalProperties": false,
               "properties": {
                 "floor": {
                   "description": "Minimum return floor (e.g., 1.0 for 100% protection)",
@@ -664,6 +665,7 @@
           "description": "Participation: 1 + participation_rate * max(0, S_T/S_0 - 1)",
           "properties": {
             "participation": {
+              "additionalProperties": false,
               "properties": {
                 "rate": {
                   "description": "Participation rate in upside (e.g., 1.0 for 100% participation)",
@@ -687,15 +689,16 @@
           "description": "Knock-in put: Put option if barrier breached, otherwise return principal",
           "properties": {
             "knock_in_put": {
+              "additionalProperties": false,
               "properties": {
-                "strike": {
-                  "description": "Strike price for knock-in put option",
+                "strike_ratio": {
+                  "description": "Put strike as a ratio of the initial level (`1.0` = 100%, the same\nunits as `final_barrier`); the put loss is\n`max(strike_ratio - S_T / S_0, 0)`.",
                   "format": "double",
                   "type": "number"
                 }
               },
               "required": [
-                "strike"
+                "strike_ratio"
               ],
               "type": "object"
             }
@@ -4703,8 +4706,8 @@
         }
       ],
       "properties": {
-        "scenario_price_shock_pct": {
-          "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+        "scenario_price_shock_decimal": {
+          "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
           "format": "double",
           "type": [
             "number",

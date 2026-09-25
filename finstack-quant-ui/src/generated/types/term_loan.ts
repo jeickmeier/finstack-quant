@@ -269,10 +269,12 @@ export type Date10 = string;
  *
  * # Variants
  *
- * - `WithheldPct`: Discount as percentage withheld from each funded draw
+ * - `WithheldBp`: Discount in basis points of each funded draw, withheld
+ *   from proceeds
  * - `WithheldAmount`: Fixed facility-level amount withheld from funded
  *   proceeds, pro-rated across draws by draw size
- * - `SeparatePct`: Percentage of each draw tracked separately, not withheld
+ * - `SeparateBp`: Discount in basis points of each draw, tracked
+ *   separately and not withheld
  * - `SeparateAmount`: Fixed facility-level amount tracked separately,
  *   pro-rated across draws by draw size
  *
@@ -284,7 +286,7 @@ export type Date10 = string;
  * use finstack_quant_core::currency::Currency;
  *
  * // 2% OID withheld from proceeds
- * let oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%
+ * let oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%
  *
  * // $50,000 fixed OID
  * let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
@@ -292,13 +294,13 @@ export type Date10 = string;
  */
 export type DAb52C59E8Dd68406Ea31 =
   | {
-      withheld_pct: number;
+      withheld_bp: number;
     }
   | {
       withheld_amount: Money;
     }
   | {
-      separate_pct: number;
+      separate_bp: number;
     }
   | {
       separate_amount: Money;
@@ -779,8 +781,8 @@ export interface D_5F6Cd145395C86Ce73B6 {
     | "pik"
     | {
         split: {
-          cash_pct: Decimal;
-          pik_pct: Decimal1;
+          cash_fraction: Decimal;
+          pik_fraction: Decimal1;
         };
       };
   /**
@@ -3041,7 +3043,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * speed, color, FX delta). When set it also replaces the adaptive spot
    * bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
    */
-  spot_bump_pct?: number | null;
+  spot_bump_decimal?: number | null;
   /**
    * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
    *
@@ -3049,7 +3051,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * vega). `None` uses the `valuations.sensitivities.v1` value (default
    * 1 vol point). Results stay reported per 1 vol point.
    */
-  vol_bump_pct?: number | null;
+  vol_bump_decimal?: number | null;
   /**
    * Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
    * convexity: InflationLinkedBond `RealDuration` and structured-credit
@@ -3528,11 +3530,13 @@ export interface Tenor2 {
  */
 export interface ScenarioPricingOverrides {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *

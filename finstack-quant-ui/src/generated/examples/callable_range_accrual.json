@@ -8,8 +8,8 @@
           "2026-09-30",
           "2026-12-31"
         ],
-        "call_price": 1.0,
-        "lockout_periods": 1
+        "lockout_periods": 1,
+        "price_pct_of_par": 100.0
       },
       "id": "CALLABLE-RA-SOFR-1Y",
       "range_accrual": {

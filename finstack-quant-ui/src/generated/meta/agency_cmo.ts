@@ -19,7 +19,7 @@ export default [
               ]
             },
             "collateral_wac": 0.045,
-            "collateral_wam": 360,
+            "collateral_wam_months": 360,
             "deal_name": "FNR 2024-1",
             "discount_curve_id": "USD-OIS",
             "id": "FNR-2024-1-A",
@@ -500,15 +500,15 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_decimal",
     "default": null,
     "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_decimal",
     "default": null,
     "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
     "format": "double"
@@ -1374,9 +1374,9 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_7c91ed386870962882de/properties/collateral_wam",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyCmo/properties/collateral_wam",
-    "description": "Collateral WAM (if no explicit collateral)",
+    "path": "#/$defs/d_7c91ed386870962882de/properties/collateral_wam_months",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyCmo/properties/collateral_wam_months",
+    "description": "Remaining collateral WAM in months (if no explicit collateral).",
     "format": "uint32",
     "minimum": 0
   },
@@ -1561,7 +1561,7 @@ export default [
   {
     "path": "#/$defs/d_91fef53f78d7c50653a0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough",
-    "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```"
+    "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .wac(0.045)\n    .coupon(0.04)\n    .servicing_fee_bp(25.0)\n    .guarantee_fee_bp(25.0)\n    .wam_months(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```"
   },
   {
     "path": "#/$defs/d_91fef53f78d7c50653a0/properties/agency",
@@ -1579,17 +1579,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
+    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/coupon",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/coupon",
+    "description": "Net pass-through coupon paid to the investor, as an annual decimal\n(`0.04` = 4%): `wac` less the servicing and guarantee fees.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_91fef53f78d7c50653a0/properties/current_face",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/current_face",
     "description": "Current face amount (remaining principal balance).",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/current_factor",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/current_factor",
-    "description": "Current pool factor (current_face / original_face).",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_91fef53f78d7c50653a0/properties/day_count",
@@ -1606,10 +1606,10 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/guarantee_fee_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_rate",
+    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/guarantee_fee_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_bp",
     "default": 0,
-    "description": "Guarantee fee rate (annual, as decimal e.g., 0.0025 for 25 bp).\n\nDefaults to `0.0` when omitted.",
+    "description": "Annual agency guarantee fee (g-fee) in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
     "format": "double"
   },
   {
@@ -1670,12 +1670,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/pass_through_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/pass_through_rate",
-    "description": "Pass-through rate (net coupon to investor).",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_91fef53f78d7c50653a0/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/payment_lag_days",
     "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
@@ -1712,10 +1706,10 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/servicing_fee_rate",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/servicing_fee_rate",
+    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/servicing_fee_bp",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/servicing_fee_bp",
     "default": 0,
-    "description": "Servicing fee rate (annual, as decimal e.g., 0.0025 for 25 bp).\n\nDefaults to `0.0` when omitted.",
+    "description": "Annual servicing fee in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
     "format": "double"
   },
   {
@@ -1725,8 +1719,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/wam",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/wam",
+    "path": "#/$defs/d_91fef53f78d7c50653a0/properties/wam_months",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/AgencyMbsPassthrough/properties/wam_months",
     "description": "Remaining weighted average maturity in months as of the valuation\ndate (current WAM, not the original term). Pool age (WALA) for\nseasoning ramps is derived separately from `issue_date`.",
     "format": "uint32",
     "minimum": 0
@@ -3953,15 +3947,15 @@ export default [
     "description": "PAC collar boundaries."
   },
   {
-    "path": "#/$defs/d_b67a73e0467888ad8dcc/properties/lower_psa",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacCollar/properties/lower_psa",
-    "description": "Lower PSA bound",
+    "path": "#/$defs/d_b67a73e0467888ad8dcc/properties/lower_speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacCollar/properties/lower_speed_multiplier",
+    "description": "Lower collar speed as a multiple of the standard PSA curve (`1.0` =\n100% PSA).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_b67a73e0467888ad8dcc/properties/upper_psa",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacCollar/properties/upper_psa",
-    "description": "Upper PSA bound",
+    "path": "#/$defs/d_b67a73e0467888ad8dcc/properties/upper_speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_cmo.schema.json#/$defs/PacCollar/properties/upper_speed_multiplier",
+    "description": "Upper collar speed as a multiple of the standard PSA curve (`3.0` =\n300% PSA).",
     "format": "double"
   },
   {
@@ -5426,9 +5420,9 @@ export default [
     "title": "Scenario Pricing Overrides"
   },
   {
-    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_pct",
-    "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
     "format": "double"
   },
   {

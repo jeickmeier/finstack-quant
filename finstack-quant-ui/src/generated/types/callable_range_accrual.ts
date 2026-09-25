@@ -517,7 +517,8 @@ export interface D_85C9Fa67E976A26B490C {
  *
  * - **LSMC**: Simulate paths with HW1F short rate model. At each call
  *   date, compute continuation value via regression. Exercise if
- *   call_price < continuation_value.
+ *   the call amount `notional * price_pct_of_par / 100` is below the
+ *   continuation value.
  * - **HW Tree**: Build trinomial tree, attach range accrual cashflows
  *   at each node, apply backward induction with call decision.
  */
@@ -554,13 +555,14 @@ export interface DDb20612Dc309C7165418 {
    */
   call_dates: Date[];
   /**
-   * Call price (fraction of notional, typically 1.0 = par).
-   */
-  call_price: number;
-  /**
    * Lockout period in number of coupon periods before first call.
    */
   lockout_periods: number;
+  /**
+   * Redemption price in percent of par (`100.0` = par). The pricer pays
+   * `notional * price_pct_of_par / 100` at exercise.
+   */
+  price_pct_of_par: number;
 }
 /**
  * Instrument-owned pricing inputs.
@@ -1594,7 +1596,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * speed, color, FX delta). When set it also replaces the adaptive spot
    * bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
    */
-  spot_bump_pct?: number | null;
+  spot_bump_decimal?: number | null;
   /**
    * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
    *
@@ -1602,7 +1604,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * vega). `None` uses the `valuations.sensitivities.v1` value (default
    * 1 vol point). Results stay reported per 1 vol point.
    */
-  vol_bump_pct?: number | null;
+  vol_bump_decimal?: number | null;
   /**
    * Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
    * convexity: InflationLinkedBond `RealDuration` and structured-credit
@@ -1953,11 +1955,13 @@ export interface Tenor {
  */
 export interface ScenarioPricingOverrides {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *

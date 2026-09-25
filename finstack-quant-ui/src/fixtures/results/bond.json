@@ -38,15 +38,13 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-09-25T07:29:39.626000000Z",
+      "timestamp": "+002026-09-25T12:23:34.079000000Z",
       "version": "0.8.0"
     },
     "covenants": null
   },
   "groups": {
     "Alternatives": [
-      "abf_facility_irr",
-      "abf_residual_irr",
       "breakeven_inflation",
       "carry01",
       "carry_accrued",
@@ -96,11 +94,11 @@
       "par_spread",
       "premium_leg_pv",
       "protection_leg_pv",
+      "recovery01",
       "risky_annuity",
       "risky_pv01",
       "spread01",
-      "spread_dv01",
-      "variance_vega"
+      "spread_dv01"
     ],
     "Equity": [
       "constituent_count",
@@ -111,18 +109,18 @@
       "equity_price_per_share",
       "equity_shares",
       "expense_ratio",
-      "fx_delta",
-      "fx_vega",
       "variance_expected",
       "variance_notional",
       "variance_realized",
+      "variance_strike_vol",
+      "variance_time_to_maturity",
       "weight_risk"
     ],
     "FX": [
       "base_amount",
-      "fixed_first_accrual_factor",
-      "floating_first_accrual_factor",
       "fx01",
+      "fx_delta",
+      "fx_vega",
       "inverse_rate",
       "spot_rate"
     ],
@@ -148,6 +146,7 @@
       "ir_cross_gamma",
       "speed",
       "vanna",
+      "variance_vega",
       "vega",
       "volga"
     ],
@@ -192,9 +191,11 @@
       "df_end_from_quote",
       "df_start",
       "financing_annuity",
+      "fixed_first_accrual_factor",
       "fixed_first_payment_date",
       "fixed_last_payment_date",
       "fixed_leg_payment_count",
+      "floating_first_accrual_factor",
       "floating_first_payment_date",
       "floating_last_payment_date",
       "floating_leg_payment_count",
@@ -207,7 +208,6 @@
       "pv_primary",
       "pv_reference",
       "quote_rate",
-      "recovery_01",
       "yf"
     ],
     "Sensitivity": [
@@ -231,6 +231,8 @@
       "abf_advance_rate_utilization",
       "abf_borrowing_base",
       "abf_borrowing_base_cushion",
+      "abf_facility_irr",
+      "abf_residual_irr",
       "abs_ce_level",
       "abs_charge_off",
       "abs_delinquency",
@@ -244,8 +246,6 @@
       "prepayment01",
       "severity01",
       "spread_duration",
-      "variance_strike_vol",
-      "variance_time_to_maturity",
       "wal",
       "wam"
     ]
@@ -430,5 +430,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "d64ee6b39e5d5f48801a1a1a8074c3bf69c977e5b282c6d4103c0db1bb944170"
+  "facadeWasmSha256": "5cdc222fefb7863c34e54308b52543007287db59bc9be4c3a1a983b5c4eb616a"
 }

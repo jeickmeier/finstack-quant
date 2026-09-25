@@ -167,21 +167,27 @@ it("inserts a nullable object and edits a recursive union inside its tuple throu
   await user.click(
     within(screen.getByRole("radiogroup", { name: "Max 1 type" })).getByRole(
       "radio",
-      { name: "Pct of current" },
+      { name: "Fraction of current" },
     ),
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Pct of current" }), {
-    target: { value: "0.02" },
-  });
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Fraction of current" }),
+    {
+      target: { value: "0.02" },
+    },
+  );
   await user.click(
     within(screen.getByRole("radiogroup", { name: "Max 2 type" })).getByRole(
       "radio",
-      { name: "Pct of original" },
+      { name: "Fraction of original" },
     ),
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Pct of original" }), {
-    target: { value: "0.03" },
-  });
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Fraction of original" }),
+    {
+      target: { value: "0.03" },
+    },
+  );
   const result = await apply(submit);
   expect(result.instrument.spec.waterfall_rules.reserve.target).toEqual({
     max: [{ fraction_of_current: 0.02 }, { fraction_of_original: 0.03 }],

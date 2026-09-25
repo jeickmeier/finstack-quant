@@ -708,15 +708,15 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_decimal",
     "default": null,
     "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_decimal",
     "default": null,
     "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
     "format": "double"
@@ -3200,7 +3200,7 @@ export default [
   {
     "path": "#/$defs/d_a561434dff1275f40d83",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType",
-    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount."
+    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized."
   },
   {
     "path": "#/$defs/d_a561434dff1275f40d83/oneOf/0",
@@ -3224,15 +3224,15 @@ export default [
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split"
   },
   {
-    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/cash_pct",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_pct",
+    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/cash_fraction",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_fraction",
     "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/pik_pct",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_pct",
+    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/pik_fraction",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_fraction",
     "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
@@ -4637,7 +4637,7 @@ export default [
   {
     "path": "#/$defs/d_cdd9cb6ed505205e6ebe",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/CouponType",
-    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount."
+    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized."
   },
   {
     "path": "#/$defs/d_cdd9cb6ed505205e6ebe/oneOf/0",
@@ -4661,15 +4661,15 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/CouponType/oneOf/2/properties/split"
   },
   {
-    "path": "#/$defs/d_cdd9cb6ed505205e6ebe/oneOf/2/properties/split/properties/cash_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_pct",
+    "path": "#/$defs/d_cdd9cb6ed505205e6ebe/oneOf/2/properties/split/properties/cash_fraction",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_fraction",
     "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/d_cdd9cb6ed505205e6ebe/oneOf/2/properties/split/properties/pik_pct",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_pct",
+    "path": "#/$defs/d_cdd9cb6ed505205e6ebe/oneOf/2/properties/split/properties/pik_fraction",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/convertible_bond.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_fraction",
     "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
@@ -6099,9 +6099,9 @@ export default [
     "title": "Scenario Pricing Overrides"
   },
   {
-    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_pct",
-    "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
     "format": "double"
   },
   {

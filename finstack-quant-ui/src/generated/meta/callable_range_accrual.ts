@@ -15,8 +15,8 @@ export default [
                 "2026-09-30",
                 "2026-12-31"
               ],
-              "call_price": 1,
-              "lockout_periods": 1
+              "lockout_periods": 1,
+              "price_pct_of_par": 100
             },
             "id": "CALLABLE-RA-SOFR-1Y",
             "range_accrual": {
@@ -431,15 +431,15 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_decimal",
     "default": null,
     "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_decimal",
     "default": null,
     "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
     "format": "double"
@@ -830,7 +830,7 @@ export default [
   {
     "path": "#/$defs/d_5139b050cb29a13b6959",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/CallableRangeAccrual",
-    "description": "Callable Range Accrual.\n\nExtends the existing range accrual concept with a Bermudan call provision\nallowing the issuer to terminate early on specified call dates.\n\nThe call decision interacts with the range accrual feature: the issuer\nwill call when the expected future value of remaining range accrual\ncoupons exceeds the call price (par). Pricing requires backward\ninduction (LSMC or HW tree) combined with forward range accrual\ncoupon simulation.\n\n# Pricing\n\n- **LSMC**: Simulate paths with HW1F short rate model. At each call\n  date, compute continuation value via regression. Exercise if\n  call_price < continuation_value.\n- **HW Tree**: Build trinomial tree, attach range accrual cashflows\n  at each node, apply backward induction with call decision."
+    "description": "Callable Range Accrual.\n\nExtends the existing range accrual concept with a Bermudan call provision\nallowing the issuer to terminate early on specified call dates.\n\nThe call decision interacts with the range accrual feature: the issuer\nwill call when the expected future value of remaining range accrual\ncoupons exceeds the call price (par). Pricing requires backward\ninduction (LSMC or HW tree) combined with forward range accrual\ncoupon simulation.\n\n# Pricing\n\n- **LSMC**: Simulate paths with HW1F short rate model. At each call\n  date, compute continuation value via regression. Exercise if\n  the call amount `notional * price_pct_of_par / 100` is below the\n  continuation value.\n- **HW Tree**: Build trinomial tree, attach range accrual cashflows\n  at each node, apply backward induction with call decision."
   },
   {
     "path": "#/$defs/d_5139b050cb29a13b6959/properties/attributes",
@@ -4820,7 +4820,7 @@ export default [
   {
     "path": "#/$defs/d_db20612dc309c7165418",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision",
-    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised."
+    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised."
   },
   {
     "path": "#/$defs/d_db20612dc309c7165418/properties/call_dates",
@@ -4834,17 +4834,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_db20612dc309c7165418/properties/call_price",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision/properties/call_price",
-    "description": "Call price (fraction of notional, typically 1.0 = par).",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_db20612dc309c7165418/properties/lockout_periods",
     "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision/properties/lockout_periods",
     "description": "Lockout period in number of coupon periods before first call.",
     "format": "uint",
     "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_db20612dc309c7165418/properties/price_pct_of_par",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/exotics/callable_range_accrual.schema.json#/$defs/BermudanCallProvision/properties/price_pct_of_par",
+    "description": "Redemption price in percent of par (`100.0` = par). The pricer pays\n`notional * price_pct_of_par / 100` at exercise.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_dda2192a4245995f4b0a",
@@ -6195,9 +6195,9 @@ export default [
     "title": "Scenario Pricing Overrides"
   },
   {
-    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_pct",
-    "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
     "format": "double"
   },
   {

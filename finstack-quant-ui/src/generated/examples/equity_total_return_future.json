@@ -6,7 +6,7 @@
       "attributes": {},
       "id": "EUREX-TESX-DEC27",
       "spot_id": "SX5E-CLOSE",
-      "spread_basis_points_id": "TESX-SPREAD-BPS",
+      "spread_bp_id": "TESX-SPREAD-BPS",
       "spread_day_count": "act_360",
       "terms": {
         "contracts": 100.0,

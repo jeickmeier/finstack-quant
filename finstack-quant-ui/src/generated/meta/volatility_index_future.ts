@@ -405,15 +405,15 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_decimal",
     "default": null,
     "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_decimal",
     "default": null,
     "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
     "format": "double"
@@ -4861,9 +4861,9 @@ export default [
     "title": "Scenario Pricing Overrides"
   },
   {
-    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_pct",
-    "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
     "format": "double"
   },
   {

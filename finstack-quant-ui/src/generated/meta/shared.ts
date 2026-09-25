@@ -145,9 +145,9 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/AgencyCmo/properties/collateral_wam",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyCmo/properties/collateral_wam",
-    "description": "Collateral WAM (if no explicit collateral)",
+    "path": "#/$defs/AgencyCmo/properties/collateral_wam_months",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyCmo/properties/collateral_wam_months",
+    "description": "Remaining collateral WAM in months (if no explicit collateral).",
     "format": "uint32",
     "minimum": 0
   },
@@ -225,7 +225,7 @@ export default [
   {
     "path": "#/$defs/AgencyMbsPassthrough",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough",
-    "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```"
+    "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~45 days → payment on the 15th of M+1\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::from((1_000_000_i64, Currency::USD)))\n    .current_face(Money::from((950_000_i64, Currency::USD)))\n    .wac(0.045)\n    .coupon(0.04)\n    .servicing_fee_bp(25.0)\n    .guarantee_fee_bp(25.0)\n    .wam_months(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_spec(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_quant_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```"
   },
   {
     "path": "#/$defs/AgencyMbsPassthrough/properties/agency",
@@ -243,17 +243,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
+    "path": "#/$defs/AgencyMbsPassthrough/properties/coupon",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/coupon",
+    "description": "Net pass-through coupon paid to the investor, as an annual decimal\n(`0.04` = 4%): `wac` less the servicing and guarantee fees.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/AgencyMbsPassthrough/properties/current_face",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/current_face",
     "description": "Current face amount (remaining principal balance).",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/AgencyMbsPassthrough/properties/current_factor",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/current_factor",
-    "description": "Current pool factor (current_face / original_face).",
-    "format": "double"
   },
   {
     "path": "#/$defs/AgencyMbsPassthrough/properties/day_count",
@@ -270,10 +270,10 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_rate",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_rate",
+    "path": "#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_bp",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_bp",
     "default": 0,
-    "description": "Guarantee fee rate (annual, as decimal e.g., 0.0025 for 25 bp).\n\nDefaults to `0.0` when omitted.",
+    "description": "Annual agency guarantee fee (g-fee) in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
     "format": "double"
   },
   {
@@ -334,12 +334,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/AgencyMbsPassthrough/properties/pass_through_rate",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/pass_through_rate",
-    "description": "Pass-through rate (net coupon to investor).",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/AgencyMbsPassthrough/properties/payment_lag_days",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/payment_lag_days",
     "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
@@ -376,10 +370,10 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/AgencyMbsPassthrough/properties/servicing_fee_rate",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/servicing_fee_rate",
+    "path": "#/$defs/AgencyMbsPassthrough/properties/servicing_fee_bp",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/servicing_fee_bp",
     "default": 0,
-    "description": "Servicing fee rate (annual, as decimal e.g., 0.0025 for 25 bp).\n\nDefaults to `0.0` when omitted.",
+    "description": "Annual servicing fee in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
     "format": "double"
   },
   {
@@ -389,8 +383,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/AgencyMbsPassthrough/properties/wam",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/wam",
+    "path": "#/$defs/AgencyMbsPassthrough/properties/wam_months",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AgencyMbsPassthrough/properties/wam_months",
     "description": "Remaining weighted average maturity in months as of the valuation\ndate (current WAM, not the original term). Pool age (WALA) for\nseasoning ramps is derived separately from `issue_date`.",
     "format": "uint32",
     "minimum": 0
@@ -642,7 +636,7 @@ export default [
   {
     "path": "#/$defs/AmortizationEvent/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AmortizationEvent/oneOf/1",
-    "description": "Cumulative collateral losses above `max_pct` percent of the original\ncollateral end revolving."
+    "description": "Cumulative collateral losses above `max_cumulative_loss` of the\noriginal collateral end revolving."
   },
   {
     "path": "#/$defs/AmortizationEvent/oneOf/1/properties/kind",
@@ -650,15 +644,15 @@ export default [
     "const": "cumulative_loss"
   },
   {
-    "path": "#/$defs/AmortizationEvent/oneOf/1/properties/max_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AmortizationEvent/oneOf/1/properties/max_pct",
-    "description": "Loss threshold in percent of original collateral (`4.0` = 4%).",
+    "path": "#/$defs/AmortizationEvent/oneOf/1/properties/max_cumulative_loss",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AmortizationEvent/oneOf/1/properties/max_cumulative_loss",
+    "description": "Loss threshold as a decimal fraction of the original collateral\n(`0.04` = 4%), in `(0, 1]`.",
     "format": "double"
   },
   {
     "path": "#/$defs/AmortizationEvent/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AmortizationEvent/oneOf/2",
-    "description": "A three-period average excess spread below `min_3m` (annual decimal)\nends revolving."
+    "description": "A three-period average excess spread below `min_excess_spread_3m`\n(annual decimal) ends revolving."
   },
   {
     "path": "#/$defs/AmortizationEvent/oneOf/2/properties/kind",
@@ -666,8 +660,8 @@ export default [
     "const": "excess_spread"
   },
   {
-    "path": "#/$defs/AmortizationEvent/oneOf/2/properties/min_3m",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AmortizationEvent/oneOf/2/properties/min_3m",
+    "path": "#/$defs/AmortizationEvent/oneOf/2/properties/min_excess_spread_3m",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AmortizationEvent/oneOf/2/properties/min_excess_spread_3m",
     "description": "Excess-spread floor as an annual decimal (`0.01` = 1%).",
     "format": "double"
   },
@@ -953,7 +947,7 @@ export default [
   {
     "path": "#/$defs/AssetBackedFacility",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetBackedFacility",
-    "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); percentages are\npercent values (`max_pct`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```"
+    "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are\npercent values (`20.0` = 20%) and loss thresholds are decimal fractions\n(`max_cumulative_loss`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```"
   },
   {
     "path": "#/$defs/AssetBackedFacility/properties/amortization_events",
@@ -2758,7 +2752,7 @@ export default [
   {
     "path": "#/$defs/BermudanCallProvision",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanCallProvision",
-    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised."
+    "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised."
   },
   {
     "path": "#/$defs/BermudanCallProvision/properties/call_dates",
@@ -2772,17 +2766,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/BermudanCallProvision/properties/call_price",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanCallProvision/properties/call_price",
-    "description": "Call price (fraction of notional, typically 1.0 = par).",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/BermudanCallProvision/properties/lockout_periods",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanCallProvision/properties/lockout_periods",
     "description": "Lockout period in number of coupon periods before first call.",
     "format": "uint",
     "minimum": 0
+  },
+  {
+    "path": "#/$defs/BermudanCallProvision/properties/price_pct_of_par",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanCallProvision/properties/price_pct_of_par",
+    "description": "Redemption price in percent of par (`100.0` = par). The pricer pays\n`notional * price_pct_of_par / 100` at exercise.",
+    "format": "double"
   },
   {
     "path": "#/$defs/BermudanSchedule",
@@ -3429,7 +3423,7 @@ export default [
   {
     "path": "#/$defs/CallableRangeAccrual",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CallableRangeAccrual",
-    "description": "Callable Range Accrual.\n\nExtends the existing range accrual concept with a Bermudan call provision\nallowing the issuer to terminate early on specified call dates.\n\nThe call decision interacts with the range accrual feature: the issuer\nwill call when the expected future value of remaining range accrual\ncoupons exceeds the call price (par). Pricing requires backward\ninduction (LSMC or HW tree) combined with forward range accrual\ncoupon simulation.\n\n# Pricing\n\n- **LSMC**: Simulate paths with HW1F short rate model. At each call\n  date, compute continuation value via regression. Exercise if\n  call_price < continuation_value.\n- **HW Tree**: Build trinomial tree, attach range accrual cashflows\n  at each node, apply backward induction with call decision."
+    "description": "Callable Range Accrual.\n\nExtends the existing range accrual concept with a Bermudan call provision\nallowing the issuer to terminate early on specified call dates.\n\nThe call decision interacts with the range accrual feature: the issuer\nwill call when the expected future value of remaining range accrual\ncoupons exceeds the call price (par). Pricing requires backward\ninduction (LSMC or HW tree) combined with forward range accrual\ncoupon simulation.\n\n# Pricing\n\n- **LSMC**: Simulate paths with HW1F short rate model. At each call\n  date, compute continuation value via regression. Exercise if\n  the call amount `notional * price_pct_of_par / 100` is below the\n  continuation value.\n- **HW Tree**: Build trinomial tree, attach range accrual cashflows\n  at each node, apply backward induction with call decision."
   },
   {
     "path": "#/$defs/CallableRangeAccrual/properties/attributes",
@@ -3902,8 +3896,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/CardPortfolioSpec/properties/fixed_allocation_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CardPortfolioSpec/properties/fixed_allocation_pct",
+    "path": "#/$defs/CardPortfolioSpec/properties/fixed_allocation_decimal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CardPortfolioSpec/properties/fixed_allocation_decimal",
     "description": "Investor allocation of trust collections fixed at the end of the\nrevolving period, as a decimal in `(0, 1]`. `None` freezes the\nallocation at the investor's floating share\n`investor_interest / (investor_interest + seller_interest)`.",
     "format": "double"
   },
@@ -5289,9 +5283,9 @@ export default [
     "description": "Whether clawback is enabled"
   },
   {
-    "path": "#/$defs/ClawbackSpec/properties/holdback_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSpec/properties/holdback_pct",
-    "description": "Optional percentage of GP carry held back until settlement",
+    "path": "#/$defs/ClawbackSpec/properties/holdback_decimal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ClawbackSpec/properties/holdback_decimal",
+    "description": "Optional share of GP carry held back until settlement, as a decimal\nfraction in `[0, 1]` (`0.2` = 20%)",
     "format": "double"
   },
   {
@@ -8491,7 +8485,7 @@ export default [
   {
     "path": "#/$defs/CouponType",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CouponType",
-    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount."
+    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized."
   },
   {
     "path": "#/$defs/CouponType/oneOf/0",
@@ -8515,15 +8509,15 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CouponType/oneOf/2/properties/split"
   },
   {
-    "path": "#/$defs/CouponType/oneOf/2/properties/split/properties/cash_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_pct",
+    "path": "#/$defs/CouponType/oneOf/2/properties/split/properties/cash_fraction",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_fraction",
     "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/CouponType/oneOf/2/properties/split/properties/pik_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_pct",
+    "path": "#/$defs/CouponType/oneOf/2/properties/split/properties/pik_fraction",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_fraction",
     "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
@@ -9726,15 +9720,15 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/spot_bump_decimal",
     "default": null,
     "description": "Spot bump as a decimal fraction of spot (0.01 = 1%).\n\nSizes every finite-difference spot greek (delta, gamma, vanna, charm,\nspeed, color, FX delta). When set it also replaces the adaptive spot\nbump. `None` uses the `valuations.sensitivities.v1` value (default 1%).",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_pct",
+    "path": "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/BumpConfig/properties/vol_bump_decimal",
     "default": null,
     "description": "Absolute volatility bump in decimal volatility (0.01 = 1 vol point).\n\nSizes every finite-difference volatility greek (vega, vanna, volga, FX\nvega). `None` uses the `valuations.sensitivities.v1` value (default\n1 vol point). Results stay reported per 1 vol point.",
     "format": "double"
@@ -12084,7 +12078,7 @@ export default [
   {
     "path": "#/$defs/d_a561434dff1275f40d83",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType",
-    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_pct, pik_pct }`: percentages applied to the coupon amount."
+    "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized."
   },
   {
     "path": "#/$defs/d_a561434dff1275f40d83/oneOf/0",
@@ -12108,15 +12102,15 @@ export default [
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split"
   },
   {
-    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/cash_pct",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_pct",
+    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/cash_fraction",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/cash_fraction",
     "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
-    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/pik_pct",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_pct",
+    "path": "#/$defs/d_a561434dff1275f40d83/oneOf/2/properties/split/properties/pik_fraction",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/CouponType/oneOf/2/properties/split/properties/pik_fraction",
     "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
@@ -15670,9 +15664,9 @@ export default [
     "title": "Scenario Pricing Overrides"
   },
   {
-    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_pct",
-    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_pct",
-    "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+    "path": "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
+    "source": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#/properties/scenario_price_shock_decimal",
+    "description": "Scenario price shock as a decimal fraction (`-0.05` = a -5% price\nshock).\n\nWhen set, valuation helpers apply it as a multiplier:\n`price * (1 + scenario_price_shock_decimal)`.",
     "format": "double"
   },
   {
@@ -17571,8 +17565,8 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/EquityTotalReturnFuture/properties/spread_basis_points_id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnFuture/properties/spread_basis_points_id",
+    "path": "#/$defs/EquityTotalReturnFuture/properties/spread_bp_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/EquityTotalReturnFuture/properties/spread_bp_id",
     "description": "Current annualized TRF spread scalar expressed in basis points.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
@@ -17812,8 +17806,8 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
-    "path": "#/$defs/ExcessSpreadSpec/properties/trap_loss_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExcessSpreadSpec/properties/trap_loss_pct",
+    "path": "#/$defs/ExcessSpreadSpec/properties/trap_loss_decimal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExcessSpreadSpec/properties/trap_loss_decimal",
     "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which terminal spread-account cash repays\ndebt principal after deferred coupons. Any surplus reaches the residual\nholder. `None` releases surplus after deferred coupons without this\ninterest-to-principal transfer.",
     "format": "double"
   },
@@ -18222,9 +18216,9 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinalPayoffType/oneOf/2/properties/knock_in_put"
   },
   {
-    "path": "#/$defs/FinalPayoffType/oneOf/2/properties/knock_in_put/properties/strike",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinalPayoffType/oneOf/2/properties/knock_in_put/properties/strike",
-    "description": "Strike price for knock-in put option",
+    "path": "#/$defs/FinalPayoffType/oneOf/2/properties/knock_in_put/properties/strike_ratio",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FinalPayoffType/oneOf/2/properties/knock_in_put/properties/strike_ratio",
+    "description": "Put strike as a ratio of the initial level (`1.0` = 100%, the same\nunits as `final_barrier`); the put loss is\n`max(strike_ratio - S_T / S_0, 0)`.",
     "format": "double"
   },
   {
@@ -21200,7 +21194,7 @@ export default [
   {
     "path": "#/$defs/IncentiveFeeSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/IncentiveFeeSpec",
-    "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share_pct`\nof the residual interest proceeds ahead of equity."
+    "description": "Manager incentive fee: once the equity IRR to date (invested capital at\nclosing against every distribution to date, including the residual on the\ncurrent payment date) reaches `hurdle_irr`, the manager takes `share`\nof the residual interest proceeds ahead of equity."
   },
   {
     "path": "#/$defs/IncentiveFeeSpec/properties/hurdle_irr",
@@ -21209,8 +21203,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/IncentiveFeeSpec/properties/share_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/IncentiveFeeSpec/properties/share_pct",
+    "path": "#/$defs/IncentiveFeeSpec/properties/share",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/IncentiveFeeSpec/properties/share",
     "description": "Share of the residual paid to the manager once the hurdle is met, as\na decimal fraction in `[0, 1]`.",
     "format": "double"
   },
@@ -24904,16 +24898,16 @@ export default [
   {
     "path": "#/$defs/OidPolicy",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OidPolicy",
-    "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldPct`: Discount as percentage withheld from each funded draw\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparatePct`: Percentage of each draw tracked separately, not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```"
+    "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```"
   },
   {
     "path": "#/$defs/OidPolicy/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OidPolicy/oneOf/0",
-    "description": "Discount as percentage (basis points) withheld from each funded draw"
+    "description": "Discount in basis points of each funded draw (`200` = 2%), withheld\nfrom proceeds"
   },
   {
-    "path": "#/$defs/OidPolicy/oneOf/0/properties/withheld_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OidPolicy/oneOf/0/properties/withheld_pct",
+    "path": "#/$defs/OidPolicy/oneOf/0/properties/withheld_bp",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OidPolicy/oneOf/0/properties/withheld_bp",
     "format": "int32"
   },
   {
@@ -24930,11 +24924,11 @@ export default [
   {
     "path": "#/$defs/OidPolicy/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OidPolicy/oneOf/2",
-    "description": "Discount as percentage of each draw tracked separately for amortization"
+    "description": "Discount in basis points of each draw (`200` = 2%), tracked\nseparately for amortization"
   },
   {
-    "path": "#/$defs/OidPolicy/oneOf/2/properties/separate_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OidPolicy/oneOf/2/properties/separate_pct",
+    "path": "#/$defs/OidPolicy/oneOf/2/properties/separate_bp",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OidPolicy/oneOf/2/properties/separate_bp",
     "format": "int32"
   },
   {
@@ -25184,15 +25178,15 @@ export default [
     "description": "PAC collar boundaries."
   },
   {
-    "path": "#/$defs/PacCollar/properties/lower_psa",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PacCollar/properties/lower_psa",
-    "description": "Lower PSA bound",
+    "path": "#/$defs/PacCollar/properties/lower_speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PacCollar/properties/lower_speed_multiplier",
+    "description": "Lower collar speed as a multiple of the standard PSA curve (`1.0` =\n100% PSA).",
     "format": "double"
   },
   {
-    "path": "#/$defs/PacCollar/properties/upper_psa",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PacCollar/properties/upper_psa",
-    "description": "Upper PSA bound",
+    "path": "#/$defs/PacCollar/properties/upper_speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PacCollar/properties/upper_speed_multiplier",
+    "description": "Upper collar speed as a multiple of the standard PSA curve (`3.0` =\n300% PSA).",
     "format": "double"
   },
   {
@@ -25502,7 +25496,7 @@ export default [
   {
     "path": "#/$defs/PaymentCalculation/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/9",
-    "description": "Manager incentive fee: `share_pct` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual."
+    "description": "Manager incentive fee: `share` of the cash reaching this recipient\nthat lies above the equity hurdle. The hurdle is tested on the\n[`EquityHistory`] in the `WaterfallContext` plus every equity\ndistribution earlier in the same waterfall run plus this cash; the\ncash that lifts the equity IRR exactly to `hurdle_irr`\n([`EquityHistory::hurdle_shortfall`]) passes to equity untouched and\nthe manager shares only in the excess. Nothing is paid while the\nhurdle is unreachable, or when no equity history is supplied. The\nstandard template places one recipient in the principal tier ahead of\n`equity_principal` and one ahead of the residual."
   },
   {
     "path": "#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee",
@@ -25515,8 +25509,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee/properties/share_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee/properties/share_pct",
+    "path": "#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee/properties/share",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PaymentCalculation/oneOf/9/properties/incentive_fee/properties/share",
     "description": "Share of the residual paid once the hurdle is met, in `[0, 1]`.",
     "format": "double"
   },
@@ -27489,8 +27483,8 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/RealEstateAsset/properties/disposition_cost_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/disposition_cost_pct",
+    "path": "#/$defs/RealEstateAsset/properties/disposition_cost_decimal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RealEstateAsset/properties/disposition_cost_decimal",
     "default": null,
     "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
     "format": "double"
@@ -28115,7 +28109,7 @@ export default [
   {
     "path": "#/$defs/ReinvestmentAssumptions/properties/price_pct",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReinvestmentAssumptions/properties/price_pct",
-    "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price`.",
+    "description": "Purchase price as percent of par (`99.0` buys `100/99` of par per unit\nof cash); must not exceed `ReinvestmentCriteria::max_price_pct`.",
     "format": "double"
   },
   {
@@ -28130,9 +28124,9 @@ export default [
     "description": "Criteria for reinvestment during revolving period"
   },
   {
-    "path": "#/$defs/ReinvestmentCriteria/properties/max_price",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReinvestmentCriteria/properties/max_price",
-    "description": "Maximum purchase price (% of par)",
+    "path": "#/$defs/ReinvestmentCriteria/properties/max_price_pct",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReinvestmentCriteria/properties/max_price_pct",
+    "description": "Maximum purchase price in percent of par (`100.0` = par).",
     "format": "double"
   },
   {
@@ -28674,8 +28668,8 @@ export default [
     "description": "A decimal fraction of the current pool balance (performing collateral\nplus any accumulation funding account), so the target amortizes with\nthe pool."
   },
   {
-    "path": "#/$defs/ReserveTarget/oneOf/1/properties/pct_of_current",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReserveTarget/oneOf/1/properties/pct_of_current",
+    "path": "#/$defs/ReserveTarget/oneOf/1/properties/fraction_of_current",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReserveTarget/oneOf/1/properties/fraction_of_current",
     "format": "double"
   },
   {
@@ -28684,14 +28678,14 @@ export default [
     "description": "A decimal fraction of the original (cut-off) pool balance: a floor\nthat does not amortize."
   },
   {
-    "path": "#/$defs/ReserveTarget/oneOf/2/properties/pct_of_original",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReserveTarget/oneOf/2/properties/pct_of_original",
+    "path": "#/$defs/ReserveTarget/oneOf/2/properties/fraction_of_original",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReserveTarget/oneOf/2/properties/fraction_of_original",
     "format": "double"
   },
   {
     "path": "#/$defs/ReserveTarget/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReserveTarget/oneOf/3",
-    "description": "The larger of two targets, typically `PctOfCurrent` with a\n`PctOfOriginal` floor."
+    "description": "The larger of two targets, typically `FractionOfCurrent` with a\n`FractionOfOriginal` floor."
   },
   {
     "path": "#/$defs/ReserveTarget/oneOf/3/properties/max",
@@ -29266,7 +29260,7 @@ export default [
   {
     "path": "#/$defs/ShiftingInterestSpec/properties/schedule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ShiftingInterestSpec/properties/schedule",
-    "description": "Schedule ascending by `months_from_closing`; each step's `senior_pct`\nis read per `mode`."
+    "description": "Schedule ascending by `months_from_closing`; each step's `senior_decimal`\nis read per `mode`."
   },
   {
     "path": "#/$defs/ShiftingInterestSpec/properties/schedule/items",
@@ -29303,8 +29297,8 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/ShiftingInterestStep/properties/senior_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ShiftingInterestStep/properties/senior_pct",
+    "path": "#/$defs/ShiftingInterestStep/properties/senior_decimal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ShiftingInterestStep/properties/senior_decimal",
     "description": "Senior share of principal (decimal, `1.0` = 100% lockout) from this step.",
     "format": "double"
   },
@@ -29317,7 +29311,7 @@ export default [
     "path": "#/$defs/ShiftMode/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ShiftMode/oneOf/0",
     "const": "shift_of_subordinate",
-    "description": "Prospectus form: the schedule value is the share of the subordinates'\npro-rata unscheduled principal that shifts to the senior, so the\nsenior's unscheduled share is `senior_pct + value × (1 − senior_pct)`\non live balances (`1.0` = full lockout, `0.0` = pro-rata)."
+    "description": "Prospectus form: the schedule value is the share of the subordinates'\npro-rata unscheduled principal that shifts to the senior, so the\nsenior's unscheduled share is `senior_decimal + value × (1 − senior_decimal)`\non live balances (`1.0` = full lockout, `0.0` = pro-rata)."
   },
   {
     "path": "#/$defs/ShiftMode/oneOf/1",
@@ -29482,19 +29476,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
-    "path": "#/$defs/Snowball/properties/callable",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball/properties/callable",
+    "path": "#/$defs/Snowball/properties/call_provision",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball/properties/call_provision",
     "description": "Optional Bermudan call provision."
   },
   {
-    "path": "#/$defs/Snowball/properties/callable/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball/properties/callable/anyOf/0",
+    "path": "#/$defs/Snowball/properties/call_provision/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball/properties/call_provision/anyOf/0",
     "ref": "#/$defs/BermudanCallProvision",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BermudanCallProvision"
   },
   {
-    "path": "#/$defs/Snowball/properties/callable/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball/properties/callable/anyOf/1"
+    "path": "#/$defs/Snowball/properties/call_provision/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Snowball/properties/call_provision/anyOf/1"
   },
   {
     "path": "#/$defs/Snowball/properties/coupon_cap",
@@ -30218,9 +30212,9 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/card/anyOf/1"
   },
   {
-    "path": "#/$defs/StructuredCredit/properties/cleanup_call_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/cleanup_call_pct",
-    "description": "Clean-up call pool factor threshold (percentage of original balance).\n\nWhen the pool factor (current balance / original balance) drops below\nthis threshold, the deal is optionally redeemed and all outstanding\ntranche balances are returned. Industry standard: typically 10%.\n\nSet to `None` to disable clean-up call (default).",
+    "path": "#/$defs/StructuredCredit/properties/cleanup_call_decimal",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/cleanup_call_decimal",
+    "description": "Clean-up call pool factor threshold as a decimal fraction of the\noriginal balance (`0.10` = 10%).\n\nWhen the pool factor (current balance / original balance) drops below\nthis threshold, the deal is optionally redeemed and all outstanding\ntranche balances are returned. Industry standard: typically 10%.\n\nSet to `None` to disable clean-up call (default).",
     "format": "double"
   },
   {
@@ -30884,18 +30878,18 @@ export default [
   {
     "path": "#/$defs/TargetOcSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TargetOcSpec",
-    "description": "Targeted overcollateralization amortization (auto and consumer ABS).\n\nEach period the notes are paid down to the amount that leaves the pool's\novercollateralization (`pool − notes`) at the target: the larger of\n`pct_of_current` of the pool balance after the period's collections and\n`floor_pct_of_original` of the cut-off balance. The required principal\ndistribution is `max(0, notes − max(pool − target, 0))`, paid to the\nnotes by priority from interest proceeds first and principal proceeds\nfor the rest; the collections above it are released to the residual\nholder."
+    "description": "Targeted overcollateralization amortization (auto and consumer ABS).\n\nEach period the notes are paid down to the amount that leaves the pool's\novercollateralization (`pool − notes`) at the target: the larger of\n`fraction_of_current` of the pool balance after the period's collections and\n`floor_fraction_of_original` of the cut-off balance. The required principal\ndistribution is `max(0, notes − max(pool − target, 0))`, paid to the\nnotes by priority from interest proceeds first and principal proceeds\nfor the rest; the collections above it are released to the residual\nholder."
   },
   {
-    "path": "#/$defs/TargetOcSpec/properties/floor_pct_of_original",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TargetOcSpec/properties/floor_pct_of_original",
+    "path": "#/$defs/TargetOcSpec/properties/floor_fraction_of_original",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TargetOcSpec/properties/floor_fraction_of_original",
     "default": 0,
     "description": "Floor on the target as a decimal fraction of the original (cut-off)\npool balance; `0.0` for no floor.",
     "format": "double"
   },
   {
-    "path": "#/$defs/TargetOcSpec/properties/pct_of_current",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TargetOcSpec/properties/pct_of_current",
+    "path": "#/$defs/TargetOcSpec/properties/fraction_of_current",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/TargetOcSpec/properties/fraction_of_current",
     "description": "Target overcollateralization as a decimal fraction of the current\npool balance (after the period's collections).",
     "format": "double"
   },
@@ -31914,8 +31908,8 @@ export default [
     "description": "Fraction of the opening commitment, as a decimal (`0.02` = 2%)."
   },
   {
-    "path": "#/$defs/UpfrontFee/oneOf/1/properties/pct_of_commitment",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/UpfrontFee/oneOf/1/properties/pct_of_commitment",
+    "path": "#/$defs/UpfrontFee/oneOf/1/properties/fraction_of_commitment",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/UpfrontFee/oneOf/1/properties/fraction_of_commitment",
     "format": "double"
   },
   {

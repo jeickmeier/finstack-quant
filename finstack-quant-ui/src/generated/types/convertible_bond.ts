@@ -836,8 +836,8 @@ export interface FixedCouponSpec {
     | "pik"
     | {
         split: {
-          cash_pct: Decimal;
-          pik_pct: Decimal1;
+          cash_fraction: Decimal;
+          pik_fraction: Decimal1;
         };
       };
   day_count: DayCount;
@@ -922,8 +922,8 @@ export interface D_355963A7Acbc2C62Fdf5 {
     | "pik"
     | {
         split: {
-          cash_pct: Decimal3;
-          pik_pct: Decimal4;
+          cash_fraction: Decimal3;
+          pik_fraction: Decimal4;
         };
       };
   day_count: DayCount1;
@@ -2133,7 +2133,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * speed, color, FX delta). When set it also replaces the adaptive spot
    * bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
    */
-  spot_bump_pct?: number | null;
+  spot_bump_decimal?: number | null;
   /**
    * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
    *
@@ -2141,7 +2141,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * vega). `None` uses the `valuations.sensitivities.v1` value (default
    * 1 vol point). Results stay reported per 1 vol point.
    */
-  vol_bump_pct?: number | null;
+  vol_bump_decimal?: number | null;
   /**
    * Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
    * convexity: InflationLinkedBond `RealDuration` and structured-credit
@@ -2391,11 +2391,13 @@ export interface Money {
  */
 export interface ScenarioPricingOverrides {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *

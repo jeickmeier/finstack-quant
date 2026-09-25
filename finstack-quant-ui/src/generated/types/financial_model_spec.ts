@@ -453,7 +453,7 @@ export type D_085E3Ec82Eb8695Eaf89 =
       amount: DD5Bd42D8B6Ec6C31D7861;
     }
   | {
-      pct_of_commitment: number;
+      fraction_of_commitment: number;
     };
 /**
  * Original Issue Discount (OID) policy for term loan origination.
@@ -480,10 +480,12 @@ export type D_085E3Ec82Eb8695Eaf89 =
  *
  * # Variants
  *
- * - `WithheldPct`: Discount as percentage withheld from each funded draw
+ * - `WithheldBp`: Discount in basis points of each funded draw, withheld
+ *   from proceeds
  * - `WithheldAmount`: Fixed facility-level amount withheld from funded
  *   proceeds, pro-rated across draws by draw size
- * - `SeparatePct`: Percentage of each draw tracked separately, not withheld
+ * - `SeparateBp`: Discount in basis points of each draw, tracked
+ *   separately and not withheld
  * - `SeparateAmount`: Fixed facility-level amount tracked separately,
  *   pro-rated across draws by draw size
  *
@@ -495,7 +497,7 @@ export type D_085E3Ec82Eb8695Eaf89 =
  * use finstack_quant_core::currency::Currency;
  *
  * // 2% OID withheld from proceeds
- * let oid = OidPolicy::WithheldPct(200);  // 200 bp = 2%
+ * let oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%
  *
  * // $50,000 fixed OID
  * let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
@@ -503,13 +505,13 @@ export type D_085E3Ec82Eb8695Eaf89 =
  */
 export type D_369F1A09E65Be1364D06 =
   | {
-      withheld_pct: number;
+      withheld_bp: number;
     }
   | {
       withheld_amount: DD5Bd42D8B6Ec6C31D7861;
     }
   | {
-      separate_pct: number;
+      separate_bp: number;
     }
   | {
       separate_amount: DD5Bd42D8B6Ec6C31D7861;
@@ -1261,12 +1263,12 @@ export interface DCdca3F67B974113083De {
            * Fraction of the coupon paid in cash, expressed as a decimal share in
            * `[0, 1]`.
            */
-          cash_pct: string;
+          cash_fraction: string;
           /**
            * Fraction of the coupon capitalized as PIK, expressed as a decimal
            * share in `[0, 1]`.
            */
-          pik_pct: string;
+          pik_fraction: string;
         };
       };
   /**
@@ -1385,12 +1387,12 @@ export interface D_210Ab4B44Ffb533F1266 {
            * Fraction of the coupon paid in cash, expressed as a decimal share in
            * `[0, 1]`.
            */
-          cash_pct: string;
+          cash_fraction: string;
           /**
            * Fraction of the coupon capitalized as PIK, expressed as a decimal
            * share in `[0, 1]`.
            */
-          pik_pct: string;
+          pik_fraction: string;
         };
       };
   /**
@@ -1721,12 +1723,12 @@ export interface D_78D4B16242Febe84F62B {
            * Fraction of the coupon paid in cash, expressed as a decimal share in
            * `[0, 1]`.
            */
-          cash_pct: string;
+          cash_fraction: string;
           /**
            * Fraction of the coupon capitalized as PIK, expressed as a decimal
            * share in `[0, 1]`.
            */
-          pik_pct: string;
+          pik_fraction: string;
         };
       };
   /**
@@ -3748,7 +3750,7 @@ export interface D_7986A62Fa15B0B1420C9 {
    * speed, color, FX delta). When set it also replaces the adaptive spot
    * bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
    */
-  spot_bump_pct?: number | null;
+  spot_bump_decimal?: number | null;
   /**
    * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
    *
@@ -3756,7 +3758,7 @@ export interface D_7986A62Fa15B0B1420C9 {
    * vega). `None` uses the `valuations.sensitivities.v1` value (default
    * 1 vol point). Results stay reported per 1 vol point.
    */
-  vol_bump_pct?: number | null;
+  vol_bump_decimal?: number | null;
   /**
    * Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
    * convexity: InflationLinkedBond `RealDuration` and structured-credit
@@ -4164,11 +4166,13 @@ export interface DEfa7027Ce3055Caec205 {
  */
 export interface DB559Ae4814037C7E11Ce {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *
@@ -4697,11 +4701,13 @@ export interface DD5Bd42D8B6Ec6C31D7865 {
  */
 export interface DB559Ae4814037C7E11Ce1 {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *
@@ -7049,11 +7055,13 @@ export interface D_3B1170Fe3280Aa725Fb4 {
  */
 export interface DB559Ae4814037C7E11Ce2 {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *
@@ -7380,12 +7388,12 @@ export interface D_8Dd62D29564577Ef6F97 {
            * Fraction of the coupon paid in cash, expressed as a decimal share in
            * `[0, 1]`.
            */
-          cash_pct: string;
+          cash_fraction: string;
           /**
            * Fraction of the coupon capitalized as PIK, expressed as a decimal
            * share in `[0, 1]`.
            */
-          pik_pct: string;
+          pik_fraction: string;
         };
       };
   /**
@@ -8828,11 +8836,13 @@ export interface DD5Bd42D8B6Ec6C31D78617 {
  */
 export interface DB559Ae4814037C7E11Ce3 {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *
@@ -11287,11 +11297,13 @@ export interface DD5Bd42D8B6Ec6C31D78624 {
  */
 export interface DB559Ae4814037C7E11Ce4 {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *
@@ -11969,11 +11981,13 @@ export interface D_7D1A98F209076E58Ed77 {
  */
 export interface DB559Ae4814037C7E11Ce5 {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *
@@ -12396,11 +12410,13 @@ export interface D_1F0A38Ebecad19081135 {
  */
 export interface DB559Ae4814037C7E11Ce6 {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *

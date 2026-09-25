@@ -404,12 +404,11 @@ export interface DD974Fb1239E1Fb4Fd137 {
  *     .pool_type(PoolType::Generic)
  *     .original_face(Money::from((1_000_000_i64, Currency::USD)))
  *     .current_face(Money::from((950_000_i64, Currency::USD)))
- *     .current_factor(0.95)
  *     .wac(0.045)
- *     .pass_through_rate(0.04)
- *     .servicing_fee_rate(0.0025)
- *     .guarantee_fee_rate(0.0025)
- *     .wam(348)
+ *     .coupon(0.04)
+ *     .servicing_fee_bp(25.0)
+ *     .guarantee_fee_bp(25.0)
+ *     .wam_months(348)
  *     .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())
  *     .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())
  *     .prepayment_spec(PrepaymentModelSpec::psa(1.0))
@@ -425,19 +424,20 @@ export interface D_24B4Bd8Fabf71247Af0B {
    */
   agency: "FNMA" | "FHLMC" | "GNMA_I" | "GNMA_II";
   attributes?: Attributes;
-  current_face: Money;
   /**
-   * Current pool factor (current_face / original_face).
+   * Net pass-through coupon paid to the investor, as an annual decimal
+   * (`0.04` = 4%): `wac` less the servicing and guarantee fees.
    */
-  current_factor: number;
+  coupon: number;
+  current_face: Money;
   day_count: DayCount;
   discount_curve_id: Id;
   /**
-   * Guarantee fee rate (annual, as decimal e.g., 0.0025 for 25 bp).
+   * Annual agency guarantee fee (g-fee) in basis points (`25.0` = 0.25%).
    *
    * Defaults to `0.0` when omitted.
    */
-  guarantee_fee_rate?: number;
+  guarantee_fee_bp?: number;
   id: Id1;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   issue_date: Date;
@@ -452,10 +452,6 @@ export interface D_24B4Bd8Fabf71247Af0B {
   maturity: Date2;
   metric_pricing_overrides?: MetricPricingOverrides;
   original_face: Money1;
-  /**
-   * Pass-through rate (net coupon to investor).
-   */
-  pass_through_rate: number;
   /**
    * Optional custom stated payment delay in days (overrides the agency
    * rule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`
@@ -472,11 +468,11 @@ export interface D_24B4Bd8Fabf71247Af0B {
   prepayment_spec: PrepaymentModelSpec;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * Servicing fee rate (annual, as decimal e.g., 0.0025 for 25 bp).
+   * Annual servicing fee in basis points (`25.0` = 0.25%).
    *
    * Defaults to `0.0` when omitted.
    */
-  servicing_fee_rate?: number;
+  servicing_fee_bp?: number;
   /**
    * Weighted average coupon (gross rate on underlying mortgages).
    */
@@ -486,7 +482,7 @@ export interface D_24B4Bd8Fabf71247Af0B {
    * date (current WAM, not the original term). Pool age (WALA) for
    * seasoning ramps is derived separately from `issue_date`.
    */
-  wam: number;
+  wam_months: number;
 }
 /**
  * Attributes for scenario selection and tagging.
@@ -1711,7 +1707,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * speed, color, FX delta). When set it also replaces the adaptive spot
    * bump. `None` uses the `valuations.sensitivities.v1` value (default 1%).
    */
-  spot_bump_pct?: number | null;
+  spot_bump_decimal?: number | null;
   /**
    * Absolute volatility bump in decimal volatility (0.01 = 1 vol point).
    *
@@ -1719,7 +1715,7 @@ export interface D_1D0C1815F8Dd0715Bd12 {
    * vega). `None` uses the `valuations.sensitivities.v1` value (default
    * 1 vol point). Results stay reported per 1 vol point.
    */
-  vol_bump_pct?: number | null;
+  vol_bump_decimal?: number | null;
   /**
    * Yield bump in basis points (1.0 = 1bp) for numerical yield duration and
    * convexity: InflationLinkedBond `RealDuration` and structured-credit
@@ -1987,11 +1983,13 @@ export interface PrepaymentModelSpec {
  */
 export interface ScenarioPricingOverrides {
   /**
-   * Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).
+   * Scenario price shock as a decimal fraction (`-0.05` = a -5% price
+   * shock).
    *
-   * When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
+   * When set, valuation helpers apply it as a multiplier:
+   * `price * (1 + scenario_price_shock_decimal)`.
    */
-  scenario_price_shock_pct?: number | null;
+  scenario_price_shock_decimal?: number | null;
   /**
    * Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
    *

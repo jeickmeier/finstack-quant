@@ -24,7 +24,7 @@
       "type": "agency_cmo",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_cmo.json",
-        "sha256": "294c2efe7aa959093a90cdb077886acb762839d90e27008c74efa365589e7130",
+        "sha256": "5afa975949c3fb3ccc98261888b35a9a9e3b869d93125cf30a21d890e99d70c0",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -62,7 +62,7 @@
       "type": "agency_mbs_passthrough",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json",
-        "sha256": "26710ba402820d4674e6b985bdf4a1c4a5059dadad6f621a1c6e84a3038ec024",
+        "sha256": "0bc71d1904254e9a7f05dc0dbf60e7a9e61627bfd9524fd1ee56e24cd6244647",
         "pointer": []
       },
       "instrumentPatches": [],
