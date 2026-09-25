@@ -1,6 +1,5 @@
 //! Volatility index future pricer implementation.
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::vol_index_future::VolatilityIndexFuture;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -13,54 +12,63 @@ pub(crate) fn compute_pv(
 ) -> finstack_quant_core::Result<Money> {
     Money::new(
         compute_pv_raw(future, context, as_of)?,
-        future.notional.currency(),
+        future.terms.currency,
     )
 }
 
+/// Undiscounted variation-margin P&L:
+/// `sign × contracts × multiplier × (mark − entry_price)`, zero after settlement.
 pub(crate) fn compute_pv_raw(
     future: &VolatilityIndexFuture,
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    future.validate_invariants()?;
-    if as_of > future.settlement_date {
+    future.validate()?;
+    if as_of > future.terms.settlement_date {
         return Ok(0.0);
     }
-    let forward_vol = if as_of == future.settlement_date {
-        future.settlement_fixing.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "VolatilityIndexFuture '{}' requires settlement_fixing on settlement date",
-                future.id
-            ))
-        })?
-    } else {
-        forward_vol(future, context)?
-    };
-    let sign = future.position.sign();
-    let contracts = future.num_contracts();
-    let pv_per_contract = (forward_vol - future.quoted_price) * future.contract_specs.multiplier;
-    Ok(sign * contracts * pv_per_contract)
+    future
+        .terms
+        .mark_to_market(mark_price(future, context, as_of)?)
 }
 
-pub(crate) fn forward_vol(
+/// Lifecycle mark: the SOQ `terms.settlement_price` on the settlement date,
+/// otherwise the listed-future rule (live quote, model level, or settlement
+/// price once trading has ended).
+pub(crate) fn mark_price(
     future: &VolatilityIndexFuture,
     context: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    future.validate()?;
+    if as_of >= future.terms.settlement_date {
+        return future.terms.settlement_price.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "VolatilityIndexFuture '{}' requires terms.settlement_price on settlement date {}",
+                future.id, future.terms.settlement_date
+            ))
+        });
+    }
+    future.terms.resolve_mark(future.id.as_str(), as_of, || {
+        fair_price(future, context, as_of)
+    })
+}
+
+pub(crate) fn fair_price(
+    future: &VolatilityIndexFuture,
+    context: &MarketContext,
+    _as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
     let vol_curve = context.get_vol_index_curve(&future.vol_index_curve_id)?;
     let t = vol_curve
         .day_count()
         .year_fraction(
             vol_curve.base_date(),
-            future.settlement_date,
+            future.terms.settlement_date,
             finstack_quant_core::dates::DayCountContext::default(),
         )?
         .max(0.0);
     Ok(vol_curve.price(t))
-}
-
-pub(crate) fn delta_vol(future: &VolatilityIndexFuture) -> f64 {
-    let sign = future.position.sign();
-    sign * future.num_contracts() * future.contract_specs.multiplier
 }
 
 #[cfg(test)]
@@ -94,15 +102,20 @@ mod tests {
     }
 
     fn sample_future() -> VolatilityIndexFuture {
+        let settlement = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-PRICER"))
-            .notional(Money::from((20_000_i64, Currency::USD)))
-            .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .quoted_price(20.0)
-            .position(Position::Long)
-            .contract_specs(
-                crate::instruments::equity::vol_index_future::VolIndexContractSpecs::vix(),
+            .terms(
+                crate::instruments::ListedFutureTerms::new(
+                    1.0,
+                    1_000.0,
+                    Currency::USD,
+                    20.0,
+                    settlement,
+                    settlement,
+                    Position::Long,
+                )
+                .expect("terms"),
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
@@ -128,9 +141,7 @@ mod tests {
     /// convexity term is added or removed; see the module docs on
     /// `PriceCurve` for why variance-derived inputs are forbidden),
     /// and the MTM is undiscounted variation margin
-    /// `(F − quoted) × multiplier × contracts × sign` in exact dollars.
-    /// Also pins the CBOE VIX contract multiplier ($1000/point) from the spec
-    /// registry.
+    /// `(F − entry) × multiplier × contracts × sign` in exact dollars.
     #[test]
     fn flat_curve_future_equals_forward_level_with_exact_variation_margin() {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -148,22 +159,15 @@ mod tests {
             .expect("curve");
         let market = MarketContext::new().insert(disc).insert(vix);
 
-        let mut future = sample_future(); // long, quoted 20.0, notional 20,000
-        future.quoted_price = 20.0;
-
-        let specs = crate::instruments::equity::vol_index_future::VolIndexContractSpecs::vix();
-        assert_eq!(
-            specs.multiplier, 1000.0,
-            "CBOE VIX futures multiplier must be $1000 per point"
-        );
+        let future = sample_future(); // long 1 contract, entry 20.0, $1000/point
 
         // Fair forward = curve level exactly (no convexity adjustment).
-        let fair = forward_vol(&future, &market).expect("forward");
+        let fair = fair_price(&future, &market, base_date).expect("forward");
         assert_eq!(fair, 21.5);
 
         // Long MTM: (21.5 − 20.0) × $1000 × contracts, undiscounted.
         let pv = compute_pv_raw(&future, &market, base_date).expect("pv");
-        let expected = 1.5 * 1000.0 * future.num_contracts();
+        let expected = 1.5 * 1000.0 * future.terms.contracts;
         assert!(
             (pv - expected).abs() < 1e-9,
             "variation-margin MTM must be exact: got {pv}, expected {expected}"

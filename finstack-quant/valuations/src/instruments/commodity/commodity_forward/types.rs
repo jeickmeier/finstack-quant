@@ -2,7 +2,7 @@
 //!
 //! Defines the `CommodityForward` instrument for physical or cash-settled
 //! commodity forward contracts. Pricing uses curve-based forward interpolation
-//! with optional quoted price override.
+//! with an optional quoted forward override (`quoted_forward`).
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
@@ -34,7 +34,7 @@ pub use crate::instruments::common_impl::parameters::SettlementType;
 /// ```
 /// where:
 /// - sign = +1.0 for Long, -1.0 for Short
-/// - F = Forward price from price curve (or quoted_price if provided)
+/// - F = Forward price from price curve (or quoted_forward if provided)
 /// - K = Contract price (entry price). If None, treated as at-market (K = F)
 /// - Q = Quantity
 /// - M = Contract multiplier
@@ -156,7 +156,7 @@ pub struct CommodityForward {
     /// Use `contract_price` for the trade entry price K.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quoted_price: Option<f64>,
+    pub quoted_forward: Option<f64>,
     /// Forward/futures price curve ID for price interpolation.
     ///
     /// Should reference a `PriceCurve` in the `MarketContext`.
@@ -255,8 +255,8 @@ impl CommodityForward {
         if let Some(price) = self.contract_price {
             validation::validate_f64_finite(price, "CommodityForward contract_price")?;
         }
-        if let Some(price) = self.quoted_price {
-            validation::validate_f64_finite(price, "CommodityForward quoted_price")?;
+        if let Some(price) = self.quoted_forward {
+            validation::validate_f64_finite(price, "CommodityForward quoted_forward")?;
         }
         if self
             .spot_id
@@ -324,7 +324,7 @@ impl CommodityForward {
     ///
     /// where:
     /// - sign = +1.0 for Long, -1.0 for Short
-    /// - F = Market forward price from `quoted_price` or `PriceCurve`
+    /// - F = Market forward price from `quoted_forward` or `PriceCurve`
     /// - K = Contract price (`contract_price`). If `None`, K = F (at-market)
     /// - Q = Quantity
     /// - M = Contract multiplier
@@ -341,18 +341,18 @@ impl CommodityForward {
     ///
     /// Get the market forward price for this contract.
     ///
-    /// Uses `quoted_price` if provided, otherwise interpolates from the
+    /// Uses `quoted_forward` if provided, otherwise interpolates from the
     /// `PriceCurve` referenced by `forward_curve_id`.
     ///
     /// # Curve Lookup Order
     ///
-    /// 1. If `quoted_price` is set, return it directly
+    /// 1. If `quoted_forward` is set, return it directly
     /// 2. Look up `PriceCurve` by `forward_curve_id`
     /// 3. If `spot_id` is set and PriceCurve not found, use cost-of-carry model
     ///
     /// # Errors
     ///
-    /// Returns an error if neither `quoted_price` nor `PriceCurve` is available.
+    /// Returns an error if neither `quoted_forward` nor `PriceCurve` is available.
     ///
     pub fn forward_price(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         self.validate()?;
@@ -361,7 +361,7 @@ impl CommodityForward {
                 market,
                 as_of,
                 delivery: self.maturity,
-                quoted: self.quoted_price,
+                quoted: self.quoted_forward,
                 forward_curve_id: &self.forward_curve_id,
                 spot_id: self.spot_id.as_deref(),
                 discount_curve_id: &self.discount_curve_id,
@@ -460,7 +460,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
             )));
         }
 
-        // Get market forward price F from quoted price or curve
+        // Get market forward price F from quoted_forward or the curve
         let forward_price = self.forward_price(market, as_of)?;
 
         // Get contract price K (entry price). If None, treat as at-market (K = F)
@@ -593,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn test_commodity_forward_with_quoted_price() {
+    fn test_commodity_forward_with_quoted_forward() {
         let forward = CommodityForward::builder()
             .id(InstrumentId::new("GC-FWD"))
             .underlying(CommodityUnderlyingParams::new(
@@ -605,16 +605,16 @@ mod tests {
             .quantity(100.0)
             .multiplier(1.0)
             .maturity(Date::from_calendar_date(2025, Month::April, 15).expect("valid date"))
-            .quoted_price_opt(Some(2000.0))
+            .quoted_forward_opt(Some(2000.0))
             .forward_curve_id(CurveId::new("GC-FWD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
             .build()
             .expect("should build");
 
-        assert_eq!(forward.quoted_price, Some(2000.0));
+        assert_eq!(forward.quoted_forward, Some(2000.0));
 
-        // When quoted price is set, it should be used directly
+        // When quoted_forward is set, it should be used directly
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let price = forward

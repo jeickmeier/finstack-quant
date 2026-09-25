@@ -4,9 +4,9 @@
 //! the present value of its cashflows through delivery, carries the remaining
 //! dirty value to the later of the valuation date and delivery start, removes
 //! accrued interest at delivery, and divides the clean price per 100 face by
-//! the exchange-published conversion factor. The resulting futures price is
-//! marked against `quoted_price` without further discounting because futures
-//! settle through daily variation margin.
+//! the exchange-published conversion factor. The resulting futures price
+//! (`BondFuture::fair_price`) is marked against `terms.entry_price` without
+//! further discounting because futures settle through daily variation margin.
 //!
 //! Carry uses `repo_curve_id` when present and otherwise `discount_curve_id`.
 //! Valuation does not search the basket for a new CTD or derive conversion

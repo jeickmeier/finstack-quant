@@ -3,7 +3,6 @@
 use super::utils::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
 };
@@ -15,10 +14,11 @@ fn test_standard_construction() {
     let future = create_standard_future(start, end);
 
     assert_eq!(future.id.as_str(), "IRF_TEST");
-    assert_eq!(future.notional.amount(), 1_000_000.0);
-    assert_eq!(future.notional.currency(), Currency::USD);
-    assert_eq!(future.quoted_price, 97.50);
-    assert_eq!(future.position, Position::Long);
+    assert_eq!(future.terms.contracts, 1.0);
+    assert_eq!(future.terms.multiplier, 2_500.0);
+    assert_eq!(future.terms.currency, Currency::USD);
+    assert_eq!(future.terms.entry_price, 97.50);
+    assert_eq!(future.terms.position, Position::Long);
 }
 
 #[test]
@@ -27,7 +27,6 @@ fn test_with_contract_specs() {
     let custom_specs = FutureContractSpecs {
         face_value: 2_000_000.0,
         tick_size: 0.01,
-        tick_value: 25.0,
         delivery_months: 6,
         convexity_adjustment: Some(0.0001),
     };
@@ -36,7 +35,6 @@ fn test_with_contract_specs() {
 
     assert_eq!(future.contract_specs.face_value, 2_000_000.0);
     assert_eq!(future.contract_specs.tick_size, 0.01);
-    assert_eq!(future.contract_specs.tick_value, 25.0);
     assert_eq!(future.contract_specs.delivery_months, 6);
     assert_eq!(future.contract_specs.convexity_adjustment, Some(0.0001));
 }
@@ -47,7 +45,6 @@ fn test_default_contract_specs() {
 
     assert_eq!(specs.face_value, 1_000_000.0);
     assert_eq!(specs.tick_size, 0.0025);
-    assert_eq!(specs.tick_value, 6.25);
     assert_eq!(specs.delivery_months, 3);
     assert!(specs.convexity_adjustment.is_none());
 }
@@ -58,7 +55,6 @@ fn test_sofr_specs() {
 
     assert_eq!(specs.face_value, 1_000_000.0);
     assert_eq!(specs.tick_size, 0.0025);
-    assert_eq!(specs.tick_value, 6.25);
 }
 
 #[test]
@@ -76,15 +72,11 @@ fn test_multiple_contracts() {
     // 5 contracts = 5 * face value
     let future = InterestRateFuture {
         id: "IRF_5_CONTRACTS".into(),
-        notional: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-        expiry: start,
+        terms: listed_terms(5_000_000.0, start, 97.50, Position::Long),
         fixing_date: Some(start),
         period_start: Some(start),
         period_end: Some(end),
-        quoted_price: 97.50,
-        settlement_price: None,
         day_count: DayCount::Act360,
-        position: Position::Long,
         contract_specs: FutureContractSpecs::default(),
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
@@ -98,11 +90,8 @@ fn test_multiple_contracts() {
         attributes: Default::default(),
     };
 
-    // Verify notional is 5x face value
-    assert_eq!(
-        future.notional.amount(),
-        5.0 * future.contract_specs.face_value
-    );
+    // 5 contracts of the standard face value
+    assert_eq!(future.terms.contracts, 5.0);
 }
 
 #[test]
@@ -114,15 +103,11 @@ fn test_different_day_counts() {
     for day_count in day_counts {
         let future = InterestRateFuture {
             id: "IRF_DC_TEST".into(),
-            notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            expiry: start,
+            terms: listed_terms(1_000_000.0, start, 97.50, Position::Long),
             fixing_date: Some(start),
             period_start: Some(start),
             period_end: Some(end),
-            quoted_price: 97.50,
-            settlement_price: None,
             day_count,
-            position: Position::Long,
             contract_specs: FutureContractSpecs::default(),
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
@@ -163,8 +148,8 @@ fn test_long_and_short_positions() {
         Position::Short,
     );
 
-    assert_eq!(long.position, Position::Long);
-    assert_eq!(short.position, Position::Short);
+    assert_eq!(long.terms.position, Position::Long);
+    assert_eq!(short.terms.position, Position::Short);
 }
 
 #[test]
@@ -195,7 +180,7 @@ fn test_implied_rate_various_prices() {
 
     for (price, expected_rate) in test_cases {
         let mut future = create_standard_future(start, end);
-        future.quoted_price = price;
+        future.terms.entry_price = price;
         let implied = future.implied_rate().expect("finite futures quote");
 
         assert!(

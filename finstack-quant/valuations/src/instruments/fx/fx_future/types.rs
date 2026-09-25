@@ -40,9 +40,8 @@ pub struct FxFuture {
     pub id: InstrumentId,
     /// Base currency, the numerator of the quoted pair.
     pub base_currency: Currency,
-    /// Quote and variation-margin currency.
-    pub quote_currency: Currency,
-    /// Standard listed position and lifecycle terms.
+    /// Standard listed position and lifecycle terms. `terms.currency` is the
+    /// quote currency of the pair and the variation-margin currency.
     pub terms: ListedFutureTerms,
     /// Quote-currency discount curve.
     pub domestic_discount_curve_id: CurveId,
@@ -83,16 +82,10 @@ impl FxFuture {
     /// Validate currency, price, and position invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.terms.validate()?;
-        if self.base_currency == self.quote_currency {
+        if self.base_currency == self.terms.currency {
             return Err(finstack_quant_core::Error::Validation(
-                "FxFuture base_currency and quote_currency must differ".to_string(),
+                "FxFuture base_currency and terms.currency must differ".to_string(),
             ));
-        }
-        if self.terms.currency != self.quote_currency {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FxFuture terms currency {} must equal quote_currency {}",
-                self.terms.currency, self.quote_currency
-            )));
         }
         for (name, value) in [
             ("entry_price", Some(self.terms.entry_price)),
@@ -109,6 +102,12 @@ impl FxFuture {
         Ok(())
     }
 
+    /// Quote currency of the pair, which is also the variation-margin currency.
+    #[inline]
+    pub fn quote_currency(&self) -> Currency {
+        self.terms.currency
+    }
+
     /// Create a canonical CME EUR/USD future example.
     pub fn example() -> finstack_quant_core::Result<Self> {
         use crate::instruments::Position;
@@ -117,7 +116,6 @@ impl FxFuture {
         Self::builder()
             .id(InstrumentId::new("CME-6E-DEC26"))
             .base_currency(Currency::EUR)
-            .quote_currency(Currency::USD)
             .terms(ListedFutureTerms::new(
                 4.0,
                 125_000.0,
@@ -153,7 +151,7 @@ impl FxFuture {
             as_of,
             maturity: self.terms.settlement_date,
             base_currency: self.base_currency,
-            quote_currency: self.quote_currency,
+            quote_currency: self.quote_currency(),
             domestic_discount_curve_id: &self.domestic_discount_curve_id,
             foreign_discount_curve_id: &self.foreign_discount_curve_id,
             spot_rate_override: self.spot_rate_override,
@@ -206,12 +204,12 @@ impl crate::instruments::Instrument for FxFuture {
         let mut dependencies = crate::instruments::MarketDependencies::new();
         dependencies.add_discount_curve(self.domestic_discount_curve_id.clone());
         dependencies.add_discount_curve(self.foreign_discount_curve_id.clone());
-        dependencies.add_fx_pair(self.base_currency, self.quote_currency);
+        dependencies.add_fx_pair(self.base_currency, self.quote_currency());
         Ok(dependencies)
     }
 
     fn fx_exposure(&self) -> Option<(Currency, Currency)> {
-        Some((self.base_currency, self.quote_currency))
+        Some((self.base_currency, self.quote_currency()))
     }
 
     fn base_value(
@@ -219,7 +217,7 @@ impl crate::instruments::Instrument for FxFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        Money::new(self.npv_raw(market, as_of)?, self.quote_currency)
+        Money::new(self.npv_raw(market, as_of)?, self.quote_currency())
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -263,7 +261,6 @@ mod tests {
         let future = FxFuture::builder()
             .id(InstrumentId::new("6E"))
             .base_currency(Currency::EUR)
-            .quote_currency(Currency::USD)
             .terms(
                 ListedFutureTerms::new(
                     2.0,

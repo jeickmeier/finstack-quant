@@ -4,10 +4,10 @@
 //!
 //! # Market Standard Formula
 //!
-//! **DeltaVol:** Δ_vol = ±contracts × face_value
+//! **DeltaVol:** Δ_vol = sign × contracts × multiplier
 //!
 //! Where:
-//! - contracts = notional / face_value
+//! - contracts and multiplier come from `terms`
 //! - sign = +1 for long, -1 for short
 //!
 //! # Note
@@ -27,6 +27,6 @@ impl crate::metrics::MetricCalculator for DeltaVolCalculator {
         context: &mut crate::metrics::MetricContext,
     ) -> finstack_quant_core::Result<f64> {
         let future: &VolatilityIndexFuture = context.instrument_as()?;
-        Ok(future.delta_vol())
+        future.delta_vol()
     }
 }

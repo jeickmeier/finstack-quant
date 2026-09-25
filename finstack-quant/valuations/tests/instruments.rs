@@ -12,6 +12,8 @@
 #[macro_use]
 #[path = "instruments/common/mod.rs"]
 mod common;
+#[path = "instruments/listed_future_wire_keys.rs"]
+mod listed_future_wire_keys;
 #[path = "instruments/registry_coverage.rs"]
 mod registry_coverage;
 #[path = "instruments/serde_skip_guard.rs"]

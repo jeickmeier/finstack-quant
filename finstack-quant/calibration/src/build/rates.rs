@@ -13,11 +13,11 @@ use finstack_quant_core::{Error, InputError, Result};
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations::instruments::rates::ir_future::{
-    FutureContractSpecs, InterestRateFuture,
+    FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
 };
 use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, IrsLegConventions};
 use finstack_quant_valuations::instruments::{
-    FixedLegSpec, FloatLegSpec, Instrument, PayReceive, Position,
+    FixedLegSpec, FloatLegSpec, Instrument, ListedFutureTerms, PayReceive, Position,
 };
 use finstack_quant_valuations::market::conventions::{
     ConventionRegistry, IrFutureReferencePeriod, RateIndexConventions, RateIndexKind,
@@ -460,21 +460,32 @@ fn build_future(
     let contract_specs = FutureContractSpecs {
         face_value: fut_conv.face_value,
         tick_size: fut_conv.tick_size,
-        tick_value: fut_conv.tick_value,
         delivery_months: fut_conv.delivery_months,
         convexity_adjustment: Some(*convexity_adjustment),
     };
+    // Term-rate contracts stop carrying value after the last trading day;
+    // in-arrears overnight contracts settle at the reference-period end.
+    let settlement_date = match fut_conv.rate_averaging {
+        RateAveragingMethod::Term => expiry_date,
+        _ => period_end,
+    };
+    let terms = ListedFutureTerms::new(
+        ctx.notional() / fut_conv.face_value,
+        fut_conv.tick_value / fut_conv.tick_size,
+        idx_conv.currency,
+        *price,
+        expiry_date,
+        settlement_date,
+        Position::Long,
+    )?;
 
     let future = InterestRateFuture::builder()
         .id(InstrumentId::new(id.as_str()))
-        .notional(Money::new(ctx.notional(), idx_conv.currency)?)
-        .expiry(expiry_date)
+        .terms(terms)
         .fixing_date(fixing)
         .period_start(period_start)
         .period_end(period_end)
-        .quoted_price(*price)
         .day_count(idx_conv.day_count)
-        .position(Position::Long)
         .contract_specs(contract_specs)
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
         .forward_curve_id(CurveId::new(ctx.require_curve_id("forward")?.to_string()))

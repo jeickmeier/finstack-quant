@@ -141,17 +141,20 @@
       "type": "bond_future",
       "spec": {
         "id": "UST-TY-10Y-FRONT-MONTH-GOLDEN",
-        "notional": {
-          "amount": "1000000",
-          "currency": "USD"
+        "terms": {
+          "contracts": 10.0,
+          "currency": "USD",
+          "entry_price": 119.5,
+          "last_trading_date": "2026-06-19",
+          "multiplier": 1000.0,
+          "position": "long",
+          "settlement": {
+            "type": "cash"
+          },
+          "settlement_date": "2026-06-30"
         },
-        "expiry": "2026-06-19",
         "delivery_start": "2026-06-22",
-        "delivery_end": "2026-06-30",
-        "quoted_price": 119.5,
-        "position": "long",
         "contract_specs": {
-          "contract_size": 100000.0,
           "standard_coupon": 0.06,
           "standard_maturity_years": 10.0,
           "repo_day_count": "act_360"

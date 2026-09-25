@@ -253,23 +253,21 @@ fn test_extreme_rate_difference() {
 }
 
 #[test]
-fn test_zero_notional() {
-    let (as_of, start, end) = standard_dates();
-    let market = build_standard_market(as_of, 0.05);
+fn test_zero_contracts_are_rejected() {
+    let (_, start, _) = standard_dates();
 
-    let future = create_custom_future(
-        "ZERO_NOTIONAL",
+    // A listed position must hold a positive number of contracts.
+    let err = finstack_quant_valuations::instruments::ListedFutureTerms::new(
         0.0,
-        start,
-        start,
-        end,
+        2_500.0,
+        finstack_quant_core::currency::Currency::USD,
         97.50,
+        start,
+        start,
         Position::Long,
-    );
-    let pv = future.value(&market, as_of).unwrap();
-
-    // Zero notional should give zero PV
-    assert_eq!(pv.amount(), 0.0);
+    )
+    .expect_err("zero contracts is not a valid listed position");
+    assert!(err.to_string().contains("contracts"));
 }
 
 #[test]

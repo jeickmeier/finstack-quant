@@ -19,7 +19,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond_future::{
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::Position;
+use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use finstack_quant_valuations::metrics::MetricId;
 use std::hint::black_box;
 use time::Month;
@@ -28,7 +28,7 @@ use time::Month;
 fn create_ust_10y_future() -> BondFuture {
     let expiry = Date::from_calendar_date(2025, Month::March, 20).unwrap();
     let delivery_start = Date::from_calendar_date(2025, Month::March, 21).unwrap();
-    let delivery_end = Date::from_calendar_date(2025, Month::March, 31).unwrap();
+    let last_delivery_date = Date::from_calendar_date(2025, Month::March, 31).unwrap();
 
     // Deliverable basket with 5 bonds
     let basket = vec![
@@ -56,12 +56,19 @@ fn create_ust_10y_future() -> BondFuture {
 
     BondFuture::builder()
         .id(InstrumentId::from("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")) // 10 contracts
-        .expiry(expiry)
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                expiry,
+                last_delivery_date,
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(delivery_start)
-        .delivery_end(delivery_end)
-        .quoted_price(125.50)
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::ust_10y())
         .deliverable_basket(basket)
         .ctd_bond_id(InstrumentId::from("US912828XG33")) // CTD bond
@@ -148,7 +155,7 @@ fn bench_model_price(c: &mut Criterion) {
 
     group.bench_function("ust_10y", |b| {
         b.iter(|| {
-            finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuturePricer::calculate_model_price(
+            finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuturePricer::fair_price(
                 black_box(&ctd_bond),
                 black_box(cf),
                 black_box(&market),
@@ -171,14 +178,13 @@ fn bench_npv(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let cf = 0.8234; // Pre-calculated conversion factor
 
-    let num_contracts = 10;
+    let contracts = 10;
     let mut sized_future = future;
-    sized_future.notional =
-        Money::new(num_contracts as f64 * 100_000.0, Currency::USD).expect("valid money fixture");
+    sized_future.terms.contracts = contracts as f64;
 
     group.bench_with_input(
-        BenchmarkId::from_parameter(format!("{}contracts", num_contracts)),
-        &num_contracts,
+        BenchmarkId::from_parameter(format!("{}contracts", contracts)),
+        &contracts,
         |b, _| {
             b.iter(|| {
                 finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuturePricer::calculate_npv(
@@ -273,7 +279,7 @@ fn bench_invoice_price(c: &mut Criterion) {
         b.iter(|| {
             future.invoice_price(
                 black_box(&ctd_bond),
-                black_box(future.quoted_price),
+                black_box(future.terms.entry_price),
                 black_box(&market),
                 black_box(settlement),
             )

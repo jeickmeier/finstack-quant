@@ -4,12 +4,11 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
 };
 pub use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::Position;
+use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use time::macros::date;
 
 /// Build a flat forward curve with constant rate
@@ -45,19 +44,35 @@ pub fn build_standard_market(as_of: Date, rate: f64) -> MarketContext {
     MarketContext::new().insert(disc_curve).insert(fwd_curve)
 }
 
+/// Listed terms for a term-rate SOFR-style future: `notional / 1,000,000`
+/// contracts at $2,500 per price point, settling on the last trading date.
+pub fn listed_terms(
+    notional: f64,
+    last_trading_date: Date,
+    entry_price: f64,
+    position: Position,
+) -> ListedFutureTerms {
+    ListedFutureTerms::new(
+        notional / 1_000_000.0,
+        2_500.0,
+        Currency::USD,
+        entry_price,
+        last_trading_date,
+        last_trading_date,
+        position,
+    )
+    .expect("valid listed terms")
+}
+
 /// Create a standard IR future for testing
 pub fn create_standard_future(start: Date, end: Date) -> InterestRateFuture {
     InterestRateFuture {
         id: "IRF_TEST".into(),
-        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        expiry: start,
+        terms: listed_terms(1_000_000.0, start, 97.50, Position::Long),
         fixing_date: Some(start),
         period_start: Some(start),
         period_end: Some(end),
-        quoted_price: 97.50, // Implies 2.5% rate
-        settlement_price: None,
         day_count: DayCount::Act360,
-        position: Position::Long,
         contract_specs: FutureContractSpecs {
             convexity_adjustment: Some(0.0),
             ..FutureContractSpecs::default()
@@ -82,20 +97,16 @@ pub fn create_custom_future(
     expiry: Date,
     period_start: Date,
     period_end: Date,
-    quoted_price: f64,
+    entry_price: f64,
     position: Position,
 ) -> InterestRateFuture {
     InterestRateFuture {
         id: id.into(),
-        notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
-        expiry,
+        terms: listed_terms(notional, expiry, entry_price, position),
         fixing_date: Some(expiry),
         period_start: Some(period_start),
         period_end: Some(period_end),
-        quoted_price,
-        settlement_price: None,
         day_count: DayCount::Act360,
-        position,
         contract_specs: FutureContractSpecs {
             convexity_adjustment: Some(0.0),
             ..FutureContractSpecs::default()
@@ -118,7 +129,6 @@ pub fn create_sofr_specs() -> FutureContractSpecs {
     FutureContractSpecs {
         face_value: 1_000_000.0,
         tick_size: 0.0025, // 0.25 bp
-        tick_value: 6.25,  // $6.25 per tick for 3M
         delivery_months: 3,
         convexity_adjustment: Some(0.0),
     }
@@ -129,7 +139,6 @@ pub fn create_eurodollar_specs() -> FutureContractSpecs {
     FutureContractSpecs {
         face_value: 1_000_000.0,
         tick_size: 0.0025,
-        tick_value: 6.25,
         delivery_months: 3,
         convexity_adjustment: Some(0.0),
     }

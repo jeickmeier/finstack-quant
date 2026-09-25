@@ -5,11 +5,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
 };
-use finstack_quant_valuations::instruments::Position;
+use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use time::macros::date;
 
 fn flat_forward(id: &str, as_of: Date, rate: f64, day_count: DayCount) -> ForwardCurve {
@@ -32,14 +31,14 @@ fn overnight_future(
 ) -> InterestRateFuture {
     InterestRateFuture::builder()
         .id(id.into())
-        .notional(Money::new(1_000_000.0, currency).expect("valid money fixture"))
-        .expiry(end)
+        .terms(
+            ListedFutureTerms::new(1.0, 2_500.0, currency, 95.0, end, end, Position::Long)
+                .expect("terms"),
+        )
         .fixing_date(end)
         .period_start(start)
         .period_end(end)
-        .quoted_price(95.0)
         .day_count(day_count)
-        .position(Position::Long)
         .contract_specs(FutureContractSpecs {
             convexity_adjustment: Some(0.0),
             ..FutureContractSpecs::default()

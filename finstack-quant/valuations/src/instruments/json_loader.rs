@@ -938,7 +938,6 @@ mod tests {
             "SoftCallTrigger",
             "TrancheStructure",
             "ValuationDiscounts",
-            "VolIndexContractSpecs",
         ] {
             assert_eq!(
                 schema["$defs"][definition]["additionalProperties"], false,

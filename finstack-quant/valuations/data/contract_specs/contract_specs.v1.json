@@ -6,7 +6,6 @@
       "source": "CME Group 10-Year T-Note Futures contract specifications",
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
-      "contract_size": 100000.0,
       "standard_coupon": 0.06,
       "standard_maturity_years": 10.0,
       "repo_day_count": "act_360"
@@ -16,7 +15,6 @@
       "source": "CME Group 5-Year T-Note Futures contract specifications",
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
-      "contract_size": 100000.0,
       "standard_coupon": 0.06,
       "standard_maturity_years": 5.0,
       "repo_day_count": "act_360"
@@ -26,7 +24,6 @@
       "source": "CME Group 2-Year T-Note Futures contract specifications",
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
-      "contract_size": 200000.0,
       "standard_coupon": 0.06,
       "standard_maturity_years": 2.0,
       "repo_day_count": "act_360"
@@ -36,7 +33,6 @@
       "source": "Eurex Euro-Bund Futures contract specifications",
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
-      "contract_size": 100000.0,
       "standard_coupon": 0.06,
       "standard_maturity_years": 10.0,
       "repo_day_count": "act_360"
@@ -46,42 +42,9 @@
       "source": "ICE Long Gilt Futures contract specifications",
       "source_version": "2026-04",
       "effective_date": "2026-04-26",
-      "contract_size": 100000.0,
       "standard_coupon": 0.04,
       "standard_maturity_years": 10.0,
       "repo_day_count": "act_365f"
-    }
-  ],
-  "vol_index_futures": [
-    {
-      "ids": ["cboe.vix_future", "vix_future", "vix"],
-      "source": "Cboe VIX Futures contract specifications",
-      "source_version": "2026-04",
-      "effective_date": "2026-04-26",
-      "multiplier": 1000.0,
-      "tick_size": 0.05,
-      "tick_value": 50.0,
-      "index_id": "VIX"
-    },
-    {
-      "ids": ["cboe.mini_vix_future", "mini_vix_future", "mini_vix"],
-      "source": "Cboe Mini VIX Futures contract specifications",
-      "source_version": "2026-04",
-      "effective_date": "2026-04-26",
-      "multiplier": 100.0,
-      "tick_size": 0.05,
-      "tick_value": 5.0,
-      "index_id": "VIX"
-    },
-    {
-      "ids": ["eurex.vstoxx_future", "vstoxx_future", "vstoxx"],
-      "source": "Eurex VSTOXX Futures contract specifications",
-      "source_version": "2026-04",
-      "effective_date": "2026-04-26",
-      "multiplier": 100.0,
-      "tick_size": 0.05,
-      "tick_value": 5.0,
-      "index_id": "VSTOXX"
     }
   ],
   "repo_defaults": [

@@ -460,7 +460,7 @@
       "type": "bond_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/bond_future.json",
-        "sha256": "ed994401d4cf102180031b4aed4c16be48f5c5cd1aa0a13319c0cc8e528af99b",
+        "sha256": "242e6f039859129e29bc22a08bc04853bd8db3eabebc6d73fba169cb7d19f021",
         "pointer": []
       },
       "instrumentPatches": [
@@ -514,10 +514,10 @@
         "marketHistory": null
       },
       "edit": {
-        "path": ["instrument", "spec", "quoted_price"],
+        "path": ["instrument", "spec", "terms", "entry_price"],
         "from": 112.25,
         "to": 113,
-        "description": "Change quoted_price from 112.25 to 113; native present value must change."
+        "description": "Change terms.entry_price from 112.25 to 113; native present value must change."
       },
       "reference": {
         "baseline": {
@@ -1779,7 +1779,7 @@
       "type": "fx_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/fx_future.json",
-        "sha256": "14685525789b70dc6bd069f52e8c1ee4c89d55ea5f97868ccd449f5f6a6839a5",
+        "sha256": "df29e0b4c9c662b7bb19a7f99937daf4b79c91ae24d7c880aadf407c27dcfd70",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2164,7 +2164,7 @@
       "type": "interest_rate_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_future.json",
-        "sha256": "664b8530cd6f977b9690999675af74be8f187667da4aa40c403052d235180bbc",
+        "sha256": "9527ab640857bfe4330888870e3c9573d069f8e139195df50a28de1a66f0b4dc",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2182,10 +2182,10 @@
         "marketHistory": null
       },
       "edit": {
-        "path": ["instrument", "spec", "notional", "amount"],
-        "from": "1000000",
-        "to": "1100000",
-        "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
+        "path": ["instrument", "spec", "terms", "contracts"],
+        "from": 1.0,
+        "to": 1.1,
+        "description": "Change terms.contracts from 1.0 to 1.1; native present value must change."
       },
       "reference": {
         "baseline": {
@@ -2957,7 +2957,7 @@
       "type": "volatility_index_future",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/volatility_index_future.json",
-        "sha256": "5b02c5b2a6db8fbf2214b1b42add8f253063b6fc9aafddb73f60c6390a582ab4",
+        "sha256": "d73c2c1d9aca9d6398733047ffc6afea3b0901f8b0fa4860833f6451648f6e9b",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2975,10 +2975,10 @@
         "marketHistory": null
       },
       "edit": {
-        "path": ["instrument", "spec", "notional", "amount"],
-        "from": "100000",
-        "to": "110000",
-        "description": "Change notional.amount from 100000 to 110000; native present value must change."
+        "path": ["instrument", "spec", "terms", "contracts"],
+        "from": 4.651162790697675,
+        "to": 5.116279069767442,
+        "description": "Change terms.contracts from 4.651162790697675 to 5.116279069767442; native present value must change."
       },
       "reference": {
         "baseline": {

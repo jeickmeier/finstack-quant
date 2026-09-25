@@ -15,11 +15,13 @@
 //!
 //! The present value of a volatility index future is:
 //! ```text
-//! NPV = (Forward_Vol - Quoted_Price) × Multiplier × Contracts × Position_Sign
+//! NPV = (Mark - Entry_Price) × Multiplier × Contracts × Position_Sign
 //! ```
 //! where:
-//! - Quoted_Price = Entry/traded price of the future position
-//! - Forward_Vol = Today's fair forward level (mark) interpolated from the vol index curve
+//! - Entry_Price = `terms.entry_price`, the traded price of the position
+//! - Mark = `terms.quoted_price` when supplied, otherwise the fair level
+//!   ([`VolatilityIndexFuture::fair_price`]) interpolated from the vol index
+//!   curve; the SOQ `terms.settlement_price` on the settlement date
 //! - Multiplier = Contract multiplier (typically 1000 for VIX)
 //! - Position_Sign = +1 for long, -1 for short
 //!
@@ -41,43 +43,48 @@
 //! - Whaley, R. E. (2009). "Understanding the VIX." *Journal of Portfolio Management*. `docs/REFERENCES.md#whaley-2009-vix`
 
 use super::pricer;
-use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::impl_instrument_base;
+use crate::instruments::common_impl::listed::ListedFutureTerms;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use time::macros::date;
 
 /// Volatility Index Future instrument.
 ///
 /// Represents a futures contract on a volatility index such as VIX, VXN,
 /// or VSTOXX. These contracts provide exposure to expected future volatility.
+/// Position size, multiplier, entry price and lifecycle dates live in the
+/// shared [`ListedFutureTerms`]; `terms.settlement_price` is the official
+/// Special Opening Quotation (SOQ) in index points.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_valuations::instruments::equity::vol_index_future::{
-///     VolatilityIndexFuture, VolIndexContractSpecs,
-/// };
-/// use finstack_quant_valuations::instruments::Position;
+/// use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
+/// use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::Date;
-/// use finstack_quant_core::money::Money;
 /// use finstack_quant_core::types::{CurveId, InstrumentId};
 /// use time::Month;
 ///
+/// let settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();
 /// let future = VolatilityIndexFuture::builder()
 ///     .id(InstrumentId::new("VIX-FUT-2025M03"))
-///     .notional(Money::from((100_000_i64, Currency::USD)))
-///     .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())
-///     .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())
-///     .quoted_price(21.50)
-///     .position(Position::Long)
-///     .contract_specs(VolIndexContractSpecs::default())
+///     .terms(
+///         ListedFutureTerms::new(
+///             5.0,
+///             1_000.0,
+///             Currency::USD,
+///             21.50,
+///             settlement,
+///             settlement,
+///             Position::Long,
+///         )
+///         .unwrap(),
+///     )
 ///     .discount_curve_id(CurveId::new("USD-OIS"))
 ///     .vol_index_curve_id(CurveId::new("VIX"))
 ///     .build()
@@ -86,6 +93,7 @@ use time::macros::date;
 #[derive(
     Clone,
     Debug,
+    PartialEq,
     finstack_quant_valuations_macros::FinancialBuilder,
     serde::Serialize,
     serde::Deserialize,
@@ -95,40 +103,12 @@ use time::macros::date;
 pub struct VolatilityIndexFuture {
     /// Unique identifier.
     pub id: InstrumentId,
-    /// Notional exposure in currency units. PV is scaled by
-    /// `notional.amount() / (multiplier × quoted_price)` to represent
-    /// the number of contracts.
-    pub notional: Money,
-    /// Future expiry date. For VIX futures this is the final settlement day
-    /// itself (the Wednesday ~30 days before the expiry of the SPX options
-    /// used in the settlement calculation), not a date 30 days before
-    /// settlement.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub expiry: Date,
-    /// Final settlement date — the morning Special Opening Quotation (SOQ)
-    /// of the index is computed on this date (same day as `expiry` for VIX).
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub settlement_date: Date,
-    /// Final settlement/SOQ fixing in index points.
-    #[serde(default)]
-    #[builder(optional)]
-    pub settlement_fixing: Option<f64>,
-    /// Quoted future price (index points, e.g., 21.50).
-    pub quoted_price: f64,
-    /// Position side (Long or Short).
-    pub position: Position,
-    /// Contract specifications.
-    #[builder(default)]
-    #[serde(default)]
-    pub contract_specs: VolIndexContractSpecs,
+    /// Standard listed position and lifecycle terms. `terms.multiplier` is the
+    /// settlement-currency value of one index point ($1,000 for CBOE VIX),
+    /// `terms.entry_price` is the trade price in index points and
+    /// `terms.settlement_date` is the SOQ date on which the final settlement
+    /// price is fixed.
+    pub terms: ListedFutureTerms,
     /// Discount curve identifier. **Unused in PV**: the future is daily
     /// margined so the mark-to-market is undiscounted, and no Dv01 is
     /// registered. Retained for market-data identification/scenario plumbing.
@@ -157,100 +137,58 @@ pub struct VolatilityIndexFuture {
     )]
     pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
+    #[builder(default)]
+    #[serde(default)]
     pub attributes: Attributes,
-}
-
-/// Contract specifications for volatility index futures.
-///
-/// VIX futures have standardized specifications set by CBOE:
-/// - Standard multiplier: $1,000 per index point
-/// - Minimum tick: 0.05 index points ($50)
-/// - Weekly and monthly expiries available
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct VolIndexContractSpecs {
-    /// Contract multiplier (USD per index point).
-    /// VIX standard: 1000 (each point = $1,000)
-    pub multiplier: f64,
-    /// Tick size in index points.
-    /// VIX standard: 0.05 points
-    pub tick_size: f64,
-    /// Tick value in currency units.
-    /// VIX standard: $50 per tick (0.05 × 1000)
-    pub tick_value: f64,
-    /// Index identifier (e.g., "VIX", "VXN", "VSTOXX").
-    pub index_id: String,
-}
-
-impl Default for VolIndexContractSpecs {
-    fn default() -> Self {
-        Self::vix()
-    }
-}
-
-#[allow(clippy::expect_used)]
-fn contract_spec_registry() -> &'static ContractSpecRegistry {
-    embedded_registry().expect("embedded contract-spec registry should load")
-}
-
-#[allow(clippy::expect_used)]
-fn vol_index_future_specs_from_registry(id: &str) -> VolIndexContractSpecs {
-    contract_spec_registry()
-        .vol_index_future_specs(id)
-        .expect("embedded volatility index future contract spec should exist")
-}
-
-impl VolIndexContractSpecs {
-    /// Create specs for standard VIX futures.
-    pub fn vix() -> Self {
-        vol_index_future_specs_from_registry("cboe.vix_future")
-    }
-
-    /// Create specs for Mini VIX futures.
-    pub fn mini_vix() -> Self {
-        vol_index_future_specs_from_registry("cboe.mini_vix_future")
-    }
-
-    /// Create specs for VSTOXX futures.
-    pub fn vstoxx() -> Self {
-        vol_index_future_specs_from_registry("eurex.vstoxx_future")
-    }
 }
 
 impl VolatilityIndexFuture {
     /// Create a canonical example VIX future for testing and documentation.
     pub fn example() -> finstack_quant_core::Result<Self> {
+        use crate::instruments::Position;
+        use time::macros::date;
+
         Self::builder()
             .id(InstrumentId::new("VIX-FUT-2025M03"))
-            .notional(Money::from((100_000_i64, Currency::USD)))
-            .expiry(date!(2025 - 03 - 19))
-            .settlement_date(date!(2025 - 03 - 19))
-            .quoted_price(21.50)
-            .position(Position::Long)
-            .contract_specs(VolIndexContractSpecs::vix())
+            .terms(ListedFutureTerms::new(
+                4.651162790697675,
+                1_000.0,
+                Currency::USD,
+                21.50,
+                date!(2025 - 03 - 19),
+                date!(2025 - 03 - 19),
+                Position::Long,
+            )?)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .attributes(Attributes::new())
             .build()
     }
 
-    /// Calculate the number of contracts based on notional and quoted price.
-    ///
-    /// # Formula
-    /// ```text
-    /// contracts = notional / (multiplier × quoted_price)
-    /// ```
-    pub fn num_contracts(&self) -> f64 {
-        let contract_value = self.contract_specs.multiplier * self.quoted_price;
-        if contract_value > 0.0 {
-            self.notional.amount() / contract_value
-        } else {
-            0.0
+    /// Validate listed terms and the positive-price domain of an index level.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.terms.validate()?;
+        for (name, value) in [
+            ("entry_price", Some(self.terms.entry_price)),
+            ("quoted_price", self.terms.quoted_price),
+            ("settlement_price", self.terms.settlement_price),
+        ] {
+            if value.is_some_and(|price| !price.is_finite() || price <= 0.0) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "VolatilityIndexFuture '{}' terms.{name} must be positive and finite",
+                    self.id
+                )));
+            }
         }
+        Ok(())
     }
 
     /// Calculate the raw present value as f64.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context containing the volatility index curve.
+    /// * `as_of` - Valuation date controlling live versus final-settlement state.
     pub fn npv_raw(
         &self,
         context: &MarketContext,
@@ -259,16 +197,44 @@ impl VolatilityIndexFuture {
         pricer::compute_pv_raw(self, context, as_of)
     }
 
-    /// Get the forward volatility level at settlement.
-    pub fn forward_vol(&self, context: &MarketContext) -> finstack_quant_core::Result<f64> {
-        pricer::forward_vol(self, context)
+    /// Model futures level in index points: the volatility index curve read at
+    /// `terms.settlement_date`.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context containing the volatility index curve.
+    /// * `as_of` - Valuation date. The curve's own base date anchors the time
+    ///   axis, so the level does not depend on `as_of`; the argument keeps the
+    ///   signature of the other listed futures' `fair_price`.
+    pub fn fair_price(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        pricer::fair_price(self, context, as_of)
     }
 
-    /// Calculate DV01 (delta with respect to vol index level).
+    /// Resolve the live quote, model level, or official final settlement price.
     ///
-    /// Returns the P&L change for a 1-point increase in the vol index level.
-    pub fn delta_vol(&self) -> f64 {
-        pricer::delta_vol(self)
+    /// On and after `terms.settlement_date` the SOQ in `terms.settlement_price`
+    /// is required; before it the listed-future lifecycle rules apply.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context containing the volatility index curve.
+    /// * `as_of` - Valuation date controlling live versus final-settlement state.
+    pub fn mark_price(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        pricer::mark_price(self, context, as_of)
+    }
+
+    /// P&L change for a 1-point increase in the vol index level
+    /// (`sign × contracts × multiplier`).
+    pub fn delta_vol(&self) -> finstack_quant_core::Result<f64> {
+        self.terms.point_delta()
     }
 }
 
@@ -308,7 +274,7 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
     ) -> finstack_quant_core::Result<(f64, Currency)> {
         Ok((
             pricer::compute_pv_raw(self, curves, as_of)?,
-            self.notional.currency(),
+            self.terms.currency,
         ))
     }
 
@@ -317,45 +283,24 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
     }
 
     fn expiry(&self) -> Option<Date> {
-        Some(self.settlement_date)
+        Some(self.terms.settlement_date)
     }
 
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
-        if self.expiry > self.settlement_date {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VolatilityIndexFuture '{}' expiry must not follow settlement",
-                self.id
-            )));
-        }
-        if !self.quoted_price.is_finite() || self.quoted_price <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VolatilityIndexFuture '{}' quoted_price must be positive and finite",
-                self.id
-            )));
-        }
-        if !self.contract_specs.multiplier.is_finite() || self.contract_specs.multiplier <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VolatilityIndexFuture '{}' multiplier must be positive and finite",
-                self.id
-            )));
-        }
-        if let Some(fixing) = self.settlement_fixing {
-            if !fixing.is_finite() || fixing <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "VolatilityIndexFuture '{}' settlement_fixing must be positive and finite",
-                    self.id
-                )));
-            }
-        }
-        Ok(())
+        self.validate()
     }
 
     crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture {
+    /// Market-value exposure at the entry price:
+    /// `contracts × multiplier × entry_price` in `terms.currency`.
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
-        Ok(Some(self.notional))
+        Ok(Some(Money::new(
+            self.terms.contracts * self.terms.multiplier * self.terms.entry_price,
+            self.terms.currency,
+        )?))
     }
 
     fn raw_cashflow_schedule(
@@ -381,6 +326,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture 
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
+    use crate::instruments::Position;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::term_structures::{PriceCurve, PriceCurveKind};
     use time::Month;
@@ -407,6 +353,21 @@ mod tests {
         MarketContext::new().insert(disc).insert(vix)
     }
 
+    /// One VIX contract ($1000/point) settling on 2025-04-01.
+    fn listed_terms(entry_price: f64, position: Position) -> ListedFutureTerms {
+        let settlement = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        ListedFutureTerms::new(
+            1.0,
+            1_000.0,
+            Currency::USD,
+            entry_price,
+            settlement,
+            settlement,
+            position,
+        )
+        .expect("terms")
+    }
+
     #[test]
     fn test_at_market_future() {
         let market = setup_market();
@@ -415,12 +376,7 @@ mod tests {
         // Create a future at the forward price (should have zero NPV)
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-ATM"))
-            .notional(Money::from((20_000_i64, Currency::USD))) // 1 contract at 20
-            .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .quoted_price(20.0) // At the 3M forward level
-            .position(Position::Long)
-            .contract_specs(VolIndexContractSpecs::vix())
+            .terms(listed_terms(20.0, Position::Long))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
@@ -443,12 +399,7 @@ mod tests {
         // Long position entered above today's forward mark
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-LONG"))
-            .notional(Money::from((22_000_i64, Currency::USD))) // ~1 contract
-            .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .quoted_price(22.0) // Entry above the ~20 forward level
-            .position(Position::Long)
-            .contract_specs(VolIndexContractSpecs::vix())
+            .terms(listed_terms(22.0, Position::Long))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
@@ -467,15 +418,10 @@ mod tests {
         let market = setup_market();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        // Short position with quoted price above forward
+        // Short position with entry price above forward
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-SHORT"))
-            .notional(Money::from((22_000_i64, Currency::USD)))
-            .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .quoted_price(22.0)
-            .position(Position::Short)
-            .contract_specs(VolIndexContractSpecs::vix())
+            .terms(listed_terms(22.0, Position::Short))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
@@ -493,18 +439,13 @@ mod tests {
     fn test_delta_vol() {
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-DELTA"))
-            .notional(Money::from((20_000_i64, Currency::USD))) // 1 contract at 20
-            .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .quoted_price(20.0)
-            .position(Position::Long)
-            .contract_specs(VolIndexContractSpecs::vix())
+            .terms(listed_terms(20.0, Position::Long))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .build()
             .expect("valid future");
 
-        let delta = future.delta_vol();
+        let delta = future.delta_vol().expect("delta");
         // Long 1 contract: delta = +1 × 1000 = +1000
         // (NPV increases by $1000 for each 1-point increase in forward vol)
         assert!(
@@ -522,6 +463,6 @@ mod tests {
         let recovered: VolatilityIndexFuture =
             serde_json::from_str(&json).expect("json deserialization");
         assert_eq!(future.id, recovered.id);
-        assert!((future.quoted_price - recovered.quoted_price).abs() < 1e-10);
+        assert_eq!(future, recovered);
     }
 }

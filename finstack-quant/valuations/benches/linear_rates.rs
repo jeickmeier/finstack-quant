@@ -20,11 +20,11 @@ use finstack_quant_valuations::instruments::rates::ir_future::{
     FutureContractSpecs, InterestRateFuture, RateAveragingMethod,
 };
 use finstack_quant_valuations::instruments::rates::repo::{CollateralSpec, Repo};
-use finstack_quant_valuations::instruments::Position;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::{
     ExerciseStyle, Instrument, PayReceive, SettlementType,
 };
+use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -236,15 +236,20 @@ fn ir_future() -> InterestRateFuture {
     let end = date_support::date(2025, 10, 1);
     InterestRateFuture {
         id: InstrumentId::new("IRF-BENCH"),
-        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        expiry: start,
+        terms: ListedFutureTerms::new(
+            1.0,
+            2_500.0,
+            Currency::USD,
+            97.50,
+            start,
+            start,
+            Position::Long,
+        )
+        .expect("valid listed terms"),
         fixing_date: Some(start),
         period_start: Some(start),
         period_end: Some(end),
-        quoted_price: 97.50,
-        settlement_price: None,
         day_count: DayCount::Act360,
-        position: Position::Long,
         contract_specs: FutureContractSpecs {
             convexity_adjustment: Some(0.0),
             ..FutureContractSpecs::default()

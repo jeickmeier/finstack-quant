@@ -20,7 +20,7 @@
           "type": "integer"
         },
         "face_value": {
-          "description": "Face value of contract (e.g., $1,000,000 for Eurodollar/SOFR futures)",
+          "description": "Face value of one contract in currency units (e.g., $1,000,000 for\nEurodollar/SOFR futures)",
           "format": "double",
           "type": "number"
         },
@@ -28,17 +28,11 @@
           "description": "Tick size in price points (e.g., 0.0025 = 0.25bp for SOFR futures)",
           "format": "double",
           "type": "number"
-        },
-        "tick_value": {
-          "description": "Tick value in currency units (e.g., $6.25 for 3M SOFR)",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
         "face_value",
         "tick_size",
-        "tick_value",
         "delivery_months"
       ],
       "type": "object"
@@ -50,7 +44,7 @@
     },
     "InterestRateFuture": {
       "additionalProperties": false,
-      "description": "Interest Rate Future instrument.",
+      "description": "Interest Rate Future instrument.\n\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]. `terms.multiplier` is the settlement-currency\nvalue of one full price point per contract (`tick_value / tick_size`, e.g.\n$2,500 for CME SR3), `terms.last_trading_date` is the last trading day and\n`terms.settlement_date` is the date after which the position carries no\nvalue (the last trading day for term-rate contracts, the reference-period\nend for in-arrears overnight contracts).",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -68,10 +62,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve identifier"
         },
-        "expiry": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Future expiry/delivery date"
-        },
         "fixing_calendar_id": {
           "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used.",
           "type": [
@@ -88,7 +78,7 @@
               "type": "null"
             }
           ],
-          "description": "Underlying rate fixing date.\n\nDefaults to `expiry` when omitted."
+          "description": "Underlying rate fixing date.\n\nDefaults to `terms.last_trading_date` when omitted."
         },
         "fixing_index_id": {
           "anyOf": [
@@ -117,10 +107,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Exposure size expressed in currency units. PV is scaled by\n`notional.amount() / contract_specs.face_value` to support\nmultiples of the standard contract."
-        },
         "period_end": {
           "anyOf": [
             {
@@ -143,15 +129,6 @@
           ],
           "description": "Rate period start date.\n\nDefaults to 2 calendar days after fixing date when omitted."
         },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)"
-        },
-        "quoted_price": {
-          "description": "Quoted future price (e.g., 99.25)",
-          "format": "double",
-          "type": "number"
-        },
         "rate_averaging": {
           "$ref": "#/$defs/RateAveragingMethod",
           "description": "Rate settlement method defined by the exchange contract."
@@ -160,13 +137,9 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement_price": {
-          "description": "Optional official final settlement price in futures price points.\n\nRequired after the last trading date for in-arrears contracts whose\nfinal settlement occurs after trading terminates.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position, multiplier, price and lifecycle terms."
         },
         "vol_surface_id": {
           "anyOf": [
@@ -182,16 +155,127 @@
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
-        "quoted_price",
+        "terms",
         "day_count",
-        "position",
         "contract_specs",
         "discount_curve_id",
         "forward_curve_id",
         "rate_averaging",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "ListedFutureSettlement": {
+      "description": "Final settlement mode for a listed future.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash settlement of final variation margin.",
+          "properties": {
+            "type": {
+              "const": "cash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Delivery of a standardized quantity of an identified asset.",
+          "properties": {
+            "asset": {
+              "description": "Deliverable asset, grade, location, or basket identifier.",
+              "type": "string"
+            },
+            "quantity_per_contract": {
+              "description": "Physical units delivered per exchange contract.",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "physical",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "asset",
+            "quantity_per_contract"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ListedFutureTerms": {
+      "additionalProperties": false,
+      "description": "Standardized position, multiplier, and lifecycle terms for a listed future.",
+      "properties": {
+        "contracts": {
+          "description": "Number of exchange contracts. Fractional values are permitted for\nportfolio aggregation but must be finite and strictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency in which variation margin is paid."
+        },
+        "entry_price": {
+          "description": "Trade fill price in the same price-point units as the market mark.",
+          "format": "double",
+          "type": "number"
+        },
+        "last_trading_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Final date on which the contract trades."
+        },
+        "multiplier": {
+          "description": "Settlement-currency value of one full price point per contract.",
+          "format": "double",
+          "type": "number"
+        },
+        "position": {
+          "$ref": "#/$defs/Position",
+          "description": "Long or short position direction."
+        },
+        "quoted_price": {
+          "description": "Optional live exchange mark, in price points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "settlement": {
+          "$ref": "#/$defs/ListedFutureSettlement",
+          "default": {
+            "type": "cash"
+          },
+          "description": "Cash or physical final settlement convention."
+        },
+        "settlement_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date on which final cash settlement is completed."
+        },
+        "settlement_price": {
+          "description": "Optional official final settlement price, in price points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "contracts",
+        "multiplier",
+        "currency",
+        "entry_price",
+        "last_trading_date",
+        "settlement_date",
+        "position"
       ],
       "type": "object"
     },
@@ -261,24 +345,28 @@
             "convexity_adjustment": 0.0,
             "delivery_months": 3,
             "face_value": 1000000.0,
-            "tick_size": 0.0025,
-            "tick_value": 6.25
+            "tick_size": 0.0025
           },
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
-          "expiry": "2025-03-17",
           "fixing_date": "2025-03-17",
           "forward_curve_id": "USD-SOFR-3M",
           "id": "IRF-ED-3M-MAR25",
-          "notional": {
-            "amount": "1000000",
-            "currency": "USD"
-          },
           "period_end": "2025-06-18",
           "period_start": "2025-03-19",
-          "position": "long",
-          "quoted_price": 95.5,
           "rate_averaging": "term",
+          "terms": {
+            "contracts": 1.0,
+            "currency": "USD",
+            "entry_price": 95.5,
+            "last_trading_date": "2025-03-17",
+            "multiplier": 2500.0,
+            "position": "long",
+            "settlement": {
+              "type": "cash"
+            },
+            "settlement_date": "2025-03-17"
+          },
           "vol_surface_id": null
         },
         "type": "interest_rate_future"

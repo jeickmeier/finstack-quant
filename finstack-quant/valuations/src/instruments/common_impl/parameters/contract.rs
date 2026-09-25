@@ -1,43 +1,6 @@
-//! Contract specifications and general parameter types.
+//! Schedule specification parameter type.
 
 use serde::{Deserialize, Serialize};
-
-/// Contract size information for derivatives
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct ContractSpec {
-    /// Number of units per contract
-    pub contract_size: f64,
-    /// Optional multiplier for pricing
-    pub multiplier: Option<f64>,
-}
-
-impl ContractSpec {
-    /// Create a new contract specification
-    pub fn new(contract_size: f64) -> Self {
-        Self {
-            contract_size,
-            multiplier: None,
-        }
-    }
-
-    /// Standard single-unit contract
-    pub fn unit() -> Self {
-        Self::new(1.0)
-    }
-
-    /// Set the contract multiplier
-    pub fn with_multiplier(mut self, multiplier: f64) -> Self {
-        self.multiplier = Some(multiplier);
-        self
-    }
-}
-
-impl Default for ContractSpec {
-    fn default() -> Self {
-        Self::unit()
-    }
-}
 
 /// Schedule specification for payment periods
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,21 +77,6 @@ mod tests {
 
     fn sample_dates() -> (Date, Date) {
         (date!(2025 - 01 - 02), date!(2026 - 01 - 02))
-    }
-
-    #[test]
-    fn contract_spec_builders_set_expected_fields() {
-        let plain = ContractSpec::new(1000.0);
-        let unit = ContractSpec::unit();
-        let custom = ContractSpec::new(50.0).with_multiplier(2.5);
-
-        assert_eq!(plain.contract_size, 1000.0);
-        assert_eq!(plain.multiplier, None);
-        assert_eq!(unit.contract_size, 1.0);
-        assert_eq!(unit.multiplier, None);
-        assert_eq!(custom.contract_size, 50.0);
-        assert_eq!(custom.multiplier, Some(2.5));
-        assert_eq!(ContractSpec::default().contract_size, 1.0);
     }
 
     #[test]

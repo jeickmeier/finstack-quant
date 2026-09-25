@@ -283,7 +283,7 @@
     },
     "BondFuture": {
       "additionalProperties": false,
-      "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but\n  do not mutate the selected CTD. [`crate::instruments::Instrument::value`]\n  marks the caller-supplied CTD only; refresh it daily with\n  [`Self::determine_ctd_by_implied_repo`] when the basket can switch.\n- **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureSpecs, DeliverableBond,\n};\nuse finstack_quant_valuations::instruments::{Attributes, Position};\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .expiry(date!(2025 - 03 - 20))\n    .delivery_start(date!(2025 - 03 - 21))\n    .delivery_end(date!(2025 - 03 - 31))\n    .quoted_price(125.50)\n    .position(Position::Long)\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```",
+      "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but\n  do not mutate the selected CTD. [`crate::instruments::Instrument::value`]\n  marks the caller-supplied CTD only; refresh it daily with\n  [`Self::determine_ctd_by_implied_repo`] when the basket can switch.\n- **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureSpecs, DeliverableBond,\n};\nuse finstack_quant_valuations::instruments::{Attributes, ListedFutureTerms, Position};\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\n// 10 UST 10Y contracts ($100,000 face each, $1,000 per price point).\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .terms(ListedFutureTerms::new(\n        10.0,\n        1_000.0,\n        Currency::USD,\n        125.50,\n        date!(2025 - 03 - 20),\n        date!(2025 - 03 - 31),\n        Position::Long,\n    )?)\n    .delivery_start(date!(2025 - 03 - 21))\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -291,7 +291,7 @@
         },
         "contract_specs": {
           "$ref": "#/$defs/BondFutureSpecs",
-          "description": "Contract specifications (contract size, standard coupon, repo day count)"
+          "description": "Contract specifications (standard coupon, standard maturity, repo day count)"
         },
         "ctd_bond": {
           "anyOf": [
@@ -323,10 +323,6 @@
           "minItems": 1,
           "type": "array"
         },
-        "delivery_end": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Last delivery date"
-        },
         "delivery_start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "First delivery date"
@@ -334,10 +330,6 @@
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Financing/discount curve identifier.\n\nUsed to carry the CTD bond forward to the delivery date (the cost of\nfinancing the position) whenever no explicit [`repo_curve_id`](Self::repo_curve_id)\nis set. Must be provisionable as a discount curve in the market context."
-        },
-        "expiry": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Future expiry date (last trading day)"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -350,18 +342,6 @@
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
-        },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional exposure in currency units.\nFor multiple contracts, use notional = contract_specs.contract_size × num_contracts"
-        },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)"
-        },
-        "quoted_price": {
-          "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\nUsed only for mark-to-market: `base_value` returns model-minus-contract\nvalue for a long position. Basis, implied-repo and invoice helpers take\nthe current futures price as an explicit argument instead.\nCurrent-settlement variation margin is a separate cash-P&L workflow."
         },
         "repo_curve_id": {
           "anyOf": [
@@ -377,16 +357,16 @@
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position and lifecycle terms. `terms.multiplier` is the\ncurrency value of one full price point (per-contract face / 100),\n`terms.entry_price` the trade price per 100 face, `terms.last_trading_date`\nthe last trading day and `terms.settlement_date` the last delivery date."
         }
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
+        "terms",
         "delivery_start",
-        "delivery_end",
-        "quoted_price",
-        "position",
         "contract_specs",
         "deliverable_basket",
         "discount_curve_id",
@@ -396,13 +376,8 @@
     },
     "BondFutureSpecs": {
       "additionalProperties": false,
-      "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract: contract\nsize, the notional bond parameters used for conversion factor\ncalculations, and the implied-repo day count.\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`delivery_end` and the caller-supplied invoice settlement date, so the\nspec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```",
+      "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date` and the caller-supplied invoice settlement date, so\nthe spec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```",
       "properties": {
-        "contract_size": {
-          "description": "Face value of a single contract (e.g., $100,000 for UST)",
-          "format": "double",
-          "type": "number"
-        },
         "repo_day_count": {
           "$ref": "#/$defs/RepoDayCountWire",
           "default": "act_360",
@@ -420,7 +395,6 @@
         }
       },
       "required": [
-        "contract_size",
         "standard_coupon",
         "standard_maturity_years"
       ],
@@ -1288,6 +1262,120 @@
         }
       ]
     },
+    "ListedFutureSettlement": {
+      "description": "Final settlement mode for a listed future.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash settlement of final variation margin.",
+          "properties": {
+            "type": {
+              "const": "cash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Delivery of a standardized quantity of an identified asset.",
+          "properties": {
+            "asset": {
+              "description": "Deliverable asset, grade, location, or basket identifier.",
+              "type": "string"
+            },
+            "quantity_per_contract": {
+              "description": "Physical units delivered per exchange contract.",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "physical",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "asset",
+            "quantity_per_contract"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ListedFutureTerms": {
+      "additionalProperties": false,
+      "description": "Standardized position, multiplier, and lifecycle terms for a listed future.",
+      "properties": {
+        "contracts": {
+          "description": "Number of exchange contracts. Fractional values are permitted for\nportfolio aggregation but must be finite and strictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency in which variation margin is paid."
+        },
+        "entry_price": {
+          "description": "Trade fill price in the same price-point units as the market mark.",
+          "format": "double",
+          "type": "number"
+        },
+        "last_trading_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Final date on which the contract trades."
+        },
+        "multiplier": {
+          "description": "Settlement-currency value of one full price point per contract.",
+          "format": "double",
+          "type": "number"
+        },
+        "position": {
+          "$ref": "#/$defs/Position",
+          "description": "Long or short position direction."
+        },
+        "quoted_price": {
+          "description": "Optional live exchange mark, in price points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "settlement": {
+          "$ref": "#/$defs/ListedFutureSettlement",
+          "default": {
+            "type": "cash"
+          },
+          "description": "Cash or physical final settlement convention."
+        },
+        "settlement_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date on which final cash settlement is completed."
+        },
+        "settlement_price": {
+          "description": "Optional official final settlement price, in price points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "contracts",
+        "multiplier",
+        "currency",
+        "entry_price",
+        "last_trading_date",
+        "settlement_date",
+        "position"
+      ],
+      "type": "object"
+    },
     "MakeWholeSpec": {
       "additionalProperties": false,
       "description": "Make-whole call specification.\n\nDefines the reference curve and spread used to compute the make-whole redemption\nprice. The issuer pays the holder the greater of par and the present value of\nremaining cashflows discounted at the reference rate plus a spread.\n\n# Industry Practice\n\n- Investment-grade corporates: typically Treasury + 25-50 bp\n- High-yield: typically Treasury + 50-100 bp\n- Convertibles: typically Treasury + 50 bp",
@@ -1307,12 +1395,6 @@
         "spread_bp"
       ],
       "type": "object"
-    },
-    "NonNegativeF64Wire": {
-      "description": "Finite JSON number greater than or equal to zero.",
-      "format": "double",
-      "minimum": 0.0,
-      "type": "number"
     },
     "Notional": {
       "additionalProperties": false,
@@ -1770,7 +1852,6 @@
         "spec": {
           "attributes": {},
           "contract_specs": {
-            "contract_size": 100000.0,
             "repo_day_count": "act_360",
             "standard_coupon": 0.06,
             "standard_maturity_years": 10.0
@@ -1786,17 +1867,21 @@
               "conversion_factor": 0.7915
             }
           ],
-          "delivery_end": "2025-09-30",
           "delivery_start": "2025-09-22",
           "discount_curve_id": "USD-TREASURY",
-          "expiry": "2025-09-19",
           "id": "TYU5",
-          "notional": {
-            "amount": "1000000",
-            "currency": "USD"
-          },
-          "position": "long",
-          "quoted_price": 112.25
+          "terms": {
+            "contracts": 10.0,
+            "currency": "USD",
+            "entry_price": 112.25,
+            "last_trading_date": "2025-09-19",
+            "multiplier": 1000.0,
+            "position": "long",
+            "settlement": {
+              "type": "cash"
+            },
+            "settlement_date": "2025-09-30"
+          }
         },
         "type": "bond_future"
       },

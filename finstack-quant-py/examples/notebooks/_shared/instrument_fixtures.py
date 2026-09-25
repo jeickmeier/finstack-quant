@@ -550,19 +550,24 @@ def ir_future(idx: int) -> tuple[str, dict]:
         "type": "interest_rate_future",
         "spec": {
             "id": iid,
-            "notional": {"amount": "1000000", "currency": "USD"},
-            "expiry": f"{y}-{m}-17",
+            # One CME SR3 contract: $2,500 per price point ($6.25 per 0.0025 tick).
+            "terms": {
+                "contracts": 1.0,
+                "multiplier": 2500.0,
+                "currency": "USD",
+                "entry_price": price,
+                "last_trading_date": f"{y}-{m}-17",
+                "settlement_date": f"{y}-{m}-17",
+                "position": "long" if idx % 2 == 0 else "short",
+            },
             "fixing_date": f"{y}-{m}-17",
             "period_start": f"{y}-{m}-19",
             "period_end": f"{ey}-{em}-18",
-            "quoted_price": price,
             "day_count": "act_360",
             "rate_averaging": "term",
-            "position": "long" if idx % 2 == 0 else "short",
             "contract_specs": {
                 "face_value": 1000000.0,
                 "tick_size": 0.0025,
-                "tick_value": 6.25,
                 "delivery_months": 3,
                 "convexity_adjustment": 0.0002,
             },
@@ -790,9 +795,9 @@ def instrument_description(instrument_spec: dict) -> str:
         return f"Swpn {opt} {swap_tenor}Y K={strike:.1f}%"
 
     if itype == "interest_rate_future":
-        exp = s["expiry"][:7]
-        pos = s["position"][:1].upper()
-        price = float(s["quoted_price"])
+        exp = s["terms"]["last_trading_date"][:7]
+        pos = s["terms"]["position"][:1].upper()
+        price = float(s["terms"]["entry_price"])
         return f"SOFR Fut {exp} {pos} @{price:.2f}"
 
     if itype == "equity":

@@ -509,7 +509,6 @@ def futures_inputs() -> dict[str, dict[str, Any]]:
             "id": "UST-FUTURE",
             "attributes": {},
             "contract_specs": {
-                "contract_size": 100000.0,
                 "repo_day_count": "act_360",
                 "standard_coupon": 0.06,
                 "standard_maturity_years": 10.0,
@@ -520,14 +519,18 @@ def futures_inputs() -> dict[str, dict[str, Any]]:
                 {"bond_id": "UST-DELIVERABLE-A", "conversion_factor": 0.845},
                 {"bond_id": "UST-DELIVERABLE-B", "conversion_factor": 0.95},
             ],
-            "delivery_end": "2025-09-30",
             "delivery_start": "2025-09-22",
             "discount_curve_id": "USD-TREASURY",
             "repo_curve_id": "USD-REPO",
-            "expiry": "2025-09-19",
-            "notional": {"amount": "1000000", "currency": "USD"},
-            "position": "long",
-            "quoted_price": 108.0,
+            "terms": {
+                "contracts": 10.0,
+                "multiplier": 1000.0,
+                "currency": "USD",
+                "entry_price": 108.0,
+                "last_trading_date": "2025-09-19",
+                "settlement_date": "2025-09-30",
+                "position": "long",
+            },
         },
     }
     listed = {
@@ -603,15 +606,17 @@ def variance_inputs() -> dict[str, dict[str, Any]]:
         "spec": {
             "id": "VIX-FUTURE",
             "attributes": {},
-            "contract_specs": {"index_id": "VIX", "multiplier": 1000.0, "tick_size": 0.05, "tick_value": 50.0},
             "discount_curve_id": "USD-OIS",
-            "expiry": "2025-03-19",
-            "settlement_date": "2025-03-19",
             "vol_index_curve_id": "VIX",
-            "notional": {"amount": "100000", "currency": "USD"},
-            "quoted_price": 21.5,
-            "position": "long",
-            "settlement_fixing": None,
+            "terms": {
+                "contracts": 100000.0 / (1000.0 * 21.5),
+                "multiplier": 1000.0,
+                "currency": "USD",
+                "entry_price": 21.5,
+                "last_trading_date": "2025-03-19",
+                "settlement_date": "2025-03-19",
+                "position": "long",
+            },
         },
     }
     option = futures_inputs()["SPX-FUTURE-CALL"]

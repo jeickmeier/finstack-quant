@@ -4,7 +4,7 @@
 //! - **underlying**: Underlying asset parameters (FX, equity, index)
 //! - **legs**: Leg specifications for swaps and structured products
 //! - **market**: Market-specific parameters for options and derivatives
-//! - **contract**: Contract specifications and general types
+//! - **contract**: Schedule specification type
 //! - **conventions**: Standard market conventions for bonds and swaps
 
 pub mod contract;
@@ -17,7 +17,7 @@ pub mod trs_common;
 pub mod underlying;
 pub mod volatility;
 
-pub use contract::{ContractSpec, ScheduleSpec};
+pub use contract::ScheduleSpec;
 pub use conventions::{BondConvention, CommodityConvention, IRSConvention};
 pub use finstack_quant_models::types::OptionMarketParams;
 pub use legs::{

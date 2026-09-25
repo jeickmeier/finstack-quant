@@ -384,11 +384,10 @@ rationale = "The complete persisted equity_total_return_future spec implements P
 [[instrument]]
 tag = "volatility_index_future"
 fixture = "json_examples/volatility_index_future.json"
-lossless = false
-partial_eq_blocker = "VolatilityIndexFuture.contract_specs: VolIndexContractSpecs"
+lossless = true
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "VolatilityIndexFuture.contract_specs: VolIndexContractSpecs lacks PartialEq across settlement and multiplier terms."
+rationale = "The complete persisted volatility_index_future spec implements PartialEq; registry coverage compares the concrete Rust values."
 
 [[instrument]]
 tag = "fx_spot"

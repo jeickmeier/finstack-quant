@@ -1,6 +1,5 @@
 //! Embedded exchange contract-specification registry.
 
-use crate::instruments::equity::vol_index_future::VolIndexContractSpecs;
 use crate::instruments::fixed_income::bond_future::BondFutureSpecs;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
@@ -18,7 +17,6 @@ static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<ContractSpecRegistry> = EmbeddedJ
 pub(crate) struct ContractSpecRegistry {
     schema: String,
     bond_futures: Vec<BondFutureSpecRecord>,
-    vol_index_futures: Vec<VolIndexFutureSpecRecord>,
     repo_defaults: Vec<RepoDefaultRecord>,
 }
 
@@ -30,24 +28,9 @@ impl ContractSpecRegistry {
             .find(|record| has_id(&record.ids, id))
             .ok_or_else(|| not_found("bond future contract spec", id))?;
         Ok(BondFutureSpecs {
-            contract_size: record.contract_size,
             standard_coupon: record.standard_coupon,
             standard_maturity_years: record.standard_maturity_years,
             repo_day_count: record.repo_day_count,
-        })
-    }
-
-    pub(crate) fn vol_index_future_specs(&self, id: &str) -> Result<VolIndexContractSpecs> {
-        let record = self
-            .vol_index_futures
-            .iter()
-            .find(|record| has_id(&record.ids, id))
-            .ok_or_else(|| not_found("volatility index future contract spec", id))?;
-        Ok(VolIndexContractSpecs {
-            multiplier: record.multiplier,
-            tick_size: record.tick_size,
-            tick_value: record.tick_value,
-            index_id: record.index_id.clone(),
         })
     }
 
@@ -74,22 +57,12 @@ impl ContractSpecRegistry {
         )?;
         finstack_quant_core::validation::validate_unique_ids(
             "contract-spec registry",
-            "volatility index future contract spec",
-            self.vol_index_futures
-                .iter()
-                .map(|record| record.ids.as_slice()),
-        )?;
-        finstack_quant_core::validation::validate_unique_ids(
-            "contract-spec registry",
             "repo default spec",
             self.repo_defaults
                 .iter()
                 .map(|record| record.ids.as_slice()),
         )?;
         for record in &self.bond_futures {
-            record.validate()?;
-        }
-        for record in &self.vol_index_futures {
             record.validate()?;
         }
         for record in &self.repo_defaults {
@@ -115,7 +88,6 @@ struct BondFutureSpecRecord {
     source: String,
     source_version: String,
     effective_date: String,
-    contract_size: f64,
     standard_coupon: f64,
     standard_maturity_years: f64,
     repo_day_count: DayCount,
@@ -132,10 +104,6 @@ impl BondFutureSpecRecord {
             &self.effective_date,
             "bond future effective date",
         )?;
-        finstack_quant_core::validation::validate_f64_positive(
-            self.contract_size,
-            "bond future contract size",
-        )?;
         finstack_quant_core::validation::validate_f64_unit_interval(
             self.standard_coupon,
             "bond future standard coupon",
@@ -151,49 +119,6 @@ impl BondFutureSpecRecord {
             )));
         }
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct VolIndexFutureSpecRecord {
-    ids: Vec<String>,
-    source: String,
-    source_version: String,
-    effective_date: String,
-    multiplier: f64,
-    tick_size: f64,
-    tick_value: f64,
-    index_id: String,
-}
-
-impl VolIndexFutureSpecRecord {
-    fn validate(&self) -> Result<()> {
-        finstack_quant_core::validation::validate_source_metadata(
-            "volatility index future contract spec",
-            &self.source,
-            &self.source_version,
-        )?;
-        finstack_quant_core::validation::validate_non_blank(
-            &self.effective_date,
-            "volatility index future effective date",
-        )?;
-        finstack_quant_core::validation::validate_f64_positive(
-            self.multiplier,
-            "volatility index future multiplier",
-        )?;
-        finstack_quant_core::validation::validate_f64_positive(
-            self.tick_size,
-            "volatility index future tick size",
-        )?;
-        finstack_quant_core::validation::validate_f64_positive(
-            self.tick_value,
-            "volatility index future tick value",
-        )?;
-        finstack_quant_core::validation::validate_non_blank(
-            &self.index_id,
-            "volatility index future index id",
-        )
     }
 }
 
@@ -293,22 +218,11 @@ mod tests {
         let ust_10y = registry
             .bond_future_specs("cme.ust_10y")
             .expect("UST 10Y spec");
-        assert_eq!(ust_10y.contract_size, 100_000.0);
         assert_eq!(ust_10y.standard_coupon, 0.06);
 
         let gilt = registry.bond_future_specs("gilt").expect("gilt spec");
         assert_eq!(gilt.standard_coupon, 0.04);
         assert_eq!(gilt.repo_day_count, DayCount::Act365F);
-    }
-
-    #[test]
-    fn embedded_registry_preserves_vol_future_specs() {
-        let registry = embedded_registry().expect("registry should load");
-        let vix_future = registry
-            .vol_index_future_specs("cboe.vix_future")
-            .expect("VIX future spec");
-        assert_eq!(vix_future.multiplier, 1000.0);
-        assert_eq!(vix_future.index_id, "VIX");
     }
 
     #[test]

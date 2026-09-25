@@ -226,14 +226,14 @@ impl BondFuturePricer {
     /// Returns an error if `conversion_factor` is not positive and finite, the
     /// discount factor to delivery is not positive and finite, or CTD pricing,
     /// schedule, accrual, or curve lookup fails.
-    pub fn calculate_model_price(
+    pub fn fair_price(
         ctd_bond: &Bond,
         conversion_factor: f64,
         market: &MarketContext,
         as_of: Date,
         delivery_date: Date,
     ) -> Result<f64> {
-        Self::calculate_model_price_with_financing_curve(
+        Self::fair_price_with_financing_curve(
             ctd_bond,
             conversion_factor,
             market,
@@ -243,7 +243,7 @@ impl BondFuturePricer {
         )
     }
 
-    fn calculate_model_price_with_financing_curve(
+    fn fair_price_with_financing_curve(
         ctd_bond: &Bond,
         conversion_factor: f64,
         market: &MarketContext,
@@ -308,12 +308,13 @@ impl BondFuturePricer {
         Ok(forward_clean_percent / conversion_factor)
     }
 
-    /// Calculate the model price using the financing convention declared by a future.
+    /// Model futures price of `future` (points per 100 face) using the
+    /// financing convention it declares.
     ///
     /// The CTD is carried to `max(future.delivery_start, as_of)`. The financing
     /// curve is `future.repo_curve_id` when set, otherwise the future's own
     /// `discount_curve_id`.
-    pub(crate) fn calculate_model_price_for_future(
+    pub(crate) fn fair_price_for_future(
         future: &super::BondFuture,
         ctd_bond: &Bond,
         conversion_factor: f64,
@@ -325,7 +326,7 @@ impl BondFuturePricer {
             .repo_curve_id
             .as_ref()
             .unwrap_or(&future.discount_curve_id);
-        Self::calculate_model_price_with_financing_curve(
+        Self::fair_price_with_financing_curve(
             ctd_bond,
             conversion_factor,
             market,
@@ -337,43 +338,45 @@ impl BondFuturePricer {
 
     /// Calculate the NPV (present value) of a bond future position.
     ///
-    /// The NPV represents the mark-to-market value of the futures position,
-    /// calculated as the undiscounted model-to-contract value.
+    /// The NPV is the undiscounted variation-margin value of the position
+    /// against its entry price, following the listed-future lifecycle in
+    /// `future.terms`: live contracts mark to `terms.terms.entry_price` when
+    /// supplied and otherwise to the CTD model price
+    /// ([`Self::fair_price_for_future`]); after `terms.last_trading_date` the
+    /// official `terms.settlement_price` is required; after
+    /// `terms.settlement_date` the value is zero.
     ///
     /// # Formula
     ///
-    /// NPV = (Model_Price - Contract_Price) × (Notional / 100) × Sign
+    /// NPV = Sign × Contracts × Multiplier × (Mark − Entry_Price)
     ///
-    /// Where:
-    /// - Contract_Price: Entry/contract price stored in `quoted_price`
-    /// - Model_Price: Theoretical fair value based on CTD bond
-    /// - Notional: Total notional exposure (contract_size × num_contracts)
-    /// - Sign: +1 for Long positions, -1 for Short positions
-    /// - Division by 100: Prices are quoted per $100 face value
-    ///
-    /// Note: No discount factor is applied because exchange-traded futures
-    /// settle daily via variation margin (mark-to-market).
+    /// Where `Multiplier` is the currency value of one full price point
+    /// (per-contract face / 100). No discount factor is applied because
+    /// exchange-traded futures settle daily via variation margin.
     ///
     /// # Arguments
     ///
-    /// - `future`: Bond future supplying entry price, notional, position side,
-    ///   delivery dates, and financing-curve policy.
+    /// - `future`: Bond future supplying listed terms (entry price, contracts,
+    ///   multiplier, position side, lifecycle dates), the delivery start and
+    ///   the financing-curve policy.
     /// - `ctd_bond`: Cheapest-to-deliver bond whose carry-adjusted clean price
     ///   determines the model futures price.
     /// - `conversion_factor`: Positive, finite, unitless conversion factor for
     ///   `ctd_bond`.
     /// - `market`: Market context containing the CTD pricing inputs and required
     ///   discount or repo curves.
-    /// - `as_of`: Valuation date. Dates after `future.delivery_end` return zero.
+    /// - `as_of`: Valuation date controlling the contract lifecycle.
     ///
     /// # Returns
     ///
-    /// Undiscounted mark-to-market value in the future notional's currency.
+    /// Undiscounted mark-to-market value in `future.terms.currency`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the conversion factor or delivery discount factor
-    /// is invalid, or if CTD pricing, schedule, accrual, or curve lookup fails.
+    /// Returns an error if the listed terms are invalid, the settlement price
+    /// is missing after the last trading date, the conversion factor or
+    /// delivery discount factor is invalid, or CTD pricing, schedule, accrual,
+    /// or curve lookup fails.
     pub fn calculate_npv(
         future: &super::BondFuture,
         ctd_bond: &Bond,
@@ -381,30 +384,12 @@ impl BondFuturePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        if as_of > future.delivery_end {
-            return Ok(Money::from((0_i64, future.notional.currency())));
-        }
-        // Calculate the theoretical model price, carrying the CTD forward to
-        // the contract's delivery date.
-        let model_price = Self::calculate_model_price_for_future(
-            future,
-            ctd_bond,
-            conversion_factor,
-            market,
-            as_of,
-        )?;
-
-        let price_diff = model_price - future.quoted_price;
-
-        let position_sign = future.position.sign();
-
-        // Futures MTM: no discounting — exchange-traded futures settle daily
-        // via variation margin, so the mark-to-market is undiscounted.
-        let notional_value = future.notional.amount();
-        let npv_amount = price_diff * (notional_value / 100.0) * position_sign;
-
-        // Return as Money with same currency as notional
-        Money::new(npv_amount, future.notional.currency())
+        let npv = future
+            .terms
+            .npv_from_model_price(future.id.as_str(), as_of, || {
+                Self::fair_price_for_future(future, ctd_bond, conversion_factor, market, as_of)
+            })?;
+        Money::new(npv, future.terms.currency)
     }
 }
 
@@ -466,7 +451,7 @@ mod tests {
 
     use crate::cashflow::traits::CashflowProvider;
     use crate::instruments::fixed_income::bond::Bond;
-    use crate::instruments::Position;
+    use crate::instruments::{ListedFutureTerms, Position};
 
     /// CME U.S. Treasury contract spec (6% notional coupon) with the given
     /// standard maturity, which selects the conversion-factor rounding rules.
@@ -813,7 +798,7 @@ mod tests {
             .expect("Failed to calculate conversion factor for par bond");
 
         // Calculate model futures price
-        let model_price = BondFuturePricer::calculate_model_price(
+        let model_price = BondFuturePricer::fair_price(
             &bond,
             cf,
             &market,
@@ -846,7 +831,7 @@ mod tests {
         let cf = BondFuturePricer::calculate_conversion_factor(&bond, &cme_specs(10.0), as_of)
             .expect("Failed to calculate conversion factor for discount bond");
 
-        let model_price = BondFuturePricer::calculate_model_price(
+        let model_price = BondFuturePricer::fair_price(
             &bond,
             cf,
             &market,
@@ -876,7 +861,7 @@ mod tests {
         let cf = BondFuturePricer::calculate_conversion_factor(&bond, &cme_specs(10.0), as_of)
             .expect("Failed to calculate conversion factor for premium bond");
 
-        let model_price = BondFuturePricer::calculate_model_price(
+        let model_price = BondFuturePricer::fair_price(
             &bond,
             cf,
             &market,
@@ -908,7 +893,7 @@ mod tests {
 
         let cf = BondFuturePricer::calculate_conversion_factor(&bond, &cme_specs(10.0), as_of)
             .expect("Failed to calculate conversion factor for manual verification");
-        let model_price = BondFuturePricer::calculate_model_price(
+        let model_price = BondFuturePricer::fair_price(
             &bond,
             cf,
             &market,
@@ -960,9 +945,8 @@ mod tests {
         let delivery_date = date!(2025 - 07 - 15);
         let cf = 0.8234_f64;
 
-        let model_price =
-            BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of, delivery_date)
-                .expect("carry-adjusted model price should compute");
+        let model_price = BondFuturePricer::fair_price(&bond, cf, &market, as_of, delivery_date)
+            .expect("carry-adjusted model price should compute");
 
         // --- Independent carry-adjusted forward reconstruction ---
         let disc = market
@@ -1014,7 +998,7 @@ mod tests {
     /// Helper to create a test BondFuture
     fn create_test_bond_future(
         notional: f64,
-        quoted_price: f64,
+        entry_price: f64,
         position: Position,
         expiry: Date,
     ) -> crate::instruments::fixed_income::bond_future::BondFuture {
@@ -1024,12 +1008,19 @@ mod tests {
 
         BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
-            .expiry(expiry)
+            .terms(
+                ListedFutureTerms::new(
+                    notional / 100_000.0,
+                    1_000.0,
+                    Currency::USD,
+                    entry_price,
+                    expiry,
+                    expiry + time::Duration::days(10),
+                    position,
+                )
+                .expect("terms"),
+            )
             .delivery_start(expiry + time::Duration::days(1))
-            .delivery_end(expiry + time::Duration::days(10))
-            .quoted_price(quoted_price)
-            .position(position)
             .contract_specs(BondFutureSpecs::default())
             .deliverable_basket(vec![DeliverableBond {
                 bond_id: InstrumentId::new("TEST_BOND"),
@@ -1045,11 +1036,11 @@ mod tests {
     #[test]
     fn test_npv_long_position() {
         // Setup: Long position where quoted price > model price (profitable)
-        let quoted_price = 125.50;
+        let entry_price = 125.50;
         let notional = 1_000_000.0; // 10 contracts × $100k
         let expiry = date!(2025 - 03 - 20);
 
-        let future = create_test_bond_future(notional, quoted_price, Position::Long, expiry);
+        let future = create_test_bond_future(notional, entry_price, Position::Long, expiry);
 
         // Create CTD bond that will result in model price < quoted price
         let ctd_bond = create_test_bond(
@@ -1070,7 +1061,7 @@ mod tests {
             .expect("Failed to calculate NPV for long position");
 
         println!("\n=== NPV Long Position Test ===");
-        println!("Quoted Price: {:.4}", quoted_price);
+        println!("Entry Price: {:.4}", entry_price);
         println!("Conversion Factor: {:.4}", cf);
         println!("Notional: ${:.0}", notional);
         println!("NPV: ${:.2}", npv.amount());
@@ -1083,7 +1074,7 @@ mod tests {
         // 1. NPV currency matches future currency
         assert_eq!(
             npv.currency(),
-            future.notional.currency(),
+            future.terms.currency,
             "NPV currency should match future currency"
         );
 
@@ -1123,19 +1114,14 @@ mod tests {
         );
         let cf = 0.8234;
 
-        let model =
-            BondFuturePricer::calculate_model_price_for_future(&future, &bond, cf, &market, as_of)
-                .expect("future-aware model price");
-        let fallback = BondFuturePricer::calculate_model_price(
-            &bond,
-            cf,
-            &market,
-            as_of,
-            future.delivery_start,
-        )
-        .expect("discount-curve fallback");
+        let model = BondFuturePricer::fair_price_for_future(&future, &bond, cf, &market, as_of)
+            .expect("future-aware model price");
+        let fallback =
+            BondFuturePricer::fair_price(&bond, cf, &market, as_of, future.delivery_start)
+                .expect("discount-curve fallback");
         let npv = BondFuturePricer::calculate_npv(&future, &bond, cf, &market, as_of).expect("npv");
-        let implied_model = future.quoted_price + npv.amount() * 100.0 / future.notional.amount();
+        let implied_model = future.terms.entry_price
+            + npv.amount() / (future.terms.contracts * future.terms.multiplier);
 
         assert!((model - implied_model).abs() < 1e-10);
         assert!(
@@ -1147,11 +1133,11 @@ mod tests {
     #[test]
     fn test_npv_short_position() {
         // Setup: Short position (opposite sign to long)
-        let quoted_price = 125.50;
+        let entry_price = 125.50;
         let notional = 1_000_000.0; // 10 contracts × $100k
         let expiry = date!(2025 - 03 - 20);
 
-        let future = create_test_bond_future(notional, quoted_price, Position::Short, expiry);
+        let future = create_test_bond_future(notional, entry_price, Position::Short, expiry);
 
         // Use same CTD bond and market as long position test
         let ctd_bond = create_test_bond(
@@ -1170,13 +1156,13 @@ mod tests {
             .expect("Failed to calculate NPV for short position");
 
         // For comparison, calculate NPV for equivalent long position
-        let future_long = create_test_bond_future(notional, quoted_price, Position::Long, expiry);
+        let future_long = create_test_bond_future(notional, entry_price, Position::Long, expiry);
 
         let npv_long = BondFuturePricer::calculate_npv(&future_long, &ctd_bond, cf, &market, as_of)
             .expect("Failed to calculate NPV for long position");
 
         println!("\n=== NPV Short Position Test ===");
-        println!("Quoted Price: {:.4}", quoted_price);
+        println!("Entry Price: {:.4}", entry_price);
         println!("Conversion Factor: {:.4}", cf);
         println!("NPV Short: ${:.2}", npv_short.amount());
         println!("NPV Long: ${:.2}", npv_long.amount());
@@ -1198,11 +1184,11 @@ mod tests {
         // Manual verification test with explicit values
         // This test verifies the NPV formula step-by-step
 
-        let quoted_price = 125.00; // Round number for easier calculation
+        let entry_price = 125.00; // Round number for easier calculation
         let notional = 1_000_000.0; // 10 contracts
         let expiry = date!(2025 - 03 - 20);
 
-        let future = create_test_bond_future(notional, quoted_price, Position::Long, expiry);
+        let future = create_test_bond_future(notional, entry_price, Position::Long, expiry);
 
         // Create a par bond (coupon = market rate) for predictable model price
         let ctd_bond = create_test_bond(
@@ -1220,27 +1206,22 @@ mod tests {
 
         // Use the contract's delivery date so the model price matches the one
         // `calculate_npv` derives internally (it carries the CTD to delivery).
-        let model_price = BondFuturePricer::calculate_model_price(
-            &ctd_bond,
-            cf,
-            &market,
-            as_of,
-            future.delivery_start,
-        )
-        .expect("Failed to calculate model price");
+        let model_price =
+            BondFuturePricer::fair_price(&ctd_bond, cf, &market, as_of, future.delivery_start)
+                .expect("Failed to calculate model price");
 
         let npv = BondFuturePricer::calculate_npv(&future, &ctd_bond, cf, &market, as_of)
             .expect("Failed to calculate NPV");
 
         println!("\n=== NPV Manual Verification ===");
-        println!("Quoted Price: {:.4}", quoted_price);
+        println!("Entry Price: {:.4}", entry_price);
         println!("Model Price: {:.4}", model_price);
-        println!("Price Differential: {:.4}", model_price - quoted_price);
+        println!("Price Differential: {:.4}", model_price - entry_price);
         println!("Conversion Factor: {:.4}", cf);
         println!("Notional: ${:.0}", notional);
 
         // Manual model-to-contract value (undiscounted futures convention).
-        let price_diff = model_price - quoted_price;
+        let price_diff = model_price - entry_price;
         let manual_npv = price_diff * (notional / 100.0) * 1.0; // 1.0 for Long
 
         println!("Manual NPV: ${:.2}", manual_npv);
@@ -1305,7 +1286,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
         let expiry = date!(2025 - 03 - 20);
         let delivery_start = date!(2025 - 03 - 21);
-        let delivery_end = date!(2025 - 03 - 31);
+        let last_delivery_date = date!(2025 - 03 - 31);
 
         let bond_a = Bond::fixed(
             "BOND-A",
@@ -1345,12 +1326,19 @@ mod tests {
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .expiry(expiry)
+            .terms(
+                ListedFutureTerms::new(
+                    10.0,
+                    1_000.0,
+                    Currency::USD,
+                    125.50,
+                    expiry,
+                    last_delivery_date,
+                    Position::Long,
+                )
+                .expect("terms"),
+            )
             .delivery_start(delivery_start)
-            .delivery_end(delivery_end)
-            .quoted_price(125.50)
-            .position(Position::Long)
             .contract_specs(BondFutureSpecs::default())
             .deliverable_basket(vec![
                 DeliverableBond {

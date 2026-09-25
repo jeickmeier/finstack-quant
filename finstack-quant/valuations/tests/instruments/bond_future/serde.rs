@@ -9,13 +9,12 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::bond_future::{
     BondFuture, BondFutureSpecs, DeliverableBond,
 };
-use finstack_quant_valuations::instruments::Attributes;
-use finstack_quant_valuations::instruments::Position;
+use finstack_quant_valuations::instruments::{Attributes, Instrument};
+use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use time::Month;
 
 /// Create a test deliverable bond.
@@ -30,12 +29,19 @@ fn create_test_deliverable_bond() -> DeliverableBond {
 fn create_test_bond_future() -> BondFuture {
     BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.50)
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -64,12 +70,19 @@ fn create_bond_future_with_basket() -> BondFuture {
 
     BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                100.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Short,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.50)
-        .position(Position::Short)
         .contract_specs(BondFutureSpecs::ust_10y())
         .deliverable_basket(basket)
         .ctd_bond_id(InstrumentId::new("US912828XH15"))
@@ -142,7 +155,6 @@ fn test_bond_future_specs_default_roundtrip() {
     let deserialized: BondFutureSpecs =
         serde_json::from_str(&json).expect("Deserialization failed");
 
-    assert_eq!(specs.contract_size, deserialized.contract_size);
     assert_eq!(specs.standard_coupon, deserialized.standard_coupon);
     assert_eq!(
         specs.standard_maturity_years,
@@ -157,7 +169,6 @@ fn test_bond_future_specs_ust_10y_roundtrip() {
     let _deserialized: BondFutureSpecs =
         serde_json::from_str(&json).expect("Deserialization failed");
 
-    assert_eq!(specs.contract_size, 100_000.0);
     assert_eq!(specs.standard_coupon, 0.06);
 }
 
@@ -205,12 +216,17 @@ fn test_bond_future_specs_json_structure() {
     let json = serde_json::to_string_pretty(&specs).expect("Serialization failed");
 
     // Verify all required fields are present
-    assert!(json.contains("contract_size"));
     assert!(json.contains("standard_coupon"));
     assert!(json.contains("standard_maturity_years"));
     assert!(json.contains("repo_day_count"));
     // Tick economics and a settlement lag are not part of the pricing spec.
-    for removed in ["tick_size", "tick_value", "settlement_days", "calendar_id"] {
+    for removed in [
+        "contract_size",
+        "tick_size",
+        "tick_value",
+        "settlement_days",
+        "calendar_id",
+    ] {
         assert!(!json.contains(removed), "{removed} must not serialize");
     }
 }
@@ -218,13 +234,14 @@ fn test_bond_future_specs_json_structure() {
 #[test]
 fn test_bond_future_specs_rejects_removed_fields() {
     for removed in [
+        r#""contract_size": 100000.0"#, // schema-rejection-test: now terms.multiplier
         r#""tick_size": 0.015625"#,
         r#""tick_value": 15.625"#,
         r#""settlement_days": 2"#,
         r#""calendar_id": "nyse""#,
     ] {
         let json = format!(
-            r#"{{"contract_size": 100000.0, "standard_coupon": 0.06,
+            r#"{{"standard_coupon": 0.06,
                 "standard_maturity_years": 10.0, {removed}}}"#
         );
         assert!(
@@ -244,15 +261,12 @@ fn test_bond_future_minimal_roundtrip() {
     let deserialized: BondFuture = serde_json::from_str(&json).expect("Deserialization failed");
 
     assert_eq!(future.id, deserialized.id);
-    assert_eq!(future.notional.amount(), deserialized.notional.amount());
-    assert_eq!(future.notional.currency(), deserialized.notional.currency());
-    assert_eq!(future.expiry, deserialized.expiry);
+    assert_eq!(future.terms, deserialized.terms);
     assert_eq!(future.delivery_start, deserialized.delivery_start);
-    assert_eq!(future.delivery_end, deserialized.delivery_end);
-    assert_eq!(future.quoted_price, deserialized.quoted_price);
+    assert_eq!(future.terms.entry_price, deserialized.terms.entry_price);
     assert_eq!(
-        format!("{:?}", future.position),
-        format!("{:?}", deserialized.position)
+        format!("{:?}", future.terms.position),
+        format!("{:?}", deserialized.terms.position)
     );
     assert_eq!(future.ctd_bond_id, deserialized.ctd_bond_id);
     assert_eq!(future.discount_curve_id, deserialized.discount_curve_id);
@@ -281,8 +295,8 @@ fn test_bond_future_with_basket_roundtrip() {
 
     // Verify position
     assert_eq!(
-        format!("{:?}", future.position),
-        format!("{:?}", deserialized.position)
+        format!("{:?}", future.terms.position),
+        format!("{:?}", deserialized.terms.position)
     );
 }
 
@@ -290,12 +304,19 @@ fn test_bond_future_with_basket_roundtrip() {
 fn test_bond_future_long_position_roundtrip() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.50)
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -309,7 +330,7 @@ fn test_bond_future_long_position_roundtrip() {
 
     assert_eq!(
         format!("{:?}", Position::Long),
-        format!("{:?}", deserialized.position)
+        format!("{:?}", deserialized.terms.position)
     );
 }
 
@@ -317,12 +338,19 @@ fn test_bond_future_long_position_roundtrip() {
 fn test_bond_future_short_position_roundtrip() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Short,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.50)
-        .position(Position::Short)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -336,7 +364,7 @@ fn test_bond_future_short_position_roundtrip() {
 
     assert_eq!(
         format!("{:?}", Position::Short),
-        format!("{:?}", deserialized.position)
+        format!("{:?}", deserialized.terms.position)
     );
 }
 
@@ -350,12 +378,19 @@ fn test_bond_future_with_attributes_roundtrip() {
 
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.50)
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -384,11 +419,11 @@ fn test_bond_future_json_structure() {
 
     // Verify all required fields are present
     assert!(json.contains("id"));
-    assert!(json.contains("notional"));
-    assert!(json.contains("expiry"));
+    assert!(json.contains("terms"));
+    assert!(json.contains("entry_price"));
+    assert!(json.contains("last_trading_date"));
+    assert!(json.contains("settlement_date"));
     assert!(json.contains("delivery_start"));
-    assert!(json.contains("delivery_end"));
-    assert!(json.contains("quoted_price"));
     assert!(json.contains("position"));
     assert!(json.contains("contract_specs"));
     assert!(json.contains("deliverable_basket"));
@@ -408,12 +443,19 @@ fn test_bond_future_different_currencies() {
     for (currency, curve_id) in currencies {
         let future = BondFuture::builder()
             .id(InstrumentId::new("TEST"))
-            .notional(Money::new(1_000_000.0, currency).expect("valid money fixture"))
-            .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+            .terms(
+                ListedFutureTerms::new(
+                    10.0,
+                    1_000.0,
+                    currency,
+                    125.50,
+                    Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                    Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                    Position::Long,
+                )
+                .expect("terms"),
+            )
             .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-            .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-            .quoted_price(125.50)
-            .position(Position::Long)
             .contract_specs(BondFutureSpecs::default())
             .deliverable_basket(vec![create_test_deliverable_bond()])
             .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -425,7 +467,7 @@ fn test_bond_future_different_currencies() {
         let json = serde_json::to_string(&future).expect("Serialization failed");
         let deserialized: BondFuture = serde_json::from_str(&json).expect("Deserialization failed");
 
-        assert_eq!(currency, deserialized.notional.currency());
+        assert_eq!(currency, deserialized.terms.currency);
         assert_eq!(future.discount_curve_id, deserialized.discount_curve_id);
     }
 }
@@ -437,17 +479,17 @@ fn test_bond_future_deny_unknown_fields() {
     // JSON with an unknown field "unknown_field"
     let json = r#"{
         "id": "TYH5",
-        "notional": {
-            "amount": "1000000.0",
-            "currency": "USD"
+        "terms": {
+            "contracts": 10.0,
+            "multiplier": 1000.0,
+            "currency": "USD",
+            "entry_price": 125.50,
+            "last_trading_date": "2025-03-20",
+            "settlement_date": "2025-03-31",
+            "position": "long"
         },
-        "expiry": "2025-03-20",
         "delivery_start": "2025-03-21",
-        "delivery_end": "2025-03-31",
-        "quoted_price": 125.50,
-        "position": "long",
         "contract_specs": {
-            "contract_size": 100000.0,
             "standard_coupon": 0.06,
             "standard_maturity_years": 10.0
         },
@@ -485,7 +527,6 @@ fn test_bond_future_deny_unknown_fields() {
 #[test]
 fn test_bond_future_specs_rejects_unknown_field() {
     let json = r#"{
-        "contract_size": 100000.0,
         "standard_coupon": 0.06,
         "standard_maturity_years": 10.0,
         "extra_field": "ignored"
@@ -506,17 +547,17 @@ fn test_bond_future_minimal_json() {
     // (this ensures defaults work for optional fields if any are added in the future)
     let json = r#"{
         "id": "TYH5",
-        "notional": {
-            "amount": "1000000.0",
-            "currency": "USD"
+        "terms": {
+            "contracts": 10.0,
+            "multiplier": 1000.0,
+            "currency": "USD",
+            "entry_price": 125.50,
+            "last_trading_date": "2025-03-20",
+            "settlement_date": "2025-03-31",
+            "position": "long"
         },
-        "expiry": "2025-03-20",
         "delivery_start": "2025-03-21",
-        "delivery_end": "2025-03-31",
-        "quoted_price": 125.50,
-        "position": "long",
         "contract_specs": {
-            "contract_size": 100000.0,
             "standard_coupon": 0.06,
             "standard_maturity_years": 10.0
         },
@@ -543,7 +584,7 @@ fn test_bond_future_minimal_json() {
 
     let future = result.unwrap();
     assert_eq!(future.id.as_str(), "TYH5");
-    assert_eq!(future.quoted_price, 125.50);
+    assert_eq!(future.terms.entry_price, 125.50);
 }
 
 #[test]
@@ -555,7 +596,7 @@ fn test_bond_future_pretty_json() {
     let deserialized: BondFuture = serde_json::from_str(&json).expect("Deserialization failed");
 
     assert_eq!(future.id, deserialized.id);
-    assert_eq!(future.quoted_price, deserialized.quoted_price);
+    assert_eq!(future.terms.entry_price, deserialized.terms.entry_price);
 }
 
 #[test]
@@ -567,7 +608,7 @@ fn test_bond_future_compact_json() {
     let deserialized: BondFuture = serde_json::from_str(&json).expect("Deserialization failed");
 
     assert_eq!(future.id, deserialized.id);
-    assert_eq!(future.quoted_price, deserialized.quoted_price);
+    assert_eq!(future.terms.entry_price, deserialized.terms.entry_price);
 }
 
 // Edge Cases
@@ -576,12 +617,19 @@ fn test_bond_future_compact_json() {
 fn test_bond_future_large_notional() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000_000.0, Currency::USD).expect("valid money fixture")) // $1 billion
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                10000.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.50)
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -594,9 +642,8 @@ fn test_bond_future_large_notional() {
     let deserialized: BondFuture = serde_json::from_str(&json).expect("Deserialization failed");
 
     assert_eq!(
-        future.notional.amount(),
-        deserialized.notional.amount(),
-        "Large notional should round-trip correctly"
+        future.terms.contracts, deserialized.terms.contracts,
+        "Large position should round-trip correctly"
     );
 }
 
@@ -604,12 +651,19 @@ fn test_bond_future_large_notional() {
 fn test_bond_future_fractional_price() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.515625,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.515625) // 125-16.5/32
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -622,7 +676,7 @@ fn test_bond_future_fractional_price() {
     let deserialized: BondFuture = serde_json::from_str(&json).expect("Deserialization failed");
 
     assert_eq!(
-        future.quoted_price, deserialized.quoted_price,
+        future.terms.entry_price, deserialized.terms.entry_price,
         "Fractional price should round-trip correctly"
     );
 }
@@ -631,12 +685,19 @@ fn test_bond_future_fractional_price() {
 fn test_bond_future_empty_attributes() {
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).unwrap())
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).unwrap(),
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).unwrap())
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).unwrap())
-        .quoted_price(125.50)
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
@@ -657,8 +718,11 @@ fn test_bond_future_empty_attributes() {
 #[test]
 fn bond_future_wire_enforces_static_runtime_bounds() {
     let mut future = create_test_bond_future();
-    future.quoted_price = -1.0;
-    assert!(serde_json::to_value(&future).is_err());
+    future.terms.entry_price = -1.0;
+    let err = future
+        .validate_invariants()
+        .expect_err("negative entry price is rejected");
+    assert!(err.to_string().contains("terms.entry_price"), "{err}");
 
     let mut future = create_test_bond_future();
     future.deliverable_basket.clear();
@@ -686,5 +750,4 @@ fn bond_future_wire_enforces_static_runtime_bounds() {
         false
     );
     assert_eq!(schema["$defs"]["PositiveF64Wire"]["exclusiveMinimum"], 0.0);
-    assert_eq!(schema["$defs"]["NonNegativeF64Wire"]["minimum"], 0.0);
 }

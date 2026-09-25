@@ -78,21 +78,28 @@ fn dollar_roll_exposes_cashflow_provider_bridge() {
 fn bond_future_exposes_cashflow_provider_bridge() {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
-    use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations::instruments::fixed_income::bond_future::{
         BondFutureSpecs, DeliverableBond,
     };
+    use finstack_quant_valuations::instruments::ListedFutureTerms;
     use time::Month;
 
     let future = BondFuture::builder()
         .id(InstrumentId::new("TYH5"))
-        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("valid date"))
+        .terms(
+            ListedFutureTerms::new(
+                10.0,
+                1_000.0,
+                Currency::USD,
+                125.50,
+                Date::from_calendar_date(2025, Month::March, 20).expect("valid date"),
+                Date::from_calendar_date(2025, Month::March, 31).expect("valid date"),
+                Position::Long,
+            )
+            .expect("terms"),
+        )
         .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("valid date"))
-        .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
-        .quoted_price(125.50)
-        .position(Position::Long)
         .contract_specs(BondFutureSpecs::default())
         .deliverable_basket(vec![DeliverableBond {
             bond_id: InstrumentId::new("US912828XG33"),

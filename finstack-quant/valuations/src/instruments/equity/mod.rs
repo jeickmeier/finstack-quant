@@ -130,5 +130,5 @@ pub use real_estate::{
 };
 pub use spot::Equity;
 pub use variance_swap::{EquityPriceSeriesPolicy, VarianceSwap};
-pub use vol_index_future::{VolIndexContractSpecs, VolatilityIndexFuture};
+pub use vol_index_future::VolatilityIndexFuture;
 pub use vol_index_future_option::VolatilityIndexFutureOption;

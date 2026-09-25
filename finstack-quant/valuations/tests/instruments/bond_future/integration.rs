@@ -17,7 +17,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond_future::{
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::Position;
+use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
 use finstack_quant_valuations::pricer::{standard_pricer_registry, InstrumentType, ModelKey};
 use time::macros::date;
 
@@ -184,10 +184,10 @@ fn create_deliverable_basket() -> (Vec<Bond>, Vec<DeliverableBond>) {
 struct TestBondFutureConfig {
     id: &'static str,
     notional: f64,
-    expiry: Date,
+    last_trading_date: Date,
     delivery_start: Date,
-    delivery_end: Date,
-    quoted_price: f64,
+    settlement_date: Date,
+    entry_price: f64,
     position: Position,
     deliverable_basket: Vec<DeliverableBond>,
     ctd_bond_id: &'static str,
@@ -197,12 +197,19 @@ struct TestBondFutureConfig {
 fn create_ust_10y_future(config: TestBondFutureConfig) -> BondFuture {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .notional(Money::new(config.notional, Currency::USD).expect("valid money fixture"))
-        .expiry(config.expiry)
+        .terms(
+            ListedFutureTerms::new(
+                config.notional / 100_000.0,
+                1_000.0,
+                Currency::USD,
+                config.entry_price,
+                config.last_trading_date,
+                config.settlement_date,
+                config.position,
+            )
+            .expect("terms"),
+        )
         .delivery_start(config.delivery_start)
-        .delivery_end(config.delivery_end)
-        .quoted_price(config.quoted_price)
-        .position(config.position)
         .contract_specs(BondFutureSpecs::ust_10y())
         .deliverable_basket(config.deliverable_basket)
         .ctd_bond_id(InstrumentId::new(config.ctd_bond_id))
@@ -216,12 +223,19 @@ fn create_ust_10y_future(config: TestBondFutureConfig) -> BondFuture {
 fn create_ust_10y_future_with_ctd(config: TestBondFutureConfig, ctd_bond: Bond) -> BondFuture {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .notional(Money::new(config.notional, Currency::USD).expect("valid money fixture"))
-        .expiry(config.expiry)
+        .terms(
+            ListedFutureTerms::new(
+                config.notional / 100_000.0,
+                1_000.0,
+                Currency::USD,
+                config.entry_price,
+                config.last_trading_date,
+                config.settlement_date,
+                config.position,
+            )
+            .expect("terms"),
+        )
         .delivery_start(config.delivery_start)
-        .delivery_end(config.delivery_end)
-        .quoted_price(config.quoted_price)
-        .position(config.position)
         .contract_specs(BondFutureSpecs::ust_10y())
         .deliverable_basket(config.deliverable_basket)
         .ctd_bond_id(InstrumentId::new(config.ctd_bond_id))
@@ -238,12 +252,19 @@ fn try_create_ust_10y_future(
 ) -> finstack_quant_core::Result<BondFuture> {
     BondFuture::builder()
         .id(InstrumentId::new(config.id))
-        .notional(Money::new(config.notional, Currency::USD).expect("valid money fixture"))
-        .expiry(config.expiry)
+        .terms(
+            ListedFutureTerms::new(
+                config.notional / 100_000.0,
+                1_000.0,
+                Currency::USD,
+                config.entry_price,
+                config.last_trading_date,
+                config.settlement_date,
+                config.position,
+            )
+            .expect("terms"),
+        )
         .delivery_start(config.delivery_start)
-        .delivery_end(config.delivery_end)
-        .quoted_price(config.quoted_price)
-        .position(config.position)
         .contract_specs(BondFutureSpecs::ust_10y())
         .deliverable_basket(config.deliverable_basket)
         .ctd_bond_id(InstrumentId::new(config.ctd_bond_id))
@@ -293,10 +314,10 @@ fn test_realistic_ust_10y_future_full_workflow() {
     let future = create_ust_10y_future(TestBondFutureConfig {
         id: "TYH5",
         notional: 1_000_000.0,
-        expiry: date!(2025 - 03 - 20),         // Expiry: March 20, 2025
-        delivery_start: date!(2025 - 03 - 21), // Delivery start: March 21, 2025
-        delivery_end: date!(2025 - 03 - 31),   // Delivery end: March 31, 2025
-        quoted_price: 125.50,                  // Quoted futures price
+        last_trading_date: date!(2025 - 03 - 20), // Expiry: March 20, 2025
+        delivery_start: date!(2025 - 03 - 21),    // Delivery start: March 21, 2025
+        settlement_date: date!(2025 - 03 - 31),   // Delivery end: March 31, 2025
+        entry_price: 125.50,                      // Quoted futures price
         position: Position::Long,
         deliverable_basket: deliverable_bonds.clone(), // Clone to allow later access
         ctd_bond_id: "US912828XG33",
@@ -320,14 +341,9 @@ fn test_realistic_ust_10y_future_full_workflow() {
     );
 
     // Test 2: Model Price Calculation (carry-adjusted to the delivery date)
-    let model_price = BondFuturePricer::calculate_model_price(
-        ctd_bond,
-        ctd_cf,
-        &market,
-        as_of,
-        future.delivery_start,
-    )
-    .expect("Model price calculation should succeed");
+    let model_price =
+        BondFuturePricer::fair_price(ctd_bond, ctd_cf, &market, as_of, future.delivery_start)
+            .expect("Model price calculation should succeed");
 
     // Model price should be a reasonable value (80-150 range for UST futures)
     assert!(
@@ -336,11 +352,11 @@ fn test_realistic_ust_10y_future_full_workflow() {
         model_price
     );
 
-    println!("Quoted price: {}", future.quoted_price);
+    println!("Quoted price: {}", future.terms.entry_price);
     println!("Model price: {:.4}", model_price);
     println!(
         "Price differential: {:.4} points",
-        future.quoted_price - model_price
+        future.terms.entry_price - model_price
     );
 
     // Test 3: Invoice Price Calculation (settlement amount)
@@ -349,7 +365,7 @@ fn test_realistic_ust_10y_future_full_workflow() {
 
     // Calculate accrued interest at settlement
     // For invoice price: Invoice = (Futures_Price × CF) + Accrued
-    let futures_price = future.quoted_price;
+    let futures_price = future.terms.entry_price;
     let invoice_price_per_100 = futures_price * ctd_cf;
 
     println!(
@@ -358,7 +374,7 @@ fn test_realistic_ust_10y_future_full_workflow() {
     );
 
     // For 10 contracts ($1,000,000 notional), total invoice is:
-    let total_invoice = (future.notional.amount() / 100.0) * invoice_price_per_100;
+    let total_invoice = future.terms.contracts * future.terms.multiplier * invoice_price_per_100;
     println!(
         "Total invoice amount for 10 contracts: ${:.2}",
         total_invoice
@@ -396,7 +412,7 @@ fn test_bond_future_pricer_registry_ctd_npv() {
     let as_of = date!(2025 - 01 - 15);
     let expiry = date!(2025 - 03 - 20);
     let delivery_start = date!(2025 - 03 - 21);
-    let delivery_end = date!(2025 - 03 - 31);
+    let last_delivery_date = date!(2025 - 03 - 31);
 
     let ctd_bond = create_ust_bond(
         "US912828XG33",
@@ -424,10 +440,10 @@ fn test_bond_future_pricer_registry_ctd_npv() {
         TestBondFutureConfig {
             id: "TYH5",
             notional: 1_000_000.0,
-            expiry,
+            last_trading_date: expiry,
             delivery_start,
-            delivery_end,
-            quoted_price: 125.50,
+            settlement_date: last_delivery_date,
+            entry_price: 125.50,
             position: Position::Long,
             deliverable_basket: basket,
             ctd_bond_id: "US912828XG33",
@@ -467,10 +483,10 @@ fn test_bond_future_default_model_uses_clean_price_proxy() {
     let future = create_ust_10y_future(TestBondFutureConfig {
         id: "TYH5",
         notional: 1_000_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: vec![deliverable_bonds[0].clone()],
         ctd_bond_id: "US912828XG33",
@@ -499,10 +515,10 @@ fn test_short_position_npv() {
     let long_future = create_ust_10y_future(TestBondFutureConfig {
         id: "TYH5_LONG",
         notional: 100_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: vec![deliverable_bonds[0].clone()],
         ctd_bond_id: "US912828XG33",
@@ -512,10 +528,10 @@ fn test_short_position_npv() {
     let short_future = create_ust_10y_future(TestBondFutureConfig {
         id: "TYH5_SHORT",
         notional: 100_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Short,
         deliverable_basket: vec![deliverable_bonds[0].clone()],
         ctd_bond_id: "US912828XG33",
@@ -549,10 +565,10 @@ fn test_error_handling_invalid_dates() {
     let result = try_create_ust_10y_future(TestBondFutureConfig {
         id: "INVALID",
         notional: 100_000.0,
-        expiry: date!(2025 - 03 - 25), // Expiry AFTER delivery start (invalid!)
-        delivery_start: date!(2025 - 03 - 21), // Delivery start
-        delivery_end: date!(2025 - 03 - 31), // Delivery end
-        quoted_price: 125.50,
+        last_trading_date: date!(2025 - 03 - 25), // Expiry AFTER delivery start (invalid!)
+        delivery_start: date!(2025 - 03 - 21),    // Delivery start
+        settlement_date: date!(2025 - 03 - 31),   // Delivery end
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: deliverable_bonds,
         ctd_bond_id: "US912828XG33",
@@ -565,7 +581,8 @@ fn test_error_handling_invalid_dates() {
     );
     let err = result.unwrap_err();
     assert!(
-        format!("{}", err).contains("expiry") && format!("{}", err).contains("delivery_start"),
+        format!("{}", err).contains("terms.last_trading_date")
+            && format!("{}", err).contains("delivery_start"),
         "Error message should mention date ordering: {}",
         err
     );
@@ -573,16 +590,16 @@ fn test_error_handling_invalid_dates() {
 
 #[test]
 fn test_error_handling_invalid_delivery_period() {
-    // Test validation: delivery_start must be before delivery_end
+    // Test validation: delivery_start must be before terms.settlement_date
     let (_, deliverable_bonds) = create_deliverable_basket();
 
     let result = try_create_ust_10y_future(TestBondFutureConfig {
         id: "INVALID",
         notional: 100_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 31), // Delivery start AFTER delivery end (invalid!)
-        delivery_end: date!(2025 - 03 - 21),   // Delivery end
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 21), // Delivery end
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: deliverable_bonds,
         ctd_bond_id: "US912828XG33",
@@ -591,12 +608,12 @@ fn test_error_handling_invalid_delivery_period() {
 
     assert!(
         result.is_err(),
-        "Should fail validation when delivery_start >= delivery_end"
+        "Should fail validation when delivery_start >= terms.settlement_date"
     );
     let err = result.unwrap_err();
     assert!(
         format!("{}", err).contains("delivery_start")
-            && format!("{}", err).contains("delivery_end"),
+            && format!("{}", err).contains("terms.settlement_date"),
         "Error message should mention delivery period: {}",
         err
     );
@@ -608,10 +625,10 @@ fn test_error_handling_empty_basket() {
     let result = try_create_ust_10y_future(TestBondFutureConfig {
         id: "INVALID",
         notional: 100_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: vec![], // Empty basket (invalid!)
         ctd_bond_id: "US912828XG33",
@@ -641,10 +658,10 @@ fn test_error_handling_ctd_not_in_basket() {
     let result = try_create_ust_10y_future(TestBondFutureConfig {
         id: "INVALID",
         notional: 100_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: deliverable_bonds,
         ctd_bond_id: "NONEXISTENT_BOND", // Not in basket!
@@ -674,10 +691,10 @@ fn test_error_handling_negative_conversion_factor() {
     let result = try_create_ust_10y_future(TestBondFutureConfig {
         id: "INVALID",
         notional: 100_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: deliverable_bonds,
         ctd_bond_id: "US912828XG33",
@@ -714,10 +731,10 @@ fn test_multiple_contracts_scaling() {
     let future_1_contract = create_ust_10y_future(TestBondFutureConfig {
         id: "TY_1",
         notional: 100_000.0, // 1 contract
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: vec![deliverable_bonds[0].clone()],
         ctd_bond_id: "US912828XG33",
@@ -727,10 +744,10 @@ fn test_multiple_contracts_scaling() {
     let future_5_contracts = create_ust_10y_future(TestBondFutureConfig {
         id: "TY_5",
         notional: 500_000.0, // 5 contracts
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: vec![deliverable_bonds[0].clone()],
         ctd_bond_id: "US912828XG33",
@@ -740,10 +757,10 @@ fn test_multiple_contracts_scaling() {
     let future_10_contracts = create_ust_10y_future(TestBondFutureConfig {
         id: "TY_10",
         notional: 1_000_000.0, // 10 contracts
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price: 125.50,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price: 125.50,
         position: Position::Long,
         deliverable_basket: vec![deliverable_bonds[0].clone()],
         ctd_bond_id: "US912828XG33",
@@ -884,7 +901,7 @@ fn test_bond_future_dv01_calculation() {
     let as_of = date!(2025 - 01 - 15);
     let expiry = date!(2025 - 03 - 20);
     let delivery_start = date!(2025 - 03 - 21);
-    let delivery_end = date!(2025 - 03 - 31);
+    let last_delivery_date = date!(2025 - 03 - 31);
 
     // Create CTD bond (5% coupon, maturing in ~8 years)
     let ctd_bond = create_ust_bond(
@@ -919,10 +936,10 @@ fn test_bond_future_dv01_calculation() {
         TestBondFutureConfig {
             id: "TYH5",
             notional: 1_000_000.0,
-            expiry,
+            last_trading_date: expiry,
             delivery_start,
-            delivery_end,
-            quoted_price: 125.50, // Quoted futures price
+            settlement_date: last_delivery_date,
+            entry_price: 125.50, // Quoted futures price
             position: Position::Long,
             deliverable_basket: basket,
             ctd_bond_id: "US912828XG33",
@@ -1043,7 +1060,7 @@ fn test_bond_future_dv01_sign_convention() {
     let as_of = date!(2025 - 01 - 15);
     let expiry = date!(2025 - 03 - 20);
     let delivery_start = date!(2025 - 03 - 21);
-    let delivery_end = date!(2025 - 03 - 31);
+    let last_delivery_date = date!(2025 - 03 - 31);
 
     // Create CTD bond
     let ctd_bond = create_ust_bond(
@@ -1074,10 +1091,10 @@ fn test_bond_future_dv01_sign_convention() {
         TestBondFutureConfig {
             id: "TYH5_LONG",
             notional: 1_000_000.0,
-            expiry,
+            last_trading_date: expiry,
             delivery_start,
-            delivery_end,
-            quoted_price: 125.50,
+            settlement_date: last_delivery_date,
+            entry_price: 125.50,
             position: Position::Long,
             deliverable_basket: basket.clone(),
             ctd_bond_id: "US912828XG33",
@@ -1091,10 +1108,10 @@ fn test_bond_future_dv01_sign_convention() {
         TestBondFutureConfig {
             id: "TYH5_SHORT",
             notional: 1_000_000.0,
-            expiry,
+            last_trading_date: expiry,
             delivery_start,
-            delivery_end,
-            quoted_price: 125.50,
+            settlement_date: last_delivery_date,
+            entry_price: 125.50,
             position: Position::Short,
             deliverable_basket: basket,
             ctd_bond_id: "US912828XG33",
@@ -1179,18 +1196,18 @@ fn test_invoice_price() {
     }
 
     // Create a UST 10Y future
-    let quoted_price = 125.50; // e.g., 125-16/32
+    let entry_price = 125.50; // e.g., 125-16/32
     let expiry = date!(2025 - 03 - 20);
     let delivery_start = date!(2025 - 03 - 21);
-    let delivery_end = date!(2025 - 03 - 31);
+    let last_delivery_date = date!(2025 - 03 - 31);
 
     let future = create_ust_10y_future(TestBondFutureConfig {
         id: "TYH5",
         notional: 1_000_000.0, // 10 contracts
-        expiry,
+        last_trading_date: expiry,
         delivery_start,
-        delivery_end,
-        quoted_price,
+        settlement_date: last_delivery_date,
+        entry_price,
         position: Position::Long,
         deliverable_basket: deliverable_bonds.clone(),
         ctd_bond_id: "US912828XG33", // First bond as CTD
@@ -1202,10 +1219,10 @@ fn test_invoice_price() {
     let ctd_bond = &bonds[0]; // First bond is the CTD
 
     let invoice = future
-        .invoice_price(ctd_bond, quoted_price, &market, settlement_date)
+        .invoice_price(ctd_bond, entry_price, &market, settlement_date)
         .expect("Failed to calculate invoice price");
 
-    println!("Futures quoted price: {:.2}", quoted_price);
+    println!("Futures quoted price: {:.2}", entry_price);
     println!(
         "CTD bond conversion factor: {:.4}",
         deliverable_bonds[0].conversion_factor
@@ -1222,8 +1239,8 @@ fn test_invoice_price() {
 
     // For a 125.50 futures price with CF ~0.8, invoice should be ~103 per $100 face
     // For 10 contracts ($1M notional), total should be ~$1,030,000
-    let expected_per_100 = quoted_price * cf;
-    let expected_total = (future.notional.amount() / 100.0) * expected_per_100;
+    let expected_per_100 = entry_price * cf;
+    let expected_total = future.terms.contracts * future.terms.multiplier * expected_per_100;
 
     // Allow for accrued interest variation (within ±5% of expected)
     let tolerance = expected_total * 0.05;
@@ -1287,14 +1304,14 @@ fn test_bucketed_dv01_registration() {
 
 /// Helper: build a UST 10Y future over a fixed two-bond basket with explicit
 /// conversion factors and quoted price, for exercising `determine_ctd`.
-fn ctd_test_future(quoted_price: f64) -> BondFuture {
+fn ctd_test_future(entry_price: f64) -> BondFuture {
     create_ust_10y_future(TestBondFutureConfig {
         id: "TY-CTD",
         notional: 1_000_000.0,
-        expiry: date!(2025 - 03 - 20),
+        last_trading_date: date!(2025 - 03 - 20),
         delivery_start: date!(2025 - 03 - 21),
-        delivery_end: date!(2025 - 03 - 31),
-        quoted_price,
+        settlement_date: date!(2025 - 03 - 31),
+        entry_price,
         position: Position::Long,
         deliverable_basket: vec![
             DeliverableBond {
@@ -1363,7 +1380,7 @@ fn test_determine_ctd_errors_without_valid_prices() {
 /// the registry but were previously only exercised via the direct pricer
 /// methods. These confirm the registry path returns exactly the direct-call
 /// values: `ConversionFactor` == the CTD's basket CF, and `FuturesPrice` ==
-/// `BondFuturePricer::calculate_model_price` for the embedded CTD.
+/// `BondFuturePricer::fair_price` for the embedded CTD.
 #[test]
 fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
     use finstack_quant_valuations::instruments::Instrument;
@@ -1385,10 +1402,10 @@ fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
         TestBondFutureConfig {
             id: "TY-METRICS",
             notional: 1_000_000.0,
-            expiry: date!(2025 - 03 - 20),
+            last_trading_date: date!(2025 - 03 - 20),
             delivery_start: date!(2025 - 03 - 21),
-            delivery_end: date!(2025 - 03 - 31),
-            quoted_price: 125.50,
+            settlement_date: date!(2025 - 03 - 31),
+            entry_price: 125.50,
             position: Position::Long,
             deliverable_basket: deliverable_bonds,
             ctd_bond_id: "US912828XG33",
@@ -1399,14 +1416,9 @@ fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
 
     // Direct model price (same CTD, CF, market, valuation + delivery date the
     // metric calculator uses) — computed before `future`/`market` are moved.
-    let direct = BondFuturePricer::calculate_model_price(
-        &ctd_bond,
-        ctd_cf,
-        &market,
-        as_of,
-        future.delivery_start,
-    )
-    .expect("direct model price");
+    let direct =
+        BondFuturePricer::fair_price(&ctd_bond, ctd_cf, &market, as_of, future.delivery_start)
+            .expect("direct model price");
 
     let pv = future.value(&market, as_of).expect("future should value");
     let mut ctx = MetricContext::new(
@@ -1434,6 +1446,6 @@ fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
     // FuturesPrice metric must match the direct model-price calculation.
     assert!(
         (metric_price - direct).abs() < 1e-9,
-        "FuturesPrice metric ({metric_price}) should match calculate_model_price ({direct})"
+        "FuturesPrice metric ({metric_price}) should match fair_price ({direct})"
     );
 }

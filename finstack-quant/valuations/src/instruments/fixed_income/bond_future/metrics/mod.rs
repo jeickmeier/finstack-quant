@@ -1,8 +1,10 @@
 //! Bond-future pricing and interest-rate metrics.
 //!
 //! The registered metrics are:
-//! - `FuturesPrice`: carry-adjusted forward clean CTD price per 100 face,
-//!   divided by the resolved basket conversion factor.
+//! - `FuturesPrice`: the lifecycle mark — `terms.quoted_price` when supplied,
+//!   otherwise the carry-adjusted forward clean CTD price per 100 face divided
+//!   by the resolved basket conversion factor (`BondFuture::fair_price`); the
+//!   official `terms.settlement_price` after the last trading date.
 //! - `ConversionFactor`: the resolved CTD's unitless factor from the
 //!   deliverable basket.
 //! - `Dv01`: NPV sensitivity to the configured parallel combined rate-curve
@@ -12,7 +14,8 @@
 //!
 //! Conversion-factor scaling follows the valuation formulas:
 //! `Model_Price = Forward_Clean_CTD_Percent / Conversion_Factor` and
-//! `NPV = (Model_Price - Quoted_Price) × (Notional / 100) × Position_Sign`.
+//! `NPV = Position_Sign × Contracts × Multiplier × (Mark - Entry_Price)`, where
+//! the mark is the model price while the contract is live.
 
 use crate::metrics::MetricRegistry;
 use crate::pricer::InstrumentType;

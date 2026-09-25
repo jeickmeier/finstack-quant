@@ -158,7 +158,7 @@ fn test_build_euribor_futures() {
         .as_any()
         .downcast_ref::<finstack_quant_valuations::instruments::rates::ir_future::InterestRateFuture>()
         .expect("Expected InterestRateFuture");
-    assert_eq!(future.notional.currency(), Currency::EUR);
+    assert_eq!(future.terms.currency, Currency::EUR);
     assert_eq!(
         future.day_count,
         finstack_quant_core::dates::DayCount::Act360

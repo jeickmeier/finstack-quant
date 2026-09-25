@@ -5,6 +5,120 @@
       "description": "Canonical schema marker for persisted instrument envelopes.",
       "type": "string"
     },
+    "ListedFutureSettlement": {
+      "description": "Final settlement mode for a listed future.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash settlement of final variation margin.",
+          "properties": {
+            "type": {
+              "const": "cash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Delivery of a standardized quantity of an identified asset.",
+          "properties": {
+            "asset": {
+              "description": "Deliverable asset, grade, location, or basket identifier.",
+              "type": "string"
+            },
+            "quantity_per_contract": {
+              "description": "Physical units delivered per exchange contract.",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "physical",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "asset",
+            "quantity_per_contract"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ListedFutureTerms": {
+      "additionalProperties": false,
+      "description": "Standardized position, multiplier, and lifecycle terms for a listed future.",
+      "properties": {
+        "contracts": {
+          "description": "Number of exchange contracts. Fractional values are permitted for\nportfolio aggregation but must be finite and strictly positive.",
+          "format": "double",
+          "type": "number"
+        },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency in which variation margin is paid."
+        },
+        "entry_price": {
+          "description": "Trade fill price in the same price-point units as the market mark.",
+          "format": "double",
+          "type": "number"
+        },
+        "last_trading_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Final date on which the contract trades."
+        },
+        "multiplier": {
+          "description": "Settlement-currency value of one full price point per contract.",
+          "format": "double",
+          "type": "number"
+        },
+        "position": {
+          "$ref": "#/$defs/Position",
+          "description": "Long or short position direction."
+        },
+        "quoted_price": {
+          "description": "Optional live exchange mark, in price points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "settlement": {
+          "$ref": "#/$defs/ListedFutureSettlement",
+          "default": {
+            "type": "cash"
+          },
+          "description": "Cash or physical final settlement convention."
+        },
+        "settlement_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date on which final cash settlement is completed."
+        },
+        "settlement_price": {
+          "description": "Optional official final settlement price, in price points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "contracts",
+        "multiplier",
+        "currency",
+        "entry_price",
+        "last_trading_date",
+        "settlement_date",
+        "position"
+      ],
+      "type": "object"
+    },
     "Position": {
       "description": "Position direction for futures and forwards.",
       "oneOf": [
@@ -20,63 +134,18 @@
         }
       ]
     },
-    "VolIndexContractSpecs": {
-      "additionalProperties": false,
-      "description": "Contract specifications for volatility index futures.\n\nVIX futures have standardized specifications set by CBOE:\n- Standard multiplier: $1,000 per index point\n- Minimum tick: 0.05 index points ($50)\n- Weekly and monthly expiries available",
-      "properties": {
-        "index_id": {
-          "description": "Index identifier (e.g., \"VIX\", \"VXN\", \"VSTOXX\").",
-          "type": "string"
-        },
-        "multiplier": {
-          "description": "Contract multiplier (USD per index point).\nVIX standard: 1000 (each point = $1,000)",
-          "format": "double",
-          "type": "number"
-        },
-        "tick_size": {
-          "description": "Tick size in index points.\nVIX standard: 0.05 points",
-          "format": "double",
-          "type": "number"
-        },
-        "tick_value": {
-          "description": "Tick value in currency units.\nVIX standard: $50 per tick (0.05 × 1000)",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "multiplier",
-        "tick_size",
-        "tick_value",
-        "index_id"
-      ],
-      "type": "object"
-    },
     "VolatilityIndexFuture": {
       "additionalProperties": false,
-      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::{\n    VolatilityIndexFuture, VolIndexContractSpecs,\n};\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .notional(Money::from((100_000_i64, Currency::USD)))\n    .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .quoted_price(21.50)\n    .position(Position::Long)\n    .contract_specs(VolIndexContractSpecs::default())\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "default": {},
           "description": "Attributes for scenario selection and tagging"
-        },
-        "contract_specs": {
-          "$ref": "#/$defs/VolIndexContractSpecs",
-          "default": {
-            "index_id": "VIX",
-            "multiplier": 1000.0,
-            "tick_size": 0.05,
-            "tick_value": 50.0
-          },
-          "description": "Contract specifications."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing."
-        },
-        "expiry": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Future expiry date. For VIX futures this is the final settlement day\nitself (the Wednesday ~30 days before the expiry of the SPX options\nused in the settlement calculation), not a date 30 days before\nsettlement."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -90,35 +159,13 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional exposure in currency units. PV is scaled by\n`notional.amount() / (multiplier × quoted_price)` to represent\nthe number of contracts."
-        },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)."
-        },
-        "quoted_price": {
-          "description": "Quoted future price (index points, e.g., 21.50).",
-          "format": "double",
-          "type": "number"
-        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX)."
-        },
-        "settlement_fixing": {
-          "default": null,
-          "description": "Final settlement/SOQ fixing in index points.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position and lifecycle terms. `terms.multiplier` is the\nsettlement-currency value of one index point ($1,000 for CBOE VIX),\n`terms.entry_price` is the trade price in index points and\n`terms.settlement_date` is the SOQ date on which the final settlement\nprice is fixed."
         },
         "vol_index_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -127,14 +174,9 @@
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
-        "settlement_date",
-        "quoted_price",
-        "position",
+        "terms",
         "discount_curve_id",
-        "vol_index_curve_id",
-        "attributes"
+        "vol_index_curve_id"
       ],
       "type": "object"
     },
@@ -165,23 +207,20 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "contract_specs": {
-            "index_id": "VIX",
-            "multiplier": 1000.0,
-            "tick_size": 0.05,
-            "tick_value": 50.0
-          },
           "discount_curve_id": "USD-OIS",
-          "expiry": "2025-03-19",
           "id": "VIX-FUT-2025M03",
-          "notional": {
-            "amount": "100000",
-            "currency": "USD"
+          "terms": {
+            "contracts": 4.651162790697675,
+            "currency": "USD",
+            "entry_price": 21.5,
+            "last_trading_date": "2025-03-19",
+            "multiplier": 1000.0,
+            "position": "long",
+            "settlement": {
+              "type": "cash"
+            },
+            "settlement_date": "2025-03-19"
           },
-          "position": "long",
-          "quoted_price": 21.5,
-          "settlement_date": "2025-03-19",
-          "settlement_fixing": null,
           "vol_index_curve_id": "VIX"
         },
         "type": "volatility_index_future"

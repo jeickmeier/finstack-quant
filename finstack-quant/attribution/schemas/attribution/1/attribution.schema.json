@@ -3360,7 +3360,7 @@
     },
     "BondFuture": {
       "additionalProperties": false,
-      "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but\n  do not mutate the selected CTD. [`crate::instruments::Instrument::value`]\n  marks the caller-supplied CTD only; refresh it daily with\n  [`Self::determine_ctd_by_implied_repo`] when the basket can switch.\n- **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureSpecs, DeliverableBond,\n};\nuse finstack_quant_valuations::instruments::{Attributes, Position};\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .expiry(date!(2025 - 03 - 20))\n    .delivery_start(date!(2025 - 03 - 21))\n    .delivery_end(date!(2025 - 03 - 31))\n    .quoted_price(125.50)\n    .position(Position::Long)\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```",
+      "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but\n  do not mutate the selected CTD. [`crate::instruments::Instrument::value`]\n  marks the caller-supplied CTD only; refresh it daily with\n  [`Self::determine_ctd_by_implied_repo`] when the basket can switch.\n- **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureSpecs, DeliverableBond,\n};\nuse finstack_quant_valuations::instruments::{Attributes, ListedFutureTerms, Position};\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\n// 10 UST 10Y contracts ($100,000 face each, $1,000 per price point).\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .terms(ListedFutureTerms::new(\n        10.0,\n        1_000.0,\n        Currency::USD,\n        125.50,\n        date!(2025 - 03 - 20),\n        date!(2025 - 03 - 31),\n        Position::Long,\n    )?)\n    .delivery_start(date!(2025 - 03 - 21))\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -3368,7 +3368,7 @@
         },
         "contract_specs": {
           "$ref": "#/$defs/BondFutureSpecs",
-          "description": "Contract specifications (contract size, standard coupon, repo day count)"
+          "description": "Contract specifications (standard coupon, standard maturity, repo day count)"
         },
         "ctd_bond": {
           "anyOf": [
@@ -3400,10 +3400,6 @@
           "minItems": 1,
           "type": "array"
         },
-        "delivery_end": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Last delivery date"
-        },
         "delivery_start": {
           "$ref": "#/$defs/DateWire",
           "description": "First delivery date"
@@ -3411,10 +3407,6 @@
         "discount_curve_id": {
           "$ref": "#/$defs/Id",
           "description": "Financing/discount curve identifier.\n\nUsed to carry the CTD bond forward to the delivery date (the cost of\nfinancing the position) whenever no explicit [`repo_curve_id`](Self::repo_curve_id)\nis set. Must be provisionable as a discount curve in the market context."
-        },
-        "expiry": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Future expiry date (last trading day)"
         },
         "id": {
           "$ref": "#/$defs/Id",
@@ -3427,18 +3419,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
-        },
-        "notional": {
-          "$ref": "#/$defs/Money",
-          "description": "Notional exposure in currency units.\nFor multiple contracts, use notional = contract_specs.contract_size × num_contracts"
-        },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)"
-        },
-        "quoted_price": {
-          "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\nUsed only for mark-to-market: `base_value` returns model-minus-contract\nvalue for a long position. Basis, implied-repo and invoice helpers take\nthe current futures price as an explicit argument instead.\nCurrent-settlement variation margin is a separate cash-P&L workflow."
         },
         "repo_curve_id": {
           "anyOf": [
@@ -3454,16 +3434,16 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "description": "Scenario-only pricing adjustments."
+        },
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position and lifecycle terms. `terms.multiplier` is the\ncurrency value of one full price point (per-contract face / 100),\n`terms.entry_price` the trade price per 100 face, `terms.last_trading_date`\nthe last trading day and `terms.settlement_date` the last delivery date."
         }
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
+        "terms",
         "delivery_start",
-        "delivery_end",
-        "quoted_price",
-        "position",
         "contract_specs",
         "deliverable_basket",
         "discount_curve_id",
@@ -3473,13 +3453,8 @@
     },
     "BondFutureSpecs": {
       "additionalProperties": false,
-      "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract: contract\nsize, the notional bond parameters used for conversion factor\ncalculations, and the implied-repo day count.\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`delivery_end` and the caller-supplied invoice settlement date, so the\nspec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```",
+      "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date` and the caller-supplied invoice settlement date, so\nthe spec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```",
       "properties": {
-        "contract_size": {
-          "description": "Face value of a single contract (e.g., $100,000 for UST)",
-          "format": "double",
-          "type": "number"
-        },
         "repo_day_count": {
           "$ref": "#/$defs/RepoDayCountWire",
           "default": "act_360",
@@ -3497,7 +3472,6 @@
         }
       },
       "required": [
-        "contract_size",
         "standard_coupon",
         "standard_maturity_years"
       ],
@@ -6863,7 +6837,7 @@
     },
     "CommodityForward": {
       "additionalProperties": false,
-      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_price if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
+      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -6949,7 +6923,7 @@
           "$ref": "#/$defs/PositiveF64Wire",
           "description": "Contract quantity in units."
         },
-        "quoted_price": {
+        "quoted_forward": {
           "description": "Optional quoted forward price (overrides curve lookup for F).\n\nThis is a market price override, not the contract entry price.\nUse `contract_price` for the trade entry price K.",
           "format": "double",
           "type": [
@@ -15124,7 +15098,7 @@
           "type": "integer"
         },
         "face_value": {
-          "description": "Face value of contract (e.g., $1,000,000 for Eurodollar/SOFR futures)",
+          "description": "Face value of one contract in currency units (e.g., $1,000,000 for\nEurodollar/SOFR futures)",
           "format": "double",
           "type": "number"
         },
@@ -15132,17 +15106,11 @@
           "description": "Tick size in price points (e.g., 0.0025 = 0.25bp for SOFR futures)",
           "format": "double",
           "type": "number"
-        },
-        "tick_value": {
-          "description": "Tick value in currency units (e.g., $6.25 for 3M SOFR)",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
         "face_value",
         "tick_size",
-        "tick_value",
         "delivery_months"
       ],
       "type": "object"
@@ -15900,10 +15868,6 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "quote_currency": {
-          "$ref": "#/$defs/Currency",
-          "description": "Quote and variation-margin currency."
-        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "description": "Scenario-only pricing adjustments."
@@ -15918,13 +15882,12 @@
         },
         "terms": {
           "$ref": "#/$defs/ListedFutureTerms",
-          "description": "Standard listed position and lifecycle terms."
+          "description": "Standard listed position and lifecycle terms. `terms.currency` is the\nquote currency of the pair and the variation-margin currency."
         }
       },
       "required": [
         "id",
         "base_currency",
-        "quote_currency",
         "terms",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id"
@@ -19129,7 +19092,7 @@
     },
     "InterestRateFuture": {
       "additionalProperties": false,
-      "description": "Interest Rate Future instrument.",
+      "description": "Interest Rate Future instrument.\n\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]. `terms.multiplier` is the settlement-currency\nvalue of one full price point per contract (`tick_value / tick_size`, e.g.\n$2,500 for CME SR3), `terms.last_trading_date` is the last trading day and\n`terms.settlement_date` is the date after which the position carries no\nvalue (the last trading day for term-rate contracts, the reference-period\nend for in-arrears overnight contracts).",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -19147,10 +19110,6 @@
           "$ref": "#/$defs/Id",
           "description": "Discount curve identifier"
         },
-        "expiry": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Future expiry/delivery date"
-        },
         "fixing_calendar_id": {
           "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used.",
           "type": [
@@ -19167,7 +19126,7 @@
               "type": "null"
             }
           ],
-          "description": "Underlying rate fixing date.\n\nDefaults to `expiry` when omitted."
+          "description": "Underlying rate fixing date.\n\nDefaults to `terms.last_trading_date` when omitted."
         },
         "fixing_index_id": {
           "anyOf": [
@@ -19196,10 +19155,6 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/Money",
-          "description": "Exposure size expressed in currency units. PV is scaled by\n`notional.amount() / contract_specs.face_value` to support\nmultiples of the standard contract."
-        },
         "period_end": {
           "anyOf": [
             {
@@ -19222,15 +19177,6 @@
           ],
           "description": "Rate period start date.\n\nDefaults to 2 calendar days after fixing date when omitted."
         },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)"
-        },
-        "quoted_price": {
-          "description": "Quoted future price (e.g., 99.25)",
-          "format": "double",
-          "type": "number"
-        },
         "rate_averaging": {
           "$ref": "#/$defs/RateAveragingMethod",
           "description": "Rate settlement method defined by the exchange contract."
@@ -19239,13 +19185,9 @@
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement_price": {
-          "description": "Optional official final settlement price in futures price points.\n\nRequired after the last trading date for in-arrears contracts whose\nfinal settlement occurs after trading terminates.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position, multiplier, price and lifecycle terms."
         },
         "vol_surface_id": {
           "anyOf": [
@@ -19261,11 +19203,8 @@
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
-        "quoted_price",
+        "terms",
         "day_count",
-        "position",
         "contract_specs",
         "discount_curve_id",
         "forward_curve_id",
@@ -30467,38 +30406,6 @@
       ],
       "type": "object"
     },
-    "VolIndexContractSpecs": {
-      "additionalProperties": false,
-      "description": "Contract specifications for volatility index futures.\n\nVIX futures have standardized specifications set by CBOE:\n- Standard multiplier: $1,000 per index point\n- Minimum tick: 0.05 index points ($50)\n- Weekly and monthly expiries available",
-      "properties": {
-        "index_id": {
-          "description": "Index identifier (e.g., \"VIX\", \"VXN\", \"VSTOXX\").",
-          "type": "string"
-        },
-        "multiplier": {
-          "description": "Contract multiplier (USD per index point).\nVIX standard: 1000 (each point = $1,000)",
-          "format": "double",
-          "type": "number"
-        },
-        "tick_size": {
-          "description": "Tick size in index points.\nVIX standard: 0.05 points",
-          "format": "double",
-          "type": "number"
-        },
-        "tick_value": {
-          "description": "Tick value in currency units.\nVIX standard: $50 per tick (0.05 × 1000)",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "multiplier",
-        "tick_size",
-        "tick_value",
-        "index_id"
-      ],
-      "type": "object"
-    },
     "VolInterpolationMode": {
       "description": "Interpolation contract for vol surfaces.",
       "oneOf": [
@@ -30646,29 +30553,16 @@
     },
     "VolatilityIndexFuture": {
       "additionalProperties": false,
-      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::{\n    VolatilityIndexFuture, VolIndexContractSpecs,\n};\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .notional(Money::from((100_000_i64, Currency::USD)))\n    .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .quoted_price(21.50)\n    .position(Position::Long)\n    .contract_specs(VolIndexContractSpecs::default())\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
+          "default": {},
           "description": "Attributes for scenario selection and tagging"
-        },
-        "contract_specs": {
-          "$ref": "#/$defs/VolIndexContractSpecs",
-          "default": {
-            "index_id": "VIX",
-            "multiplier": 1000.0,
-            "tick_size": 0.05,
-            "tick_value": 50.0
-          },
-          "description": "Contract specifications."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/Id",
           "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing."
-        },
-        "expiry": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Future expiry date. For VIX futures this is the final settlement day\nitself (the Wednesday ~30 days before the expiry of the SPX options\nused in the settlement calculation), not a date 30 days before\nsettlement."
         },
         "id": {
           "$ref": "#/$defs/Id",
@@ -30682,35 +30576,13 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/Money",
-          "description": "Notional exposure in currency units. PV is scaled by\n`notional.amount() / (multiplier × quoted_price)` to represent\nthe number of contracts."
-        },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)."
-        },
-        "quoted_price": {
-          "description": "Quoted future price (index points, e.g., 21.50).",
-          "format": "double",
-          "type": "number"
-        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement_date": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX)."
-        },
-        "settlement_fixing": {
-          "default": null,
-          "description": "Final settlement/SOQ fixing in index points.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position and lifecycle terms. `terms.multiplier` is the\nsettlement-currency value of one index point ($1,000 for CBOE VIX),\n`terms.entry_price` is the trade price in index points and\n`terms.settlement_date` is the SOQ date on which the final settlement\nprice is fixed."
         },
         "vol_index_curve_id": {
           "$ref": "#/$defs/Id",
@@ -30719,14 +30591,9 @@
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
-        "settlement_date",
-        "quoted_price",
-        "position",
+        "terms",
         "discount_curve_id",
-        "vol_index_curve_id",
-        "attributes"
+        "vol_index_curve_id"
       ],
       "type": "object"
     },

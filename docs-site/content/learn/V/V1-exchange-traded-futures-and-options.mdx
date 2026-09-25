@@ -94,7 +94,8 @@ for instrument_id, envelope in inputs.items():
     terms = envelope['instrument']['spec']
     contract_rows.append({'id': instrument_id, 'type': envelope['instrument']['type'],
                           'currency': (terms.get('notional') or terms.get('terms', {})).get('currency'),
-                          'expiry': terms.get('expiry') or terms.get('terms', {}).get('expiry')})
+                          'expiry': terms.get('expiry') or terms.get('terms', {}).get('expiry')
+                                    or terms.get('terms', {}).get('last_trading_date')})
 print({'as_of': AS_OF.isoformat(), 'base_positions': base_ids, 'volatility_extension': vol_added})
 print(pd.DataFrame(contract_rows).to_string(index=False))
 ```
@@ -178,7 +179,8 @@ from _shared.instrument_fixtures import ir_future,instrument_envelope
 from finstack_quant.core.market_data import VolSurface
 from finstack_quant.core.dates import next_imm,imm_option_expiry
 _,ir_raw=ir_future(0)
-ir_raw["spec"].update({"expiry":"2025-06-18","fixing_date":"2025-06-18",
+ir_raw["spec"]["terms"].update({"last_trading_date":"2025-06-18","settlement_date":"2025-06-18"})
+ir_raw["spec"].update({"fixing_date":"2025-06-18",
     "period_start":"2025-06-18","period_end":"2025-09-17","vol_surface_id":"IR-NORMAL-VOL"})
 ir_raw["spec"]["contract_specs"]["convexity_adjustment"]=None
 convexity_rows=[]
@@ -203,7 +205,7 @@ equity_future=instrument_envelope({"type":"equity_future","spec":{"id":"V1-SPX-F
     "spot_id":"SPX-SPOT","div_yield_id":"SPX-DIV"}})
 fx_terms={**terms,"contracts":4.,"multiplier":125000.,"entry_price":1.08}
 fx_future=instrument_envelope({"type":"fx_future","spec":{"id":"V1-EURUSD-FUTURE",
-    "base_currency":"EUR","quote_currency":"USD","terms":fx_terms,
+    "base_currency":"EUR","terms":fx_terms,
     "domestic_discount_curve_id":"USD-OIS","foreign_discount_curve_id":"EUR-OIS"}})
 carry_results={}
 for name,payload in [("equity",equity_future),("FX",fx_future)]:
@@ -249,7 +251,7 @@ from _shared.analyst_book import instruments as base_instruments
 corporate=base_instruments("base")["USD-CORP"]
 bond_risk=price_instrument(json.dumps(corporate),market,AS_OF,metrics=["dv01","bucketed_dv01"])
 one_future=deepcopy(inputs["UST-FUTURE"])
-one_future["instrument"]["spec"]["notional"]={"amount":"100000","currency":"USD"}
+one_future["instrument"]["spec"]["terms"]["contracts"]=1.0
 future_risk=price_instrument(json.dumps(one_future),market,AS_OF,model="bond_future_clean_price_proxy",metrics=["dv01"])
 contracts_to_short=bond_risk.metrics["dv01"]/future_risk.metrics["dv01"]
 residual=bond_risk.metrics["dv01"]-round(contracts_to_short)*future_risk.metrics["dv01"]

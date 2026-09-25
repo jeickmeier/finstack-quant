@@ -1040,7 +1040,7 @@ for label,m in [("base",market),("joint_stress",stress)]:
         proxy=deepcopy(future_inputs["UST-FUTURE"])
         proxy["instrument"]["spec"].update(ctd_bond_id=deliverable,ctd_bond=future_inputs[deliverable]["instrument"]["spec"])
         out=price_instrument(json.dumps(proxy),m,AS_OF,model="bond_future_clean_price_proxy",metrics=["futures_price","conversion_factor","dv01"])
-        quote=proxy["instrument"]["spec"]["quoted_price"]
+        quote=proxy["instrument"]["spec"]["terms"]["entry_price"]
         delivery_rows.append({"case":label,"deliverable":deliverable,"fair_future":out.metrics["futures_price"],
             "conversion_factor":out.metrics["conversion_factor"],"gross_basis_pct":out.metrics["conversion_factor"]*(out.metrics["futures_price"]-quote),"DV01":out.metrics["dv01"]})
 delivery_table=pd.DataFrame(delivery_rows)
@@ -1202,7 +1202,7 @@ for day in dates:
     future=deepcopy(tracks.vol_extension()["UST-FUTURE"])
     future_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy",metrics=["futures_price"])
     cumulative_vm_cash=future_mark.value.amount
-    future["instrument"]["spec"]["quoted_price"]=future_mark.metrics["futures_price"]
+    future["instrument"]["spec"]["terms"]["entry_price"]=future_mark.metrics["futures_price"]
     reset_mark=price_instrument(json.dumps(future),dated,day,model="bond_future_clean_price_proxy").value.amount
     sleeves={"common":sum(value for iid,value in by_position.items() if iid in common_ids),
              "track_extension":sum(value for iid,value in by_position.items() if iid not in common_ids)}
@@ -1276,7 +1276,7 @@ from finstack_quant.reporting.theme import INSTITUTIONAL
 trim_fraction=.50
 trim_row=scenario.loc[scenario.position=="UST-FUTURE"].iloc[0]
 future_spec=tracks.futures_inputs()["UST-FUTURE"]["instrument"]["spec"]
-held_contracts=float(future_spec["notional"]["amount"])/future_spec["contract_specs"]["contract_size"]
+held_contracts=float(future_spec["terms"]["contracts"])
 trim_contracts=held_contracts*trim_fraction
 trim_base=float(positions.loc[positions.position=="UST-FUTURE","usd_value"].iloc[0])*trim_fraction
 stress_loss_avoided=-float(trim_row.pnl_usd)*trim_fraction

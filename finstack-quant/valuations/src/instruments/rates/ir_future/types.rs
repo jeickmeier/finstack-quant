@@ -31,6 +31,7 @@ use crate::constants::ONE_BASIS_POINT;
 // Params-based constructor removed; build via builder instead.
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
+use crate::instruments::common_impl::listed::ListedFutureTerms;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -61,6 +62,14 @@ pub(crate) struct RateFutureProjection {
 }
 
 /// Interest Rate Future instrument.
+///
+/// Position size, multiplier, entry price and lifecycle dates live in the
+/// shared [`ListedFutureTerms`]. `terms.multiplier` is the settlement-currency
+/// value of one full price point per contract (`tick_value / tick_size`, e.g.
+/// $2,500 for CME SR3), `terms.last_trading_date` is the last trading day and
+/// `terms.settlement_date` is the date after which the position carries no
+/// value (the last trading day for term-rate contracts, the reference-period
+/// end for in-arrears overnight contracts).
 #[derive(
     Clone,
     Debug,
@@ -74,20 +83,11 @@ pub(crate) struct RateFutureProjection {
 pub struct InterestRateFuture {
     /// Unique identifier
     pub id: InstrumentId,
-    /// Exposure size expressed in currency units. PV is scaled by
-    /// `notional.amount() / contract_specs.face_value` to support
-    /// multiples of the standard contract.
-    pub notional: Money,
-    /// Future expiry/delivery date
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub expiry: Date,
+    /// Standard listed position, multiplier, price and lifecycle terms.
+    pub terms: ListedFutureTerms,
     /// Underlying rate fixing date.
     ///
-    /// Defaults to `expiry` when omitted.
+    /// Defaults to `terms.last_trading_date` when omitted.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
@@ -118,19 +118,8 @@ pub struct InterestRateFuture {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub period_end: Option<Date>,
-    /// Quoted future price (e.g., 99.25)
-    pub quoted_price: f64,
-    /// Optional official final settlement price in futures price points.
-    ///
-    /// Required after the last trading date for in-arrears contracts whose
-    /// final settlement occurs after trading terminates.
-    #[builder(optional)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settlement_price: Option<f64>,
     /// Day count convention
     pub day_count: DayCount,
-    /// Position side (Long or Short)
-    pub position: Position,
     /// Contract specifications
     pub contract_specs: FutureContractSpecs,
     /// Discount curve identifier
@@ -188,12 +177,11 @@ pub struct InterestRateFuture {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FutureContractSpecs {
-    /// Face value of contract (e.g., $1,000,000 for Eurodollar/SOFR futures)
+    /// Face value of one contract in currency units (e.g., $1,000,000 for
+    /// Eurodollar/SOFR futures)
     pub face_value: f64,
     /// Tick size in price points (e.g., 0.0025 = 0.25bp for SOFR futures)
     pub tick_size: f64,
-    /// Tick value in currency units (e.g., $6.25 for 3M SOFR)
-    pub tick_value: f64,
     /// Number of delivery months (e.g., 3 for quarterly contracts)
     pub delivery_months: u8,
     /// Optional pre-computed convexity adjustment (in rate terms).
@@ -224,7 +212,6 @@ impl FutureContractSpecs {
     pub const CME_SR3: FutureContractSpecs = FutureContractSpecs {
         face_value: 1_000_000.0,
         tick_size: 0.0025,
-        tick_value: 6.25,
         delivery_months: 3,
         convexity_adjustment: None,
     };
@@ -233,7 +220,6 @@ impl FutureContractSpecs {
         for (field, value) in [
             ("face_value", self.face_value),
             ("tick_size", self.tick_size),
-            ("tick_value", self.tick_value),
         ] {
             if !value.is_finite() || value <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -272,24 +258,7 @@ impl InterestRateFuture {
     /// Validate contract scaling, dates, quotes, and convexity inputs.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let context = format!("IR future '{}'", self.id.as_str());
-        if !self.notional.amount().is_finite() || self.notional.amount() < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} notional must be non-negative and finite"
-            )));
-        }
-        if !self.quoted_price.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} quoted_price must be finite"
-            )));
-        }
-        if self
-            .settlement_price
-            .is_some_and(|price| !price.is_finite())
-        {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} settlement_price must be finite when supplied"
-            )));
-        }
+        self.terms.validate()?;
         self.contract_specs.validate(&context)?;
         let (fixing, period_start, period_end) = self.resolve_dates()?;
         match self.rate_averaging {
@@ -356,7 +325,7 @@ impl InterestRateFuture {
     /// Returns an invalid-date-range error when the resolved end is not after
     /// the resolved start.
     pub fn resolve_dates(&self) -> finstack_quant_core::Result<(Date, Date, Date)> {
-        let fixing = self.fixing_date.unwrap_or(self.expiry);
+        let fixing = self.fixing_date.unwrap_or(self.terms.last_trading_date);
         let period_start = self
             .period_start
             .unwrap_or(fixing + time::Duration::days(2));
@@ -378,14 +347,19 @@ impl InterestRateFuture {
         use finstack_quant_core::currency::Currency;
         InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-ED-3M-MAR25"))
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .expiry(date!(2025 - 03 - 17))
+            .terms(ListedFutureTerms::new(
+                1.0,
+                2_500.0,
+                Currency::USD,
+                95.50,
+                date!(2025 - 03 - 17),
+                date!(2025 - 03 - 17),
+                Position::Long,
+            )?)
             .fixing_date_opt(Some(date!(2025 - 03 - 17)))
             .period_start_opt(Some(date!(2025 - 03 - 19)))
             .period_end_opt(Some(date!(2025 - 06 - 18)))
-            .quoted_price(95.50)
             .day_count(finstack_quant_core::dates::DayCount::Act360)
-            .position(Position::Long)
             .contract_specs(FutureContractSpecs {
                 convexity_adjustment: Some(0.0), // Strict mode requires explicit adjustment or vol surface
                 ..FutureContractSpecs::default()
@@ -403,16 +377,16 @@ impl InterestRateFuture {
         self
     }
 
-    /// Get implied rate from quoted price.
+    /// Get the rate implied by the entry price `terms.entry_price`.
     ///
     /// Interest rate futures quote as 100 minus the rate, i.e., a price of 97.50
     /// implies a 2.50% rate.
     ///
     /// # Errors
     ///
-    /// Returns an error when the quoted price produces a non-finite rate.
+    /// Returns an error when the entry price produces a non-finite rate.
     pub fn implied_rate(&self) -> finstack_quant_core::Result<Rate> {
-        Rate::from_percent(100.0 - self.quoted_price)
+        Rate::from_percent(100.0 - self.terms.entry_price)
     }
 
     fn fixing_index_id(&self) -> &str {
@@ -493,7 +467,7 @@ impl InterestRateFuture {
             RateAveragingMethod::ArithmeticAverage => {
                 let calendar = resolve_overnight_fixing_calendar(
                     self.fixing_calendar_id.as_deref(),
-                    self.notional.currency(),
+                    self.terms.currency,
                     &format!("IR future '{}'", self.id),
                 )?;
                 let projection =
@@ -515,7 +489,7 @@ impl InterestRateFuture {
             RateAveragingMethod::CompoundedOvernight => {
                 let calendar = resolve_overnight_fixing_calendar(
                     self.fixing_calendar_id.as_deref(),
-                    self.notional.currency(),
+                    self.terms.currency,
                     &format!("IR future '{}'", self.id),
                 )?;
                 let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
@@ -576,30 +550,11 @@ impl InterestRateFuture {
         Ok(adjustment * projection.parallel_forward_sensitivity)
     }
 
-    fn terminal_date(&self, period_end: Date) -> Date {
-        match self.rate_averaging {
-            RateAveragingMethod::Term => self.expiry,
-            RateAveragingMethod::ArithmeticAverage | RateAveragingMethod::CompoundedOvernight => {
-                period_end
-            }
-        }
-    }
-
-    fn position_value_from_mark(&self, mark: f64) -> finstack_quant_core::Result<f64> {
-        if !mark.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "IR future '{}' mark must be finite",
-                self.id
-            )));
-        }
-        let contracts_scale = self.notional.amount() / self.contract_specs.face_value;
-        let price_delta = mark - self.quoted_price;
-        let pv_per_contract =
-            price_delta / self.contract_specs.tick_size * self.contract_specs.tick_value;
-        Ok(self.position.sign() * contracts_scale * pv_per_contract)
-    }
-
-    /// Return the live model mark or official final settlement price.
+    /// Return the live quote, model price, or official final settlement price.
+    ///
+    /// Live contracts use `terms.quoted_price` when supplied and otherwise
+    /// [`Self::fair_price`]; after `terms.last_trading_date` the official
+    /// `terms.settlement_price` is required.
     ///
     /// # Arguments
     ///
@@ -611,15 +566,24 @@ impl InterestRateFuture {
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        if as_of > self.expiry {
-            return self.settlement_price.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "IR future '{}' requires settlement_price after expiry {}",
-                    self.id, self.expiry
-                ))
-            });
-        }
+        self.terms
+            .resolve_mark(self.id.as_str(), as_of, || self.fair_price(context, as_of))
+    }
 
+    /// Model futures price `100 × (1 − R − CA)` in price points, where `R` is
+    /// the exchange-defined settlement rate over the reference period and
+    /// `CA` the convexity adjustment.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context containing the projection, discount, fixing, and volatility inputs.
+    /// * `as_of` - Valuation date separating published fixings from projected observations.
+    pub fn fair_price(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
         use finstack_quant_core::dates::DayCountContext;
         let (_fixing_date, period_start, period_end) = self.resolve_dates()?;
 
@@ -657,11 +621,10 @@ impl InterestRateFuture {
         Ok(100.0 * (1.0 - projection.rate - effective_adjustment))
     }
 
-    /// Calculates the present value of the interest rate future.
+    /// Calculates the raw present value of the interest rate future (f64).
     ///
-    /// PV = (model_price - contract_price) / tick_size × tick_value × contracts × position_sign
-    ///
-    /// Calculates the raw present value of the interest rate future (f64)
+    /// PV = sign × contracts × multiplier × (mark − entry_price), and zero
+    /// after `terms.settlement_date`.
     ///
     /// # Day Count Conventions
     ///
@@ -679,18 +642,20 @@ impl InterestRateFuture {
     ///
     /// Futures are marked-to-market daily with variation margin, so no discounting is
     /// applied. The PV represents the current mark-to-market gain/loss versus the
-    /// quoted entry price.
+    /// entry price.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - Market context containing the projection, discount, fixing, and volatility inputs.
+    /// * `as_of` - Valuation date controlling the contract lifecycle.
     pub fn npv_raw(
         &self,
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         self.validate()?;
-        let (_fixing_date, _period_start, period_end) = self.resolve_dates()?;
-        if as_of > self.terminal_date(period_end) {
-            return Ok(0.0);
-        }
-        self.position_value_from_mark(self.mark_price(context, as_of)?)
+        self.terms
+            .npv_from_model_price(self.id.as_str(), as_of, || self.fair_price(context, as_of))
     }
 
     /// Derive contract tick value for the instrument accrual.
@@ -858,7 +823,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let pv = self.npv_raw(curves, as_of)?;
-        finstack_quant_core::money::Money::new(pv, self.notional.currency())
+        finstack_quant_core::money::Money::new(pv, self.terms.currency)
     }
 
     fn base_value_raw(
@@ -874,11 +839,11 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<(f64, finstack_quant_core::currency::Currency)> {
-        Ok((self.npv_raw(curves, as_of)?, self.notional.currency()))
+        Ok((self.npv_raw(curves, as_of)?, self.terms.currency))
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.expiry)
+        Some(self.terms.last_trading_date)
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -890,8 +855,12 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {
+    /// Face exposure `terms.contracts × contract_specs.face_value` in `terms.currency`.
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
-        Ok(Some(self.notional))
+        Ok(Some(Money::new(
+            self.terms.contracts * self.contract_specs.face_value,
+            self.terms.currency,
+        )?))
     }
 
     fn raw_cashflow_schedule(
@@ -921,6 +890,21 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::macros::date;
 
+    /// One CME SR3-style contract ($2,500 per point) whose last trading day is
+    /// also its settlement date.
+    fn listed_terms(last_trading_date: Date, entry_price: f64) -> ListedFutureTerms {
+        ListedFutureTerms::new(
+            1.0,
+            2_500.0,
+            Currency::USD,
+            entry_price,
+            last_trading_date,
+            last_trading_date,
+            Position::Long,
+        )
+        .expect("terms")
+    }
+
     #[test]
     fn market_dependencies_include_optional_convexity_volatility() {
         let mut future = InterestRateFuture::example().expect("example future");
@@ -937,14 +921,11 @@ mod tests {
     }
 
     #[test]
-    fn ir_future_defaults_dates_from_expiry_and_contract_specs() {
+    fn ir_future_defaults_dates_from_last_trading_date_and_contract_specs() {
         let irf = InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-DEFAULT-DATES"))
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .expiry(date!(2025 - 03 - 17))
-            .quoted_price(95.50)
+            .terms(listed_terms(date!(2025 - 03 - 17), 95.50))
             .day_count(DayCount::Act360)
-            .position(Position::Long)
             .contract_specs(FutureContractSpecs::default())
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
@@ -965,14 +946,11 @@ mod tests {
     fn ir_future_respects_explicit_date_overrides() {
         let irf = InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-EXPLICIT-DATES"))
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .expiry(date!(2025 - 03 - 17))
+            .terms(listed_terms(date!(2025 - 03 - 17), 95.50))
             .fixing_date_opt(Some(date!(2025 - 03 - 18)))
             .period_start_opt(Some(date!(2025 - 03 - 20)))
             .period_end_opt(Some(date!(2025 - 06 - 20)))
-            .quoted_price(95.50)
             .day_count(DayCount::Act360)
-            .position(Position::Long)
             .contract_specs(FutureContractSpecs::default())
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
@@ -987,7 +965,7 @@ mod tests {
     }
 
     #[test]
-    fn term_future_has_no_value_after_expiry_even_before_reference_period_end() {
+    fn term_future_has_no_value_after_settlement_even_before_reference_period_end() {
         let future = InterestRateFuture::example().expect("example future");
         let value = future
             .npv_raw(&MarketContext::new(), date!(2025 - 03 - 18))
@@ -996,18 +974,18 @@ mod tests {
     }
 
     #[test]
-    fn in_arrears_future_uses_official_settlement_after_expiry() {
+    fn in_arrears_future_uses_official_settlement_after_last_trading_date() {
         let mut future = InterestRateFuture::example().expect("example future");
         future.rate_averaging = RateAveragingMethod::CompoundedOvernight;
         future.fixing_date = future.period_end;
-        future.settlement_price = Some(96.0);
+        future.terms.settlement_date = future.period_end.expect("period end");
+        future.terms.settlement_price = Some(96.0);
 
         let mark = future
             .mark_price(&MarketContext::new(), date!(2025 - 03 - 18))
             .expect("official settlement mark");
         assert_eq!(mark, 96.0);
-        let expected =
-            (96.0 - 95.50) / future.contract_specs.tick_size * future.contract_specs.tick_value;
+        let expected = (96.0 - 95.50) * future.terms.multiplier;
         let value = future
             .npv_raw(&MarketContext::new(), date!(2025 - 03 - 18))
             .expect("post-expiry in-arrears value");
@@ -1022,14 +1000,11 @@ mod tests {
         let as_of = date!(2025 - 01 - 03);
         let future = InterestRateFuture::builder()
             .id(InstrumentId::new("SR1-PARTIAL-CONVEXITY"))
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .expiry(date!(2025 - 01 - 07))
+            .terms(listed_terms(date!(2025 - 01 - 07), 95.0))
             .fixing_date_opt(Some(date!(2025 - 01 - 07)))
             .period_start_opt(Some(date!(2025 - 01 - 02)))
             .period_end_opt(Some(date!(2025 - 01 - 07)))
-            .quoted_price(95.0)
             .day_count(DayCount::Act360)
-            .position(Position::Long)
             .contract_specs(FutureContractSpecs {
                 convexity_adjustment: Some(0.001),
                 ..FutureContractSpecs::default()
@@ -1080,7 +1055,6 @@ mod tests {
         let specs = FutureContractSpecs::default();
         assert_eq!(specs.face_value, 1_000_000.0);
         assert_eq!(specs.tick_size, 0.0025);
-        assert_eq!(specs.tick_value, 6.25);
         assert_eq!(specs.delivery_months, 3);
         assert_eq!(specs.convexity_adjustment, None);
 
@@ -1094,7 +1068,6 @@ mod tests {
             .expect("embedded registry should contain CME:SR3");
         assert_eq!(specs.face_value, conventions.face_value);
         assert_eq!(specs.tick_size, conventions.tick_size);
-        assert_eq!(specs.tick_value, conventions.tick_value);
         assert_eq!(specs.delivery_months, conventions.delivery_months);
         assert_eq!(specs.convexity_adjustment, conventions.convexity_adjustment);
     }
@@ -1172,14 +1145,11 @@ mod tests {
     fn ir_future_rejects_pre_curve_or_straddling_projection_period() {
         let future = InterestRateFuture::builder()
             .id(InstrumentId::new("IRF-PRE-BASE"))
-            .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .expiry(date!(2025 - 01 - 15))
+            .terms(listed_terms(date!(2025 - 01 - 15), 95.0))
             .fixing_date_opt(Some(date!(2025 - 01 - 15)))
             .period_start_opt(Some(date!(2025 - 01 - 17)))
             .period_end_opt(Some(date!(2025 - 04 - 17)))
-            .quoted_price(95.0)
             .day_count(DayCount::Act360)
-            .position(Position::Long)
             .contract_specs(FutureContractSpecs {
                 convexity_adjustment: Some(0.0),
                 ..FutureContractSpecs::default()

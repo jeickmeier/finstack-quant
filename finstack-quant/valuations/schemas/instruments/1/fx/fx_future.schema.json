@@ -33,10 +33,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "quote_currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Quote and variation-margin currency."
-        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
@@ -51,13 +47,12 @@
         },
         "terms": {
           "$ref": "#/$defs/ListedFutureTerms",
-          "description": "Standard listed position and lifecycle terms."
+          "description": "Standard listed position and lifecycle terms. `terms.currency` is the\nquote currency of the pair and the variation-margin currency."
         }
       },
       "required": [
         "id",
         "base_currency",
-        "quote_currency",
         "terms",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id"
@@ -229,7 +224,6 @@
           "domestic_discount_curve_id": "USD-OIS",
           "foreign_discount_curve_id": "EUR-OIS",
           "id": "CME-6E-DEC26",
-          "quote_currency": "USD",
           "terms": {
             "contracts": 4.0,
             "currency": "USD",

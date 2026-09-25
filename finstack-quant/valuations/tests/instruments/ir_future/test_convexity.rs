@@ -57,7 +57,6 @@ fn test_explicit_convexity_adjustment() {
     let specs_with_ca = FutureContractSpecs {
         face_value: 1_000_000.0,
         tick_size: 0.0025,
-        tick_value: 6.25,
         delivery_months: 3,
         convexity_adjustment: Some(0.0005), // 5 bp adjustment
     };

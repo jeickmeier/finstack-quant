@@ -15,7 +15,7 @@
 //!
 //! VIX futures are marked relative to the forward volatility curve:
 //! ```text
-//! NPV = (Forward_Vol - Quoted_Price) × Multiplier × Contracts × Position_Sign
+//! NPV = (Mark - Entry_Price) × Multiplier × Contracts × Position_Sign
 //! ```
 //! (a long gains when the forward mark rises above the entry price; the MTM
 //! is undiscounted because the position is daily margined).
@@ -50,13 +50,12 @@
 //! # See Also
 //!
 //! - [`VolatilityIndexFuture`] for instrument struct
-//! - [`VolIndexContractSpecs`] for contract specifications
 //! - [`crate::instruments::equity::equity_option`] for cash-settled volatility-index options
 
 pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use types::{VolIndexContractSpecs, VolatilityIndexFuture};
+pub use types::VolatilityIndexFuture;
 
 // Builder provided by FinancialBuilder derive

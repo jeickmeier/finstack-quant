@@ -20,24 +20,25 @@
           "convexity_adjustment": 0.0,
           "delivery_months": 3,
           "face_value": 1000000.0,
-          "tick_size": 0.0025,
-          "tick_value": 6.25
+          "tick_size": 0.0025
         },
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
-        "expiry": "2026-06-17",
         "fixing_date": "2026-06-17",
         "forward_curve_id": "USD-SOFR-3M",
         "id": "SOFR-3M-QUARTERLY-QUANTLIB",
-        "notional": {
-          "amount": "10000000",
-          "currency": "USD"
-        },
         "period_end": "2026-09-18",
         "period_start": "2026-06-19",
-        "position": "long",
-        "quoted_price": 95.7,
         "rate_averaging": "term",
+        "terms": {
+          "contracts": 10.0,
+          "currency": "USD",
+          "entry_price": 95.7,
+          "last_trading_date": "2026-06-17",
+          "multiplier": 2500.0,
+          "position": "long",
+          "settlement_date": "2026-06-17"
+        },
         "vol_surface_id": null
       },
       "type": "interest_rate_future"

@@ -42,7 +42,7 @@ fn create_test_market() -> MarketContext {
 }
 
 #[test]
-fn test_commodity_forward_pricing_with_quoted_price() {
+fn test_commodity_forward_pricing_with_quoted_forward() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let settlement = Date::from_calendar_date(2025, Month::June, 15).unwrap();
     let market = create_test_market();
@@ -61,7 +61,7 @@ fn test_commodity_forward_pricing_with_quoted_price() {
         .maturity(settlement)
         .position(Position::Long)
         .contract_price_opt(Some(72.0)) // Entry price below market for positive MTM
-        .quoted_price_opt(Some(75.0)) // Quoted market price at $75/BBL
+        .quoted_forward_opt(Some(75.0)) // Quoted market price at $75/BBL
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::new())
@@ -109,7 +109,7 @@ fn test_commodity_forward_pricing_expired() {
         .multiplier(1.0)
         .maturity(settlement)
         .position(Position::Long)
-        .quoted_price_opt(Some(75.0))
+        .quoted_forward_opt(Some(75.0))
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::new())
@@ -141,7 +141,7 @@ fn test_commodity_forward_forward_price_from_curve() {
         .multiplier(1.0)
         .maturity(settlement)
         .position(Position::Long)
-        // No quoted_price - should use PriceCurve
+        // No quoted_forward - should use PriceCurve
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::new())
@@ -346,7 +346,7 @@ fn test_commodity_forward_analytical_parity() {
         .maturity(settlement)
         .position(Position::Long)
         .contract_price_opt(Some(contract_price))
-        .quoted_price_opt(Some(forward_price))
+        .quoted_forward_opt(Some(forward_price))
         .forward_curve_id(CurveId::new("WTI-FORWARD"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .build()

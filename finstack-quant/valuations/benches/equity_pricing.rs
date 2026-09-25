@@ -27,9 +27,7 @@ use finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalRetur
 use finstack_quant_valuations::instruments::equity::variance_swap::{
     PayReceive, RealizedVarMethod, VarianceSwap,
 };
-use finstack_quant_valuations::instruments::equity::vol_index_future::{
-    VolIndexContractSpecs, VolatilityIndexFuture,
-};
+use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
 use finstack_quant_valuations::instruments::equity::Equity;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::Position;
@@ -302,12 +300,18 @@ fn bench_vol_index_future_pv(c: &mut Criterion) {
         let expiry = as_of + time::Duration::days(months * 30);
         let fut = VolatilityIndexFuture::builder()
             .id(InstrumentId::new(format!("VIX-FUT-{label}")))
-            .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
-            .expiry(expiry)
-            .settlement_date(expiry)
-            .quoted_price(18.5)
-            .position(Position::Long)
-            .contract_specs(VolIndexContractSpecs::vix())
+            .terms(
+                ListedFutureTerms::new(
+                    100_000.0 / (1_000.0 * 18.5),
+                    1_000.0,
+                    Currency::USD,
+                    18.5,
+                    expiry,
+                    expiry,
+                    Position::Long,
+                )
+                .unwrap(),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_index_curve_id(CurveId::new("VIX"))
             .attributes(Attributes::new())

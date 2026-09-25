@@ -209,7 +209,7 @@ impl CommodityFuture {
     ///
     /// * `market` - Market context containing the configured price curve.
     /// * `as_of` - Valuation date; observations strictly before it must be realized.
-    pub fn model_settlement_price(
+    pub fn fair_price(
         &self,
         market: &MarketContext,
         as_of: Date,
@@ -283,9 +283,8 @@ impl CommodityFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.terms.resolve_mark(self.id.as_str(), as_of, || {
-            self.model_settlement_price(market, as_of)
-        })
+        self.terms
+            .resolve_mark(self.id.as_str(), as_of, || self.fair_price(market, as_of))
     }
 
     /// Calculate variation-margin P&L versus the trade fill.
@@ -296,9 +295,7 @@ impl CommodityFuture {
     /// * `as_of` - Valuation date controlling projected versus realized observations.
     pub fn npv_raw(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
         self.terms
-            .npv_from_model_price(self.id.as_str(), as_of, || {
-                self.model_settlement_price(market, as_of)
-            })
+            .npv_from_model_price(self.id.as_str(), as_of, || self.fair_price(market, as_of))
     }
 
     /// Sensitivity to a parallel one-unit increase in every projected price observation.
@@ -416,7 +413,7 @@ mod tests {
         let future = average_future(vec![(date!(2026 - 01 - 02), 80.0)]);
         let as_of = date!(2026 - 01 - 05);
         let settlement = future
-            .model_settlement_price(&flat_market(), as_of)
+            .fair_price(&flat_market(), as_of)
             .expect("settlement");
         assert!((settlement - (80.0 + 100.0 + 100.0) / 3.0).abs() < 1.0e-12);
         assert!(
@@ -428,7 +425,7 @@ mod tests {
     fn missing_realized_average_fixing_is_rejected() {
         let future = average_future(Vec::new());
         let error = future
-            .model_settlement_price(&flat_market(), date!(2026 - 01 - 05))
+            .fair_price(&flat_market(), date!(2026 - 01 - 05))
             .expect_err("missing fixing must fail");
         assert!(error.to_string().contains("2026-01-02"));
     }
@@ -441,7 +438,7 @@ mod tests {
             (date!(2026 - 01 - 06), 100.0),
         ]);
         let settlement = future
-            .model_settlement_price(&MarketContext::new(), date!(2026 - 01 - 07))
+            .fair_price(&MarketContext::new(), date!(2026 - 01 - 07))
             .expect("fully realized settlement");
         assert_eq!(settlement, 90.0);
     }

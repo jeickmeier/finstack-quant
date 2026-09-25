@@ -2,6 +2,66 @@
 
 ## [Unreleased]
 
+### Listed futures (2026-09-24)
+
+Interest-rate, bond and volatility-index futures now carry the shared
+`ListedFutureTerms` (`terms`) like every other listed future: position size is
+`terms.contracts` × `terms.multiplier`, the trade price is `terms.entry_price`,
+the optional live mark is `terms.quoted_price`, the lifecycle dates are
+`terms.last_trading_date` / `terms.settlement_date` and the official final
+settlement is `terms.settlement_price`. The model futures price is `fair_price`
+on every listed future. Fixtures were migrated with `contracts = notional /
+face` and `multiplier = tick_value / tick_size` (IR), `face / 100` (bond) or
+`contracts = notional / (multiplier × entry_price)` (VIX), so no numbers change
+beyond float re-association.
+
+#### Changed (BREAKING)
+
+- `InterestRateFuture.notional`, `.expiry`, `.quoted_price`,
+  `.settlement_price` and `.position` (now `terms: ListedFutureTerms`:
+  `contracts = notional / contract_specs.face_value`, `multiplier =
+  tick_value / tick_size` — $2,500 for CME SR3 —, `entry_price`,
+  `last_trading_date`, `settlement_date` — the last trading date for term
+  contracts, the reference-period end for overnight contracts —,
+  `settlement_price`, `position`). `fixing_date` defaults to
+  `terms.last_trading_date`; `implied_rate()` reads `terms.entry_price`.
+  Rust, JSON.
+- `FutureContractSpecs.tick_value` (removed; the value of a price point is
+  `terms.multiplier`). Rust, JSON.
+- `InterestRateFuture::mark_price` now resolves through the listed-future
+  lifecycle (live `terms.quoted_price`, else the new
+  `InterestRateFuture::fair_price`, `terms.settlement_price` after the last
+  trading date). Rust.
+- `BondFuture.notional`, `.expiry`, `.delivery_end`, `.quoted_price` and
+  `.position` (now `terms: ListedFutureTerms` with `multiplier = contract face
+  / 100`, `last_trading_date`, `settlement_date` = last delivery date);
+  `delivery_start` stays. The official `terms.settlement_price` is required
+  after the last trading date. Rust, JSON.
+- `BondFutureSpecs.contract_size` (removed; now `terms.multiplier × 100`).
+  Rust, JSON.
+- `BondFuturePricer::calculate_model_price` (now `fair_price`); new
+  `BondFuture::fair_price` and `BondFuture::mark_price`; the `futures_price`
+  metric is the lifecycle mark. Rust.
+- `VolatilityIndexFuture.notional`, `.expiry`, `.settlement_date`,
+  `.quoted_price`, `.position` and `.contract_specs` (now `terms:
+  ListedFutureTerms`), `.settlement_fixing` (now `terms.settlement_price`,
+  required on the settlement date), `::forward_vol(context)` (now
+  `fair_price(context, as_of)`), `::delta_vol()` now returns `Result<f64>`.
+  Rust, JSON.
+- `CommodityFuture::model_settlement_price` (now `fair_price`). Rust.
+- `CommodityForward.quoted_price` (now `quoted_forward`). Rust, JSON.
+- `FxFuture.quote_currency` (removed from the wire; the quote and
+  variation-margin currency is `terms.currency`, read through
+  `FxFuture::quote_currency()`). Rust, JSON.
+
+#### Removed
+
+- `VolIndexContractSpecs` with `vix()`, `mini_vix()` and `vstoxx()`, and the
+  volatility-index-future section of the embedded contract-spec registry
+  (`terms.multiplier` carries the contract multiplier). Rust, JSON.
+- Unused `instruments::ContractSpec`. Rust.
+- `VolatilityIndexFuture::num_contracts` (now `terms.contracts`). Rust.
+
 ### Settlement and payment timing (2026-09-24)
 
 `settlement_date` is a date, `settlement` is only the delivery method, the T+N

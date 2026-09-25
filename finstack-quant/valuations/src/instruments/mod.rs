@@ -220,7 +220,7 @@ pub use equity::{
     EquityFutureQuantoSpec, EquityOption, EquityPriceSeriesPolicy, EquityTotalReturnFuture,
     EquityTotalReturnSwap, FinalPayoffType, LeveredRealEstateEquity, PrivateMarketsFund,
     RealEstateAsset, RealEstateFinancing, RealEstateValuationMethod, TerminalValueSpec,
-    VarianceSwap, VolIndexContractSpecs, VolatilityIndexFuture, VolatilityIndexFutureOption,
+    VarianceSwap, VolatilityIndexFuture, VolatilityIndexFutureOption,
 };
 
 pub use fx::FxVarianceSwap;
@@ -269,11 +269,11 @@ pub use common_impl::traits::{
 };
 
 pub use common_impl::parameters::{
-    BasisSwapLeg, BondConvention, CommodityUnderlyingParams, ContractSpec, CreditParams,
-    EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FinancingRateCompounding,
-    FixedLegSpec, FloatLegSpec, FxUnderlyingParams, IRSConvention, IndexUnderlyingParams,
-    Monitoring, OptionMarketParams, OptionType, ParRateMethod, PayReceive, PremiumLegSpec,
-    ProtectionLegSpec, QuantoSpec, ScheduleSpec, SettlementType, TotalReturnLegSpec,
+    BasisSwapLeg, BondConvention, CommodityUnderlyingParams, CreditParams, EquityUnderlyingParams,
+    ExerciseStyle, FinancingLegSpec, FinancingRateCompounding, FixedLegSpec, FloatLegSpec,
+    FxUnderlyingParams, IRSConvention, IndexUnderlyingParams, Monitoring, OptionMarketParams,
+    OptionType, ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, QuantoSpec,
+    ScheduleSpec, SettlementType, TotalReturnLegSpec,
 };
 
 pub use common_impl::parameters::trs_common::{TrsScheduleSpec, TrsSide};

@@ -137,6 +137,11 @@ fn typed_semantic_equality(
             Some(first == second)
         }
         (
+            "volatility_index_future",
+            InstrumentJson::VolatilityIndexFuture(first),
+            InstrumentJson::VolatilityIndexFuture(second),
+        ) => Some(first == second),
+        (
             "equity_future",
             InstrumentJson::EquityFuture(first),
             InstrumentJson::EquityFuture(second),

@@ -34,15 +34,18 @@
 //! Present value of futures position:
 //!
 //! ```text
-//! PV = Contracts × Contract_size × (Price_market - Price_entry) × Tick_value
+//! PV = Position_sign × Contracts × Multiplier × (Price_mark - Price_entry)
 //! ```
+//!
+//! where `Multiplier` is the currency value of one full price point
+//! (`tick_value / tick_size`, $2,500 for CME SR3).
 //!
 //! For calibration, futures imply forward rates that price instruments.
 //!
 //! # Market Conventions
 //!
 //! - **Contract size**: $1,000,000 (SOFR), $1,000,000 (Eurodollar)
-//! - **Tick value**: $25 per basis point typically
+//! - **Multiplier**: $2,500 per price point for 3M SOFR ($25 per basis point)
 //! - **Expiry**: IMM dates (3rd Wednesday of Mar/Jun/Sep/Dec)
 //! - **Settlement**: Cash-settled to reference rate
 //!
