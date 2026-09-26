@@ -224,7 +224,7 @@ fn flat_consistent_market(as_of: time::Date, rate: f64) -> MarketContext {
 /// Non-callable floating loan with a quoted clean price on the flat
 /// consistent market (default T+2 settlement; the tiny settlement carry is
 /// absorbed by the pinning tolerance).
-fn solve_dm_at_clean_price(margin_bp: i64, clean_px: f64) -> f64 {
+fn solve_dm_at_clean_price(spread_bp: i64, clean_px: f64) -> f64 {
     let as_of = date!(2025 - 01 - 01);
     let maturity = date!(2028 - 01 - 01);
     let overrides = InstrumentPricingOverrides {
@@ -242,7 +242,7 @@ fn solve_dm_at_clean_price(margin_bp: i64, clean_px: f64) -> f64 {
         .maturity(maturity)
         .rate(RateSpec::Floating(FloatingRateSpec {
             forward_curve_id: CurveId::from("USD-SOFR"),
-            spread_bp: Decimal::from(margin_bp),
+            spread_bp: Decimal::from(spread_bp),
             gearing: Decimal::from(1),
             gearing_includes_spread: true,
             index_floor_bp: None,

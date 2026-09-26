@@ -103,7 +103,7 @@ mod replay_tests {
             .start_date(as_of)
             .maturity(date!(2024 - 02 - 01))
             .day_count(DayCount::Act360)
-            .quote_rate_opt(Some(rust_decimal::Decimal::try_from(0.045).unwrap()))
+            .fixed_rate_opt(Some(rust_decimal::Decimal::try_from(0.045).unwrap()))
             .discount_curve_id("USD".into())
             .build()
             .unwrap();

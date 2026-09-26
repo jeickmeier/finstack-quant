@@ -1372,8 +1372,8 @@
     {
       "instruments": [
         {
-          "artifact_id": "sha256:e93c11f7d5074cae0fd54e8518ecd99b28caeb66a7ce7ced8eece183473a565f",
-          "content_hash": "sha256:e93c11f7d5074cae0fd54e8518ecd99b28caeb66a7ce7ced8eece183473a565f",
+          "artifact_id": "sha256:cc921b8796dfca06e9fbfc5bb9c01c5883dfc410bcdf20a363e6f7c69f1f9f7a",
+          "content_hash": "sha256:cc921b8796dfca06e9fbfc5bb9c01c5883dfc410bcdf20a363e6f7c69f1f9f7a",
           "dependencies": {
             "curves": {
               "credit_curves": [],
@@ -1396,13 +1396,13 @@
                 "calendar_id": null,
                 "day_count": "act_360",
                 "discount_curve_id": "USD-OIS",
+                "fixed_rate": null,
                 "id": "DEP_1M",
                 "maturity": "2024-02-01",
                 "notional": {
                   "amount": "1000000",
                   "currency": "USD"
                 },
-                "quote_rate": null,
                 "settlement_days": null,
                 "start_date": "2024-01-01"
               },
@@ -1425,7 +1425,7 @@
       },
       "positions": [
         {
-          "artifact_id": "sha256:e93c11f7d5074cae0fd54e8518ecd99b28caeb66a7ce7ced8eece183473a565f",
+          "artifact_id": "sha256:cc921b8796dfca06e9fbfc5bb9c01c5883dfc410bcdf20a363e6f7c69f1f9f7a",
           "entity_id": "ACME_CORP",
           "id": "POS_001",
           "instrument_id": "DEP_1M",

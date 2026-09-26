@@ -8,6 +8,7 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use rust_decimal::Decimal;
 
 /// Call or put on a CMS spread.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -60,8 +61,13 @@ pub struct CmsSpreadOption {
     pub long_cms_tenor: Tenor,
     /// Short CMS tenor (e.g., 2Y).
     pub short_cms_tenor: Tenor,
-    /// Strike spread (in decimal, e.g., 0.005 = 50bp).
-    pub strike: f64,
+    /// Strike on the CMS spread as a decimal rate (0.005 = 50bp).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub strike: Decimal,
     /// Call or put on the spread.
     pub option_type: CmsSpreadOptionType,
     /// Notional amount.
@@ -148,6 +154,15 @@ pub struct CmsSpreadOption {
 }
 
 impl CmsSpreadOption {
+    /// Strike as an `f64` decimal rate for the pricing kernels.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `strike` cannot be represented as `f64`.
+    pub(crate) fn strike_rate(&self) -> finstack_quant_core::Result<f64> {
+        finstack_quant_core::decimal::decimal_to_f64(self.strike)
+    }
+
     /// Validate the CMS spread option parameters.
     ///
     /// Checks:
@@ -167,9 +182,7 @@ impl CmsSpreadOption {
             },
         )?;
 
-        validation::require_with(self.strike.is_finite(), || {
-            format!("CmsSpreadOption strike ({}) must be finite", self.strike)
-        })?;
+        self.strike_rate()?;
 
         validation::require_with(self.payment_date >= self.expiry_date, || {
             format!(
@@ -215,7 +228,7 @@ impl CmsSpreadOption {
                 .expect("valid example tenor"),
             short_cms_tenor: Tenor::new(2, finstack_quant_core::dates::TenorUnit::Years)
                 .expect("valid example tenor"),
-            strike: 0.005, // 50bp
+            strike: Decimal::new(5, 3), // 50bp
             option_type: CmsSpreadOptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry_date: Date::from_calendar_date(2027, Month::March, 29).expect("valid"),
@@ -262,14 +275,14 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSpreadOption {
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.long_vol_surface_id.clone(),
                 None,
-                Some(self.strike),
+                Some(self.strike_rate()?),
             ),
         );
         deps.add_volatility_dependency(
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.short_vol_surface_id.clone(),
                 None,
-                Some(self.strike),
+                Some(self.strike_rate()?),
             ),
         );
         let long_tenor_years = self.long_cms_tenor.months().map(f64::from).ok_or_else(|| {
@@ -437,7 +450,7 @@ mod tests {
         let json = serde_json::to_string(&opt).expect("serialize");
         let deser: CmsSpreadOption = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deser.id, opt.id);
-        assert!((deser.strike - opt.strike).abs() < 1e-12);
+        assert_eq!(deser.strike, opt.strike);
     }
 
     #[test]
@@ -447,7 +460,7 @@ mod tests {
         let mut opt = CmsSpreadOption::example();
         opt.expiry_date = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
-        opt.strike = 0.005;
+        opt.strike = Decimal::new(5, 3);
         opt.correlation = 0.50;
 
         let amount = price_amount(&opt, &market, as_of);
@@ -464,7 +477,7 @@ mod tests {
         let mut low_corr = CmsSpreadOption::example();
         low_corr.expiry_date = date(2026, Month::January, 1);
         low_corr.payment_date = date(2026, Month::January, 5);
-        low_corr.strike = 0.010;
+        low_corr.strike = Decimal::new(10, 3);
         low_corr.correlation = 0.0;
 
         let mut high_corr = low_corr.clone();
@@ -482,7 +495,7 @@ mod tests {
         let mut opt = CmsSpreadOption::example();
         opt.expiry_date = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
-        opt.strike = 0.010;
+        opt.strike = Decimal::new(10, 3);
         opt.correlation = 0.50;
 
         let low_vol = price_amount(&opt, &market(as_of, 0.015), as_of);
@@ -565,7 +578,7 @@ mod tests {
         let mut usd = CmsSpreadOption::example();
         usd.expiry_date = date(2026, Month::January, 1);
         usd.payment_date = date(2026, Month::January, 5);
-        usd.strike = 0.0;
+        usd.strike = Decimal::ZERO;
         usd.correlation = 0.50;
         usd.index_id = Some(IndexId::new("USD-SOFR-OIS"));
 

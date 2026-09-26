@@ -13,7 +13,7 @@
       "commodity_type": "Energy",
       "currency": "USD",
       "discount_curve_id": "USD-OIS",
-      "fixed_price": "3.5",
+      "fixed_price": 3.5,
       "forward_curve_id": "NG-SPOT-AVG",
       "frequency": {
         "count": 1,

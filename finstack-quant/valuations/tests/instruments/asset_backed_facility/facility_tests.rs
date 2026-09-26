@@ -89,7 +89,7 @@ fn facility(drawn: f64, commitment: f64) -> AssetBackedFacility {
         .borrowing_base_rules(rules())
         .commitment(usd(commitment))
         .drawn(usd(drawn))
-        .margin_bp(600.0)
+        .spread_bp(600.0)
         .unused_fee_bp(50.0)
         .closing_date(close())
         .revolving_end(d(2026, 1, 1))
@@ -713,7 +713,7 @@ fn floating_facility_interest_is_tagged_float_reset() {
     let fixed = facility(60_000_000.0, 100_000_000.0);
     let mut floating = fixed.clone();
     floating.forward_curve_id = Some(CurveId::new("USD-SOFR-3M".to_string()));
-    floating.margin_bp = 250.0;
+    floating.spread_bp = 250.0;
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(close())
         .knots([(0.0, 0.04), (12.0, 0.04)])

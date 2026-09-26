@@ -107,7 +107,7 @@ def instruments(stage: str = "base") -> dict[str, dict[str, Any]]:
                 "start_date": "2025-01-14",
                 "maturity": "2025-07-15",
                 "day_count": "act_360",
-                "quote_rate": rate,
+                "fixed_rate": rate,
                 "discount_curve_id": f"{currency}-OIS",
                 "attributes": {"tags": ["cash-deposit"], "meta": {"sector": "cash"}},
             },

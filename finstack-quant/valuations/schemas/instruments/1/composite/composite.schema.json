@@ -971,7 +971,7 @@
               "type": "null"
             }
           ],
-          "description": "Forward-curve identifier of the floating index; `None` makes\n`margin_bp` the all-in fixed rate."
+          "description": "Forward-curve identifier of the floating index; `None` makes\n`spread_bp` the all-in fixed rate."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -992,11 +992,6 @@
             "number",
             "null"
           ]
-        },
-        "margin_bp": {
-          "description": "Margin over the index (or the all-in fixed rate) in basis points.",
-          "format": "double",
-          "type": "number"
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -1041,6 +1036,11 @@
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "spread_bp": {
+          "description": "Margin over the index (or the all-in fixed rate when `forward_curve_id`\nis `None`) in basis points (600 = 6%).",
+          "format": "double",
+          "type": "number"
         },
         "stochastic_default_spec": {
           "anyOf": [
@@ -1099,7 +1099,7 @@
         "borrowing_base_rules",
         "commitment",
         "drawn",
-        "margin_bp",
+        "spread_bp",
         "closing_date",
         "revolving_end",
         "maturity",
@@ -4058,9 +4058,9 @@
           "default": "cash",
           "description": "Settlement type (defaults to Cash; caps/floors are virtually always cash-settled)"
         },
-        "spread": {
+        "spread_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Contractual spread added to the referenced rate, in decimal rate units.\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor."
+          "description": "Contractual margin added to the referenced rate, in basis points (10 = 10bp).\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor."
         },
         "start_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -5073,9 +5073,8 @@
           "description": "Attributes for scenario selection and grouping"
         },
         "cms_tenor": {
-          "description": "Tenor of the CMS swap in years (e.g., 10.0 for 10Y)",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
@@ -5291,9 +5290,8 @@
           "description": "Swaption volatility surface for short tenor."
         },
         "strike": {
-          "description": "Strike spread (in decimal, e.g., 0.005 = 50bp).",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Strike on the CMS spread as a decimal rate (0.005 = 50bp)."
         },
         "swap_fixed_day_count": {
           "anyOf": [
@@ -5378,18 +5376,18 @@
       "additionalProperties": false,
       "description": "CMS (Constant Maturity Swap) swap instrument.\n\nOne leg pays a CMS rate (the par swap rate for a reference tenor, e.g., 10Y)\nobserved on each fixing date, and the other leg pays a fixed or floating rate.\n\nThe CMS rate requires a convexity adjustment because the CMS rate is not a\nmartingale under the payment measure. The adjustment depends on the correlation\nbetween the CMS rate and the numeraire (annuity).\n\n# Reference\n\nHagan, P. S. (2003). \"Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors.\"\n*Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`",
       "properties": {
-        "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {},
-          "description": "Attributes for scenario selection and grouping."
-        },
-        "cms_accrual_fractions": {
+        "accrual_fractions": {
           "description": "Accrual fractions for each CMS period.",
           "items": {
             "format": "double",
             "type": "number"
           },
           "type": "array"
+        },
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "default": {},
+          "description": "Attributes for scenario selection and grouping."
         },
         "cms_cap": {
           "description": "Optional cap on the CMS rate (decimal).",
@@ -5399,17 +5397,6 @@
             "null"
           ]
         },
-        "cms_day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for CMS leg accrual."
-        },
-        "cms_fixing_dates": {
-          "description": "Fixing dates for CMS rate observations.",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
         "cms_floor": {
           "description": "Optional floor on the CMS rate (decimal).",
           "format": "double",
@@ -5418,27 +5405,29 @@
             "null"
           ]
         },
-        "cms_payment_dates": {
-          "description": "Payment dates for the CMS leg.",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
-        "cms_spread": {
-          "default": 0.0,
-          "description": "Spread over the CMS rate (decimal, e.g., 0.001 = 10bp).",
-          "format": "double",
-          "type": "number"
+        "cms_spread_bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "default": "0",
+          "description": "Additive spread over the CMS rate in basis points (10 = 10bp)."
         },
         "cms_tenor": {
-          "description": "CMS tenor in years (e.g., 10.0 for 10Y swap rate).",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for CMS leg accrual."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID for present value calculations."
+        },
+        "fixing_dates": {
+          "description": "Fixing dates for CMS rate observations.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -5474,6 +5463,13 @@
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount."
+        },
+        "payment_dates": {
+          "description": "Payment dates for the CMS leg.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -5537,10 +5533,10 @@
         "notional",
         "side",
         "cms_tenor",
-        "cms_fixing_dates",
-        "cms_payment_dates",
-        "cms_accrual_fractions",
-        "cms_day_count",
+        "fixing_dates",
+        "payment_dates",
+        "accrual_fractions",
+        "day_count",
         "funding_leg",
         "discount_curve_id",
         "forward_curve_id",
@@ -6503,7 +6499,7 @@
     },
     "CommoditySwap": {
       "additionalProperties": false,
-      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(rust_decimal::Decimal::try_from(3.50).expect(\"valid decimal\"))\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
+      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(3.50)\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6539,8 +6535,9 @@
           "description": "Discount curve ID."
         },
         "fixed_price": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Fixed price per unit."
+          "description": "Fixed price per commodity unit, in the notional currency (finite).",
+          "format": "double",
+          "type": "number"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -8634,6 +8631,18 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve id used for valuation and par extraction."
         },
+        "fixed_rate": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional contractual simple rate r (annualised decimal, 0.045 = 4.5%) for the deposit.\n\nNote: `cashflow_schedule()` requires `fixed_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique identifier for the deposit."
@@ -8653,18 +8662,6 @@
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Principal amount of the deposit."
-        },
-        "quote_rate": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional quoted simple rate r (annualised) for the deposit.\n\nNote: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -11065,7 +11062,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days."
+          "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -11099,7 +11096,7 @@
             "null"
           ]
         },
-        "reset_lag": {
+        "reset_lag_days": {
           "description": "Reset lag in business days (fixing to value date)",
           "format": "int32",
           "type": "integer"
@@ -11125,7 +11122,7 @@
         "maturity",
         "fixed_rate",
         "day_count",
-        "reset_lag",
+        "reset_lag_days",
         "discount_curve_id",
         "forward_curve_id",
         "attributes"
@@ -11437,6 +11434,7 @@
       "description": "Funding leg specification for a CMS swap.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Fixed rate funding leg.",
           "properties": {
             "accrual_fractions": {
@@ -11459,9 +11457,8 @@
               "type": "array"
             },
             "rate": {
-              "description": "Fixed coupon rate (decimal, e.g., 0.03 = 3%).",
-              "format": "double",
-              "type": "number"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+              "description": "Fixed coupon rate as a decimal annual rate (0.03 = 3%)."
             },
             "type": {
               "const": "fixed",
@@ -11478,6 +11475,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg.",
           "properties": {
             "accrual_fractions": {
@@ -11503,10 +11501,9 @@
               },
               "type": "array"
             },
-            "spread": {
-              "description": "Spread over the floating index (decimal, e.g., 0.001 = 10bp).",
-              "format": "double",
-              "type": "number"
+            "spread_bp": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+              "description": "Additive spread over the floating index in basis points (10 = 10bp)."
             },
             "type": {
               "const": "floating",
@@ -11515,7 +11512,7 @@
           },
           "required": [
             "type",
-            "spread",
+            "spread_bp",
             "payment_dates",
             "accrual_fractions",
             "day_count",
@@ -13167,7 +13164,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
         },
-        "interpolation_override": {
+        "interpolation": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationInterpolation"
@@ -13176,9 +13173,9 @@
               "type": "null"
             }
           ],
-          "description": "Contractual monthly CPI interpolation, overriding index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
+          "description": "Contractual monthly CPI interpolation; takes precedence over index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
         },
-        "lag_override": {
+        "lag": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationLag"
@@ -13187,7 +13184,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional contract-level lag override."
+          "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -13341,14 +13338,14 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
         },
-        "base_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Base date for index (may differ from issue date)"
-        },
-        "base_index": {
+        "base_cpi": {
           "description": "Base CPI/index value at issue",
           "format": "double",
           "type": "number"
+        },
+        "base_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Base date for index (may differ from issue date)"
         },
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
@@ -13440,7 +13437,7 @@
         "day_count",
         "issue_date",
         "maturity",
-        "base_index",
+        "base_cpi",
         "base_date",
         "indexation_method",
         "lag",
@@ -13507,7 +13504,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
         },
-        "interpolation_override": {
+        "interpolation": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationInterpolation"
@@ -13516,9 +13513,9 @@
               "type": "null"
             }
           ],
-          "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
+          "description": "Contractual monthly reference-index interpolation; takes precedence over index metadata;\nwithout either source the default is monthly step interpolation."
         },
-        "lag_override": {
+        "lag": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationLag"
@@ -13527,7 +13524,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional contract-level lag override (if set, overrides index lag)"
+          "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -17580,8 +17577,8 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Stable identifier used to match the asset to diagnostics and scenarios."
         },
-        "index_floor": {
-          "description": "Floor on the floating index (annual decimal, e.g. `0.01` = 1%)\napplied before `spread_bp` is added, matching\n`FloatingRateSpec::index_floor_bp`; `None` for no floor. Ignored on\nfixed-rate rows.",
+        "index_floor_bp": {
+          "description": "Floor on the floating index in basis points (100 = 1%), applied before\n`spread_bp` is added, matching `FloatingRateSpec::index_floor_bp`;\n`None` for no floor. Ignored on fixed-rate rows.",
           "format": "double",
           "type": [
             "number",
@@ -18371,10 +18368,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID (domestic currency)."
         },
-        "equity_strike": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Strike price for equity option."
-        },
         "expiry": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Option expiry date."
@@ -18462,6 +18455,11 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Equity spot price identifier."
         },
+        "strike": {
+          "description": "Per-unit strike of the equity underlying, in `base_currency` price units.",
+          "format": "double",
+          "type": "number"
+        },
         "underlying_ticker": {
           "description": "Underlying equity ticker symbol.",
           "type": "string"
@@ -18474,7 +18472,7 @@
       "required": [
         "id",
         "underlying_ticker",
-        "equity_strike",
+        "strike",
         "option_type",
         "expiry",
         "notional",
@@ -19617,8 +19615,8 @@
       "additionalProperties": false,
       "description": "Terms of the collateral bought with reinvested principal.\n\nEach purchase creates a bullet first-lien row maturing `maturity_months`\nafter the purchase date, accruing ACT/360 at `forward_curve_id` plus `spread_bp`\n(or at `spread_bp` as a fixed coupon when no index is given), bought at\n`price_pct` percent of par. A discount price builds par.",
       "properties": {
-        "coupon_floor": {
-          "description": "Minimum all-in annual coupon as a decimal (a floor on the resolved\nindex plus spread), if any.",
+        "all_in_floor_bp": {
+          "description": "Minimum all-in annual coupon in basis points (a floor on the resolved\nindex plus spread, 100 = 1%), if any.",
           "format": "double",
           "type": [
             "number",
@@ -19784,8 +19782,8 @@
           "description": "Unique identifier for the rep line",
           "type": "string"
         },
-        "index_floor": {
-          "description": "Floor on the floating index (annual decimal) applied before\n`spread_bp`; `None` for no floor.",
+        "index_floor_bp": {
+          "description": "Floor on the floating index in basis points (100 = 1%), applied before\n`spread_bp`; `None` for no floor.",
           "format": "double",
           "type": [
             "number",
@@ -20881,7 +20879,7 @@
     },
     "Snowball": {
       "additionalProperties": false,
-      "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - L_i, 0)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - leverage * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`",
+      "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - L_i, 0)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - gearing * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -20906,13 +20904,6 @@
             "null"
           ]
         },
-        "coupon_dates": {
-          "description": "Coupon payment dates (must be sorted ascending).",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
         "coupon_floor": {
           "description": "Floor on each period coupon (typically 0.0).",
           "format": "double",
@@ -20927,13 +20918,17 @@
           "description": "Discount curve ID."
         },
         "fixed_rate": {
-          "description": "Fixed rate component.",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Fixed rate component as a decimal annual rate (0.05 = 5%)."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Rates forward curve that projects the floating index (also the fixing-series key)."
+        },
+        "gearing": {
+          "description": "Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).",
+          "format": "double",
+          "type": "number"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -20952,11 +20947,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
         },
-        "leverage": {
-          "description": "Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).",
-          "format": "double",
-          "type": "number"
-        },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
@@ -20965,9 +20955,20 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount."
         },
+        "payment_dates": {
+          "description": "Coupon payment dates, one per period, strictly ascending and after\n`start_date`. Period `i` accrues from the previous payment date (or\n`start_date`) to `payment_dates[i]` and fixes in advance at its start.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
+        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Accrual start of the first coupon period; also the first in-advance\nfixing date."
         },
         "variant": {
           "$ref": "#/$defs/SnowballVariant",
@@ -20990,10 +20991,11 @@
         "variant",
         "initial_coupon",
         "fixed_rate",
-        "leverage",
+        "gearing",
         "coupon_floor",
         "notional",
-        "coupon_dates",
+        "start_date",
+        "payment_dates",
         "forward_curve_id",
         "index_tenor",
         "discount_curve_id",
@@ -21012,7 +21014,7 @@
         },
         {
           "const": "inverse_floater",
-          "description": "Inverse floater: c_i = max(fixed - leverage * floating, 0).",
+          "description": "Inverse floater: c_i = max(fixed - gearing * floating, 0).",
           "type": "string"
         }
       ]
@@ -22149,13 +22151,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection."
         },
-        "coupon_dates": {
-          "description": "Coupon payment dates (must be sorted ascending).",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
         "coupon_floor": {
           "description": "Floor on each period's coupon (typically 0.0).",
           "format": "double",
@@ -22170,9 +22165,8 @@
           "description": "Discount curve ID for PV calculations."
         },
         "fixed_rate": {
-          "description": "Fixed coupon rate (the \"strike\" rate).",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Fixed coupon rate (the \"strike\" rate) as a decimal annual rate (0.05 = 5%)."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -22198,9 +22192,20 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount."
         },
+        "payment_dates": {
+          "description": "Coupon payment dates, one per period, strictly ascending and after\n`start_date`. Period `i` accrues from the previous payment date (or\n`start_date`) to `payment_dates[i]` and fixes in advance at its start.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
+        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Accrual start of the first coupon period; also the first in-advance\nfixing date."
         },
         "target_coupon": {
           "description": "Target cumulative coupon level (triggers early redemption).\n\nA zero target is allowed and represents redemption at the first\nfuture coupon date without coupon accrual.",
@@ -22225,7 +22230,8 @@
         "coupon_floor",
         "target_coupon",
         "notional",
-        "coupon_dates",
+        "start_date",
+        "payment_dates",
         "index_tenor",
         "forward_curve_id",
         "discount_curve_id",
@@ -24005,7 +24011,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
         },
-        "interpolation_override": {
+        "interpolation": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationInterpolation"
@@ -24014,9 +24020,9 @@
               "type": "null"
             }
           ],
-          "description": "Contractual monthly reference-index interpolation. Overrides index metadata;\nwithout either source the default is monthly step interpolation."
+          "description": "Contractual monthly reference-index interpolation; takes precedence over index metadata;\nwithout either source the default is monthly step interpolation."
         },
-        "lag_override": {
+        "lag": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationLag"
@@ -24025,7 +24031,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional contract-level lag override (if set, overrides index lag)"
+          "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

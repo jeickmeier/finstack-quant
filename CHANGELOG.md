@@ -2,6 +2,70 @@
 
 ## [Unreleased]
 
+### Coupon, strike and inflation terms (2026-09-24)
+
+A margin over a floating or CMS index is `spread_bp` / `cms_spread_bp` (basis
+points), the fixing lag is `reset_lag_days`, a flat contractual rate is
+`fixed_rate: Decimal`, the index multiplier is `gearing`, structured-credit
+floors are `index_floor_bp` / `all_in_floor_bp`, explicit schedules are
+`start_date` plus `payment_dates`, a CMS tenor is a `Tenor`, an option strike is
+`strike`, the base reference CPI is `base_cpi`, and the contractual inflation
+lag and interpolation are `lag` / `interpolation`. Retired keys are rejected by
+`deny_unknown_fields`; every migrated example reprices bit-for-bit.
+
+#### Changed (BREAKING)
+
+- `CapFloor.spread` (decimal rate) (now `spread_bp`, a `Decimal` in basis
+  points: `0.001` becomes `10`); Python `CapFloor.spread` getter and
+  `CapFloorBuilder.spread` (now `spread_bp`, taking `float | Bps`);
+  Rust/Python/JSON.
+- `CmsSwap.cms_spread` (decimal `f64`) (now `cms_spread_bp`, a `Decimal` in
+  basis points); `FundingLeg::Floating.spread` (decimal `f64`) (now
+  `spread_bp`, a `Decimal` in basis points); `FundingLeg::Fixed.rate` is now a
+  `Decimal` (JSON string); `FundingLegSpec` follows; `FundingLeg` now denies
+  unknown fields; Rust/JSON.
+- `CmsSwap.cms_fixing_dates`/`cms_payment_dates`/`cms_accrual_fractions`/`cms_day_count`
+  (now `fixing_dates`/`payment_dates`/`accrual_fractions`/`day_count`, matching
+  `CmsOption`); `CmsSwap::from_schedule` takes `cms_tenor: Tenor`,
+  `cms_spread_bp: Decimal` and `day_count`; Rust/JSON.
+- `CmsSwap.cms_tenor` and `CmsOption.cms_tenor` (fractional years `f64`) (now
+  `Tenor`, wire `{"count": 10, "unit": "years"}`); a day- or week-based tenor is
+  rejected; Rust/JSON.
+- `CmsSpreadOption.strike` is now a `Decimal` (JSON string, `"0.005"` = 50bp);
+  Rust/JSON.
+- `AssetBackedFacility.margin_bp` (now `spread_bp`; still the all-in fixed rate
+  when `forward_curve_id` is `None`); Python getter and builder setter
+  `margin_bp` (now `spread_bp`); Rust/Python/JSON.
+- `Bond::floating`/`floating_with_convention`, `CashflowSpec::floating`/`floating_bp`/`floating_with_reset_lag`
+  parameter `margin_bp` (now `spread_bp`); Python `Bond.floating*` keyword
+  `margin_bp` (now `spread_bp`); WASM `marginBp` (now `spreadBp`);
+  Rust/Python/WASM.
+- `ForwardRateAgreement.reset_lag` (now `reset_lag_days`); Rust/JSON. The
+  reset-lag defaults of the other carriers are unchanged.
+- `Deposit.quote_rate` (now `fixed_rate`), `ConventionDepositParams.quote_rate`
+  (now `fixed_rate`); Rust/JSON. The `quote_rate` metric id is unchanged.
+- `Snowball.leverage` (now `gearing`); `Snowball.fixed_rate` and
+  `Tarn.fixed_rate` are now `Decimal` (JSON string); `Snowball.coupon_dates` and
+  `Tarn.coupon_dates` (N + 1 boundaries) (now `start_date` plus N
+  `payment_dates`); Rust/JSON.
+- `snowball_coupon_profile` / `inverse_floater_coupon_profile` parameters
+  `floor`/`cap`/`leverage` (now `coupon_floor`/`coupon_cap`/`gearing`), with
+  `coupon_cap: Option<f64>` (`None` = uncapped; infinity is no longer
+  accepted); Rust/Python/WASM.
+- `PoolAsset.index_floor` and `RepLine.index_floor` (annual decimal) (now
+  `index_floor_bp`, basis points: `0.01` becomes `100`);
+  `ReinvestmentAssumptions.coupon_floor` (annual decimal) (now
+  `all_in_floor_bp`, basis points); Python `PoolAsset`/`RepLine` keyword and
+  getter `index_floor` (now `index_floor_bp`); Rust/Python/JSON.
+- `QuantoOption.equity_strike: Money` (now `strike: f64`, per-unit price in
+  `base_currency`); Rust/JSON.
+- `CommoditySwap.fixed_price` is now an `f64` (JSON number), matching
+  `CommoditySwaption.fixed_price`; Rust/JSON.
+- `InflationLinkedBond.base_index` and `InflationLinkedBondParams.base_index`
+  (now `base_cpi`); Rust/JSON.
+- `InflationSwap`/`YoYInflationSwap`/`InflationCapFloor.lag_override` and
+  `interpolation_override` (now `lag` and `interpolation`); Rust/JSON.
+
 ### Underlying identity, spot ids and size (2026-09-24)
 
 The underlying spot is a typed `spot_id: PriceId`; no market id is read from

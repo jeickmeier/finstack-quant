@@ -813,33 +813,29 @@ def snowball_coupon_profile(
     initial_coupon: float,
     fixed_rate: float,
     floating_fixings: list[float],
-    floor: float,
-    cap: float,
+    coupon_floor: float,
+    coupon_cap: float | None,
 ) -> list[float]:
     """
     Compute a snowball coupon schedule.
 
-    Snowball: ``c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)``
+    Snowball: ``c_i = clip(c_{i-1} + fixed_rate - L_i, coupon_floor, coupon_cap)``
     with ``c_0 = initial_coupon``.
-
-    Pass ``float('inf')`` as ``cap`` for an uncapped coupon.
 
     Parameters
     ----------
     initial_coupon : float
-        First-period coupon for snowball mode.
+        First-period coupon in decimal annual-rate units (non-negative).
     fixed_rate : float
-        Fixed strike rate.
+        Fixed strike rate in decimal annual-rate units.
     floating_fixings : list[float]
-        Floating rate fixings (one per period).
-    floor : float
-        Per-period coupon floor.
-    cap : float
-        Per-period coupon cap (use ``float('inf')`` for uncapped).
-    is_inverse_floater : bool
-        ``True`` for inverse floater mode, ``False`` for snowball.
-    leverage : float, default 1.0
-        Leverage multiplier for inverse floater mode.
+        Floating rate fixings (one per period) in decimal annual-rate units.
+    coupon_floor : float
+        Per-period coupon floor in decimal annual-rate units (non-negative).
+    coupon_cap : float | None
+        Per-period coupon cap in decimal annual-rate units. When set it must be
+        finite and strictly greater than ``coupon_floor``; ``None`` leaves the
+        coupon uncapped.
 
     Returns
     -------
@@ -849,10 +845,10 @@ def snowball_coupon_profile(
     Raises
     ------
     ValueError
-        If ``fixed_rate``, ``initial_coupon``, ``floor``, or a fixing is
-        non-finite; ``initial_coupon`` or ``floor`` is negative; or ``cap`` is
-        NaN or is not strictly greater than ``floor``. Positive infinity is
-        accepted as an uncapped ``cap``.
+        If ``fixed_rate``, ``initial_coupon``, ``coupon_floor``, or a fixing is
+        non-finite; ``initial_coupon`` or ``coupon_floor`` is negative; or
+        ``coupon_cap`` is set and is non-finite or not strictly greater than
+        ``coupon_floor``.
 
     Examples
     --------
@@ -866,9 +862,9 @@ def snowball_coupon_profile(
 def inverse_floater_coupon_profile(
     fixed_rate: float,
     floating_fixings: list[float],
-    floor: float,
-    cap: float,
-    leverage: float,
+    coupon_floor: float,
+    coupon_cap: float | None,
+    gearing: float,
 ) -> list[float]:
     """
     Compute a path-independent inverse-floater coupon schedule.
@@ -880,27 +876,30 @@ def inverse_floater_coupon_profile(
     floating_fixings : list[float]
         Floating reference-rate fixings in decimal annual-rate units, one per
         coupon period in the returned schedule.
-    floor : float
-        Per-period minimum coupon rate in decimal annual-rate units.
-    cap : float
-        Per-period maximum coupon rate in decimal annual-rate units; use
-        ``float("inf")`` for no cap.
-    leverage : float
-        Multiplier applied to each floating fixing before it offsets the fixed rate.
+    coupon_floor : float
+        Per-period minimum coupon rate in decimal annual-rate units
+        (non-negative).
+    coupon_cap : float | None
+        Per-period maximum coupon rate in decimal annual-rate units. When set it
+        must be finite and strictly greater than ``coupon_floor``; ``None``
+        leaves the coupon uncapped.
+    gearing : float
+        Positive multiplier applied to each floating fixing before it offsets
+        the fixed rate.
 
     Returns
     -------
     list[float]
-        Coupon rate for each fixing after applying ``fixed_rate - leverage *
-        fixing`` and clamping the result to ``[floor, cap]``.
+        Coupon rate for each fixing after applying ``fixed_rate - gearing *
+        fixing`` and clamping the result to ``[coupon_floor, coupon_cap]``.
 
     Raises
     ------
     ValueError
-        If ``fixed_rate``, ``floor``, ``leverage``, or a fixing is non-finite;
-        ``floor`` is negative; ``leverage`` is non-positive; or ``cap`` is NaN
-        or is not strictly greater than ``floor``. Positive infinity is
-        accepted as an uncapped ``cap``.
+        If ``fixed_rate``, ``coupon_floor``, ``gearing``, or a fixing is
+        non-finite; ``coupon_floor`` is negative; ``gearing`` is non-positive;
+        or ``coupon_cap`` is set and is non-finite or not strictly greater than
+        ``coupon_floor``.
 
     Examples
     --------

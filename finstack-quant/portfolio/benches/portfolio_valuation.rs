@@ -82,7 +82,7 @@ fn create_selective_benchmark_portfolio(
             .maturity(maturity_2y())
             .day_count(DayCount::Act360)
             .discount_curve_id(curve_id.into())
-            .quote_rate_opt(Some(dec!(0.04)))
+            .fixed_rate_opt(Some(dec!(0.04)))
             .build()
             .unwrap();
         builder = builder.position(

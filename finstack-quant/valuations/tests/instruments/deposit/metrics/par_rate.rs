@@ -16,7 +16,7 @@ fn test_par_rate_makes_pv_zero() {
     // Execute - price with par rate
     let dep_par = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(par_rate)
+        .fixed_rate(par_rate)
         .build();
 
     // Par rate zeroes the *trade* NPV (pricing view, includes the T+0 initial

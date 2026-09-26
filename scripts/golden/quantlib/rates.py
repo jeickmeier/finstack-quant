@@ -117,7 +117,7 @@ def build_fra() -> dict[str, Any]:
                     "maturity": "2026-11-03",
                     "fixed_rate": "0.0425",
                     "day_count": "act_360",
-                    "reset_lag": 2,
+                    "reset_lag_days": 2,
                     "fixing_calendar_id": "usny",
                     "fixing_business_day_convention": "modified_following",
                     "discount_curve_id": "USD-OIS",

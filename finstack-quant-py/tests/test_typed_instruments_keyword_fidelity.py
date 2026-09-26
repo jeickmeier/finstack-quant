@@ -127,7 +127,7 @@ def test_capfloor_builder_setters_accept_keyword_value() -> None:
         .rate_option_type(value="cap")
         .notional(value=Money(5_000_000.0, Currency("USD")))
         .strike(value=0.05)
-        .spread(value=0.001)
+        .spread_bp(value=10.0)
         .start_date(value=datetime.date(2024, 1, 15))
         .maturity(value=datetime.date(2027, 1, 15))
         .frequency(value=Tenor.quarterly())

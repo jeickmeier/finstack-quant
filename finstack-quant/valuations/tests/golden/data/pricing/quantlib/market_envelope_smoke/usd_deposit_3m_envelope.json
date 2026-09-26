@@ -92,7 +92,7 @@
         "start_date": "2026-04-30",
         "maturity": "2026-07-30",
         "day_count": "act_360",
-        "quote_rate": "0.041",
+        "fixed_rate": "0.041",
         "discount_curve_id": "USD-OIS",
         "attributes": {
           "tags": [

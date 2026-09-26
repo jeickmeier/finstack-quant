@@ -18,10 +18,10 @@
         "discount_curve_id": "USD-OIS",
         "day_count": "one_one",
         "side": "pay",
-        "lag_override": {
+        "lag": {
           "months": 3
         },
-        "interpolation_override": "linear",
+        "interpolation": "linear",
         "base_cpi": 300,
         "attributes": {}
       }

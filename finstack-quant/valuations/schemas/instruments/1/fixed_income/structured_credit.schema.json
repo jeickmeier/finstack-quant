@@ -5676,8 +5676,8 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Stable identifier used to match the asset to diagnostics and scenarios."
         },
-        "index_floor": {
-          "description": "Floor on the floating index (annual decimal, e.g. `0.01` = 1%)\napplied before `spread_bp` is added, matching\n`FloatingRateSpec::index_floor_bp`; `None` for no floor. Ignored on\nfixed-rate rows.",
+        "index_floor_bp": {
+          "description": "Floor on the floating index in basis points (100 = 1%), applied before\n`spread_bp` is added, matching `FloatingRateSpec::index_floor_bp`;\n`None` for no floor. Ignored on fixed-rate rows.",
           "format": "double",
           "type": [
             "number",
@@ -6415,8 +6415,8 @@
       "additionalProperties": false,
       "description": "Terms of the collateral bought with reinvested principal.\n\nEach purchase creates a bullet first-lien row maturing `maturity_months`\nafter the purchase date, accruing ACT/360 at `forward_curve_id` plus `spread_bp`\n(or at `spread_bp` as a fixed coupon when no index is given), bought at\n`price_pct` percent of par. A discount price builds par.",
       "properties": {
-        "coupon_floor": {
-          "description": "Minimum all-in annual coupon as a decimal (a floor on the resolved\nindex plus spread), if any.",
+        "all_in_floor_bp": {
+          "description": "Minimum all-in annual coupon in basis points (a floor on the resolved\nindex plus spread, 100 = 1%), if any.",
           "format": "double",
           "type": [
             "number",
@@ -6582,8 +6582,8 @@
           "description": "Unique identifier for the rep line",
           "type": "string"
         },
-        "index_floor": {
-          "description": "Floor on the floating index (annual decimal) applied before\n`spread_bp`; `None` for no floor.",
+        "index_floor_bp": {
+          "description": "Floor on the floating index in basis points (100 = 1%), applied before\n`spread_bp`; `None` for no floor.",
           "format": "double",
           "type": [
             "number",

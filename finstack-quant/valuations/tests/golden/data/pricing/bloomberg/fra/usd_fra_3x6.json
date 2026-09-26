@@ -396,7 +396,7 @@
         "maturity": "2026-10-06",
         "fixed_rate": "0.036437",
         "day_count": "act_360",
-        "reset_lag": 2,
+        "reset_lag_days": 2,
         "fixing_calendar_id": "usny",
         "fixing_business_day_convention": "modified_following",
         "discount_curve_id": "USD-SOFR",

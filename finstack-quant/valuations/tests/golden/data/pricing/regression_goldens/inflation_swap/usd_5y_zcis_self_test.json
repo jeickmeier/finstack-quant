@@ -334,7 +334,7 @@
         },
         "day_count": "one_one",
         "base_cpi": 300.0,
-        "interpolation_override": "linear",
+        "interpolation": "linear",
         "calendar_id": "nyse",
         "business_day_convention": "modified_following"
       }

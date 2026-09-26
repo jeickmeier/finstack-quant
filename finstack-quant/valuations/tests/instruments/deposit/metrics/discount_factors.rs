@@ -77,7 +77,7 @@ fn test_df_end_from_quote_consistency() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -104,7 +104,7 @@ fn test_df_end_from_quote_with_zero_rate() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.0)
+        .fixed_rate(0.0)
         .build();
 
     // Execute
@@ -128,7 +128,7 @@ fn test_df_end_from_quote_with_high_rate() {
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.10) // 10% rate
+        .fixed_rate(0.10) // 10% rate
         .build();
 
     // Execute

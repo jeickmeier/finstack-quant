@@ -92,7 +92,7 @@ pub fn standard_deposit(base: Date) -> Deposit {
             base.day(),
         ))
         .day_count(DayCount::Act360)
-        .quote_rate_opt(Some(Decimal::try_from(0.0).expect("valid decimal")))
+        .fixed_rate_opt(Some(Decimal::try_from(0.0).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .build()
         .unwrap()
@@ -105,7 +105,7 @@ pub struct DepositBuilder {
     start_date: Date,
     maturity: Date,
     day_count: DayCount,
-    quote_rate: Option<Decimal>,
+    fixed_rate: Option<Decimal>,
     discount_curve_id: String,
 }
 
@@ -117,7 +117,7 @@ impl DepositBuilder {
             start_date: base,
             maturity: date(base.year(), (base.month() as u8 + 6).min(12), base.day()),
             day_count: DayCount::Act360,
-            quote_rate: Some(Decimal::try_from(0.0).expect("valid decimal")),
+            fixed_rate: Some(Decimal::try_from(0.0).expect("valid decimal")),
             discount_curve_id: "USD-OIS".to_string(),
         }
     }
@@ -147,8 +147,8 @@ impl DepositBuilder {
         self
     }
 
-    pub fn quote_rate(mut self, rate: f64) -> Self {
-        self.quote_rate = Some(Decimal::try_from(rate).expect("valid decimal"));
+    pub fn fixed_rate(mut self, rate: f64) -> Self {
+        self.fixed_rate = Some(Decimal::try_from(rate).expect("valid decimal"));
         self
     }
 
@@ -167,7 +167,7 @@ impl DepositBuilder {
             .discount_curve_id(CurveId::new(&self.discount_curve_id))
             .build()
             .unwrap();
-        dep.quote_rate = self.quote_rate;
+        dep.fixed_rate = self.fixed_rate;
         dep
     }
 }

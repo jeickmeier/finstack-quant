@@ -768,7 +768,7 @@ def commodity_inputs() -> dict[str, dict[str, Any]]:
             "commodity_type": "Energy",
             "currency": "USD",
             "discount_curve_id": "USD-OIS",
-            "fixed_price": "3.2",
+            "fixed_price": 3.2,
             "forward_curve_id": "NG-FORWARD",
             "frequency": {"count": 1, "unit": "months"},
             "maturity": "2025-12-15",

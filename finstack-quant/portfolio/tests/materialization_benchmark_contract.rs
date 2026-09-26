@@ -63,13 +63,13 @@ fn shared_fixtures_are_deterministic_and_have_required_shapes() {
             assert_eq!(schedule[19][0], "2035-01-01");
             assert_eq!(schedule[19][1]["amount"], "0");
         } else {
-            let fixing_dates = spec["cms_fixing_dates"]
+            let fixing_dates = spec["fixing_dates"]
                 .as_array()
                 .expect("CMS fixing schedule");
-            let payment_dates = spec["cms_payment_dates"]
+            let payment_dates = spec["payment_dates"]
                 .as_array()
                 .expect("CMS payment schedule");
-            let accruals = spec["cms_accrual_fractions"]
+            let accruals = spec["accrual_fractions"]
                 .as_array()
                 .expect("CMS accrual schedule");
             let funding_dates = spec["funding_leg"]["payment_dates"]

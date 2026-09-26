@@ -340,7 +340,9 @@ fn test_zero_quantity_is_rejected() {
     let err = option
         .value(&market, as_of)
         .expect_err("zero-quantity equity option must fail validation");
-    assert!(err.to_string().contains("EquityOption.quantity must be non-zero"));
+    assert!(err
+        .to_string()
+        .contains("EquityOption.quantity must be non-zero"));
 }
 
 #[test]

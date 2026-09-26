@@ -113,7 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .day_count(DayCount::Act360)
         .discount_curve_id("USD".into())
         // Required: a Deposit prices off its own quoted rate.
-        .quote_rate_opt(Some(f64_to_decimal(0.045)?))
+        .fixed_rate_opt(Some(f64_to_decimal(0.045)?))
         .build()?;
 
     let position = Position::new(

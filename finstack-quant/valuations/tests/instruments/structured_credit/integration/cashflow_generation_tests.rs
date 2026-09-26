@@ -46,7 +46,7 @@ fn create_test_pool() -> AssetPool {
                 rate: 0.08,
                 spread_bp: Some(450.0 + i as f64 * 50.0),
                 forward_curve_id: Some("SOFR-3M".to_string()),
-                index_floor: None,
+                index_floor_bp: None,
                 maturity: maturity_date(),
                 credit_quality: Some(CreditRating::BB),
                 industry: Some(format!("Industry_{}", i % 3)),

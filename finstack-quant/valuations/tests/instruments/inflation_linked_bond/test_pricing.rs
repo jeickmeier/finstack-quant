@@ -235,7 +235,7 @@ fn test_npv_with_deflation_protection() {
     let mut ilb = sample_tips();
     ilb.deflation_protection =
         finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::DeflationProtection::AllPayments;
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.issue_date = d(2025, 1, 2);
     ilb.maturity = d(2026, 1, 2);
 
@@ -437,7 +437,7 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
         .day_count(DayCount::Act365F)
         .issue_date(as_of)
         .maturity(maturity)
-        .base_index(100.0)
+        .base_cpi(100.0)
         .base_date(as_of)
         .indexation_method(IndexationMethod::Tips)
         .lag(InflationLag::None)

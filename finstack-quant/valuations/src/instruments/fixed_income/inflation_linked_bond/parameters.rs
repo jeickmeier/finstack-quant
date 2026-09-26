@@ -20,7 +20,7 @@ pub struct InflationLinkedBondParams {
     /// Maturity date
     pub maturity: Date,
     /// Base index value at issue
-    pub base_index: f64,
+    pub base_cpi: f64,
     /// Payment frequency
     pub frequency: Tenor,
     /// Day count convention
@@ -38,7 +38,7 @@ impl InflationLinkedBondParams {
         real_coupon: f64,
         issue: Date,
         maturity: Date,
-        base_index: f64,
+        base_cpi: f64,
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
@@ -47,7 +47,7 @@ impl InflationLinkedBondParams {
             real_coupon: finstack_quant_core::decimal::f64_to_decimal(real_coupon)?,
             issue,
             maturity,
-            base_index,
+            base_cpi,
             frequency,
             day_count,
         })
@@ -63,14 +63,14 @@ impl InflationLinkedBondParams {
         real_coupon: f64,
         issue: Date,
         maturity: Date,
-        base_index: f64,
+        base_cpi: f64,
     ) -> finstack_quant_core::Result<Self> {
         Self::new(
             notional,
             real_coupon,
             issue,
             maturity,
-            base_index,
+            base_cpi,
             Tenor::semi_annual(),
             DayCount::ActActIsma,
         )
@@ -86,14 +86,14 @@ impl InflationLinkedBondParams {
         real_coupon: f64,
         issue: Date,
         maturity: Date,
-        base_index: f64,
+        base_cpi: f64,
     ) -> finstack_quant_core::Result<Self> {
         Self::new(
             notional,
             real_coupon,
             issue,
             maturity,
-            base_index,
+            base_cpi,
             Tenor::semi_annual(),
             DayCount::ActActIsma,
         )

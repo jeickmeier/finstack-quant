@@ -22,7 +22,7 @@ fn test_standard_usd_3m_deposit() {
         .start_date(base)
         .maturity(date(2025, 4, 1))
         .day_count(DayCount::Act360)
-        .quote_rate(0.02)
+        .fixed_rate(0.02)
         .discount_curve_id("USD-OIS")
         .build();
 
@@ -54,7 +54,7 @@ fn test_standard_eur_6m_deposit() {
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act360)
-        .quote_rate(0.015)
+        .fixed_rate(0.015)
         .discount_curve_id("EUR-OIS")
         .build();
 
@@ -83,7 +83,7 @@ fn test_overnight_deposit_libor_style() {
         .start_date(base)
         .maturity(date(2025, 1, 2))
         .day_count(DayCount::Act360)
-        .quote_rate(0.05)
+        .fixed_rate(0.05)
         .build();
 
     // Execute
@@ -105,7 +105,7 @@ fn test_deposit_rate_convention_act360() {
         .start_date(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act360)
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -177,7 +177,7 @@ fn test_simple_interest_calculation() {
         .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(rate)
+        .fixed_rate(rate)
         .build();
 
     // Execute
@@ -199,21 +199,21 @@ fn test_multi_currency_portfolio() {
     let dep_usd = DepositBuilder::new(base)
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .discount_curve_id("USD-OIS")
         .build();
 
     let dep_eur = DepositBuilder::new(base)
         .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.02)
+        .fixed_rate(0.02)
         .discount_curve_id("EUR-OIS")
         .build();
 
     let dep_gbp = DepositBuilder::new(base)
         .notional(Money::new(1_000_000.0, Currency::GBP).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.025)
+        .fixed_rate(0.025)
         .discount_curve_id("GBP-OIS")
         .build();
 
@@ -240,14 +240,14 @@ fn test_rate_quote_vs_price_quote() {
     // Deposit quoted at rate
     let dep_rate = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.035)
+        .fixed_rate(0.035)
         .build();
 
     // Deposit at par rate
     let par = compute_metric(&dep_rate, &ctx, base, MetricId::DepositParRate);
     let dep_par = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(par)
+        .fixed_rate(par)
         .build();
 
     // Execute - trade NPVs (pricing view via `npv_raw`, includes the T+0
@@ -291,7 +291,7 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
         .start_date(trade_date) // Will be adjusted by spot lag
         .maturity(date(2025, 2, 7)) // 1 month maturity from spot
         .day_count(DayCount::Act360)
-        .quote_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
+        .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
         .settlement_days_opt(Some(2))
@@ -365,7 +365,7 @@ fn test_deposit_without_spot_lag_uses_raw_dates() {
         .start_date(trade_date)
         .maturity(date(2025, 2, 3))
         .day_count(DayCount::Act360)
-        .quote_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
+        .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
         // No settlement_days_opt - should use raw dates
@@ -399,7 +399,7 @@ fn test_gbp_deposit_t0_settlement() {
         .start_date(trade_date)
         .maturity(date(2025, 2, 3))
         .day_count(DayCount::Act365F) // GBP uses Act/365
-        .quote_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
+        .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("GBP-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
         .settlement_days_opt(Some(0)) // T+0 for GBP
@@ -451,7 +451,7 @@ fn test_modified_following_eom_adjustment() {
         .start_date(trade_date)
         .maturity(date(2026, 1, 31)) // Saturday - should roll back to Friday Jan 30
         .day_count(DayCount::Act360)
-        .quote_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
+        .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

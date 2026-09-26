@@ -47,8 +47,8 @@ impl PyRepLine {
     ///     points (e.g. ``150.0`` = 150bp), for floating-rate lines.
     /// forward_curve_id : str, optional
     ///     Reference index identifier, if floating.
-    /// index_floor : float, optional
-    ///     Floor on the floating index as an annual decimal, applied before
+    /// index_floor_bp : float, optional
+    ///     Floor on the floating index in basis points (``100`` = 1%), applied before
     ///     ``spread_bp``; ignored on fixed-rate lines.
     /// cpr : float, optional
     ///     Constant prepayment rate override, as an annual decimal (e.g.
@@ -97,12 +97,12 @@ impl PyRepLine {
     /// True
     #[new]
     #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *, asset_type,
-                        spread_bp = None, forward_curve_id = None, index_floor = None, cpr = None,
+                        spread_bp = None, forward_curve_id = None, index_floor_bp = None, cpr = None,
                         cdr = None, recovery_rate = None, contractual_payment = None,
                         amortization_term_months = None, io_months = None))]
     #[pyo3(
         text_signature = "(id, balance, rate, maturity, seasoning_months, day_count, *, asset_type, \
-spread_bp=None, forward_curve_id=None, index_floor=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
+spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -116,7 +116,7 @@ spread_bp=None, forward_curve_id=None, index_floor=None, cpr=None, cdr=None, rec
         asset_type: &Bound<'_, PyAny>,
         spread_bp: Option<&Bound<'_, PyAny>>,
         forward_curve_id: Option<String>,
-        index_floor: Option<f64>,
+        index_floor_bp: Option<f64>,
         cpr: Option<f64>,
         cdr: Option<f64>,
         recovery_rate: Option<f64>,
@@ -140,7 +140,7 @@ spread_bp=None, forward_curve_id=None, index_floor=None, cpr=None, cdr=None, rec
         );
         inner.spread_bp = spread_bp;
         inner.forward_curve_id = forward_curve_id;
-        inner.index_floor = index_floor;
+        inner.index_floor_bp = index_floor_bp;
         inner.seasoning_months = seasoning_months;
         if let Some(cpr) = cpr {
             inner = inner.with_cpr(cpr);
@@ -230,11 +230,11 @@ spread_bp=None, forward_curve_id=None, index_floor=None, cpr=None, cdr=None, rec
         self.inner.forward_curve_id.clone()
     }
 
-    /// Floor on the floating index (annual decimal) applied before the
+    /// Floor on the floating index in basis points, applied before the
     /// spread, or ``None``.
     #[getter]
-    fn index_floor(&self) -> Option<f64> {
-        self.inner.index_floor
+    fn index_floor_bp(&self) -> Option<f64> {
+        self.inner.index_floor_bp
     }
 
     /// Contractual periodic payment, or ``None`` when inferred.

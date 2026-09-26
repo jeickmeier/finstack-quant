@@ -86,7 +86,7 @@ fn tarn_coupon_profile<'py>(
 /// Compute the coupon schedule for a snowball note.
 ///
 /// ```text
-/// c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)
+/// c_i = clip(c_{i-1} + fixed_rate - L_i, coupon_floor, coupon_cap)
 /// ```
 ///
 /// with ``c_0 = initial_coupon``.
@@ -99,48 +99,78 @@ fn tarn_coupon_profile<'py>(
 ///     Fixed rate component.
 /// floating_fixings : list[float]
 ///     Floating rate fixings (one per period).
-/// floor : float
-///     Per-period floor (non-negative).
-/// cap : float
-///     Per-period cap; must be strictly greater than ``floor``.  Pass
-///     ``float('inf')`` for an uncapped coupon.
+/// coupon_floor : float
+///     Per-period coupon floor as a decimal annual rate (non-negative).
+/// coupon_cap : float | None
+///     Per-period coupon cap as a decimal annual rate; when set it must be
+///     finite and strictly greater than ``coupon_floor``. ``None`` leaves the
+///     coupon uncapped.
 /// Returns
 /// -------
 /// list[float]
 ///     Coupon for each period in order.
 #[pyfunction]
+#[pyo3(
+    signature = (initial_coupon, fixed_rate, floating_fixings, coupon_floor, coupon_cap),
+    text_signature = "(initial_coupon, fixed_rate, floating_fixings, coupon_floor, coupon_cap)"
+)]
 fn snowball_coupon_profile(
     initial_coupon: f64,
     fixed_rate: f64,
     floating_fixings: Vec<f64>,
-    floor: f64,
-    cap: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
 ) -> PyResult<Vec<f64>> {
     coupon_profiles::snowball_coupon_profile(
         initial_coupon,
         fixed_rate,
         &floating_fixings,
-        floor,
-        cap,
+        coupon_floor,
+        coupon_cap,
     )
     .map_err(display_to_py)
 }
 
 /// Compute a path-independent inverse-floater coupon schedule.
+///
+/// ``c_i = clip(fixed_rate - gearing * L_i, coupon_floor, coupon_cap)``.
+///
+/// Parameters
+/// ----------
+/// fixed_rate : float
+///     Fixed coupon component as a decimal annual rate.
+/// floating_fixings : list[float]
+///     Floating rate fixings (one per period) as decimal annual rates.
+/// coupon_floor : float
+///     Per-period coupon floor as a decimal annual rate (non-negative).
+/// coupon_cap : float | None
+///     Per-period coupon cap as a decimal annual rate; when set it must be
+///     finite and strictly greater than ``coupon_floor``. ``None`` leaves the
+///     coupon uncapped.
+/// gearing : float
+///     Positive multiplier on each floating fixing.
+/// Returns
+/// -------
+/// list[float]
+///     Coupon for each period in order.
 #[pyfunction]
+#[pyo3(
+    signature = (fixed_rate, floating_fixings, coupon_floor, coupon_cap, gearing),
+    text_signature = "(fixed_rate, floating_fixings, coupon_floor, coupon_cap, gearing)"
+)]
 fn inverse_floater_coupon_profile(
     fixed_rate: f64,
     floating_fixings: Vec<f64>,
-    floor: f64,
-    cap: f64,
-    leverage: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
+    gearing: f64,
 ) -> PyResult<Vec<f64>> {
     coupon_profiles::inverse_floater_coupon_profile(
         fixed_rate,
         &floating_fixings,
-        floor,
-        cap,
-        leverage,
+        coupon_floor,
+        coupon_cap,
+        gearing,
     )
     .map_err(display_to_py)
 }

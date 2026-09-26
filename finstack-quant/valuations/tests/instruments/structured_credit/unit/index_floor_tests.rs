@@ -26,7 +26,7 @@ fn close() -> Date {
 }
 
 /// 10M SOFR + 400 loan (SOFR forward flat at 4%), A 9M fixed 5%, E 1M.
-fn deal(index_floor: Option<f64>) -> StructuredCredit {
+fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
     let maturity = d(2029, 1, 15);
     let mut pool = AssetPool::new("P", DealType::Clo, Currency::USD);
     let mut loan = PoolAsset::floating_rate_loan(
@@ -37,7 +37,7 @@ fn deal(index_floor: Option<f64>) -> StructuredCredit {
         maturity,
         DayCount::Act360,
     );
-    loan.index_floor = index_floor;
+    loan.index_floor_bp = index_floor_bp;
     pool.assets.push(loan);
     let tranches = TrancheStructure::new(vec![
         Tranche::new(
@@ -79,8 +79,8 @@ fn an_index_floor_above_the_forward_lifts_the_pool_coupon() {
     let market = market_with_curves(close());
     let unfloored = run_simulation_with_diagnostics(&deal(None), &market, close()).expect("run");
     let floored =
-        run_simulation_with_diagnostics(&deal(Some(0.06)), &market, close()).expect("run");
-    let slack = run_simulation_with_diagnostics(&deal(Some(0.01)), &market, close()).expect("run");
+        run_simulation_with_diagnostics(&deal(Some(600.0)), &market, close()).expect("run");
+    let slack = run_simulation_with_diagnostics(&deal(Some(100.0)), &market, close()).expect("run");
 
     let first = |run: &finstack_quant_valuations::instruments::fixed_income::structured_credit::SimulationRun| {
         run.diagnostics.periods[0].interest_collections.amount()
@@ -117,7 +117,7 @@ fn oas_differs_between_floored_and_unfloored_pools() {
     )
     .expect("oas");
     let floored = calculate_tranche_oas(
-        &deal(Some(0.06)),
+        &deal(Some(600.0)),
         "E",
         90.0,
         &market,

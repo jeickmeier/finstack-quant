@@ -118,7 +118,7 @@ impl PyAssetBackedFacility {
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-    /// >>> AssetBackedFacility.example().margin_bp
+    /// >>> AssetBackedFacility.example().spread_bp
     /// 600.0
     #[staticmethod]
     #[pyo3(text_signature = "()")]
@@ -452,8 +452,8 @@ impl PyAssetBackedFacility {
 
     /// Margin over the index (or the all-in fixed rate) in basis points.
     #[getter]
-    fn margin_bp(&self) -> f64 {
-        self.inner.margin_bp
+    fn spread_bp(&self) -> f64 {
+        self.inner.spread_bp
     }
 
     /// Fee on the undrawn commitment in basis points per annum.
@@ -631,11 +631,11 @@ impl PyAssetBackedFacility {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "AssetBackedFacility(id={:?}, commitment={}, drawn={}, margin_bp={}, revolving_end={})",
+            "AssetBackedFacility(id={:?}, commitment={}, drawn={}, spread_bp={}, revolving_end={})",
             self.inner.id.as_str(),
             self.inner.commitment.amount(),
             self.inner.drawn.amount(),
-            self.inner.margin_bp,
+            self.inner.spread_bp,
             self.inner.revolving_end
         )
     }
@@ -1093,10 +1093,10 @@ impl PyAssetBackedFacilityBuilder {
     /// ValueError
     ///     If this builder was already consumed by ``build``.
     #[pyo3(text_signature = "($self, value)")]
-    fn margin_bp<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
+    fn spread_bp<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         let converted = value;
         let b = take_facility(&mut slf)?;
-        slf.inner = Some(b.margin_bp(converted));
+        slf.inner = Some(b.spread_bp(converted));
         Ok(slf)
     }
 

@@ -4,18 +4,18 @@
       "additionalProperties": false,
       "description": "CMS (Constant Maturity Swap) swap instrument.\n\nOne leg pays a CMS rate (the par swap rate for a reference tenor, e.g., 10Y)\nobserved on each fixing date, and the other leg pays a fixed or floating rate.\n\nThe CMS rate requires a convexity adjustment because the CMS rate is not a\nmartingale under the payment measure. The adjustment depends on the correlation\nbetween the CMS rate and the numeraire (annuity).\n\n# Reference\n\nHagan, P. S. (2003). \"Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors.\"\n*Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`",
       "properties": {
-        "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {},
-          "description": "Attributes for scenario selection and grouping."
-        },
-        "cms_accrual_fractions": {
+        "accrual_fractions": {
           "description": "Accrual fractions for each CMS period.",
           "items": {
             "format": "double",
             "type": "number"
           },
           "type": "array"
+        },
+        "attributes": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "default": {},
+          "description": "Attributes for scenario selection and grouping."
         },
         "cms_cap": {
           "description": "Optional cap on the CMS rate (decimal).",
@@ -25,17 +25,6 @@
             "null"
           ]
         },
-        "cms_day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for CMS leg accrual."
-        },
-        "cms_fixing_dates": {
-          "description": "Fixing dates for CMS rate observations.",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
         "cms_floor": {
           "description": "Optional floor on the CMS rate (decimal).",
           "format": "double",
@@ -44,27 +33,29 @@
             "null"
           ]
         },
-        "cms_payment_dates": {
-          "description": "Payment dates for the CMS leg.",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
-        "cms_spread": {
-          "default": 0.0,
-          "description": "Spread over the CMS rate (decimal, e.g., 0.001 = 10bp).",
-          "format": "double",
-          "type": "number"
+        "cms_spread_bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "default": "0",
+          "description": "Additive spread over the CMS rate in basis points (10 = 10bp)."
         },
         "cms_tenor": {
-          "description": "CMS tenor in years (e.g., 10.0 for 10Y swap rate).",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for CMS leg accrual."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID for present value calculations."
+        },
+        "fixing_dates": {
+          "description": "Fixing dates for CMS rate observations.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -100,6 +91,13 @@
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount."
+        },
+        "payment_dates": {
+          "description": "Payment dates for the CMS leg.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -163,10 +161,10 @@
         "notional",
         "side",
         "cms_tenor",
-        "cms_fixing_dates",
-        "cms_payment_dates",
-        "cms_accrual_fractions",
-        "cms_day_count",
+        "fixing_dates",
+        "payment_dates",
+        "accrual_fractions",
+        "day_count",
         "funding_leg",
         "discount_curve_id",
         "forward_curve_id",
@@ -178,6 +176,7 @@
       "description": "Funding leg specification for a CMS swap.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Fixed rate funding leg.",
           "properties": {
             "accrual_fractions": {
@@ -200,9 +199,8 @@
               "type": "array"
             },
             "rate": {
-              "description": "Fixed coupon rate (decimal, e.g., 0.03 = 3%).",
-              "format": "double",
-              "type": "number"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+              "description": "Fixed coupon rate as a decimal annual rate (0.03 = 3%)."
             },
             "type": {
               "const": "fixed",
@@ -219,6 +217,7 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg.",
           "properties": {
             "accrual_fractions": {
@@ -244,10 +243,9 @@
               },
               "type": "array"
             },
-            "spread": {
-              "description": "Spread over the floating index (decimal, e.g., 0.001 = 10bp).",
-              "format": "double",
-              "type": "number"
+            "spread_bp": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+              "description": "Additive spread over the floating index in basis points (10 = 10bp)."
             },
             "type": {
               "const": "floating",
@@ -256,7 +254,7 @@
           },
           "required": [
             "type",
-            "spread",
+            "spread_bp",
             "payment_dates",
             "accrual_fractions",
             "day_count",
@@ -312,29 +310,26 @@
     {
       "instrument": {
         "spec": {
-          "attributes": {},
-          "cms_accrual_fractions": [
+          "accrual_fractions": [
             0.25,
             0.25,
             0.25,
             0.25
           ],
-          "cms_day_count": "act_365f",
-          "cms_fixing_dates": [
+          "attributes": {},
+          "cms_spread_bp": "0",
+          "cms_tenor": {
+            "count": 10,
+            "unit": "years"
+          },
+          "day_count": "act_365f",
+          "discount_curve_id": "USD-OIS",
+          "fixing_dates": [
             "2025-03-20",
             "2025-06-20",
             "2025-09-22",
             "2025-12-22"
           ],
-          "cms_payment_dates": [
-            "2025-06-20",
-            "2025-09-22",
-            "2025-12-22",
-            "2026-03-20"
-          ],
-          "cms_spread": 0.0,
-          "cms_tenor": 10.0,
-          "discount_curve_id": "USD-OIS",
           "forward_curve_id": "USD-LIBOR-3M",
           "funding_leg": {
             "accrual_fractions": [
@@ -350,7 +345,7 @@
               "2025-12-22",
               "2026-03-20"
             ],
-            "rate": 0.03,
+            "rate": "0.03",
             "type": "fixed"
           },
           "id": "CMSSWAP-10Y-USD",
@@ -359,6 +354,12 @@
             "amount": "10000000",
             "currency": "USD"
           },
+          "payment_dates": [
+            "2025-06-20",
+            "2025-09-22",
+            "2025-12-22",
+            "2026-03-20"
+          ],
           "side": "pay",
           "swap_float_day_count": "act_360",
           "vol_surface_id": "USD-CMS10Y-VOL"

@@ -94,7 +94,7 @@ def build_deposit() -> dict[str, Any]:
                     "start_date": VALUATION_DATE,
                     "maturity": "2026-07-30",
                     "day_count": "act_360",
-                    "quote_rate": str(QUOTE_RATE),
+                    "fixed_rate": str(QUOTE_RATE),
                     "discount_curve_id": "USD-OIS",
                     "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
                     "settlement_days": 0,

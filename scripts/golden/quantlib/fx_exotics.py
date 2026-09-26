@@ -398,7 +398,7 @@ def build_quanto_option() -> dict[str, Any]:
                 "spec": {
                     "id": "NKY-USD-QUANTO-CALL-1Y-QUANTLIB",
                     "underlying_ticker": "NKY",
-                    "equity_strike": {"amount": str(strike), "currency": "JPY"},
+                    "strike": strike,
                     "option_type": "call",
                     "expiry": "2027-04-30",
                     "notional": {"amount": "1000", "currency": "USD"},

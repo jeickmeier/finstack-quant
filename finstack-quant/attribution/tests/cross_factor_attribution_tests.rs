@@ -260,7 +260,7 @@ fn single_factor_instrument_has_zero_cross_factor() {
             .start_date(as_of_t0)
             .maturity(as_of_t0.add_months(12))
             .day_count(DayCount::Act360)
-            .quote_rate_opt(Some(Decimal::ZERO))
+            .fixed_rate_opt(Some(Decimal::ZERO))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .build()
             .expect("deposit should build"),

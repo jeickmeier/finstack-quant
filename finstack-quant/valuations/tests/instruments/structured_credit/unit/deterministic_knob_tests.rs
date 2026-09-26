@@ -133,7 +133,7 @@ fn window() -> ReinvestmentPeriod {
             price_pct: 100.0,
             maturity_months: 60,
             forward_curve_id: None,
-            coupon_floor: None,
+            all_in_floor_bp: None,
         }),
     }
 }
@@ -735,9 +735,9 @@ fn knobs() -> Vec<Knob> {
             change: |d| d.pool.assets[0].io_months = Some(24),
         },
         Knob {
-            name: "pool.assets.index_floor",
+            name: "pool.assets.index_floor_bp",
             common: floating_first_asset,
-            change: |d| d.pool.assets[0].index_floor = Some(0.10),
+            change: |d| d.pool.assets[0].index_floor_bp = Some(1000.0),
         },
         Knob {
             name: "pool.assets.origination_date",

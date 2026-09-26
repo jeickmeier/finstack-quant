@@ -301,7 +301,7 @@ impl Bond {
     /// * `id` - Unique identifier for the bond
     /// * `notional` - Principal amount of the bond
     /// * `forward_curve_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
-    /// * `margin_bp` - Spread over index in typed basis points (e.g., `Bps::new(200)`)
+    /// * `spread_bp` - Spread over index in typed basis points (e.g., `Bps::new(200)`)
     /// * `issue` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
     /// * `frequency` - Payment frequency (e.g., `Tenor::quarterly()`)
@@ -346,7 +346,7 @@ impl Bond {
         id: impl Into<InstrumentId>,
         notional: Money,
         forward_curve_id: impl Into<CurveId>,
-        margin_bp: impl Into<Bps>,
+        spread_bp: impl Into<Bps>,
         issue: Date,
         maturity: Date,
         frequency: finstack_quant_core::dates::Tenor,
@@ -371,7 +371,7 @@ impl Bond {
             id,
             notional,
             forward_curve_id,
-            margin_bp,
+            spread_bp,
             issue,
             maturity,
             frequency,
@@ -391,7 +391,7 @@ impl Bond {
     /// * `id` - Unique identifier for the bond
     /// * `notional` - Principal amount of the bond
     /// * `forward_curve_id` - Forward curve identifier (e.g., `USD-SOFR-3M`)
-    /// * `margin_bp` - Spread over the index in typed basis points
+    /// * `spread_bp` - Spread over the index in typed basis points
     /// * `issue` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
     /// * `frequency` - Payment frequency
@@ -431,7 +431,7 @@ impl Bond {
         id: impl Into<InstrumentId>,
         notional: Money,
         forward_curve_id: impl Into<CurveId>,
-        margin_bp: impl Into<Bps>,
+        spread_bp: impl Into<Bps>,
         issue: Date,
         maturity: Date,
         frequency: finstack_quant_core::dates::Tenor,
@@ -439,9 +439,9 @@ impl Bond {
         convention: crate::instruments::common_impl::parameters::BondConvention,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
-        let margin_bp = margin_bp.into();
+        let spread_bp = spread_bp.into();
         let mut cashflow_spec =
-            CashflowSpec::floating_bp(forward_curve_id.into(), margin_bp, frequency, day_count);
+            CashflowSpec::floating_bp(forward_curve_id.into(), spread_bp, frequency, day_count);
         if let CashflowSpec::Floating(spec) = &mut cashflow_spec {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention

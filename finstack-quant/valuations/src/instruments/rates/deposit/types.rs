@@ -20,7 +20,7 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId, Rate};
+use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -80,9 +80,9 @@ pub struct Deposit {
     /// Day count convention for interest accrual.
     pub day_count: DayCount,
 
-    /// Optional quoted simple rate r (annualised) for the deposit.
+    /// Optional contractual simple rate r (annualised decimal, 0.045 = 4.5%) for the deposit.
     ///
-    /// Note: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`
+    /// Note: `cashflow_schedule()` requires `fixed_rate` to be set. Leaving it as `None`
     /// is only appropriate if the caller never requests cashflow generation/PV from
     /// this instrument (e.g., constructing placeholders).
     #[builder(optional)]
@@ -91,7 +91,7 @@ pub struct Deposit {
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DecimalWire>")
     )]
-    pub quote_rate: Option<Decimal>,
+    pub fixed_rate: Option<Decimal>,
     /// Discount curve id used for valuation and par extraction.
     pub discount_curve_id: CurveId,
     /// Instrument-owned pricing inputs.
@@ -152,8 +152,8 @@ pub struct ConventionDepositParams<'a> {
     pub trade_date: Date,
     /// Deposit maturity date.
     pub maturity: Date,
-    /// Quoted simple annualized rate in decimal form.
-    pub quote_rate: f64,
+    /// Contractual simple annualized rate in decimal form (0.045 = 4.5%).
+    pub fixed_rate: f64,
     /// Rate index used to resolve market conventions.
     pub index_id: &'a str,
     /// Discount curve used for valuation and par extraction.
@@ -174,7 +174,7 @@ impl Deposit {
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2024 - 07 - 01))
             .day_count(DayCount::Act360)
-            .quote_rate_opt(Decimal::try_from(0.045).ok())
+            .fixed_rate_opt(Decimal::try_from(0.045).ok())
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
             .settlement_days_opt(Some(2))
@@ -199,7 +199,7 @@ impl Deposit {
             notional,
             trade_date,
             maturity,
-            quote_rate,
+            fixed_rate,
             index_id,
             discount_curve_id,
             attributes,
@@ -216,8 +216,8 @@ impl Deposit {
             .start_date(trade_date)
             .maturity(maturity)
             .day_count(conv.day_count)
-            .quote_rate_opt(Some(finstack_quant_core::decimal::f64_to_decimal(
-                quote_rate,
+            .fixed_rate_opt(Some(finstack_quant_core::decimal::f64_to_decimal(
+                fixed_rate,
             )?))
             .discount_curve_id(CurveId::new(discount_curve_id))
             .attributes(attributes)
@@ -253,14 +253,6 @@ impl Deposit {
             as_of,
             &self.discount_curve_id,
         )
-    }
-}
-
-impl DepositBuilder {
-    /// Set the quoted rate using a typed rate.
-    pub fn quote_rate_rate(mut self, rate: Rate) -> Self {
-        self.quote_rate = Decimal::try_from(rate.as_decimal()).ok();
-        self
     }
 }
 
@@ -388,12 +380,12 @@ impl Deposit {
         )?;
 
         // Warn about extreme rates (don't fail, as they may be intentional)
-        if let Some(r) = self.quote_rate {
-            let r_f64 = decimal_to_f64(r, "Deposit quote_rate")?;
+        if let Some(r) = self.fixed_rate {
+            let r_f64 = decimal_to_f64(r, "Deposit fixed_rate")?;
             if validation::rate_outside_range(r_f64, MIN_REASONABLE_RATE, MAX_REASONABLE_RATE) {
                 tracing::warn!(
                     deposit_id = %self.id,
-                    quote_rate = r_f64,
+                    fixed_rate = r_f64,
                     min_bound = MIN_REASONABLE_RATE,
                     max_bound = MAX_REASONABLE_RATE,
                     "Deposit quote rate {:.4} ({:.0} bp) is outside typical range [{:.0}%, {:.0}%]",
@@ -518,12 +510,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
 
-        let r = self.quote_rate.ok_or_else(|| {
+        let r = self.fixed_rate.ok_or_else(|| {
             finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                id: "deposit quote_rate".to_string(),
+                id: "deposit fixed_rate".to_string(),
             })
         })?;
-        let r = decimal_to_f64(r, "Deposit quote_rate")?;
+        let r = decimal_to_f64(r, "Deposit fixed_rate")?;
         let redemption = self.notional * (1.0 + r * yf);
         let flows = vec![
             crate::cashflow::primitives::CashFlow::new(
@@ -574,7 +566,7 @@ mod tests {
             notional: Money::from((1_000_000_i64, Currency::USD)),
             trade_date: date!(2025 - 01 - 02),
             maturity: date!(2025 - 07 - 02),
-            quote_rate: 0.045,
+            fixed_rate: 0.045,
             index_id: "USD-SOFR-OIS",
             discount_curve_id: "USD-OIS",
             attributes: Attributes::new(),
@@ -590,7 +582,7 @@ mod tests {
         assert_eq!(deposit.maturity, date!(2025 - 07 - 02));
         assert_eq!(deposit.day_count, DayCount::Act360);
         assert_eq!(
-            deposit.quote_rate.and_then(|rate| rate.to_f64()),
+            deposit.fixed_rate.and_then(|rate| rate.to_f64()),
             Some(0.045)
         );
         assert_eq!(deposit.discount_curve_id, CurveId::new("USD-OIS"));
@@ -609,9 +601,7 @@ mod tests {
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .start_date(date!(2025 - 01 - 02))
             .maturity(date!(2025 - 07 - 02))
-            .quote_rate_rate(
-                finstack_quant_core::types::Rate::from_decimal(0.045).expect("valid rate fixture"),
-            )
+            .fixed_rate_opt(Decimal::try_from(0.045).ok())
             .day_count(DayCount::Act360)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(Attributes::new())

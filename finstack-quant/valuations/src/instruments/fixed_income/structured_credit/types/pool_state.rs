@@ -58,7 +58,7 @@ pub(crate) struct PoolState {
     pub(crate) io_months: Vec<Option<u32>>,
     /// Minimum all-in coupon per asset (a floor on the resolved floating
     /// rate); `None` for every asset except reinvestment purchases with a
-    /// `coupon_floor`.
+    /// `all_in_floor_bp` (held here as an annual decimal).
     pub(crate) rate_floors: Vec<Option<f64>>,
     /// Floor on the floating index per asset (annual decimal), applied
     /// before the spread; `None` for unfloored or fixed-rate rows.
@@ -134,7 +134,8 @@ impl PoolState {
         self.advances.push(0.0);
         self.liquidation.push(asset.liquidation);
         self.rate_floors.push(rate_floor);
-        self.index_floors.push(asset.index_floor);
+        self.index_floors
+            .push(asset.index_floor_bp.map(|bp| bp / 10_000.0));
         let curve_index = asset.forward_curve_id.as_ref().map(|id| {
             self.unique_curves
                 .iter()
@@ -249,7 +250,11 @@ impl PoolState {
             amortization_term_months,
             io_months,
             rate_floors: vec![None; n],
-            index_floors: pool.assets.iter().map(|asset| asset.index_floor).collect(),
+            index_floors: pool
+                .assets
+                .iter()
+                .map(|asset| asset.index_floor_bp.map(|bp| bp / 10_000.0))
+                .collect(),
             delinquent,
             balloon,
             prepayment_penalty,

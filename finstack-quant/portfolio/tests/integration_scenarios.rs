@@ -36,7 +36,7 @@ fn apply_and_revalue_succeeds() {
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -114,7 +114,7 @@ fn scenario_pnl_reconciles_end_to_end() {
             .maturity(as_of + Duration::days(days))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
             .discount_curve_id("USD".into())
-            .quote_rate_opt(Some(
+            .fixed_rate_opt(Some(
                 rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
             ))
             .build()
@@ -220,7 +220,7 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         .maturity(as_of + Duration::days(90))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()

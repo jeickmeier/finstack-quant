@@ -118,7 +118,7 @@ fn deposit(id: &str, maturity: Date) -> Deposit {
         .start_date(base_date())
         .maturity(maturity)
         .day_count(DayCount::Act360)
-        .quote_rate_opt(Some(Decimal::try_from(0.04).unwrap()))
+        .fixed_rate_opt(Some(Decimal::try_from(0.04).unwrap()))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .build()
         .unwrap()
@@ -133,7 +133,7 @@ fn fra(id: &str, start: Date, end: Date) -> ForwardRateAgreement {
         maturity: end,
         fixed_rate: Decimal::try_from(0.042).unwrap(),
         day_count: DayCount::Act360,
-        reset_lag: 2,
+        reset_lag_days: 2,
         fixing_calendar_id: None,
         fixing_business_day_convention: None,
         observed_fixing: None,
@@ -209,7 +209,7 @@ fn interest_rate_cap(id: &str, maturity: Date) -> CapFloor {
         vol_shift: 0.0,
         overnight_coupon: None,
         premium: None,
-        spread: Decimal::ZERO,
+        spread_bp: Decimal::ZERO,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),

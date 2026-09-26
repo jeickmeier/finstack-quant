@@ -5277,7 +5277,7 @@ export interface BondConstructor {
    * @param id - Unique instrument identifier.
    * @param notional - Principal amount of the bond.
    * @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
-   * @param marginBp - Spread over the index in whole basis points (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp margins, which preserves the exact decimal spread).
+   * @param spreadBp - Spread over the index in whole basis points (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp margins, which preserves the exact decimal spread).
    * @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
    * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
    * @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
@@ -5290,7 +5290,7 @@ export interface BondConstructor {
     id: string,
     notional: Money,
     forwardCurveId: string,
-    marginBp: Bps,
+    spreadBp: Bps,
     issue: string,
     maturity: string,
     frequency: Tenor,
@@ -8674,33 +8674,33 @@ export interface ValuationsNamespace {
    * @param initialCoupon - Starting coupon rate before the first snowball update, in decimal form.
    * @param fixedRate - Fixed coupon rate in decimal form added at each snowball step.
    * @param floatingFixings - Ordered floating-rate fixings in decimal form, one for each coupon period.
-   * @param floor - Minimum permitted coupon rate in decimal form.
-   * @param cap - Maximum permitted coupon rate in decimal form.
-   * @throws Error - Throws a JavaScript exception if `initial_coupon` or `floor` is negative; `initial_coupon`, `fixed_rate`, `floor`, or any fixing is non-finite; or `cap` is NaN or is not greater than `floor`.
+   * @param couponFloor - Minimum permitted coupon rate in decimal form.
+   * @param couponCap - Optional maximum permitted coupon rate in decimal form; `null`/`undefined` leaves the coupon uncapped.
+   * @throws Error - Throws a JavaScript exception if `initial_coupon` or `coupon_floor` is negative; `initial_coupon`, `fixed_rate`, `coupon_floor`, or any fixing is non-finite; or `coupon_cap` is set and is non-finite or not greater than `coupon_floor`.
    */
   snowballCouponProfile(
     initialCoupon: number,
     fixedRate: number,
     floatingFixings: number[],
-    floor: number,
-    cap: number
+    couponFloor: number,
+    couponCap: number | null | undefined
   ): Float64Array;
   /**
    * Path-independent inverse-floater coupon schedule.
    * @returns One decimal coupon rate per fixing, in the same order as `floatingFixings`.
-   * @param fixedRate - Fixed coupon rate in decimal form before the leveraged floating deduction.
+   * @param fixedRate - Fixed coupon rate in decimal form before the geared floating deduction.
    * @param floatingFixings - Ordered floating-rate fixings in decimal form, one for each coupon period.
-   * @param floor - Minimum permitted coupon rate in decimal form.
-   * @param cap - Maximum permitted coupon rate in decimal form.
-   * @param leverage - Positive multiplier applied to each floating fixing in the inverse-floater coupon.
-   * @throws Error - Throws a JavaScript exception if `floor` is negative; `fixed_rate`, `floor`, `leverage`, or any fixing is non-finite; `leverage` is non-positive; or `cap` is NaN or is not greater than `floor`.
+   * @param couponFloor - Minimum permitted coupon rate in decimal form.
+   * @param couponCap - Optional maximum permitted coupon rate in decimal form; `null`/`undefined` leaves the coupon uncapped.
+   * @param gearing - Positive multiplier applied to each floating fixing in the inverse-floater coupon.
+   * @throws Error - Throws a JavaScript exception if `coupon_floor` is negative; `fixed_rate`, `coupon_floor`, `gearing`, or any fixing is non-finite; `gearing` is non-positive; or `coupon_cap` is set and is non-finite or not greater than `coupon_floor`.
    */
   inverseFloaterCouponProfile(
     fixedRate: number,
     floatingFixings: number[],
-    floor: number,
-    cap: number,
-    leverage: number
+    couponFloor: number,
+    couponCap: number | null | undefined,
+    gearing: number
   ): Float64Array;
   /**
    * Intrinsic (undiscounted, unhedged) payoff of a CMS spread option.

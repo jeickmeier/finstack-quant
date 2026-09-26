@@ -784,7 +784,7 @@ mod tests {
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
             .discount_curve_id("USD".into())
-            .quote_rate_opt(Some(
+            .fixed_rate_opt(Some(
                 rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
             ))
             .build()
@@ -860,7 +860,7 @@ mod tests {
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
             .discount_curve_id("USD".into())
-            .quote_rate_opt(Some(
+            .fixed_rate_opt(Some(
                 rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
             ))
             .build()
@@ -912,7 +912,7 @@ mod tests {
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
             .discount_curve_id("USD".into())
-            .quote_rate_opt(Some(
+            .fixed_rate_opt(Some(
                 rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
             ))
             .build()
@@ -957,7 +957,7 @@ mod tests {
             .maturity(date!(2024 - 02 - 01))
             .day_count(finstack_quant_core::dates::DayCount::Act360)
             .discount_curve_id("USD".into())
-            .quote_rate_opt(Some(
+            .fixed_rate_opt(Some(
                 rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
             ))
             .build()

@@ -180,14 +180,14 @@ pub struct InflationCapFloor {
         skip_serializing_if = "crate::instruments::ScenarioPricingOverrides::is_empty"
     )]
     pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
-    /// Optional contract-level lag override.
+    /// Contractual CPI observation lag; when `None` the index lag, then the
+    /// curve's indexation lag, applies.
     #[builder(optional)]
-    pub lag_override: Option<InflationLag>,
-    /// Contractual monthly CPI interpolation, overriding index metadata.
+    pub lag: Option<InflationLag>,
+    /// Contractual monthly CPI interpolation; takes precedence over index metadata.
     /// Defaults to monthly step interpolation when neither source supplies it.
     #[builder(optional)]
-    pub interpolation_override:
-        Option<finstack_quant_core::market_data::scalars::InflationInterpolation>,
+    pub interpolation: Option<finstack_quant_core::market_data::scalars::InflationInterpolation>,
 
     //
     // A YoY inflation caplet pays `(CPI(Tᵢ)/CPI(Tᵢ₋₁) − 1 − K)⁺`. Under the
@@ -243,7 +243,7 @@ impl InflationCapFloor {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("USD-INFL-VOL"))
-            .lag_override(InflationLag::Months(3))
+            .lag(InflationLag::Months(3))
             .attributes(Attributes::new())
             .build()
             .expect("Example InflationCapFloor construction should not fail")
@@ -276,7 +276,7 @@ impl InflationCapFloor {
 
     fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
         crate::instruments::common_impl::helpers::resolve_inflation_lag(
-            self.lag_override,
+            self.lag,
             self.inflation_index_id.as_str(),
             curves,
         )
@@ -296,7 +296,7 @@ impl InflationCapFloor {
         date: Date,
     ) -> finstack_quant_core::Result<f64> {
         let interpolation = self
-            .interpolation_override
+            .interpolation
             .or_else(|| {
                 curves
                     .get_inflation_index(self.inflation_index_id.as_str())

@@ -40,14 +40,14 @@ pub(crate) fn collateral_asset_rate_for_period(
     fallback_all_in_rate: f64,
     spread_bp: Option<f64>,
     rate_shift: f64,
-    index_floor: Option<f64>,
+    index_floor_rate: Option<f64>,
 ) -> Result<f64> {
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
     let spread = spread_bp.unwrap_or(0.0) / 10_000.0;
     // The floor applies to the index before the spread (`FloatingRateSpec`
     // convention), so a floored loan pays `max(index, floor) + spread`.
-    let floored = |index: f64| index_floor.map_or(index, |floor| index.max(floor));
+    let floored = |index: f64| index_floor_rate.map_or(index, |floor| index.max(floor));
 
     if fixing_date < fwd.base_date() {
         if let Ok(series) = fixings::get_fixing_series(context, fwd.id().as_str()) {

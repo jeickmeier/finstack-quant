@@ -119,7 +119,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
-            .lag_override(InflationLag::None)
+            .lag(InflationLag::None)
             .attributes(crate::instruments::common_impl::traits::Attributes::new())
             .build()
             .expect("yoy swap")

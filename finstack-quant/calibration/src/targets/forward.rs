@@ -818,7 +818,7 @@ mod tests {
                     }),
                     Arc::new(Deposit {
                         id: InstrumentId::new(format!("DEP-{pillar_time}")),
-                        quote_rate: Some(
+                        fixed_rate: Some(
                             rust_decimal::Decimal::try_from(quote_rate)
                                 .expect("valid deposit rate"),
                         ),
@@ -927,7 +927,7 @@ mod tests {
                     }),
                     Arc::new(Deposit {
                         id: InstrumentId::new(format!("DEP-{days}D")),
-                        quote_rate: Some(
+                        fixed_rate: Some(
                             rust_decimal::Decimal::try_from(rate).expect("valid deposit rate"),
                         ),
                         discount_curve_id: CurveId::new("USD-OIS"),
@@ -1000,7 +1000,7 @@ mod tests {
                     }),
                     Arc::new(Deposit {
                         id: InstrumentId::new(format!("DEP-{days}D")),
-                        quote_rate: Some(
+                        fixed_rate: Some(
                             rust_decimal::Decimal::try_from(rate).expect("valid deposit rate"),
                         ),
                         discount_curve_id: CurveId::new("USD-OIS"),

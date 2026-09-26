@@ -80,7 +80,7 @@ fn make_deposit_currency(id: &str, curve_id: &str, notional: f64, currency: Curr
         .maturity(base_date() + time::Duration::days(90))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id(curve_id.into())
-        .quote_rate_opt(Some(rust_decimal::Decimal::try_from(0.045).unwrap()))
+        .fixed_rate_opt(Some(rust_decimal::Decimal::try_from(0.045).unwrap()))
         .build()
         .unwrap()
 }

@@ -226,10 +226,10 @@ fn schedule_rich_swap(index: usize) -> CmsSwap {
         start,
         end,
         Tenor::semi_annual(),
-        10.0,
-        (index % 50) as f64 / 100_000.0,
+        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+        rust_decimal::Decimal::new((index % 50) as i64, 1),
         FundingLegSpec::Floating {
-            spread: (index % 25) as f64 / 100_000.0,
+            spread_bp: rust_decimal::Decimal::new((index % 25) as i64, 1),
             day_count: DayCount::Act360,
             forward_curve_id: "USD-SOFR-3M".into(),
         },

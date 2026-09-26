@@ -1,7 +1,7 @@
 //! Pricing tests for CMS Option.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -215,7 +215,7 @@ fn test_vanna_computable() {
             continue;
         }
         let start = reference.reference_swap_start(fixing).unwrap();
-        let end = start.add_months((12.0 * inst.cms_tenor).round() as i32);
+        let end = start.add_months(inst.cms_tenor.months().expect("month tenor") as i32);
         let (forward, _) = reference
             .forward_rate_and_annuity(&market, as_of, start, end)
             .unwrap();
@@ -224,7 +224,7 @@ fn test_vanna_computable() {
             let convexity = convexity_adjustment_with_frequency(
                 sigma,
                 t,
-                inst.cms_tenor,
+                inst.cms_tenor.to_years(),
                 forward,
                 reference.payments_per_year().unwrap(),
             );
@@ -317,7 +317,7 @@ fn test_cms_option_requires_vol_surface_in_market() {
     let inst = CmsOption {
         id: InstrumentId::new("CMS-NO-VOL"),
         strike: Decimal::try_from(0.025).expect("valid decimal"),
-        cms_tenor: 10.0,
+        cms_tenor: Tenor::new(10, TenorUnit::Years).expect("10Y tenor"),
         fixing_dates,
         payment_dates,
         accrual_fractions,
@@ -352,7 +352,7 @@ fn seasoned_cms_option(fixing: Date, payment: Date) -> CmsOption {
     CmsOption {
         id: InstrumentId::new("CMS-SEASONED"),
         strike: Decimal::try_from(0.025).expect("valid decimal"),
-        cms_tenor: 10.0,
+        cms_tenor: Tenor::new(10, TenorUnit::Years).expect("10Y tenor"),
         fixing_dates: vec![fixing],
         payment_dates: vec![payment],
         accrual_fractions: vec![0.25],

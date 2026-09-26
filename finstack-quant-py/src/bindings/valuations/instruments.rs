@@ -551,7 +551,7 @@ impl PyBond {
     ///     Principal amount; a bare number needs ``currency``.
     /// forward_curve_id : str
     ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-    /// margin_bp : float | Bps
+    /// spread_bp : float | Bps
     ///     Spread over the index in whole basis points (fractions are
     ///     rounded).
     /// issue : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -579,7 +579,7 @@ impl PyBond {
     ///     ``notional`` is not finite and positive, or ``issue`` is not
     ///     strictly before ``maturity``.
     /// TypeError
-    ///     If ``margin_bp``/``notional`` has an unsupported type or a date
+    ///     If ``spread_bp``/``notional`` has an unsupported type or a date
     ///     cannot be interpreted.
     ///
     /// Examples
@@ -593,9 +593,9 @@ impl PyBond {
     /// >>> frn.has_floating_coupons
     /// True
     #[staticmethod]
-    #[pyo3(signature = (id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -603,7 +603,7 @@ impl PyBond {
         id: &str,
         notional: &Bound<'_, PyAny>,
         forward_curve_id: &str,
-        margin_bp: &Bound<'_, PyAny>,
+        spread_bp: &Bound<'_, PyAny>,
         issue: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         frequency: PyRef<'_, PyTenor>,
@@ -615,7 +615,7 @@ impl PyBond {
             id,
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
-            bps_value_from_py(margin_bp, "margin_bp")?,
+            bps_value_from_py(spread_bp, "spread_bp")?,
             extract_date(issue)?,
             extract_date(maturity)?,
             frequency.inner,
@@ -638,7 +638,7 @@ impl PyBond {
     ///     Principal amount; a bare number needs ``currency``.
     /// forward_curve_id : str
     ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-    /// margin_bp : float | Bps
+    /// spread_bp : float | Bps
     ///     Spread over the index in whole basis points (fractions are
     ///     rounded).
     /// issue : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -667,7 +667,7 @@ impl PyBond {
     ///     If ``convention`` is unknown, a bare ``notional`` has no
     ///     ``currency``, or validation fails.
     /// TypeError
-    ///     If ``margin_bp``/``notional`` has an unsupported type or a date
+    ///     If ``spread_bp``/``notional`` has an unsupported type or a date
     ///     cannot be interpreted.
     ///
     /// Examples
@@ -681,9 +681,9 @@ impl PyBond {
     /// >>> frn.settlement_days
     /// 2
     #[staticmethod]
-    #[pyo3(signature = (id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -691,7 +691,7 @@ impl PyBond {
         id: &str,
         notional: &Bound<'_, PyAny>,
         forward_curve_id: &str,
-        margin_bp: &Bound<'_, PyAny>,
+        spread_bp: &Bound<'_, PyAny>,
         issue: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         frequency: PyRef<'_, PyTenor>,
@@ -704,7 +704,7 @@ impl PyBond {
             id,
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
-            bps_value_from_py(margin_bp, "margin_bp")?,
+            bps_value_from_py(spread_bp, "spread_bp")?,
             extract_date(issue)?,
             extract_date(maturity)?,
             frequency.inner,

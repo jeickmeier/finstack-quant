@@ -99,14 +99,15 @@ fn market(as_of: Date) -> MarketContext {
 /// redemption. `fixed_rate` 6% with a forward ~2-4% keeps every coupon well
 /// above the `0` floor (so the `max` never binds); `target_coupon` 1e9 is
 /// never hit, so the note has no path dependence.
-fn floating_note_tarn(coupon_dates: Vec<Date>) -> Tarn {
+fn floating_note_tarn(start_date: Date, payment_dates: Vec<Date>) -> Tarn {
     Tarn {
         id: InstrumentId::new("TARN-PARITY"),
-        fixed_rate: 0.06,
+        fixed_rate: rust_decimal::Decimal::new(6, 2),
         coupon_floor: 0.0,
         target_coupon: 1.0e9,
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        coupon_dates,
+        start_date,
+        payment_dates,
         index_tenor: Tenor::semi_annual(),
         forward_curve_id: CurveId::new("USD-SOFR-6M"),
         discount_curve_id: CurveId::new("USD-OIS"),
@@ -142,15 +143,19 @@ fn tree_floating_note_pv(
     let ctx = DayCountContext::default();
     let notional = tarn.notional.amount();
 
-    let maturity = *tarn.coupon_dates.last().expect("coupon dates");
+    let maturity = *tarn.payment_dates.last().expect("payment dates");
+    let boundaries: Vec<Date> = std::iter::once(tarn.start_date)
+        .chain(tarn.payment_dates.iter().copied())
+        .collect();
+    let fixed_rate =
+        rust_decimal::prelude::ToPrimitive::to_f64(&tarn.fixed_rate).expect("fixed rate");
     let horizon = day_count
         .year_fraction(as_of, maturity, ctx)
         .expect("maturity year fraction");
 
     // Thread the in-advance fixing times through the tree grid so each
     // coupon's fixing lands exactly on a node level.
-    let fixing_times: Vec<f64> = tarn
-        .coupon_dates
+    let fixing_times: Vec<f64> = boundaries
         .iter()
         .filter(|&&d| d > as_of)
         .map(|&d| day_count.year_fraction(as_of, d, ctx).expect("fixing time"))
@@ -160,7 +165,7 @@ fn tree_floating_note_pv(
         .expect("tree calibrate");
 
     let mut pv = 0.0_f64;
-    for period in tarn.coupon_dates.windows(2) {
+    for period in boundaries.windows(2) {
         let (start, end) = (period[0], period[1]);
         if end <= as_of {
             continue;
@@ -189,7 +194,7 @@ fn tree_floating_note_pv(
             // HW1F bond price, reconstructed at the in-advance fixing node.
             let p = tree.bond_price(fix_step, node, t_end, discount_curve);
             let fwd = (1.0 / p - 1.0) / accrual;
-            let coupon = (tarn.fixed_rate - fwd).max(tarn.coupon_floor) * accrual;
+            let coupon = (fixed_rate - fwd).max(tarn.coupon_floor) * accrual;
             q_sum += q;
             q_coupon += q * coupon;
         }
@@ -217,8 +222,7 @@ fn tarn_floating_note_mc_matches_hw_tree() {
     let discount_curve = market.get_discount("USD-OIS").expect("discount");
 
     // Semi-annual coupons over 3 years.
-    let coupon_dates = vec![
-        date(2025, Month::January, 1),
+    let payment_dates = vec![
         date(2025, Month::July, 1),
         date(2026, Month::January, 1),
         date(2026, Month::July, 1),
@@ -226,7 +230,7 @@ fn tarn_floating_note_mc_matches_hw_tree() {
         date(2027, Month::July, 1),
         date(2028, Month::January, 1),
     ];
-    let tarn = floating_note_tarn(coupon_dates);
+    let tarn = floating_note_tarn(date(2025, Month::January, 1), payment_dates);
 
     // Modest mean reversion / 40 bp vol. A small σ keeps the O(σ²) discounting-
     // convention term negligible; the short rate is still genuinely stochastic

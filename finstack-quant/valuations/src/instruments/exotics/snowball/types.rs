@@ -7,6 +7,8 @@ use crate::instruments::rates::hw1f::bermudan_call::BermudanCallProvision;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 
 /// Snowball note variant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -15,7 +17,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 pub enum SnowballVariant {
     /// Path-dependent snowball: c_i = max(c_{i-1} + fixed - floating, 0).
     Snowball,
-    /// Inverse floater: c_i = max(fixed - leverage * floating, 0).
+    /// Inverse floater: c_i = max(fixed - gearing * floating, 0).
     InverseFloater,
 }
 
@@ -45,7 +47,7 @@ impl std::fmt::Display for SnowballVariant {
 /// # Variants
 ///
 /// - **Snowball**: Coupon depends on previous coupon (path-dependent)
-/// - **Inverse Floater**: Coupon = fixed_rate - leverage * floating_rate
+/// - **Inverse Floater**: Coupon = fixed_rate - gearing * floating_rate
 ///   (simpler, not path-dependent, but often combined with callability)
 ///
 /// # References
@@ -61,23 +63,38 @@ pub struct Snowball {
     pub variant: SnowballVariant,
     /// Initial coupon for snowball (c_0); ignored for inverse floater.
     pub initial_coupon: f64,
-    /// Fixed rate component.
-    pub fixed_rate: f64,
-    /// Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).
-    pub leverage: f64,
+    /// Fixed rate component as a decimal annual rate (0.05 = 5%).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub fixed_rate: Decimal,
+    /// Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).
+    pub gearing: f64,
     /// Floor on each period coupon (typically 0.0).
     pub coupon_floor: f64,
     /// Optional cap on each period coupon.
     pub coupon_cap: Option<f64>,
     /// Notional amount.
     pub notional: Money,
-    /// Coupon payment dates (must be sorted ascending).
+    /// Accrual start of the first coupon period; also the first in-advance
+    /// fixing date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start_date: Date,
+    /// Coupon payment dates, one per period, strictly ascending and after
+    /// `start_date`. Period `i` accrues from the previous payment date (or
+    /// `start_date`) to `payment_dates[i]` and fixes in advance at its start.
     #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
-    pub coupon_dates: Vec<Date>,
+    pub payment_dates: Vec<Date>,
     /// Rates forward curve that projects the floating index (also the fixing-series key).
     pub forward_curve_id: CurveId,
     /// Contractual tenor of the observed floating index (must match the forward curve tenor).
@@ -117,29 +134,30 @@ impl Snowball {
     /// Validate the snowball parameters.
     ///
     /// Checks:
-    /// - At least two coupon dates
-    /// - Coupon dates are sorted ascending
-    /// - Fixed rate is finite
-    /// - Leverage is positive and finite
+    /// - At least one payment date
+    /// - `start_date` and the payment dates are strictly ascending
+    /// - Fixed rate converts to `f64`
+    /// - Gearing is positive and finite
     /// - Floor is non-negative
     /// - Cap (if set) is greater than floor
     /// - Initial coupon is non-negative for snowball variant
     /// - Callable provision validates (if present)
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        validation::require_with(self.coupon_dates.len() >= 2, || {
-            "Snowball requires at least two coupon dates".to_string()
+        validation::require_with(!self.payment_dates.is_empty(), || {
+            "Snowball requires at least one payment date".to_string()
         })?;
 
-        validation::validate_sorted_strict(&self.coupon_dates, "Snowball coupon_dates")?;
+        validation::validate_sorted_strict(
+            &self.period_boundaries(),
+            "Snowball start_date followed by payment_dates",
+        )?;
 
-        validation::require_with(self.fixed_rate.is_finite(), || {
-            format!("Snowball fixed_rate ({}) must be finite", self.fixed_rate)
-        })?;
+        finstack_quant_core::decimal::decimal_to_f64(self.fixed_rate)?;
 
-        validation::require_with(self.leverage > 0.0 && self.leverage.is_finite(), || {
+        validation::require_with(self.gearing > 0.0 && self.gearing.is_finite(), || {
             format!(
-                "Snowball leverage ({}) must be positive and finite",
-                self.leverage
+                "Snowball gearing ({}) must be positive and finite",
+                self.gearing
             )
         })?;
 
@@ -184,8 +202,8 @@ impl Snowball {
         use finstack_quant_core::currency::Currency;
         use time::Month;
 
-        let coupon_dates = vec![
-            Date::from_calendar_date(2026, Month::June, 30).expect("valid"),
+        let start_date = Date::from_calendar_date(2026, Month::June, 30).expect("valid");
+        let payment_dates = vec![
             Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
             Date::from_calendar_date(2027, Month::June, 30).expect("valid"),
             Date::from_calendar_date(2027, Month::December, 31).expect("valid"),
@@ -197,12 +215,13 @@ impl Snowball {
             id: InstrumentId::new("SNOWBALL-USD-3Y"),
             variant: SnowballVariant::Snowball,
             initial_coupon: 0.03,
-            fixed_rate: 0.05,
-            leverage: 1.0,
+            fixed_rate: Decimal::new(5, 2),
+            gearing: 1.0,
             coupon_floor: 0.0,
             coupon_cap: None,
             notional: Money::from((1_000_000_i64, Currency::USD)),
-            coupon_dates,
+            start_date,
+            payment_dates,
             forward_curve_id: CurveId::new("USD-SOFR-6M"),
             index_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -222,8 +241,8 @@ impl Snowball {
         use finstack_quant_core::currency::Currency;
         use time::Month;
 
-        let coupon_dates = vec![
-            Date::from_calendar_date(2026, Month::March, 31).expect("valid"),
+        let start_date = Date::from_calendar_date(2026, Month::March, 31).expect("valid");
+        let payment_dates = vec![
             Date::from_calendar_date(2026, Month::June, 30).expect("valid"),
             Date::from_calendar_date(2026, Month::September, 30).expect("valid"),
             Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
@@ -233,12 +252,13 @@ impl Snowball {
             id: InstrumentId::new("INV-FLOATER-USD-1Y"),
             variant: SnowballVariant::InverseFloater,
             initial_coupon: 0.0, // ignored for inverse floater
-            fixed_rate: 0.08,
-            leverage: 1.5,
+            fixed_rate: Decimal::new(8, 2),
+            gearing: 1.5,
             coupon_floor: 0.0,
             coupon_cap: Some(0.10),
             notional: Money::from((500_000_i64, Currency::USD)),
-            coupon_dates,
+            start_date,
+            payment_dates,
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             index_tenor: Tenor::quarterly(),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -252,10 +272,20 @@ impl Snowball {
         }
     }
 
+    /// Coupon period boundaries: `start_date` followed by every payment date.
+    ///
+    /// Period `i` accrues over `[boundaries[i], boundaries[i + 1]]`, fixes in
+    /// advance at `boundaries[i]` and pays at `boundaries[i + 1]`.
+    pub(crate) fn period_boundaries(&self) -> Vec<Date> {
+        std::iter::once(self.start_date)
+            .chain(self.payment_dates.iter().copied())
+            .collect()
+    }
+
     /// Compute the coupon for a given period based on the variant.
     ///
     /// For snowball: c_i = max(prev_coupon + fixed_rate - floating, floor)
-    /// For inverse floater: c_i = max(fixed_rate - leverage * floating, floor)
+    /// For inverse floater: c_i = max(fixed_rate - gearing * floating, floor)
     ///
     /// Applies optional cap after floor.
     ///
@@ -266,9 +296,11 @@ impl Snowball {
     /// * `prev_coupon` - Previous period's coupon in decimal; used as `c_{i-1}` for the
     ///   snowball variant and ignored for inverse floater.
     pub fn compute_coupon(&self, floating_rate: f64, prev_coupon: f64) -> f64 {
+        // `validate` guarantees the conversion; a rate `Decimal` always fits in `f64`.
+        let fixed_rate = self.fixed_rate.to_f64().unwrap_or(f64::NAN);
         let raw = match self.variant {
-            SnowballVariant::Snowball => prev_coupon + self.fixed_rate - floating_rate,
-            SnowballVariant::InverseFloater => self.fixed_rate - self.leverage * floating_rate,
+            SnowballVariant::Snowball => prev_coupon + fixed_rate - floating_rate,
+            SnowballVariant::InverseFloater => fixed_rate - self.gearing * floating_rate,
         };
 
         let floored = raw.max(self.coupon_floor);
@@ -290,12 +322,12 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
     fn default_model(&self) -> crate::pricer::ModelKey {
         match self.variant {
             // Snowball is path-dependent, needs MC.
-            // An inverse-floater coupon `max(fixed − leverage·float, floor)`
+            // An inverse-floater coupon `max(fixed − gearing·float, floor)`
             // (optionally capped) is an option on the floating rate: the floor
             // is a floorlet, the cap a caplet. The `Discounting` pricer applies
             // `compute_coupon` to a single deterministic forward, so it captures
             // only intrinsic value and drops the floor/cap time value (and
-            // leveraged convexity). Default to the HW1F MC pricer, which prices
+            // geared convexity). Default to the HW1F MC pricer, which prices
             // the embedded optionality correctly; `Discounting` remains an
             // explicit, fast, intrinsic-only approximation for callers who opt in.
             SnowballVariant::Snowball | SnowballVariant::InverseFloater => {
@@ -338,7 +370,7 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
     }
 
     fn effective_start_date(&self) -> Option<Date> {
-        self.coupon_dates.first().copied()
+        Some(self.start_date)
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -418,7 +450,7 @@ mod tests {
     #[test]
     fn inverse_floater_coupon() {
         let s = Snowball::example_inverse_floater();
-        // fixed = 0.08, leverage = 1.5, floating = 0.03
+        // fixed = 0.08, gearing = 1.5, floating = 0.03
         // c = max(0.08 - 1.5 * 0.03, 0) = max(0.035, 0) = 0.035
         let c = s.compute_coupon(0.03, 0.0);
         assert!((c - 0.035).abs() < 1e-12);
@@ -427,7 +459,7 @@ mod tests {
     #[test]
     fn inverse_floater_coupon_with_cap() {
         let s = Snowball::example_inverse_floater();
-        // fixed = 0.08, leverage = 1.5, floating = 0.0
+        // fixed = 0.08, gearing = 1.5, floating = 0.0
         // c = max(0.08 - 0.0, 0) = 0.08, but cap = 0.10 => 0.08
         let c = s.compute_coupon(0.0, 0.0);
         assert!((c - 0.08).abs() < 1e-12);
@@ -436,7 +468,7 @@ mod tests {
     #[test]
     fn inverse_floater_floors_at_zero() {
         let s = Snowball::example_inverse_floater();
-        // fixed = 0.08, leverage = 1.5, floating = 0.10
+        // fixed = 0.08, gearing = 1.5, floating = 0.10
         // c = max(0.08 - 0.15, 0) = max(-0.07, 0) = 0
         let c = s.compute_coupon(0.10, 0.0);
         assert!((c).abs() < 1e-12);

@@ -1614,7 +1614,7 @@ mod coverage_position_tests {
             rate: 0.08,
             spread_bp: Some(400.0),
             forward_curve_id: None,
-            index_floor: None,
+            index_floor_bp: None,
             maturity: maturity(),
             credit_quality: Some(CreditRating::BB),
             industry: Some("Technology".into()),

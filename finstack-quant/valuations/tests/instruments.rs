@@ -12,6 +12,8 @@
 #[macro_use]
 #[path = "instruments/common/mod.rs"]
 mod common;
+#[path = "instruments/coupon_strike_inflation_wire_keys.rs"]
+mod coupon_strike_inflation_wire_keys;
 #[path = "instruments/credit_wire_keys.rs"]
 mod credit_wire_keys;
 #[path = "instruments/exotic_payoff_wire_keys.rs"]

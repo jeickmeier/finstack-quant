@@ -482,7 +482,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .maturity(maturity_2y())
             .day_count(DayCount::Act360)
             .discount_curve_id(discount_curve_id.into())
-            .quote_rate_opt(Some(dec!(0.04)))
+            .fixed_rate_opt(Some(dec!(0.04)))
             .build()
             .unwrap();
         let entity_id = format!("FUND_{}", (i % 5) + 1);
@@ -985,8 +985,8 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .maturity(maturity_5y())
             .fixed_rate(rust_decimal::Decimal::try_from(0.02).expect("valid literal"))
             .inflation_index_id("USD-CPI".into())
-            .lag_override(InflationLag::Months(3))
-            .interpolation_override(InflationInterpolation::Step)
+            .lag(InflationLag::Months(3))
+            .interpolation(InflationInterpolation::Step)
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
@@ -1143,7 +1143,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .maturity(maturity_2y())
             .day_count(DayCount::Act360)
             .discount_curve_id("USD-OIS".into())
-            .quote_rate_opt(Some(dec!(0.04)))
+            .fixed_rate_opt(Some(dec!(0.04)))
             .build()
             .unwrap();
         let entity_id = format!("FUND_{}", (i % 5) + 1);

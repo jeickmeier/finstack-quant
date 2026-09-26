@@ -394,7 +394,7 @@
               "type": "null"
             }
           ],
-          "description": "Forward-curve identifier of the floating index; `None` makes\n`margin_bp` the all-in fixed rate."
+          "description": "Forward-curve identifier of the floating index; `None` makes\n`spread_bp` the all-in fixed rate."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -415,11 +415,6 @@
             "number",
             "null"
           ]
-        },
-        "margin_bp": {
-          "description": "Margin over the index (or the all-in fixed rate) in basis points.",
-          "format": "double",
-          "type": "number"
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -464,6 +459,11 @@
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "spread_bp": {
+          "description": "Margin over the index (or the all-in fixed rate when `forward_curve_id`\nis `None`) in basis points (600 = 6%).",
+          "format": "double",
+          "type": "number"
         },
         "stochastic_default_spec": {
           "anyOf": [
@@ -522,7 +522,7 @@
         "borrowing_base_rules",
         "commitment",
         "drawn",
-        "margin_bp",
+        "spread_bp",
         "closing_date",
         "revolving_end",
         "maturity",
@@ -4248,8 +4248,8 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Stable identifier used to match the asset to diagnostics and scenarios."
         },
-        "index_floor": {
-          "description": "Floor on the floating index (annual decimal, e.g. `0.01` = 1%)\napplied before `spread_bp` is added, matching\n`FloatingRateSpec::index_floor_bp`; `None` for no floor. Ignored on\nfixed-rate rows.",
+        "index_floor_bp": {
+          "description": "Floor on the floating index in basis points (100 = 1%), applied before\n`spread_bp` is added, matching `FloatingRateSpec::index_floor_bp`;\n`None` for no floor. Ignored on fixed-rate rows.",
           "format": "double",
           "type": [
             "number",
@@ -4893,8 +4893,8 @@
       "additionalProperties": false,
       "description": "Terms of the collateral bought with reinvested principal.\n\nEach purchase creates a bullet first-lien row maturing `maturity_months`\nafter the purchase date, accruing ACT/360 at `forward_curve_id` plus `spread_bp`\n(or at `spread_bp` as a fixed coupon when no index is given), bought at\n`price_pct` percent of par. A discount price builds par.",
       "properties": {
-        "coupon_floor": {
-          "description": "Minimum all-in annual coupon as a decimal (a floor on the resolved\nindex plus spread), if any.",
+        "all_in_floor_bp": {
+          "description": "Minimum all-in annual coupon in basis points (a floor on the resolved\nindex plus spread, 100 = 1%), if any.",
           "format": "double",
           "type": [
             "number",
@@ -5060,8 +5060,8 @@
           "description": "Unique identifier for the rep line",
           "type": "string"
         },
-        "index_floor": {
-          "description": "Floor on the floating index (annual decimal) applied before\n`spread_bp`; `None` for no floor.",
+        "index_floor_bp": {
+          "description": "Floor on the floating index in basis points (100 = 1%), applied before\n`spread_bp`; `None` for no floor.",
           "format": "double",
           "type": [
             "number",
@@ -6526,7 +6526,6 @@
             "unit": "months"
           },
           "id": "ABF-EXAMPLE",
-          "margin_bp": 600.0,
           "maturity": "2030-01-15",
           "payment_calendar_id": "nyse",
           "prepayment_spec": {
@@ -6539,6 +6538,7 @@
             "recovery_lag": 12
           },
           "revolving_end": "2026-01-15",
+          "spread_bp": 600.0,
           "term_out": {
             "months": 24
           },

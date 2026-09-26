@@ -6,6 +6,7 @@ use crate::instruments::common_impl::validation;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use rust_decimal::Decimal;
 
 /// Target Redemption Note (TARN).
 ///
@@ -39,8 +40,13 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 pub struct Tarn {
     /// Unique instrument identifier.
     pub id: InstrumentId,
-    /// Fixed coupon rate (the "strike" rate).
-    pub fixed_rate: f64,
+    /// Fixed coupon rate (the "strike" rate) as a decimal annual rate (0.05 = 5%).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub fixed_rate: Decimal,
     /// Floor on each period's coupon (typically 0.0).
     pub coupon_floor: f64,
     /// Target cumulative coupon level (triggers early redemption).
@@ -50,13 +56,23 @@ pub struct Tarn {
     pub target_coupon: f64,
     /// Notional amount.
     pub notional: Money,
-    /// Coupon payment dates (must be sorted ascending).
+    /// Accrual start of the first coupon period; also the first in-advance
+    /// fixing date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub start_date: Date,
+    /// Coupon payment dates, one per period, strictly ascending and after
+    /// `start_date`. Period `i` accrues from the previous payment date (or
+    /// `start_date`) to `payment_dates[i]` and fixes in advance at its start.
     #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
-    pub coupon_dates: Vec<Date>,
+    pub payment_dates: Vec<Date>,
     /// Contractual tenor of the observed floating index (e.g. 3M, 6M); must match the forward curve tenor.
     pub index_tenor: Tenor,
     /// Rates forward curve that projects the floating index (also the fixing-series key).
@@ -94,21 +110,22 @@ impl Tarn {
     /// Validate the TARN parameters.
     ///
     /// Checks:
-    /// - At least two coupon dates (need a period to accrue)
-    /// - Coupon dates are sorted ascending
-    /// - Fixed rate is finite
+    /// - At least one payment date (need a period to accrue)
+    /// - `start_date` and the payment dates are strictly ascending
+    /// - Fixed rate converts to `f64`
     /// - Target coupon is non-negative
     /// - Coupon floor is finite and non-negative by convention
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        validation::require_with(self.coupon_dates.len() >= 2, || {
-            "TARN requires at least two coupon dates".to_string()
+        validation::require_with(!self.payment_dates.is_empty(), || {
+            "TARN requires at least one payment date".to_string()
         })?;
 
-        validation::validate_sorted_strict(&self.coupon_dates, "TARN coupon_dates")?;
+        validation::validate_sorted_strict(
+            &self.period_boundaries(),
+            "TARN start_date followed by payment_dates",
+        )?;
 
-        validation::require_with(self.fixed_rate.is_finite(), || {
-            format!("TARN fixed_rate ({}) must be finite", self.fixed_rate)
-        })?;
+        finstack_quant_core::decimal::decimal_to_f64(self.fixed_rate)?;
 
         validation::require_with(
             self.target_coupon >= 0.0 && self.target_coupon.is_finite(),
@@ -133,14 +150,24 @@ impl Tarn {
         Ok(())
     }
 
+    /// Coupon period boundaries: `start_date` followed by every payment date.
+    ///
+    /// Period `i` accrues over `[boundaries[i], boundaries[i + 1]]`, fixes in
+    /// advance at `boundaries[i]` and pays at `boundaries[i + 1]`.
+    pub(crate) fn period_boundaries(&self) -> Vec<Date> {
+        std::iter::once(self.start_date)
+            .chain(self.payment_dates.iter().copied())
+            .collect()
+    }
+
     /// Create a canonical example TARN for testing.
     #[allow(clippy::expect_used)]
     pub fn example() -> Self {
         use finstack_quant_core::currency::Currency;
         use time::Month;
 
-        let coupon_dates = vec![
-            Date::from_calendar_date(2026, Month::June, 30).expect("valid"),
+        let start_date = Date::from_calendar_date(2026, Month::June, 30).expect("valid");
+        let payment_dates = vec![
             Date::from_calendar_date(2026, Month::December, 31).expect("valid"),
             Date::from_calendar_date(2027, Month::June, 30).expect("valid"),
             Date::from_calendar_date(2027, Month::December, 31).expect("valid"),
@@ -154,11 +181,12 @@ impl Tarn {
 
         Tarn {
             id: InstrumentId::new("TARN-USD-5Y"),
-            fixed_rate: 0.06,
+            fixed_rate: Decimal::new(6, 2),
             coupon_floor: 0.0,
             target_coupon: 0.15,
             notional: Money::from((1_000_000_i64, Currency::USD)),
-            coupon_dates,
+            start_date,
+            payment_dates,
             index_tenor: Tenor::semi_annual(),
             forward_curve_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -217,7 +245,7 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
     }
 
     fn effective_start_date(&self) -> Option<Date> {
-        self.coupon_dates.first().copied()
+        Some(self.start_date)
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -239,17 +267,18 @@ mod tests {
     }
 
     #[test]
-    fn tarn_too_few_coupon_dates() {
+    fn tarn_without_payment_dates_fails() {
         use finstack_quant_core::currency::Currency;
         use time::Month;
 
         let tarn = Tarn {
             id: InstrumentId::new("TARN-BAD"),
-            fixed_rate: 0.05,
+            fixed_rate: Decimal::new(5, 2),
             coupon_floor: 0.0,
             target_coupon: 0.10,
             notional: Money::from((100_000_i64, Currency::USD)),
-            coupon_dates: vec![Date::from_calendar_date(2026, Month::June, 30).expect("valid")],
+            start_date: Date::from_calendar_date(2026, Month::June, 30).expect("valid"),
+            payment_dates: Vec::new(),
             index_tenor: Tenor::semi_annual(),
             forward_curve_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
@@ -291,7 +320,7 @@ mod tests {
         let json = serde_json::to_string(&tarn).expect("serialize");
         let deser: Tarn = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deser.id, tarn.id);
-        assert!((deser.fixed_rate - tarn.fixed_rate).abs() < 1e-12);
+        assert_eq!(deser.fixed_rate, tarn.fixed_rate);
         assert!((deser.target_coupon - tarn.target_coupon).abs() < 1e-12);
     }
 

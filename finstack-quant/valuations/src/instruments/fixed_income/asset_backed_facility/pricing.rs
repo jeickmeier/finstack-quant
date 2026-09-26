@@ -119,13 +119,13 @@ impl AssetBackedFacility {
                 let dec = |value: f64| {
                     rust_decimal::Decimal::try_from(value).map_err(|_| {
                         finstack_quant_core::Error::Validation(format!(
-                            "margin_bp {value} cannot be represented as a decimal"
+                            "spread_bp {value} cannot be represented as a decimal"
                         ))
                     })
                 };
                 TrancheCoupon::Floating(FloatingRateSpec {
                     forward_curve_id: forward_curve_id.clone(),
-                    spread_bp: dec(self.margin_bp)?,
+                    spread_bp: dec(self.spread_bp)?,
                     gearing: dec(1.0)?,
                     gearing_includes_spread: true,
                     index_floor_bp: None,
@@ -143,7 +143,7 @@ impl AssetBackedFacility {
                 })
             }
             None => TrancheCoupon::Fixed {
-                rate: self.margin_bp / 10_000.0,
+                rate: self.spread_bp / 10_000.0,
             },
         };
         let mut note = Tranche::from_balance(

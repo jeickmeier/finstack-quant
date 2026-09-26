@@ -113,7 +113,7 @@ impl CmsSpreadOptionPricer {
             cms_spread_payoff(
                 long_leg.forward_rate,
                 short_leg.forward_rate,
-                inst.strike,
+                inst.strike_rate()?,
                 inst.option_type,
             )
         } else {
@@ -226,12 +226,13 @@ impl CmsSpreadOptionPricer {
         let rho = inst.correlation.clamp(-0.999_999, 0.999_999);
         let rho_complement = (1.0 - rho * rho).sqrt();
 
+        let strike = inst.strike_rate()?;
         let expected = quadrature.integrate(|z_long| {
             quadrature.integrate(|z_independent| {
                 let z_short = rho * z_long + rho_complement * z_independent;
                 let long_rate = quantile_from_gaussian(long_vol, long_leg, z_long);
                 let short_rate = quantile_from_gaussian(short_vol, short_leg, z_short);
-                cms_spread_payoff(long_rate, short_rate, inst.strike, inst.option_type)
+                cms_spread_payoff(long_rate, short_rate, strike, inst.option_type)
             })
         });
 
@@ -510,7 +511,7 @@ mod tests {
         let mut inst = CmsSpreadOption::example();
         inst.expiry_date = expiry;
         inst.payment_date = payment;
-        inst.strike = 0.0;
+        inst.strike = rust_decimal::Decimal::ZERO;
         inst.option_type = CmsSpreadOptionType::Call;
 
         let market = MarketContext::new()

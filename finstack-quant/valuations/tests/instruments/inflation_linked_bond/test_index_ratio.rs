@@ -37,7 +37,7 @@ fn test_index_ratio_with_3month_lag() {
     // Arrange
     let mut ilb = sample_tips();
     ilb.lag = InflationLag::Months(3);
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.base_date = d(2024, 12, 1);
 
     // Create index with specific values for precise lag testing
@@ -65,7 +65,7 @@ fn test_index_ratio_with_8month_lag_uk() {
     // Arrange
     let mut ilb = sample_uk_linker();
     ilb.lag = InflationLag::Months(8);
-    ilb.base_index = 320.0;
+    ilb.base_cpi = 320.0;
     ilb.base_date = d(2024, 6, 1);
 
     // Create index with specific values for precise lag testing
@@ -123,7 +123,7 @@ fn test_ref_cpi_mid_month_matches_treasury_golden() {
     // index_ratio routes through the same formula for TIPS-style bonds.
     let mut ilb = sample_tips();
     ilb.lag = InflationLag::Months(3);
-    ilb.base_index = 251.712;
+    ilb.base_cpi = 251.712;
     let ratio = ilb.index_ratio(d(2019, 4, 15), &index).unwrap();
     relative_eq(ratio, expected / 251.712, 1e-12, "mid-month index ratio");
 }
@@ -155,7 +155,7 @@ fn test_index_ratio_no_deflation_protection() {
     // Arrange
     let mut ilb = sample_tips();
     ilb.deflation_protection = DeflationProtection::None;
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
 
     // Create deflation scenario index
     let observations = vec![
@@ -183,7 +183,7 @@ fn test_index_ratio_maturity_only_deflation_protection() {
     // Arrange
     let mut ilb = sample_tips();
     ilb.deflation_protection = DeflationProtection::MaturityOnly;
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.maturity = d(2025, 1, 15);
 
     // Create deflation scenario index
@@ -224,7 +224,7 @@ fn test_index_ratio_all_payments_deflation_protection() {
     // Arrange
     let mut ilb = sample_tips();
     ilb.deflation_protection = DeflationProtection::AllPayments;
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
 
     // Create deflation scenario index
     let observations = vec![
@@ -251,7 +251,7 @@ fn test_index_ratio_all_payments_deflation_protection() {
 fn test_index_ratio_from_curve() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.base_date = d(2024, 12, 1);
 
     let (_, curve) = market_context_with_curve();
@@ -270,7 +270,7 @@ fn test_index_ratio_from_curve_official_weighting() {
     // path: first-of-month anchors CPI(m−3)/CPI(m−2) weighted by (day−1)/D(m).
     // Query 2025-05-15 → anchors 2025-02-01 and 2025-03-01, weight 14/31.
     let mut ilb = sample_tips();
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
 
     let (_, curve) = market_context_with_curve();
 
@@ -406,7 +406,7 @@ fn test_index_ratio_canadian_requires_linear_interpolation() {
 fn test_index_ratio_rejects_zero_base_index() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.base_index = 0.0; // Invalid
+    ilb.base_cpi = 0.0; // Invalid
 
     let (_, index) = market_context_with_index();
 
@@ -419,7 +419,7 @@ fn test_index_ratio_rejects_zero_base_index() {
 fn test_index_ratio_rejects_negative_base_index() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.base_index = -100.0; // Invalid
+    ilb.base_cpi = -100.0; // Invalid
 
     let (_, index) = market_context_with_index();
 
@@ -432,7 +432,7 @@ fn test_index_ratio_rejects_negative_base_index() {
 fn test_index_ratio_extreme_inflation() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.base_index = 100.0;
+    ilb.base_cpi = 100.0;
 
     // Create extreme inflation scenario index
     let observations = vec![
@@ -458,7 +458,7 @@ fn test_index_ratio_extreme_inflation() {
 fn test_index_ratio_time_series() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.lag = InflationLag::Months(3);
 
     // Build a time series with steady 0.5% monthly inflation

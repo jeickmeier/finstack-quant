@@ -367,7 +367,7 @@ fn build_deposit(
         .start_date(start)
         .maturity(end)
         .day_count(conv.day_count)
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             Decimal::try_from(*rate).map_err(|_| InputError::ConversionOverflow)?,
         ))
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
@@ -413,7 +413,7 @@ fn build_fra(
         .maturity(end_date)
         .fixed_rate(Decimal::try_from(*rate).map_err(|_| InputError::ConversionOverflow)?)
         .day_count(conv.day_count)
-        .reset_lag(conv.default_reset_lag_days)
+        .reset_lag_days(conv.default_reset_lag_days)
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
         .forward_curve_id(CurveId::new(ctx.require_curve_id("forward")?.to_string()))
         .side(PayReceive::Receive)

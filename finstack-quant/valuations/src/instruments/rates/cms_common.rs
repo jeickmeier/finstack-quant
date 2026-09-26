@@ -21,6 +21,29 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_core::Result;
 
+/// Whole months of a CMS reference-swap tenor.
+///
+/// # Arguments
+///
+/// * `tenor` - Tenor of the CMS reference swap (e.g. 10Y); must be month- or
+///   year-based and non-zero.
+/// * `label` - Wire path of the tenor field, quoted in the error message
+///   (e.g. `CmsSwap cms_tenor`).
+///
+/// # Errors
+///
+/// Returns a validation error for a day- or week-based or zero tenor.
+pub fn cms_tenor_months(tenor: Tenor, label: &str) -> Result<i32> {
+    match tenor.months() {
+        Some(months) if months > 0 => i32::try_from(months).map_err(|_| {
+            finstack_quant_core::Error::Validation(format!("{label} ({tenor}) is too long"))
+        }),
+        _ => Err(finstack_quant_core::Error::Validation(format!(
+            "{label} ({tenor}) must be a positive month- or year-based tenor"
+        ))),
+    }
+}
+
 /// Reference swap of a CMS fixing, with its leg conventions resolved.
 ///
 /// Resolution order for every leg field is explicit override >

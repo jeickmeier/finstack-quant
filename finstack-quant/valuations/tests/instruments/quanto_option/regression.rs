@@ -85,7 +85,7 @@ fn build_option(correlation: f64) -> QuantoOption {
     QuantoOption::builder()
         .id(InstrumentId::new("QUANTO-REGRESSION"))
         .underlying_ticker("NKY".to_string())
-        .equity_strike(Money::new(35_000.0, Currency::JPY).expect("valid money fixture"))
+        .strike(35_000.0)
         .option_type(OptionType::Call)
         .expiry(EXPIRY)
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))

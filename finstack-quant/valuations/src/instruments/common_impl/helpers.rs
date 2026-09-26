@@ -1337,7 +1337,7 @@ pub(crate) fn apply_inflation_lag(date: Date, lag: InflationLag) -> Date {
 
 /// Resolve the effective lag for an inflation instrument.
 ///
-/// Priority: (1) explicit `lag_override`, (2) index lag from market context,
+/// Priority: (1) the contract's explicit `lag`, (2) index lag from market context,
 /// (3) the projection curve's `indexation_lag_months`, (4)
 /// `InflationLag::None`.
 ///
@@ -1347,11 +1347,11 @@ pub(crate) fn apply_inflation_lag(date: Date, lag: InflationLag) -> Date {
 /// axis while the curve itself is built on a lagged one, silently
 /// over-projecting the reference index at both ends of a swap.
 pub(crate) fn resolve_inflation_lag(
-    lag_override: Option<InflationLag>,
+    contract_lag: Option<InflationLag>,
     index_id: &str,
     curves: &MarketContext,
 ) -> InflationLag {
-    if let Some(lag) = lag_override {
+    if let Some(lag) = contract_lag {
         return lag;
     }
     if let Ok(index) = curves.get_inflation_index(index_id) {
@@ -1511,7 +1511,7 @@ mod realized_inflation_index_tests {
     }
 
     #[test]
-    fn contract_lag_override_replaces_index_default_lag() {
+    fn contract_lag_replaces_index_default_lag() {
         let index = step_index();
         let value = realized_inflation_index_value(
             &index,

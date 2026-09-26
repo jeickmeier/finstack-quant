@@ -99,7 +99,7 @@ impl CmsOptionPricer {
                 let observed = crate::instruments::rates::hw1f::fixings::historical_cms_fixing(
                     curves,
                     &inst.forward_curve_id,
-                    inst.cms_tenor,
+                    inst.cms_tenor.to_years(),
                     fixing_date,
                 )?;
                 let option_val = match inst.option_type {
@@ -115,7 +115,10 @@ impl CmsOptionPricer {
             // 1. Calculate Forward Swap Rate
             let reference_swap = inst.reference_swap();
             let swap_start = reference_swap.reference_swap_start(fixing_date)?;
-            let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
+            let swap_tenor_months = crate::instruments::rates::cms_common::cms_tenor_months(
+                inst.cms_tenor,
+                "CmsOption cms_tenor",
+            )?;
             let swap_end = swap_start.add_months(swap_tenor_months);
 
             // Calculate annuity and forward rate
@@ -170,7 +173,7 @@ impl CmsOptionPricer {
                 convexity_adjustment_with_frequency(
                     atm_vol,
                     time_to_fixing,
-                    inst.cms_tenor,
+                    inst.cms_tenor.to_years(),
                     forward_swap_rate,
                     reference_swap.payments_per_year()?,
                 )

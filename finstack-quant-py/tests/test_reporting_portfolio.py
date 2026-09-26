@@ -121,7 +121,7 @@ def test_portfolio_tearsheet_real_portfolio() -> None:
                         "start_date": "2025-01-15",
                         "maturity": "2025-04-15",
                         "day_count": "act_360",
-                        "quote_rate": "0.045",
+                        "fixed_rate": "0.045",
                         "discount_curve_id": "USD-OIS",
                         "attributes": {},
                     },

@@ -117,7 +117,7 @@ fn build_deposit_portfolio() -> finstack_quant_portfolio::Portfolio {
         .maturity(dep1_end)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -130,7 +130,7 @@ fn build_deposit_portfolio() -> finstack_quant_portfolio::Portfolio {
         .maturity(dep2_end)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()

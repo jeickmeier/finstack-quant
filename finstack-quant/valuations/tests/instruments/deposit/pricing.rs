@@ -18,7 +18,7 @@ fn test_zero_rate_deposit_negative_pv() {
     // Execute
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.0)
+        .fixed_rate(0.0)
         .build();
 
     // `value` is holder-view position value (PV of remaining flows; the T+0
@@ -39,7 +39,7 @@ fn test_positive_rate_deposit_less_negative_pv() {
     // Execute
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.05)
+        .fixed_rate(0.05)
         .build();
 
     let pv = dep.value(&ctx, base).unwrap();
@@ -67,7 +67,7 @@ fn test_par_rate_gives_zero_pv() {
     // Execute - price with par rate
     let dep_par = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(par_rate)
+        .fixed_rate(par_rate)
         .build();
 
     // Par rate zeroes the *trade* NPV (pricing view, includes the T+0 initial
@@ -93,12 +93,12 @@ fn test_higher_rate_increases_pv() {
     // Execute - two deposits with different rates
     let dep_low = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.01)
+        .fixed_rate(0.01)
         .build();
 
     let dep_high = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.05)
+        .fixed_rate(0.05)
         .build();
 
     let pv_low = dep_low.value(&ctx, base).unwrap();
@@ -118,12 +118,12 @@ fn test_longer_maturity_increases_rate_sensitivity() {
     // Execute - two deposits with different maturities
     let dep_short = DepositBuilder::new(base)
         .maturity(date(2025, 4, 1))
-        .quote_rate(rate)
+        .fixed_rate(rate)
         .build();
 
     let dep_long = DepositBuilder::new(base)
         .maturity(date(2026, 1, 1))
-        .quote_rate(rate)
+        .fixed_rate(rate)
         .build();
 
     let pv_short = dep_short.value(&ctx, base).unwrap();
@@ -143,13 +143,13 @@ fn test_notional_scales_pv_linearly() {
     let dep_1m = DepositBuilder::new(base)
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     let dep_2m = DepositBuilder::new(base)
         .notional(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     let pv_1m = dep_1m.value(&ctx, base).unwrap();
@@ -167,7 +167,7 @@ fn test_valuation_on_different_as_of_dates() {
 
     let dep = DepositBuilder::new(date(2025, 1, 15))
         .maturity(date(2025, 7, 15))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute - value on different dates
@@ -190,7 +190,7 @@ fn test_steep_curve_impact() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2026, 1, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -209,7 +209,7 @@ fn test_value_trait_implementation() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -228,7 +228,7 @@ fn test_npv_matches_value_trait() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -248,13 +248,13 @@ fn test_pricing_with_act_365_day_count() {
     let dep_360 = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act360)
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     let dep_365 = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
         .day_count(DayCount::Act365F)
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -273,7 +273,7 @@ fn test_negative_rate_environment() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(-0.01)
+        .fixed_rate(-0.01)
         .build();
 
     // Execute
@@ -293,7 +293,7 @@ fn test_pricing_on_maturity_date() {
 
     let dep = DepositBuilder::new(base)
         .maturity(end)
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -313,7 +313,7 @@ fn test_theta_correctness_with_as_of_forward() {
 
     let dep = DepositBuilder::new(date(2025, 1, 15))
         .maturity(date(2025, 7, 15))
-        .quote_rate(0.05)
+        .fixed_rate(0.05)
         .build();
 
     // Value on curve base date and one day later
@@ -339,7 +339,7 @@ fn test_cashflow_based_npv_consistency() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // NPV should be deterministic and repeatable

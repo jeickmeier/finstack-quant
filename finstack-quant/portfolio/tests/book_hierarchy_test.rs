@@ -69,7 +69,7 @@ fn test_book_hierarchy_three_levels() {
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -82,7 +82,7 @@ fn test_book_hierarchy_three_levels() {
         .maturity(date!(2024 - 03 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -95,7 +95,7 @@ fn test_book_hierarchy_three_levels() {
         .maturity(date!(2024 - 04 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -227,7 +227,7 @@ fn test_book_hierarchy_multiple_root_books() {
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -240,7 +240,7 @@ fn test_book_hierarchy_multiple_root_books() {
         .maturity(date!(2024 - 03 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -325,7 +325,7 @@ fn test_position_without_book() {
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -366,7 +366,7 @@ fn test_book_hierarchy_is_order_independent() {
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()
@@ -423,7 +423,7 @@ fn test_reassigning_position_between_books_removes_stale_membership() {
         .maturity(date!(2024 - 02 - 01))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()

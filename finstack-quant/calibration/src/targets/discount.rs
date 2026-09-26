@@ -1129,7 +1129,7 @@ mod tests {
         let instrument = std::sync::Arc::new(
             finstack_quant_valuations::instruments::rates::deposit::Deposit {
                 id: InstrumentId::new("DEP-1Y"),
-                quote_rate: Some(rust_decimal::Decimal::try_from(0.02).expect("valid decimal")),
+                fixed_rate: Some(rust_decimal::Decimal::try_from(0.02).expect("valid decimal")),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 instrument_pricing_overrides: Default::default(),
                 metric_pricing_overrides: Default::default(),
@@ -1198,7 +1198,7 @@ mod tests {
         let instrument = std::sync::Arc::new(
             finstack_quant_valuations::instruments::rates::deposit::Deposit {
                 id: InstrumentId::new("DEP-1Y"),
-                quote_rate: Some(rust_decimal::Decimal::try_from(rate).expect("valid decimal")),
+                fixed_rate: Some(rust_decimal::Decimal::try_from(rate).expect("valid decimal")),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 instrument_pricing_overrides: Default::default(),
                 metric_pricing_overrides: Default::default(),
@@ -1273,7 +1273,7 @@ mod tests {
                 let instrument = std::sync::Arc::new(
                     finstack_quant_valuations::instruments::rates::deposit::Deposit {
                         id: InstrumentId::new(format!("DEP-{}D", days)),
-                        quote_rate: Some(
+                        fixed_rate: Some(
                             rust_decimal::Decimal::try_from(rate).expect("valid decimal"),
                         ),
                         discount_curve_id: CurveId::new("USD-OIS"),
@@ -1389,7 +1389,7 @@ mod tests {
             let instrument = std::sync::Arc::new(
                 finstack_quant_valuations::instruments::rates::deposit::Deposit {
                     id: InstrumentId::new("FUT-3M"),
-                    quote_rate: Some(rust_decimal::Decimal::try_from(0.05).expect("valid decimal")),
+                    fixed_rate: Some(rust_decimal::Decimal::try_from(0.05).expect("valid decimal")),
                     discount_curve_id: CurveId::new("USD-OIS"),
                     instrument_pricing_overrides: Default::default(),
                     metric_pricing_overrides: Default::default(),

@@ -160,7 +160,7 @@ tests. Its fourteen fields classify as:
 
 - required: `id`, `notional`, `start_date`, `maturity`, `day_count`,
   `discount_curve_id`
-- `Option<_>`, so optional: `quote_rate`, `settlement_days`, `calendar_id`
+- `Option<_>`, so optional: `fixed_rate`, `settlement_days`, `calendar_id`
 - required-but-defaulted: `business_day_convention`
   (`#[builder(default = BusinessDayConvention::ModifiedFollowing)]`) and the
   three override bags `instrument_pricing_overrides`,
@@ -189,7 +189,7 @@ fn six_month_deposit() -> finstack_quant_core::Result<Deposit> {
         .build()
 }
 
-assert!(six_month_deposit().unwrap().quote_rate.is_none());
+assert!(six_month_deposit().unwrap().fixed_rate.is_none());
 ```
 
 Because `Deposit` has both `start_date` and `maturity`, a build with

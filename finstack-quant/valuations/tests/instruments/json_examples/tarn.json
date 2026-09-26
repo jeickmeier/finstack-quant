@@ -2,22 +2,10 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "coupon_dates": [
-        "2026-06-30",
-        "2026-12-31",
-        "2027-06-30",
-        "2027-12-31",
-        "2028-06-30",
-        "2028-12-31",
-        "2029-06-30",
-        "2029-12-31",
-        "2030-06-30",
-        "2030-12-31"
-      ],
       "coupon_floor": 0.0,
       "day_count": "act_360",
       "discount_curve_id": "USD-OIS",
-      "fixed_rate": 0.06,
+      "fixed_rate": "0.06",
       "forward_curve_id": "USD-SOFR-6M",
       "id": "TARN-USD-5Y",
       "index_tenor": {
@@ -28,6 +16,18 @@
         "amount": "1000000",
         "currency": "USD"
       },
+      "payment_dates": [
+        "2026-12-31",
+        "2027-06-30",
+        "2027-12-31",
+        "2028-06-30",
+        "2028-12-31",
+        "2029-06-30",
+        "2029-12-31",
+        "2030-06-30",
+        "2030-12-31"
+      ],
+      "start_date": "2026-06-30",
       "target_coupon": 0.15,
       "vol_surface_id": "USD-SOFR-HW-VOL"
     },

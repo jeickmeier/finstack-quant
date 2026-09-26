@@ -18,9 +18,8 @@
           "description": "Attributes for scenario selection and grouping"
         },
         "cms_tenor": {
-          "description": "Tenor of the CMS swap in years (e.g., 10.0 for 10Y)",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
@@ -205,7 +204,10 @@
             0.25
           ],
           "attributes": {},
-          "cms_tenor": 10.0,
+          "cms_tenor": {
+            "count": 10,
+            "unit": "years"
+          },
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
           "fixing_dates": [

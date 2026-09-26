@@ -126,13 +126,13 @@ fn test_dv01_with_different_day_counts() {
     let dep_360 = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
         .day_count(finstack_quant_core::dates::DayCount::Act360)
-        .quote_rate(0.05) // 5% rate so interest accrual differs
+        .fixed_rate(0.05) // 5% rate so interest accrual differs
         .build();
 
     let dep_365 = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
-        .quote_rate(0.05) // Same rate but different accrual due to day count
+        .fixed_rate(0.05) // Same rate but different accrual due to day count
         .build();
 
     // Execute

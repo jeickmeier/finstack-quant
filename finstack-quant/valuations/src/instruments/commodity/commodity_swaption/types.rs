@@ -1112,7 +1112,7 @@ mod tests {
                 Currency::USD,
             ))
             .quantity(10_000.0)
-            .fixed_price(rust_decimal::Decimal::try_from(strike).expect("decimal"))
+            .fixed_price(strike)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
             .side(crate::instruments::PayReceive::Pay)
             .start_date(swap_start)

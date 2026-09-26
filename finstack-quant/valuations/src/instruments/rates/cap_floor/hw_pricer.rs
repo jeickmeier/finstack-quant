@@ -323,7 +323,7 @@ impl CapFloorHullWhitePricer {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
         let term_strike = strike
-            - cap_floor.spread_f64().map_err(|e| {
+            - cap_floor.spread_rate().map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
@@ -1126,7 +1126,7 @@ mod tests {
             "USD-CAP-VOL",
         )
         .expect("caplet");
-        with_spread.spread = rust_decimal::Decimal::try_from(0.01).expect("spread");
+        with_spread.spread_bp = rust_decimal::Decimal::from(100);
         with_spread
             .instrument_pricing_overrides
             .model_config
@@ -1136,7 +1136,7 @@ mod tests {
             .model_config
             .hw1f_sigma = Some(0.012);
         let mut reduced_strike = with_spread.clone();
-        reduced_strike.spread = rust_decimal::Decimal::ZERO;
+        reduced_strike.spread_bp = rust_decimal::Decimal::ZERO;
         reduced_strike.strike = rust_decimal::Decimal::try_from(0.03).expect("strike");
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))

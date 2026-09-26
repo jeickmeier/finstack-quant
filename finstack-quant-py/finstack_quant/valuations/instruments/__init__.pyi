@@ -333,7 +333,7 @@ class Bond:
         id: str,
         notional: Money | float,
         forward_curve_id: str,
-        margin_bp: float | Bps,
+        spread_bp: float | Bps,
         issue: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         frequency: Tenor,
@@ -359,7 +359,7 @@ class Bond:
             Principal amount; a bare number is tagged with ``currency``.
         forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
-        margin_bp : float | Bps
+        spread_bp : float | Bps
             Spread over the index in whole basis points (fractions are rounded).
         issue : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
@@ -386,7 +386,7 @@ class Bond:
             ``notional`` is not finite and positive, or ``issue`` is not strictly
             before ``maturity``.
         TypeError
-            If ``margin_bp``/``notional`` has an unsupported type or a date cannot
+            If ``spread_bp``/``notional`` has an unsupported type or a date cannot
             be interpreted.
 
         Examples
@@ -414,7 +414,7 @@ class Bond:
         id: str,
         notional: Money | float,
         forward_curve_id: str,
-        margin_bp: float | Bps,
+        spread_bp: float | Bps,
         issue: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         frequency: Tenor,
@@ -439,7 +439,7 @@ class Bond:
             Principal amount; a bare number is tagged with ``currency``.
         forward_curve_id : str
             Forward curve identifier (e.g. ``"EUR-EURIBOR-3M"``).
-        margin_bp : float | Bps
+        spread_bp : float | Bps
             Spread over the index in whole basis points (fractions are rounded).
         issue : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
@@ -467,7 +467,7 @@ class Bond:
             If ``convention`` is unknown, a bare ``notional`` has no ``currency``,
             or validation fails.
         TypeError
-            If ``margin_bp``/``notional`` has an unsupported type or a date cannot
+            If ``spread_bp``/``notional`` has an unsupported type or a date cannot
             be interpreted.
 
         Examples
@@ -6941,9 +6941,9 @@ class CapFloor:
         """
         ...
     @property
-    def spread(self) -> float:
+    def spread_bp(self) -> float:
         """
-        Contractual spread added to the index, as a decimal rate.
+        Contractual margin added to the index, in basis points.
 
         Returns
         -------
@@ -7357,14 +7357,14 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not finite.
         """
         ...
-    def spread(self, value: float | Rate) -> CapFloorBuilder:
+    def spread_bp(self, value: float | Bps) -> CapFloorBuilder:
         """
-        Set the contractual spread added to the referenced rate.
+        Set the contractual margin added to the referenced rate.
 
         Parameters
         ----------
-        value : float | Rate
-            Spread in decimal rate units (``0.001`` = 10bp) or a ``Rate``, added after projecting the index.
+        value : float | Bps
+            Margin in basis points (``10`` = 10bp) or a ``Bps``, added after projecting the index.
 
         Returns
         -------
@@ -15494,7 +15494,7 @@ class RepLine:
         asset_type: dict[str, Any],
         spread_bp: float | Bps | None = None,
         forward_curve_id: str | None = None,
-        index_floor: float | None = None,
+        index_floor_bp: float | None = None,
         cpr: float | None = None,
         cdr: float | None = None,
         recovery_rate: float | None = None,
@@ -15527,8 +15527,8 @@ class RepLine:
             points (e.g. ``150.0`` = 150bp), for floating-rate lines.
         forward_curve_id : str, optional
             Reference index identifier, if floating.
-        index_floor : float, optional
-            Floor on the floating index as an annual decimal, applied before
+        index_floor_bp : float, optional
+            Floor on the floating index in basis points (``100`` = 1%), applied before
             ``spread_bp``; ignored on fixed-rate lines.
         cpr : float, optional
             Constant prepayment rate override, as an annual decimal (e.g.
@@ -15781,9 +15781,9 @@ class RepLine:
         ...
 
     @property
-    def index_floor(self) -> float | None:
+    def index_floor_bp(self) -> float | None:
         """
-        Floor on the floating index (annual decimal) applied before the spread.
+        Floor on the floating index in basis points, applied before the spread.
 
         Returns
         -------
@@ -16199,7 +16199,7 @@ class AssetPool:
             yield below which a surviving asset is skipped), optional
             ``amortizing_tranches`` (note ids paid down inside the window) and
             optional ``assumptions`` (``spread_bp``, ``price_pct``,
-            ``maturity_months``, ``forward_curve_id``, ``coupon_floor``) describing the
+            ``maturity_months``, ``forward_curve_id``, ``all_in_floor_bp``) describing the
             replacement collateral; omitted assumptions clone the surviving
             pool pro rata.
 
@@ -17915,7 +17915,7 @@ class PoolAsset:
         day_count: DayCount | None = None,
         spread_bp: float | None = None,
         forward_curve_id: str | None = None,
-        index_floor: float | None = None,
+        index_floor_bp: float | None = None,
         credit_quality: str | None = None,
         industry: str | None = None,
         obligor_id: str | None = None,
@@ -17966,8 +17966,8 @@ class PoolAsset:
         forward_curve_id : str, optional
             Forward-curve identifier of the floating index; ``None`` for a
             fixed-rate row.
-        index_floor : float, optional
-            Floor on the floating index as an annual decimal (``0.01`` = 1%),
+        index_floor_bp : float, optional
+            Floor on the floating index in basis points (``100`` = 1%),
             applied before ``spread_bp`` is added; ignored on fixed-rate rows.
         credit_quality : str, optional
             Credit rating (``"BB"``, ``"CCC"``, ``"NR"`` ...), used by the
@@ -18335,9 +18335,9 @@ class PoolAsset:
         ...
 
     @property
-    def index_floor(self) -> float | None:
+    def index_floor_bp(self) -> float | None:
         """
-        Floor on the floating index (annual decimal) applied before the spread.
+        Floor on the floating index in basis points, applied before the spread.
 
         Returns
         -------
@@ -25089,7 +25089,7 @@ class AssetBackedFacility:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-        >>> AssetBackedFacility.example().margin_bp
+        >>> AssetBackedFacility.example().spread_bp
         600.0
         """
         ...
@@ -25476,7 +25476,7 @@ class AssetBackedFacility:
         """
         ...
     @property
-    def margin_bp(self) -> float:
+    def spread_bp(self) -> float:
         """
         Margin over the index (or the all-in fixed rate) in basis points.
 
@@ -25839,7 +25839,7 @@ class AssetBackedFacilityBuilder:
 
     Builders are consumed by ``build()``; create a new builder per facility.
     Required fields: ``id``, ``collateral``, ``borrowing_base_rules``,
-    ``commitment``, ``drawn``, ``margin_bp``, ``closing_date``,
+    ``commitment``, ``drawn``, ``spread_bp``, ``closing_date``,
     ``revolving_end``, ``maturity``, ``frequency`` and ``discount_curve_id``.
     ``day_count`` defaults to Act/360 and ``unused_fee_bp`` to zero. Nested
     specs accept a ``dict`` or JSON ``str`` in the Rust serde shape.
@@ -25859,7 +25859,7 @@ class AssetBackedFacilityBuilder:
     ...     .borrowing_base_rules({"advance_rates": [{"asset_class": "*", "rate": 0.75}]})
     ...     .commitment(Money(80_000_000.0, Currency("USD")))
     ...     .drawn(60_000_000.0, currency="USD")
-    ...     .margin_bp(550.0)
+    ...     .spread_bp(550.0)
     ...     .unused_fee_bp(50.0)
     ...     .closing_date(datetime.date(2024, 1, 15))
     ...     .revolving_end(datetime.date(2026, 1, 15))
@@ -26010,7 +26010,7 @@ class AssetBackedFacilityBuilder:
             If the builder was already consumed.
         """
         ...
-    def margin_bp(self, value: float) -> AssetBackedFacilityBuilder:
+    def spread_bp(self, value: float) -> AssetBackedFacilityBuilder:
         """
         Set the margin over the index (or the all-in fixed rate).
 

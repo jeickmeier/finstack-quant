@@ -17,13 +17,13 @@
         "calendar_id": null,
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
+        "fixed_rate": "0.041",
         "id": "USD-DEP-3M-GOLDEN",
         "maturity": "2026-07-30",
         "notional": {
           "amount": "10000000",
           "currency": "USD"
         },
-        "quote_rate": "0.041",
         "settlement_days": 0,
         "start_date": "2026-04-30"
       },

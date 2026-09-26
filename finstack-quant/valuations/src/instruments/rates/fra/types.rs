@@ -65,7 +65,7 @@ pub struct ForwardRateAgreement {
     pub id: InstrumentId,
     /// Notional amount
     pub notional: Money,
-    /// Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days.
+    /// Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
@@ -98,7 +98,7 @@ pub struct ForwardRateAgreement {
     /// Day count convention for interest accrual
     pub day_count: DayCount,
     /// Reset lag in business days (fixing to value date)
-    pub reset_lag: i32,
+    pub reset_lag_days: i32,
     /// Optional fixing calendar identifier for business day adjustment
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -193,8 +193,9 @@ impl ForwardRateAgreement {
         }
 
         // Guard against unit mistakes (e.g., passing years as days).
-        validation::require_with(self.reset_lag.abs() <= 31, || {
-            "FRA reset_lag has an unexpectedly large magnitude (expected business days)".to_string()
+        validation::require_with(self.reset_lag_days.abs() <= 31, || {
+            "FRA reset_lag_days has an unexpectedly large magnitude (expected business days)"
+                .to_string()
         })?;
 
         if let Some(fixing_date) = self.fixing_date {
@@ -235,7 +236,7 @@ impl ForwardRateAgreement {
             .maturity(date!(2024 - 07 - 03))
             .fixed_rate(finstack_quant_core::decimal::f64_to_decimal(0.045)?)
             .day_count(DayCount::Act360)
-            .reset_lag(2)
+            .reset_lag_days(2)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
             .side(PayReceive::Receive)
@@ -278,7 +279,7 @@ impl ForwardRateAgreement {
             .maturity(maturity)
             .fixed_rate(finstack_quant_core::decimal::f64_to_decimal(fixed_rate)?)
             .day_count(conv.day_count)
-            .reset_lag(conv.default_reset_lag_days)
+            .reset_lag_days(conv.default_reset_lag_days)
             .discount_curve_id(CurveId::new(discount_curve_id))
             .forward_curve_id(CurveId::new(forward_curve_id))
             .side(side)
@@ -314,9 +315,9 @@ impl ForwardRateAgreement {
         }
 
         // Determine fixing date: use explicit fixing_date if provided,
-        // otherwise infer from start_date - reset_lag business days.
+        // otherwise infer from start_date - reset_lag_days business days.
         //
-        // IMPORTANT: reset_lag is in BUSINESS DAYS, not calendar days.
+        // IMPORTANT: reset_lag_days is in BUSINESS DAYS, not calendar days.
         let fixing_date = match self.fixing_date {
             Some(explicit_date) => explicit_date,
             None => {
@@ -325,11 +326,12 @@ impl ForwardRateAgreement {
                     .unwrap_or(BusinessDayConvention::ModifiedFollowing);
                 let resolved_cal_id = self.resolved_fixing_calendar_id();
 
-                // Compute base fixing date by subtracting reset_lag business days
+                // Compute base fixing date by subtracting reset_lag_days business days
                 let base_fixing_date = if let Some(cal_id) = resolved_cal_id.as_deref() {
                     if let Some(cal) = calendar_by_id(cal_id) {
                         // Use calendar-aware business day subtraction
-                        self.start_date.add_business_days(-(self.reset_lag), cal)?
+                        self.start_date
+                            .add_business_days(-(self.reset_lag_days), cal)?
                     } else {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "FRA '{}': fixing calendar '{}' could not be resolved",
@@ -435,7 +437,7 @@ impl ForwardRateAgreement {
     ///
     /// # Reset Lag Handling
     ///
-    /// The fixing date is inferred from `start_date - reset_lag` using **business days**
+    /// The fixing date is inferred from `start_date - reset_lag_days` using **business days**
     /// when a calendar is available, or weekday-only subtraction otherwise. This aligns
     /// with market conventions where reset lag is specified in business days (e.g., T-2).
     ///
@@ -600,7 +602,7 @@ mod tests {
         // FRA 3M x 6M
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
-        let fixing = start.add_weekdays(-2); // 2 business days before start for reset_lag
+        let fixing = start.add_weekdays(-2); // 2 business days before start for reset_lag_days
         let t_start = fwd
             .day_count()
             .year_fraction(base, start, DayCountContext::default())
@@ -624,7 +626,7 @@ mod tests {
                     .expect("fixed rate should convert in test"),
             )
             .day_count(finstack_quant_core::dates::DayCount::Act360)
-            .reset_lag(2)
+            .reset_lag_days(2)
             .discount_curve_id("DISC".into())
             .forward_curve_id("FWD-3M".into())
             .side(PayReceive::Pay) // Pay fixed, receive floating
@@ -688,7 +690,7 @@ mod tests {
                     .expect("fixed rate should convert in test"),
             ) // Different from market rate
             .day_count(finstack_quant_core::dates::DayCount::Act360)
-            .reset_lag(2)
+            .reset_lag_days(2)
             .discount_curve_id("DISC".into())
             .forward_curve_id("FWD-3M".into())
             .side(PayReceive::Receive)
@@ -756,7 +758,7 @@ mod tests {
             .maturity(end)
             .fixed_rate(rust_decimal::Decimal::new(5, 2))
             .day_count(DayCount::Act360)
-            .reset_lag(2)
+            .reset_lag_days(2)
             .discount_curve_id("DISC".into())
             .forward_curve_id("FWD-3M".into())
             .side(PayReceive::Pay)
@@ -785,7 +787,7 @@ mod serde_tests {
             "maturity": "2025-07-03",
             "fixed_rate": "0.045",
             "day_count": "act_360",
-            "reset_lag": 2,
+            "reset_lag_days": 2,
             "discount_curve_id": "USD-OIS",
             "forward_curve_id": "USD-SOFR-3M",
             "attributes": {"tags": [], "meta": {}}
@@ -816,7 +818,7 @@ mod serde_tests {
         assert_eq!(fra.id, InstrumentId::new("FRA-USD-SOFR-3X6"));
         assert_eq!(fra.notional, Money::from((1_000_000_i64, Currency::USD)));
         assert_eq!(fra.day_count, DayCount::Act360);
-        assert_eq!(fra.reset_lag, 2);
+        assert_eq!(fra.reset_lag_days, 2);
         assert_eq!(fra.discount_curve_id, CurveId::new("USD-OIS"));
         assert_eq!(fra.forward_curve_id, CurveId::new("USD-SOFR-3M"));
         assert_eq!(fra.fixed_rate.to_f64(), Some(0.045));

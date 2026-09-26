@@ -625,7 +625,7 @@ def test_cap_floor_example_getters_and_new_setters() -> None:
         .rate_option_type("floor")
         .notional(5_000_000.0, currency="USD")
         .strike(Rate(0.02))
-        .spread(0.0)
+        .spread_bp(0.0)
         .premium("2025-01-20", 10_000.0, currency="USD")
         .start_date("2025-01-15")
         .maturity("2028-01-15")

@@ -2,7 +2,7 @@
   "$defs": {
     "CommoditySwap": {
       "additionalProperties": false,
-      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(rust_decimal::Decimal::try_from(3.50).expect(\"valid decimal\"))\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
+      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(3.50)\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -38,8 +38,9 @@
           "description": "Discount curve ID."
         },
         "fixed_price": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Fixed price per unit."
+          "description": "Fixed price per commodity unit, in the notional currency (finite).",
+          "format": "double",
+          "type": "number"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -198,7 +199,7 @@
           "commodity_type": "Energy",
           "currency": "USD",
           "discount_curve_id": "USD-OIS",
-          "fixed_price": "3.5",
+          "fixed_price": 3.5,
           "forward_curve_id": "NG-SPOT-AVG",
           "frequency": {
             "count": 1,

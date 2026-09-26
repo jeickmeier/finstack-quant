@@ -129,7 +129,7 @@ pub fn create_standard_fra() -> ForwardRateAgreement {
         maturity: end,
         fixed_rate: Decimal::try_from(0.05).expect("valid decimal"), // At-market: 5% = forward rate
         day_count: DayCount::Act360,
-        reset_lag: 2,
+        reset_lag_days: 2,
         fixing_calendar_id: None,
         fixing_business_day_convention: None,
         observed_fixing: None,
@@ -153,7 +153,7 @@ pub struct TestFraBuilder {
     maturity: Date,
     fixed_rate: f64,
     day_count: DayCount,
-    reset_lag: i32,
+    reset_lag_days: i32,
     discount_curve_id: String,
     forward_curve_id: String,
     side: PayReceive,
@@ -170,7 +170,7 @@ impl Default for TestFraBuilder {
             maturity: end,
             fixed_rate: 0.05, // At-market: 5% = forward rate
             day_count: DayCount::Act360,
-            reset_lag: 2,
+            reset_lag_days: 2,
             discount_curve_id: "USD_OIS".to_string(),
             forward_curve_id: "USD_LIBOR_3M".to_string(),
             side: PayReceive::Receive, // receive fixed rate
@@ -235,7 +235,7 @@ impl TestFraBuilder {
             maturity: self.maturity,
             fixed_rate: Decimal::try_from(self.fixed_rate).expect("valid decimal"),
             day_count: self.day_count,
-            reset_lag: self.reset_lag,
+            reset_lag_days: self.reset_lag_days,
             fixing_calendar_id: None,
             fixing_business_day_convention: None,
             observed_fixing: None,

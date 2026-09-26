@@ -116,7 +116,7 @@ impl StructuredCredit {
                     || assumptions.price_pct > period.criteria.max_price_pct
                     || assumptions.maturity_months == 0
                     || assumptions
-                        .coupon_floor
+                        .all_in_floor_bp
                         .is_some_and(|floor| !floor.is_finite())
                 {
                     return Err(finstack_quant_core::Error::Validation(

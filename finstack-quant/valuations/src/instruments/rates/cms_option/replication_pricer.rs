@@ -257,7 +257,7 @@ impl CmsReplicationPricer {
                 let observed = crate::instruments::rates::hw1f::fixings::historical_cms_fixing(
                     curves,
                     &inst.forward_curve_id,
-                    inst.cms_tenor,
+                    inst.cms_tenor.to_years(),
                     fixing_date,
                 )?;
                 let df_pay =
@@ -272,7 +272,11 @@ impl CmsReplicationPricer {
 
             // Forward-starting swap parameters for this fixing
             let swap_start = reference_swap.reference_swap_start(fixing_date)?;
-            let swap_end = swap_start.add_months((inst.cms_tenor * 12.0).round() as i32);
+            let swap_end =
+                swap_start.add_months(crate::instruments::rates::cms_common::cms_tenor_months(
+                    inst.cms_tenor,
+                    "CmsOption cms_tenor",
+                )?);
 
             // F (forward swap rate). The market annuity A₀ is intentionally
             // discarded: the static replication uses the closed-form par
@@ -303,7 +307,7 @@ impl CmsReplicationPricer {
                     time_to_fixing: ttf,
                     df_pay,
                     vol_surface: vol_surface.as_ref(),
-                    cms_tenor: inst.cms_tenor,
+                    cms_tenor: inst.cms_tenor.to_years(),
                     payments_per_year: m,
                     payment_delay:
                         crate::instruments::rates::cms_common::signed_act365f_year_fraction(

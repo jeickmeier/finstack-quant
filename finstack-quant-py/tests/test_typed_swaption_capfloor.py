@@ -141,7 +141,7 @@ class TestCapFloorTyped:
             .rate_option_type("floor")
             .notional(Money(2_000_000.0, Currency("USD")))
             .strike(0.03)
-            .spread(0.001)
+            .spread_bp(10.0)
             .premium(
                 datetime.date(2024, 2, 15),
                 Money(25_000.0, Currency("USD")),
@@ -159,7 +159,7 @@ class TestCapFloorTyped:
             .build()
         )
         payload = json.loads(cap.to_json())
-        assert payload["instrument"]["spec"]["spread"] == "0.001"
+        assert payload["instrument"]["spec"]["spread_bp"] == "10"
         assert payload["instrument"]["spec"]["premium"] == [
             "2024-02-15",
             {"amount": "25000", "currency": "USD"},

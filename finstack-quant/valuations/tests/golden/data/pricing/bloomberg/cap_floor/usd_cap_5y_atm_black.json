@@ -1327,7 +1327,7 @@
         "forward_curve_id": "USD-SOFR",
         "vol_surface_id": "USD-RFR-BVOL-CUBE-5Y",
         "vol_type": "normal",
-        "spread": "0",
+        "spread_bp": "0",
         "overnight_coupon": {
           "compounding": {
             "compounded_with_rate_cutoff": {

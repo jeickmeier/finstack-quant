@@ -80,13 +80,14 @@ pub struct InflationSwap {
     pub day_count: DayCount,
     /// Trade side
     pub side: PayReceive,
-    /// Optional contract-level lag override (if set, overrides index lag)
+    /// Contractual CPI observation lag; when `None` the index lag, then the
+    /// curve's indexation lag, applies.
     #[builder(optional)]
-    pub lag_override: Option<InflationLag>,
-    /// Contractual monthly reference-index interpolation. Overrides index metadata;
+    pub lag: Option<InflationLag>,
+    /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
     /// without either source the default is monthly step interpolation.
     #[builder(optional)]
-    pub interpolation_override: Option<InflationInterpolation>,
+    pub interpolation: Option<InflationInterpolation>,
     /// Explicit Base CPI (reference index level at start with lag applied).
     /// If not provided, it will be looked up/calculated from start date.
     #[builder(optional)]
@@ -147,7 +148,7 @@ impl InflationSwap {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(InflationLag::Months(3))
+            .lag(InflationLag::Months(3))
             .business_day_convention(BusinessDayConvention::Following)
             .attributes(Attributes::new())
             .build()
@@ -188,7 +189,7 @@ impl InflationSwap {
 
     fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
         crate::instruments::common_impl::helpers::resolve_inflation_lag(
-            self.lag_override,
+            self.lag,
             self.inflation_index_id.as_str(),
             curves,
         )
@@ -201,7 +202,7 @@ impl InflationSwap {
         date: Date,
     ) -> finstack_quant_core::Result<f64> {
         let interpolation = self
-            .interpolation_override
+            .interpolation
             .or_else(|| {
                 curves
                     .get_inflation_index(self.inflation_index_id.as_str())
@@ -634,13 +635,14 @@ pub struct YoYInflationSwap {
     pub day_count: DayCount,
     /// Trade side
     pub side: PayReceive,
-    /// Optional contract-level lag override (if set, overrides index lag)
+    /// Contractual CPI observation lag; when `None` the index lag, then the
+    /// curve's indexation lag, applies.
     #[builder(optional)]
-    pub lag_override: Option<InflationLag>,
-    /// Contractual monthly reference-index interpolation. Overrides index metadata;
+    pub lag: Option<InflationLag>,
+    /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
     /// without either source the default is monthly step interpolation.
     #[builder(optional)]
-    pub interpolation_override: Option<InflationInterpolation>,
+    pub interpolation: Option<InflationInterpolation>,
     /// Observed contractual reference CPI at start, with lag and interpolation
     /// already applied. If absent, start CPI must resolve from market observations.
     #[builder(optional)]
@@ -702,7 +704,7 @@ impl YoYInflationSwap {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(InflationLag::Months(3))
+            .lag(InflationLag::Months(3))
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .attributes(Attributes::new())
             .build()
@@ -734,7 +736,7 @@ impl YoYInflationSwap {
 
     fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
         crate::instruments::common_impl::helpers::resolve_inflation_lag(
-            self.lag_override,
+            self.lag,
             self.inflation_index_id.as_str(),
             curves,
         )
@@ -755,7 +757,7 @@ impl YoYInflationSwap {
             }
         }
         let interpolation = self
-            .interpolation_override
+            .interpolation
             .or_else(|| {
                 curves
                     .get_inflation_index(self.inflation_index_id.as_str())
@@ -1125,7 +1127,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(InflationLag::None)
+            .lag(InflationLag::None)
             .attributes(Attributes::new())
             .build()
             .expect("swap should build")
@@ -1172,7 +1174,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(InflationLag::None)
+            .lag(InflationLag::None)
             .base_cpi(100.0)
             .attributes(Attributes::new())
             .build()
@@ -1232,7 +1234,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(InflationLag::None)
+            .lag(InflationLag::None)
             .attributes(Attributes::new())
             .build()
             .expect("swap should build");
@@ -1300,7 +1302,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Receive)
-            .lag_override(InflationLag::None)
+            .lag(InflationLag::None)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");
@@ -1372,7 +1374,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(InflationLag::None)
+            .lag(InflationLag::None)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");
@@ -1409,7 +1411,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(InflationLag::None)
+            .lag(InflationLag::None)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");

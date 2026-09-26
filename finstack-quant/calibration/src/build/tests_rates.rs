@@ -45,7 +45,7 @@ fn test_build_deposit() {
     if let Some(dep) = instrument.as_any().downcast_ref::<Deposit>() {
         assert_eq!(dep.notional.currency(), Currency::USD);
         assert_eq!(
-            dep.quote_rate,
+            dep.fixed_rate,
             Some(Decimal::try_from(0.035).expect("valid decimal"))
         );
     } else {

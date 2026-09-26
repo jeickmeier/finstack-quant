@@ -58,7 +58,7 @@ fn test_lag_override_vs_index_lag() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
-        .lag_override(InflationLag::None)
+        .lag(InflationLag::None)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -103,7 +103,7 @@ fn test_different_lag_durations() {
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag_override(if *lag_months == 0 {
+            .lag(if *lag_months == 0 {
                 InflationLag::None
             } else {
                 InflationLag::Months(*lag_months)
@@ -150,7 +150,7 @@ fn test_lag_in_days_vs_months() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
-        .lag_override(InflationLag::Months(3))
+        .lag(InflationLag::Months(3))
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -165,7 +165,7 @@ fn test_lag_in_days_vs_months() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
-        .lag_override(InflationLag::Days(90))
+        .lag(InflationLag::Days(90))
         .attributes(Default::default())
         .build()
         .unwrap();

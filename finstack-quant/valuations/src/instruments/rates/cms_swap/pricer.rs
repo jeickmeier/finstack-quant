@@ -84,9 +84,9 @@ impl CmsSwapPricer {
 
         let mut total_pv = 0.0;
 
-        for (i, &fixing_date) in inst.cms_fixing_dates.iter().enumerate() {
-            let payment_date = inst.cms_payment_dates[i];
-            let accrual_fraction = inst.cms_accrual_fractions[i];
+        for (i, &fixing_date) in inst.fixing_dates.iter().enumerate() {
+            let payment_date = inst.payment_dates[i];
+            let accrual_fraction = inst.accrual_fractions[i];
 
             if payment_date <= as_of {
                 continue;
@@ -112,6 +112,7 @@ impl CmsSwapPricer {
                 accrual_fractions,
                 ..
             } => {
+                let fixed_rate = finstack_quant_core::decimal::decimal_to_f64(*rate)?;
                 let mut total_pv = 0.0;
                 for (i, &payment_date) in payment_dates.iter().enumerate() {
                     if payment_date <= as_of {
@@ -120,17 +121,18 @@ impl CmsSwapPricer {
                     let accrual = accrual_fractions[i];
                     let df =
                         relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
-                    total_pv += rate * accrual * df * inst.notional.amount();
+                    total_pv += fixed_rate * accrual * df * inst.notional.amount();
                 }
                 Ok(total_pv)
             }
             FundingLeg::Floating {
-                spread,
+                spread_bp,
                 payment_dates,
                 accrual_fractions,
                 forward_curve_id,
                 ..
             } => {
+                let spread = finstack_quant_core::decimal::decimal_to_f64(*spread_bp)? / 10_000.0;
                 let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
                 let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
                     forward_curve_id.as_str(),
@@ -294,9 +296,9 @@ impl CmsSwapReplicationPricer {
         let payments_per_year = inst.reference_swap().payments_per_year()?;
 
         let mut total_pv = 0.0;
-        for (i, &fixing_date) in inst.cms_fixing_dates.iter().enumerate() {
-            let payment_date = inst.cms_payment_dates[i];
-            let accrual_fraction = inst.cms_accrual_fractions[i];
+        for (i, &fixing_date) in inst.fixing_dates.iter().enumerate() {
+            let payment_date = inst.payment_dates[i];
+            let accrual_fraction = inst.accrual_fractions[i];
 
             if payment_date <= as_of {
                 continue;
@@ -327,7 +329,7 @@ impl CmsSwapReplicationPricer {
                 time_to_fixing,
                 df_pay,
                 vol_surface: vol_surface.as_ref(),
-                cms_tenor: inst.cms_tenor,
+                cms_tenor: inst.cms_tenor.to_years(),
                 payments_per_year,
                 payment_delay: crate::instruments::rates::cms_common::signed_act365f_year_fraction(
                     inst.reference_swap().reference_swap_start(fixing_date)?,
@@ -342,12 +344,13 @@ impl CmsSwapReplicationPricer {
                 forward_rate + (caplet(forward_rate)? - floorlet(forward_rate)?) / df_pay;
 
             // Coupon rate with spread and smile-consistent embedded cap/floor.
-            let mut coupon_rate = expected_cms + inst.cms_spread;
+            let cms_spread = inst.cms_spread_rate()?;
+            let mut coupon_rate = expected_cms + cms_spread;
             if let Some(cap) = inst.cms_cap {
-                coupon_rate -= caplet(cap - inst.cms_spread)? / df_pay;
+                coupon_rate -= caplet(cap - cms_spread)? / df_pay;
             }
             if let Some(floor) = inst.cms_floor {
-                coupon_rate += floorlet(floor - inst.cms_spread)? / df_pay;
+                coupon_rate += floorlet(floor - cms_spread)? / df_pay;
             }
 
             total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
@@ -413,12 +416,12 @@ pub(super) fn cms_coupon_rate(
         let observed = crate::instruments::rates::hw1f::fixings::historical_cms_fixing(
             market,
             &inst.forward_curve_id,
-            inst.cms_tenor,
+            inst.cms_tenor.to_years(),
             fixing_date,
         )?;
         return apply_cms_cap_floor(
             observed,
-            inst.cms_spread,
+            inst.cms_spread_rate()?,
             inst.cms_cap,
             inst.cms_floor,
             &vol_surface,
@@ -447,7 +450,7 @@ pub(super) fn cms_coupon_rate(
                 forward_swap_rate,
             ),
             time_to_fixing,
-            inst.cms_tenor,
+            inst.cms_tenor.to_years(),
             forward_swap_rate,
             inst.reference_swap().payments_per_year()?,
         ) * convexity_scale
@@ -457,7 +460,7 @@ pub(super) fn cms_coupon_rate(
 
     apply_cms_cap_floor(
         forward_swap_rate + adj,
-        inst.cms_spread,
+        inst.cms_spread_rate()?,
         inst.cms_cap,
         inst.cms_floor,
         &vol_surface,
@@ -480,7 +483,10 @@ pub(super) fn cms_forward_and_ttf(
 ) -> Result<(f64, f64)> {
     let reference_swap = inst.reference_swap();
     let swap_start = reference_swap.reference_swap_start(fixing_date)?;
-    let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
+    let swap_tenor_months = crate::instruments::rates::cms_common::cms_tenor_months(
+        inst.cms_tenor,
+        "CmsSwap cms_tenor",
+    )?;
     let swap_end = swap_start.add_months(swap_tenor_months);
     let (forward_swap_rate, _annuity) =
         reference_swap.forward_rate_and_annuity(market, as_of, swap_start, swap_end)?;
@@ -617,8 +623,10 @@ mod tests {
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::types::IndexId;
     use finstack_quant_core::types::{CurveId, InstrumentId};
+    use rust_decimal::Decimal;
 
     fn floating_leg_swap() -> CmsSwap {
         let start = date(2025, 1, 1);
@@ -628,15 +636,16 @@ mod tests {
             .id(InstrumentId::new("CMS-FLOAT"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
-            .cms_tenor(10.0)
-            .cms_fixing_dates(vec![start])
-            .cms_payment_dates(vec![first_pay])
-            .cms_accrual_fractions(vec![0.25])
-            .cms_day_count(DayCount::Act365F)
-            .cms_spread(0.0)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![start])
+            .payment_dates(vec![first_pay])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Floating {
-                spread: 0.0,
+                spread_bp: Decimal::ZERO,
                 payment_dates: vec![first_pay, second_pay],
                 accrual_fractions: vec![0.25, 0.25],
                 day_count: DayCount::Act360,
@@ -735,15 +744,16 @@ mod tests {
             .id(InstrumentId::new("CMS-CAPPED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
-            .cms_tenor(10.0)
-            .cms_fixing_dates(vec![fixing])
-            .cms_payment_dates(vec![pay])
-            .cms_accrual_fractions(vec![0.25])
-            .cms_day_count(DayCount::Act365F)
-            .cms_spread(0.0)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![fixing])
+            .payment_dates(vec![pay])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
-                rate: 0.0,
+                rate: Decimal::ZERO,
                 payment_dates: vec![pay],
                 accrual_fractions: vec![0.25],
                 day_count: DayCount::Act365F,
@@ -844,15 +854,16 @@ mod tests {
             .id(InstrumentId::new("CMS-SEASONED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
-            .cms_tenor(10.0)
-            .cms_fixing_dates(vec![fixing])
-            .cms_payment_dates(vec![pay])
-            .cms_accrual_fractions(vec![0.25])
-            .cms_day_count(DayCount::Act365F)
-            .cms_spread(0.0)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![fixing])
+            .payment_dates(vec![pay])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
-                rate: 0.0,
+                rate: Decimal::ZERO,
                 payment_dates: vec![pay],
                 accrual_fractions: vec![0.25],
                 day_count: DayCount::Act365F,
@@ -921,15 +932,16 @@ mod tests {
             .id(InstrumentId::new("CMS-FLOORED"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
-            .cms_tenor(10.0)
-            .cms_fixing_dates(vec![fixing])
-            .cms_payment_dates(vec![pay])
-            .cms_accrual_fractions(vec![0.25])
-            .cms_day_count(DayCount::Act365F)
-            .cms_spread(0.0)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
+            .fixing_dates(vec![fixing])
+            .payment_dates(vec![pay])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
-                rate: 0.0,
+                rate: Decimal::ZERO,
                 payment_dates: vec![pay],
                 accrual_fractions: vec![0.25],
                 day_count: DayCount::Act365F,
@@ -1001,20 +1013,25 @@ mod tests {
 
     /// Receive-CMS swap with a single fixing and a zero-rate fixed funding leg,
     /// so the swap NPV isolates the CMS leg.
-    fn single_fixing_cms_swap(cms_tenor: f64, fixing: Date, payment: Date) -> CmsSwap {
+    fn single_fixing_cms_swap(cms_tenor_years: u32, fixing: Date, payment: Date) -> CmsSwap {
         CmsSwap::builder()
             .id(InstrumentId::new("CMS-REPL"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
-            .cms_tenor(cms_tenor)
-            .cms_fixing_dates(vec![fixing])
-            .cms_payment_dates(vec![payment])
-            .cms_accrual_fractions(vec![0.25])
-            .cms_day_count(DayCount::Act365F)
-            .cms_spread(0.0)
+            .cms_tenor(
+                Tenor::new(
+                    cms_tenor_years,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("CMS tenor"),
+            )
+            .fixing_dates(vec![fixing])
+            .payment_dates(vec![payment])
+            .accrual_fractions(vec![0.25])
+            .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
-                rate: 0.0,
+                rate: Decimal::ZERO,
                 payment_dates: vec![payment],
                 accrual_fractions: vec![0.25],
                 day_count: DayCount::Act360,
@@ -1032,7 +1049,7 @@ mod tests {
     #[test]
     fn replication_cms_leg_exceeds_linear_forward_leg() {
         let as_of = date(2025, 1, 1);
-        let swap = single_fixing_cms_swap(20.0, date(2030, 1, 1), date(2030, 4, 1));
+        let swap = single_fixing_cms_swap(20, date(2030, 1, 1), date(2030, 4, 1));
         let market = cms_market_with_vol(as_of, 0.30);
 
         let linear = CmsSwapPricer::new()
@@ -1056,7 +1073,7 @@ mod tests {
     #[test]
     fn replication_close_to_hagan_for_short_tenor_low_vol() {
         let as_of = date(2025, 1, 1);
-        let swap = single_fixing_cms_swap(2.0, date(2026, 1, 1), date(2026, 4, 1));
+        let swap = single_fixing_cms_swap(2, date(2026, 1, 1), date(2026, 4, 1));
         let market = cms_market_with_vol(as_of, 0.10);
 
         let hagan = CmsSwapPricer::new()
@@ -1081,7 +1098,7 @@ mod tests {
     #[test]
     fn replication_exceeds_hagan_for_long_tenor_high_vol() {
         let as_of = date(2025, 1, 1);
-        let swap = single_fixing_cms_swap(20.0, date(2030, 1, 1), date(2030, 4, 1));
+        let swap = single_fixing_cms_swap(20, date(2030, 1, 1), date(2030, 4, 1));
         let market = cms_market_with_vol(as_of, 0.30);
 
         let hagan = CmsSwapPricer::new()
@@ -1115,7 +1132,7 @@ mod tests {
 
         let as_of = date(2025, 6, 1);
         // Fixed 2025-01-01, pays 2025-07-01: fixed-but-unpaid at as_of.
-        let swap = single_fixing_cms_swap(10.0, date(2025, 1, 1), date(2025, 7, 1));
+        let swap = single_fixing_cms_swap(10, date(2025, 1, 1), date(2025, 7, 1));
         let fixing_series = ScalarTimeSeries::new(
             finstack_quant_core::market_data::fixings::cms_fixing_series_id("USD-LIBOR-3M", 10.0),
             vec![(date(2025, 1, 1), 0.045)],
@@ -1146,7 +1163,7 @@ mod tests {
     #[test]
     fn replication_errors_on_non_positive_forward() {
         let as_of = date(2025, 1, 1);
-        let swap = single_fixing_cms_swap(10.0, date(2026, 1, 1), date(2026, 4, 1));
+        let swap = single_fixing_cms_swap(10, date(2026, 1, 1), date(2026, 4, 1));
         // Negative-rate market: 0% discounting (constant DFs are valid) with a
         // -1% projection curve drives the reference par swap rate negative.
         let market = MarketContext::new()

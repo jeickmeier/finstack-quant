@@ -33,7 +33,7 @@ fn build_yoy(side: PayReceive, fixed_rate: f64, notional: f64) -> YoYInflationSw
         .discount_curve_id(CurveId::new("USD-OIS"))
         .day_count(DayCount::Act365F)
         .side(side)
-        .lag_override(InflationLag::Months(3))
+        .lag(InflationLag::Months(3))
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .attributes(Attributes::new())
         .build()

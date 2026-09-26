@@ -97,7 +97,7 @@
               "amount": "1000000",
               "currency": "USD"
             },
-            "quote_rate": "0.05",
+            "fixed_rate": "0.05",
             "start_date": "2025-01-15"
           },
           "type": "deposit"

@@ -1100,9 +1100,9 @@
           "default": "cash",
           "description": "Settlement type (defaults to Cash; caps/floors are virtually always cash-settled)"
         },
-        "spread": {
+        "spread_bp": {
           "$ref": "#/$defs/DecimalWire",
-          "description": "Contractual spread added to the referenced rate, in decimal rate units.\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor."
+          "description": "Contractual margin added to the referenced rate, in basis points (10 = 10bp).\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor."
         },
         "start_date": {
           "$ref": "#/$defs/DateWire",

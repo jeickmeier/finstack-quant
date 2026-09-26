@@ -106,93 +106,110 @@ pub fn tarn_coupon_profile(
 
 /// Compute the coupon schedule for a snowball note.
 ///
-/// `c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)` with
+/// `c_i = clip(c_{i-1} + fixed_rate - L_i, coupon_floor, coupon_cap)` with
 /// `c_0 = initial_coupon`.
 ///
 /// # Arguments
 ///
-/// * `initial_coupon` - Initial coupon `c_0` (must be non-negative).
-/// * `fixed_rate` - Fixed rate component.
-/// * `floating_fixings` - Floating rate fixings (one per period).
-/// * `floor` - Per-period floor (non-negative).
-/// * `cap` - Per-period cap; must be strictly greater than `floor`. Pass
-///   `f64::INFINITY` for an uncapped coupon.
+/// * `initial_coupon` - Initial coupon `c_0` as a decimal annual rate (must be
+///   non-negative).
+/// * `fixed_rate` - Fixed rate component as a decimal annual rate.
+/// * `floating_fixings` - Floating rate fixings (one per period), as decimal
+///   annual rates.
+/// * `coupon_floor` - Per-period coupon floor as a decimal annual rate
+///   (non-negative).
+/// * `coupon_cap` - Optional per-period coupon cap as a decimal annual rate;
+///   when set it must be finite and strictly greater than `coupon_floor`.
+///   `None` leaves the coupon uncapped.
 ///
 /// # Errors
 ///
 /// Returns an error message string if any input is non-finite, the floor is
-/// negative, the cap is not strictly above the floor, the leverage is
-/// or the initial coupon is negative.
+/// negative, the cap is not strictly above the floor, or the initial coupon
+/// is negative.
 pub fn snowball_coupon_profile(
     initial_coupon: f64,
     fixed_rate: f64,
     floating_fixings: &[f64],
-    floor: f64,
-    cap: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
 ) -> Result<Vec<f64>, String> {
     coupon_profile(
         CouponProfileMode::Snowball { initial_coupon },
         fixed_rate,
         floating_fixings,
-        floor,
-        cap,
+        coupon_floor,
+        coupon_cap,
     )
 }
 
 /// Compute the path-independent inverse-floater coupon schedule.
 ///
-/// `c_i = clip(fixed_rate - leverage * L_i, floor, cap)`.
+/// `c_i = clip(fixed_rate - gearing * L_i, coupon_floor, coupon_cap)`.
 ///
 /// # Arguments
 ///
 /// * `fixed_rate` - Fixed coupon component as a decimal annual rate.
 /// * `floating_fixings` - Reset rates in coupon-period order, as decimal
 ///   annual rates.
-/// * `floor` - Inclusive lower coupon bound as a decimal annual rate.
-/// * `cap` - Inclusive upper coupon bound as a decimal annual rate.
-/// * `leverage` - Floating-rate multiplier subtracted from `fixed_rate` at
-///   each reset.
+/// * `coupon_floor` - Inclusive lower coupon bound as a decimal annual rate
+///   (non-negative).
+/// * `coupon_cap` - Optional inclusive upper coupon bound as a decimal annual
+///   rate; when set it must be finite and strictly greater than
+///   `coupon_floor`. `None` leaves the coupon uncapped.
+/// * `gearing` - Positive multiplier on each floating fixing, subtracted from
+///   `fixed_rate` at each reset.
+///
+/// # Errors
+///
+/// Returns an error message string if any input is non-finite, the floor is
+/// negative, the cap is not strictly above the floor, or the gearing is not
+/// strictly positive.
 pub fn inverse_floater_coupon_profile(
     fixed_rate: f64,
     floating_fixings: &[f64],
-    floor: f64,
-    cap: f64,
-    leverage: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
+    gearing: f64,
 ) -> Result<Vec<f64>, String> {
     coupon_profile(
-        CouponProfileMode::InverseFloater { leverage },
+        CouponProfileMode::InverseFloater { gearing },
         fixed_rate,
         floating_fixings,
-        floor,
-        cap,
+        coupon_floor,
+        coupon_cap,
     )
 }
 
 enum CouponProfileMode {
     Snowball { initial_coupon: f64 },
-    InverseFloater { leverage: f64 },
+    InverseFloater { gearing: f64 },
 }
 
-#[allow(clippy::unreachable)] // Each mode initializes exactly one of prev or leverage.
+#[allow(clippy::unreachable)] // Each mode initializes exactly one of prev or gearing.
 fn coupon_profile(
     mode: CouponProfileMode,
     fixed_rate: f64,
     floating_fixings: &[f64],
-    floor: f64,
-    cap: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
 ) -> Result<Vec<f64>, String> {
     if !fixed_rate.is_finite() {
         return Err("fixed_rate must be finite".to_owned());
     }
-    if !floor.is_finite() || floor < 0.0 {
-        return Err(format!("floor ({floor}) must be non-negative and finite"));
-    }
-    if cap.is_nan() || cap <= floor {
+    if !coupon_floor.is_finite() || coupon_floor < 0.0 {
         return Err(format!(
-            "cap ({cap}) must be strictly greater than floor ({floor})"
+            "coupon_floor ({coupon_floor}) must be non-negative and finite"
         ));
     }
-    let (mut prev, leverage) = match mode {
+    if let Some(cap) = coupon_cap {
+        if !cap.is_finite() || cap <= coupon_floor {
+            return Err(format!(
+                "coupon_cap ({cap}) must be finite and strictly greater than coupon_floor ({coupon_floor})"
+            ));
+        }
+    }
+    let (mut prev, gearing) = match mode {
         CouponProfileMode::Snowball { initial_coupon } => {
             if !initial_coupon.is_finite() || initial_coupon < 0.0 {
                 return Err(format!(
@@ -201,11 +218,11 @@ fn coupon_profile(
             }
             (Some(initial_coupon), None)
         }
-        CouponProfileMode::InverseFloater { leverage } => {
-            if !leverage.is_finite() || leverage <= 0.0 {
-                return Err(format!("leverage ({leverage}) must be positive and finite"));
+        CouponProfileMode::InverseFloater { gearing } => {
+            if !gearing.is_finite() || gearing <= 0.0 {
+                return Err(format!("gearing ({gearing}) must be positive and finite"));
             }
-            (None, Some(leverage))
+            (None, Some(gearing))
         }
     };
 
@@ -214,16 +231,15 @@ fn coupon_profile(
         if !l_i.is_finite() {
             return Err("floating_fixings must all be finite".to_owned());
         }
-        let raw = match (prev, leverage) {
+        let raw = match (prev, gearing) {
             (Some(previous), None) => previous + fixed_rate - l_i,
-            (None, Some(leverage)) => fixed_rate - leverage * l_i,
+            (None, Some(gearing)) => fixed_rate - gearing * l_i,
             _ => unreachable!("coupon profile mode is internally consistent"),
         };
-        let floored = raw.max(floor);
-        let c = if cap.is_finite() {
-            floored.min(cap)
-        } else {
-            floored
+        let floored = raw.max(coupon_floor);
+        let c = match coupon_cap {
+            Some(cap) => floored.min(cap),
+            None => floored,
         };
         out.push(c);
         if prev.is_some() {
@@ -372,7 +388,7 @@ mod tests {
 
     #[test]
     fn snowball_honors_cap_and_floor() {
-        let coupons = snowball_coupon_profile(0.02, 0.05, &[0.01, 0.04, 0.03], 0.0, 0.10)
+        let coupons = snowball_coupon_profile(0.02, 0.05, &[0.01, 0.04, 0.03], 0.0, Some(0.10))
             .expect("valid snowball inputs");
         assert_eq!(coupons.len(), 3);
         for c in coupons {
@@ -382,7 +398,7 @@ mod tests {
 
     #[test]
     fn snowball_inverse_floater_is_path_independent() {
-        let coupons = inverse_floater_coupon_profile(0.06, &[0.01, 0.02], 0.0, f64::INFINITY, 2.0)
+        let coupons = inverse_floater_coupon_profile(0.06, &[0.01, 0.02], 0.0, None, 2.0)
             .expect("valid inverse-floater inputs");
         // c_i = 0.06 - 2 * L_i
         assert!((coupons[0] - (0.06 - 2.0 * 0.01)).abs() < 1e-12);
@@ -391,9 +407,9 @@ mod tests {
 
     #[test]
     fn snowball_rejects_cap_below_floor() {
-        let err = snowball_coupon_profile(0.0, 0.05, &[0.01], 0.10, 0.05)
+        let err = snowball_coupon_profile(0.0, 0.05, &[0.01], 0.10, Some(0.05))
             .expect_err("cap <= floor must be rejected");
-        assert!(err.contains("cap"));
+        assert!(err.contains("coupon_cap"));
     }
 
     #[test]

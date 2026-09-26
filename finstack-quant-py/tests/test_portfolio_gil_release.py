@@ -55,7 +55,7 @@ def _portfolio_spec_json(position_count: int) -> str:
                     "start_date": AS_OF.isoformat(),
                     "maturity": "2025-07-15",
                     "day_count": "act_360",
-                    "quote_rate": "0.04",
+                    "fixed_rate": "0.04",
                     "discount_curve_id": "USD-OIS",
                     "attributes": {},
                 },

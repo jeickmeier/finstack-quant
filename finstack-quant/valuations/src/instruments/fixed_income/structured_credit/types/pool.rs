@@ -41,12 +41,11 @@ pub struct PoolAsset {
     pub spread_bp: Option<f64>,
     /// Rates forward-curve identifier for floating-rate assets, such as SOFR-3M.
     pub forward_curve_id: Option<String>,
-    /// Floor on the floating index (annual decimal, e.g. `0.01` = 1%)
-    /// applied before `spread_bp` is added, matching
-    /// `FloatingRateSpec::index_floor_bp`; `None` for no floor. Ignored on
-    /// fixed-rate rows.
+    /// Floor on the floating index in basis points (100 = 1%), applied before
+    /// `spread_bp` is added, matching `FloatingRateSpec::index_floor_bp`;
+    /// `None` for no floor. Ignored on fixed-rate rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub index_floor: Option<f64>,
+    pub index_floor_bp: Option<f64>,
     /// Contractual maturity date of the asset.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -211,7 +210,7 @@ impl PoolAsset {
             spread_bp,
             forward_curve_id,
             maturity: bond.maturity,
-            index_floor: None,
+            index_floor_bp: None,
             credit_quality: None,
             industry,
             obligor_id: None,
@@ -294,7 +293,7 @@ impl PoolAsset {
             spread_bp: Some(spread_bp),
             forward_curve_id: Some(forward_curve_id.into()),
             maturity,
-            index_floor: None,
+            index_floor_bp: None,
             credit_quality: None,
             industry: None,
             obligor_id: None,
@@ -340,7 +339,7 @@ impl PoolAsset {
             spread_bp: None, // Fixed rate - no separate spread
             forward_curve_id: None,
             maturity,
-            index_floor: None,
+            index_floor_bp: None,
             credit_quality: None,
             industry: None,
             obligor_id: None,
@@ -478,9 +477,9 @@ pub struct ReinvestmentAssumptions {
     /// Floating-rate index id (a forward curve in the market context), or
     /// `None` for a fixed coupon.
     pub forward_curve_id: Option<String>,
-    /// Minimum all-in annual coupon as a decimal (a floor on the resolved
-    /// index plus spread), if any.
-    pub coupon_floor: Option<f64>,
+    /// Minimum all-in annual coupon in basis points (a floor on the resolved
+    /// index plus spread, 100 = 1%), if any.
+    pub all_in_floor_bp: Option<f64>,
 }
 
 /// Criteria for reinvestment during revolving period
@@ -645,10 +644,10 @@ pub struct RepLine {
     pub spread_bp: Option<f64>,
     /// Rates forward-curve identifier (if floating)
     pub forward_curve_id: Option<String>,
-    /// Floor on the floating index (annual decimal) applied before
+    /// Floor on the floating index in basis points (100 = 1%), applied before
     /// `spread_bp`; `None` for no floor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub index_floor: Option<f64>,
+    pub index_floor_bp: Option<f64>,
     /// Weighted average maturity date
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -705,7 +704,7 @@ impl RepLine {
             rate,
             spread_bp: None,
             forward_curve_id: None,
-            index_floor: None,
+            index_floor_bp: None,
             maturity,
             seasoning_months: 0,
             day_count,
@@ -830,7 +829,7 @@ impl AssetPool {
                     rate: line.rate,
                     spread_bp: line.spread_bp,
                     forward_curve_id: line.forward_curve_id,
-                    index_floor: line.index_floor,
+                    index_floor_bp: line.index_floor_bp,
                     maturity: line.maturity,
                     credit_quality: None,
                     industry: None,

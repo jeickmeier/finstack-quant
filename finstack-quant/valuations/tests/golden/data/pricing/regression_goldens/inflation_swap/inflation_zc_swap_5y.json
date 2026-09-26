@@ -189,7 +189,7 @@
         "base_cpi": 312.49179121221636,
         "calendar_id": "nyse",
         "business_day_convention": "modified_following",
-        "interpolation_override": "linear"
+        "interpolation": "linear"
       }
     }
   },

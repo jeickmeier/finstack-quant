@@ -52,7 +52,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
         },
-        "interpolation_override": {
+        "interpolation": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationInterpolation"
@@ -61,9 +61,9 @@
               "type": "null"
             }
           ],
-          "description": "Contractual monthly CPI interpolation, overriding index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
+          "description": "Contractual monthly CPI interpolation; takes precedence over index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
         },
-        "lag_override": {
+        "lag": {
           "anyOf": [
             {
               "$ref": "#/$defs/InflationLag"
@@ -72,7 +72,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional contract-level lag override."
+          "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
         },
         "maturity": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -290,8 +290,8 @@
           },
           "id": "INFLCAP-USD-5Y",
           "inflation_index_id": "US-CPI",
-          "interpolation_override": null,
-          "lag_override": {
+          "interpolation": null,
+          "lag": {
             "months": 3
           },
           "maturity": "2029-01-15",

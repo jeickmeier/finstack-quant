@@ -217,7 +217,7 @@ pub(super) fn recycle_reinvestment_principal(
 ///
 /// The row `REINVEST-{n}` matures `maturity_months` after `payment_date`,
 /// capped at the notes' legal final, accrues ACT/360 at the index plus spread
-/// (floored at `coupon_floor`) or at the spread as a fixed coupon, and is
+/// (floored at `all_in_floor_bp`) or at the spread as a fixed coupon, and is
 /// bought at `price_fraction` of par. A purchase whose current yield is below
 /// `min_yield` is ineligible and leaves the cash in the principal account.
 fn purchase_replacement_collateral(
@@ -260,9 +260,8 @@ fn purchase_replacement_collateral(
         )?,
         None => spread,
     };
-    let coupon = assumptions
-        .coupon_floor
-        .map_or(coupon, |floor| coupon.max(floor));
+    let all_in_floor = assumptions.all_in_floor_bp.map(|bp| bp / 10_000.0);
+    let coupon = all_in_floor.map_or(coupon, |floor| coupon.max(floor));
     if coupon / price_fraction < min_yield {
         return Ok(Money::from((0_i64, state.base_currency)));
     }
@@ -291,9 +290,7 @@ fn purchase_replacement_collateral(
     asset.asset_type = AssetType::FirstLienLoan {};
     asset.purchase_price = Some(recyclable);
     asset.acquisition_date = Some(payment_date);
-    state
-        .pool_state
-        .push_asset(&asset, assumptions.coupon_floor);
+    state.pool_state.push_asset(&asset, all_in_floor);
     state.pool.to_mut().assets.push(asset);
     Ok(recyclable)
 }

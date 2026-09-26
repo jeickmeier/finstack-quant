@@ -50,7 +50,7 @@ impl InflationSource {
         }
     }
 
-    /// Unfloored index ratio `RefCPI(date) / base_index` for `bond`.
+    /// Unfloored index ratio `RefCPI(date) / base_cpi` for `bond`.
     pub(super) fn ratio(&self, bond: &InflationLinkedBond, date: Date) -> Result<f64> {
         match self {
             Self::Index(index) => bond.index_ratio(date, index.as_ref()),
@@ -117,10 +117,10 @@ impl InflationSource {
                     InflationLag::Days(days) => cpi_on(date - Duration::days(i64::from(days)))?,
                     _ => cpi_on(date)?,
                 };
-                if bond.base_index <= 0.0 {
+                if bond.base_cpi <= 0.0 {
                     return Err(finstack_quant_core::InputError::NonPositiveValue.into());
                 }
-                Ok(current_index / bond.base_index)
+                Ok(current_index / bond.base_cpi)
             }
         }
     }
@@ -171,10 +171,10 @@ impl InflationLinkedBond {
             _ => inflation_index.value_on(date)?,
         };
 
-        if self.base_index <= 0.0 {
+        if self.base_cpi <= 0.0 {
             return Err(finstack_quant_core::InputError::NonPositiveValue.into());
         }
-        Ok(current_index / self.base_index)
+        Ok(current_index / self.base_cpi)
     }
 
     pub(super) fn validate_index_conventions(
@@ -261,10 +261,10 @@ impl InflationLinkedBond {
             _ => inflation_curve.cpi_on_date(date)?,
         };
 
-        if self.base_index <= 0.0 {
+        if self.base_cpi <= 0.0 {
             return Err(finstack_quant_core::InputError::NonPositiveValue.into());
         }
-        Ok(current_index / self.base_index)
+        Ok(current_index / self.base_cpi)
     }
 
     /// Whether the indexation method uses daily-interpolated reference CPI

@@ -551,7 +551,7 @@ fn quanto_option() -> QuantoOption {
     QuantoOption::builder()
         .id(InstrumentId::new("QUANTO-ROUTING"))
         .underlying_ticker("NKY".to_string())
-        .equity_strike(Money::new(35_000.0, Currency::JPY).expect("money"))
+        .strike(35_000.0)
         .option_type(OptionType::Call)
         .expiry(time::macros::date!(2027 - 01 - 04))
         .notional(Money::new(1_000_000.0, Currency::USD).expect("money"))

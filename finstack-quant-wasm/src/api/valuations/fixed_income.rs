@@ -78,7 +78,7 @@ impl JsBond {
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal amount of the bond.
     /// @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
-    /// @param marginBp - Spread over the index in whole basis points
+    /// @param spreadBp - Spread over the index in whole basis points
     /// (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp
     /// margins, which preserves the exact decimal spread).
     /// @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
@@ -94,7 +94,7 @@ impl JsBond {
         id: &str,
         notional: &JsMoney,
         forward_curve_id: &str,
-        margin_bp: &JsBps,
+        spread_bp: &JsBps,
         issue: &str,
         maturity: &str,
         frequency: &JsTenor,
@@ -105,7 +105,7 @@ impl JsBond {
             id,
             notional.inner,
             forward_curve_id,
-            margin_bp.inner,
+            spread_bp.inner,
             parse_iso_date(issue)?,
             parse_iso_date(maturity)?,
             frequency.inner,

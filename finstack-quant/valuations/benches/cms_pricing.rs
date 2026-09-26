@@ -85,7 +85,7 @@ fn create_market(as_of: Date) -> MarketContext {
 
 // CMS Option builder — n quarterly fixing periods
 
-fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: f64) -> CmsOption {
+fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: Tenor) -> CmsOption {
     let mut fixing_dates = Vec::with_capacity(n_periods);
     let mut payment_dates = Vec::with_capacity(n_periods);
     let mut accrual_fractions = Vec::with_capacity(n_periods);
@@ -134,7 +134,11 @@ fn bench_cms_option_period_count(c: &mut Criterion) {
     let market = create_market(as_of);
 
     let n = 20;
-    let cap = make_cms_option(as_of, n, 10.0);
+    let cap = make_cms_option(
+        as_of,
+        n,
+        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
+    );
 
     group.throughput(Throughput::Elements(n as u64));
     group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
@@ -157,7 +161,7 @@ fn bench_cms_option_cms_tenor(c: &mut Criterion) {
     let market = create_market(as_of);
 
     let label = "10Y";
-    let cms_tenor = 10.0;
+    let cms_tenor = Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap();
     let cap = make_cms_option(as_of, 20, cms_tenor);
 
     group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
@@ -192,10 +196,10 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
         start,
         end,
         Tenor::quarterly(),
-        10.0,
-        0.0,
+        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
+        Decimal::ZERO,
         FundingLegSpec::Fixed {
-            rate: 0.03,
+            rate: Decimal::new(3, 2),
             day_count: DayCount::Thirty360,
         },
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -227,7 +231,11 @@ fn bench_cms_option_replication(c: &mut Criterion) {
     let as_of = base_date();
     let market = create_market(as_of);
     let n = 20;
-    let cap = make_cms_option(as_of, n, 10.0);
+    let cap = make_cms_option(
+        as_of,
+        n,
+        Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).unwrap(),
+    );
     let pricer = CmsReplicationPricer::new();
 
     group.throughput(Throughput::Elements(n as u64));

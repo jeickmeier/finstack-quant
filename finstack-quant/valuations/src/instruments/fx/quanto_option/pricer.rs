@@ -56,7 +56,7 @@ fn collect_quanto_inputs(
         curves,
         inst.vol_surface_id.as_str(),
         t,
-        inst.equity_strike.amount(),
+        inst.strike,
     )?;
 
     // The quanto drift adjustment uses ATM-forward FX vol, so absolute-strike
@@ -120,7 +120,7 @@ fn payoff_scale(inst: &QuantoOption) -> finstack_quant_core::Result<f64> {
     // pricing call cost ~3-4x for vanna/volga which call `value()` 4x.
     match (inst.quantity, inst.payoff_fx_rate) {
         (Some(quantity), Some(fx_rate)) => Ok(quantity * fx_rate),
-        (None, None) => Ok(inst.notional.amount() / inst.equity_strike.amount()),
+        (None, None) => Ok(inst.notional.amount() / inst.strike),
         _ => Err(finstack_quant_core::Error::Validation(
             "QuantoOption requires both quantity and payoff_fx_rate when either is supplied"
                 .to_string(),
@@ -180,7 +180,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
                     PricingErrorContext::default(),
                 )
             })?;
-            let strike = quanto.equity_strike.amount();
+            let strike = quanto.strike;
             let intrinsic_unit = match quanto.option_type {
                 crate::instruments::OptionType::Call => (spot - strike).max(0.0),
                 crate::instruments::OptionType::Put => (strike - spot).max(0.0),
@@ -216,7 +216,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
                     PricingErrorContext::default(),
                 )
             })?;
-            let strike = quanto.equity_strike.amount();
+            let strike = quanto.strike;
             let intrinsic_unit = match quanto.option_type {
                 crate::instruments::OptionType::Call => (spot - strike).max(0.0),
                 crate::instruments::OptionType::Put => (strike - spot).max(0.0),
@@ -236,7 +236,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         let price = match quanto.option_type {
             crate::instruments::OptionType::Call => quanto_call(
                 spot,
-                quanto.equity_strike.amount(),
+                quanto.strike,
                 t,
                 r_dom,
                 r_for,
@@ -247,7 +247,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             ),
             crate::instruments::OptionType::Put => quanto_put(
                 spot,
-                quanto.equity_strike.amount(),
+                quanto.strike,
                 t,
                 r_dom,
                 r_for,
@@ -346,7 +346,7 @@ mod tests {
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-DISC"))
             .underlying_ticker("NKY".to_string())
-            .equity_strike(Money::from((35000_i64, Currency::JPY)))
+            .strike(35_000.0)
             .option_type(crate::instruments::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -447,7 +447,7 @@ mod tests {
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-EXPIRY"))
             .underlying_ticker("NKY".to_string())
-            .equity_strike(Money::from((35_000_i64, Currency::JPY)))
+            .strike(35_000.0)
             .option_type(crate::instruments::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -551,7 +551,7 @@ mod tests {
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-ATM"))
             .underlying_ticker("AAPL".to_string())
-            .equity_strike(Money::from((100_i64, Currency::EUR)))
+            .strike(100.0)
             .option_type(crate::instruments::OptionType::Call)
             .expiry(expiry)
             .notional(Money::from((1_000_000_i64, Currency::USD)))

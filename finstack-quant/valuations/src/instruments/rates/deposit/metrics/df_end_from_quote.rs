@@ -27,7 +27,7 @@ impl MetricCalculator for DfEndFromQuoteCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let deposit: &Deposit = context.instrument_as()?;
 
-        let r = deposit.quote_rate.ok_or_else(|| {
+        let r = deposit.fixed_rate.ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
                 id: "QuoteRate (required for implied DF calculation)".to_string(),
             })

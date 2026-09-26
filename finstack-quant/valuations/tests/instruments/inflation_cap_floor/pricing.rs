@@ -59,7 +59,7 @@ fn test_caplet_intrinsic_after_fixing() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_override_opt(None)
+        .lag_opt(None)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -122,7 +122,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_override_opt(None)
+        .lag_opt(None)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -143,7 +143,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_override_opt(None)
+        .lag_opt(None)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -204,7 +204,7 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
             .vol_surface_id(CurveId::new(vol_surface_id))
             // Zero lag so the fixing date is in the future and the convexity
             // adjustment (which requires t_fix > 0) is active.
-            .lag_override_opt(Some(InflationLag::Months(0)))
+            .lag_opt(Some(InflationLag::Months(0)))
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()

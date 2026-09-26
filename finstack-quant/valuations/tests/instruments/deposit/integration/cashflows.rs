@@ -14,7 +14,7 @@ fn test_cashflow_generation_two_flows() {
     let dep = DepositBuilder::new(base)
         .start_date(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -52,7 +52,7 @@ fn test_cashflow_redemption_amount() {
         .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(rate)
+        .fixed_rate(rate)
         .build();
 
     // Execute
@@ -82,7 +82,7 @@ fn test_cashflow_conservation_of_value() {
     let dep = DepositBuilder::new(base)
         .start_date(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute - compare against the pricing-view trade NPV (`npv_raw`), which
@@ -125,7 +125,7 @@ fn test_cashflow_with_zero_rate() {
         .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .start_date(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.0)
+        .fixed_rate(0.0)
         .build();
 
     // Execute
@@ -161,12 +161,12 @@ fn test_cashflow_notional_scales() {
 
     let dep_1m = DepositBuilder::new(base)
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     let dep_2m = DepositBuilder::new(base)
         .notional(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute

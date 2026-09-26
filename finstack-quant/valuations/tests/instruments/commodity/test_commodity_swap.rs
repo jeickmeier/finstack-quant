@@ -11,8 +11,6 @@ use finstack_quant_valuations::instruments::rates::irs::PayReceive;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
 use time::Month;
 
 /// Helper to create a test market context with discount and price curves.
@@ -59,7 +57,7 @@ fn test_commodity_swap_pricing() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(3.50).expect("valid decimal")) // Same as spot
+        .fixed_price(3.50) // Same as spot
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
@@ -98,7 +96,7 @@ fn test_commodity_swap_fixed_leg_pv() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(3.50).expect("valid decimal"))
+        .fixed_price(3.50)
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
@@ -132,7 +130,7 @@ fn test_commodity_swap_payment_schedule() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(3.50).expect("valid decimal"))
+        .fixed_price(3.50)
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(start)
@@ -175,7 +173,7 @@ fn test_commodity_swap_receive_fixed() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(3.50).expect("valid decimal"))
+        .fixed_price(3.50)
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
@@ -195,7 +193,7 @@ fn test_commodity_swap_receive_fixed() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(3.50).expect("valid decimal"))
+        .fixed_price(3.50)
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Receive) // Receive fixed
         .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
@@ -243,7 +241,7 @@ fn test_commodity_swap_par_rate_round_trip() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(1.0).expect("valid decimal")) // Placeholder
+        .fixed_price(1.0) // Placeholder
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(start_date)
@@ -264,11 +262,7 @@ fn test_commodity_swap_par_rate_round_trip() {
     // where Fixed_PV_per_dollar is the fixed leg PV assuming fixed_price = 1.0
     // But our fixed leg PV uses the actual fixed_price, so we need to adjust
     // Fixed leg PV = ∑ Q × P_fixed × DF, so PV_per_unit = Fixed_PV / P_fixed
-    let fixed_pv_per_unit = fixed_leg_pv_per_dollar
-        / test_swap
-            .fixed_price
-            .to_f64()
-            .expect("fixed_price converts to f64");
+    let fixed_pv_per_unit = fixed_leg_pv_per_dollar / test_swap.fixed_price;
     let par_fixed_price = floating_pv / fixed_pv_per_unit;
 
     // Step 2: Create swap at par rate
@@ -281,7 +275,7 @@ fn test_commodity_swap_par_rate_round_trip() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(par_fixed_price).expect("valid decimal"))
+        .fixed_price(par_fixed_price)
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(start_date)
@@ -322,7 +316,7 @@ fn test_commodity_swap_cashflow_npv_consistency() {
             Currency::USD,
         ))
         .quantity(10000.0)
-        .fixed_price(Decimal::try_from(3.55).expect("valid decimal"))
+        .fixed_price(3.55)
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(as_of)
@@ -382,7 +376,7 @@ fn test_commodity_swap_delta_analytical() {
             Currency::USD,
         ))
         .quantity(quantity)
-        .fixed_price(Decimal::try_from(3.55).expect("valid decimal"))
+        .fixed_price(3.55)
         .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
         .side(PayReceive::Pay)
         .start_date(as_of)

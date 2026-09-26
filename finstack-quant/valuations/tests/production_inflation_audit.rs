@@ -49,7 +49,7 @@ fn b17_fixed_inflation_leg_compounds_one_per_annual_period() {
 #[test]
 fn b17_month_end_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() {
     let mut bond = InflationLinkedBond::example();
-    bond.base_index = 300.0;
+    bond.base_cpi = 300.0;
     bond.lag = InflationLag::Months(3);
     let index = InflationIndex::new(
         "US-CPI",
@@ -250,7 +250,7 @@ fn b17_projected_inflation_uses_contract_month_interpolation_weights() {
     swap.start_date = as_of;
     swap.maturity = date!(2026 - 02 - 16);
     swap.base_cpi = Some(300.0);
-    swap.lag_override = Some(InflationLag::Months(3));
+    swap.lag = Some(InflationLag::Months(3));
     let actual = swap
         .pv_inflation_leg(&market, as_of)
         .expect("inflation PV")

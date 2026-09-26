@@ -1,7 +1,7 @@
 //! CMS static replication against independent lognormal density integration.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -66,13 +66,13 @@ fn single_curve_cms(
     fixing: Date,
     payment: Date,
     strike_rate: f64,
-    cms_tenor: f64,
+    cms_tenor_years: u32,
     option_type: OptionType,
 ) -> CmsOption {
     CmsOption {
         id: InstrumentId::new("CMS-TEST"),
         strike: Decimal::try_from(strike_rate).expect("valid strike"),
-        cms_tenor,
+        cms_tenor: Tenor::new(cms_tenor_years, TenorUnit::Years).expect("CMS tenor"),
         fixing_dates: vec![fixing],
         payment_dates: vec![payment],
         accrual_fractions: vec![1.0],
@@ -114,7 +114,7 @@ fn density_price(inst: &CmsOption, market: &MarketContext, as_of: Date, vol: f64
     let start = reference
         .reference_swap_start(inst.fixing_dates[0])
         .unwrap();
-    let end = start.add_months((inst.cms_tenor * 12.0).round() as i32);
+    let end = start.add_months(inst.cms_tenor.months().expect("month tenor") as i32);
     let (forward, _) = reference
         .forward_rate_and_annuity(market, as_of, start, end)
         .unwrap();
@@ -142,7 +142,7 @@ fn density_price(inst: &CmsOption, market: &MarketContext, as_of: Date, vol: f64
     let m = reference.payments_per_year().expect("reference frequency");
     let weight = |rate: f64| {
         // Direct par-annuity formula, evaluated only at strictly positive rates.
-        let annuity = -(-(inst.cms_tenor * m) * (rate / m).ln_1p()).exp_m1() / rate;
+        let annuity = -(-(inst.cms_tenor.to_years() * m) * (rate / m).ln_1p()).exp_m1() / rate;
         (1.0 + rate / m).powf(-m * delay) / annuity
     };
     let sigma_t = vol * t.sqrt();
@@ -174,7 +174,7 @@ fn density_price(inst: &CmsOption, market: &MarketContext, as_of: Date, vol: f64
 #[test]
 fn replication_matches_independent_density_across_strikes_and_payment_lags() {
     let as_of = Date::from_calendar_date(2025, Month::January, 2).unwrap();
-    for (fixing_year, tenor, vol) in [(2026, 10.0, 0.2), (2030, 20.0, 0.8)] {
+    for (fixing_year, tenor, vol) in [(2026, 10, 0.2), (2030, 20, 0.8)] {
         let fixing = Date::from_calendar_date(fixing_year, Month::January, 2).unwrap();
         for month in [Month::April, Month::December] {
             let payment = Date::from_calendar_date(fixing_year, month, 2).unwrap();
@@ -203,7 +203,7 @@ fn replication_zero_volatility_preserves_intrinsic_for_itm_and_sub_bp_strikes() 
         let market = single_curve_market(as_of, 0.03, vol);
         for strike in [-0.01, 0.0, 0.00001, 0.02, 0.03, 0.04] {
             for kind in [OptionType::Call, OptionType::Put] {
-                let inst = single_curve_cms(fixing, payment, strike, 10.0, kind);
+                let inst = single_curve_cms(fixing, payment, strike, 10, kind);
                 let expected = density_price(&inst, &market, as_of, 0.0);
                 assert!((replication_price(&inst, &market, as_of) - expected).abs() < 1e-10);
             }
@@ -224,8 +224,8 @@ fn replication_cap_floor_parity_has_strike_independent_cms_forward() {
         .unwrap();
     let mut implied = Vec::new();
     for strike in [0.00001, 0.01, 0.03, 0.06, 0.15] {
-        let cap = single_curve_cms(fixing, payment, strike, 20.0, OptionType::Call);
-        let floor = single_curve_cms(fixing, payment, strike, 20.0, OptionType::Put);
+        let cap = single_curve_cms(fixing, payment, strike, 20, OptionType::Call);
+        let floor = single_curve_cms(fixing, payment, strike, 20, OptionType::Put);
         implied.push(
             strike
                 + (replication_price(&cap, &market, as_of)

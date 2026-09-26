@@ -21,7 +21,7 @@ fn test_zero_period_deposit() {
         .start_date(base)
         .maturity(base)
         .day_count(DayCount::Act360)
-        .quote_rate_opt(Some(Decimal::try_from(0.05).expect("valid decimal")))
+        .fixed_rate_opt(Some(Decimal::try_from(0.05).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .build();
 
@@ -40,7 +40,7 @@ fn test_zero_rate_deposit() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.0)
+        .fixed_rate(0.0)
         .build();
 
     // Execute - trade NPV (pricing view, includes the T+0 initial exchange).
@@ -59,7 +59,7 @@ fn test_very_high_rate() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(1.0)
+        .fixed_rate(1.0)
         .build();
 
     // Execute
@@ -79,7 +79,7 @@ fn test_very_small_notional() {
     let dep = DepositBuilder::new(base)
         .notional(Money::new(0.01, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -99,7 +99,7 @@ fn test_very_large_notional() {
     let dep = DepositBuilder::new(base)
         .notional(Money::new(1_000_000_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -119,7 +119,7 @@ fn test_very_short_maturity_one_day() {
     let dep = DepositBuilder::new(base)
         .start_date(base)
         .maturity(date(2025, 1, 2))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -139,7 +139,7 @@ fn test_very_long_maturity() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2035, 1, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -157,7 +157,7 @@ fn test_negative_rate_environment() {
 
     let dep = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(-0.005)
+        .fixed_rate(-0.005)
         .build();
 
     // Execute - trade NPV (pricing view, includes the T+0 initial exchange).
@@ -181,7 +181,7 @@ fn test_pricing_on_start_date() {
     let dep = DepositBuilder::new(base)
         .start_date(start)
         .maturity(date(2025, 8, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -200,7 +200,7 @@ fn test_pricing_after_maturity() {
     let dep = DepositBuilder::new(date(2024, 1, 1))
         .start_date(date(2024, 1, 1))
         .maturity(date(2024, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Matured deposits have no future cashflows under the signed canonical
@@ -222,7 +222,7 @@ fn test_thirty360_with_end_of_month() {
         .start_date(date(2025, 1, 31))
         .maturity(date(2025, 7, 31))
         .day_count(DayCount::Thirty360)
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -244,7 +244,7 @@ fn test_leap_year_handling() {
         .start_date(base)
         .maturity(date(2024, 8, 29))
         .day_count(DayCount::Act365F)
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -273,13 +273,13 @@ fn test_missing_quote_rate_defaults_to_zero() {
     // Execute
     let err = dep
         .value(&ctx, base)
-        .expect_err("npv() should require quote_rate");
+        .expect_err("npv() should require fixed_rate");
 
     // Validate
     let msg = err.to_string();
     assert!(
-        msg.contains("quote_rate"),
-        "Error should mention quote_rate: {msg}"
+        msg.contains("fixed_rate"),
+        "Error should mention fixed_rate: {msg}"
     );
 }
 
@@ -292,13 +292,13 @@ fn test_back_to_back_deposits_same_period() {
     let dep1 = DepositBuilder::new(base)
         .id("DEP-1")
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     let dep2 = DepositBuilder::new(base)
         .id("DEP-2")
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .build();
 
     // Execute
@@ -321,7 +321,7 @@ fn test_rate_exactly_equal_to_par() {
 
     let dep_at_par = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(par)
+        .fixed_rate(par)
         .build();
 
     // Par rate zeroes the *trade* NPV (pricing view via `npv_raw`); the
@@ -346,14 +346,14 @@ fn test_multiple_currencies_independent() {
     let dep_usd = DepositBuilder::new(base)
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .discount_curve_id("USD-OIS")
         .build();
 
     let dep_eur = DepositBuilder::new(base)
         .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .maturity(date(2025, 7, 1))
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .discount_curve_id("EUR-OIS")
         .build();
 
@@ -395,7 +395,7 @@ fn test_business_day_convention_adjustment_causes_effective_date_crossover() {
         .start_date(date(2025, 1, 3)) // Friday - trade date
         .maturity(date(2025, 1, 6)) // Monday - just 1 business day after Friday
         .day_count(DayCount::Act360)
-        .quote_rate_opt(Some(Decimal::try_from(0.03).expect("valid decimal")))
+        .fixed_rate_opt(Some(Decimal::try_from(0.03).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .settlement_days_opt(Some(2)) // T+2: Friday + 2 biz days = Tuesday Jan 7
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -426,7 +426,7 @@ fn test_extreme_rate_warning_but_valid() {
     // Test with very high rate (200% = 20000 bp)
     let dep_high = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(2.0) // 200% - triggers warning
+        .fixed_rate(2.0) // 200% - triggers warning
         .build();
 
     // Should validate and price successfully (warning logged but not blocking)
@@ -440,7 +440,7 @@ fn test_extreme_rate_warning_but_valid() {
     // Test with very negative rate (-20% = -2000 bp)
     let dep_low = DepositBuilder::new(base)
         .maturity(date(2025, 7, 1))
-        .quote_rate(-0.2) // -20% - triggers warning
+        .fixed_rate(-0.2) // -20% - triggers warning
         .build();
 
     assert!(

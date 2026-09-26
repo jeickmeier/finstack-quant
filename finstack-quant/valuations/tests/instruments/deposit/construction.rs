@@ -35,7 +35,7 @@ fn test_basic_construction() {
     assert_eq!(dep.maturity, date(2025, 7, 1));
     assert!(matches!(dep.day_count, DayCount::Act360));
     assert_eq!(dep.discount_curve_id.as_str(), "USD-OIS");
-    assert!(dep.quote_rate.is_none());
+    assert!(dep.fixed_rate.is_none());
 }
 
 #[test]
@@ -53,12 +53,12 @@ fn test_construction_with_quote_rate() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .build()
         .unwrap();
-    dep.quote_rate = Some(Decimal::try_from(0.05).expect("valid decimal"));
+    dep.fixed_rate = Some(Decimal::try_from(0.05).expect("valid decimal"));
 
     // Validate
-    assert!(dep.quote_rate.is_some());
+    assert!(dep.fixed_rate.is_some());
     assert_eq!(
-        dep.quote_rate,
+        dep.fixed_rate,
         Some(Decimal::try_from(0.05).expect("valid decimal"))
     );
 }
@@ -176,14 +176,14 @@ fn test_builder_pattern_ergonomics() {
         .start_date(date(2025, 2, 1))
         .maturity(date(2025, 8, 1))
         .day_count(DayCount::Act365F)
-        .quote_rate(0.03)
+        .fixed_rate(0.03)
         .discount_curve_id("EUR-OIS")
         .build();
 
     assert_eq!(dep.id.as_str(), "DEP-FLUENT");
     assert_eq!(dep.notional.amount(), 5_000_000.0);
     assert_eq!(dep.notional.currency(), Currency::EUR);
-    assert!(dep.quote_rate.is_some());
+    assert!(dep.fixed_rate.is_some());
 }
 
 #[test]

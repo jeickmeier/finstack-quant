@@ -32,8 +32,8 @@ pub struct CmsOption {
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
     pub strike: Decimal,
-    /// Tenor of the CMS swap in years (e.g., 10.0 for 10Y)
-    pub cms_tenor: f64,
+    /// Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
+    pub cms_tenor: Tenor,
     /// Observation/fixing dates for CMS rate
     #[serde(with = "finstack_quant_core::wire::dates")]
     #[cfg_attr(
@@ -133,6 +133,10 @@ impl CmsOption {
 
     /// Validate CMS option schedule vectors.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        crate::instruments::rates::cms_common::cms_tenor_months(
+            self.cms_tenor,
+            "CmsOption cms_tenor",
+        )?;
         if self.fixing_dates.len() != self.payment_dates.len()
             || self.fixing_dates.len() != self.accrual_fractions.len()
         {
@@ -175,7 +179,9 @@ impl CmsOption {
         CmsOption::builder()
             .id(InstrumentId::new("CMSOPT-10Y-USD"))
             .strike(Decimal::try_from(0.025).expect("valid decimal"))
-            .cms_tenor(10.0)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
             .fixing_dates(fixing_dates)
             .payment_dates(payment_dates)
             .accrual_fractions(accrual_fractions)
@@ -240,7 +246,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsOption {
         deps.add_series_id(
             finstack_quant_core::market_data::fixings::cms_fixing_series_id(
                 self.forward_curve_id.as_str(),
-                self.cms_tenor,
+                self.cms_tenor.to_years(),
             ),
         );
         Ok(deps)
@@ -283,7 +289,9 @@ mod validation_tests {
         let result = CmsOption::builder()
             .id(InstrumentId::new("CMSOPT-BAD"))
             .strike(Decimal::try_from(0.025).expect("valid decimal"))
-            .cms_tenor(10.0)
+            .cms_tenor(
+                Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y tenor"),
+            )
             .fixing_dates(vec![
                 test_date(Month::March, 20),
                 test_date(Month::June, 20),

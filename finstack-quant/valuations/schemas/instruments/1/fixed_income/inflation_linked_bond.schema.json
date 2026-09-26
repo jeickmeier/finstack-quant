@@ -100,14 +100,14 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
         },
-        "base_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Base date for index (may differ from issue date)"
-        },
-        "base_index": {
+        "base_cpi": {
           "description": "Base CPI/index value at issue",
           "format": "double",
           "type": "number"
+        },
+        "base_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Base date for index (may differ from issue date)"
         },
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
@@ -199,7 +199,7 @@
         "day_count",
         "issue_date",
         "maturity",
-        "base_index",
+        "base_cpi",
         "base_date",
         "indexation_method",
         "lag",
@@ -272,8 +272,8 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "base_cpi": 100.0,
           "base_date": "2024-01-15",
-          "base_index": 100.0,
           "business_day_convention": "unadjusted",
           "calendar_id": null,
           "day_count": "act_act_isma",

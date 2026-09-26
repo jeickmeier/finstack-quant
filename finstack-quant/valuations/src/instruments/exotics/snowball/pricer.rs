@@ -50,7 +50,7 @@ struct SnowballCouponSpec {
     variant: SnowballVariant,
     initial_coupon: f64,
     fixed_rate: f64,
-    leverage: f64,
+    gearing: f64,
     coupon_floor: f64,
     coupon_cap: Option<f64>,
 }
@@ -84,7 +84,7 @@ impl SnowballCouponSpec {
     fn compute_coupon(&self, floating_rate: f64, prev_coupon: f64) -> f64 {
         let raw = match self.variant {
             SnowballVariant::Snowball => prev_coupon + self.fixed_rate - floating_rate,
-            SnowballVariant::InverseFloater => self.fixed_rate - self.leverage * floating_rate,
+            SnowballVariant::InverseFloater => self.fixed_rate - self.gearing * floating_rate,
         };
         let floored = raw.max(self.coupon_floor);
         self.coupon_cap.map_or(floored, |cap| floored.min(cap))
@@ -221,9 +221,9 @@ impl SnowballDiscountingPricer {
         }
         ensure_not_callable(inst)?;
 
-        let first_coupon_date = inst.coupon_dates[0];
-        let final_coupon_date = *inst.coupon_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("Snowball requires coupon dates".to_string())
+        let first_coupon_date = inst.start_date;
+        let final_coupon_date = *inst.payment_dates.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
         })?;
         if as_of >= final_coupon_date {
             return Ok(Money::from((0_i64, inst.notional.currency())));
@@ -254,7 +254,7 @@ impl SnowballDiscountingPricer {
         let mut pv = 0.0;
         let mut prev_coupon = inst.initial_coupon;
         let mut event_idx = 0usize;
-        for period in inst.coupon_dates.windows(2) {
+        for period in inst.period_boundaries().windows(2) {
             let start = period[0];
             let end = period[1];
             if end <= as_of {
@@ -277,8 +277,8 @@ impl SnowballDiscountingPricer {
             event_idx += 1;
         }
 
-        let maturity = *inst.coupon_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("Snowball requires coupon dates".to_string())
+        let maturity = *inst.payment_dates.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
         })?;
         let redemption_df = relative_df_discount_curve(discount_curve.as_ref(), as_of, maturity)?;
         pv += inst.notional.amount() * redemption_df;
@@ -397,9 +397,9 @@ impl SnowballHw1fMcPricer {
         inst.validate()?;
         ensure_not_callable(inst)?;
 
-        let first_coupon_date = inst.coupon_dates[0];
-        let final_coupon_date = *inst.coupon_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("Snowball requires coupon dates".to_string())
+        let first_coupon_date = inst.start_date;
+        let final_coupon_date = *inst.payment_dates.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
         })?;
         if as_of >= final_coupon_date {
             let zero = Money::from((0_i64, inst.notional.currency()));
@@ -464,8 +464,8 @@ impl SnowballHw1fMcPricer {
         let spec = SnowballCouponSpec {
             variant: inst.variant,
             initial_coupon: inst.initial_coupon,
-            fixed_rate: inst.fixed_rate,
-            leverage: inst.leverage,
+            fixed_rate: finstack_quant_core::decimal::decimal_to_f64(inst.fixed_rate)?,
+            gearing: inst.gearing,
             coupon_floor: inst.coupon_floor,
             coupon_cap: inst.coupon_cap,
         };
@@ -483,8 +483,8 @@ impl SnowballHw1fMcPricer {
         // fix in advance but pay at the period end, so the simulation must
         // reach the last payment date for the pathwise bank-account numeraire
         // B(T_pay) to be observable.
-        let maturity_date = *inst.coupon_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("Snowball requires coupon dates".to_string())
+        let maturity_date = *inst.payment_dates.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
         })?;
         let maturity_time =
             inst.day_count
@@ -632,7 +632,7 @@ fn coupon_events(
         inst.id.as_str(),
     )?;
     let mut events = Vec::new();
-    for period in inst.coupon_dates.windows(2) {
+    for period in inst.period_boundaries().windows(2) {
         let start = period[0];
         let end = period[1];
         if end <= as_of {
@@ -703,7 +703,7 @@ fn coupon_events(
 /// An already-seasoned first coupon contributes no path event.
 fn event_times(inst: &Snowball, as_of: Date) -> Result<Vec<f64>> {
     let mut times = Vec::new();
-    for period in inst.coupon_dates.windows(2) {
+    for period in inst.period_boundaries().windows(2) {
         let start = period[0];
         let end = period[1];
         if end <= as_of || start <= as_of {
@@ -769,13 +769,13 @@ mod tests {
             id: InstrumentId::new("SNOWBALL-TEST"),
             variant: SnowballVariant::Snowball,
             initial_coupon: 0.03,
-            fixed_rate: 0.05,
-            leverage: 1.0,
+            fixed_rate: rust_decimal::Decimal::new(5, 2),
+            gearing: 1.0,
             coupon_floor: 0.0,
             coupon_cap: None,
             notional: Money::from((1_000_000_i64, Currency::USD)),
-            coupon_dates: vec![
-                date(2025, Month::January, 1),
+            start_date: date(2025, Month::January, 1),
+            payment_dates: vec![
                 date(2025, Month::July, 1),
                 date(2026, Month::January, 1),
                 date(2026, Month::July, 1),
@@ -797,8 +797,8 @@ mod tests {
         Snowball {
             variant: SnowballVariant::InverseFloater,
             initial_coupon: 0.0,
-            fixed_rate: 0.08,
-            leverage: 1.5,
+            fixed_rate: rust_decimal::Decimal::new(8, 2),
+            gearing: 1.5,
             coupon_cap: Some(0.10),
             ..test_snowball()
         }
@@ -982,7 +982,7 @@ mod tests {
         let mut pv = 0.0;
         let mut prev_coupon = inst.initial_coupon;
 
-        for period in inst.coupon_dates.windows(2) {
+        for period in inst.period_boundaries().windows(2) {
             let start = period[0];
             let end = period[1];
             if end <= as_of {
@@ -1008,7 +1008,7 @@ mod tests {
             prev_coupon = coupon;
         }
 
-        let maturity = *inst.coupon_dates.last().expect("maturity");
+        let maturity = *inst.payment_dates.last().expect("maturity");
         let df = relative_df_discount_curve(disc.as_ref(), as_of, maturity).expect("df");
         pv += inst.notional.amount() * df;
         pv
@@ -1041,7 +1041,7 @@ mod tests {
     /// residual gap (empirically ≈ $5.3k): the simple-vs-continuous-compounding
     /// difference between the discount curve's *simple* forward and the
     /// projection curve's *integral-averaged* rate, amplified by the inverse
-    /// floater's 1.5× leverage, plus the θ(t)-bootstrap discretization residual.
+    /// floater's 1.5× gearing, plus the θ(t)-bootstrap discretization residual.
     ///
     /// This guards the two code paths against silently drifting apart on the
     /// fixing window again: reverting either pricer to an in-arrears

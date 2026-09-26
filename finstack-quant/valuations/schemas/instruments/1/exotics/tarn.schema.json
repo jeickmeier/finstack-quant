@@ -13,13 +13,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection."
         },
-        "coupon_dates": {
-          "description": "Coupon payment dates (must be sorted ascending).",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
         "coupon_floor": {
           "description": "Floor on each period's coupon (typically 0.0).",
           "format": "double",
@@ -34,9 +27,8 @@
           "description": "Discount curve ID for PV calculations."
         },
         "fixed_rate": {
-          "description": "Fixed coupon rate (the \"strike\" rate).",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Fixed coupon rate (the \"strike\" rate) as a decimal annual rate (0.05 = 5%)."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -62,9 +54,20 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount."
         },
+        "payment_dates": {
+          "description": "Coupon payment dates, one per period, strictly ascending and after\n`start_date`. Period `i` accrues from the previous payment date (or\n`start_date`) to `payment_dates[i]` and fixes in advance at its start.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
+        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Accrual start of the first coupon period; also the first in-advance\nfixing date."
         },
         "target_coupon": {
           "description": "Target cumulative coupon level (triggers early redemption).\n\nA zero target is allowed and represents redemption at the first\nfuture coupon date without coupon accrual.",
@@ -89,7 +92,8 @@
         "coupon_floor",
         "target_coupon",
         "notional",
-        "coupon_dates",
+        "start_date",
+        "payment_dates",
         "index_tenor",
         "forward_curve_id",
         "discount_curve_id",
@@ -125,22 +129,10 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "coupon_dates": [
-            "2026-06-30",
-            "2026-12-31",
-            "2027-06-30",
-            "2027-12-31",
-            "2028-06-30",
-            "2028-12-31",
-            "2029-06-30",
-            "2029-12-31",
-            "2030-06-30",
-            "2030-12-31"
-          ],
           "coupon_floor": 0.0,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
-          "fixed_rate": 0.06,
+          "fixed_rate": "0.06",
           "forward_curve_id": "USD-SOFR-6M",
           "id": "TARN-USD-5Y",
           "index_tenor": {
@@ -151,6 +143,18 @@
             "amount": "1000000",
             "currency": "USD"
           },
+          "payment_dates": [
+            "2026-12-31",
+            "2027-06-30",
+            "2027-12-31",
+            "2028-06-30",
+            "2028-12-31",
+            "2029-06-30",
+            "2029-12-31",
+            "2030-06-30",
+            "2030-12-31"
+          ],
+          "start_date": "2026-06-30",
           "target_coupon": 0.15,
           "vol_surface_id": "USD-SOFR-HW-VOL"
         },

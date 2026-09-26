@@ -800,7 +800,7 @@ fn test_pool_asset_type_classification() {
         rate: 0.07,
         spread_bp: Some(450.0),
         forward_curve_id: Some("SOFR-3M".to_string()),
-        index_floor: None,
+        index_floor_bp: None,
         maturity: maturity_date(),
         credit_quality: Some(CreditRating::BB),
         industry: Some("Technology".to_string()),

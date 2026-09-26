@@ -8,7 +8,7 @@
 //! # Variants
 //!
 //! - **Snowball**: c_i = max(c_{i-1} + fixed - floating, 0)
-//! - **Inverse Floater**: c_i = max(fixed - leverage * floating, 0)
+//! - **Inverse Floater**: c_i = max(fixed - gearing * floating, 0)
 //!
 //! # See Also
 //!

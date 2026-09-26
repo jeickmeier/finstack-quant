@@ -69,9 +69,9 @@ it.each([
   {
     name: "deposit decimal",
     module: deposit,
-    path: ["instrument", "spec", "quote_rate"],
+    path: ["instrument", "spec", "fixed_rate"],
     value: "bad",
-    field: "instrument.spec.quote_rate",
+    field: "instrument.spec.fixed_rate",
   },
   {
     name: "bond external coupon",

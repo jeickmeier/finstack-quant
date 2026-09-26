@@ -230,7 +230,7 @@ pub struct CapFloor {
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
     pub strike: Decimal,
-    /// Contractual spread added to the referenced rate, in decimal rate units.
+    /// Contractual margin added to the referenced rate, in basis points (10 = 10bp).
     ///
     /// Term-index coupons add this spread after projecting the index. For
     /// overnight coupons, [`OvernightSpreadCompounding`] determines whether it
@@ -242,7 +242,7 @@ pub struct CapFloor {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
-    pub spread: Decimal,
+    pub spread_bp: Decimal,
     /// Start date of underlying period
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -395,10 +395,15 @@ impl CapFloor {
             .ok_or(finstack_quant_core::InputError::ConversionOverflow.into())
     }
 
-    pub(crate) fn spread_f64(&self) -> finstack_quant_core::Result<f64> {
-        self.spread
+    /// Index margin as a decimal rate (`spread_bp / 10_000`).
+    pub(crate) fn spread_rate(&self) -> finstack_quant_core::Result<f64> {
+        let spread_bp = self
+            .spread_bp
             .to_f64()
-            .ok_or(finstack_quant_core::InputError::ConversionOverflow.into())
+            .ok_or(finstack_quant_core::Error::from(
+                finstack_quant_core::InputError::ConversionOverflow,
+            ))?;
+        Ok(spread_bp / 10_000.0)
     }
 
     /// Create a cap, floor, caplet or floorlet with the standard schedule
@@ -444,7 +449,7 @@ impl CapFloor {
             rate_option_type,
             notional,
             strike: finstack_quant_core::decimal::f64_to_decimal(strike)?,
-            spread: Decimal::ZERO,
+            spread_bp: Decimal::ZERO,
             start_date,
             maturity,
             frequency: frequency

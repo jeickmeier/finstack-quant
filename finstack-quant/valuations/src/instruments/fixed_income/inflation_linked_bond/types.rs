@@ -173,7 +173,7 @@ pub struct InflationLinkedBond {
     )]
     pub maturity: Date,
     /// Base CPI/index value at issue
-    pub base_index: f64,
+    pub base_cpi: f64,
     /// Base date for index (may differ from issue date)
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -275,9 +275,9 @@ impl InflationLinkedBond {
                 "{context} base_date cannot follow maturity"
             )));
         }
-        if !self.base_index.is_finite() || self.base_index <= 0.0 {
+        if !self.base_cpi.is_finite() || self.base_cpi <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} base_index must be positive and finite"
+                "{context} base_cpi must be positive and finite"
             )));
         }
         if self
@@ -338,7 +338,7 @@ impl InflationLinkedBond {
             day_count: DayCount::ActActIsma, // US Treasury convention
             issue_date: date!(2024 - 01 - 15),
             maturity: date!(2034 - 01 - 15),
-            base_index: 100.0,
+            base_cpi: 100.0,
             base_date: date!(2024 - 01 - 15),
             indexation_method: IndexationMethod::Tips,
             lag: IndexationMethod::Tips.standard_lag(),
@@ -370,7 +370,7 @@ impl InflationLinkedBond {
             day_count: bond_params.day_count,
             issue_date: bond_params.issue,
             maturity: bond_params.maturity,
-            base_index: bond_params.base_index,
+            base_cpi: bond_params.base_cpi,
             base_date: bond_params.issue,
             indexation_method: IndexationMethod::Tips,
             lag: IndexationMethod::Tips.standard_lag(),
@@ -428,7 +428,7 @@ impl InflationLinkedBond {
     ///     day_count: DayCount::ActActIsma,
     ///     issue: date!(1999-07-26),  // Pre-2005 issue
     ///     maturity: date!(2020-07-26),
-    ///     base_index: 162.9,
+    ///     base_cpi: 162.9,
     /// };
     ///
     /// let gilt = InflationLinkedBond::new_uk_linker(
@@ -463,7 +463,7 @@ impl InflationLinkedBond {
             day_count: bond_params.day_count,
             issue_date: bond_params.issue,
             maturity: bond_params.maturity,
-            base_index: bond_params.base_index,
+            base_cpi: bond_params.base_cpi,
             base_date,
             indexation_method: IndexationMethod::Uk,
             lag: IndexationMethod::Uk.standard_lag(), // 8-month lag for legacy gilts
@@ -1008,7 +1008,7 @@ mod tests {
             day_count: DayCount::Thirty360,
             issue_date: as_of,
             maturity,
-            base_index: 100.0,
+            base_cpi: 100.0,
             base_date: as_of,
             indexation_method: IndexationMethod::Tips,
             lag: InflationLag::None,
@@ -1123,7 +1123,7 @@ mod tests {
             day_count: DayCount::Thirty360,
             issue_date: issue,
             maturity,
-            base_index: 100.0,
+            base_cpi: 100.0,
             base_date: issue,
             indexation_method: IndexationMethod::Tips,
             lag: InflationLag::None,
@@ -1203,7 +1203,7 @@ mod tests {
             day_count: DayCount::Thirty360,
             issue_date: d(2024, Month::January, 15),
             maturity: d(2026, Month::January, 15),
-            base_index: 100.0,
+            base_cpi: 100.0,
             base_date: d(2024, Month::January, 15),
             indexation_method: IndexationMethod::Tips,
             lag: InflationLag::None,
@@ -1289,7 +1289,7 @@ mod tests {
         let ratio = bond
             .index_ratio_from_market(d(2025, Month::June, 15), &market)
             .expect("hybrid RefCPI");
-        let expected = (110.0 + (14.0 / 30.0) * (120.0 - 110.0)) / bond.base_index;
+        let expected = (110.0 + (14.0 / 30.0) * (120.0 - 110.0)) / bond.base_cpi;
         assert!((ratio - expected).abs() < 1e-12);
     }
 

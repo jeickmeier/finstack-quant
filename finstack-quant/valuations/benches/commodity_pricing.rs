@@ -38,7 +38,6 @@ mod commodity_curve_support;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/volatility.rs"]
 mod volatility_support;
-use rust_decimal::Decimal;
 use std::hint::black_box;
 use time::Month;
 
@@ -139,7 +138,7 @@ fn commodity_swap_contract(label: &str, end: Date) -> CommoditySwap {
         .id(InstrumentId::new(label))
         .underlying(wti_underlying())
         .quantity(10_000.0)
-        .fixed_price(Decimal::try_from(75.0).expect("fixed price"))
+        .fixed_price(75.0)
         .forward_curve_id(CurveId::new("WTI-FWD"))
         .side(PayReceive::Pay)
         .start_date(start)

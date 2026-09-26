@@ -8,7 +8,7 @@ fn test_quote_rate_returns_set_rate() {
     // Setup
     let base = date(2025, 1, 1);
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
-    let dep = DepositBuilder::new(base).quote_rate(0.0375).build();
+    let dep = DepositBuilder::new(base).fixed_rate(0.0375).build();
 
     // Execute
     let quote = compute_metric(&dep, &ctx, base, MetricId::QuoteRate);
@@ -22,7 +22,7 @@ fn test_quote_rate_with_zero() {
     // Setup
     let base = date(2025, 1, 1);
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
-    let dep = DepositBuilder::new(base).quote_rate(0.0).build();
+    let dep = DepositBuilder::new(base).fixed_rate(0.0).build();
 
     // Execute
     let quote = compute_metric(&dep, &ctx, base, MetricId::QuoteRate);
@@ -36,7 +36,7 @@ fn test_quote_rate_with_negative_rate() {
     // Setup
     let base = date(2025, 1, 1);
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
-    let dep = DepositBuilder::new(base).quote_rate(-0.005).build();
+    let dep = DepositBuilder::new(base).fixed_rate(-0.005).build();
 
     // Execute
     let quote = compute_metric(&dep, &ctx, base, MetricId::QuoteRate);
@@ -50,7 +50,7 @@ fn test_quote_rate_with_high_rate() {
     // Setup
     let base = date(2025, 1, 1);
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
-    let dep = DepositBuilder::new(base).quote_rate(0.15).build();
+    let dep = DepositBuilder::new(base).fixed_rate(0.15).build();
 
     // Execute
     let quote = compute_metric(&dep, &ctx, base, MetricId::QuoteRate);

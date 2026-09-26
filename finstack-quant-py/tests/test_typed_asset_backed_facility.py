@@ -46,7 +46,7 @@ def _facility(drawn: float = 60_000_000.0) -> AssetBackedFacility:
         })
         .commitment(Money(80_000_000.0, USD))
         .drawn(drawn, currency="USD")
-        .margin_bp(600.0)
+        .spread_bp(600.0)
         .unused_fee_bp(50.0)
         .closing_date(CLOSE)
         .revolving_end(datetime.date(2026, 1, 15))
@@ -80,7 +80,7 @@ def test_builder_exposes_every_field_and_rejects_an_overdrawn_line() -> None:
     assert facility.drawn.amount == 60_000_000.0
     assert facility.undrawn.amount == 20_000_000.0
     assert facility.forward_curve_id is None
-    assert facility.margin_bp == 600.0
+    assert facility.spread_bp == 600.0
     assert facility.unused_fee_bp == 50.0
     assert facility.closing_date == CLOSE
     assert facility.revolving_end == datetime.date(2026, 1, 15)
@@ -117,7 +117,7 @@ def test_amortization_events_pull_the_revolving_end_forward() -> None:
         .borrowing_base_rules({"advance_rates": [{"asset_class": "*", "rate": 0.8}]})
         .commitment(80_000_000.0, currency="USD")
         .drawn(60_000_000.0, currency="USD")
-        .margin_bp(600.0)
+        .spread_bp(600.0)
         .closing_date(CLOSE)
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
@@ -212,7 +212,7 @@ def test_every_amortization_event_kind_projects_with_documented_units() -> None:
             .borrowing_base_rules(base.borrowing_base_rules)
             .commitment(base.commitment)
             .drawn(base.drawn)
-            .margin_bp(600.0)
+            .spread_bp(600.0)
             .unused_fee_bp(50.0)
             .closing_date(CLOSE)
             .revolving_end(datetime.date(2026, 1, 15))
@@ -242,7 +242,7 @@ def test_draws_fees_and_readvance_round_trip_and_project() -> None:
         .borrowing_base_rules(base.borrowing_base_rules)
         .commitment(base.commitment)
         .drawn(base.drawn)
-        .margin_bp(600.0)
+        .spread_bp(600.0)
         .closing_date(CLOSE)
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))

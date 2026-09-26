@@ -519,7 +519,7 @@ fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
         .day_count(DayCount::Thirty360)
         .issue_date(as_of)
         .maturity(maturity)
-        .base_index(100.0)
+        .base_cpi(100.0)
         .base_date(as_of)
         .indexation_method(IndexationMethod::Tips)
         .lag(InflationLag::None)

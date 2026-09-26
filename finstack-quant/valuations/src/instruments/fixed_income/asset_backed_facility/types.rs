@@ -120,12 +120,13 @@ pub struct AssetBackedFacility {
     /// commitment and strictly below the collateral balance.
     pub drawn: Money,
     /// Forward-curve identifier of the floating index; `None` makes
-    /// `margin_bp` the all-in fixed rate.
+    /// `spread_bp` the all-in fixed rate.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forward_curve_id: Option<CurveId>,
-    /// Margin over the index (or the all-in fixed rate) in basis points.
-    pub margin_bp: f64,
+    /// Margin over the index (or the all-in fixed rate when `forward_curve_id`
+    /// is `None`) in basis points (600 = 6%).
+    pub spread_bp: f64,
     /// Fee on the undrawn commitment in basis points per annum.
     #[builder(default)]
     #[serde(default)]
@@ -264,7 +265,7 @@ impl AssetBackedFacility {
             })
             .commitment(Money::from((80_000_000_i64, Currency::USD)))
             .drawn(Money::from((70_000_000_i64, Currency::USD)))
-            .margin_bp(600.0)
+            .spread_bp(600.0)
             .unused_fee_bp(50.0)
             .closing_date(closing)
             .revolving_end(closing.add_months(24))
@@ -356,7 +357,7 @@ impl AssetBackedFacility {
             )));
         }
         for (label, value) in [
-            ("margin_bp", self.margin_bp),
+            ("spread_bp", self.spread_bp),
             ("unused_fee_bp", self.unused_fee_bp),
         ] {
             if !value.is_finite() || value < 0.0 {

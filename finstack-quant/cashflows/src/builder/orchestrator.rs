@@ -449,7 +449,7 @@ impl CashFlowBuilder {
     /// Build the cashflow schedule with optional market curves for floating rate projection.
     ///
     /// When curves are provided, floating rate coupons use forward rates:
-    /// `coupon = outstanding * (forward_rate * gearing + margin_bp * 1e-4) * year_fraction`
+    /// `coupon = outstanding * (forward_rate * gearing + spread_bp * 1e-4) * year_fraction`
     ///
     /// Without curves, the fallback policy on each floating spec controls behavior
     /// (default: error; `SpreadOnly` uses just margin; `FixedRate(r)` uses a fixed index).

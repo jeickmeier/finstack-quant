@@ -158,7 +158,7 @@ fn test_caplet_creation() {
         vol_shift: 0.0,
         overnight_coupon: None,
         premium: None,
-        spread: Decimal::ZERO,
+        spread_bp: Decimal::ZERO,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -196,7 +196,7 @@ fn test_floorlet_creation() {
         vol_shift: 0.0,
         overnight_coupon: None,
         premium: None,
-        spread: Decimal::ZERO,
+        spread_bp: Decimal::ZERO,
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -446,15 +446,15 @@ fn legacy_cap_json_defaults_overnight_coupon_to_none() {
         "default overnight terms should be omitted for backward-compatible JSON"
     );
     assert!(
-        value.get("spread").is_none(),
-        "zero spread should be omitted for backward-compatible JSON"
+        value.get("spread_bp").is_none(),
+        "zero spread_bp should be omitted for backward-compatible JSON"
     );
     value
         .as_object_mut()
         .expect("cap JSON object")
-        .remove("spread");
+        .remove("spread_bp");
 
     let decoded: CapFloor = serde_json::from_value(value).expect("deserialize legacy cap JSON");
     assert!(decoded.overnight_coupon.is_none());
-    assert_eq!(decoded.spread, Decimal::ZERO);
+    assert_eq!(decoded.spread_bp, Decimal::ZERO);
 }

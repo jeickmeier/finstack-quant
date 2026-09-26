@@ -184,7 +184,7 @@ def borrower_data() -> dict[str, Any]:
             "model_sofr": 0.05,
             "spread_bp": 250.0,
             "amortization_per_quarter_of_original": 0.025,
-            "index_floor": 0.0,
+            "index_floor_bp": 0.0,
             "day_count": "act_360",
             "coupon_frequency": "3M",
             "settlement_days": 2,

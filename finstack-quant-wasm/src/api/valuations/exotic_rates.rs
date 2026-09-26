@@ -59,32 +59,33 @@ pub fn tarn_coupon_profile(
 
 /// Snowball coupon schedule.
 ///
-///   `c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)` with `c_0 = initial_coupon`.
+///   `c_i = clip(c_{i-1} + fixed_rate - L_i, coupon_floor, coupon_cap)` with `c_0 = initial_coupon`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `initial_coupon` or `floor` is negative;
-/// `initial_coupon`, `fixed_rate`, `floor`, or any fixing is non-finite; or
-/// `cap` is NaN or is not greater than `floor`.
+/// Throws a JavaScript exception if `initial_coupon` or `coupon_floor` is
+/// negative; `initial_coupon`, `fixed_rate`, `coupon_floor`, or any fixing is
+/// non-finite; or `coupon_cap` is set and is non-finite or not greater than
+/// `coupon_floor`.
 /// @param initial_coupon - Starting coupon rate before the first snowball update, in decimal form.
 /// @param fixed_rate - Fixed coupon rate in decimal form added at each snowball step.
 /// @param floating_fixings - Ordered floating-rate fixings in decimal form, one for each coupon period.
-/// @param floor - Minimum permitted coupon rate in decimal form.
-/// @param cap - Maximum permitted coupon rate in decimal form.
+/// @param coupon_floor - Minimum permitted coupon rate in decimal form.
+/// @param coupon_cap - Optional maximum permitted coupon rate in decimal form; `null`/`undefined` leaves the coupon uncapped.
 #[wasm_bindgen(js_name = snowballCouponProfile)]
 pub fn snowball_coupon_profile(
     initial_coupon: f64,
     fixed_rate: f64,
     floating_fixings: Vec<f64>,
-    floor: f64,
-    cap: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
 ) -> Result<Box<[f64]>, JsValue> {
     coupon_profiles::snowball_coupon_profile(
         initial_coupon,
         fixed_rate,
         &floating_fixings,
-        floor,
-        cap,
+        coupon_floor,
+        coupon_cap,
     )
     .map(Vec::into_boxed_slice)
     .map_err(to_js_err)
@@ -94,28 +95,29 @@ pub fn snowball_coupon_profile(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `floor` is negative; `fixed_rate`,
-/// `floor`, `leverage`, or any fixing is non-finite; `leverage` is
-/// non-positive; or `cap` is NaN or is not greater than `floor`.
-/// @param fixed_rate - Fixed coupon rate in decimal form before the leveraged floating deduction.
+/// Throws a JavaScript exception if `coupon_floor` is negative; `fixed_rate`,
+/// `coupon_floor`, `gearing`, or any fixing is non-finite; `gearing` is
+/// non-positive; or `coupon_cap` is set and is non-finite or not greater than
+/// `coupon_floor`.
+/// @param fixed_rate - Fixed coupon rate in decimal form before the geared floating deduction.
 /// @param floating_fixings - Ordered floating-rate fixings in decimal form, one for each coupon period.
-/// @param floor - Minimum permitted coupon rate in decimal form.
-/// @param cap - Maximum permitted coupon rate in decimal form.
-/// @param leverage - Positive multiplier applied to each floating fixing in the inverse-floater coupon.
+/// @param coupon_floor - Minimum permitted coupon rate in decimal form.
+/// @param coupon_cap - Optional maximum permitted coupon rate in decimal form; `null`/`undefined` leaves the coupon uncapped.
+/// @param gearing - Positive multiplier applied to each floating fixing in the inverse-floater coupon.
 #[wasm_bindgen(js_name = inverseFloaterCouponProfile)]
 pub fn inverse_floater_coupon_profile(
     fixed_rate: f64,
     floating_fixings: Vec<f64>,
-    floor: f64,
-    cap: f64,
-    leverage: f64,
+    coupon_floor: f64,
+    coupon_cap: Option<f64>,
+    gearing: f64,
 ) -> Result<Box<[f64]>, JsValue> {
     coupon_profiles::inverse_floater_coupon_profile(
         fixed_rate,
         &floating_fixings,
-        floor,
-        cap,
-        leverage,
+        coupon_floor,
+        coupon_cap,
+        gearing,
     )
     .map(Vec::into_boxed_slice)
     .map_err(to_js_err)
@@ -190,7 +192,7 @@ mod tests {
 
     #[test]
     fn snowball_honors_cap_and_floor() {
-        let coupons = snowball_coupon_profile(0.02, 0.05, vec![0.01, 0.04, 0.03], 0.0, 0.10)
+        let coupons = snowball_coupon_profile(0.02, 0.05, vec![0.01, 0.04, 0.03], 0.0, Some(0.10))
             .expect("snowball");
         assert_eq!(coupons.len(), 3);
         for c in coupons {
@@ -199,8 +201,8 @@ mod tests {
     }
 
     #[test]
-    fn inverse_floater_uses_explicit_leverage() {
-        let coupons = inverse_floater_coupon_profile(0.05, vec![0.01, 0.02], 0.0, 0.10, 2.0)
+    fn inverse_floater_uses_explicit_gearing() {
+        let coupons = inverse_floater_coupon_profile(0.05, vec![0.01, 0.02], 0.0, Some(0.10), 2.0)
             .expect("inverse floater");
         assert!((coupons[0] - 0.03).abs() < 1e-12);
         assert!((coupons[1] - 0.01).abs() < 1e-12);

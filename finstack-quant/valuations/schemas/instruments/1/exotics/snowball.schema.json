@@ -37,7 +37,7 @@
     },
     "Snowball": {
       "additionalProperties": false,
-      "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - L_i, 0)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - leverage * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`",
+      "description": "Snowball structured note.\n\nThe coupon in each period depends on the previous period's coupon,\ncreating a path-dependent \"snowball\" accumulation:\n\n```text\nc_i = max(c_{i-1} + fixed_rate - L_i, 0)\n```\n\nwhere L_i is the floating rate and c_0 = initial_coupon.\n\nIf the floating rate stays low, coupons ratchet up over time.\nIf rates spike, the coupon floors at zero and must rebuild.\n\n# Variants\n\n- **Snowball**: Coupon depends on previous coupon (path-dependent)\n- **Inverse Floater**: Coupon = fixed_rate - gearing * floating_rate\n  (simpler, not path-dependent, but often combined with callability)\n\n# References\n\n- Brigo, D., & Mercurio, F. (2006). *Interest Rate Models*. Chapter 14. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -62,13 +62,6 @@
             "null"
           ]
         },
-        "coupon_dates": {
-          "description": "Coupon payment dates (must be sorted ascending).",
-          "items": {
-            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-          },
-          "type": "array"
-        },
         "coupon_floor": {
           "description": "Floor on each period coupon (typically 0.0).",
           "format": "double",
@@ -83,13 +76,17 @@
           "description": "Discount curve ID."
         },
         "fixed_rate": {
-          "description": "Fixed rate component.",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Fixed rate component as a decimal annual rate (0.05 = 5%)."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Rates forward curve that projects the floating index (also the fixing-series key)."
+        },
+        "gearing": {
+          "description": "Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).",
+          "format": "double",
+          "type": "number"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -108,11 +105,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
         },
-        "leverage": {
-          "description": "Leverage multiplier on floating rate (1.0 for snowball, variable for inverse floater).",
-          "format": "double",
-          "type": "number"
-        },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
@@ -121,9 +113,20 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount."
         },
+        "payment_dates": {
+          "description": "Coupon payment dates, one per period, strictly ascending and after\n`start_date`. Period `i` accrues from the previous payment date (or\n`start_date`) to `payment_dates[i]` and fixes in advance at its start.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          "type": "array"
+        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
+        },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Accrual start of the first coupon period; also the first in-advance\nfixing date."
         },
         "variant": {
           "$ref": "#/$defs/SnowballVariant",
@@ -146,10 +149,11 @@
         "variant",
         "initial_coupon",
         "fixed_rate",
-        "leverage",
+        "gearing",
         "coupon_floor",
         "notional",
-        "coupon_dates",
+        "start_date",
+        "payment_dates",
         "forward_curve_id",
         "index_tenor",
         "discount_curve_id",
@@ -168,7 +172,7 @@
         },
         {
           "const": "inverse_floater",
-          "description": "Inverse floater: c_i = max(fixed - leverage * floating, 0).",
+          "description": "Inverse floater: c_i = max(fixed - gearing * floating, 0).",
           "type": "string"
         }
       ]
@@ -202,30 +206,30 @@
           "attributes": {},
           "call_provision": null,
           "coupon_cap": null,
-          "coupon_dates": [
-            "2026-06-30",
-            "2026-12-31",
-            "2027-06-30",
-            "2027-12-31",
-            "2028-06-30",
-            "2028-12-31"
-          ],
           "coupon_floor": 0.0,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
-          "fixed_rate": 0.05,
+          "fixed_rate": "0.05",
           "forward_curve_id": "USD-SOFR-6M",
+          "gearing": 1.0,
           "id": "SNOWBALL-USD-3Y",
           "index_tenor": {
             "count": 6,
             "unit": "months"
           },
           "initial_coupon": 0.03,
-          "leverage": 1.0,
           "notional": {
             "amount": "1000000",
             "currency": "USD"
           },
+          "payment_dates": [
+            "2026-12-31",
+            "2027-06-30",
+            "2027-12-31",
+            "2028-06-30",
+            "2028-12-31"
+          ],
+          "start_date": "2026-06-30",
           "variant": "snowball",
           "vol_surface_id": "USD-SOFR-HW-VOL"
         },

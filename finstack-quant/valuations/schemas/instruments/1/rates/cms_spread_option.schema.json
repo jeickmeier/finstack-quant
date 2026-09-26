@@ -84,9 +84,8 @@
           "description": "Swaption volatility surface for short tenor."
         },
         "strike": {
-          "description": "Strike spread (in decimal, e.g., 0.005 = 50bp).",
-          "format": "double",
-          "type": "number"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Strike on the CMS spread as a decimal rate (0.005 = 50bp)."
         },
         "swap_fixed_day_count": {
           "anyOf": [
@@ -229,7 +228,7 @@
             "unit": "years"
           },
           "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
-          "strike": 0.005
+          "strike": "0.005"
         },
         "type": "cms_spread_option"
       },

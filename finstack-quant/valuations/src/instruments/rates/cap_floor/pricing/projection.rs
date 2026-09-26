@@ -52,7 +52,7 @@ pub(crate) fn resolve_optioned_coupon(
     market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<OptionedCouponProjection> {
-    let spread = cap_floor.spread_f64()?;
+    let spread = cap_floor.spread_rate()?;
 
     if let Some(overnight) = &cap_floor.overnight_coupon {
         let forward_curve = match market.get_forward(cap_floor.forward_curve_id.as_ref()) {
@@ -325,7 +325,7 @@ mod tests {
         let as_of = date!(2024 - 12 - 02);
         let market = market(as_of);
         let mut exclude = compounded_sofr_caplet();
-        exclude.spread = Decimal::try_from(0.01).expect("spread");
+        exclude.spread_bp = Decimal::from(100);
         let mut include = exclude.clone();
         include
             .overnight_coupon
@@ -378,7 +378,7 @@ mod tests {
         let market = market(as_of);
         let mut caplet = compounded_sofr_caplet();
         caplet.overnight_coupon = None;
-        caplet.spread = Decimal::try_from(0.01).expect("spread");
+        caplet.spread_bp = Decimal::from(100);
         let period = caplet.pricing_periods().expect("periods").remove(0);
         let projected =
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("term projection");

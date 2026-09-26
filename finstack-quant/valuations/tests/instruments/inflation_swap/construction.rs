@@ -56,12 +56,12 @@ fn test_builder_with_lag_override() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Receive)
-        .lag_override(InflationLag::Months(2))
+        .lag(InflationLag::Months(2))
         .attributes(Attributes::new())
         .build()
         .unwrap();
 
-    assert_eq!(swap.lag_override, Some(InflationLag::Months(2)));
+    assert_eq!(swap.lag, Some(InflationLag::Months(2)));
 }
 
 #[test]

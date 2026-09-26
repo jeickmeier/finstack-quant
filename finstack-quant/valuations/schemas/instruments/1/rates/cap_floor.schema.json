@@ -106,9 +106,9 @@
           "default": "cash",
           "description": "Settlement type (defaults to Cash; caps/floors are virtually always cash-settled)"
         },
-        "spread": {
+        "spread_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
-          "description": "Contractual spread added to the referenced rate, in decimal rate units.\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor."
+          "description": "Contractual margin added to the referenced rate, in basis points (10 = 10bp).\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor."
         },
         "start_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

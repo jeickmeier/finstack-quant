@@ -225,7 +225,7 @@ fn reinvestment_assumptions_change_the_replacement_collateral() {
                 price_pct: 99.0,
                 maturity_months: 72,
                 forward_curve_id: None,
-                coupon_floor: None,
+                all_in_floor_bp: None,
             }),
         )),
         0.0,
@@ -253,6 +253,40 @@ fn reinvestment_assumptions_change_the_replacement_collateral() {
     }
 }
 
+/// `all_in_floor_bp` is quoted in basis points: a 600bp floor under a 350bp
+/// fixed replacement coupon buys the same collateral as a 600bp coupon with no
+/// floor. A floor read as a decimal (600 = 60,000%) would explode the residual.
+#[test]
+fn reinvestment_all_in_floor_is_quoted_in_basis_points() {
+    let assumptions = |spread_bp: f64, all_in_floor_bp: Option<f64>| {
+        Some(window(
+            &[],
+            Some(ReinvestmentAssumptions {
+                spread_bp,
+                price_pct: 100.0,
+                maturity_months: 72,
+                forward_curve_id: None,
+                all_in_floor_bp,
+            }),
+        ))
+    };
+    let floored = simulate(assumptions(350.0, Some(600.0)), 0.0, Vec::new());
+    let coupon = simulate(assumptions(600.0, None), 0.0, Vec::new());
+    let unfloored = simulate(assumptions(350.0, None), 0.0, Vec::new());
+    let floored_e = floored["E"].total_interest.amount();
+    let coupon_e = coupon["E"].total_interest.amount();
+    // Both books replacement collateral paying 6% on the same par, so the
+    // residual matches to rounding of the per-period accrual arithmetic.
+    assert!(
+        (floored_e - coupon_e).abs() <= 1e-6 * coupon_e.abs().max(1.0),
+        "a 600bp all-in floor must pay the same as a 600bp coupon: {floored_e} vs {coupon_e}"
+    );
+    assert!(
+        floored_e > unfloored["E"].total_interest.amount() + 100_000.0,
+        "the floor binds above the 350bp coupon"
+    );
+}
+
 #[test]
 fn synthetic_purchases_mature_no_later_than_legal_final() {
     let results = simulate(
@@ -263,7 +297,7 @@ fn synthetic_purchases_mature_no_later_than_legal_final() {
                 price_pct: 100.0,
                 maturity_months: 240,
                 forward_curve_id: None,
-                coupon_floor: None,
+                all_in_floor_bp: None,
             }),
         )),
         0.0,

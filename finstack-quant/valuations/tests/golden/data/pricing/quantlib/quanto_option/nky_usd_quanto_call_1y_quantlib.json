@@ -17,10 +17,6 @@
         "day_count": "act_365f",
         "div_yield_id": "NKY-DIVYIELD",
         "domestic_discount_curve_id": "USD-OIS",
-        "equity_strike": {
-          "amount": "100.0",
-          "currency": "JPY"
-        },
         "expiry": "2027-04-30",
         "foreign_discount_curve_id": "JPY-OIS",
         "fx_spot_id": "JPYUSD-SPOT",
@@ -35,6 +31,7 @@
         "quantity": 1000.0,
         "quote_currency": "USD",
         "spot_id": "NKY-SPOT",
+        "strike": 100.0,
         "underlying_ticker": "NKY",
         "vol_surface_id": "NKY-VOL-QL"
       },

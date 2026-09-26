@@ -80,7 +80,7 @@ def _deposit_position(
                 "start_date": AS_OF,
                 "maturity": "2025-07-15",
                 "day_count": "act_360",
-                "quote_rate": "0.04",
+                "fixed_rate": "0.04",
                 "discount_curve_id": curve_id,
                 "attributes": {},
             },

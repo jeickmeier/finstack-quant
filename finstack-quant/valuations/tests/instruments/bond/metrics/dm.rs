@@ -301,12 +301,12 @@ fn flat_frn_market(
     MarketContext::new().insert(disc).insert(fwd)
 }
 
-fn flat_market_frn(as_of: time::Date, maturity: time::Date, margin_bp: i32) -> Bond {
+fn flat_market_frn(as_of: time::Date, maturity: time::Date, spread_bp: i32) -> Bond {
     Bond::floating(
         "DM-PAR-PIN",
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         "USD-SOFR-3M",
-        margin_bp,
+        spread_bp,
         as_of,
         maturity,
         finstack_quant_core::dates::Tenor::quarterly(),
@@ -316,9 +316,9 @@ fn flat_market_frn(as_of: time::Date, maturity: time::Date, margin_bp: i32) -> B
     .expect("FRN construction should succeed")
 }
 
-fn solve_dm_at_clean_price(as_of: time::Date, margin_bp: i32, clean_px: f64) -> f64 {
+fn solve_dm_at_clean_price(as_of: time::Date, spread_bp: i32, clean_px: f64) -> f64 {
     use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
-    let mut bond = flat_market_frn(as_of, date!(2027 - 01 - 01), margin_bp);
+    let mut bond = flat_market_frn(as_of, date!(2027 - 01 - 01), spread_bp);
     bond.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
     let market = flat_frn_market(as_of, 0.03);

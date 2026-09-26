@@ -1825,10 +1825,10 @@ impl PyCapFloor {
         decimal_f64(self.inner.strike)
     }
 
-    /// Contractual spread added to the index, as a decimal rate.
+    /// Contractual margin added to the index, in basis points.
     #[getter]
-    fn spread(&self) -> f64 {
-        decimal_f64(self.inner.spread)
+    fn spread_bp(&self) -> f64 {
+        decimal_f64(self.inner.spread_bp)
     }
 
     /// Start date of the underlying period.
@@ -2115,13 +2115,13 @@ impl PyCapFloorBuilder {
         Ok(slf)
     }
 
-    /// Set the contractual spread added to the referenced rate.
+    /// Set the contractual margin added to the referenced rate.
     ///
     /// Parameters
     /// ----------
-    /// value : float | Rate
-    ///     Spread in decimal rate units (``0.001`` = 10bp) or a ``Rate``,
-    ///     added after projecting the index.
+    /// value : float | Bps
+    ///     Margin in basis points (``10`` = 10bp) or a ``Bps``, added after
+    ///     projecting the index.
     ///
     /// Returns
     /// -------
@@ -2133,17 +2133,17 @@ impl PyCapFloorBuilder {
     /// ValueError
     ///     If ``value`` is not finite.
     /// TypeError
-    ///     If ``value`` is neither a number nor a ``Rate``.
+    ///     If ``value`` is neither a number nor a ``Bps``.
     #[pyo3(text_signature = "($self, value)")]
-    fn spread<'py>(
+    fn spread_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spread = rate_decimal_from_py(value, "spread")?;
-        let spread = decimal_from_f64(spread, "spread")?;
+        let spread_bp = crate::bindings::valuations::convert::bps_from_py(value, "spread_bp")?;
+        let spread_bp = decimal_from_f64(spread_bp, "spread_bp")?;
         let b = take_cap_floor(&mut slf)?;
-        slf.inner = Some(b.spread(spread));
-        slf.fields.push(("spread", spread.to_string()));
+        slf.inner = Some(b.spread_bp(spread_bp));
+        slf.fields.push(("spread_bp", spread_bp.to_string()));
         Ok(slf)
     }
 

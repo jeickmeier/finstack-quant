@@ -246,7 +246,10 @@
       "spec": {
         "id": "USD-CMS10Y-FLOORLET-ATM-20260516",
         "strike": "0.0404026801",
-        "cms_tenor": 10.0,
+        "cms_tenor": {
+          "count": 10,
+          "unit": "years"
+        },
         "fixing_dates": [
           "2027-05-18"
         ],

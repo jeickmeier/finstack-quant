@@ -720,7 +720,7 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
     option.start_date = date!(2025 - 01 - 15);
     option.maturity = date!(2026 - 01 - 15);
     option.strike = rust_decimal::Decimal::ZERO;
-    option.lag_override = Some(InflationLag::None);
+    option.lag = Some(InflationLag::None);
     let market = MarketContext::new()
         .insert(
             DiscountCurve::builder("USD-OIS")

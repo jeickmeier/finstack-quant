@@ -57,10 +57,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID (domestic currency)."
         },
-        "equity_strike": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Strike price for equity option."
-        },
         "expiry": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Option expiry date."
@@ -148,6 +144,11 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Equity spot price identifier."
         },
+        "strike": {
+          "description": "Per-unit strike of the equity underlying, in `base_currency` price units.",
+          "format": "double",
+          "type": "number"
+        },
         "underlying_ticker": {
           "description": "Underlying equity ticker symbol.",
           "type": "string"
@@ -160,7 +161,7 @@
       "required": [
         "id",
         "underlying_ticker",
-        "equity_strike",
+        "strike",
         "option_type",
         "expiry",
         "notional",
@@ -208,10 +209,6 @@
           "day_count": "act_365f",
           "div_yield_id": "NKY-DIV",
           "domestic_discount_curve_id": "USD-OIS",
-          "equity_strike": {
-            "amount": "35000",
-            "currency": "JPY"
-          },
           "expiry": "2030-06-21",
           "foreign_discount_curve_id": "JPY-OIS",
           "fx_spot_id": "JPYUSD-SPOT",
@@ -226,6 +223,7 @@
           "quantity": 4000.0,
           "quote_currency": "USD",
           "spot_id": "NKY-SPOT",
+          "strike": 35000.0,
           "underlying_ticker": "NKY",
           "vol_surface_id": "NKY-VOL"
         },

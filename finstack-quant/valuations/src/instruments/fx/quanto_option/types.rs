@@ -27,8 +27,8 @@ pub struct QuantoOption {
     pub id: InstrumentId,
     /// Underlying equity ticker symbol
     pub underlying_ticker: String,
-    /// Strike price for equity option
-    pub equity_strike: Money,
+    /// Per-unit strike of the equity underlying, in `base_currency` price units.
+    pub strike: f64,
     /// Option type (call or put)
     pub option_type: OptionType,
     /// Option expiry date
@@ -41,7 +41,7 @@ pub struct QuantoOption {
     /// Strike-equivalent domestic reference notional.
     ///
     /// When `quantity` and `payoff_fx_rate` are supplied, this must
-    /// equal `quantity * payoff_fx_rate * equity_strike.amount()`.
+    /// equal `quantity * payoff_fx_rate * strike`.
     pub notional: Money,
     /// Number of underlying units covered by the option payoff.
     ///
@@ -125,8 +125,8 @@ struct QuantoOptionUnchecked {
     id: InstrumentId,
     /// Underlying equity ticker symbol.
     underlying_ticker: String,
-    /// Strike price for equity option.
-    equity_strike: Money,
+    /// Per-unit strike of the equity underlying, in `base_currency` price units.
+    strike: f64,
     /// Option type (call or put).
     option_type: OptionType,
     /// Option expiry date.
@@ -189,7 +189,7 @@ impl TryFrom<QuantoOptionUnchecked> for QuantoOption {
         let quanto = Self {
             id: value.id,
             underlying_ticker: value.underlying_ticker,
-            equity_strike: value.equity_strike,
+            strike: value.strike,
             option_type: value.option_type,
             expiry: value.expiry,
             notional: value.notional,
@@ -226,7 +226,7 @@ impl QuantoOption {
         QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-NKY-USD-CALL"))
             .underlying_ticker("NKY".to_string())
-            .equity_strike(Money::from((35000_i64, Currency::JPY)))
+            .strike(35_000.0)
             .option_type(crate::instruments::OptionType::Call)
             .expiry(crate::instruments::common_impl::example_constants::FAR_EXPIRY)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -261,13 +261,6 @@ impl QuantoOption {
                 self.correlation
             )));
         }
-        if self.equity_strike.currency() != self.base_currency {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "QuantoOption equity_strike currency ({}) must match base_currency ({})",
-                self.equity_strike.currency(),
-                self.base_currency
-            )));
-        }
         if self.notional.currency() != self.quote_currency {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "QuantoOption notional currency ({}) must match quote_currency ({})",
@@ -275,10 +268,10 @@ impl QuantoOption {
                 self.quote_currency
             )));
         }
-        if !self.equity_strike.amount().is_finite() || self.equity_strike.amount() <= 0.0 {
+        if !self.strike.is_finite() || self.strike <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "QuantoOption equity_strike must be positive and finite; got {}",
-                self.equity_strike.amount()
+                "QuantoOption strike must be positive and finite; got {}",
+                self.strike
             )));
         }
         if !self.notional.amount().is_finite() || self.notional.amount() <= 0.0 {
@@ -301,11 +294,11 @@ impl QuantoOption {
                         fx_rate
                     )));
                 }
-                let expected = quantity * fx_rate * self.equity_strike.amount();
+                let expected = quantity * fx_rate * self.strike;
                 let tolerance = 1e-8 * expected.abs().max(self.notional.amount().abs()).max(1.0);
                 if (self.notional.amount() - expected).abs() > tolerance {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "QuantoOption notional ({}) must match quantity * payoff_fx_rate * equity_strike ({})",
+                        "QuantoOption notional ({}) must match quantity * payoff_fx_rate * strike ({})",
                         self.notional.amount(),
                         expected
                     )));
@@ -639,7 +632,7 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
             crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                 self.vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
-                Some(self.equity_strike.amount()),
+                Some(self.strike),
             ),
         );
         if let Some(dividend_yield) = &self.div_yield_id {
@@ -770,7 +763,7 @@ mod tests {
         );
         assert_eq!(
             deps.volatility_dependencies[0].reference_strike,
-            Some(option.equity_strike.amount())
+            Some(option.strike)
         );
         assert_eq!(
             deps.volatility_dependencies[1]

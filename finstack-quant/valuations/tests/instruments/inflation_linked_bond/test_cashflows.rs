@@ -112,7 +112,7 @@ fn test_dated_cashflows_quarterly() {
 fn test_coupon_amounts_reflect_inflation_adjustment() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.notional = finstack_quant_core::money::Money::new(
         1_000_000.0,
         finstack_quant_core::currency::Currency::USD,
@@ -165,7 +165,7 @@ fn test_coupon_amounts_reflect_inflation_adjustment() {
 fn test_principal_repayment_inflation_adjusted() {
     // Arrange: bond with base_date and maturity within the inflation curve range
     let mut ilb = sample_tips();
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.notional = finstack_quant_core::money::Money::new(
         1_000_000.0,
         finstack_quant_core::currency::Currency::USD,
@@ -219,7 +219,7 @@ fn test_schedule_with_deflation_protection() {
     let mut ilb = sample_tips();
     ilb.deflation_protection =
         finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::DeflationProtection::AllPayments;
-    ilb.base_index = 300.0;
+    ilb.base_cpi = 300.0;
     ilb.issue_date = d(2024, 1, 1);
     ilb.maturity = d(2025, 1, 1);
 

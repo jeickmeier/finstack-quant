@@ -269,9 +269,9 @@ impl TarnPricer {
     ) -> Result<MoneyEstimate> {
         inst.validate()?;
 
-        let first_coupon_date = inst.coupon_dates[0];
-        let final_coupon_date = *inst.coupon_dates.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation("TARN requires coupon dates".to_string())
+        let first_coupon_date = inst.start_date;
+        let final_coupon_date = *inst.payment_dates.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("TARN requires payment dates".to_string())
         })?;
         if as_of >= final_coupon_date {
             let zero = Money::from((0_i64, inst.notional.currency()));
@@ -325,7 +325,7 @@ impl TarnPricer {
         let mut events = Vec::new();
         let mut event_times = Vec::new();
 
-        for period in inst.coupon_dates.windows(2) {
+        for period in inst.period_boundaries().windows(2) {
             let start = period[0];
             let end = period[1];
             if end <= as_of {
@@ -424,9 +424,9 @@ impl TarnPricer {
         // fix in advance but pay at the period end, so the simulation must
         // reach the last payment date for the pathwise bank-account numeraire
         // B(T_pay) to be observable.
-        let maturity_date = *inst.coupon_dates.last().ok_or_else(|| {
+        let maturity_date = *inst.payment_dates.last().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "TARN {} requires coupon dates",
+                "TARN {} requires payment dates",
                 inst.id.as_str()
             ))
         })?;
@@ -451,7 +451,7 @@ impl TarnPricer {
         };
 
         let payoff = TarnPayoff::new(
-            inst.fixed_rate,
+            finstack_quant_core::decimal::decimal_to_f64(inst.fixed_rate)?,
             inst.coupon_floor,
             inst.target_coupon,
             inst.notional.amount(),
@@ -489,7 +489,7 @@ fn deterministic_estimate(
     config: &RateExoticMcConfig,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
     let mut payoff = TarnPayoff::new(
-        inst.fixed_rate,
+        finstack_quant_core::decimal::decimal_to_f64(inst.fixed_rate)?,
         inst.coupon_floor,
         inst.target_coupon,
         inst.notional.amount(),
@@ -592,12 +592,12 @@ mod tests {
     fn test_tarn(target_coupon: f64) -> Tarn {
         Tarn {
             id: InstrumentId::new("TARN-TEST"),
-            fixed_rate: 0.06,
+            fixed_rate: rust_decimal::Decimal::new(6, 2),
             coupon_floor: 0.0,
             target_coupon,
             notional: Money::from((1_000_000_i64, Currency::USD)),
-            coupon_dates: vec![
-                date(2025, Month::January, 1),
+            start_date: date(2025, Month::January, 1),
+            payment_dates: vec![
                 date(2025, Month::July, 1),
                 date(2026, Month::January, 1),
                 date(2026, Month::July, 1),
@@ -718,7 +718,7 @@ mod tests {
         let mut pv = 0.0;
         let mut redeemed = false;
 
-        for period in tarn.coupon_dates.windows(2) {
+        for period in tarn.period_boundaries().windows(2) {
             let start = period[0];
             let end = period[1];
             if end <= as_of {
@@ -732,7 +732,9 @@ mod tests {
                 .expect("projection time");
             let floating_rate = projection.rate(projection_time);
 
-            let coupon = (tarn.fixed_rate - floating_rate).max(tarn.coupon_floor) * accrual;
+            let fixed_rate =
+                finstack_quant_core::decimal::decimal_to_f64(tarn.fixed_rate).expect("fixed_rate");
+            let coupon = (fixed_rate - floating_rate).max(tarn.coupon_floor) * accrual;
             let actual = tracker.add_coupon(coupon);
             pv += actual * tarn.notional.amount() * p_end;
             if tracker.is_knocked_out() {
@@ -743,7 +745,7 @@ mod tests {
         }
 
         if !redeemed {
-            let maturity = *tarn.coupon_dates.last().expect("maturity");
+            let maturity = *tarn.payment_dates.last().expect("maturity");
             let df = relative_df_discount_curve(disc.as_ref(), as_of, maturity).expect("df");
             pv += tarn.notional.amount() * df;
         }
@@ -844,7 +846,7 @@ mod tests {
         let first_coupon_df = market
             .get_discount("USD-OIS")
             .expect("discount")
-            .df_between_dates(as_of, tarn.coupon_dates[1])
+            .df_between_dates(as_of, tarn.payment_dates[0])
             .expect("df");
         assert!((expected - tarn.notional.amount() * first_coupon_df).abs() < 1e-8);
     }

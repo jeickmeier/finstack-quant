@@ -40,7 +40,7 @@ fn test_tips_creation_via_helper() {
         tips.real_coupon,
         Decimal::try_from(0.0125).expect("valid decimal")
     );
-    assert_eq!(tips.base_index, 250.0);
+    assert_eq!(tips.base_cpi, 250.0);
     assert_eq!(tips.notional.amount(), 1_000_000.0);
     assert_eq!(tips.notional.currency(), Currency::USD);
     assert_eq!(tips.frequency, Tenor::semi_annual());
@@ -78,7 +78,7 @@ fn test_uk_linker_creation_via_helper() {
         uk_gilt.real_coupon,
         Decimal::try_from(0.00625).expect("valid decimal")
     );
-    assert_eq!(uk_gilt.base_index, 280.0);
+    assert_eq!(uk_gilt.base_cpi, 280.0);
     assert_eq!(uk_gilt.base_date, base_date);
     assert_eq!(uk_gilt.notional.currency(), Currency::GBP);
     assert_eq!(uk_gilt.deflation_protection, DeflationProtection::None);
@@ -98,7 +98,7 @@ fn test_builder_pattern_full_customization() {
     );
     assert_eq!(bond.issue_date, d(2020, 1, 15));
     assert_eq!(bond.maturity, d(2030, 1, 15));
-    assert_eq!(bond.base_index, 250.0);
+    assert_eq!(bond.base_cpi, 250.0);
     assert_eq!(bond.indexation_method, IndexationMethod::Tips);
 }
 
@@ -219,7 +219,7 @@ fn test_parameter_struct_tips() {
     );
     assert_eq!(params.issue, issue);
     assert_eq!(params.maturity, maturity);
-    assert_eq!(params.base_index, 200.0);
+    assert_eq!(params.base_cpi, 200.0);
     assert_eq!(params.frequency, Tenor::semi_annual());
     assert_eq!(params.day_count, DayCount::ActActIsma);
 }
@@ -243,7 +243,7 @@ fn test_parameter_struct_uk_linker() {
     );
     assert_eq!(params.issue, issue);
     assert_eq!(params.maturity, maturity);
-    assert_eq!(params.base_index, 300.0);
+    assert_eq!(params.base_cpi, 300.0);
     assert_eq!(params.frequency, Tenor::semi_annual());
     assert_eq!(params.day_count, DayCount::ActActIsma);
 }

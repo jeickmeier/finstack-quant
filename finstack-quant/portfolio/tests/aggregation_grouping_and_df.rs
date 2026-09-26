@@ -25,7 +25,7 @@ fn dataframe_exports_have_expected_columns() {
         .maturity(end_date)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .discount_curve_id("USD".into())
-        .quote_rate_opt(Some(
+        .fixed_rate_opt(Some(
             rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
         ))
         .build()

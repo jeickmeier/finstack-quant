@@ -184,7 +184,7 @@ const INSTRUMENT_JSON = JSON.stringify({
     start_date: '2024-01-01',
     maturity: '2024-07-01',
     day_count: 'act_360',
-    quote_rate: 0.045,
+    fixed_rate: 0.045,
     discount_curve_id: 'USD-OIS',
     attributes: {},
     business_day_convention: 'modified_following',

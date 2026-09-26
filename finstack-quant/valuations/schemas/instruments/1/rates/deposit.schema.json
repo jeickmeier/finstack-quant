@@ -32,6 +32,18 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve id used for valuation and par extraction."
         },
+        "fixed_rate": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional contractual simple rate r (annualised decimal, 0.045 = 4.5%) for the deposit.\n\nNote: `cashflow_schedule()` requires `fixed_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique identifier for the deposit."
@@ -51,18 +63,6 @@
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Principal amount of the deposit."
-        },
-        "quote_rate": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional quoted simple rate r (annualised) for the deposit.\n\nNote: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders)."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -129,13 +129,13 @@
           "calendar_id": null,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
+          "fixed_rate": "0.045",
           "id": "DEP-USD-6M",
           "maturity": "2024-07-01",
           "notional": {
             "amount": "100000",
             "currency": "USD"
           },
-          "quote_rate": "0.045",
           "settlement_days": 2,
           "start_date": "2024-01-01"
         },

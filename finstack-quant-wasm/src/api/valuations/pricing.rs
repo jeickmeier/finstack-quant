@@ -702,13 +702,13 @@ mod tests {
 
         let tarn = Tarn {
             id: InstrumentId::new("TARN-WASM-E2E"),
-            fixed_rate: 0.06,
+            fixed_rate: "0.06".parse().expect("rate"),
             coupon_floor: 0.0,
             target_coupon: 1.0,
             notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
-            coupon_dates: vec![
-                Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+            start_date: Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+            payment_dates: vec![
                 Date::from_calendar_date(2025, Month::July, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::July, 1).expect("date"),
@@ -747,14 +747,14 @@ mod tests {
             id: InstrumentId::new("SNOWBALL-WASM-E2E"),
             variant: SnowballVariant::Snowball,
             initial_coupon: 0.03,
-            fixed_rate: 0.05,
-            leverage: 1.0,
+            fixed_rate: "0.05".parse().expect("rate"),
+            gearing: 1.0,
             coupon_floor: 0.0,
             coupon_cap: None,
             notional: Money::new(1_000_000.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
-            coupon_dates: vec![
-                Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+            start_date: Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+            payment_dates: vec![
                 Date::from_calendar_date(2025, Month::July, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::July, 1).expect("date"),
@@ -787,14 +787,14 @@ mod tests {
             id: InstrumentId::new("INV-FLOATER-WASM-E2E"),
             variant: SnowballVariant::InverseFloater,
             initial_coupon: 0.0,
-            fixed_rate: 0.08,
-            leverage: 1.5,
+            fixed_rate: "0.08".parse().expect("rate"),
+            gearing: 1.5,
             coupon_floor: 0.0,
             coupon_cap: Some(0.10),
             notional: Money::new(500_000.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
-            coupon_dates: vec![
-                Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+            start_date: Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+            payment_dates: vec![
                 Date::from_calendar_date(2025, Month::July, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::July, 1).expect("date"),
@@ -898,7 +898,7 @@ mod tests {
             id: InstrumentId::new("CMS-SPREAD-WASM-E2E"),
             long_cms_tenor: Tenor::new(10, TenorUnit::Years).expect("valid tenor fixture"),
             short_cms_tenor: Tenor::new(2, TenorUnit::Years).expect("valid tenor fixture"),
-            strike: 0.005,
+            strike: "0.005".parse().expect("strike"),
             option_type: CmsSpreadOptionType::Call,
             notional: Money::new(10_000_000.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
