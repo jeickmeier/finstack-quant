@@ -165,8 +165,9 @@ pub(super) fn route_reserve_interest(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::{
-        AssetPool, DealType, PoolAsset, Tranche, TrancheCoupon, TrancheStructure,
+        AssetPool, DealType, PoolAsset, Tranche, TrancheStructure,
     };
     use finstack_quant_core::types::InstrumentId;
     use time::macros::date;
@@ -197,7 +198,7 @@ mod tests {
             90.0,
             TrancheSeniority::Senior,
             usd(9_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             date!(2030 - 01 - 01),
         )
         .expect("senior");
@@ -207,7 +208,7 @@ mod tests {
             100.0,
             TrancheSeniority::Equity,
             usd(1_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             date!(2030 - 01 - 01),
         )
         .expect("equity");
@@ -350,7 +351,7 @@ mod tests {
                 100.0,
                 TrancheSeniority::Senior,
                 usd(90_000_000.0),
-                TrancheCoupon::Fixed { rate: 0.06 },
+                RateSpec::Fixed { rate: 0.06 },
                 deal.maturity,
             )
             .expect("senior"),
@@ -360,7 +361,7 @@ mod tests {
                 10.0,
                 TrancheSeniority::Equity,
                 usd(10_000_000.0),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 deal.maturity,
             )
             .expect("equity"),

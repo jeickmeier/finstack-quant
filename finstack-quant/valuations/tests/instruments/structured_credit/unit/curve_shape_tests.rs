@@ -9,10 +9,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_wal, run_simulation, AssetPool, AssetType, DealType, DelinquencyModel,
-    PoolAsset, StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    PoolAsset, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -69,7 +69,7 @@ fn auto_abs(level_pay: bool) -> StructuredCredit {
             90.0,
             TrancheSeniority::Senior,
             usd(9_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity(),
         )
         .expect("A"),
@@ -79,7 +79,7 @@ fn auto_abs(level_pay: bool) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(1_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),

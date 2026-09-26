@@ -573,16 +573,18 @@
           "anti_dilution": "none",
           "dividend_adjustment": "none"
         },
-        "fixed_coupon": {
-          "rate": "0.02",
-          "frequency": {
-            "count": 6,
-            "unit": "months"
-          },
-          "day_count": "30_360",
-          "business_day_convention": "following",
-          "stub": "none",
-          "calendar_id": "weekends_only"
+        "cashflow_spec": {
+          "fixed": {
+            "rate": "0.02",
+            "frequency": {
+              "count": 6,
+              "unit": "months"
+            },
+            "day_count": "30_360",
+            "business_day_convention": "following",
+            "stub": "none",
+            "calendar_id": "weekends_only"
+          }
         },
         "attributes": {
           "tags": [

@@ -16,7 +16,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
     AmortizationSpec, RateSpec, TermLoan,
@@ -97,11 +97,11 @@ fn term_loan(application: OvernightIndexConstraintApplication) -> TermLoan {
 fn revolver(application: OvernightIndexConstraintApplication) -> RevolvingCredit {
     let mut facility = RevolvingCredit::builder()
         .id("RC-SOFR".into())
-        .commitment_amount(usd(NOTIONAL))
-        .drawn_amount(usd(NOTIONAL))
+        .commitment(usd(NOTIONAL))
+        .drawn(usd(NOTIONAL))
         .issue_date(ISSUE)
         .maturity(MATURITY)
-        .base_rate_spec(BaseRateSpec::Floating(spec(application)))
+        .rate(RateSpec::Floating(spec(application)))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
@@ -182,7 +182,7 @@ fn revolver_rejects_unsupported_floating_spec_fields() {
 
     let with_spec = |spec: FloatingRateSpec| {
         let mut facility = revolver(OvernightIndexConstraintApplication::Daily);
-        facility.base_rate_spec = BaseRateSpec::Floating(spec);
+        facility.rate = RateSpec::Floating(spec);
         facility
     };
     let mut tenor = spec(OvernightIndexConstraintApplication::Daily);

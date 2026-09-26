@@ -238,7 +238,7 @@ fn term_loan(id: &str, notional: f64) -> FinancialStatementInstrument {
             .notional_limit(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .issue_date(issue_date())
             .maturity(maturity_date())
-            .rate(RateSpec::Fixed { rate_bp: 500 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .frequency(Tenor::quarterly())
             .day_count(DayCount::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)

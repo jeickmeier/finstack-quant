@@ -22,12 +22,13 @@ use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AdvanceRate, AdvancingPolicy, AssetPool, BorrowingBaseRules, CoverageRules,
     CoverageTestSpec, CoverageTrigger, DealFees, DealType, DelinquencyModel, EligibilityRule,
     HedgeSwap, IncentiveFeeSpec, LossAllocationPolicy, LossRecognition, ModificationSpec,
     PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, TriggerConsequence,
+    Tranche, TrancheSeniority, TrancheStructure, TriggerConsequence,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AfcSpec, AssetType, BalloonSpec, CallAssumption, CardPortfolioSpec, EarlyAmortizationSpec,
@@ -84,7 +85,7 @@ fn baseline() -> StructuredCredit {
             60.0,
             TrancheSeniority::Senior,
             usd(60_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity(),
         )
         .expect("A"),
@@ -94,7 +95,7 @@ fn baseline() -> StructuredCredit {
             90.0,
             TrancheSeniority::Mezzanine,
             usd(30_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.07 },
+            RateSpec::Fixed { rate: 0.07 },
             maturity(),
         )
         .expect("B"),
@@ -104,7 +105,7 @@ fn baseline() -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(10_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),
@@ -295,7 +296,7 @@ fn floating_first_asset(deal: &mut StructuredCredit) {
 /// the collateral WAC), carryover off.
 fn afc_binding(deal: &mut StructuredCredit) {
     let senior = deal.tranches.tranches[0].id.to_string();
-    deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.20 };
+    deal.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.20 };
     deal.waterfall_rules = Some(WaterfallRules {
         afc: Some(AfcSpec {
             capped_tranches: vec![senior],
@@ -403,7 +404,7 @@ fn clear_deal_tests(deal: &mut StructuredCredit) {
 /// with the baseline's 7% class B the residual never returns the 10M before
 /// legal final, so the hurdle knob starts from a cheaper mezzanine coupon.
 fn cheap_mezzanine(deal: &mut StructuredCredit) {
-    tranche(deal, "B").coupon = TrancheCoupon::Fixed { rate: 0.03 };
+    tranche(deal, "B").coupon = RateSpec::Fixed { rate: 0.03 };
 }
 
 fn knobs() -> Vec<Knob> {
@@ -998,7 +999,7 @@ fn knobs() -> Vec<Knob> {
         Knob {
             name: "tranches.A.coupon",
             common: none,
-            change: |d| tranche(d, "A").coupon = TrancheCoupon::Fixed { rate: 0.06 },
+            change: |d| tranche(d, "A").coupon = RateSpec::Fixed { rate: 0.06 },
         },
         Knob {
             name: "tranches.A.day_count",

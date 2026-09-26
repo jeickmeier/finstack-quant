@@ -36,7 +36,7 @@ fn term_loan_fixed_with_draws_and_fees() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 800 })
+        .rate(term_loan::RateSpec::Fixed { rate: 0.08 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -48,10 +48,12 @@ fn term_loan_fixed_with_draws_and_fees() {
         .amortization(term_loan::AmortizationSpec::None)
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(Some(
-            Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee::Amount(
+                Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
+            ),
         ))
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: Date::from_calendar_date(2026, time::Month::January, 1).unwrap(),
             draws: vec![
@@ -65,10 +67,10 @@ fn term_loan_fixed_with_draws_and_fees() {
                 },
             ],
             commitment_steps: vec![],
-            usage_fee_bp: 10.0,
-            commitment_fee_bp: 25.0,
+            usage_fee_bp: rust_decimal_macros::dec!(10),
+            commitment_fee_bp: rust_decimal_macros::dec!(25),
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
-            oid_policy: Some(OidPolicy::WithheldBp(100)), // 1% withheld OID on draws
+            oid_policy: Some(OidPolicy::WithheldBp(rust_decimal_macros::dec!(100))), // 1% withheld OID on draws
         }))
         .covenants_opt(None)
         .attributes(Default::default())
@@ -108,7 +110,7 @@ fn term_loan_commitment_fee_step_downs() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 700 })
+        .rate(term_loan::RateSpec::Fixed { rate: 0.07 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -121,17 +123,17 @@ fn term_loan_commitment_fee_step_downs() {
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end,
             draws: vec![],
             commitment_steps: vec![CommitmentStep {
                 date: step_down,
                 amount: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-                fee_bp: 0.0,
+                reduction_fee_bp: rust_decimal_macros::dec!(0),
             }],
-            usage_fee_bp: 0.0,
-            commitment_fee_bp: 100.0,
+            usage_fee_bp: rust_decimal_macros::dec!(0),
+            commitment_fee_bp: rust_decimal_macros::dec!(100),
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -189,7 +191,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 650 })
+        .rate(term_loan::RateSpec::Fixed { rate: 0.065 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -202,13 +204,13 @@ fn term_loan_commitment_fee_windowed_to_availability() {
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end,
             draws: vec![],
             commitment_steps: vec![],
-            usage_fee_bp: 0.0,
-            commitment_fee_bp: 50.0,
+            usage_fee_bp: rust_decimal_macros::dec!(0),
+            commitment_fee_bp: rust_decimal_macros::dec!(50),
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -246,7 +248,7 @@ fn term_loan_oid_eir_amortization_schedule() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 500 })
+        .rate(term_loan::RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -259,7 +261,7 @@ fn term_loan_oid_eir_amortization_schedule() {
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+            commitment: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: issue,
             draws: vec![DrawEvent {
@@ -267,10 +269,10 @@ fn term_loan_oid_eir_amortization_schedule() {
                 amount: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             }],
             commitment_steps: vec![],
-            usage_fee_bp: 0.0,
-            commitment_fee_bp: 0.0,
+            usage_fee_bp: rust_decimal_macros::dec!(0),
+            commitment_fee_bp: rust_decimal_macros::dec!(0),
             fee_base: term_loan::CommitmentFeeBase::Undrawn,
-            oid_policy: Some(OidPolicy::WithheldBp(200)),
+            oid_policy: Some(OidPolicy::WithheldBp(rust_decimal_macros::dec!(200))),
         }))
         .covenants_opt(None)
         .oid_eir_opt(Some(OidEirSpec::default()))
@@ -331,7 +333,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 600 })
+        .rate(term_loan::RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -379,7 +381,7 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
     let covenants = term_loan::TermLoanCovenantEvents {
         margin_steps: vec![term_loan::MarginStep {
             date: step_date,
-            delta_bp: 200,
+            delta_bp: rust_decimal_macros::dec!(200),
         }],
         ..Default::default()
     };
@@ -389,7 +391,7 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
         .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 600 })
+        .rate(term_loan::RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(
@@ -439,7 +441,7 @@ fn term_loan_golden_pv_and_metrics() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 500 }) // 5%
+        .rate(term_loan::RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -514,21 +516,21 @@ fn term_loan_amortizing_outstanding_path() {
     let issue = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2027, time::Month::January, 1).unwrap();
 
-    // Amortizing loan with PercentPerPeriod
+    // Amortizing loan with PercentOfRemainingPerPeriod
     let loan = TermLoan::builder()
         .id("TL-AMORT".into())
         .currency(Currency::USD)
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 500 })
+        .rate(term_loan::RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(term_loan::AmortizationSpec::PercentPerPeriod { bp: 1250 }) // 12.5% per quarter
+        .amortization(term_loan::AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.125 }) // 12.5% per quarter
         .coupon_type(finstack_quant_cashflows::builder::specs::CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -620,13 +622,13 @@ fn term_loan_rejects_retired_commitment_step_downs_key() {
         "/instrument/spec",
         "ddtl",
         serde_json::json!({
-            "commitment_limit": {"amount": "1000000", "currency": "USD"},
+            "commitment": {"amount": "1000000", "currency": "USD"},
             "availability_start": "2025-01-01",
             "availability_end": "2026-01-01",
             "draws": [],
             "commitment_step_downs": [],
-            "usage_fee_bp": 0.0,
-            "commitment_fee_bp": 0.0,
+            "usage_fee_bp": "0",
+            "commitment_fee_bp": "0",
             "fee_base": "undrawn",
             "oid_policy": null
         }),
@@ -657,6 +659,6 @@ fn retired_oid_withheld_pct_and_separate_pct_keys_are_rejected() {
             .expect_err(&format!("{retired} uses a retired key"));
     }
     let bp: OidPolicy =
-        serde_json::from_value(serde_json::json!({"withheld_bp": 200})).expect("withheld_bp");
-    assert!(matches!(bp, OidPolicy::WithheldBp(200)));
+        serde_json::from_value(serde_json::json!({"withheld_bp": "200"})).expect("withheld_bp");
+    assert!(matches!(bp, OidPolicy::WithheldBp(v) if v == rust_decimal_macros::dec!(200)));
 }

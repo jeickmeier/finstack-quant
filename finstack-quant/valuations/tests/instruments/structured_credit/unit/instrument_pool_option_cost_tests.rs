@@ -5,12 +5,13 @@
 use finstack_quant_core::dates::Date;
 use finstack_quant_models::credit::pool::StochasticDefaultSpec;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     CreditSpreadProcessSpec, RevolvingCreditPricer,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, CoverageTestSpec, InstrumentCollateral, PricingMode,
-    StochasticPricingResult, StructuredCredit, TrancheCoupon,
+    StochasticPricingResult, StructuredCredit,
 };
 use time::macros::date;
 
@@ -110,7 +111,7 @@ fn single_revolver_pool_matches_the_standalone_option_cost() {
     let mut deal = pool_of(Vec::new(), spread, 1e-6);
     for tranche in deal.tranches.tranches.iter_mut() {
         if tranche.id.as_str() == "A" {
-            tranche.coupon = TrancheCoupon::Fixed { rate: 0.01 };
+            tranche.coupon = RateSpec::Fixed { rate: 0.01 };
         }
     }
     let pooled = deal
@@ -188,7 +189,7 @@ fn credit_risky_single_revolver_pool_matches_the_standalone_option_cost_in_expec
     let mut deal = pool_of(Vec::new(), spread, 0.25);
     for tranche in deal.tranches.tranches.iter_mut() {
         if tranche.id.as_str() == "A" {
-            tranche.coupon = TrancheCoupon::Fixed { rate: 0.01 };
+            tranche.coupon = RateSpec::Fixed { rate: 0.01 };
         }
     }
     let pooled = deal
@@ -236,7 +237,7 @@ fn senior_coverage_position_diverts_to_the_senior_note_only() {
         // a residual for the failing position to trap.
         for tranche in deal.tranches.tranches.iter_mut() {
             if tranche.id.as_str() == "A" {
-                tranche.coupon = TrancheCoupon::Fixed { rate: 0.01 };
+                tranche.coupon = RateSpec::Fixed { rate: 0.01 };
             }
         }
         deal.with_stochastic_default(StochasticDefaultSpec::gaussian_copula(0.01, 0.3));

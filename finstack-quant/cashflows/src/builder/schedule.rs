@@ -182,7 +182,7 @@ pub(crate) fn finalize_flows(
     let meta = CashFlowMeta {
         projected_fixings,
         calendar_ids: cals,
-        facility_limit: None,
+        commitment: None,
         issue_date,
         maturity: maturity_date,
         representation: CashflowRepresentation::default(),
@@ -246,8 +246,9 @@ pub struct CashFlowMeta {
     pub representation: CashflowRepresentation,
     /// Holiday calendar IDs used for schedule adjustments.
     pub calendar_ids: Vec<String>,
-    /// Optional facility limit/commitment for instruments like RCFs.
-    pub facility_limit: Option<Money>,
+    /// Total facility commitment for revolving and delayed-draw facilities;
+    /// `None` for instruments without one.
+    pub commitment: Option<Money>,
     /// Issue date of the instrument, when known.
     ///
     /// Used by the accrual engine to establish the first coupon period start
@@ -915,7 +916,7 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
 /// - `representation`: `Projected` dominates mixed inputs, followed by
 ///   `Placeholder`, `Contractual`, and `NoResidual`.
 /// - `calendar_ids`: union of all inputs, sorted and deduplicated.
-/// - `facility_limit`: kept only if every input agrees; mismatches → `None`.
+/// - `commitment`: kept only if every input agrees; mismatches → `None`.
 /// - `issue_date`: kept only if every input agrees; mismatches → `None`.
 ///
 /// Empty input yields an empty schedule with default metadata.
@@ -930,7 +931,7 @@ where
     let mut flows = Vec::new();
     let mut calendar_ids = Vec::new();
     let mut projected_fixings = Vec::new();
-    let mut facility_limit: Option<Option<Money>> = None;
+    let mut commitment: Option<Option<Money>> = None;
     let mut issue_date: Option<Option<Date>> = None;
     let mut maturity_date: Option<Option<Date>> = None;
     let mut representation: Option<CashflowRepresentation> = None;
@@ -945,7 +946,7 @@ where
         flows.extend(schedule_flows);
         calendar_ids.extend(schedule_meta.calendar_ids);
         projected_fixings.extend(schedule_meta.projected_fixings);
-        merge_matching_option(&mut facility_limit, schedule_meta.facility_limit);
+        merge_matching_option(&mut commitment, schedule_meta.commitment);
         merge_matching_option(&mut issue_date, schedule_meta.issue_date);
         merge_matching_option(&mut maturity_date, schedule_meta.maturity);
     }
@@ -962,7 +963,7 @@ where
             projected_fixings,
             representation: representation.unwrap_or_default(),
             calendar_ids,
-            facility_limit: facility_limit.unwrap_or(None),
+            commitment: commitment.unwrap_or(None),
             issue_date: issue_date.unwrap_or(None),
             maturity: maturity_date.unwrap_or(None),
         },
@@ -1483,7 +1484,7 @@ mod tests {
                 projected_fixings: Vec::new(),
                 representation: CashflowRepresentation::Projected,
                 calendar_ids: vec!["nyc".to_string()],
-                facility_limit: None,
+                commitment: None,
                 issue_date: Some(d1),
                 maturity: None,
             },
@@ -1506,7 +1507,7 @@ mod tests {
                 projected_fixings: Vec::new(),
                 representation: CashflowRepresentation::Projected,
                 calendar_ids: vec!["lon".to_string(), "nyc".to_string()],
-                facility_limit: None,
+                commitment: None,
                 issue_date: Some(d1),
                 maturity: None,
             },

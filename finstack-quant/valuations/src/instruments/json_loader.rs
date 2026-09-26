@@ -935,7 +935,7 @@ mod tests {
             "PacCollar",
             "RevolvingCreditFees",
             "SabrParameters",
-            "SoftCallTrigger",
+            "PriceTrigger",
             "TrancheStructure",
             "ValuationDiscounts",
         ] {

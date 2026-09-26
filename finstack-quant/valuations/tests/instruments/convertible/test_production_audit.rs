@@ -136,11 +136,12 @@ fn production_convertible_coupon_date_call_does_not_duplicate_coupon() {
         (DayCount::Act365F, 181.0 / 365.0),
         (DayCount::Thirty360, 0.5),
     ] {
-        bond.fixed_coupon
-            .as_mut()
-            .expect("coupon")
-            .schedule
-            .day_count = day_count;
+        let finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(coupon) =
+            &mut bond.cashflow_spec
+        else {
+            panic!("fixed coupon");
+        };
+        coupon.schedule.day_count = day_count;
         let actual = price_convertible_bond(
             &with_tree_steps(&bond, 365),
             &market(as_of, 0.0, 1.0, 0.2),
@@ -328,7 +329,12 @@ fn production_convertible_surface_uses_conversion_strike() {
 fn production_convertible_floating_coupons_use_the_forward_curve() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = create_floating_convertible();
-    let floating = bond.floating_coupon.as_mut().expect("floating coupon");
+    let finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Floating(
+        floating,
+    ) = &mut bond.cashflow_spec
+    else {
+        panic!("floating coupon");
+    };
     floating.rate_spec.reset_lag_days = 0;
     floating.rate_spec.fallback = finstack_quant_cashflows::builder::FloatingRateFallback::Error;
     let ctx = market(as_of, 0.0, 0.001, 0.2).insert(
@@ -352,7 +358,12 @@ fn production_convertible_seasoned_floater_uses_fixings_and_current_accrual() {
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     let as_of = date!(2025 - 04 - 02);
     let mut bond = create_floating_convertible();
-    let floating = bond.floating_coupon.as_mut().expect("floating coupon");
+    let finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Floating(
+        floating,
+    ) = &mut bond.cashflow_spec
+    else {
+        panic!("floating coupon");
+    };
     floating.rate_spec.reset_lag_days = 0;
     floating.rate_spec.fallback = finstack_quant_cashflows::builder::FloatingRateFallback::Error;
     let ctx = market(as_of, 0.0, 0.001, 0.2).insert(
@@ -387,7 +398,8 @@ fn production_convertible_seasoned_floater_uses_fixings_and_current_accrual() {
 fn production_convertible_bond_floor_uses_the_pricing_recovery_blend() {
     let as_of = date!(2025 - 01 - 01);
     let mut bond = create_standard_convertible();
-    bond.fixed_coupon = None;
+    bond.cashflow_spec =
+        finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
     bond.maturity = as_of + time::Duration::days(200);
     bond.credit_curve_id = Some("CREDIT".into());
     bond.recovery_rate = Some(0.4);
@@ -459,7 +471,8 @@ fn production_convertible_implied_vol_uses_a_valid_lattice_bracket() {
     let as_of = date!(2025 - 01 - 01);
     for volatility in [0.1, 0.8] {
         let mut bond = create_standard_convertible();
-        bond.fixed_coupon = None;
+        bond.cashflow_spec =
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
         let ctx = market(as_of, 0.05, 90.0, volatility);
         let target = bond.value(&ctx, as_of).expect("target PV").amount();
         bond.instrument_pricing_overrides
@@ -516,7 +529,8 @@ fn production_convertible_implied_vol_preserves_selected_engine() {
     }
     let as_of = date!(2025 - 01 - 01);
     let mut bond = create_standard_convertible();
-    bond.fixed_coupon = None;
+    bond.cashflow_spec =
+        finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
     let ctx = market(as_of, 0.0, 90.0, 0.4);
     let target = price_convertible_bond(
         &with_tree_steps(&bond, 17),
@@ -555,7 +569,8 @@ fn production_convertible_implied_vol_is_independent_of_trade_scale() {
     let as_of = date!(2025 - 01 - 01);
     for notional in [1_000.0, 1_000_000.0, 1_000_000_000.0] {
         let mut bond = create_standard_convertible();
-        bond.fixed_coupon = None;
+        bond.cashflow_spec =
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default();
         bond.notional = finstack_quant_core::money::Money::new(notional, bond.notional.currency())
             .expect("notional");
         bond.conversion.ratio = Some(notional / 100.0);

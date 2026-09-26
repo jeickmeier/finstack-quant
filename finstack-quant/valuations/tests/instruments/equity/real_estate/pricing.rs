@@ -492,7 +492,7 @@ fn test_levered_real_estate_equity_value_is_asset_minus_debt() {
         .notional_limit(Money::new(600.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
-        .rate(RateSpec::Fixed { rate_bp: 500 }) // 5%
+        .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -571,7 +571,7 @@ fn test_levered_real_estate_equity_custom_metrics_compute() {
         .notional_limit(Money::new(700.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
-        .rate(RateSpec::Fixed { rate_bp: 600 }) // 6%
+        .rate(RateSpec::Fixed { rate: 0.06 }) // 6%
         .frequency(Tenor::annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -657,7 +657,7 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
         .notional_limit(Money::new(700.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
-        .rate(RateSpec::Fixed { rate_bp: 600 }) // 6%
+        .rate(RateSpec::Fixed { rate: 0.06 }) // 6%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -862,7 +862,7 @@ fn test_dscr_min_excludes_balloon_principal_at_maturity() {
         .notional_limit(Money::new(700.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(noi2)
-        .rate(RateSpec::Fixed { rate_bp: 600 }) // 6% => ~42/yr interest
+        .rate(RateSpec::Fixed { rate: 0.06 }) // 6% => ~42/yr interest
         .frequency(Tenor::annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

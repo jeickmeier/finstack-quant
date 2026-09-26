@@ -8,11 +8,10 @@
 use finstack_quant_core::dates::{calendar_by_id, Date};
 use rust_decimal::Decimal;
 
-use super::types::{
-    BaseRateSpec, CreditSpreadProcessSpec, DrawRepaySpec, RevolvingCredit, UtilizationProcess,
-};
+use super::types::{CreditSpreadProcessSpec, DrawRepaySpec, RevolvingCredit, UtilizationProcess};
 use crate::cashflow::builder::FeeTier;
 use crate::instruments::common_impl::validation;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::loan_terms::UpfrontFee;
 
 /// Validate a dated step schedule: strictly increasing, after the commitment
@@ -125,39 +124,32 @@ impl RevolvingCredit {
         self.pricing_model_override()?;
 
         // Commitment amount must be positive
-        validation::validate_money_gt(
-            self.commitment_amount,
-            0.0,
-            "RevolvingCredit commitment_amount",
-        )?;
-        validation::validate_money_finite(self.drawn_amount, "RevolvingCredit drawn_amount")?;
+        validation::validate_money_gt(self.commitment, 0.0, "RevolvingCredit commitment")?;
+        validation::validate_money_finite(self.drawn, "RevolvingCredit drawn")?;
 
         // Drawn amount must be non-negative (check before relationship check
-        // so a negative drawn_amount is reported clearly rather than passing
+        // so a negative drawn is reported clearly rather than passing
         // the drawn <= commitment check vacuously)
-        validation::require_with(self.drawn_amount.amount() >= 0.0, || {
+        validation::require_with(self.drawn.amount() >= 0.0, || {
             format!(
-                "RevolvingCredit drawn_amount must be non-negative, got {}",
-                self.drawn_amount
+                "RevolvingCredit drawn must be non-negative, got {}",
+                self.drawn
             )
         })?;
 
         // Drawn amount must not exceed commitment
-        validation::require_with(
-            self.drawn_amount.amount() <= self.commitment_amount.amount(),
-            || {
-                format!(
-                    "RevolvingCredit drawn_amount ({}) must not exceed commitment_amount ({})",
-                    self.drawn_amount, self.commitment_amount
-                )
-            },
-        )?;
+        validation::require_with(self.drawn.amount() <= self.commitment.amount(), || {
+            format!(
+                "RevolvingCredit drawn ({}) must not exceed commitment ({})",
+                self.drawn, self.commitment
+            )
+        })?;
 
         // Currency consistency
         validation::validate_money_currency(
-            self.drawn_amount,
-            self.commitment_amount.currency(),
-            "RevolvingCredit drawn_amount currency must match commitment_amount",
+            self.drawn,
+            self.commitment.currency(),
+            "RevolvingCredit drawn currency must match commitment",
         )?;
 
         // Date ordering: commitment must be before maturity
@@ -226,25 +218,28 @@ impl RevolvingCredit {
             })?;
             validation::validate_money_currency(
                 step.amount,
-                self.commitment_amount.currency(),
+                self.commitment.currency(),
                 "RevolvingCredit commitment_steps amount currency",
             )?;
-            validation::validate_f64_non_negative(
-                step.fee_bp,
-                &format!("RevolvingCredit commitment_steps[{index}].fee_bp"),
-            )?;
+            if step.reduction_fee_bp < Decimal::ZERO {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "RevolvingCredit commitment_steps[{index}].reduction_fee_bp must be \
+                     non-negative, got {}",
+                    step.reduction_fee_bp
+                )));
+            }
         }
         if let Some(lc) = &self.lc {
             validation::validate_money_gt(lc.sublimit, 0.0, "RevolvingCredit lc.sublimit")?;
             validation::validate_money_currency(
                 lc.sublimit,
-                self.commitment_amount.currency(),
+                self.commitment.currency(),
                 "RevolvingCredit lc.sublimit currency",
             )?;
             validation::validate_money_finite(lc.outstanding, "RevolvingCredit lc.outstanding")?;
             validation::validate_money_currency(
                 lc.outstanding,
-                self.commitment_amount.currency(),
+                self.commitment.currency(),
                 "RevolvingCredit lc.outstanding currency",
             )?;
             validation::require_with(
@@ -257,13 +252,12 @@ impl RevolvingCredit {
                 },
             )?;
             validation::require_with(
-                self.drawn_amount.amount() + lc.outstanding.amount()
-                    <= self.commitment_amount.amount() + 1e-9,
+                self.drawn.amount() + lc.outstanding.amount() <= self.commitment.amount() + 1e-9,
                 || {
                     format!(
-                        "RevolvingCredit drawn_amount ({}) plus lc.outstanding ({}) must not \
-                         exceed commitment_amount ({})",
-                        self.drawn_amount, lc.outstanding, self.commitment_amount
+                        "RevolvingCredit drawn ({}) plus lc.outstanding ({}) must not \
+                         exceed commitment ({})",
+                        self.drawn, lc.outstanding, self.commitment
                     )
                 },
             )?;
@@ -277,18 +271,18 @@ impl RevolvingCredit {
                 lc.fronting_fee_bp,
                 "RevolvingCredit lc.fronting_fee_bp",
             )?;
-            match (lc.fee_bp, &self.base_rate_spec) {
+            match (lc.fee_bp, &self.rate) {
                 (Some(fee_bp), _) => {
                     validation::validate_f64_non_negative(fee_bp, "RevolvingCredit lc.fee_bp")?;
                 }
-                (None, BaseRateSpec::Fixed { .. }) => {
+                (None, RateSpec::Fixed { .. }) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "RevolvingCredit {}: lc.fee_bp is required on a fixed-rate facility (no \
                          floating margin to default to)",
                         self.id
                     )));
                 }
-                (None, BaseRateSpec::Floating(_)) => {}
+                (None, RateSpec::Floating(_)) => {}
             }
             let mut outstanding = lc.outstanding.amount();
             let mut previous: Option<Date> = None;
@@ -316,7 +310,7 @@ impl RevolvingCredit {
                 )?;
                 validation::validate_money_currency(
                     event.amount,
-                    self.commitment_amount.currency(),
+                    self.commitment.currency(),
                     "RevolvingCredit lc.events amount currency",
                 )?;
                 outstanding += if event.is_issue {
@@ -373,7 +367,7 @@ impl RevolvingCredit {
                 validation::validate_money_finite(*upfront_fee, "RevolvingCredit upfront_fee")?;
                 validation::validate_money_currency(
                     *upfront_fee,
-                    self.commitment_amount.currency(),
+                    self.commitment.currency(),
                     "RevolvingCredit upfront_fee currency",
                 )?;
                 validation::require_with(upfront_fee.amount() >= 0.0, || {
@@ -411,7 +405,7 @@ impl RevolvingCredit {
             validation::validate_money_finite(fee.amount, "RevolvingCredit scheduled_fees amount")?;
             validation::validate_money_currency(
                 fee.amount,
-                self.commitment_amount.currency(),
+                self.commitment.currency(),
                 "RevolvingCredit scheduled_fees amount currency",
             )?;
             validation::require_with(fee.amount.amount() >= 0.0, || {
@@ -432,11 +426,11 @@ impl RevolvingCredit {
         // conversion used by the cashflow engine. This keeps the public
         // validation/JSON boundary aligned with pricing for gearing, decimal
         // conversion, and index/all-in floor-cap ordering.
-        match &self.base_rate_spec {
-            BaseRateSpec::Fixed { rate } => {
+        match &self.rate {
+            RateSpec::Fixed { rate } => {
                 validation::validate_f64_finite(*rate, "RevolvingCredit fixed base rate")?;
             }
-            BaseRateSpec::Floating(spec) => {
+            RateSpec::Floating(spec) => {
                 validation::require_with(spec.gearing > Decimal::ZERO, || {
                     format!(
                         "RevolvingCredit floating gearing must be positive, got {}",
@@ -481,7 +475,7 @@ impl RevolvingCredit {
             DrawRepaySpec::Deterministic(events) => {
                 let mut events = events.iter().collect::<Vec<_>>();
                 events.sort_by_key(|event| event.date);
-                let mut balance = self.drawn_amount.amount();
+                let mut balance = self.drawn.amount();
                 for event in &events {
                     validation::require_with(
                         event.date > self.issue_date && event.date <= self.maturity,
@@ -504,7 +498,7 @@ impl RevolvingCredit {
                     )?;
                     validation::validate_money_currency(
                         event.amount,
-                        self.commitment_amount.currency(),
+                        self.commitment.currency(),
                         "RevolvingCredit draw/repay amount currency",
                     )?;
                     if event.is_draw {
@@ -566,27 +560,27 @@ impl RevolvingCredit {
                 })?;
                 match &spec.utilization_process {
                     UtilizationProcess::MeanReverting {
-                        target_rate,
-                        speed,
-                        volatility,
+                        theta,
+                        kappa,
+                        sigma,
                         spread_sensitivity,
                     } => {
                         validation::require_with(
-                            target_rate.is_finite() && (0.0..=1.0).contains(target_rate),
+                            theta.is_finite() && (0.0..=1.0).contains(theta),
                             || {
                                 format!(
-                                    "RevolvingCredit utilization target_rate must be finite and \
-                                     in [0, 1], got {target_rate}"
+                                    "RevolvingCredit draw_repay_spec.stochastic.utilization_process.mean_reverting.theta \
+                                     must be finite and in [0, 1], got {theta}"
                                 )
                             },
                         )?;
                         validation::validate_f64_positive(
-                            *speed,
-                            "RevolvingCredit utilization speed",
+                            *kappa,
+                            "RevolvingCredit draw_repay_spec.stochastic.utilization_process.mean_reverting.kappa",
                         )?;
                         validation::validate_f64_non_negative(
-                            *volatility,
-                            "RevolvingCredit utilization volatility",
+                            *sigma,
+                            "RevolvingCredit draw_repay_spec.stochastic.utilization_process.mean_reverting.sigma",
                         )?;
                         validation::require_with(spread_sensitivity.is_finite(), || {
                             format!(

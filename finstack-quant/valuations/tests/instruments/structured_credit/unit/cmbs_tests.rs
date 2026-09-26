@@ -11,11 +11,11 @@ use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, AssetPool, AssetType, BalloonSpec, CmbsDscrCalculator,
     DealFees, DealType, PenaltyStep, PeriodDiagnostics, PoolAsset, PrepaymentPenalty,
-    SpecialServicingSpec, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    SpecialServicingSpec, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
@@ -73,7 +73,7 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
             70.0,
             TrancheSeniority::Senior,
             usd(total * 0.7),
-            TrancheCoupon::Fixed { rate: 0.06 },
+            RateSpec::Fixed { rate: 0.06 },
             maturity(),
         )
         .expect("A"),
@@ -83,7 +83,7 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
             90.0,
             TrancheSeniority::Mezzanine,
             usd(total * 0.2),
-            TrancheCoupon::Fixed { rate: 0.09 },
+            RateSpec::Fixed { rate: 0.09 },
             maturity(),
         )
         .expect("B"),
@@ -93,7 +93,7 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(total * 0.1),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),

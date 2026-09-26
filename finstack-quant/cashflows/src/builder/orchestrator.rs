@@ -81,6 +81,9 @@ pub(super) struct AmortizationSetup {
     pub(super) custom_principal_map: Option<finstack_quant_core::HashMap<Date, Money>>,
     pub(super) linear_delta: Option<Decimal>, // for LinearTo
     pub(super) percent_per: Option<Decimal>,  // for PercentOfOriginalPerPeriod
+    pub(super) percent_remaining: Option<Decimal>, // for PercentOfRemainingPerPeriod
+    /// `(start, last installment date, installment)` for LinearBetween.
+    pub(super) linear_between: Option<(Date, Date, Decimal)>,
 }
 
 /// Grouped inputs for collecting all relevant schedule dates.
@@ -168,7 +171,10 @@ fn derive_amortization_setup(
     if amort_base.is_empty()
         && matches!(
             notional.amort,
-            AmortizationSpec::LinearTo { .. } | AmortizationSpec::PercentOfOriginalPerPeriod { .. }
+            AmortizationSpec::LinearTo { .. }
+                | AmortizationSpec::PercentOfOriginalPerPeriod { .. }
+                | AmortizationSpec::PercentOfRemainingPerPeriod { .. }
+                | AmortizationSpec::LinearBetween { .. }
         )
     {
         return Err(InputError::Invalid.into());
@@ -221,6 +227,32 @@ fn derive_amortization_setup(
         _ => (None, None),
     };
 
+    let percent_remaining = match &notional.amort {
+        AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
+            Some(f64_to_decimal(*pct)?.max(Decimal::ZERO))
+        }
+        _ => None,
+    };
+
+    let linear_between = match &notional.amort {
+        AmortizationSpec::LinearBetween { start, end } => {
+            let window: Vec<Date> = amort_base
+                .iter()
+                .copied()
+                .filter(|date| *date > *start && *date <= *end)
+                .collect();
+            let Some(last) = window.last().copied() else {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "LinearBetween window ({start}, {end}] contains no payment date"
+                )));
+            };
+            let initial = f64_to_decimal(notional.initial.amount())?;
+            let installment = initial / Decimal::from(window.len() as u64);
+            Some((*start, last, installment.max(Decimal::ZERO)))
+        }
+        _ => None,
+    };
+
     let amort_dates: finstack_quant_core::HashSet<Date> = amort_base.into_iter().collect();
 
     Ok(AmortizationSetup {
@@ -230,6 +262,8 @@ fn derive_amortization_setup(
         custom_principal_map,
         linear_delta,
         percent_per,
+        percent_remaining,
+        linear_between,
     })
 }
 

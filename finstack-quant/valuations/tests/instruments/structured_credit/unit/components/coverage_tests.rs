@@ -10,9 +10,10 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, CoverageTestSpec, DealType, PoolAsset, TestContext, Tranche, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    AssetPool, CoverageTestSpec, DealType, PoolAsset, TestContext, Tranche, TrancheSeniority,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -86,7 +87,7 @@ fn test_oc_test_passing_scenario() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -97,7 +98,7 @@ fn test_oc_test_passing_scenario() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -140,7 +141,7 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -180,7 +181,7 @@ fn test_oc_test_failing_scenario() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -191,7 +192,7 @@ fn test_oc_test_failing_scenario() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -234,7 +235,7 @@ fn test_oc_test_with_cash_balance() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -245,7 +246,7 @@ fn test_oc_test_with_cash_balance() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -289,7 +290,7 @@ fn oc_numerator_carries_pending_recovery_claims_at_recovery_value() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -299,7 +300,7 @@ fn oc_numerator_carries_pending_recovery_claims_at_recovery_value() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -347,7 +348,7 @@ fn test_oc_test_cure_amount_calculation() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -358,7 +359,7 @@ fn test_oc_test_cure_amount_calculation() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -398,7 +399,7 @@ fn test_ic_test_passing_scenario() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -409,7 +410,7 @@ fn test_ic_test_passing_scenario() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 }, // 5% = 1.25M quarterly
+        RateSpec::Fixed { rate: 0.05 }, // 5% = 1.25M quarterly
         maturity_date(),
     )
     .unwrap();
@@ -444,7 +445,7 @@ fn test_ic_test_failing_scenario() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -455,7 +456,7 @@ fn test_ic_test_failing_scenario() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -489,7 +490,7 @@ fn test_ic_test_no_cure_amount() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -500,7 +501,7 @@ fn test_ic_test_no_cure_amount() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -565,7 +566,7 @@ fn test_oc_test_empty_pool() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -576,7 +577,7 @@ fn test_oc_test_empty_pool() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -611,7 +612,7 @@ fn test_ic_test_no_interest_collections() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -622,7 +623,7 @@ fn test_ic_test_no_interest_collections() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -664,7 +665,7 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -677,7 +678,7 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(99_999_999.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -713,7 +714,7 @@ fn claim_test_tranches() -> TrancheStructure {
         10.0,
         TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         maturity_date(),
     )
     .unwrap();
@@ -723,7 +724,7 @@ fn claim_test_tranches() -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();

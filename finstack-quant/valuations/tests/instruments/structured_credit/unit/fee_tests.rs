@@ -11,9 +11,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, DealFees, DealType, FundingSource, IncentiveFeeSpec, PoolAsset,
-    StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -61,7 +62,7 @@ fn clo(adjust: impl FnOnce(&mut DealFees)) -> StructuredCredit {
             b,
             sen,
             usd(bal),
-            TrancheCoupon::Fixed { rate: cpn },
+            RateSpec::Fixed { rate: cpn },
             maturity,
         )
         .expect("tranche")

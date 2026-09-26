@@ -12,10 +12,11 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_metrics, run_simulation, AssetPool, CallAssumption, DealType, PoolAsset,
     ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheCoupon, TrancheMetrics, TrancheSeniority, TrancheStructure,
+    TrancheMetrics, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -89,7 +90,7 @@ fn clo(cpr: f64) -> StructuredCredit {
             60.0,
             TrancheSeniority::Senior,
             usd(60_000_000.0),
-            TrancheCoupon::Floating(floating(150.0)),
+            RateSpec::Floating(floating(150.0)),
             maturity(),
         )
         .expect("A"),
@@ -99,7 +100,7 @@ fn clo(cpr: f64) -> StructuredCredit {
             90.0,
             TrancheSeniority::Mezzanine,
             usd(30_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.07 },
+            RateSpec::Fixed { rate: 0.07 },
             maturity(),
         )
         .expect("B"),
@@ -109,7 +110,7 @@ fn clo(cpr: f64) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(10_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),

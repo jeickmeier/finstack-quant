@@ -418,7 +418,8 @@ impl TermLoanDiscountingPricer {
 
         // Margin events are effective from the start of the contractual accrual
         // period. Combine coincident covenant changes before lookup.
-        let mut margin_deltas = BTreeMap::<finstack_quant_core::dates::Date, i32>::new();
+        let mut margin_deltas =
+            BTreeMap::<finstack_quant_core::dates::Date, rust_decimal::Decimal>::new();
         if let Some(covenants) = &loan.covenants {
             for step in &covenants.margin_steps {
                 *margin_deltas.entry(step.date).or_default() += step.delta_bp;
@@ -460,12 +461,17 @@ impl TermLoanDiscountingPricer {
                 .accrual
                 .as_ref()
                 .map_or(reset_date, |accrual| accrual.start);
-            let active_delta_bp: i32 = margin_deltas
+            let active_delta_bp: rust_decimal::Decimal = margin_deltas
                 .range(..=accrual_start)
                 .map(|(_, delta_bp)| *delta_bp)
                 .sum();
             let mut params = base_params.clone();
-            params.spread_bp += f64::from(active_delta_bp);
+            params.spread_bp += rust_decimal::prelude::ToPrimitive::to_f64(&active_delta_bp)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "margin step {active_delta_bp} bp is not representable as f64"
+                    ))
+                })?;
             let all_in_rate = crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                 raw_fixing, &params,
             );
@@ -750,7 +756,7 @@ mod tests {
             crate::instruments::fixed_income::term_loan::TermLoanCovenantEvents {
                 margin_steps: vec![crate::instruments::fixed_income::term_loan::MarginStep {
                     date: date(2025, 1, 1),
-                    delta_bp: 200,
+                    delta_bp: rust_decimal::Decimal::from(200),
                 }],
                 ..Default::default()
             },

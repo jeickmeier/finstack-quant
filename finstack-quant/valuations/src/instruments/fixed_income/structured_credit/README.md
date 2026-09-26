@@ -19,7 +19,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `StructuredCredit` | The instrument. `new_abs`/`new_clo`/`new_cmbs`/`new_rmbs` apply deal-type defaults; `builder()` for full control; `example()` for a canonical deal. |
 | `DealType`, `AssetType`, `TrancheSeniority` | `DealType::{Clo, Cbo, Abs, Rmbs, Cmbs, Auto, Card}` and pool/tranche taxonomy. Only `Abs`, `Clo`, `Cmbs` and `Rmbs` have `new_*` constructors and registry profiles. |
 | `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats` | Collateral pool and its aggregates. Floating rows (`forward_curve_id` + `spread_bp`) may carry `index_floor_bp`, a floor on the index in basis points applied before the spread. |
-| `Tranche`, `TrancheBuilder`, `TrancheStructure`, `TrancheCoupon` | Capital structure. |
+| `Tranche`, `TrancheBuilder`, `TrancheStructure` | Capital structure; tranche coupons are the shared `loan_terms::RateSpec`. |
 | `Waterfall`, `WaterfallBuilder`, `WaterfallTier`, `Recipient`, `RecipientType`, `PaymentType`, `PaymentCalculation`, `AllocationMode` | Waterfall construction. |
 | `WaterfallRules`, `AfcSpec`, `StepDownSpec`, `StepDownTrigger`, `ShiftingInterestSpec`, `ShiftMode` | Declarative rules layered onto the base waterfall per period (`pricing/resolve.rs`). |
 | `CoverageTestSpec`, `CoverageTestAction`, `CoverageTestType`, `CoverageTrigger` (tranche-level), `TriggerConsequence` | OC/IC tests as waterfall positions — see [Coverage tests](#coverage-tests). |
@@ -848,7 +848,7 @@ Both bindings expose structured credit under their `instruments` namespace:
 
 Deep sub-configs (`WaterfallRules`, the stochastic specs, `DealFees`,
 `DelinquencyModel`, `CardPortfolioSpec`, `CoverageTestSpec`,
-`CoverageTrigger`, the CMBS `PoolAsset` sub-specs, floating `TrancheCoupon`)
+`CoverageTrigger`, the CMBS `PoolAsset` sub-specs, floating tranche `RateSpec`)
 stay dict / JSON sub-fields in Python and everything stays JSON in WASM.
 
 ## Verification

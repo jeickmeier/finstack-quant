@@ -3,7 +3,7 @@
 //!
 //! Mirrors the `PyTermLoan` pattern in `instruments.rs`: every public Rust
 //! field is a getter, `price` / `metric` share the `price_instrument`
-//! pipeline, and the nested specs (`base_rate_spec`, `fees`,
+//! pipeline, and the nested specs (`rate`, `fees`,
 //! `draw_repay_spec`) stay in their serde dict shape per the nested-spec rule.
 //! `price_with_paths` and `expected_cashflows` bind the Rust
 //! `RevolvingCreditPricer` entry points that have no `price_instrument` twin.

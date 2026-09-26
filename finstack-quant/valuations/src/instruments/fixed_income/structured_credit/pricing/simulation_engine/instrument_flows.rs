@@ -22,18 +22,18 @@ use super::reserve::{fund_collateral_draws, replenish_reserve_from_repayments};
 use super::*;
 use crate::cashflow::builder::{CashFlowSchedule, FloatingRateParams};
 use crate::instruments::fixed_income::bond::CashflowSpec;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::revolving_credit::pricing::path_generator::build_credit_spread_params;
 use crate::instruments::fixed_income::revolving_credit::pricing::unified::{
     DEFAULT_CREDIT_SPREAD_IMPLIED_VOL, DEFAULT_UTIL_CREDIT_CORR,
 };
 use crate::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit,
-    StochasticUtilizationSpec, UtilizationProcess,
+    CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, StochasticUtilizationSpec,
+    UtilizationProcess,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
     CallExercisePolicy, CollateralInstrument, InstrumentCollateral, PutExercisePolicy,
 };
-use crate::instruments::fixed_income::term_loan::RateSpec;
 use finstack_quant_cashflows::traits::CashflowScheduleSource;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -1116,9 +1116,9 @@ fn build_schedule(
         }
         CollateralInstrument::Revolver(facility) => {
             let schedule = facility.raw_cashflow_schedule(context, as_of)?;
-            // `drawn_amount` is the balance at the simulation anchor in both
+            // `drawn` is the balance at the simulation anchor in both
             // modes; deterministic events are future-only.
-            let opening = facility.drawn_amount.amount();
+            let opening = facility.drawn.amount();
             (
                 CollateralKind::Revolver,
                 schedule,
@@ -1176,12 +1176,12 @@ fn build_schedule(
     let fixed_coupon = match held {
         CollateralInstrument::Bond(bond) => fixed_coupon_of(&bond.cashflow_spec)?,
         CollateralInstrument::TermLoan(loan) => match &loan.rate {
-            RateSpec::Fixed { rate_bp } => Some(f64::from(*rate_bp) / 10_000.0),
+            RateSpec::Fixed { rate } => Some(*rate),
             RateSpec::Floating(_) => None,
         },
-        CollateralInstrument::Revolver(facility) => match &facility.base_rate_spec {
-            BaseRateSpec::Fixed { rate } => Some(*rate),
-            BaseRateSpec::Floating(_) => None,
+        CollateralInstrument::Revolver(facility) => match &facility.rate {
+            RateSpec::Fixed { rate } => Some(*rate),
+            RateSpec::Floating(_) => None,
         },
     };
     let call_policy = collateral.call_policy_for(&id);
@@ -1255,9 +1255,9 @@ fn build_schedule(
             RateSpec::Floating(spec) => Some(FloatingRateParams::try_from(spec)?),
             RateSpec::Fixed { .. } => None,
         },
-        CollateralInstrument::Revolver(facility) => match &facility.base_rate_spec {
-            BaseRateSpec::Floating(spec) => Some(FloatingRateParams::try_from(spec)?),
-            BaseRateSpec::Fixed { .. } => None,
+        CollateralInstrument::Revolver(facility) => match &facility.rate {
+            RateSpec::Floating(spec) => Some(FloatingRateParams::try_from(spec)?),
+            RateSpec::Fixed { .. } => None,
         },
     };
     let revolver = match held {
@@ -1286,9 +1286,9 @@ fn build_schedule(
                 .map(|k| {
                     let start = if k == 0 { as_of } else { period_dates[k - 1] };
                     let delta = facility.margin_delta_bp_at(start) / 10_000.0;
-                    match &facility.base_rate_spec {
-                        BaseRateSpec::Fixed { rate } => MarginTerms::FixedRate(*rate + delta),
-                        BaseRateSpec::Floating(_) => MarginTerms::Spread,
+                    match &facility.rate {
+                        RateSpec::Fixed { rate } => MarginTerms::FixedRate(*rate + delta),
+                        RateSpec::Floating(_) => MarginTerms::Spread,
                     }
                 })
                 .collect(),
@@ -1327,9 +1327,9 @@ fn utilization_terms(
     as_of: Date,
 ) -> Result<UtilizationTerms> {
     let UtilizationProcess::MeanReverting {
-        target_rate,
-        speed,
-        volatility,
+        theta,
+        kappa,
+        sigma,
         spread_sensitivity,
     } = &spec.utilization_process;
     let anchor = as_of.max(facility.issue_date);
@@ -1375,9 +1375,9 @@ fn utilization_terms(
         .unwrap_or(0.0)
         .clamp(-1.0, 1.0);
     Ok(UtilizationTerms {
-        kappa: *speed,
-        theta: *target_rate,
-        sigma: *volatility,
+        kappa: *kappa,
+        theta: *theta,
+        sigma: *sigma,
         spread_sensitivity: *spread_sensitivity,
         util_credit_corr,
         spread,

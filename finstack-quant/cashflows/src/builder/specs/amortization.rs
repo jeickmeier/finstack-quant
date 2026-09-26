@@ -45,6 +45,33 @@ pub enum AmortizationSpec {
         /// Fraction of original notional paid per period (e.g., 0.05 = 5%).
         pct: f64,
     },
+    /// Fixed percentage of the **remaining** outstanding paid each period
+    /// (declining balance): the payment is `outstanding * pct`, so it falls
+    /// geometrically from period to period.
+    PercentOfRemainingPerPeriod {
+        /// Fraction of the outstanding principal paid per period (e.g.,
+        /// 0.025 = 2.5%), in `[0, 1]`.
+        pct: f64,
+    },
+    /// Equal principal installments on every payment date in `(start, end]`,
+    /// repaying the outstanding principal in full by `end`.
+    LinearBetween {
+        /// Amortization start; installments fall on payment dates strictly
+        /// after it.
+        #[serde(with = "finstack_quant_core::wire::date")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        start: Date,
+        /// Amortization end (full repayment), on or before maturity.
+        #[serde(with = "finstack_quant_core::wire::date")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        end: Date,
+    },
     /// Custom principal exchanges on specific dates (absolute cash amounts).
     /// Positive amounts reduce outstanding (i.e., principal paid by issuer).
     CustomPrincipal {
@@ -58,8 +85,8 @@ pub enum AmortizationSpec {
     },
 }
 
-/// [`Hash`] is manual because [`Self::PercentOfOriginalPerPeriod`] carries an
-/// `f64`, which cannot participate in a derived [`Eq`]/[`Hash`] impl.
+/// [`Hash`] is manual because the percentage variants carry an `f64`, which
+/// cannot participate in a derived [`Eq`]/[`Hash`] impl.
 impl Hash for AmortizationSpec {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
@@ -67,9 +94,14 @@ impl Hash for AmortizationSpec {
             Self::None => {}
             Self::LinearTo { final_notional } => final_notional.hash(state),
             Self::StepRemaining { schedule } => schedule.hash(state),
-            Self::PercentOfOriginalPerPeriod { pct } => {
+            Self::PercentOfOriginalPerPeriod { pct }
+            | Self::PercentOfRemainingPerPeriod { pct } => {
                 // `f64` PartialEq treats `-0.0 == 0.0`; canonicalize before hashing.
                 (pct + 0.0).to_bits().hash(state);
+            }
+            Self::LinearBetween { start, end } => {
+                start.hash(state);
+                end.hash(state);
             }
             Self::CustomPrincipal { items } => items.hash(state),
         }
@@ -121,7 +153,9 @@ impl Notional {
     /// - `LinearTo`: Currency must match initial; final_notional must not exceed initial.
     /// - `StepRemaining`: Dates must be strictly increasing (sorted, no duplicates);
     ///   currencies must match; remaining amounts must be non-increasing.
-    /// - `PercentOfOriginalPerPeriod`: Percentage must be finite and in range `[0.0, 1.0]`.
+    /// - `PercentOfOriginalPerPeriod` / `PercentOfRemainingPerPeriod`: Percentage must
+    ///   be finite and in range `[0.0, 1.0]`.
+    /// - `LinearBetween`: `start` must precede `end`.
     /// - `CustomPrincipal`: All currencies must match initial.
     ///
     /// # Errors
@@ -211,17 +245,26 @@ impl Notional {
                 }
                 Ok(())
             }
-            AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
+            AmortizationSpec::PercentOfOriginalPerPeriod { pct }
+            | AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
                 if !pct.is_finite() {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "PercentOfOriginalPerPeriod pct must be finite; got {}",
+                        "amortization pct must be finite; got {}",
                         pct
                     )));
                 }
                 if *pct < 0.0 || *pct > 1.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "PercentOfOriginalPerPeriod pct must be in [0.0, 1.0]; got {}",
+                        "amortization pct must be in [0.0, 1.0]; got {}",
                         pct
+                    )));
+                }
+                Ok(())
+            }
+            AmortizationSpec::LinearBetween { start, end } => {
+                if start >= end {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "LinearBetween start {start} must precede end {end}"
                     )));
                 }
                 Ok(())

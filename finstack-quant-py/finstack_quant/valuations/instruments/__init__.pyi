@@ -2609,7 +2609,7 @@ class TermLoan:
     >>> from finstack_quant.valuations.instruments import TermLoan
     >>> loan = TermLoan.example()
     >>> (loan.id, loan.rate)
-    ('TERM-LOAN-USD-5Y', {'fixed': {'rate_bp': 600}})
+    ('TERM-LOAN-USD-5Y', {'fixed': {'rate': 0.06}})
     """
 
     @staticmethod
@@ -2946,7 +2946,7 @@ class TermLoan:
         Returns
         -------
         dict[str, object]
-            ``{"fixed": {"rate_bp": 600}}`` or ``{"floating": {...}}``.
+            ``{"fixed": {"rate": 0.06}}`` (decimal rate) or ``{"floating": {...}}``.
 
         Notes
         -----
@@ -3066,7 +3066,7 @@ class TermLoan:
         Returns
         -------
         str | dict[str, object]
-            ``"none"``, ``{"percent_per_period": {"bp": 250}}``, ``{"linear": {...}}``, ...
+            ``"none"``, ``{"percent_of_remaining_per_period": {"pct": 0.025}}``, ``{"linear_between": {...}}``, ...
 
         Notes
         -----
@@ -3089,14 +3089,16 @@ class TermLoan:
         """
         ...
     @property
-    def upfront_fee(self) -> Money | None:
+    def upfront_fee(self) -> dict[str, object] | None:
         """
-        Upfront fee paid at funding.
+        Upfront (arrangement or OID) fee paid on the issue date.
 
         Returns
         -------
-        Money | None
-            Currency-tagged fee amount, or ``None`` when the loan has no upfront fee.
+        dict[str, object] | None
+            ``UpfrontFee`` serde dict (``{"amount": Money-dict}`` or
+            ``{"fraction_of_commitment": 0.02}``), or ``None`` when the loan
+            has no upfront fee.
 
         Notes
         -----
@@ -3251,11 +3253,11 @@ class TermLoanBuilder:
     ...     .frequency(Tenor.quarterly())
     ...     .day_count(DayCount.ACT_360)
     ...     .discount_curve_id("USD-OIS")
-    ...     .amortization({"percent_per_period": {"bp": 250}})
+    ...     .amortization({"percent_of_remaining_per_period": {"pct": 0.025}})
     ...     .build()
     ... )
     >>> loan.rate
-    {'fixed': {'rate_bp': 600}}
+    {'fixed': {'rate': 0.06}}
     """
 
     def id(self, value: str) -> TermLoanBuilder:
@@ -3368,7 +3370,7 @@ class TermLoanBuilder:
         ----------
         value : float | Rate | dict[str, object] | str
             A bare decimal (``0.06`` = 6%) or ``Rate`` sets a fixed rate (mirrors
-            Rust ``RateSpec::fixed_rate``; rounded to whole basis points). A
+            Rust ``RateSpec::fixed_rate``). A
             ``dict`` / JSON ``str`` is the Rust ``RateSpec`` in serde form, e.g.
             ``{"floating": {"forward_curve_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
 
@@ -3535,7 +3537,7 @@ class TermLoanBuilder:
         Parameters
         ----------
         value : dict[str, object] | str
-            Rust ``AmortizationSpec`` in serde form (``dict`` or JSON string), e.g. ``"none"``, ``{"percent_per_period": {"bp": 250}}`` or ``{"linear": {"start": "2025-01-01", "end": "2029-01-01"}}``.
+            Rust ``AmortizationSpec`` in serde form (``dict`` or JSON string), e.g. ``"none"``, ``{"percent_of_remaining_per_period": {"pct": 0.025}}`` (declining balance), ``{"percent_of_original_per_period": {"pct": 0.01}}``, ``{"linear_between": {"start": "2025-01-01", "end": "2029-01-01"}}`` or ``{"custom_principal": {"items": [...]}}``; ``linear_to`` and ``step_remaining`` are rejected at ``build()``.
 
         Returns
         -------
@@ -3568,14 +3570,19 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
-    def upfront_fee(self, value: Money | float, currency: str | None = None) -> TermLoanBuilder:
+    def upfront_fee(
+        self, value: Money | float | dict[str, object] | str, currency: str | None = None
+    ) -> TermLoanBuilder:
         """
-        Set the upfront fee.
+        Set the upfront (arrangement or OID) fee paid on the issue date.
 
         Parameters
         ----------
-        value : Money | float
-            Upfront fee; a bare number is tagged with ``currency``.
+        value : Money | float | dict[str, object] | str
+            A ``Money`` or bare number (tagged with ``currency``) is an absolute
+            amount; a ``dict`` or JSON string is the ``UpfrontFee`` serde form
+            (``{"amount": Money-dict}`` or ``{"fraction_of_commitment": 0.02}``,
+            a decimal fraction of the DDTL commitment, else ``notional_limit``).
         currency : str, optional
             ISO-4217 code applied when ``value`` is a bare number.
 
@@ -3587,7 +3594,7 @@ class TermLoanBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or a bare number is given without ``currency``.
+            If the builder was already consumed by ``build()``, a bare number is given without ``currency``, or a ``dict``/string does not match the ``UpfrontFee`` shape.
         """
         ...
     def ddtl(self, value: dict[str, object] | str) -> TermLoanBuilder:
@@ -11562,29 +11569,17 @@ class ConvertibleBond:
         """
         ...
     @property
-    def fixed_coupon(self) -> dict[str, object] | None:
+    def cashflow_spec(self) -> dict[str, object]:
         """
-        Fixed coupon specification in serde form.
+        Coupon/cashflow specification in serde form, the same shape as
+        ``Bond.cashflow_spec``.
 
         Returns
         -------
-        dict[str, object] | None
-            The ``FixedCouponSpec`` dict, or ``None``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def floating_coupon(self) -> dict[str, object] | None:
-        """
-        Floating coupon specification in serde form.
-
-        Returns
-        -------
-        dict[str, object] | None
-            The ``FloatingCouponSpec`` dict, or ``None``.
+        dict[str, object]
+            ``{"fixed": {...}}``, ``{"floating": {...}}``, ``{"step_up": {...}}``
+            or ``{"amortizing": {...}}``; a zero-coupon convertible is a fixed
+            spec with rate ``"0"``.
 
         Notes
         -----
@@ -11628,7 +11623,7 @@ class ConvertibleBondBuilder:
 
     Builders are consumed by ``build()``; create a new builder per
     instrument. Required fields: ``id``, ``notional``, ``issue_date``,
-    ``maturity``, ``discount_curve_id``, ``conversion``.
+    ``maturity``, ``discount_curve_id``, ``conversion``, ``cashflow_spec``.
 
     Examples
     --------
@@ -11646,6 +11641,7 @@ class ConvertibleBondBuilder:
     ...     .conversion(ConversionSpec(ratio=20.0, anti_dilution="full_ratchet"))
     ...     .spot_id("ACME")
     ...     .vol_surface_id("ACME-VOL")
+    ...     .cashflow_spec(ConvertibleBond.example().cashflow_spec)
     ...     .build()
     ... )
     >>> bond.conversion_ratio
@@ -11884,7 +11880,7 @@ class ConvertibleBondBuilder:
         Parameters
         ----------
         value : dict[str, object] | str
-            ``SoftCallTrigger`` as a dict or JSON object string with ``threshold_pct`` (percent of conversion price, e.g. ``130.0``), ``observation_days`` and ``required_days_above``.
+            ``PriceTrigger`` as a dict or JSON object string with ``threshold_pct`` (percent of conversion price, e.g. ``130.0``), ``observation_days`` and ``required_days_above``.
 
         Returns
         -------
@@ -11894,7 +11890,7 @@ class ConvertibleBondBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or ``value`` does not match the ``SoftCallTrigger`` shape.
+            If the builder was already consumed by ``build()`` or ``value`` does not match the ``PriceTrigger`` shape.
         """
         ...
     def settlement_days(self, value: int) -> ConvertibleBondBuilder:
@@ -11937,14 +11933,17 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def fixed_coupon(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+    def cashflow_spec(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
         """
-        Set the fixed coupon specification.
+        Set the coupon/cashflow specification.
 
         Parameters
         ----------
         value : dict[str, object] | str
-            ``FixedCouponSpec`` as a dict or JSON object string (``coupon_type``, decimal ``rate`` and a ``schedule`` block).
+            Rust ``CashflowSpec`` as a dict or JSON object string (the same
+            shape as ``Bond.cashflow_spec``, e.g. ``{"fixed": {"coupon_type":
+            "cash", "rate": "0.05", ...schedule}}``); a zero-coupon convertible
+            uses a fixed spec with rate ``"0"``.
 
         Returns
         -------
@@ -11954,27 +11953,7 @@ class ConvertibleBondBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()`` or ``value`` does not match the ``FixedCouponSpec`` shape.
-        """
-        ...
-    def floating_coupon(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
-        """
-        Set the floating coupon specification.
-
-        Parameters
-        ----------
-        value : dict[str, object] | str
-            ``FloatingCouponSpec`` as a dict or JSON object string.
-
-        Returns
-        -------
-        ConvertibleBondBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If the builder was already consumed by ``build()`` or ``value`` does not match the ``FloatingCouponSpec`` shape.
+            If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``CashflowSpec``.
         """
         ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> ConvertibleBondBuilder:
@@ -16951,7 +16930,7 @@ class Tranche:
     @property
     def coupon(self) -> dict[str, Any]:
         """
-        Coupon definition (``TrancheCoupon`` serde shape).
+        Coupon definition (``RateSpec`` serde shape).
 
         Returns
         -------
@@ -17274,7 +17253,7 @@ class TrancheBuilder:
 
     def coupon_floating(self, value: dict[str, Any] | str) -> TrancheBuilder:
         """
-        Set a floating-rate coupon from a JSON ``TrancheCoupon::Floating`` payload.
+        Set a floating-rate coupon from a JSON ``RateSpec::Floating`` payload.
 
         The floating-rate spec (``FloatingRateSpec``: index, spread, gearing,
         floors/caps, reset conventions) stays JSON per the nested-spec rule —
@@ -17283,7 +17262,7 @@ class TrancheBuilder:
         Parameters
         ----------
         value : dict[str, Any] | str
-            JSON-encoded, externally-tagged ``TrancheCoupon`` value, e.g.
+            JSON-encoded, externally-tagged ``RateSpec`` value, e.g.
             ``{"floating": {...FloatingRateSpec fields...}}``.
 
         Returns
@@ -17294,7 +17273,7 @@ class TrancheBuilder:
         Raises
         ------
         ValueError
-            If ``value`` is not valid JSON for the ``TrancheCoupon`` shape.
+            If ``value`` is not valid JSON for the ``RateSpec`` shape.
         """
         ...
 
@@ -25089,8 +25068,8 @@ class AssetBackedFacility:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-        >>> AssetBackedFacility.example().spread_bp
-        600.0
+        >>> AssetBackedFacility.example().rate
+        {'fixed': {'rate': 0.06}}
         """
         ...
     @staticmethod
@@ -25177,7 +25156,7 @@ class AssetBackedFacility:
         market_history: MarketHistory | dict[str, Any] | str | None = None,
     ) -> ValuationResult:
         """
-        Price the lender's projected flows (interest, principal and unused fees) and return a :class:`~finstack_quant.valuations.ValuationResult`.
+        Price the lender's projected flows (interest, principal and commitment fees) and return a :class:`~finstack_quant.valuations.ValuationResult`.
 
         Same pipeline and keyword surface as :func:`price_instrument`.
 
@@ -25312,7 +25291,7 @@ class AssetBackedFacility:
         Returns
         -------
         FacilityProjection
-            Facility and residual flows, unused fees and the period record.
+            Facility and residual flows, commitment fees and the period record.
 
         Raises
         ------
@@ -25461,14 +25440,15 @@ class AssetBackedFacility:
         """
         ...
     @property
-    def forward_curve_id(self) -> str | None:
+    def rate(self) -> dict[str, Any]:
         """
-        Floating index curve identifier, or ``None`` for a fixed all-in rate.
+        Facility coupon as its ``RateSpec`` serde dict.
 
         Returns
         -------
-        str | None
-            The forward-curve id.
+        dict[str, Any]
+            ``{"fixed": {"rate": r}}`` with a decimal all-in rate, or
+            ``{"floating": {...}}`` with a ``FloatingRateSpec``.
 
         Notes
         -----
@@ -25476,24 +25456,9 @@ class AssetBackedFacility:
         """
         ...
     @property
-    def spread_bp(self) -> float:
+    def commitment_fee_bp(self) -> float:
         """
-        Margin over the index (or the all-in fixed rate) in basis points.
-
-        Returns
-        -------
-        float
-            Basis points per annum.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
-    def unused_fee_bp(self) -> float:
-        """
-        Fee on the undrawn commitment in basis points per annum.
+        Commitment fee on the undrawn commitment in basis points per annum.
 
         Returns
         -------
@@ -25598,7 +25563,7 @@ class AssetBackedFacility:
     @property
     def day_count(self) -> DayCount:
         """
-        Accrual day count of the facility interest and the unused fee.
+        Accrual day count of the facility interest and the commitment fee.
 
         Returns
         -------
@@ -25694,9 +25659,9 @@ class AssetBackedFacility:
         ...
 
     @property
-    def draw_schedule(self) -> list[dict[str, Any]]:
+    def draws(self) -> list[dict[str, Any]]:
         """
-        Scheduled draws after closing as ``FacilityDraw`` serde dicts (``date``, ``amount``).
+        Scheduled draws after closing as ``DrawEvent`` serde dicts (``date``, ``amount``).
 
         Returns
         -------
@@ -25839,9 +25804,9 @@ class AssetBackedFacilityBuilder:
 
     Builders are consumed by ``build()``; create a new builder per facility.
     Required fields: ``id``, ``collateral``, ``borrowing_base_rules``,
-    ``commitment``, ``drawn``, ``spread_bp``, ``closing_date``,
+    ``commitment``, ``drawn``, ``rate``, ``closing_date``,
     ``revolving_end``, ``maturity``, ``frequency`` and ``discount_curve_id``.
-    ``day_count`` defaults to Act/360 and ``unused_fee_bp`` to zero. Nested
+    ``day_count`` defaults to Act/360 and ``commitment_fee_bp`` to zero. Nested
     specs accept a ``dict`` or JSON ``str`` in the Rust serde shape.
 
     Examples
@@ -25859,8 +25824,8 @@ class AssetBackedFacilityBuilder:
     ...     .borrowing_base_rules({"advance_rates": [{"asset_class": "*", "rate": 0.75}]})
     ...     .commitment(Money(80_000_000.0, Currency("USD")))
     ...     .drawn(60_000_000.0, currency="USD")
-    ...     .spread_bp(550.0)
-    ...     .unused_fee_bp(50.0)
+    ...     .rate(0.055)
+    ...     .commitment_fee_bp(50.0)
     ...     .closing_date(datetime.date(2024, 1, 15))
     ...     .revolving_end(datetime.date(2026, 1, 15))
     ...     .maturity(datetime.date(2030, 1, 15))
@@ -25990,14 +25955,17 @@ class AssetBackedFacilityBuilder:
             If ``value`` is neither ``Money`` nor a number.
         """
         ...
-    def forward_curve_id(self, value: str) -> AssetBackedFacilityBuilder:
+    def rate(self, value: float | dict[str, Any] | str) -> AssetBackedFacilityBuilder:
         """
-        Set the floating index; omit for a fixed all-in rate.
+        Set the facility coupon.
 
         Parameters
         ----------
-        value : str
-            Forward-curve identifier (e.g. ``"USD-SOFR-3M"``).
+        value : float | dict[str, Any] | str
+            A bare decimal builds a fixed all-in rate (``0.06`` = 6%); a
+            ``dict`` or JSON ``str`` in the ``RateSpec`` serde shape
+            (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
+            ``FloatingRateSpec``) is used verbatim.
 
         Returns
         -------
@@ -26007,17 +25975,18 @@ class AssetBackedFacilityBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed.
+            If the spec does not match the serde shape or the builder was
+            already consumed.
         """
         ...
-    def spread_bp(self, value: float) -> AssetBackedFacilityBuilder:
+    def commitment_fee_bp(self, value: float) -> AssetBackedFacilityBuilder:
         """
-        Set the margin over the index (or the all-in fixed rate).
+        Set the commitment fee on the undrawn commitment.
 
         Parameters
         ----------
         value : float
-            Basis points per annum.
+            Basis points per annum (``50.0`` = 0.50%).
 
         Returns
         -------
@@ -26027,27 +25996,7 @@ class AssetBackedFacilityBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed.
-        """
-        ...
-    def unused_fee_bp(self, value: float) -> AssetBackedFacilityBuilder:
-        """
-        Set the fee on the undrawn commitment.
-
-        Parameters
-        ----------
-        value : float
-            Basis points per annum.
-
-        Returns
-        -------
-        AssetBackedFacilityBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If the builder was already consumed.
+            If ``value`` is not finite or the builder was already consumed.
         """
         ...
     def closing_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> AssetBackedFacilityBuilder:
@@ -26248,14 +26197,14 @@ class AssetBackedFacilityBuilder:
         """
         ...
 
-    def draw_schedule(self, value: list[dict[str, Any]] | str) -> AssetBackedFacilityBuilder:
+    def draws(self, value: list[dict[str, Any]] | str) -> AssetBackedFacilityBuilder:
         """
         Set the scheduled draws after closing.
 
         Parameters
         ----------
         value : list[dict[str, Any]] | str
-            ``FacilityDraw`` serde objects ``{"date": "2025-01-01", "amount":
+            ``DrawEvent`` serde objects ``{"date": "2025-01-01", "amount":
             {"amount": "10000000", "currency": "USD"}}``, ascending by date;
             each is applied on the first payment date at or after its date.
 
@@ -26267,7 +26216,7 @@ class AssetBackedFacilityBuilder:
         Raises
         ------
         ValueError
-            If ``value`` does not match the ``FacilityDraw`` shape or this
+            If ``value`` does not match the ``DrawEvent`` shape or this
             builder was already consumed by ``build``.
         """
         ...
@@ -26461,7 +26410,7 @@ class AssetBackedFacilityBuilder:
 class FacilityProjection:
     """
     Facility and residual projection (:meth:`AssetBackedFacility.project`'s
-    return value): the lender's interest and principal, the unused-commitment
+    return value): the lender's interest and principal, the commitment
     fees, the residual class's flows and the synthetic deal's period record.
 
     Examples
@@ -26473,7 +26422,7 @@ class FacilityProjection:
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
     >>> projection = facility.project(market, as_of)
     >>> list(projection.to_dataframe().columns)
-    ['date', 'interest', 'principal', 'unused_fee', 'draw', 'lender_total', 'residual']
+    ['date', 'interest', 'principal', 'commitment_fee', 'draw', 'lender_total', 'residual']
     """
 
     @staticmethod
@@ -26582,9 +26531,9 @@ class FacilityProjection:
         """
         ...
     @property
-    def unused_fees(self) -> list[tuple[datetime.date, Money]]:
+    def commitment_fees(self) -> list[tuple[datetime.date, Money]]:
         """
-        Unused-commitment fee per payment date.
+        Commitment fee per payment date.
 
         Returns
         -------
@@ -26650,7 +26599,7 @@ class FacilityProjection:
         One row per payment date as a pandas ``DataFrame``.
 
         Columns: ``date`` (ISO 8601 string), ``interest``, ``principal``,
-        ``unused_fee``, ``draw`` (lender advances), ``lender_total`` (the
+        ``commitment_fee``, ``draw`` (lender advances), ``lender_total`` (the
         first three summed less draws) and ``residual`` (cash to the residual
         class), all in currency units.
 
@@ -26987,7 +26936,7 @@ class RevolvingCredit:
         """
         ...
     @property
-    def commitment_amount(self) -> Money:
+    def commitment(self) -> Money:
         """
         Total committed amount.
 
@@ -27002,7 +26951,7 @@ class RevolvingCredit:
         """
         ...
     @property
-    def drawn_amount(self) -> Money:
+    def drawn(self) -> Money:
         """
         Drawn balance at the simulation anchor (the later of the commitment and valuation dates), in both deterministic and stochastic mode.
 
@@ -27047,14 +26996,14 @@ class RevolvingCredit:
         """
         ...
     @property
-    def base_rate_spec(self) -> dict[str, Any]:
+    def rate(self) -> dict[str, Any]:
         """
-        Base-rate specification as its serde ``dict``.
+        Coupon specification as its ``RateSpec`` serde ``dict``.
 
         Returns
         -------
         dict[str, Any]
-            ``{"fixed": {"rate": r}}`` or ``{"floating": {...}}``.
+            ``{"fixed": {"rate": r}}`` with a decimal rate, or ``{"floating": {...}}``.
 
         Raises
         ------
@@ -27112,7 +27061,7 @@ class RevolvingCredit:
     @property
     def commitment_steps(self) -> list[dict[str, Any]]:
         """
-        Scheduled commitment changes as serde ``dict`` rows (``date``, ``amount``, ``fee_bp``); empty when the commitment is flat.
+        Scheduled commitment changes as serde ``dict`` rows (``date``, ``amount``, ``reduction_fee_bp``); empty when the commitment is flat.
 
         Returns
         -------
@@ -27407,8 +27356,8 @@ class RevolvingCreditBuilder:
     ``FinancialBuilder`` output one setter for one setter.
 
     Builders are consumed by ``build()``; create a new builder per facility.
-    Required fields: ``id``, ``commitment_amount``, ``drawn_amount``,
-    ``issue_date``, ``maturity``, ``base_rate_spec``, ``day_count``,
+    Required fields: ``id``, ``commitment``, ``drawn``,
+    ``issue_date``, ``maturity``, ``rate``, ``day_count``,
     ``frequency``, ``fees`` (or :meth:`fees_flat`), ``draw_repay_spec``,
     ``discount_curve_id`` and ``recovery_rate``. Nested specs accept a
     ``dict`` or JSON ``str`` in the Rust serde shape.
@@ -27423,11 +27372,11 @@ class RevolvingCreditBuilder:
     ...     RevolvingCredit
     ...     .builder()
     ...     .id("RCF-1")
-    ...     .commitment_amount(Money(50_000_000.0, Currency("USD")))
-    ...     .drawn_amount(Money(10_000_000.0, Currency("USD")))
+    ...     .commitment(Money(50_000_000.0, Currency("USD")))
+    ...     .drawn(Money(10_000_000.0, Currency("USD")))
     ...     .issue_date(datetime.date(2024, 1, 15))
     ...     .maturity(datetime.date(2027, 1, 15))
-    ...     .base_rate_spec(0.06)
+    ...     .rate(0.06)
     ...     .day_count("act_360")
     ...     .frequency("3M")
     ...     .fees_flat(25.0, 10.0, 5.0)
@@ -27460,7 +27409,7 @@ class RevolvingCreditBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def commitment_amount(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+    def commitment(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
         """
         Set the total commitment.
 
@@ -27485,7 +27434,7 @@ class RevolvingCreditBuilder:
             If ``value`` is neither ``Money`` nor a number.
         """
         ...
-    def drawn_amount(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
+    def drawn(self, value: Money | float, currency: str | None = None) -> RevolvingCreditBuilder:
         """
         Set the drawn balance at the simulation anchor, the later of the commitment date and the valuation date, in both modes. Deterministic draw/repay events must be dated after that anchor.
 
@@ -27550,15 +27499,15 @@ class RevolvingCreditBuilder:
             If ``value`` is not a date or the builder was already consumed.
         """
         ...
-    def base_rate_spec(self, value: float | dict[str, Any] | str) -> RevolvingCreditBuilder:
+    def rate(self, value: float | dict[str, Any] | str) -> RevolvingCreditBuilder:
         """
-        Set the base rate.
+        Set the facility coupon.
 
         Parameters
         ----------
         value : float | dict[str, Any] | str
             A bare decimal builds a fixed rate (``0.06`` = 6%); a ``dict`` or
-            JSON ``str`` in the ``BaseRateSpec`` serde shape
+            JSON ``str`` in the ``RateSpec`` serde shape
             (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
             ``FloatingRateSpec``) is used verbatim.
 
@@ -27652,10 +27601,11 @@ class RevolvingCreditBuilder:
         Parameters
         ----------
         value : list[dict[str, Any]] | str
-            Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict, "fee_bp":
-            float}`` (a ``list`` of dicts or a JSON ``str``), each the
-            commitment in force from its date; ``fee_bp`` is the reduction fee
-            on a step down, in basis points of the reduced amount. Dates must
+            Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict,
+            "reduction_fee_bp": str}`` (a ``list`` of dicts or a JSON ``str``),
+            each the commitment in force from its date; ``reduction_fee_bp`` is
+            the one-off reduction fee on a step down, a decimal string in basis
+            points of the reduced amount (default ``"0"``). Dates must
             be strictly increasing, after the commitment date and on or before
             maturity.
 
@@ -27749,7 +27699,8 @@ class RevolvingCreditBuilder:
         Parameters
         ----------
         value : list[dict[str, Any]] | str
-            Rows of ``{"date": "YYYY-MM-DD", "delta_bp": int}`` (a ``list`` of
+            Rows of ``{"date": "YYYY-MM-DD", "delta_bp": str}`` (a decimal
+            string in basis points; a ``list`` of
             dicts or a JSON ``str``); each delta shifts the floating spread or
             the fixed rate from its date, cumulatively. Dates must be strictly
             increasing and strictly inside the facility life.
@@ -28073,10 +28024,10 @@ class EnhancedMonteCarloResult:
     >>> from finstack_quant.valuations.instruments import RevolvingCredit
     >>> envelope = json.loads(RevolvingCredit.example().to_json())
     >>> spec = envelope["instrument"]["spec"]
-    >>> spec["base_rate_spec"] = {"fixed": {"rate": 0.06}}
+    >>> spec["rate"] = {"fixed": {"rate": 0.06}}
     >>> spec["draw_repay_spec"] = {
     ...     "stochastic": {
-    ...         "utilization_process": {"mean_reverting": {"target_rate": 0.6, "speed": 1.0, "volatility": 0.25}},
+    ...         "utilization_process": {"mean_reverting": {"theta": 0.6, "kappa": 1.0, "sigma": 0.25}},
     ...         "mc_config": {
     ...             "credit_spread_process": {"constant": 0.025},
     ...         },

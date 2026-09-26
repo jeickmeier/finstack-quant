@@ -419,7 +419,7 @@ trace_rows=[{"tranche":tranche,"stressed_one_period_cash":structured_credit_tran
 print(pd.DataFrame(trace_rows).to_string(index=False))
 print("Trace contains remaining post-as-of cash only; exported defaulted-notional rows are loss records, not investor cash receipts, and zero-PV as-of records are excluded from the remaining-value reconciliation.")
 rev=tracks.credit_extension()["ANALYST-REVOLVER"]["instrument"]["spec"]
-commitment=float(rev["commitment_amount"]["amount"]);drawn=float(rev["drawn_amount"]["amount"])
+commitment=float(rev["commitment"]["amount"]);drawn=float(rev["drawn"]["amount"])
 util0=drawn/commitment;draw_rows=[]
 for rho in [0.,.30]:
     joint=CorrelatedBernoulli(.25,.10,rho)

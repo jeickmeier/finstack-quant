@@ -1,6 +1,6 @@
 //! Regressions from the 2026-09-17 credit-analyst coverage audit.
 //!
-//! Each test pins one measured audit probe: the `drawn_amount` anchor
+//! Each test pins one measured audit probe: the `drawn` anchor
 //! semantic shared by both engines, the typed schedule conventions, and the
 //! credit-risk visibility of the undrawn commitment.
 
@@ -9,9 +9,10 @@ use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, CreditSpreadProcessSpec, DrawRepayEvent, DrawRepaySpec, McConfig,
-    RevolvingCredit, RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
+    CreditSpreadProcessSpec, DrawRepayEvent, DrawRepaySpec, McConfig, RevolvingCredit,
+    RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides};
 use finstack_quant_valuations::metrics::MetricId;
@@ -44,11 +45,11 @@ fn market() -> MarketContext {
 fn seasoned(draw_repay_spec: DrawRepaySpec) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-ANCHOR".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(4_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(4_000_000.0))
         .issue_date(COMMITMENT)
         .maturity(MATURITY)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
+        .rate(RateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees"))
@@ -63,9 +64,9 @@ fn seasoned(draw_repay_spec: DrawRepaySpec) -> RevolvingCredit {
 fn zero_vol_stochastic() -> DrawRepaySpec {
     DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         utilization_process: UtilizationProcess::MeanReverting {
-            target_rate: 0.4,
-            speed: 1.0,
-            volatility: 0.0,
+            theta: 0.4,
+            kappa: 1.0,
+            sigma: 0.0,
             spread_sensitivity: 0.0,
         },
         use_sobol_qmc: false,
@@ -102,8 +103,8 @@ fn metrics(facility: &RevolvingCredit, model: ModelKey) -> (f64, f64, f64) {
 /// Audit probe A: with the same fields, the deterministic and the
 /// zero-volatility stochastic engine must read the same anchor balance.
 /// Before the fix the deterministic engine replayed a historical draw on top
-/// of `drawn_amount` (PV 7.09M, utilization 0.60) while the stochastic engine
-/// started from `drawn_amount` (PV 4.76M, utilization 0.40).
+/// of `drawn` (PV 7.09M, utilization 0.60) while the stochastic engine
+/// started from `drawn` (PV 4.76M, utilization 0.40).
 #[test]
 fn drawn_amount_is_the_anchor_balance_in_both_modes() {
     let deterministic = seasoned(DrawRepaySpec::Deterministic(vec![]));
@@ -177,11 +178,11 @@ fn conventions(
 ) -> finstack_quant_core::Result<RevolvingCredit> {
     RevolvingCredit::builder()
         .id("RC-CAL".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(4_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(4_000_000.0))
         .issue_date(AS_OF)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
+        .rate(RateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees"))
@@ -341,11 +342,11 @@ fn stepped(
 ) -> finstack_quant_core::Result<RevolvingCredit> {
     RevolvingCredit::builder()
         .id("RC-STEP".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(drawn))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(drawn))
         .issue_date(AS_OF)
         .maturity(date!(2027 - 01 - 15))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
+        .rate(RateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees"))
@@ -363,7 +364,7 @@ fn step_to_6m() -> Vec<CommitmentStep> {
     vec![CommitmentStep {
         date: STEP_DATE,
         amount: usd(6_000_000.0),
-        fee_bp: 25.0,
+        reduction_fee_bp: rust_decimal_macros::dec!(25),
     }]
 }
 
@@ -460,9 +461,9 @@ fn stochastic_utilization_books_the_principal_implied_by_a_commitment_step() {
 fn zero_vol_stochastic_at(target: f64) -> DrawRepaySpec {
     DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         utilization_process: UtilizationProcess::MeanReverting {
-            target_rate: target,
-            speed: 1.0,
-            volatility: 0.0,
+            theta: target,
+            kappa: 1.0,
+            sigma: 0.0,
             spread_sensitivity: 0.0,
         },
         use_sobol_qmc: false,
@@ -518,11 +519,11 @@ fn with_steps(
     fees.steps = fee_steps;
     RevolvingCredit::builder()
         .id("RC-MARGIN".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(5_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(5_000_000.0))
         .issue_date(AS_OF)
         .maturity(date!(2027 - 01 - 15))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
+        .rate(RateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(fees)
@@ -552,7 +553,7 @@ fn margin_step_reprices_interest_from_its_date() {
         DrawRepaySpec::Deterministic(vec![]),
         vec![MarginStep {
             date: date!(2026 - 07 - 15),
-            delta_bp: 100,
+            delta_bp: rust_decimal_macros::dec!(100),
         }],
         vec![],
     );
@@ -604,7 +605,7 @@ fn fee_step_changes_only_the_named_fee() {
 fn intra_period_margin_step_is_honoured_by_both_engines() {
     let step = MarginStep {
         date: date!(2026 - 08 - 15),
-        delta_bp: 100,
+        delta_bp: rust_decimal_macros::dec!(100),
     };
     let deterministic = with_steps(
         DrawRepaySpec::Deterministic(vec![]),
@@ -638,8 +639,8 @@ use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
     LcEvent, LetterOfCreditSpec,
 };
 
-fn sofr_plus(spread_bp: i64) -> BaseRateSpec {
-    BaseRateSpec::Floating(FloatingRateSpec {
+fn sofr_plus(spread_bp: i64) -> RateSpec {
+    RateSpec::Floating(FloatingRateSpec {
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::from(spread_bp),
         gearing: rust_decimal::Decimal::ONE,
@@ -698,11 +699,11 @@ fn with_lc(
     ];
     RevolvingCredit::builder()
         .id("RC-LC".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(3_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(3_000_000.0))
         .issue_date(AS_OF)
         .maturity(date!(2027 - 01 - 15))
-        .base_rate_spec(sofr_plus(325))
+        .rate(sofr_plus(325))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(fees)
@@ -839,9 +840,9 @@ fn lc_draw_at_default_enters_the_default_leg() {
 fn stochastic_utilization_is_capped_by_outstanding_letters_of_credit() {
     let spec = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         utilization_process: UtilizationProcess::MeanReverting {
-            target_rate: 0.95,
-            speed: 3.0,
-            volatility: 0.3,
+            theta: 0.95,
+            kappa: 3.0,
+            sigma: 0.3,
             spread_sensitivity: 0.0,
         },
         use_sobol_qmc: false,
@@ -884,7 +885,7 @@ fn lc_validation_rejects_infeasible_sublimits() {
         None,
     )
     .expect("facility");
-    fixed.base_rate_spec = BaseRateSpec::Fixed { rate: 0.07 };
+    fixed.rate = RateSpec::Fixed { rate: 0.07 };
     let err = fixed
         .validate()
         .expect_err("fixed rate needs lc.fee_bp")
@@ -917,18 +918,18 @@ fn flat_consistent_market() -> MarketContext {
 }
 
 fn quote_facility(
-    base_rate_spec: BaseRateSpec,
+    rate: RateSpec,
     drawn: f64,
     quoted_clean_price_pct: Option<f64>,
     quoted_dm: Option<f64>,
 ) -> RevolvingCredit {
     let mut facility = RevolvingCredit::builder()
         .id("RC-QUOTE".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(drawn))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(drawn))
         .issue_date(AS_OF)
         .maturity(date!(2028 - 01 - 15))
-        .base_rate_spec(base_rate_spec)
+        .rate(rate)
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees"))
@@ -1003,7 +1004,7 @@ fn discount_margin_and_price_from_dm_round_trip_a_quote() {
 /// current period's interest on the facility day count.
 #[test]
 fn accrued_interest_is_pro_rata_within_the_current_period() {
-    let mut facility = quote_facility(BaseRateSpec::Fixed { rate: 0.06 }, 5_000_000.0, None, None);
+    let mut facility = quote_facility(RateSpec::Fixed { rate: 0.06 }, 5_000_000.0, None, None);
     facility.issue_date = date!(2024 - 10 - 15);
     // Valuation 2025-01-15 sits 92 days into the 2024-10-15 -> 2025-01-15 ... no:
     // the period is 2025-01-15 -> 2025-04-15 with settlement on its start, so
@@ -1034,13 +1035,13 @@ fn accrued_interest_is_pro_rata_within_the_current_period() {
 fn yield_to_maturity_moves_inversely_with_the_quote() {
     let m = flat_consistent_market();
     let par = quote_facility(
-        BaseRateSpec::Fixed { rate: 0.06 },
+        RateSpec::Fixed { rate: 0.06 },
         10_000_000.0,
         Some(100.0),
         None,
     );
     let discount = quote_facility(
-        BaseRateSpec::Fixed { rate: 0.06 },
+        RateSpec::Fixed { rate: 0.06 },
         10_000_000.0,
         Some(98.0),
         None,
@@ -1055,7 +1056,7 @@ fn yield_to_maturity_moves_inversely_with_the_quote() {
 /// fee on the undrawn, over the drawn balance.
 #[test]
 fn all_in_rate_is_cash_cost_over_time_weighted_drawn_balance() {
-    let facility = quote_facility(BaseRateSpec::Fixed { rate: 0.07 }, 5_000_000.0, None, None);
+    let facility = quote_facility(RateSpec::Fixed { rate: 0.07 }, 5_000_000.0, None, None);
     let rate = quote_metric(
         &facility,
         &flat_consistent_market(),
@@ -1082,11 +1083,11 @@ fn knot_hazard() -> HazardCurve {
 fn exposure_facility(drawn: f64, leq: f64, credit: bool) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-EXPOSURE".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(drawn))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(drawn))
         .issue_date(AS_OF)
         .maturity(date!(2028 - 01 - 15))
-        .base_rate_spec(sofr_plus(325))
+        .rate(sofr_plus(325))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).expect("fees"))
@@ -1227,11 +1228,11 @@ fn origination_facility(upfront: Option<UpfrontFee>, fees_bp: f64) -> RevolvingC
     fees.upfront_fee = upfront;
     RevolvingCredit::builder()
         .id("RC-ORIG".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(10_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(10_000_000.0))
         .issue_date(date!(2025 - 02 - 15))
         .maturity(date!(2028 - 02 - 15))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
+        .rate(RateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(fees)
@@ -1374,7 +1375,7 @@ fn term_out_recipe_stops_availability_and_amortizes() {
     .map(|(date, amount)| CommitmentStep {
         date,
         amount: usd(amount),
-        fee_bp: 0.0,
+        reduction_fee_bp: rust_decimal_macros::dec!(0),
     })
     .collect();
     facility.validate().expect("valid");
@@ -1455,7 +1456,7 @@ fn accordion_allows_draws_above_the_opening_commitment() {
     facility.commitment_steps = vec![CommitmentStep {
         date: date!(2026 - 01 - 15),
         amount: usd(15_000_000.0),
-        fee_bp: 0.0,
+        reduction_fee_bp: rust_decimal_macros::dec!(0),
     }];
     facility.draw_repay_spec = DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
         date: date!(2026 - 02 - 01),
@@ -1488,13 +1489,13 @@ fn accordion_allows_draws_above_the_opening_commitment() {
 #[test]
 fn historical_commitment_steps_book_no_principal() {
     let mut facility = seasoned(zero_vol_stochastic_at(0.5));
-    facility.commitment_amount = usd(20_000_000.0);
+    facility.commitment = usd(20_000_000.0);
     facility.commitment_steps = vec![CommitmentStep {
         date: date!(2024 - 07 - 15),
         amount: usd(10_000_000.0),
-        fee_bp: 25.0,
+        reduction_fee_bp: rust_decimal_macros::dec!(25),
     }];
-    facility.drawn_amount = usd(5_000_000.0);
+    facility.drawn = usd(5_000_000.0);
     facility.validate().expect("seasoned facility");
     let result = finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCreditPricer::price_with_paths(&facility, &market(), AS_OF)
         .expect("paths");

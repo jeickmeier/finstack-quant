@@ -28,9 +28,9 @@ use crate::errors::{core_to_py, display_to_py, serde_json_to_py, value_error};
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
-    AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, FacilityDraw, FacilityProjection,
-    TermOutSpec,
+    AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, FacilityProjection, TermOutSpec,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::{DrawEvent, RateSpec};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CreditModelConfig;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::DealFees;
 use finstack_quant_valuations::instruments::InstrumentJson;
@@ -118,8 +118,8 @@ impl PyAssetBackedFacility {
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import AssetBackedFacility
-    /// >>> AssetBackedFacility.example().spread_bp
-    /// 600.0
+    /// >>> AssetBackedFacility.example().rate
+    /// {'fixed': {'rate': 0.06}}
     #[staticmethod]
     #[pyo3(text_signature = "()")]
     fn example() -> PyResult<Self> {
@@ -201,7 +201,7 @@ impl PyAssetBackedFacility {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Price the lender's projected flows (interest, principal and unused
+    /// Price the lender's projected flows (interest, principal and commitment
     /// fees) through the shared pricing pipeline.
     ///
     /// Parameters
@@ -348,7 +348,7 @@ impl PyAssetBackedFacility {
     /// Returns
     /// -------
     /// FacilityProjection
-    ///     Facility and residual flows, unused fees and the period record.
+    ///     Facility and residual flows, commitment fees and the period record.
     ///
     /// Raises
     /// ------
@@ -441,25 +441,19 @@ impl PyAssetBackedFacility {
         self.inner.undrawn().map(money_to_py).map_err(core_to_py)
     }
 
-    /// Floating index curve identifier, or ``None`` for a fixed all-in rate.
+    /// Facility coupon as its ``RateSpec`` serde ``dict``: ``{"fixed":
+    /// {"rate": r}}`` with a decimal all-in rate, or ``{"floating": {...}}``
+    /// with a ``FloatingRateSpec``.
     #[getter]
-    fn forward_curve_id(&self) -> Option<String> {
-        self.inner
-            .forward_curve_id
-            .as_ref()
-            .map(|id| id.to_string())
+    fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.rate)
     }
 
-    /// Margin over the index (or the all-in fixed rate) in basis points.
+    /// Commitment fee on the undrawn commitment, in basis points per annum.
     #[getter]
-    fn spread_bp(&self) -> f64 {
-        self.inner.spread_bp
-    }
-
-    /// Fee on the undrawn commitment in basis points per annum.
-    #[getter]
-    fn unused_fee_bp(&self) -> f64 {
-        self.inner.unused_fee_bp
+    fn commitment_fee_bp(&self) -> f64 {
+        rust_decimal::prelude::ToPrimitive::to_f64(&self.inner.commitment_fee_bp)
+            .unwrap_or_default()
     }
 
     /// Closing date as ``datetime.date``.
@@ -502,7 +496,7 @@ impl PyAssetBackedFacility {
         }
     }
 
-    /// Accrual day count of the facility interest and unused fee.
+    /// Accrual day count of the facility interest and commitment fee.
     #[getter]
     fn day_count(&self) -> PyDayCount {
         PyDayCount {
@@ -553,8 +547,8 @@ impl PyAssetBackedFacility {
 
     /// Scheduled draws as a list of ``{"date": ..., "amount": Money}`` dicts.
     #[getter]
-    fn draw_schedule<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.draw_schedule)
+    fn draws<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.draws)
     }
 
     /// Whether the line is re-advanced up to the borrowing base each
@@ -631,19 +625,19 @@ impl PyAssetBackedFacility {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "AssetBackedFacility(id={:?}, commitment={}, drawn={}, spread_bp={}, revolving_end={})",
+            "AssetBackedFacility(id={:?}, commitment={}, drawn={}, rate={}, revolving_end={})",
             self.inner.id.as_str(),
             self.inner.commitment.amount(),
             self.inner.drawn.amount(),
-            self.inner.spread_bp,
+            serde_json::to_string(&self.inner.rate).unwrap_or_default(),
             self.inner.revolving_end
         )
     }
 }
 
 /// Facility and residual projection (``AssetBackedFacility.project``'s
-/// return value): the lender's interest and principal, the unused-commitment
-/// fees, the residual's flows and the synthetic deal's period record.
+/// return value): the lender's interest and principal, the commitment fees,
+/// the residual's flows and the synthetic deal's period record.
 ///
 /// Examples
 /// --------
@@ -655,7 +649,7 @@ impl PyAssetBackedFacility {
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
 /// >>> projection = facility.project(market, as_of)
 /// >>> list(projection.to_dataframe().columns)
-/// ['date', 'interest', 'principal', 'unused_fee', 'lender_total', 'residual']
+/// ['date', 'interest', 'principal', 'commitment_fee', 'draw', 'lender_total', 'residual']
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "FacilityProjection",
@@ -756,12 +750,11 @@ impl PyFacilityProjection {
         }
     }
 
-    /// Unused-commitment fee per payment date as ``(datetime.date, Money)``
-    /// pairs.
+    /// Commitment fee per payment date as ``(datetime.date, Money)`` pairs.
     #[getter]
-    fn unused_fees<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
+    fn commitment_fees<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
         self.inner
-            .unused_fees
+            .commitment_fees
             .iter()
             .map(|(date, amount)| Ok((date_to_py(py, *date)?, money_to_py(*amount))))
             .collect()
@@ -805,7 +798,8 @@ impl PyFacilityProjection {
     /// One row per payment date as a pandas ``DataFrame``.
     ///
     /// Columns: ``date`` (ISO 8601 string), ``interest``, ``principal``,
-    /// ``unused_fee``, ``lender_total`` (the three summed) and ``residual``
+    /// ``commitment_fee``, ``draw``, ``lender_total`` (interest, principal and
+    /// commitment fee less draws) and ``residual``
     /// (cash to the residual class), all in currency units.
     ///
     /// Returns
@@ -824,7 +818,7 @@ impl PyFacilityProjection {
         for (index, flows) in [
             &self.inner.facility.interest_flows,
             &self.inner.facility.principal_flows,
-            &self.inner.unused_fees,
+            &self.inner.commitment_fees,
             &self.inner.residual.cashflows,
             &self.inner.draws,
         ]
@@ -842,7 +836,7 @@ impl PyFacilityProjection {
                     "date": date.to_string(),
                     "interest": values[0],
                     "principal": values[1],
-                    "unused_fee": values[2],
+                    "commitment_fee": values[2],
                     "draw": values[4],
                     "lender_total": values[0] + values[1] + values[2] - values[4],
                     "residual": values[3],
@@ -856,7 +850,7 @@ impl PyFacilityProjection {
                 ("date", "str"),
                 ("interest", "float64"),
                 ("principal", "float64"),
-                ("unused_fee", "float64"),
+                ("commitment_fee", "float64"),
                 ("draw", "float64"),
                 ("lender_total", "float64"),
                 ("residual", "float64"),
@@ -867,11 +861,11 @@ impl PyFacilityProjection {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "FacilityProjection(payments={}, total_interest={}, total_principal={}, unused_fees={})",
+            "FacilityProjection(payments={}, total_interest={}, total_principal={}, commitment_fees={})",
             self.inner.facility.cashflows.len(),
             self.inner.facility.total_interest.amount(),
             self.inner.facility.total_principal.amount(),
-            self.inner.unused_fees.len()
+            self.inner.commitment_fees.len()
         )
     }
 }
@@ -1049,12 +1043,15 @@ impl PyAssetBackedFacilityBuilder {
         Ok(slf)
     }
 
-    /// Set the floating index; omit for a fixed all-in rate.
+    /// Set the facility coupon.
     ///
     /// Parameters
     /// ----------
-    /// value : str
-    ///     Forward-curve identifier (e.g. ``"USD-SOFR-3M"``).
+    /// value : float | dict | str
+    ///     A bare decimal builds a fixed all-in rate (``0.06`` = 6%); a
+    ///     ``dict`` or JSON ``str`` in the ``RateSpec`` serde shape
+    ///     (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
+    ///     ``FloatingRateSpec``) is used verbatim.
     ///
     /// Returns
     /// -------
@@ -1064,24 +1061,30 @@ impl PyAssetBackedFacilityBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    ///     If the spec does not match the serde shape or this builder was
+    ///     already consumed by ``build``.
     #[pyo3(text_signature = "($self, value)")]
-    fn forward_curve_id<'py>(
+    fn rate<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: &str,
+        py: Python<'_>,
+        value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted = CurveId::new(value.to_string());
+        let spec: RateSpec = if let Ok(rate) = value.extract::<f64>() {
+            RateSpec::Fixed { rate }
+        } else {
+            crate::bindings::module_utils::py_to_serde(py, value, "rate")?
+        };
         let b = take_facility(&mut slf)?;
-        slf.inner = Some(b.forward_curve_id(converted));
+        slf.inner = Some(b.rate(spec));
         Ok(slf)
     }
 
-    /// Set the margin over the index (or the all-in fixed rate).
+    /// Set the commitment fee on the undrawn commitment.
     ///
     /// Parameters
     /// ----------
     /// value : float
-    ///     Basis points per annum.
+    ///     Basis points per annum (``50.0`` = 0.50%).
     ///
     /// Returns
     /// -------
@@ -1091,39 +1094,17 @@ impl PyAssetBackedFacilityBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If this builder was already consumed by ``build``.
+    ///     If ``value`` is not finite or this builder was already consumed by
+    ///     ``build``.
     #[pyo3(text_signature = "($self, value)")]
-    fn spread_bp<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        let converted = value;
-        let b = take_facility(&mut slf)?;
-        slf.inner = Some(b.spread_bp(converted));
-        Ok(slf)
-    }
-
-    /// Set the fee on the undrawn commitment.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : float
-    ///     Basis points per annum.
-    ///
-    /// Returns
-    /// -------
-    /// AssetBackedFacilityBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If this builder was already consumed by ``build``.
-    #[pyo3(text_signature = "($self, value)")]
-    fn unused_fee_bp<'py>(
+    fn commitment_fee_bp<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let converted = value;
+        let converted =
+            crate::bindings::valuations::instruments::decimal_from_f64(value, "commitment_fee_bp")?;
         let b = take_facility(&mut slf)?;
-        slf.inner = Some(b.unused_fee_bp(converted));
+        slf.inner = Some(b.commitment_fee_bp(converted));
         Ok(slf)
     }
 
@@ -1389,7 +1370,7 @@ impl PyAssetBackedFacilityBuilder {
     /// Parameters
     /// ----------
     /// value : list[dict] | str
-    ///     ``FacilityDraw`` serde objects ``{"date": "2025-01-01", "amount":
+    ///     ``DrawEvent`` serde objects ``{"date": "2025-01-01", "amount":
     ///     {"amount": 10000000.0, "currency": "USD"}}``, ascending by date;
     ///     each is applied on the first payment date at or after its date.
     ///
@@ -1401,18 +1382,17 @@ impl PyAssetBackedFacilityBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` does not match the ``FacilityDraw`` shape or this
+    ///     If ``value`` does not match the ``DrawEvent`` shape or this
     ///     builder was already consumed by ``build``.
     #[pyo3(text_signature = "($self, value)")]
-    fn draw_schedule<'py>(
+    fn draws<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let draws: Vec<FacilityDraw> =
-            crate::bindings::module_utils::py_to_serde(py, value, "draw_schedule")?;
+        let draws: Vec<DrawEvent> = crate::bindings::module_utils::py_to_serde(py, value, "draws")?;
         let b = take_facility(&mut slf)?;
-        slf.inner = Some(b.draw_schedule(draws));
+        slf.inner = Some(b.draws(draws));
         Ok(slf)
     }
 

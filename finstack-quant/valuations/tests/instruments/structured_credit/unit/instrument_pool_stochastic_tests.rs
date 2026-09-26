@@ -7,9 +7,10 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_models::credit::pool::StochasticDefaultSpec;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit,
-    RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
+    CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,
+    StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_oas, CallExercisePolicy, InstrumentCollateral, OasConfig, PricingMode,
@@ -41,20 +42,20 @@ fn stochastic_revolver(volatility: f64, spread_sensitivity: f64, credit: bool) -
     });
     let mut builder = RevolvingCredit::builder()
         .id("RCF-STOCH".into())
-        .commitment_amount(usd(50_000_000.0))
-        .drawn_amount(usd(10_000_000.0))
+        .commitment(usd(50_000_000.0))
+        .drawn(usd(10_000_000.0))
         .issue_date(CLOSING)
         .maturity(date!(2027 - 01 - 15))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).expect("fees"))
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
             StochasticUtilizationSpec {
                 utilization_process: UtilizationProcess::MeanReverting {
-                    target_rate: 0.5,
-                    speed: 1.0,
-                    volatility,
+                    theta: 0.5,
+                    kappa: 1.0,
+                    sigma: volatility,
                     spread_sensitivity,
                 },
                 use_sobol_qmc: false,

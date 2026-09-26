@@ -10,11 +10,12 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::cashflow_engine::{
     CashflowEngine, ThreeFactorPathData,
 };
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use time::macros::date;
 
@@ -53,11 +54,11 @@ fn build_seasoned_floating_facility(
 ) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-FIXING-TEST".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue_date)
         .maturity(maturity_date)
-        .base_rate_spec(BaseRateSpec::Floating(FloatingRateSpec {
+        .rate(RateSpec::Floating(FloatingRateSpec {
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"), // +200 bp
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -213,11 +214,11 @@ fn test_fixings_respect_floor() {
     // Build a facility with a 3% floor on the index rate
     let facility = RevolvingCredit::builder()
         .id("RC-FIXING-FLOOR".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue_date)
         .maturity(maturity_date)
-        .base_rate_spec(BaseRateSpec::Floating(FloatingRateSpec {
+        .rate(RateSpec::Floating(FloatingRateSpec {
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"), // +200 bp
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -362,7 +363,7 @@ fn test_non_seasoned_facility_ignores_fixings() {
 fn valuation_date_reset_uses_contractual_t_minus_two_fixing() {
     let as_of = date!(2025 - 01 - 15);
     let mut facility = build_seasoned_floating_facility(as_of, date!(2026 - 01 - 15));
-    let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec else {
+    let RateSpec::Floating(spec) = &mut facility.rate else {
         panic!("test facility must be floating");
     };
     spec.reset_lag_days = 2;

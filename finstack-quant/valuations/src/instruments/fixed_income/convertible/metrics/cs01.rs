@@ -295,8 +295,9 @@ mod tests {
             div_yield_id: Some("AAPL-DIVYIELD".into()),
             call_put: None,
             soft_call_trigger: None,
-            fixed_coupon: Some(fixed_coupon),
-            floating_coupon: None,
+            cashflow_spec: crate::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                fixed_coupon,
+            ),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),

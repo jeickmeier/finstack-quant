@@ -578,8 +578,8 @@
         "discount_curve_id": "USD-CORP",
         "credit_curve_id": "ACME-HZD",
         "amortization": {
-          "percent_per_period": {
-            "bp": 250
+          "percent_of_remaining_per_period": {
+            "pct": 0.025
           }
         },
         "instrument_pricing_overrides": {

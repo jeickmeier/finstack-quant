@@ -9,8 +9,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use time::macros::date;
 
@@ -21,11 +22,11 @@ fn test_interest_on_drawn_amounts() {
     // Arrange
     let facility = RevolvingCredit::builder()
         .id("RC-CF-INTEREST".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 0.0).unwrap())
@@ -52,11 +53,11 @@ fn test_commitment_fee_on_undrawn() {
     // Arrange
     let facility = RevolvingCredit::builder()
         .id("RC-CF-COMMIT".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture")) // 80% undrawn
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture")) // 80% undrawn
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 10.0, 0.0).unwrap()) // High commitment fee
@@ -83,11 +84,11 @@ fn test_utilization_fee_at_threshold() {
     // Arrange
     let facility = RevolvingCredit::builder()
         .id("RC-CF-UTIL".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(8_000_000.0, Currency::USD).expect("valid money fixture")) // 80% utilization
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(8_000_000.0, Currency::USD).expect("valid money fixture")) // 80% utilization
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 15.0).unwrap()) // Utilization fee above threshold

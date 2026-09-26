@@ -633,17 +633,17 @@ mod tests {
     }
 
     fn revolving_credit_json(invalid_gearing: bool, with_credit: bool) -> String {
-        use finstack_quant_valuations::instruments::fixed_income::revolving_credit::BaseRateSpec;
+        use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
         use finstack_quant_valuations::instruments::{InstrumentJson, RevolvingCredit};
 
         let mut facility = RevolvingCredit::example().expect("facility");
         if invalid_gearing {
-            let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec else {
+            let RateSpec::Floating(spec) = &mut facility.rate else {
                 unreachable!("example is floating");
             };
             spec.gearing = Default::default();
         } else {
-            facility.base_rate_spec = BaseRateSpec::Fixed { rate: 0.05 };
+            facility.rate = RateSpec::Fixed { rate: 0.05 };
         }
         if with_credit {
             facility.credit_curve_id = Some("USD-HZ".into());
@@ -1055,7 +1055,7 @@ mod tests {
 
     #[test]
     fn revolving_credit_metrics_and_cashflow_fail_closed_cross_wasm_context() {
-        // `drawn_amount` (10M of 50M) is the balance at the valuation date;
+        // `drawn` (10M of 50M) is the balance at the valuation date;
         // the example's 5M draw on 2024-03-01 lies in the future of
         // 2024-02-01 and must not enter the as-of metrics.
         let instrument = revolving_credit_json(false, false);

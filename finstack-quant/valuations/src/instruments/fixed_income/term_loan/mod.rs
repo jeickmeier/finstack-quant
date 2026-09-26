@@ -41,7 +41,7 @@
 //!     .notional_limit(Money::new(10_000_000.0, Currency::USD)?)
 //!     .issue_date(date!(2025 - 01 - 15))
 //!     .maturity(date!(2030 - 01 - 15))
-//!     .rate(RateSpec::Fixed { rate_bp: 600 })
+//!     .rate(RateSpec::Fixed { rate: 0.06 })
 //!     .frequency(Tenor::quarterly())
 //!     .day_count(DayCount::Act360)
 //!     .discount_curve_id(CurveId::new("USD-CREDIT"))
@@ -69,7 +69,7 @@ pub(crate) mod types;
 pub use super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 pub use spec::{
     AmortizationSpec, CashSweepEvent, CommitmentFeeBase, DdtlSpec, DrawEvent, LoanCall,
-    LoanCallSchedule, LoanCallType, OidPolicy, PikToggle, TermLoanCovenantEvents,
+    LoanCallSchedule, LoanCallType, MakeWholeSpec, OidPolicy, PikToggle, TermLoanCovenantEvents,
 };
 pub use types::{RateSpec, TermLoan, TermLoanBuilder};
 

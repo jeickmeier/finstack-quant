@@ -25,7 +25,7 @@ fn test_theta_reflects_time_decay() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

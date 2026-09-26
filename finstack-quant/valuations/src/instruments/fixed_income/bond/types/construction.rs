@@ -846,35 +846,7 @@ impl Bond {
         let mut b = CashFlowSchedule::builder();
         let _ = b.principal(self.notional, self.issue_date, self.maturity);
 
-        // Match on the cashflow spec variant
-        match &self.cashflow_spec {
-            CashflowSpec::Fixed(spec) => {
-                let _ = b.fixed_cf(spec.clone());
-            }
-            CashflowSpec::Floating(spec) => {
-                let _ = b.floating_cf(spec.clone());
-            }
-            CashflowSpec::StepUp(spec) => {
-                let _ = b.step_up_cf(spec.clone());
-            }
-            CashflowSpec::Amortizing { base, schedule } => {
-                let _ = b.amortization(schedule.clone());
-                match &**base {
-                    CashflowSpec::Fixed(spec) => {
-                        let _ = b.fixed_cf(spec.clone());
-                    }
-                    CashflowSpec::Floating(spec) => {
-                        let _ = b.floating_cf(spec.clone());
-                    }
-                    CashflowSpec::StepUp(spec) => {
-                        let _ = b.step_up_cf(spec.clone());
-                    }
-                    CashflowSpec::Amortizing { .. } => {
-                        return Err(finstack_quant_core::InputError::Invalid.into());
-                    }
-                }
-            }
-        }
+        self.cashflow_spec.add_to_builder(&mut b)?;
 
         // Build the schedule with market curves for floating rate computation
         b.build(Some(curves))

@@ -21,7 +21,7 @@ const BP_TO_RATE: Decimal = Decimal::from_parts(1, 0, 0, false, 4);
 /// fees (explicit amounts) that fall on the given date.
 ///
 /// For periodic fees, computes the fee amount as `base * bp * year_fraction`
-/// where base is either the drawn balance or the undrawn balance (facility_limit - outstanding).
+/// where base is either the drawn balance or the undrawn balance (commitment - outstanding).
 ///
 /// When a fee's `accrual_basis` is `PointInTime`, the outstanding balance is
 /// sampled at the period's accrual start from `outstanding_history` (falling
@@ -86,12 +86,12 @@ pub(in crate::builder) fn emit_fees_on(
 
                 let base_amt = match &pf.base {
                     FeeBase::Drawn => effective_outstanding,
-                    FeeBase::Undrawn { facility_limit } => {
-                        if facility_limit.currency() != ccy {
+                    FeeBase::Undrawn { commitment } => {
+                        if commitment.currency() != ccy {
                             return Err(InputError::Invalid.into());
                         }
-                        let facility_limit_dec = f64_to_decimal(facility_limit.amount())?;
-                        (facility_limit_dec - effective_outstanding).max(Decimal::ZERO)
+                        let commitment_dec = f64_to_decimal(commitment.amount())?;
+                        (commitment_dec - effective_outstanding).max(Decimal::ZERO)
                     }
                 };
 
@@ -361,7 +361,7 @@ mod tests {
         let mid = Date::from_calendar_date(2025, Month::February, 14).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let payment = end;
-        let facility_limit = 2_000_000.0;
+        let commitment = 2_000_000.0;
 
         let history: Vec<(Date, Decimal)> = vec![(start, dec!(1000000)), (mid, dec!(500000))];
 
@@ -372,8 +372,7 @@ mod tests {
             dec!(50),
             FeeAccrualBasis::TimeWeightedAverage,
             FeeBase::Undrawn {
-                facility_limit: Money::new(facility_limit, Currency::USD)
-                    .expect("valid money fixture"),
+                commitment: Money::new(commitment, Currency::USD).expect("valid money fixture"),
             },
         );
 
@@ -391,7 +390,7 @@ mod tests {
 
         assert_eq!(flows.len(), 2);
         let twa_outstanding = (1_000_000.0 * 30.0 + 500_000.0 * 60.0) / 90.0;
-        let undrawn = facility_limit - twa_outstanding;
+        let undrawn = commitment - twa_outstanding;
         let expected_fee = undrawn * 0.005 * (90.0 / 360.0);
         let fee: f64 = flows.iter().map(|flow| flow.amount.amount()).sum();
         assert!(

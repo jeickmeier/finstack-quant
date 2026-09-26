@@ -5,9 +5,10 @@ use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, R
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_oas, run_simulation_with_diagnostics, AssetPool, DealType, OasConfig,
-    PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -46,7 +47,7 @@ fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
             90.0,
             TrancheSeniority::Senior,
             usd(9_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("A"),
@@ -56,7 +57,7 @@ fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(1_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("E"),

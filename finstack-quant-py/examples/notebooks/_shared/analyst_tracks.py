@@ -73,20 +73,20 @@ def credit_extension() -> dict[str, dict[str, Any]]:
     Raises:
         ValueError: If a canonical example cannot be serialized.
 
-    >>> credit_extension()["ANALYST-REVOLVER"]["instrument"]["spec"]["drawn_amount"]["amount"]
+    >>> credit_extension()["ANALYST-REVOLVER"]["instrument"]["spec"]["drawn"]["amount"]
     '4000000'
     """
     _, facility = revolver(0)
     facility["spec"].update({
         "id": "ANALYST-REVOLVER",
-        "commitment_amount": {"amount": "10000000", "currency": "USD"},
-        "drawn_amount": {"amount": "4000000", "currency": "USD"},
+        "commitment": {"amount": "10000000", "currency": "USD"},
+        "drawn": {"amount": "4000000", "currency": "USD"},
         "issue_date": AS_OF.isoformat(),
         "maturity": "2030-01-15",
         "recovery_rate": 0.4,
         "draw_repay_spec": {"deterministic": []},
     })
-    facility["spec"]["base_rate_spec"]["floating"]["spread_bp"] = "325"
+    facility["spec"]["rate"]["floating"]["spread_bp"] = "325"
     facility["spec"]["fees"] = {
         "commitment_fee_tiers": [{"threshold": "0", "bp": "50"}],
         "usage_fee_tiers": [{"threshold": "0", "bp": "0"}, {"threshold": "0.5", "bp": "25"}],
@@ -316,7 +316,7 @@ def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 2048) -> d
     payload = credit_extension()["ANALYST-REVOLVER"]
     payload["instrument"]["spec"]["draw_repay_spec"] = {
         "stochastic": {
-            "utilization_process": {"mean_reverting": {"target_rate": 0.55, "speed": 1.0, "volatility": 0.10}},
+            "utilization_process": {"mean_reverting": {"theta": 0.55, "kappa": 1.0, "sigma": 0.10}},
             "use_sobol_qmc": False,
             "mc_config": {
                 "correlation_matrix": None,
@@ -359,13 +359,12 @@ def convertible_limit() -> dict[str, Any]:
         "maturity": "2026-01-15",
         "credit_curve_id": None,
         "discount_curve_id": "CONVERT-LIMIT-DF",
-        "fixed_coupon": None,
-        "floating_coupon": None,
         "call_put": None,
         "spot_id": "CONVERT-LIMIT",
         "vol_surface_id": "CONVERT-LIMIT-VOL",
         "div_yield_id": "CONVERT-LIMIT-DIVYIELD",
     })
+    spec["cashflow_spec"]["fixed"]["rate"] = "0"  # zero coupon
     spec["conversion"].update({"ratio": 10.0, "policy": {"window": {"start": "2026-01-15", "end": "2026-01-15"}}})
     return payload
 

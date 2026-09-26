@@ -26,8 +26,9 @@
 //! [`ZSpreadParallelCs01`]: crate::metrics::ZSpreadParallelCs01
 //! [`ZSpreadBucketedCs01`]: crate::metrics::ZSpreadBucketedCs01
 
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;
-use crate::instruments::fixed_income::revolving_credit::types::{BaseRateSpec, DrawRepaySpec};
+use crate::instruments::fixed_income::revolving_credit::types::DrawRepaySpec;
 use crate::instruments::RevolvingCredit;
 use crate::metrics::{ZSpreadCs01, ZSpreadCs01Inputs};
 use finstack_quant_core::dates::Date;
@@ -53,15 +54,15 @@ impl ZSpreadCs01 for RevolvingCredit {
             DrawRepaySpec::Deterministic(_) => {
                 // Reuse the pricer's deterministic schedule (same fixings path)
                 // so PV_z(0) reproduces the no-credit-curve base PV.
-                let fixings = match &self.base_rate_spec {
-                    BaseRateSpec::Floating(spec) => {
+                let fixings = match &self.rate {
+                    RateSpec::Floating(spec) => {
                         finstack_quant_core::market_data::fixings::get_fixing_series(
                             curves,
                             spec.forward_curve_id.as_ref(),
                         )
                         .ok()
                     }
-                    BaseRateSpec::Fixed { .. } => None,
+                    RateSpec::Fixed { .. } => None,
                 };
                 let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
                 let schedule = engine.generate_deterministic()?;

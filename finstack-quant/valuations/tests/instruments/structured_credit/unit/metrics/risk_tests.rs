@@ -178,10 +178,11 @@ mod discount_margin_tests {
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_discount_margin, calculate_tranche_metrics, calculate_tranche_z_spread,
         generate_tranche_cashflows, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
-        TrancheCoupon, TrancheSeniority, TrancheStructure,
+        TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -253,9 +254,9 @@ mod discount_margin_tests {
             DayCount::Thirty360,
         ));
         let senior_coupon = if floating_senior {
-            TrancheCoupon::Floating(floating_spec())
+            RateSpec::Floating(floating_spec())
         } else {
-            TrancheCoupon::Fixed { rate: 0.05 }
+            RateSpec::Fixed { rate: 0.05 }
         };
         let tranches = TrancheStructure::new(vec![
             Tranche::new(
@@ -274,7 +275,7 @@ mod discount_margin_tests {
                 100.0,
                 TrancheSeniority::Equity,
                 Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity(),
             )
             .unwrap(),
@@ -417,10 +418,11 @@ mod breakeven_cdr_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
-        TrancheCoupon, TrancheSeniority, TrancheStructure,
+        TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -459,7 +461,7 @@ mod breakeven_cdr_tests {
                 80.0,
                 TrancheSeniority::Senior,
                 Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity(),
             )
             .unwrap(),
@@ -469,7 +471,7 @@ mod breakeven_cdr_tests {
                 100.0,
                 TrancheSeniority::Equity,
                 Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity(),
             )
             .unwrap(),
@@ -521,9 +523,10 @@ mod scenario_table_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit, Tranche,
-        TrancheCoupon, TrancheSeniority, TrancheStructure,
+        TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -560,7 +563,7 @@ mod scenario_table_tests {
                 80.0,
                 TrancheSeniority::Senior,
                 Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity(),
             )
             .unwrap(),
@@ -570,7 +573,7 @@ mod scenario_table_tests {
                 100.0,
                 TrancheSeniority::Equity,
                 Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity(),
             )
             .unwrap(),
@@ -659,10 +662,11 @@ mod oas_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_oas, calculate_tranche_z_spread, AssetPool, DealType, OasConfig,
-        PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
     };
     use time::Month;
 
@@ -718,7 +722,7 @@ mod oas_tests {
                 80.0,
                 TrancheSeniority::Senior,
                 Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity(),
             )
             .unwrap(),
@@ -728,7 +732,7 @@ mod oas_tests {
                 100.0,
                 TrancheSeniority::Equity,
                 Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity(),
             )
             .unwrap(),

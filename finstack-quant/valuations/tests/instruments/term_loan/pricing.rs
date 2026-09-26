@@ -24,7 +24,7 @@ fn test_par_loan_pricing() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 }) // 5%
+        .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -63,7 +63,7 @@ fn test_discount_pricing() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 300 }) // 3%
+        .rate(RateSpec::Fixed { rate: 0.03 }) // 3%
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -103,7 +103,7 @@ fn test_premium_pricing() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 700 }) // 7%
+        .rate(RateSpec::Fixed { rate: 0.07 }) // 7%
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -162,7 +162,7 @@ fn pv_is_discounted_to_as_of_and_includes_flows_before_settlement() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("money"))
         .issue_date(issue)
         .maturity(date!(2026 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::Unadjusted)

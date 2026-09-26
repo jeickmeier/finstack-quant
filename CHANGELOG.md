@@ -2,6 +2,87 @@
 
 ## [Unreleased]
 
+### Loan and facility terms (2026-09-24)
+
+A facility's size is `commitment` and its drawn balance `drawn`; a loan,
+revolver, asset-backed facility or structured-credit note carries one coupon
+type, `loan_terms::RateSpec { fixed { rate }, floating }`, with a decimal fixed
+rate; term-loan amortization is the shared cashflows `AmortizationSpec`; a
+term-loan make-whole call carries the bond `MakeWholeSpec`; contractual margin
+and fee basis points are `Decimal` (no `i32` bp remains); a commitment step's
+one-off fee is `reduction_fee_bp`; the undrawn fee is `commitment_fee_bp`;
+the upfront fee is `Option<UpfrontFee>`; scheduled draws are
+`draws: Vec<DrawEvent>`; the revolver utilization OU uses `kappa` / `theta` /
+`sigma`; and a convertible's coupon is `cashflow_spec` with one `PriceTrigger`
+for both of its share-price triggers. Retired keys are rejected by
+`deny_unknown_fields`. Numbers do not change: every migrated input reprices
+bit-for-bit to the value the equivalent old input gave
+(`tests/instruments/loan_facility_wire_keys.rs`).
+
+#### Changed (BREAKING)
+
+- `RevolvingCredit.commitment_amount` / `drawn_amount` (now `commitment` /
+  `drawn`, fields, builder setters and Python getters/setters);
+  `DdtlSpec.commitment_limit` (now `commitment`); cashflows
+  `CashFlowMeta.facility_limit` and `FeeBase::Undrawn { facility_limit }` (now
+  `commitment`; Python `FeeBase.undrawn(commitment)` and
+  `CashFlowMeta.commitment`); Rust/Python/WASM/JSON.
+- `RevolvingCredit.base_rate_spec: BaseRateSpec` (now `rate: RateSpec`; Python
+  `RevolvingCredit.rate` / `RevolvingCreditBuilder.rate`); structured-credit
+  `Tranche.coupon: TrancheCoupon` (now `RateSpec`, same JSON);
+  `TermLoan.rate` `{"fixed": {"rate_bp": 600}}` (now `{"fixed": {"rate": 0.06}}`,
+  a decimal); `AssetBackedFacility.forward_curve_id` + `spread_bp` (now
+  `rate: RateSpec`; a floating facility gives a full `FloatingRateSpec`;
+  Python `AssetBackedFacility.rate` / builder `rate`); Rust/Python/WASM/JSON.
+- `TermLoan.amortization` is the cashflows `AmortizationSpec`:
+  `percent_per_period { bp }` (now `percent_of_remaining_per_period { pct }`,
+  a decimal), `percent_of_original_notional { bp }` (now
+  `percent_of_original_per_period { pct }`), `linear { start, end }` (now
+  `linear_between { start, end }`), `custom [..]` (now
+  `custom_principal { items }`); term loans reject `linear_to` and
+  `step_remaining`. The cashflows `AmortizationSpec` gains
+  `PercentOfRemainingPerPeriod { pct }` and `LinearBetween { start, end }`
+  (bond builder support; Python `AmortizationSpec.percent_of_remaining_per_period`
+  / `linear_between` and the `window` getter); Rust/Python/JSON.
+- `LoanCallType::MakeWhole { treasury_spread_bp: i32 }` (now
+  `MakeWhole(MakeWholeSpec { reference_curve_id, spread_bp: f64 })`, the bond
+  type); Rust/JSON.
+- `MarginStep.delta_bp: i32`, `OidPolicy::WithheldBp` / `SeparateBp(i32)` and
+  `DdtlSpec.usage_fee_bp` / `commitment_fee_bp: f64` (now `Decimal`, JSON
+  strings such as `"125"`); Rust/Python/JSON.
+- `CommitmentStep.fee_bp: f64` (now `reduction_fee_bp: Decimal`, a one-off fee
+  in bp of the reduced amount); Rust/Python/JSON.
+- `AssetBackedFacility.unused_fee_bp: f64` (now `commitment_fee_bp: Decimal`);
+  `FacilityProjection.unused_fees` (now `commitment_fees`, booked as
+  `CFKind::CommitmentFee` instead of `CFKind::Fee`); Python
+  `FacilityProjection.to_dataframe` column `unused_fee` (now
+  `commitment_fee`); Rust/Python/JSON.
+- `TermLoan.upfront_fee: Option<Money>` (now `Option<UpfrontFee>`, e.g.
+  `{"amount": {...}}` or `{"fraction_of_commitment": 0.02}` of the DDTL
+  commitment, else `notional_limit`); Python `TermLoan.upfront_fee` returns the
+  serde dict and the builder also accepts that dict; Rust/Python/JSON.
+- `AssetBackedFacility.draw_schedule: Vec<FacilityDraw>` (now
+  `draws: Vec<DrawEvent>`; `DrawEvent` moves to `loan_terms` and is shared
+  with the DDTL); Rust/Python/JSON.
+- `UtilizationProcess::MeanReverting { target_rate, speed, volatility }` (now
+  `{ theta, kappa, sigma }`); the enum now denies unknown fields;
+  Rust/Python/WASM/JSON.
+- `ConvertibleBond.fixed_coupon` / `floating_coupon` (now
+  `cashflow_spec: CashflowSpec`, the bond type; a zero-coupon convertible is a
+  fixed spec with rate `"0"`; Python getter/builder `cashflow_spec`);
+  `SoftCallTrigger` (now `PriceTrigger`, same fields);
+  `ConversionEvent::PriceTrigger { threshold, lookback_days }` (now
+  `PriceTrigger(PriceTrigger { threshold_pct, observation_days,
+  required_days_above })`: the level is a percent of the conversion price,
+  not an absolute share price; the observation window is not modeled for
+  contingent conversion); Rust/Python/WASM/JSON.
+
+#### Removed
+
+- `BaseRateSpec`, `TrancheCoupon`, the term-loan `RateSpec` and the
+  term-loan `AmortizationSpec` (schema name `TermLoanAmortizationSpec`),
+  `FacilityDraw`, `SoftCallTrigger`.
+
 ### Dates and calendars (2026-09-24)
 
 Flat contract dates are `start_date` / `maturity`; bonds, loans and revolvers

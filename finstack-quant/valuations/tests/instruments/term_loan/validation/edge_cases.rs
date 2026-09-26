@@ -25,7 +25,7 @@ fn test_zero_coupon_loan() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 0 }) // Zero coupon
+        .rate(RateSpec::Fixed { rate: 0.0 }) // Zero coupon
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -64,7 +64,7 @@ fn test_very_short_maturity() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2025 - 04 - 01)) // 3 months
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -100,7 +100,7 @@ fn test_very_long_maturity() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2055 - 01 - 01)) // 30 years
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -136,7 +136,7 @@ fn test_negative_rate_environment() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -176,7 +176,7 @@ fn build_ddtl_loan(ddtl: DdtlSpec) -> finstack_quant_core::Result<TermLoan> {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -193,7 +193,7 @@ fn build_ddtl_loan(ddtl: DdtlSpec) -> finstack_quant_core::Result<TermLoan> {
 fn test_ddtl_draws_exceeding_commitment_rejected() {
     // Cumulative draws ($6M + $6M = $12M) exceed $10M commitment
     let result = build_ddtl_loan(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![
@@ -207,8 +207,8 @@ fn test_ddtl_draws_exceeding_commitment_rejected() {
             },
         ],
         commitment_steps: vec![],
-        usage_fee_bp: 0.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(0),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
@@ -224,7 +224,7 @@ fn test_ddtl_draws_exceeding_commitment_rejected() {
 fn test_ddtl_draws_within_commitment_accepted() {
     // Cumulative draws ($4M + $4M = $8M) within $10M
     let result = build_ddtl_loan(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![
@@ -238,8 +238,8 @@ fn test_ddtl_draws_within_commitment_accepted() {
             },
         ],
         commitment_steps: vec![],
-        usage_fee_bp: 0.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(0),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
@@ -251,15 +251,15 @@ fn test_ddtl_draws_within_commitment_accepted() {
 #[test]
 fn test_negative_oid_bp_rejected() {
     let result = build_ddtl_loan(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![],
         commitment_steps: vec![],
-        usage_fee_bp: 0.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(0),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
-        oid_policy: Some(OidPolicy::WithheldBp(-100)),
+        oid_policy: Some(OidPolicy::WithheldBp(rust_decimal_macros::dec!(-100))),
     });
     let err = result.expect_err("negative OID basis points should be rejected");
     assert!(
@@ -271,15 +271,15 @@ fn test_negative_oid_bp_rejected() {
 #[test]
 fn test_zero_oid_bp_accepted() {
     let result = build_ddtl_loan(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![],
         commitment_steps: vec![],
-        usage_fee_bp: 0.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(0),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
-        oid_policy: Some(OidPolicy::WithheldBp(0)),
+        oid_policy: Some(OidPolicy::WithheldBp(rust_decimal_macros::dec!(0))),
     });
     assert!(result.is_ok(), "zero OID basis points should be valid");
 }
@@ -288,17 +288,17 @@ fn test_zero_oid_bp_accepted() {
 fn test_ddtl_commitment_step_fee_rejected() {
     // Term-loan DDTL steps carry no reduction fee; a non-zero fee_bp would be inert.
     let result = build_ddtl_loan(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2027 - 01 - 01),
         draws: vec![],
         commitment_steps: vec![CommitmentStep {
             date: date!(2026 - 01 - 01),
             amount: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-            fee_bp: 25.0,
+            reduction_fee_bp: rust_decimal_macros::dec!(25),
         }],
-        usage_fee_bp: 0.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(0),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
@@ -307,20 +307,4 @@ fn test_ddtl_commitment_step_fee_rejected() {
         err.to_string().contains("fee_bp must be 0"),
         "unexpected error: {err}"
     );
-}
-
-#[test]
-fn test_ddtl_non_finite_fee_rejected() {
-    let result = build_ddtl_loan(DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        availability_start: date!(2025 - 01 - 01),
-        availability_end: date!(2027 - 01 - 01),
-        draws: vec![],
-        commitment_steps: vec![],
-        usage_fee_bp: f64::NAN,
-        commitment_fee_bp: 0.0,
-        fee_base: CommitmentFeeBase::Undrawn,
-        oid_policy: None,
-    });
-    assert!(result.is_err(), "a NaN usage fee must be rejected");
 }

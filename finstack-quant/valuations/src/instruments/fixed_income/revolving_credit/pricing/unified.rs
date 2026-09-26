@@ -213,9 +213,10 @@ mod tests {
     use super::*;
     use crate::instruments::fixed_income::revolving_credit::ThreeFactorPathData;
 
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::revolving_credit::{
-        BaseRateSpec, CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit,
-        RevolvingCreditFees, StochasticUtilizationSpec, UtilizationProcess,
+        CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,
+        StochasticUtilizationSpec, UtilizationProcess,
     };
     use finstack_quant_core::dates::DayCount;
 
@@ -253,12 +254,12 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-RECOVERY-NODBL".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
             // Zero coupon isolates the principal leg.
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
+            .rate(RateSpec::Fixed { rate: 0.0 })
             .day_count(DayCount::Act365F)
             .frequency(Tenor::annual())
             .fees(RevolvingCreditFees::default())
@@ -325,11 +326,11 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-SEASONED".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
+            .rate(RateSpec::Fixed { rate: 0.0 })
             .day_count(DayCount::Act365F)
             .frequency(Tenor::annual())
             .fees(RevolvingCreditFees::default())
@@ -380,7 +381,7 @@ mod tests {
     }
 
     /// M2.8: a deterministic draw/repay event dated on the commitment date is
-    /// rejected — the position at commitment is defined by `drawn_amount`
+    /// rejected — the position at commitment is defined by `drawn`
     /// and a commitment-date event double-counted principal (interest on 2X,
     /// 2X terminal repayment).
     #[test]
@@ -392,11 +393,11 @@ mod tests {
 
         let result = RevolvingCredit::builder()
             .id("RC-COMMIT-EVENT".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((400_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act365F)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
@@ -427,20 +428,20 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-SOBOL".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((400_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
                     utilization_process: UtilizationProcess::MeanReverting {
-                        target_rate: 0.5,
-                        speed: 0.75,
-                        volatility: 0.05,
+                        theta: 0.5,
+                        kappa: 0.75,
+                        sigma: 0.05,
                         spread_sensitivity: 0.0,
                     },
                     use_sobol_qmc: true,
@@ -613,20 +614,20 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-UNIFIED-PATHS".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((400_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
                     utilization_process: UtilizationProcess::MeanReverting {
-                        target_rate: 0.5,
-                        speed: 0.75,
-                        volatility: 0.05,
+                        theta: 0.5,
+                        kappa: 0.75,
+                        sigma: 0.05,
                         spread_sensitivity: 0.0,
                     },
                     use_sobol_qmc: false,
@@ -680,20 +681,20 @@ mod tests {
 
         let result = RevolvingCredit::builder()
             .id("RC-ONE-PATH".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((400_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
                     utilization_process: UtilizationProcess::MeanReverting {
-                        target_rate: 0.5,
-                        speed: 0.75,
-                        volatility: 0.05,
+                        theta: 0.5,
+                        kappa: 0.75,
+                        sigma: 0.05,
                         spread_sensitivity: 0.0,
                     },
                     use_sobol_qmc: false,
@@ -725,20 +726,20 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-ZEROVOL".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((400_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
                     utilization_process: UtilizationProcess::MeanReverting {
-                        target_rate: 0.5,
-                        speed: 0.75,
-                        volatility: 0.0, // zero utilization vol
+                        theta: 0.5,
+                        kappa: 0.75,
+                        sigma: 0.0, // zero utilization vol
                         spread_sensitivity: 0.0,
                     },
                     use_sobol_qmc: false,
@@ -846,20 +847,20 @@ mod tests {
         let make_facility = || {
             RevolvingCredit::builder()
                 .id("RC-DETERMINISM".into())
-                .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-                .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+                .commitment(Money::from((1_000_000_i64, Currency::USD)))
+                .drawn(Money::from((400_000_i64, Currency::USD)))
                 .issue_date(start)
                 .maturity(end)
-                .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+                .rate(RateSpec::Fixed { rate: 0.05 })
                 .day_count(DayCount::Act360)
                 .frequency(Tenor::quarterly())
                 .fees(RevolvingCreditFees::default())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                     StochasticUtilizationSpec {
                         utilization_process: UtilizationProcess::MeanReverting {
-                            target_rate: 0.5,
-                            speed: 0.75,
-                            volatility: 0.05,
+                            theta: 0.5,
+                            kappa: 0.75,
+                            sigma: 0.05,
                             spread_sensitivity: 0.0,
                         },
                         use_sobol_qmc: false,
@@ -945,20 +946,20 @@ mod tests {
         let make_facility = |mc_config: Option<McConfig>| {
             RevolvingCredit::builder()
                 .id("RC-ADVSEL".into())
-                .commitment_amount(Money::from((10_000_000_i64, Currency::USD)))
-                .drawn_amount(Money::from((5_000_000_i64, Currency::USD)))
+                .commitment(Money::from((10_000_000_i64, Currency::USD)))
+                .drawn(Money::from((5_000_000_i64, Currency::USD)))
                 .issue_date(start)
                 .maturity(end)
-                .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
+                .rate(RateSpec::Fixed { rate: 0.06 })
                 .day_count(DayCount::Act360)
                 .frequency(Tenor::quarterly())
                 .fees(RevolvingCreditFees::default())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                     StochasticUtilizationSpec {
                         utilization_process: UtilizationProcess::MeanReverting {
-                            target_rate: 0.6,
-                            speed: 0.5,
-                            volatility: 0.25,
+                            theta: 0.6,
+                            kappa: 0.5,
+                            sigma: 0.25,
                             spread_sensitivity: 0.0,
                         },
                         use_sobol_qmc: false,
@@ -1043,20 +1044,20 @@ mod tests {
         let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
         RevolvingCredit::builder()
             .id("RC-SEED-LABEL".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((400_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((400_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
                     utilization_process: UtilizationProcess::MeanReverting {
-                        target_rate: 0.5,
-                        speed: 0.75,
-                        volatility: 0.25,
+                        theta: 0.5,
+                        kappa: 0.75,
+                        sigma: 0.25,
                         spread_sensitivity: 0.0,
                     },
                     use_sobol_qmc,
@@ -1184,9 +1185,9 @@ mod tests {
     fn stochastic_spec_rejects_retired_sampling_keys() {
         let spec = StochasticUtilizationSpec {
             utilization_process: UtilizationProcess::MeanReverting {
-                target_rate: 0.5,
-                speed: 0.75,
-                volatility: 0.25,
+                theta: 0.5,
+                kappa: 0.75,
+                sigma: 0.25,
                 spread_sensitivity: 0.0,
             },
             use_sobol_qmc: false,

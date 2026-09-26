@@ -15,9 +15,10 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCu
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheCoupon, TrancheSeniority, TrancheStructure,
+    TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -106,7 +107,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             senior / (senior + mezz + equity) * 100.0,
             TrancheSeniority::Senior,
             Money::new(senior, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .unwrap(),
@@ -116,7 +117,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             (senior + mezz) / (senior + mezz + equity) * 100.0,
             TrancheSeniority::Mezzanine,
             Money::new(mezz, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.07 },
+            RateSpec::Fixed { rate: 0.07 },
             maturity,
         )
         .unwrap(),
@@ -126,7 +127,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             100.0,
             TrancheSeniority::Equity,
             Money::new(equity, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .unwrap(),

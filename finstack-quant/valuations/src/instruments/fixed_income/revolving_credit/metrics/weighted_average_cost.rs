@@ -30,13 +30,11 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let facility: &RevolvingCredit = context.instrument_as()?;
 
-        let base_rate = match &facility.base_rate_spec {
-            crate::instruments::fixed_income::revolving_credit::types::BaseRateSpec::Fixed {
-                rate,
-            } => *rate + facility.margin_delta_bp_at(context.as_of) * 1e-4,
-            crate::instruments::fixed_income::revolving_credit::types::BaseRateSpec::Floating(
-                spec,
-            ) => {
+        let base_rate = match &facility.rate {
+            crate::instruments::fixed_income::loan_terms::RateSpec::Fixed { rate } => {
+                *rate + facility.margin_delta_bp_at(context.as_of) * 1e-4
+            }
+            crate::instruments::fixed_income::loan_terms::RateSpec::Floating(spec) => {
                 let fwd = context.curves.get_forward(spec.forward_curve_id.as_str())?;
                 let index_rate = average_forward_rate(&fwd, facility, context.as_of)?;
                 let mut params =
@@ -49,22 +47,22 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
         };
 
         let as_of = context.as_of;
-        let commitment_amount = facility.commitment_at(as_of).amount();
+        let commitment = facility.commitment_at(as_of).amount();
 
-        if commitment_amount == 0.0 {
+        if commitment == 0.0 {
             return Ok(0.0);
         }
 
         let drawn_amt = drawn_balance_as_of(facility, context.as_of)?.amount();
         let lc_amt = facility.lc_outstanding_at(as_of).amount();
-        let undrawn_amt = (commitment_amount - drawn_amt - lc_amt).max(0.0);
+        let undrawn_amt = (commitment - drawn_amt - lc_amt).max(0.0);
 
         // Interest on drawn
         let interest_cost = drawn_amt * base_rate;
 
         // Commitment fee on undrawn (evaluating tiers at current utilization)
-        let utilization = if commitment_amount > 0.0 {
-            (drawn_amt + lc_amt) / commitment_amount
+        let utilization = if commitment > 0.0 {
+            (drawn_amt + lc_amt) / commitment
         } else {
             0.0
         };
@@ -75,7 +73,7 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
         let usage_cost = drawn_amt * (facility.fees.usage_fee_bp_at(utilization, as_of)? * 1e-4);
 
         // Facility fee on total commitment
-        let facility_cost = commitment_amount * (facility.fees.facility_fee_bp_at(as_of) * 1e-4);
+        let facility_cost = commitment * (facility.fees.facility_fee_bp_at(as_of) * 1e-4);
 
         // Letter-of-credit and fronting fees on the LC face
         let lc_cost = lc_amt * ((facility.lc_fee_bp_at(as_of) + facility.fronting_fee_bp()) * 1e-4);
@@ -84,7 +82,7 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
         let total_cost = interest_cost + commitment_cost + usage_cost + facility_cost + lc_cost;
 
         // Weighted average as a percentage of commitment
-        let weighted_avg_cost = total_cost / commitment_amount;
+        let weighted_avg_cost = total_cost / commitment;
 
         Ok(weighted_avg_cost)
     }

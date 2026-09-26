@@ -29,6 +29,7 @@ pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
 
+pub use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};
 pub use types::{
     calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
     AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,
@@ -46,12 +47,10 @@ pub use types::{
     RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
     SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
     SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
-    TrancheBuilder, TrancheCashflows, TrancheCoupon, TrancheDraw, TrancheReadvance,
-    TrancheSeniority, TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall,
-    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
+    TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheSeniority,
+    TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder,
+    WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
-
-pub use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};
 pub use types::{
     DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,
     StructuredCreditTranche,

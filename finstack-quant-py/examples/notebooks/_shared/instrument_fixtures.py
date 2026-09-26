@@ -142,7 +142,7 @@ def term_loan(idx: int) -> tuple[str, dict]:
             "business_day_convention": "modified_following",
             "calendar_id": None,
             "stub": "none",
-            "amortization": {"percent_per_period": {"bp": 250}},
+            "amortization": {"percent_of_remaining_per_period": {"pct": 0.025}},
             "coupon_type": "cash",
             "settlement_days": 2,
             "attributes": {"tags": ["leveraged-loan"], "meta": {}},
@@ -158,8 +158,8 @@ def revolver(idx: int) -> tuple[str, dict]:
         "type": "revolving_credit",
         "spec": {
             "id": iid,
-            "commitment_amount": {"amount": "50000000", "currency": "USD"},
-            "drawn_amount": {"amount": "10000000", "currency": "USD"},
+            "commitment": {"amount": "50000000", "currency": "USD"},
+            "drawn": {"amount": "10000000", "currency": "USD"},
             "issue_date": "2024-01-01",
             "maturity": f"{mat_year}-01-01",
             "discount_curve_id": "USD-OIS",
@@ -168,7 +168,7 @@ def revolver(idx: int) -> tuple[str, dict]:
             "stub": "short_front",
             "calendar_id": "usny",
             "recovery_rate": 0.70,
-            "base_rate_spec": {
+            "rate": {
                 "floating": {
                     "forward_curve_id": "USD-SOFR-3M",
                     "spread_bp": str(spread),
@@ -671,16 +671,18 @@ def convertible_bond(idx: int) -> tuple[str, dict]:
             },
             "spot_id": "TECH",
             "vol_surface_id": "TECH-VOL",
-            "fixed_coupon": {
-                "coupon_type": "cash",
-                "rate": str(coupon),
-                "frequency": {"count": 6, "unit": "months"},
-                "day_count": "30_360",
-                "business_day_convention": "following",
-                "calendar_id": "weekends_only",
-                "end_of_month": False,
-                "payment_lag_days": 0,
-                "stub": "none",
+            "cashflow_spec": {
+                "fixed": {
+                    "coupon_type": "cash",
+                    "rate": str(coupon),
+                    "frequency": {"count": 6, "unit": "months"},
+                    "day_count": "30_360",
+                    "business_day_convention": "following",
+                    "calendar_id": "weekends_only",
+                    "end_of_month": False,
+                    "payment_lag_days": 0,
+                    "stub": "none",
+                }
             },
             "attributes": {"tags": ["convertible"], "meta": {}},
         },
@@ -739,7 +741,7 @@ def instrument_description(instrument_spec: dict) -> str:
         tenor = int(s["maturity"][:4]) - ref_year
         rate = s["rate"]
         if "fixed" in rate:
-            return f"TL Fixed {tenor}Y {rate['fixed']['rate_bp']}bp"
+            return f"TL Fixed {tenor}Y {rate['fixed']['rate'] * 10_000:.0f}bp"
         flt = rate["floating"]
         sp = flt["spread_bp"]
         floor = flt.get("index_floor_bp", "0")
@@ -747,8 +749,8 @@ def instrument_description(instrument_spec: dict) -> str:
 
     if itype == "revolving_credit":
         tenor = int(s["maturity"][:4]) - ref_year
-        drawn = float(s["drawn_amount"]["amount"]) / 1e6
-        commit = float(s["commitment_amount"]["amount"]) / 1e6
+        drawn = float(s["drawn"]["amount"]) / 1e6
+        commit = float(s["commitment"]["amount"]) / 1e6
         return f"Revolver {tenor}Y {drawn:.0f}/{commit:.0f}M"
 
     if itype == "credit_default_swap":
@@ -817,7 +819,7 @@ def instrument_description(instrument_spec: dict) -> str:
 
     if itype == "convertible_bond":
         tenor = int(s["maturity"][:4]) - ref_year
-        cpn = float(s["fixed_coupon"]["rate"]) * 100
+        cpn = float(s["cashflow_spec"]["fixed"]["rate"]) * 100
         return f"CB {s['spot_id']} {tenor}Y {cpn:.1f}%"
 
     return itype

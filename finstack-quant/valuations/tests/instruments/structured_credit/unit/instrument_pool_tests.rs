@@ -12,13 +12,14 @@ use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{
     Bond, CallPut, CallPutSchedule, CashflowSpec,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, AssetPool, CallExercisePolicy, DealType, DefaultModelSpec,
     InstrumentCollateral, PrepaymentModelSpec, PutExercisePolicy, SimulationRun, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use time::macros::date;
@@ -33,11 +34,11 @@ pub(crate) fn usd(amount: f64) -> Money {
 pub(crate) fn fixed_revolver(issue_date: Date, maturity: Date) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id(InstrumentId::new("RCF"))
-        .commitment_amount(usd(50_000_000.0))
-        .drawn_amount(usd(10_000_000.0))
+        .commitment(usd(50_000_000.0))
+        .drawn(usd(10_000_000.0))
         .issue_date(issue_date)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).expect("fees"))
@@ -84,7 +85,7 @@ pub(crate) fn deal_with(spec: DealSpec) -> StructuredCredit {
             10.0,
             TrancheSeniority::Equity,
             usd(spec.equity),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             spec.maturity,
         )
         .expect("equity"),
@@ -94,7 +95,7 @@ pub(crate) fn deal_with(spec: DealSpec) -> StructuredCredit {
             100.0,
             TrancheSeniority::Senior,
             usd(spec.senior),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             spec.maturity,
         )
         .expect("senior"),
@@ -538,7 +539,7 @@ fn principal_funds_the_draw_first_and_then_the_senior_coupon_shortfall() {
         // A 20% senior coupon the facility's quarterly interest cannot cover.
         for tranche in deal.tranches.tranches.iter_mut() {
             if tranche.id.as_str() == "A" {
-                tranche.coupon = TrancheCoupon::Fixed { rate: 0.20 };
+                tranche.coupon = RateSpec::Fixed { rate: 0.20 };
             }
         }
         deal.principal_covers_senior_interest = covers;
@@ -616,11 +617,11 @@ fn stepped_revolver_pool_reproduces_the_standalone_schedule() {
     facility.commitment_steps = vec![CommitmentStep {
         date: date!(2025 - 07 - 01),
         amount: usd(30_000_000.0),
-        fee_bp: 25.0,
+        reduction_fee_bp: rust_decimal_macros::dec!(25),
     }];
     facility.margin_steps = vec![MarginStep {
         date: date!(2026 - 01 - 01),
-        delta_bp: 100,
+        delta_bp: rust_decimal_macros::dec!(100),
     }];
     facility.validate().expect("stepped facility");
     let market = MarketContext::new();

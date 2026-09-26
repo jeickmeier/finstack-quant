@@ -11,10 +11,11 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_pool_stats, AssetPool, CdrCalculator, CloWarfCalculator, CprCalculator, DealType,
-    DefaultModelSpec, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    DefaultModelSpec, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheSeniority,
+    TrancheStructure,
 };
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;
@@ -35,7 +36,7 @@ fn tranche_structure() -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         maturity_date(),
     )
     .unwrap();

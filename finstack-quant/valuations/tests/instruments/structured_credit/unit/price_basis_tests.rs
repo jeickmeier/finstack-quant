@@ -10,9 +10,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_metrics, scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -62,7 +63,7 @@ fn fixture(seasoned: bool) -> (StructuredCredit, Date) {
         80.0,
         TrancheSeniority::Senior,
         usd(80_000_000.0),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity,
     )
     .expect("tranche");
@@ -75,7 +76,7 @@ fn fixture(seasoned: bool) -> (StructuredCredit, Date) {
         100.0,
         TrancheSeniority::Equity,
         usd(20_000_000.0),
-        TrancheCoupon::Fixed { rate: 0.0 },
+        RateSpec::Fixed { rate: 0.0 },
         maturity,
     )
     .expect("tranche");

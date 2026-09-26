@@ -26,9 +26,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, PoolGranularity, StochasticDefaultSpec, StochasticPrepaySpec,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, PricingMode, StochasticPricingResult, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -77,7 +78,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             80.0,
             TrancheSeniority::Senior,
             Money::new(total * 0.80, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity(),
         )
         .expect("senior"),
@@ -87,7 +88,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             92.0,
             TrancheSeniority::Mezzanine,
             Money::new(total * 0.12, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.08 },
+            RateSpec::Fixed { rate: 0.08 },
             maturity(),
         )
         .expect("mezz"),
@@ -97,7 +98,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             100.0,
             TrancheSeniority::Equity,
             Money::new(total * 0.08, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("equity"),

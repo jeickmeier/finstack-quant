@@ -278,7 +278,7 @@ pub(crate) fn build_reference_tranche_schedule(
                 projected_fixings: Vec::new(),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
-                facility_limit: None,
+                commitment: None,
                 issue_date: Some(cmo.issue_date),
                 maturity: None,
             },

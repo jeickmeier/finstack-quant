@@ -23,7 +23,7 @@ use crate::metrics::MetricRegistry;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
-/// Drawn balance on the valuation date: `drawn_amount` is the balance at the
+/// Drawn balance on the valuation date: `drawn` is the balance at the
 /// simulation anchor in both modes and deterministic events are future-only,
 /// so the helper only replays events dated on `as_of` itself (none can be).
 fn drawn_balance_as_of(
@@ -33,7 +33,7 @@ fn drawn_balance_as_of(
     if facility.is_deterministic() {
         super::cashflow_engine::calculate_drawn_balance_at_date(facility, as_of, as_of)
     } else {
-        Ok(facility.drawn_amount)
+        Ok(facility.drawn)
     }
 }
 

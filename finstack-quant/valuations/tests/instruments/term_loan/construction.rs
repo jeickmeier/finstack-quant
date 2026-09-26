@@ -19,7 +19,7 @@ fn test_builder_fixed_rate_loan() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 }) // 5%
+        .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -39,7 +39,7 @@ fn test_builder_fixed_rate_loan() {
     let loan = loan.unwrap();
     assert_eq!(loan.id.as_str(), "TL-FIXED-001");
     assert_eq!(loan.currency, Currency::USD);
-    assert!(matches!(loan.rate, RateSpec::Fixed { rate_bp: 500 }));
+    assert!(matches!(loan.rate, RateSpec::Fixed { rate: 0.05 }));
 }
 
 #[test]
@@ -98,14 +98,14 @@ fn test_builder_with_amortization() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(AmortizationSpec::Linear {
+        .amortization(AmortizationSpec::LinearBetween {
             start: date!(2025 - 01 - 01),
             end: date!(2030 - 01 - 01),
         })
@@ -119,7 +119,10 @@ fn test_builder_with_amortization() {
     // Assert
     assert!(loan.is_ok());
     let loan = loan.unwrap();
-    assert!(matches!(loan.amortization, AmortizationSpec::Linear { .. }));
+    assert!(matches!(
+        loan.amortization,
+        AmortizationSpec::LinearBetween { .. }
+    ));
 }
 
 #[test]
@@ -146,7 +149,7 @@ fn test_builder_with_callability() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 550 })
+        .rate(RateSpec::Fixed { rate: 0.055 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -180,7 +183,7 @@ fn test_builder_validation_maturity_after_issue() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2030 - 01 - 01))
         .maturity(date!(2025 - 01 - 01)) // Before issue!
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -208,7 +211,7 @@ fn test_pik_coupon_type() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 800 }) // Higher rate for PIK
+        .rate(RateSpec::Fixed { rate: 0.08 }) // Higher rate for PIK
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -237,7 +240,7 @@ fn lsta_par_trade_sets_settlement_days_to_seven() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

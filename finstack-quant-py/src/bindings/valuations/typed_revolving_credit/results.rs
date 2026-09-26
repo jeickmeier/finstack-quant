@@ -25,10 +25,10 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::Enha
 /// >>> from finstack_quant.valuations.instruments import RevolvingCredit
 /// >>> envelope = json.loads(RevolvingCredit.example().to_json())
 /// >>> spec = envelope["instrument"]["spec"]
-/// >>> spec["base_rate_spec"] = {"fixed": {"rate": 0.06}}
+/// >>> spec["rate"] = {"fixed": {"rate": 0.06}}
 /// >>> spec["draw_repay_spec"] = {
 /// ...     "stochastic": {
-/// ...         "utilization_process": {"mean_reverting": {"target_rate": 0.6, "speed": 1.0, "volatility": 0.25}},
+/// ...         "utilization_process": {"mean_reverting": {"theta": 0.6, "kappa": 1.0, "sigma": 0.25}},
 /// ...         "mc_config": {
 /// ...             "credit_spread_process": {"constant": 0.025},
 /// ...         },

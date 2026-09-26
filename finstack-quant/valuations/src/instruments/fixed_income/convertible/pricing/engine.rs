@@ -1,6 +1,6 @@
 //! Convertible pricing pipeline and public pricing helpers.
 
-use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DateExt, DayCount};
+use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
@@ -323,8 +323,12 @@ fn price_convertible_bond_with_inputs(
             ConversionPolicy::Window { start, end } => {
                 *start <= bond.maturity && bond.maturity <= *end
             }
-            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger { threshold, .. }) => {
-                inputs.spot >= *threshold
+            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(trigger)) => {
+                let conversion_price = bond
+                    .effective_conversion_ratio()
+                    .filter(|ratio| *ratio > 0.0)
+                    .map_or(0.0, |ratio| bond.notional.amount() / ratio);
+                inputs.spot >= trigger.level(conversion_price)
             }
             ConversionPolicy::UponEvent(
                 ConversionEvent::QualifiedIpo | ConversionEvent::ChangeOfControl,
@@ -625,12 +629,7 @@ pub(crate) fn build_convertible_schedule(
 ) -> Result<CashFlowSchedule> {
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(bond.notional, bond.issue_date, bond.maturity);
-    if let Some(fixed_spec) = &bond.fixed_coupon {
-        let _ = builder.fixed_cf(fixed_spec.clone());
-    }
-    if let Some(floating_spec) = &bond.floating_coupon {
-        let _ = builder.floating_cf(floating_spec.clone());
-    }
+    bond.cashflow_spec.add_to_builder(&mut builder)?;
     builder.build(Some(market))
 }
 
@@ -659,9 +658,8 @@ pub fn calculate_parity(bond: &ConvertibleBond, current_spot: f64) -> Result<f64
 /// Compute the settlement date for a convertible bond.
 ///
 /// If `settlement_days` is set, advances on the coupon schedule's holiday
-/// calendar and applies its business-day convention. Zero-coupon bonds use the
-/// canonical weekends-only calendar with Following adjustment. Otherwise
-/// returns `as_of` unchanged.
+/// calendar and applies its business-day convention. Otherwise returns
+/// `as_of` unchanged.
 ///
 /// # Arguments
 ///
@@ -682,30 +680,11 @@ pub fn settlement_date(bond: &ConvertibleBond, as_of: Date) -> Result<Date> {
             "convertible settlement_days {days} exceeds the supported range"
         ))
     })?;
-    let (calendar_id, convention) = bond
-        .fixed_coupon
-        .as_ref()
-        .map(|coupon| {
-            (
-                coupon.schedule.calendar_id.as_str(),
-                coupon.schedule.business_day_convention,
-            )
-        })
-        .or_else(|| {
-            bond.floating_coupon.as_ref().map(|coupon| {
-                (
-                    coupon.schedule.calendar_id.as_str(),
-                    coupon.schedule.business_day_convention,
-                )
-            })
-        })
-        .unwrap_or((
-            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
-            BusinessDayConvention::Following,
-        ));
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
+    let schedule = bond.cashflow_spec.schedule();
+    let calendar =
+        crate::cashflow::builder::calendar::resolve_calendar_strict(schedule.calendar_id.as_str())?;
     let advanced = as_of.add_business_days(days, calendar)?;
-    adjust(advanced, convention, calendar)
+    adjust(advanced, schedule.business_day_convention, calendar)
 }
 
 /// Calculate accrued interest for a convertible bond.
@@ -734,10 +713,6 @@ pub fn calculate_accrued_interest(
     as_of: Date,
 ) -> Result<f64> {
     bond.validate_for_pricing()?;
-    if bond.fixed_coupon.is_none() && bond.floating_coupon.is_none() {
-        return Ok(0.0); // Zero-coupon
-    }
-
     let settle = settlement_date(bond, as_of)?;
 
     let schedule = build_convertible_schedule(bond, market_context)?;
@@ -752,11 +727,7 @@ pub(super) fn accrual_index(
     bond: &ConvertibleBond,
     schedule: &CashFlowSchedule,
 ) -> Result<crate::cashflow::accrual::AccrualIndex> {
-    let frequency = bond
-        .fixed_coupon
-        .as_ref()
-        .map(|c| c.schedule.frequency)
-        .or_else(|| bond.floating_coupon.as_ref().map(|c| c.schedule.frequency));
+    let frequency = Some(bond.cashflow_spec.frequency());
     crate::cashflow::accrual::AccrualIndex::build(
         schedule,
         &crate::cashflow::accrual::AccrualConfig {

@@ -6,9 +6,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -43,11 +44,11 @@ fn test_pricing_recovery_consistency() {
 
     let facility = RevolvingCredit::builder()
         .id("TEST-RCF".into())
-        .commitment_amount(commitment)
-        .drawn_amount(drawn)
+        .commitment(commitment)
+        .drawn(drawn)
         .issue_date(as_of)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 }) // 7% Coupon
+        .rate(RateSpec::Fixed { rate: 0.07 }) // 7% Coupon
         .day_count(DayCount::Act365F)
         .frequency(Tenor::annual()) // Single payment at end
         .fees(RevolvingCreditFees::default()) // No extra fees
@@ -116,11 +117,11 @@ fn test_floating_rcf_declares_forward_dependency() {
 
     let fixed_facility = RevolvingCredit::builder()
         .id("RCF-FIXED".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
@@ -132,11 +133,11 @@ fn test_floating_rcf_declares_forward_dependency() {
 
     let floating_facility = RevolvingCredit::builder()
         .id("RCF-FLOAT".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Floating(
+        .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
@@ -189,11 +190,11 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
 
     let facility = RevolvingCredit::builder()
         .id("RCF-DV01-FWD".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Floating(
+        .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
@@ -279,11 +280,11 @@ fn test_upfront_fee_excluded_after_commitment() {
 
     let facility = RevolvingCredit::builder()
         .id("RCF-UPFRONT-ASOF".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(0.0, Currency::USD).expect("valid money fixture"))
         .issue_date(commitment)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
+        .rate(RateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees({

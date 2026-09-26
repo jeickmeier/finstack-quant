@@ -309,7 +309,7 @@ fn schedule_from_projection(
                 projected_fixings: Vec::new(),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
-                facility_limit: None,
+                commitment: None,
                 issue_date: Some(mbs.issue_date),
                 maturity: None,
             },

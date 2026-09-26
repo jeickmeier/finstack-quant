@@ -5,8 +5,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use rust_decimal::Decimal;
 use time::macros::date;
@@ -37,11 +38,11 @@ fn test_builder_fixed_rate_facility() {
     // Arrange & Act
     let facility = RevolvingCredit::builder()
         .id("RC-FIXED-001".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2028 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 }) // 5%
+        .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
@@ -54,10 +55,7 @@ fn test_builder_fixed_rate_facility() {
     assert!(facility.is_ok());
     let facility = facility.unwrap();
     assert_eq!(facility.id.as_str(), "RC-FIXED-001");
-    assert!(matches!(
-        facility.base_rate_spec,
-        BaseRateSpec::Fixed { .. }
-    ));
+    assert!(matches!(facility.rate, RateSpec::Fixed { .. }));
 }
 
 #[test]
@@ -65,14 +63,11 @@ fn test_builder_floating_rate_facility() {
     // Arrange & Act
     let facility = RevolvingCredit::builder()
         .id("RC-FLOAT-001".into())
-        .commitment_amount(Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Floating(floating_rate_spec(
-            "USD-SOFR-3M",
-            250.0,
-        )))
+        .rate(RateSpec::Floating(floating_rate_spec("USD-SOFR-3M", 250.0)))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(30.0, 15.0, 8.0).unwrap())
@@ -84,10 +79,7 @@ fn test_builder_floating_rate_facility() {
     // Assert
     assert!(facility.is_ok());
     let facility = facility.unwrap();
-    assert!(matches!(
-        facility.base_rate_spec,
-        BaseRateSpec::Floating { .. }
-    ));
+    assert!(matches!(facility.rate, RateSpec::Floating { .. }));
 }
 
 #[test]
@@ -95,11 +87,11 @@ fn test_builder_with_tiered_fees() {
     // Arrange & Act
     let facility = RevolvingCredit::builder()
         .id("RC-TIERED-001".into())
-        .commitment_amount(Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(0.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
+        .rate(RateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees {
@@ -139,11 +131,11 @@ fn test_validation_maturity_after_commitment() {
     // Arrange & Act - maturity before commitment should fail
     let facility = RevolvingCredit::builder()
         .id("RC-INVALID-001".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2030 - 01 - 01))
         .maturity(date!(2025 - 01 - 01)) // Before commitment!
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
@@ -161,11 +153,11 @@ fn test_validation_drawn_within_commitment() {
     // Arrange & Act - drawn > commitment should fail
     let facility = RevolvingCredit::builder()
         .id("RC-OVERDRAWN".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(15_000_000.0, Currency::USD).expect("valid money fixture")) // Over commitment!
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(15_000_000.0, Currency::USD).expect("valid money fixture")) // Over commitment!
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())

@@ -9,11 +9,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
     calculate_tranche_oas, generate_cashflows, generate_tranche_cashflows, run_simulation,
     scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, PricingMode,
-    ScenarioGrid, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    ScenarioGrid, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{
     Instrument, PricingOptions, ScenarioPricingOverrides,
@@ -49,7 +50,7 @@ fn single_tranche_structure(balance: f64) -> TrancheStructure {
         100.0,
         finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
         Money::new(balance, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         legal_maturity(),
     )
     .unwrap();
@@ -486,7 +487,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity,
     )
     .unwrap();
@@ -613,7 +614,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity,
     )
     .unwrap();
@@ -1056,7 +1057,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
                     80.0,
                     TrancheSeniority::Senior,
                     Money::new(80_000_000.0, Currency::USD).unwrap(),
-                    TrancheCoupon::Fixed { rate: 0.20 },
+                    RateSpec::Fixed { rate: 0.20 },
                     end,
                 )
                 .unwrap(),
@@ -1066,7 +1067,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
                     100.0,
                     TrancheSeniority::Equity,
                     Money::new(20_000_000.0, Currency::USD).unwrap(),
-                    TrancheCoupon::Fixed { rate: 0.0 },
+                    RateSpec::Fixed { rate: 0.0 },
                     end,
                 )
                 .unwrap(),

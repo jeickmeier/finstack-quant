@@ -5,9 +5,10 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, PrepaymentCurve, PrepaymentModelSpec, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -34,7 +35,7 @@ fn create_minimal_tranches() -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         maturity_date(),
     )
     .unwrap();

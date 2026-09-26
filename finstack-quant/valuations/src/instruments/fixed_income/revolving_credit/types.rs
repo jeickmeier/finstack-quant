@@ -8,7 +8,7 @@ use finstack_quant_core::dates::{
     calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
 use crate::cashflow::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
@@ -16,7 +16,8 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::fixed_income::loan_terms::{
-    CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStep, OidEirSpec, ScheduledFee, UpfrontFee,
+    CommitmentStep, FeeStep, LetterOfCreditSpec, MarginStep, OidEirSpec, RateSpec, ScheduledFee,
+    UpfrontFee,
 };
 use rust_decimal::prelude::ToPrimitive;
 
@@ -42,7 +43,7 @@ pub struct RevolvingCredit {
 
     /// Opening commitment of the facility, in force from `issue_date`
     /// until the first entry of `commitment_steps`.
-    pub commitment_amount: Money,
+    pub commitment: Money,
 
     /// Scheduled commitment changes (amortizing commitments, availability
     /// expiries, accordions), each in force from its date until the next.
@@ -96,7 +97,7 @@ pub struct RevolvingCredit {
     /// engine, because the position at the anchor is defined by this field
     /// alone. The accrual period containing the valuation date accrues on
     /// this balance from its accrual start.
-    pub drawn_amount: Money,
+    pub drawn: Money,
 
     /// Date when the facility becomes available.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -115,7 +116,7 @@ pub struct RevolvingCredit {
     pub maturity: Date,
 
     /// Base rate specification (fixed or floating).
-    pub base_rate_spec: BaseRateSpec,
+    pub rate: RateSpec,
 
     /// Day count convention for interest accrual.
     pub day_count: DayCount,
@@ -243,7 +244,7 @@ impl RevolvingCredit {
         let initial_draw = Money::from((10_000_000_i64, Currency::USD));
         let start = date!(2024 - 01 - 01);
         let end = date!(2027 - 01 - 01);
-        let base_rate = BaseRateSpec::Floating(FloatingRateSpec {
+        let base_rate = RateSpec::Floating(FloatingRateSpec {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::from(250),
             gearing: Decimal::ONE,
@@ -276,11 +277,11 @@ impl RevolvingCredit {
         ]);
         RevolvingCredit::builder()
             .id(InstrumentId::new("RCF-USD-3Y"))
-            .commitment_amount(commitment)
-            .drawn_amount(initial_draw)
+            .commitment(commitment)
+            .drawn(initial_draw)
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(base_rate)
+            .rate(base_rate)
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(fees)
@@ -292,37 +293,6 @@ impl RevolvingCredit {
             .calendar_id("usny".into())
             .attributes(Attributes::new())
             .build()
-    }
-}
-
-/// Base rate specification for revolving credit interest.
-///
-/// Defines whether the facility pays a fixed rate or a floating rate
-/// tied to a market index plus margin.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[allow(clippy::large_enum_variant)]
-#[serde(rename_all = "snake_case")]
-pub enum BaseRateSpec {
-    /// Fixed rate (annualized).
-    Fixed {
-        /// Annual interest rate (e.g., 0.05 for 5%).
-        rate: f64,
-    },
-
-    /// Floating rate using canonical FloatingRateSpec.
-    ///
-    /// Composes the standard floating rate specification with full support
-    /// for floors, caps, and gearing.
-    Floating(FloatingRateSpec),
-}
-
-impl BaseRateSpec {
-    /// Create a fixed base rate using a typed rate.
-    pub fn fixed_rate(rate: Rate) -> Self {
-        Self::Fixed {
-            rate: rate.as_decimal(),
-        }
     }
 }
 
@@ -895,35 +865,35 @@ pub enum InterestRateProcessSpec {
 /// regime-switching, etc.).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum UtilizationProcess {
     /// Mean-reverting utilization rate process.
     ///
-    /// Models utilization as reverting to a long-term target with specified
-    /// speed and volatility. Uses Ornstein-Uhlenbeck dynamics:
-    /// dU(t) = speed * (target_rate - U(t)) * dt + volatility * dW(t)
+    /// Models utilization as reverting to a long-run level `theta` at speed
+    /// `kappa` with volatility `sigma`. Uses Ornstein-Uhlenbeck dynamics:
+    /// dU(t) = kappa * (theta - U(t)) * dt + sigma * dW(t)
     ///
     /// The simulated process is a **clamped** OU: each step uses the exact OU
-    /// transition and is then clamped to `[0, 1]`. When `target_rate` is well
-    /// inside the interval and `volatility` is moderate the clamp fires only
-    /// on rare tail excursions, but with `target_rate` near 0 or 1 and/or
-    /// high `volatility` the clamp binds frequently and biases the simulated
+    /// transition and is then clamped to `[0, 1]`. When `theta` is well
+    /// inside the interval and `sigma` is moderate the clamp fires only
+    /// on rare tail excursions, but with `theta` near 0 or 1 and/or
+    /// high `sigma` the clamp binds frequently and biases the simulated
     /// mean toward the interior. Keep the stationary standard deviation
-    /// `volatility / sqrt(2 * speed)` small relative to the distance from
-    /// `target_rate` to the nearest boundary.
+    /// `sigma / sqrt(2 * kappa)` small relative to the distance from
+    /// `theta` to the nearest boundary.
     MeanReverting {
-        /// Target utilization rate (0.0 to 1.0).
-        target_rate: f64,
-        /// Mean reversion speed (annualized).
-        speed: f64,
-        /// Volatility of utilization changes (annualized).
-        volatility: f64,
+        /// Long-run utilization level θ, as a fraction in `[0, 1]`.
+        theta: f64,
+        /// Mean-reversion speed κ, per year.
+        kappa: f64,
+        /// Utilization volatility σ, annualized (absolute utilization units).
+        sigma: f64,
         /// Sensitivity of the utilization target to the simulated credit
         /// spread (adverse selection), as a decimal per unit of relative
         /// spread change.
         ///
         /// The target used by the OU step becomes
-        /// `θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
+        /// `θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`
         /// where `s(t)` is the simulated spread and `s(0)` its initial level,
         /// so a spread that doubles raises the target by `spread_sensitivity`.
         /// Defaults to `0.0` (no link); the utilization/credit shock
@@ -965,21 +935,21 @@ impl RevolvingCredit {
 
     /// Get the current undrawn amount.
     pub fn undrawn_amount(&self) -> finstack_quant_core::Result<Money> {
-        self.commitment_amount.checked_sub(self.drawn_amount)
+        self.commitment.checked_sub(self.drawn)
     }
 
     /// Get the current utilization rate (drawn / committed).
     pub fn utilization_rate(&self) -> f64 {
-        if self.commitment_amount.amount() == 0.0 {
+        if self.commitment.amount() == 0.0 {
             0.0
         } else {
-            self.drawn_amount.amount() / self.commitment_amount.amount()
+            self.drawn.amount() / self.commitment.amount()
         }
     }
 
     /// Drawn balance on `date` of a deterministic draw/repay schedule.
     ///
-    /// Starts from `drawn_amount`, the balance at `anchor`, and replays in
+    /// Starts from `drawn`, the balance at `anchor`, and replays in
     /// order the `events` dated strictly after `anchor` and on or before
     /// `date`. Each event is checked against the commitment in force on its
     /// date and the running balance.
@@ -987,7 +957,7 @@ impl RevolvingCredit {
     /// # Arguments
     ///
     /// * `events` - Draw/repay events sorted by date ascending.
-    /// * `anchor` - Date `drawn_amount` refers to; events on or before it are
+    /// * `anchor` - Date `drawn` refers to; events on or before it are
     ///   not replayed.
     /// * `date` - Date the balance is wanted for; events dated on it apply.
     ///
@@ -1001,7 +971,7 @@ impl RevolvingCredit {
         anchor: Date,
         date: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let mut balance = self.drawn_amount;
+        let mut balance = self.drawn;
         for event in events {
             if event.date > date {
                 break;
@@ -1018,7 +988,7 @@ impl RevolvingCredit {
     }
 
     /// Commitment in force on `date`: the last `commitment_steps` entry
-    /// dated on or before it, else the opening `commitment_amount`.
+    /// dated on or before it, else the opening `commitment`.
     ///
     /// # Arguments
     ///
@@ -1028,7 +998,7 @@ impl RevolvingCredit {
             .iter()
             .rev()
             .find(|step| step.date <= date)
-            .map_or(self.commitment_amount, |step| step.amount)
+            .map_or(self.commitment, |step| step.amount)
     }
 
     /// Drawn balance at the simulation anchor over the commitment in force on
@@ -1043,7 +1013,7 @@ impl RevolvingCredit {
         if commitment <= 0.0 {
             0.0
         } else {
-            (self.drawn_amount.amount() / commitment).clamp(0.0, 1.0)
+            (self.drawn.amount() / commitment).clamp(0.0, 1.0)
         }
     }
 
@@ -1057,7 +1027,7 @@ impl RevolvingCredit {
         self.margin_steps
             .iter()
             .filter(|step| step.date <= date)
-            .map(|step| f64::from(step.delta_bp))
+            .map(|step| step.delta_bp.to_f64().unwrap_or_default())
             .sum()
     }
 
@@ -1089,7 +1059,7 @@ impl RevolvingCredit {
     ///
     /// * `date` - Date the LC outstanding is wanted for.
     pub fn lc_outstanding_at(&self, date: Date) -> Money {
-        let ccy = self.commitment_amount.currency();
+        let ccy = self.commitment.currency();
         let Some(lc) = &self.lc else {
             return Money::from((0_i64, ccy));
         };
@@ -1117,12 +1087,12 @@ impl RevolvingCredit {
     /// * `date` - Accrual date the fee is evaluated on.
     pub fn lc_fee_bp_at(&self, date: Date) -> f64 {
         let Some(lc) = &self.lc else { return 0.0 };
-        match (lc.fee_bp, &self.base_rate_spec) {
+        match (lc.fee_bp, &self.rate) {
             (Some(fee_bp), _) => fee_bp,
-            (None, BaseRateSpec::Floating(spec)) => {
+            (None, RateSpec::Floating(spec)) => {
                 spec.spread_bp.to_f64().unwrap_or(0.0) + self.margin_delta_bp_at(date)
             }
-            (None, BaseRateSpec::Fixed { .. }) => 0.0,
+            (None, RateSpec::Fixed { .. }) => 0.0,
         }
         .max(0.0)
     }
@@ -1170,10 +1140,12 @@ impl RevolvingCredit {
     /// Upfront fee amount in the facility currency (zero when none), resolved
     /// against the opening commitment.
     pub fn upfront_fee_amount(&self) -> Money {
-        self.fees.upfront_fee.as_ref().map_or(
-            Money::from((0_i64, self.commitment_amount.currency())),
-            |fee| fee.amount(self.commitment_amount),
-        )
+        self.fees
+            .upfront_fee
+            .as_ref()
+            .map_or(Money::from((0_i64, self.commitment.currency())), |fee| {
+                fee.amount(self.commitment)
+            })
     }
 
     /// Scheduled fixed fees dated after `as_of`, as `(date, amount)`.
@@ -1204,14 +1176,15 @@ impl RevolvingCredit {
         &self,
         as_of: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        let mut previous = self.commitment_amount;
+        let mut previous = self.commitment;
         let mut fees = Vec::new();
         for step in &self.commitment_steps {
             let reduction = previous.amount() - step.amount.amount();
-            if step.date > as_of && reduction > 0.0 && step.fee_bp > 0.0 {
+            let fee_bp = step.reduction_fee_bp.to_f64().unwrap_or_default();
+            if step.date > as_of && reduction > 0.0 && fee_bp > 0.0 {
                 fees.push((
                     step.date,
-                    Money::new(reduction * step.fee_bp * 1e-4, previous.currency())?,
+                    Money::new(reduction * fee_bp * 1e-4, previous.currency())?,
                 ));
             }
             previous = step.amount;
@@ -1256,7 +1229,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
         }
-        if let BaseRateSpec::Floating(spec) = &self.base_rate_spec {
+        if let RateSpec::Floating(spec) = &self.rate {
             deps.add_forward_curve(spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
                 spec.forward_curve_id.as_str(),
@@ -1307,7 +1280,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
 // Implement CashflowProvider for standard cashflow interface
 impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
     fn notional(&self) -> finstack_quant_core::Result<Option<finstack_quant_core::money::Money>> {
-        Ok(Some(self.commitment_amount))
+        Ok(Some(self.commitment))
     }
 
     fn raw_cashflow_schedule(
@@ -1330,15 +1303,15 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
 
         use crate::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;
         // Resolve fixings for floating-rate facilities (graceful: None if missing)
-        let fixings = match &self.base_rate_spec {
-            BaseRateSpec::Floating(spec) => {
+        let fixings = match &self.rate {
+            RateSpec::Floating(spec) => {
                 finstack_quant_core::market_data::fixings::get_fixing_series(
                     curves,
                     spec.forward_curve_id.as_ref(),
                 )
                 .ok()
             }
-            BaseRateSpec::Fixed { .. } => None,
+            RateSpec::Fixed { .. } => None,
         };
         let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
         let path_schedule = engine.generate_deterministic()?;
@@ -1396,7 +1369,7 @@ mod dependency_tests {
     #[test]
     fn floating_revolver_uses_the_canonical_fixing_series_id() {
         let facility = RevolvingCredit::example().expect("floating example");
-        let BaseRateSpec::Floating(spec) = &facility.base_rate_spec else {
+        let RateSpec::Floating(spec) = &facility.rate else {
             unreachable!("example must use a floating base rate");
         };
         let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
@@ -1454,7 +1427,7 @@ mod dependency_tests {
     #[test]
     fn validation_rejects_invalid_floating_rate_economics() {
         let mut facility = RevolvingCredit::example().expect("example");
-        let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec else {
+        let RateSpec::Floating(spec) = &mut facility.rate else {
             unreachable!("example must be floating");
         };
         spec.gearing = rust_decimal::Decimal::ZERO;

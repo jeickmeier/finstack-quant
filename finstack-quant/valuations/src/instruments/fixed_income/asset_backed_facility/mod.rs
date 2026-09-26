@@ -10,10 +10,10 @@
 //! events (`CumulativeLoss { max_cumulative_loss }` is the same decimal
 //! fraction of the original pool the engine uses). A loss or excess-spread event starts the term-out clock on
 //! its payment date, `fees` reach the waterfall ahead of the facility's
-//! interest, `draw_schedule` and `readvance_to_borrowing_base` lift the
-//! facility balance after closing, and the unused-commitment fee accrues only
+//! interest, `draws` and `readvance_to_borrowing_base` lift the
+//! facility balance after closing, and the commitment fee accrues only
 //! while the line revolves. [`AssetBackedFacility::project`] returns the
-//! note's flows, the unused-commitment fee, the draws and the residual; the
+//! note's flows, the commitment fee, the draws and the residual; the
 //! `Instrument` impl prices the lender's flows on the discount curve.
 //!
 //! # Quick example
@@ -36,9 +36,7 @@ pub use metrics::{
     AbfBorrowingBaseCushionCalculator, AbfFacilityIrrCalculator, AbfResidualIrrCalculator,
 };
 pub use pricing::{FacilityProjection, FACILITY_TRANCHE_ID, RESIDUAL_TRANCHE_ID};
-pub use types::{
-    AmortizationEvent, AssetBackedFacility, AssetBackedFacilityBuilder, FacilityDraw, TermOutSpec,
-};
+pub use types::{AmortizationEvent, AssetBackedFacility, AssetBackedFacilityBuilder, TermOutSpec};
 
 pub use crate::instruments::fixed_income::structured_credit::{
     AdvanceRate, BorrowingBaseReport, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope,

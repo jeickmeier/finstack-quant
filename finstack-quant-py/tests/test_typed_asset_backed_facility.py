@@ -46,8 +46,8 @@ def _facility(drawn: float = 60_000_000.0) -> AssetBackedFacility:
         })
         .commitment(Money(80_000_000.0, USD))
         .drawn(drawn, currency="USD")
-        .spread_bp(600.0)
-        .unused_fee_bp(50.0)
+        .rate(0.06)
+        .commitment_fee_bp(50.0)
         .closing_date(CLOSE)
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
@@ -79,9 +79,8 @@ def test_builder_exposes_every_field_and_rejects_an_overdrawn_line() -> None:
     assert facility.commitment.amount == 80_000_000.0
     assert facility.drawn.amount == 60_000_000.0
     assert facility.undrawn.amount == 20_000_000.0
-    assert facility.forward_curve_id is None
-    assert facility.spread_bp == 600.0
-    assert facility.unused_fee_bp == 50.0
+    assert facility.rate == {"fixed": {"rate": 0.06}}
+    assert facility.commitment_fee_bp == 50.0
     assert facility.closing_date == CLOSE
     assert facility.revolving_end == datetime.date(2026, 1, 15)
     assert facility.effective_revolving_end == datetime.date(2026, 1, 15)
@@ -117,7 +116,7 @@ def test_amortization_events_pull_the_revolving_end_forward() -> None:
         .borrowing_base_rules({"advance_rates": [{"asset_class": "*", "rate": 0.8}]})
         .commitment(80_000_000.0, currency="USD")
         .drawn(60_000_000.0, currency="USD")
-        .spread_bp(600.0)
+        .rate(0.06)
         .closing_date(CLOSE)
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
@@ -153,12 +152,22 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
     projection = facility.project(_market(), CLOSE)
     assert isinstance(projection, FacilityProjection)
     frame = projection.to_dataframe()
-    assert list(frame.columns) == ["date", "interest", "principal", "unused_fee", "draw", "lender_total", "residual"]
+    assert list(frame.columns) == [
+        "date",
+        "interest",
+        "principal",
+        "commitment_fee",
+        "draw",
+        "lender_total",
+        "residual",
+    ]
     lender = projection.lender_cashflows
     assert frame["lender_total"].sum() == pytest.approx(sum(amount.amount for _, amount in lender))
     assert frame["principal"].sum() == pytest.approx(60_000_000.0, rel=1e-9)
-    assert frame["unused_fee"].sum() == pytest.approx(sum(amount.amount for _, amount in projection.unused_fees))
-    assert projection.unused_fees[0][1].amount > 0.0
+    assert frame["commitment_fee"].sum() == pytest.approx(
+        sum(amount.amount for _, amount in projection.commitment_fees)
+    )
+    assert projection.commitment_fees[0][1].amount > 0.0
     assert projection.facility.tranche_id == "FACILITY"
     assert projection.residual.tranche_id == "RESIDUAL"
     assert projection.diagnostics.periods
@@ -212,8 +221,8 @@ def test_every_amortization_event_kind_projects_with_documented_units() -> None:
             .borrowing_base_rules(base.borrowing_base_rules)
             .commitment(base.commitment)
             .drawn(base.drawn)
-            .spread_bp(600.0)
-            .unused_fee_bp(50.0)
+            .rate(0.06)
+            .commitment_fee_bp(50.0)
             .closing_date(CLOSE)
             .revolving_end(datetime.date(2026, 1, 15))
             .maturity(datetime.date(2030, 1, 15))
@@ -228,7 +237,7 @@ def test_every_amortization_event_kind_projects_with_documented_units() -> None:
         assert projection.facility.total_principal.amount > 0.0
     dated = facility
     assert dated.effective_revolving_end == datetime.date(2025, 1, 15)
-    assert all(date <= datetime.date(2025, 4, 30) for date, _ in projection.unused_fees)
+    assert all(date <= datetime.date(2025, 4, 30) for date, _ in projection.commitment_fees)
 
 
 def test_draws_fees_and_readvance_round_trip_and_project() -> None:
@@ -242,19 +251,19 @@ def test_draws_fees_and_readvance_round_trip_and_project() -> None:
         .borrowing_base_rules(base.borrowing_base_rules)
         .commitment(base.commitment)
         .drawn(base.drawn)
-        .spread_bp(600.0)
+        .rate(0.06)
         .closing_date(CLOSE)
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
         .frequency("3M")
         .calendar_id("nyse")
         .term_out(24)
-        .draw_schedule([{"date": "2025-01-15", "amount": {"amount": "5000000", "currency": "USD"}}])
+        .draws([{"date": "2025-01-15", "amount": {"amount": "5000000", "currency": "USD"}}])
         .readvance_to_borrowing_base(False)
         .discount_curve_id("USD-OIS")
         .build()
     )
-    assert facility.draw_schedule[0]["amount"] == {"amount": "5000000", "currency": "USD"}
+    assert facility.draws[0]["amount"] == {"amount": "5000000", "currency": "USD"}
     assert facility.readvance_to_borrowing_base is False
     assert facility.fees is None
     again = AssetBackedFacility.from_json(facility.to_json())

@@ -1047,3 +1047,93 @@ fn linear_to_decimal_scale_hashes_equal() {
     assert_eq!(pos, neg);
     assert_eq!(hash_of(&pos), hash_of(&neg));
 }
+
+/// Declining-balance and dated-linear amortization emitted by the builder.
+///
+/// References are written out by hand: a quarterly schedule on 1,000,000
+/// with 10% of the remaining balance paid each period repays 100,000, 90,000
+/// and 81,000 on the first three payment dates (1,000,000 × 0.9^k × 0.1); a
+/// linear schedule over (Q1, maturity] repays 1,000,000 / 3 on each of the
+/// last three payment dates. Tolerance 1e-6 covers the Decimal→f64 cast.
+mod declining_and_dated_linear {
+    use super::*;
+    use finstack_quant_cashflows::builder::specs::{CouponType, FixedCouponSpec, ScheduleParams};
+    use finstack_quant_cashflows::builder::CashFlowSchedule;
+    use finstack_quant_core::cashflow::CFKind;
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+    use rust_decimal::Decimal;
+    use time::Month;
+
+    fn quarterly_spec() -> FixedCouponSpec {
+        FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: Decimal::try_from(0.05).expect("valid"),
+            schedule: ScheduleParams {
+                frequency: Tenor::quarterly(),
+                day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::Unadjusted,
+                calendar_id: "weekends_only".into(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+            },
+        }
+    }
+
+    fn amortization_flows(amort: AmortizationSpec) -> Vec<(Date, f64)> {
+        let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+        let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+        let init = Money::new(1_000_000.0, Currency::USD).expect("money");
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(init, issue, maturity)
+            .amortization(amort)
+            .fixed_cf(quarterly_spec());
+        builder
+            .build(None)
+            .expect("schedule")
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Amortization)
+            .map(|cf| (cf.date, cf.amount.amount()))
+            .collect()
+    }
+
+    #[test]
+    fn percent_of_remaining_declines_geometrically() {
+        let flows = amortization_flows(AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.1 });
+        let amounts: Vec<f64> = flows.iter().map(|(_, amount)| *amount).collect();
+        for (actual, expected) in amounts
+            .iter()
+            .zip([100_000.0, 90_000.0, 81_000.0, 72_900.0])
+        {
+            assert!((actual - expected).abs() < 1e-6, "{amounts:?}");
+        }
+    }
+
+    #[test]
+    fn linear_between_repays_in_equal_installments_by_end() {
+        let start = Date::from_calendar_date(2025, Month::April, 15).unwrap();
+        let end = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+        let flows = amortization_flows(AmortizationSpec::LinearBetween { start, end });
+        assert_eq!(flows.len(), 3, "{flows:?}");
+        assert!(flows.iter().all(|(date, _)| *date > start && *date <= end));
+        for (_, amount) in &flows {
+            assert!((amount - 1_000_000.0 / 3.0).abs() < 1e-6, "{flows:?}");
+        }
+        let total: f64 = flows.iter().map(|(_, amount)| amount).sum();
+        assert!((total - 1_000_000.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn linear_between_rejects_an_empty_window_and_unordered_dates() {
+        let start = Date::from_calendar_date(2025, Month::April, 15).unwrap();
+        let notional = Notional {
+            initial: Money::new(1_000_000.0, Currency::USD).expect("money"),
+            amort: AmortizationSpec::LinearBetween { start, end: start },
+        };
+        assert!(notional.validate().is_err());
+    }
+}

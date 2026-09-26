@@ -2046,8 +2046,8 @@ impl PyTermLoan {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Rate specification in serde form (``{"fixed": {"rate_bp": 600}}`` or
-    /// ``{"floating": {...}}``).
+    /// Rate specification in serde form (``{"fixed": {"rate": 0.06}}`` with a
+    /// decimal rate, or ``{"floating": {...}}``).
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.rate)
@@ -2096,7 +2096,8 @@ impl PyTermLoan {
     }
 
     /// Amortization specification in serde form (``"none"``,
-    /// ``{"percent_per_period": {"bp": 250}}``, ``{"linear": {...}}``, …).
+    /// ``{"percent_of_remaining_per_period": {"pct": 0.025}}``,
+    /// ``{"linear_between": {...}}``, …).
     #[getter]
     fn amortization<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.amortization)
@@ -2108,10 +2109,11 @@ impl PyTermLoan {
         enum_to_py_string(&self.inner.coupon_type)
     }
 
-    /// Upfront fee, or ``None``.
+    /// Upfront fee in ``UpfrontFee`` serde form (``{"amount": Money-dict}`` or
+    /// ``{"fraction_of_commitment": 0.02}``), or ``None``.
     #[getter]
-    fn upfront_fee(&self) -> Option<PyMoney> {
-        self.inner.upfront_fee.map(money_to_py)
+    fn upfront_fee<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        opt_serde_to_py(py, self.inner.upfront_fee.as_ref())
     }
 
     /// Delayed-draw term loan specification in serde form, or ``None``.
@@ -2345,8 +2347,8 @@ impl PyTermLoanBuilder {
     /// ----------
     /// value : float | Rate | dict | str
     ///     A bare decimal (``0.06`` = 6%) or ``Rate`` sets a fixed rate
-    ///     (mirrors Rust ``RateSpec::fixed_rate``; rounded to whole basis
-    ///     points). A ``dict``/JSON ``str`` is the Rust ``RateSpec`` in serde
+    ///     (mirrors Rust ``RateSpec::fixed_rate``). A ``dict``/JSON ``str`` is
+    ///     the Rust ``RateSpec`` in serde
     ///     form, e.g. ``{"floating": {"forward_curve_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
     ///
     /// Returns
@@ -2561,8 +2563,11 @@ impl PyTermLoanBuilder {
     /// ----------
     /// value : dict | str
     ///     Rust ``AmortizationSpec`` in serde form: ``"none"``,
-    ///     ``{"percent_per_period": {"bp": 250}}``,
-    ///     ``{"linear": {"start": "2025-01-01", "end": "2029-01-01"}}``, …
+    ///     ``{"percent_of_remaining_per_period": {"pct": 0.025}}`` (declining
+    ///     balance), ``{"percent_of_original_per_period": {"pct": 0.01}}``,
+    ///     ``{"linear_between": {"start": "2025-01-01", "end": "2029-01-01"}}``
+    ///     or ``{"custom_principal": {"items": [...]}}``; ``linear_to`` and
+    ///     ``step_remaining`` are rejected at ``build()``.
     ///
     /// Returns
     /// -------
@@ -2623,12 +2628,16 @@ impl PyTermLoanBuilder {
         Ok(slf)
     }
 
-    /// Set the upfront fee.
+    /// Set the upfront (arrangement or OID) fee paid on the issue date.
     ///
     /// Parameters
     /// ----------
-    /// value : Money | float
-    ///     Fee amount; a bare number needs ``currency``.
+    /// value : Money | float | dict | str
+    ///     A ``Money`` or bare number (which needs ``currency``) is an
+    ///     absolute amount; a ``dict``/JSON ``str`` is the Rust
+    ///     ``UpfrontFee`` in serde form (``{"amount": Money-dict}`` or
+    ///     ``{"fraction_of_commitment": 0.02}``, a decimal fraction of the
+    ///     DDTL commitment, else ``notional_limit``).
     /// currency : str, optional
     ///     ISO-4217 code applied when ``value`` is a bare number.
     ///
@@ -2640,18 +2649,27 @@ impl PyTermLoanBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a bare number is given without ``currency``.
+    ///     If a bare number is given without ``currency`` or a dict/str does
+    ///     not deserialize as an ``UpfrontFee``.
     #[pyo3(signature = (value, currency = None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
     fn upfront_fee<'py>(
         mut slf: PyRefMut<'py, Self>,
+        py: Python<'py>,
         value: &Bound<'_, PyAny>,
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "upfront_fee")?;
+        use finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee;
+        let (fee, shown) = if value.extract::<&str>().is_ok() || value.cast::<PyDict>().is_ok() {
+            let fee: UpfrontFee = spec_from_py(py, value, "upfront_fee")?;
+            (fee, "{...}".to_string())
+        } else {
+            let money = money_from_py(value, currency, "upfront_fee")?;
+            (UpfrontFee::Amount(money), money_repr(money))
+        };
         let b = take_term_loan(&mut slf)?;
-        slf.inner = Some(b.upfront_fee(money));
-        slf.fields.push(("upfront_fee", money_repr(money)));
+        slf.inner = Some(b.upfront_fee(fee));
+        slf.fields.push(("upfront_fee", shown));
         Ok(slf)
     }
 

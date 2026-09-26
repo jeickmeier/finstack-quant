@@ -1,9 +1,10 @@
-use super::{DealType, StructuredCredit, TrancheCoupon, TrancheSeniority};
+use super::{DealType, StructuredCredit, TrancheSeniority};
 use crate::cashflow::traits::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::model_params::ModelParamsSnapshot;
 use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::dates::{Date, DateExt};
@@ -72,7 +73,7 @@ impl Instrument for StructuredCredit {
             deps.add_series_id(fixing_series_id(forward_curve_id));
         }
         for tranche in &self.tranches.tranches {
-            if let TrancheCoupon::Floating(spec) = &tranche.coupon {
+            if let RateSpec::Floating(spec) = &tranche.coupon {
                 deps.add_forward_curve(spec.forward_curve_id.clone());
                 deps.add_series_id(fixing_series_id(spec.forward_curve_id.as_str()));
             }

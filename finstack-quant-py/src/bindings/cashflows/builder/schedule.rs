@@ -40,7 +40,7 @@ pub(crate) fn parse_representation(label: &str) -> PyResult<CashflowRepresentati
 ///     ``"no_residual"``.
 /// calendar_ids : list[str], optional
 ///     Holiday calendar identifiers used by the schedule (default none).
-/// facility_limit : Money, optional
+/// commitment : Money, optional
 ///     Facility limit / commitment for revolving structures.
 /// issue_date : datetime.date or str, optional
 ///     Instrument issue date.
@@ -75,13 +75,13 @@ impl PyCashFlowMeta {
     /// Construct schedule metadata; see the class docstring for parameters.
     #[new]
     #[pyo3(
-        signature = (representation="contractual", calendar_ids=None, facility_limit=None, issue_date=None, maturity=None, projected_fixings=None),
-        text_signature = "(representation=\"contractual\", calendar_ids=None, facility_limit=None, issue_date=None, maturity=None, projected_fixings=None)"
+        signature = (representation="contractual", calendar_ids=None, commitment=None, issue_date=None, maturity=None, projected_fixings=None),
+        text_signature = "(representation=\"contractual\", calendar_ids=None, commitment=None, issue_date=None, maturity=None, projected_fixings=None)"
     )]
     fn new(
         representation: &str,
         calendar_ids: Option<Vec<String>>,
-        facility_limit: Option<PyMoney>,
+        commitment: Option<PyMoney>,
         issue_date: Option<&Bound<'_, PyAny>>,
         maturity: Option<&Bound<'_, PyAny>>,
         projected_fixings: Option<Vec<PyProjectedFixing>>,
@@ -95,7 +95,7 @@ impl PyCashFlowMeta {
                     .collect(),
                 representation: parse_representation(representation)?,
                 calendar_ids: calendar_ids.unwrap_or_default(),
-                facility_limit: facility_limit.map(|m| m.inner),
+                commitment: commitment.map(|m| m.inner),
                 issue_date: issue_date.map(extract_date).transpose()?,
                 maturity: maturity.map(extract_date).transpose()?,
             },
@@ -116,8 +116,8 @@ impl PyCashFlowMeta {
 
     /// Optional facility limit / commitment.
     #[getter]
-    fn facility_limit(&self) -> Option<PyMoney> {
-        self.inner.facility_limit.map(PyMoney::from_inner)
+    fn commitment(&self) -> Option<PyMoney> {
+        self.inner.commitment.map(PyMoney::from_inner)
     }
 
     /// Instrument issue date, when known.

@@ -608,6 +608,65 @@ impl CashflowSpec {
         }
     }
 
+    /// Schedule conventions of the coupon leg (the base leg for amortizing
+    /// specs).
+    pub(crate) fn schedule(&self) -> &finstack_quant_cashflows::builder::ScheduleParams {
+        match self {
+            Self::Fixed(spec) => &spec.schedule,
+            Self::Floating(spec) => &spec.schedule,
+            Self::StepUp(spec) => &spec.schedule,
+            Self::Amortizing { base, .. } => base.schedule(),
+        }
+    }
+
+    /// Floating-rate terms of the coupon leg, when it is floating (directly or
+    /// as the base of an amortizing spec).
+    pub(crate) fn floating_rate_spec(
+        &self,
+    ) -> Option<&crate::cashflow::builder::specs::FloatingRateSpec> {
+        match self {
+            Self::Floating(spec) => Some(&spec.rate_spec),
+            Self::Amortizing { base, .. } => base.floating_rate_spec(),
+            Self::Fixed(_) | Self::StepUp(_) => None,
+        }
+    }
+
+    /// Add this coupon leg (and any amortization) to a cashflow builder whose
+    /// principal is already set.
+    ///
+    /// # Arguments
+    ///
+    /// * `builder` - Builder the coupon leg and amortization are added to.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::Invalid` for an amortizing spec nested inside
+    /// another amortizing spec.
+    pub(crate) fn add_to_builder(
+        &self,
+        builder: &mut crate::cashflow::builder::CashFlowBuilder,
+    ) -> finstack_quant_core::Result<()> {
+        match self {
+            Self::Fixed(spec) => {
+                let _ = builder.fixed_cf(spec.clone());
+            }
+            Self::Floating(spec) => {
+                let _ = builder.floating_cf(spec.clone());
+            }
+            Self::StepUp(spec) => {
+                let _ = builder.step_up_cf(spec.clone());
+            }
+            Self::Amortizing { base, schedule } => {
+                if matches!(**base, Self::Amortizing { .. }) {
+                    return Err(finstack_quant_core::InputError::Invalid.into());
+                }
+                let _ = builder.amortization(schedule.clone());
+                base.add_to_builder(builder)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Get the fixed annual coupon rate, if this specification has one.
     ///
     /// # Returns

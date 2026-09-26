@@ -2,9 +2,10 @@
 mod cases {
     use super::super::*;
 
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, DefaultModelSpec, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec,
-        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        Tranche, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::fixings::fixing_series_id;
@@ -23,7 +24,7 @@ mod cases {
                 100.0,
                 TrancheSeniority::Senior,
                 Money::new(80_000_000.0, Currency::USD).expect("senior"),
-                TrancheCoupon::Fixed { rate: 0.04 },
+                RateSpec::Fixed { rate: 0.04 },
                 deal.maturity,
             )
             .expect("senior"),
@@ -33,7 +34,7 @@ mod cases {
                 20.0,
                 TrancheSeniority::Equity,
                 Money::new(20_000_000.0, Currency::USD).expect("equity"),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 deal.maturity,
             )
             .expect("equity"),
@@ -407,7 +408,7 @@ mod cases {
                 100.0,
                 TrancheSeniority::Senior,
                 Money::new(80_000_000.0, Currency::USD).expect("balance"),
-                TrancheCoupon::Fixed { rate: 0.06 },
+                RateSpec::Fixed { rate: 0.06 },
                 deal.maturity,
             )
             .expect("senior"),
@@ -417,7 +418,7 @@ mod cases {
                 20.0,
                 TrancheSeniority::Equity,
                 Money::new(20_000_000.0, Currency::USD).expect("balance"),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 deal.maturity,
             )
             .expect("equity"),
@@ -776,7 +777,7 @@ mod cases {
             100.0,
             TrancheSeniority::Senior,
             Money::from((200_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("tranche");
@@ -840,7 +841,7 @@ mod cases {
             100.0,
             TrancheSeniority::Senior,
             usd(60),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("tranche");
@@ -943,7 +944,7 @@ mod cases {
             TrancheSeniority::Senior,
             Money::from((10_000_000_i64, Currency::USD)),
             // Non-zero coupon so the stub-period accrued interest is non-zero.
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("tranche");
@@ -1092,7 +1093,7 @@ mod cases {
                 100.0,
                 TrancheSeniority::Senior,
                 Money::from((100_000_000_i64, Currency::USD)),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity,
             )
             .expect("tranche");
@@ -1174,7 +1175,7 @@ mod cases {
                 70.0,
                 TrancheSeniority::Senior,
                 Money::from((70_000_000_i64, Currency::USD)),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity,
             )
             .expect("senior"),
@@ -1184,7 +1185,7 @@ mod cases {
                 92.0,
                 TrancheSeniority::Subordinated,
                 Money::from((22_000_000_i64, Currency::USD)),
-                TrancheCoupon::Fixed { rate: 0.07 },
+                RateSpec::Fixed { rate: 0.07 },
                 maturity,
             )
             .expect("subordinated"),
@@ -1194,7 +1195,7 @@ mod cases {
                 100.0,
                 TrancheSeniority::Equity,
                 Money::from((8_000_000_i64, Currency::USD)),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity,
             )
             .expect("equity"),
@@ -1274,7 +1275,7 @@ mod cases {
                 80.0,
                 TrancheSeniority::Senior,
                 Money::from((80_000_000_i64, Currency::USD)),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity,
             )
             .expect("senior"),
@@ -1284,7 +1285,7 @@ mod cases {
                 100.0,
                 TrancheSeniority::Equity,
                 Money::from((20_000_000_i64, Currency::USD)),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity,
             )
             .expect("equity"),
@@ -1382,7 +1383,7 @@ mod cases {
             100.0,
             TrancheSeniority::Senior,
             Money::new(original_balance, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("tranche");
@@ -1525,7 +1526,7 @@ mod cases {
             100.0,
             TrancheSeniority::Senior,
             Money::new(balance, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("tranche");
@@ -1708,7 +1709,7 @@ mod cases {
                 detach,
                 seniority,
                 Money::new(bal, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity,
             )
             .expect("tranche")
@@ -1754,7 +1755,7 @@ mod cases {
             100.0,
             TrancheSeniority::Senior,
             Money::from((10_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("tranche");
@@ -1796,7 +1797,7 @@ mod cases {
         };
         let mut deal = reserve_account_deal(0.0);
         // Note coupon well below collateral, so genuine excess spread exists.
-        deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.02 };
+        deal.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.02 };
         deal.waterfall_rules = Some(WaterfallRules {
             excess_spread: Some(ExcessSpreadSpec {
                 target_balance: Money::from((10_000_000_i64, Currency::USD)),
@@ -1846,7 +1847,7 @@ mod cases {
                     detach,
                     sen,
                     Money::new(bal, Currency::USD).expect("valid money fixture"),
-                    TrancheCoupon::Fixed { rate: 0.02 },
+                    RateSpec::Fixed { rate: 0.02 },
                     maturity,
                 )
                 .expect("tranche")
@@ -1955,7 +1956,7 @@ mod cases {
     fn reserve_account_is_drawn_to_cover_interest_shortfall() {
         fn first_period_interest(reserve: f64) -> f64 {
             let mut deal = reserve_account_deal(reserve);
-            deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.09 };
+            deal.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.09 };
             let market = MarketContext::new().insert(cleanup_discount_curve());
             let results =
                 crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
@@ -2003,7 +2004,7 @@ mod cases {
             100.0,
             TrancheSeniority::Senior,
             Money::from((8_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("senior");
@@ -2013,7 +2014,7 @@ mod cases {
             20.0,
             TrancheSeniority::Equity,
             Money::from((2_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("equity");
@@ -2055,7 +2056,7 @@ mod cases {
                 detach,
                 seniority,
                 Money::new(bal, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate },
+                RateSpec::Fixed { rate },
                 maturity,
             )
             .expect("tranche")
@@ -2505,7 +2506,7 @@ mod cases {
             80.0, // 80% of original balance = 8 M face
             TrancheSeniority::Senior,
             Money::from((8_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("senior tranche");
@@ -2515,7 +2516,7 @@ mod cases {
             100.0, // junior 20% = 2 M face
             TrancheSeniority::Equity,
             Money::from((2_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("equity tranche");
@@ -2675,7 +2676,7 @@ mod cases {
                 100.0,
                 TrancheSeniority::Senior,
                 Money::new(balance, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity,
             )
             .expect("tranche");
@@ -2763,7 +2764,7 @@ mod cases {
                     90.0,
                     TrancheSeniority::Senior,
                     Money::new(face_senior, Currency::USD).expect("valid money fixture"),
-                    TrancheCoupon::Fixed { rate: 0.05 },
+                    RateSpec::Fixed { rate: 0.05 },
                     maturity,
                 )
                 .expect("senior"),
@@ -2773,7 +2774,7 @@ mod cases {
                     100.0,
                     TrancheSeniority::Equity,
                     Money::from((10_000_000_i64, Currency::USD)),
-                    TrancheCoupon::Fixed { rate: 0.0 },
+                    RateSpec::Fixed { rate: 0.0 },
                     maturity,
                 )
                 .expect("equity"),

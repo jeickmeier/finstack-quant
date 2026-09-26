@@ -24,7 +24,7 @@ use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalRe
 use finstack_quant_valuations::instruments::fixed_income::fi_trs::TrsScheduleSpec;
 use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_valuations::instruments::fixed_income::tba::AgencyTba;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::{
@@ -51,7 +51,7 @@ fn term_loan(maturity: Date) -> TermLoan {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(base)
         .maturity(maturity)
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -72,11 +72,11 @@ fn term_loan(maturity: Date) -> TermLoan {
 fn revolving_credit_floating(maturity: Date) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-BENCH".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of())
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Floating(
+        .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: Decimal::try_from(100.0).unwrap(),
@@ -256,15 +256,15 @@ fn bench_revolving_credit_mc(c: &mut Criterion) {
     let market = revolving_credit_market(as_of);
     let mut facility =
         revolving_credit_floating(Date::from_calendar_date(2028, Month::January, 1).unwrap());
-    if let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec {
+    if let RateSpec::Floating(spec) = &mut facility.rate {
         // Reset on the valuation date: no historical fixing is needed.
         spec.reset_lag_days = 0;
     }
     facility.draw_repay_spec = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         utilization_process: UtilizationProcess::MeanReverting {
-            target_rate: 0.6,
-            speed: 1.0,
-            volatility: 0.2,
+            theta: 0.6,
+            kappa: 1.0,
+            sigma: 0.2,
             spread_sensitivity: 0.0,
         },
         use_sobol_qmc: false,

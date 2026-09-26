@@ -101,7 +101,7 @@ from finstack_quant.valuations import instrument_cashflows
 _,floor_bond=fixed_bond(0)
 spec=convert["instrument"]["spec"]
 floor_bond["spec"].update({"id":"CONVERT-FLOOR-BOND","notional":spec["notional"],
-    "issue_date":spec["issue_date"],"maturity":spec["maturity"],"cashflow_spec":{"fixed":spec["fixed_coupon"]},
+    "issue_date":spec["issue_date"],"maturity":spec["maturity"],"cashflow_spec":spec["cashflow_spec"],
     "discount_curve_id":spec["discount_curve_id"],"credit_curve_id":spec["credit_curve_id"],"settlement_days":0})
 floor_payload=json.dumps(instrument_envelope(floor_bond))
 floor_value=price_instrument(floor_payload,credit_market,AS_OF,model="hazard_rate").value.amount
@@ -152,7 +152,7 @@ s=convert["instrument"]["spec"]
 rebuilt=(ConvertibleBond.builder().id("C5-REBUILT").notional(Money(1_000_000.,"USD"))
     .issue_date(AS_OF).maturity(date(2030,1,15)).discount_curve_id("USD-OIS").credit_curve_id("CONVERT-RISKY")
     .conversion(ConversionSpec(ratio=10_000.)).spot_id("CONVERT").vol_surface_id("CONVERT-VOL").div_yield_id("CONVERT-DIVYIELD")
-    .fixed_coupon(s["fixed_coupon"]).recovery_rate(0.).build())
+    .cashflow_spec(s["cashflow_spec"]).recovery_rate(0.).build())
 validate_instrument_json(rebuilt.to_json())
 greeks=price_instrument(rebuilt.to_json(),credit_market,AS_OF,model="tree",metrics=["delta","conversion01","dividend01"])
 up=deepcopy(convert);down=deepcopy(convert)

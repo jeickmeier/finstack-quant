@@ -89,7 +89,7 @@ pub enum FeeBase {
     /// Base on undrawn = max(limit - outstanding, 0).
     Undrawn {
         /// Total facility commitment used to compute the undrawn amount.
-        facility_limit: Money,
+        commitment: Money,
     },
 }
 

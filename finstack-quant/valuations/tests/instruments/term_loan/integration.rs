@@ -33,7 +33,7 @@ fn build_simple_term_loan(as_of: Date, maturity: Date) -> TermLoan {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
-        .rate(term_loan::RateSpec::Fixed { rate_bp: 600 }) // 6%
+        .rate(term_loan::RateSpec::Fixed { rate: 0.06 }) // 6%
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(

@@ -1,13 +1,13 @@
 //! Facility projection through the structured-credit engine: the synthetic
-//! two-class deal, the facility note's flows, the unused-commitment fee and
+//! two-class deal, the facility note's flows, the commitment fee and
 //! the residual, plus the `Instrument` / `CashflowScheduleSource` impls.
 
-use finstack_quant_cashflows::builder::FloatingRateSpec;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, Discountable};
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::money::Money;
+use rust_decimal::prelude::ToPrimitive;
 use serde::{Deserialize, Serialize};
 
 use super::types::{AmortizationEvent, AssetBackedFacility};
@@ -16,11 +16,12 @@ use crate::cashflow::traits::{
 };
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, CallAssumption, CoverageRules, CoverageTestSpec,
     EarlyAmortizationSpec, LossAllocationPolicy, MarketConditions, Metadata, ReinvestmentCriteria,
     ReinvestmentPeriod, SimulationDiagnostics, StructuredCredit, Tranche, TrancheCashflows,
-    TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
+    TrancheSeniority, TrancheStructure, WaterfallRules,
 };
 use crate::instruments::fixed_income::structured_credit::{TrancheDraw, TrancheReadvance};
 
@@ -37,10 +38,10 @@ pub struct FacilityProjection {
     pub facility: TrancheCashflows,
     /// Cash paid to the residual class.
     pub residual: TrancheCashflows,
-    /// Unused-commitment fee accrued on `commitment − opening facility
-    /// balance` per accrual period while the line revolves, paid on the
-    /// period's payment date.
-    pub unused_fees: Vec<(Date, Money)>,
+    /// Commitment fee accrued on `commitment − opening facility balance` per
+    /// accrual period while the line revolves, paid on the period's payment
+    /// date.
+    pub commitment_fees: Vec<(Date, Money)>,
     /// Lender draws applied (scheduled draws and re-advances) per payment
     /// date: cash the lender advances, an outflow in the lender's IRR.
     #[serde(default)]
@@ -51,7 +52,7 @@ pub struct FacilityProjection {
 
 impl FacilityProjection {
     /// Every cashflow to the lender in date order, summed per date:
-    /// interest, principal and unused fees as inflows, draws (scheduled draws
+    /// interest, principal and commitment fees as inflows, draws (scheduled draws
     /// and re-advances) as outflows.
     ///
     /// # Errors
@@ -69,7 +70,7 @@ impl FacilityProjection {
             .facility
             .cashflows
             .iter()
-            .chain(&self.unused_fees)
+            .chain(&self.commitment_fees)
             .map(|(date, amount)| (*date, *amount))
             .chain(draws)
         {
@@ -114,38 +115,7 @@ impl AssetBackedFacility {
         let residual = self.collateral.total_balance()?.checked_sub(self.drawn)?;
         let repayment_date = self.repayment_date();
 
-        let coupon = match &self.forward_curve_id {
-            Some(forward_curve_id) => {
-                let dec = |value: f64| {
-                    rust_decimal::Decimal::try_from(value).map_err(|_| {
-                        finstack_quant_core::Error::Validation(format!(
-                            "spread_bp {value} cannot be represented as a decimal"
-                        ))
-                    })
-                };
-                TrancheCoupon::Floating(FloatingRateSpec {
-                    forward_curve_id: forward_curve_id.clone(),
-                    spread_bp: dec(self.spread_bp)?,
-                    gearing: dec(1.0)?,
-                    gearing_includes_spread: true,
-                    index_floor_bp: None,
-                    all_in_floor_bp: None,
-                    all_in_cap_bp: None,
-                    index_cap_bp: None,
-                    overnight_index_constraints: Default::default(),
-                    reset_frequency: self.frequency,
-                    index_tenor: None,
-                    reset_lag_days: 0,
-                    fixing_calendar_id: None,
-                    overnight_compounding: None,
-                    overnight_basis: None,
-                    fallback: Default::default(),
-                })
-            }
-            None => TrancheCoupon::Fixed {
-                rate: self.spread_bp / 10_000.0,
-            },
-        };
+        let coupon = self.rate.clone();
         let mut note = Tranche::from_balance(
             FACILITY_TRANCHE_ID,
             TrancheSeniority::Senior,
@@ -159,7 +129,7 @@ impl AssetBackedFacility {
             RESIDUAL_TRANCHE_ID,
             TrancheSeniority::Equity,
             residual,
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             self.maturity,
         )?;
         residual_class.frequency = self.frequency;
@@ -255,9 +225,9 @@ impl AssetBackedFacility {
         if let Some(fees) = &self.fees {
             builder = builder.fees(fees.clone());
         }
-        if !self.draw_schedule.is_empty() {
+        if !self.draws.is_empty() {
             builder = builder.tranche_draws(
-                self.draw_schedule
+                self.draws
                     .iter()
                     .map(|draw| TrancheDraw {
                         tranche_id: FACILITY_TRANCHE_ID.to_string(),
@@ -311,7 +281,7 @@ impl AssetBackedFacility {
             .map_or(self.effective_revolving_end(), |event| {
                 event.min(self.effective_revolving_end())
             });
-        let unused_fees = self.unused_fees(&facility, commitment_end)?;
+        let commitment_fees = self.commitment_fees(&facility, commitment_end)?;
         let draws = run
             .diagnostics
             .tranche_draws
@@ -322,22 +292,22 @@ impl AssetBackedFacility {
         Ok(FacilityProjection {
             facility,
             residual,
-            unused_fees,
+            commitment_fees,
             draws,
             diagnostics: run.diagnostics,
         })
     }
 
-    /// Unused-commitment fee per accrual period of the note that starts
-    /// before the commitment ends (`commitment_end`) with a positive
-    /// opening balance: `(commitment − opening balance) × unused_fee_bp ×
-    /// accrual`.
-    fn unused_fees(
+    /// Commitment fee per accrual period of the note that starts before the
+    /// commitment ends (`commitment_end`) with a positive opening balance:
+    /// `(commitment − opening balance) × commitment_fee_bp × accrual`.
+    fn commitment_fees(
         &self,
         facility: &TrancheCashflows,
         commitment_end: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        if self.unused_fee_bp <= 0.0 {
+        let fee_bp = self.commitment_fee_bp.to_f64().unwrap_or_default();
+        if fee_bp <= 0.0 {
             return Ok(Vec::new());
         }
         let currency = self.commitment.currency();
@@ -355,7 +325,7 @@ impl AssetBackedFacility {
                 period.end,
                 DayCountContext::default(),
             )?;
-            let fee = undrawn * self.unused_fee_bp / 10_000.0 * accrual;
+            let fee = undrawn * fee_bp / 10_000.0 * accrual;
             if fee > 0.0 {
                 fees.push((period.payment_date, Money::new(fee, currency)?));
             }
@@ -404,10 +374,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let projection = self.project(context, as_of)?;
         let mut flows: Vec<CashFlow> = Vec::new();
-        let interest_kind = if self.forward_curve_id.is_some() {
-            CFKind::FloatReset
-        } else {
-            CFKind::Fixed
+        let interest_kind = match self.rate {
+            RateSpec::Floating(_) => CFKind::FloatReset,
+            RateSpec::Fixed { .. } => CFKind::Fixed,
         };
         for (date, amount) in &projection.facility.interest_flows {
             if amount.amount() > 0.0 {
@@ -445,8 +414,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
                 ));
             }
         }
-        for (date, amount) in &projection.unused_fees {
-            flows.push(CashFlow::new(*date, None, *amount, CFKind::Fee, 0.0, None));
+        for (date, amount) in &projection.commitment_fees {
+            flows.push(CashFlow::new(
+                *date,
+                None,
+                *amount,
+                CFKind::CommitmentFee,
+                0.0,
+                None,
+            ));
         }
         // Draws (scheduled and re-advances) are cash the lender pays out.
         for (date, amount) in &projection.draws {
@@ -489,9 +465,9 @@ impl Instrument for AssetBackedFacility {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        if let Some(forward_curve_id) = &self.forward_curve_id {
-            deps.add_forward_curve(forward_curve_id.clone());
-            deps.add_series_id(fixing_series_id(forward_curve_id.as_str()));
+        if let RateSpec::Floating(spec) = &self.rate {
+            deps.add_forward_curve(spec.forward_curve_id.clone());
+            deps.add_series_id(fixing_series_id(spec.forward_curve_id.as_str()));
         }
         let pool = self.collateral.normalized(self.closing_date)?;
         for forward_curve_id in pool

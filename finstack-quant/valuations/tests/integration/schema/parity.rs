@@ -89,9 +89,11 @@ fn test_attribution_factors_schema_parity() {
 /// Must match `AmortizationSpec` enum in cashflows crate.
 const CANONICAL_AMORTIZATION_VARIANTS: &[&str] = &[
     "custom_principal",
+    "linear_between",
     "linear_to",
     "none",
     "percent_of_original_per_period",
+    "percent_of_remaining_per_period",
     "step_remaining",
 ];
 

@@ -174,7 +174,7 @@ class TestBuilderSpecs:
         fixed = FeeSpec.fixed(dt.date(2025, 1, 15), Money(-5_000.0, "USD"))
         assert fixed is not None
         periodic = FeeSpec.periodic_bp(
-            base=FeeBase.undrawn(facility_limit=Money(10_000_000.0, "USD")),
+            base=FeeBase.undrawn(commitment=Money(10_000_000.0, "USD")),
             bp=50,
             frequency=Tenor.quarterly(),
             day_count=DayCount.ACT_360,

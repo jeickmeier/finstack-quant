@@ -361,8 +361,7 @@ class TestConvertibleBond:
         assert bond.spot_id == "TECH"
         assert bond.credit_curve_id == "USD-CREDIT-BBB"
         assert bond.call_put is None
-        assert bond.fixed_coupon is not None
-        assert bond.floating_coupon is None
+        assert "fixed" in bond.cashflow_spec
         assert bond.issue_date == datetime.date(2024, 1, 15)
         mandatory = ConvertibleBond.example_mandatory()
         assert isinstance(mandatory.call_put, CallPutSchedule)

@@ -26,7 +26,7 @@ fn test_ytw_is_minimum_of_ytm_and_ytc() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2029 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -92,14 +92,14 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(maturity)
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(AmortizationSpec::PercentPerPeriod { bp: 250 }) // 2.5% per quarter
+        .amortization(AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.025 }) // 2.5% per quarter
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -160,7 +160,7 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
 fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
     let as_of = date!(2025 - 01 - 01);
     let ddtl = DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: date!(2025 - 01 - 01),
         availability_end: date!(2025 - 12 - 31),
         draws: vec![
@@ -174,8 +174,8 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
             },
         ],
         commitment_steps: vec![],
-        usage_fee_bp: 0.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(0),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     };
@@ -186,7 +186,7 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -238,7 +238,7 @@ fn test_ytw_includes_standing_call_for_seasoned_callable_loan() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2024 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -303,7 +303,7 @@ fn test_ytw_uses_quoted_clean_price_pct_when_present() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2029 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

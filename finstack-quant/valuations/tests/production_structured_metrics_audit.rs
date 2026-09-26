@@ -300,15 +300,14 @@ fn production_structured_metrics_discount_margin_uses_dirty_settlement_target() 
         money::Money,
         types::CurveId,
     };
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        calculate_tranche_discount_margin, TrancheCoupon,
-    };
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_tranche_discount_margin;
     use rust_decimal_macros::dec;
     let (mut deal, market) = deal_and_market();
     let as_of = date!(2024 - 02 - 15);
     let settlement = date!(2024 - 05 - 15);
     deal.quote_settlement_date = Some(settlement);
-    deal.tranches.tranches[0].coupon = TrancheCoupon::Floating(FloatingRateSpec {
+    deal.tranches.tranches[0].coupon = RateSpec::Floating(FloatingRateSpec {
         forward_curve_id: CurveId::new("SOFR-3M"),
         spread_bp: dec!(100),
         gearing: dec!(1),

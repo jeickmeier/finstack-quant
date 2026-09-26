@@ -219,7 +219,7 @@ fn amortizing_loan_model(periods: &str, currency: Currency) -> FinancialModelSpe
     use finstack_quant_statements::types::FinancialStatementInstrument;
     use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
     let mut spec = serde_json::to_value(TermLoan::example().unwrap()).unwrap();
-    for (key,value) in json!({"id":"LOAN","currency":currency.to_string(),"notional_limit":{"amount":"1000000","currency":currency.to_string()},"issue_date":"2025-01-15","maturity":"2026-01-15","frequency":{"count":1,"unit":"months"},"rate":{"fixed":{"rate_bp":1200}},"business_day_convention":"unadjusted","amortization":{"percent_per_period":{"bp":1000}}}).as_object().unwrap() {
+    for (key,value) in json!({"id":"LOAN","currency":currency.to_string(),"notional_limit":{"amount":"1000000","currency":currency.to_string()},"issue_date":"2025-01-15","maturity":"2026-01-15","frequency":{"count":1,"unit":"months"},"rate":{"fixed":{"rate":0.12}},"business_day_convention":"unadjusted","amortization":{"percent_of_remaining_per_period":{"pct":0.1}}}).as_object().unwrap() {
         spec[key]=value.clone();
     }
     let loan = serde_json::from_value(spec).unwrap();

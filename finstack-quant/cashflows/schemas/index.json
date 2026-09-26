@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
-      "bytes": 4361,
+      "bytes": 6141,
       "kind": "component",
       "path": "schemas/cashflow/1/amortization_spec.schema.json",
       "summary": "How principal is repaid over the schedule.",
@@ -26,7 +26,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
-      "bytes": 8098,
+      "bytes": 8090,
       "kind": "component",
       "path": "schemas/cashflow/1/fee_specs.schema.json",
       "summary": "Recurring or one-off fees attached to a schedule.",

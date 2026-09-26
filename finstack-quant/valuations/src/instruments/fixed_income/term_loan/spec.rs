@@ -16,7 +16,9 @@
 //!
 //! - [`DdtlSpec`]: Delayed-draw term loan features
 //! - [`TermLoanCovenantEvents`]: Covenant-driven events
-//! - [`AmortizationSpec`]: Principal repayment schedules
+//! - [`AmortizationSpec`]: Principal repayment schedules (the shared cashflows
+//!   type; term loans accept every variant except `LinearTo` and
+//!   `StepRemaining`)
 //! - [`LoanCallSchedule`]: Borrower prepayment options
 //! - [`OidPolicy`]: Original issue discount handling
 //! - [`OidEirSpec`]: Effective interest rate amortization settings
@@ -41,8 +43,11 @@
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use rust_decimal::Decimal;
 
-pub use super::super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
+pub use super::super::bond::MakeWholeSpec;
+pub use super::super::loan_terms::{CommitmentStep, DrawEvent, MarginStep, OidEirSpec};
+pub use crate::cashflow::builder::AmortizationSpec;
 
 /// Original Issue Discount (OID) policy for term loan origination.
 ///
@@ -85,7 +90,7 @@ pub use super::super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 /// use finstack_quant_core::currency::Currency;
 ///
 /// // 2% OID withheld from proceeds
-/// let oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%
+/// let oid = OidPolicy::WithheldBp(dec!(200));  // 200 bp = 2%
 ///
 /// // $50,000 fixed OID
 /// let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
@@ -97,35 +102,30 @@ pub use super::super::loan_terms::{CommitmentStep, MarginStep, OidEirSpec};
 pub enum OidPolicy {
     /// Discount in basis points of each funded draw (`200` = 2%), withheld
     /// from proceeds
-    WithheldBp(i32),
+    WithheldBp(
+        #[serde(with = "finstack_quant_core::wire::decimal")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DecimalWire")
+        )]
+        Decimal,
+    ),
     /// Fixed facility-level discount amount withheld from funded proceeds,
     /// pro-rated across draws by draw size
     WithheldAmount(Money),
     /// Discount in basis points of each draw (`200` = 2%), tracked
     /// separately for amortization
-    SeparateBp(i32),
+    SeparateBp(
+        #[serde(with = "finstack_quant_core::wire::decimal")]
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DecimalWire")
+        )]
+        Decimal,
+    ),
     /// Fixed facility-level discount amount tracked separately for
     /// amortization, pro-rated across draws by draw size
     SeparateAmount(Money),
-}
-
-/// Draw event for delayed-draw term loans (DDTL).
-///
-/// Represents a scheduled or actual draw against the commitment, reducing
-/// available capacity and increasing outstanding principal.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct DrawEvent {
-    /// Date of the draw
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub date: Date,
-    /// Amount drawn from available commitment
-    pub amount: Money,
 }
 
 /// Basis for calculating commitment fees on undrawn portions.
@@ -179,13 +179,13 @@ pub enum CommitmentFeeBase {
 ///
 /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let ddtl = DdtlSpec {
-///     commitment_limit: Money::from((10_000_000_i64, Currency::USD)),
+///     commitment: Money::from((10_000_000_i64, Currency::USD)),
 ///     availability_start: create_date(2025, Month::January, 1)?,
 ///     availability_end: create_date(2026, Month::January, 1)?,
 ///     draws: vec![],
 ///     commitment_steps: vec![],
-///     usage_fee_bp: 50.0,        // 50 bp usage fee
-///     commitment_fee_bp: 25.0,   // 25 bp commitment fee
+///     usage_fee_bp: dec!(50),        // 50 bp usage fee
+///     commitment_fee_bp: dec!(25),   // 25 bp commitment fee
 ///     fee_base: CommitmentFeeBase::Undrawn,
 ///     oid_policy: None,
 /// };
@@ -196,8 +196,8 @@ pub enum CommitmentFeeBase {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DdtlSpec {
-    /// Total commitment limit available for draws
-    pub commitment_limit: Money,
+    /// Total commitment available for draws, in the loan currency.
+    pub commitment: Money,
     /// First date draws are permitted
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -216,14 +216,25 @@ pub struct DdtlSpec {
     pub draws: Vec<DrawEvent>,
     /// Commitment steps, each effective from its date: strictly increasing
     /// dates inside the availability window, non-increasing `amount`s in the
-    /// loan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).
+    /// loan currency, and a zero `reduction_fee_bp` (term loans carry no
+    /// reduction fee).
     pub commitment_steps: Vec<CommitmentStep>,
-    /// Usage fee on drawn amounts, in basis points per annum (non-negative,
-    /// finite; `25.0` = 0.25%).
-    pub usage_fee_bp: f64,
+    /// Usage fee on drawn amounts, in basis points per annum (non-negative;
+    /// `25` = 0.25%).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub usage_fee_bp: Decimal,
     /// Commitment fee on the undrawn commitment, in basis points per annum
-    /// (non-negative, finite; `50.0` = 0.50%).
-    pub commitment_fee_bp: f64,
+    /// (non-negative; `50` = 0.50%).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub commitment_fee_bp: Decimal,
     /// Basis for commitment fee calculation
     pub fee_base: CommitmentFeeBase,
     /// Original issue discount policy, if applicable
@@ -231,8 +242,8 @@ pub struct DdtlSpec {
 }
 
 impl DdtlSpec {
-    /// Commitment limit in force on `date`: the last step-down dated on or
-    /// before `date`, else `commitment_limit`.
+    /// Commitment in force on `date`: the last step dated on or before
+    /// `date`, else `commitment`.
     ///
     /// # Arguments
     ///
@@ -243,7 +254,7 @@ impl DdtlSpec {
             .filter(|step| step.date <= date)
             .map(|step| step.amount)
             .next_back()
-            .unwrap_or(self.commitment_limit)
+            .unwrap_or(self.commitment)
     }
 }
 
@@ -310,80 +321,6 @@ pub struct TermLoanCovenantEvents {
     pub draw_stop_dates: Vec<Date>,
 }
 
-/// Principal amortization schedule specification.
-///
-/// Defines how the loan principal is amortized over its life,
-/// from no amortization (bullet) to custom schedules.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-#[non_exhaustive]
-#[serde(rename_all = "snake_case")]
-// Distinct from `finstack_quant_cashflows::builder::specs::AmortizationSpec`;
-// naming the schema keeps both out of the positional `AmortizationSpec2` slot.
-#[cfg_attr(feature = "json-schema", schemars(rename = "TermLoanAmortizationSpec"))]
-pub enum AmortizationSpec {
-    /// Bullet loan with no scheduled amortization
-    None,
-    /// Linear amortization between start and end dates
-    Linear {
-        /// Amortization start date
-        #[serde(with = "finstack_quant_core::wire::date")]
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "finstack_quant_core::wire::DateWire")
-        )]
-        start: Date,
-        /// Amortization end date (full repayment)
-        #[serde(with = "finstack_quant_core::wire::date")]
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "finstack_quant_core::wire::DateWire")
-        )]
-        end: Date,
-    },
-    /// Percentage of current outstanding principal per period (geometric decay).
-    ///
-    /// Each period, the amortization amount equals `bp / 10000 × current_outstanding`.
-    /// Because the percentage is applied to the declining balance, the dollar amount
-    /// decreases geometrically each period.
-    ///
-    /// **Note**: This is NOT the same as a flat percentage of original notional
-    /// (which would produce equal dollar payments each period).  For example,
-    /// 250 bp (2.5%) per quarter applied to $10M produces:
-    /// - Q1: $250,000 (2.5% × $10M)
-    /// - Q2: $243,750 (2.5% × $9.75M)
-    /// - Q3: $237,656 (2.5% × $9.506M)
-    /// - etc.
-    PercentPerPeriod {
-        /// Percentage in basis points per payment period (applied to current outstanding)
-        bp: i32,
-    },
-    /// Flat dollar amortization each period (percentage of original notional).
-    ///
-    /// Each period, the amortization amount equals `bp / 10000 × original_notional`.
-    /// Because the percentage is applied to the fixed original balance, the dollar
-    /// amount is identical every period (unlike `PercentPerPeriod` which decays).
-    ///
-    /// For example, 250 bp (2.5%) per quarter applied to $10M produces:
-    /// - Q1: $250,000 (2.5% × $10M)
-    /// - Q2: $250,000 (2.5% × $10M)
-    /// - Q3: $250,000 (2.5% × $10M)
-    /// - etc.
-    PercentOfOriginalNotional {
-        /// Percentage in basis points per payment period (applied to original notional)
-        bp: i32,
-    },
-    /// Custom amortization schedule with explicit principal payments
-    Custom(
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
-        )]
-        Vec<(Date, Money)>,
-    ),
-}
-
 /// Type of borrower call provision on a term loan.
 ///
 /// Institutional term loans use several types of call provisions:
@@ -414,12 +351,12 @@ pub enum LoanCallType {
     /// Soft call: callable with a premium during the call protection period.
     /// After the protection period, callable at par.
     Soft,
-    /// Make-whole call: borrower pays PV of remaining cashflows at a reference
-    /// rate plus the specified spread. Ensures lender receives full economic value.
-    MakeWhole {
-        /// Spread over the reference rate in basis points (e.g., 50 = T+50bps).
-        treasury_spread_bp: i32,
-    },
+    /// Make-whole call: borrower pays PV of remaining cashflows at the
+    /// reference curve plus spread of the shared [`MakeWholeSpec`] (the same
+    /// type bonds use). The term-loan tree pricer and yield-to-call metrics
+    /// never exercise it: paying at least the make-whole amount leaves the
+    /// lender indifferent, so the loan is not economically callable.
+    MakeWhole(MakeWholeSpec),
 }
 
 /// Borrower call option on term loan.
@@ -433,7 +370,7 @@ pub enum LoanCallType {
 /// The `call_type` field determines how the call is exercised:
 /// - `Hard`: Standard call at `price_pct_of_par` on or after `date`
 /// - `Soft`: Premium call during protection period
-/// - `MakeWhole`: PV-based redemption at Treasury + spread
+/// - `MakeWhole`: PV-based redemption at the reference curve plus spread
 ///
 /// For `MakeWhole` calls, `price_pct_of_par` serves as the minimum
 /// (floor) redemption price. The actual price is the greater of

@@ -363,7 +363,7 @@ def test_convertible_cross_gamma_uses_the_effective_volatility_quote() -> None:
     )
     spec = fixture["instrument"]["instrument"]["spec"]
     spec["call_put"] = None
-    spec["fixed_coupon"] = None
+    spec["cashflow_spec"]["fixed"]["rate"] = "0"
     spec["conversion"]["ratio"] = 10.0
 
     def price(spot: float, vol: float, metrics: list[str]) -> ValuationResult:

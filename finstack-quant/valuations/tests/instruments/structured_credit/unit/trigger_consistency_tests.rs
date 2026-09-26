@@ -11,12 +11,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation_with_diagnostics, AssetPool, CoverageTestDiagnostic,
     CoverageTestSpec, DealType, HedgeSwap, PaymentCalculation, PaymentType, PeriodDiagnostics,
     PoolAsset, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, Waterfall,
-    WaterfallContext, WaterfallTier,
+    StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext,
+    WaterfallTier,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
@@ -71,7 +72,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
             60.0,
             TrancheSeniority::Senior,
             usd(60_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             MATURITY,
         )
         .expect("A"),
@@ -81,7 +82,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(40_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             MATURITY,
         )
         .expect("E"),

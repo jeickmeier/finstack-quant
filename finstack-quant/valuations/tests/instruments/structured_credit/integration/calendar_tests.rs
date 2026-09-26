@@ -13,9 +13,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -53,7 +53,7 @@ fn create_test_tranches() -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .expect("Failed to create senior tranche");

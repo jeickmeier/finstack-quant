@@ -4,11 +4,12 @@
 //! All type definitions are in `types::waterfall`.
 
 use super::coverage_tests::TestContext;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::types::{
     AfcSpec, AllocationMode, AssetPool, CoverageRules, CoverageTestAction, CoverageTestSpec,
     DiversionRecord, EquityHistory, FundingSource, LiveCollateral, PaymentCalculation,
     PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention, Tranche,
-    TrancheCoupon, TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
+    TrancheStructure, Waterfall, WaterfallDistribution, WaterfallTier,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -1081,8 +1082,8 @@ fn shifted_tranche_rate(
         .coupon
         .try_rate_for_period(period_start, valuation_date, market)?;
     Ok(match tranche.coupon {
-        TrancheCoupon::Floating(_) => (raw + floating_rate_shift).max(0.0),
-        _ => raw,
+        RateSpec::Floating(_) => (raw + floating_rate_shift).max(0.0),
+        RateSpec::Fixed { .. } => raw,
     })
 }
 
@@ -1584,9 +1585,10 @@ mod coverage_position_tests {
     //! the `CoverageTest::calculate` level in `coverage_tests.rs`.
     use super::execute_waterfall;
     use super::WaterfallContext;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
         AllocationMode, AssetPool, AssetType, CoverageTestSpec, DealType, PaymentCalculation,
-        PaymentType, PoolAsset, Recipient, RecipientType, Tranche, TrancheCoupon, TrancheSeniority,
+        PaymentType, PoolAsset, Recipient, RecipientType, Tranche, TrancheSeniority,
         TrancheStructure, Waterfall, WaterfallTier,
     };
     use finstack_quant_core::currency::Currency;
@@ -1650,7 +1652,7 @@ mod coverage_position_tests {
             d,
             sen,
             usd(bal),
-            TrancheCoupon::Fixed { rate: cpn },
+            RateSpec::Fixed { rate: cpn },
             maturity(),
         )
         .expect("tranche")
@@ -2268,9 +2270,10 @@ mod coverage_position_tests {
 #[cfg(test)]
 mod water_fill_tests {
     use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
-        AllocationMode, AssetPool, DealType, PaymentType, Recipient, Tranche, TrancheCoupon,
-        TrancheSeniority, TrancheStructure, Waterfall, WaterfallTier,
+        AllocationMode, AssetPool, DealType, PaymentType, Recipient, Tranche, TrancheSeniority,
+        TrancheStructure, Waterfall, WaterfallTier,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -2301,7 +2304,7 @@ mod water_fill_tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((1_000_000_i64, ccy)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("date"),
         )
         .expect("tranche");

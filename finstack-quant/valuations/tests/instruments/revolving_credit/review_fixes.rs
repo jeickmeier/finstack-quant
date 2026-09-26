@@ -18,10 +18,10 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, CreditSpreadProcessSpec, DrawRepaySpec, InterestRateProcessSpec, McConfig,
-    RevolvingCredit, RevolvingCreditFees, RevolvingCreditPricer, StochasticUtilizationSpec,
-    UtilizationProcess,
+    CreditSpreadProcessSpec, DrawRepaySpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
+    RevolvingCreditFees, RevolvingCreditPricer, StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations::instruments::{
     Instrument, InstrumentPricingOverrides, PricingOptions,
@@ -66,9 +66,9 @@ fn term_spec(reset: Tenor) -> FloatingRateSpec {
 fn stochastic(target: f64, volatility: f64, mc_config: Option<McConfig>) -> DrawRepaySpec {
     DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         utilization_process: UtilizationProcess::MeanReverting {
-            target_rate: target,
-            speed: 1.0,
-            volatility,
+            theta: target,
+            kappa: 1.0,
+            sigma: volatility,
             spread_sensitivity: 0.0,
         },
         use_sobol_qmc: false,
@@ -97,17 +97,17 @@ fn no_credit_config() -> McConfig {
 fn facility(
     id: &str,
     drawn: f64,
-    base: BaseRateSpec,
+    base: RateSpec,
     draw_repay: DrawRepaySpec,
     recovery_rate: f64,
 ) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id(id.into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(drawn))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(drawn))
         .issue_date(COMMITMENT)
         .maturity(MATURITY)
-        .base_rate_spec(base)
+        .rate(base)
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
@@ -150,7 +150,7 @@ fn seasoned_stochastic_facility_prices_and_conserves_principal() {
         let mut f = facility(
             "RC-SEASONED",
             drawn,
-            BaseRateSpec::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             stochastic(0.6, 0.25, Some(no_credit_config())),
             0.4,
         );
@@ -186,7 +186,7 @@ fn seasoned_stochastic_facility_prices_and_conserves_principal() {
     let f = facility(
         "RC-SEASONED-THETA",
         drawn,
-        BaseRateSpec::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         drifting_stochastic(0.6, Some(no_credit_config())),
         0.4,
     );
@@ -219,11 +219,11 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
     };
     let err = RevolvingCredit::builder()
         .id("RC-CS01-CIR".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(3_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(3_000_000.0))
         .issue_date(COMMITMENT)
         .maturity(MATURITY)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
@@ -252,11 +252,11 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
     };
     let err = RevolvingCredit::builder()
         .id("RC-CS01-OTHER".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(3_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(3_000_000.0))
         .issue_date(COMMITMENT)
         .maturity(MATURITY)
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
@@ -303,11 +303,11 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
 
     let deterministic = RevolvingCredit::builder()
         .id("RC-RESET-DET".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(10_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(10_000_000.0))
         .issue_date(COMMITMENT)
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Floating(term_spec(monthly)))
+        .rate(RateSpec::Floating(term_spec(monthly)))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
@@ -337,11 +337,11 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
     // deterministic schedule coupon for coupon.
     let stochastic = RevolvingCredit::builder()
         .id("RC-RESET-STOCH".into())
-        .commitment_amount(usd(10_000_000.0))
-        .drawn_amount(usd(10_000_000.0))
+        .commitment(usd(10_000_000.0))
+        .drawn(usd(10_000_000.0))
         .issue_date(COMMITMENT)
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Floating(term_spec(monthly)))
+        .rate(RateSpec::Floating(term_spec(monthly)))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
@@ -411,14 +411,14 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
     let forward_mode = facility(
         "RC-BASIS-FWD",
         3_000_000.0,
-        BaseRateSpec::Floating(term_spec(Tenor::quarterly())),
+        RateSpec::Floating(term_spec(Tenor::quarterly())),
         drifting_stochastic(0.6, Some(no_credit_config())),
         0.0,
     );
     let hw_mode = facility(
         "RC-BASIS-HW",
         3_000_000.0,
-        BaseRateSpec::Floating(term_spec(Tenor::quarterly())),
+        RateSpec::Floating(term_spec(Tenor::quarterly())),
         drifting_stochastic(0.6, Some(hull_white)),
         0.0,
     );
@@ -476,11 +476,11 @@ fn leq_prices_the_draw_at_default() {
     let build = |id: &str, leq: f64| {
         RevolvingCredit::builder()
             .id(id.into())
-            .commitment_amount(usd(1_000_000.0))
-            .drawn_amount(usd(400_000.0))
+            .commitment(usd(1_000_000.0))
+            .drawn(usd(400_000.0))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
+            .rate(RateSpec::Fixed { rate: 0.0 })
             .day_count(DayCount::Act365F)
             .frequency(Tenor::annual())
             .fees(RevolvingCreditFees::default())
@@ -546,7 +546,7 @@ fn stochastic_funding_leg_conserves_cash_for_small_draws() {
     let f = facility(
         "RC-SMALL-DRAWS",
         drawn,
-        BaseRateSpec::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         stochastic(0.300_002, 1e-8, Some(no_credit_config())),
         0.4,
     );

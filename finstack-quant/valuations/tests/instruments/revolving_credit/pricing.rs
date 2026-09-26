@@ -4,8 +4,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -18,11 +19,11 @@ fn test_pricing_fixed_utilization() {
     let as_of = date!(2025 - 01 - 01);
     let facility = RevolvingCredit::builder()
         .id("RC-FIXED-UTIL".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture")) // 50% drawn
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture")) // 50% drawn
         .issue_date(as_of)
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 0.0).unwrap())
@@ -51,11 +52,11 @@ fn test_pricing_zero_utilization() {
     let as_of = date!(2025 - 01 - 01);
     let facility = RevolvingCredit::builder()
         .id("RC-ZERO-UTIL".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture")) // Undrawn
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(0.0, Currency::USD).expect("valid money fixture")) // Undrawn
         .issue_date(as_of)
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 0.0).unwrap())
@@ -82,11 +83,11 @@ fn test_pricing_full_utilization() {
     let as_of = date!(2025 - 01 - 01);
     let facility = RevolvingCredit::builder()
         .id("RC-FULL-UTIL".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture")) // 100% drawn
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture")) // 100% drawn
         .issue_date(as_of)
         .maturity(date!(2026 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(30.0, 15.0, 10.0).unwrap())

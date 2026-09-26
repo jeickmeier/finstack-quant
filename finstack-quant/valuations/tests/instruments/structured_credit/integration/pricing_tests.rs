@@ -8,10 +8,10 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -88,7 +88,7 @@ fn create_simple_tranches() -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(8_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.035 },
+        RateSpec::Fixed { rate: 0.035 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
     .unwrap();

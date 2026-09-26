@@ -25,7 +25,8 @@ mod tests {
     use finstack_quant_core::money::Money;
     use time::Month;
 
-    use super::super::types::{BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees};
+    use super::super::types::{DrawRepaySpec, RevolvingCredit, RevolvingCreditFees};
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
 
     #[test]
     fn test_unified_pricer_key() {
@@ -43,11 +44,11 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-UNIFIED-DET".into())
-            .commitment_amount(Money::from((10_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((5_000_000_i64, Currency::USD)))
+            .commitment(Money::from((10_000_000_i64, Currency::USD)))
+            .drawn(Money::from((5_000_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
@@ -98,20 +99,20 @@ mod tests {
 
         let facility = RevolvingCredit::builder()
             .id("RC-UNIFIED-STOCH".into())
-            .commitment_amount(Money::from((10_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((5_000_000_i64, Currency::USD)))
+            .commitment(Money::from((10_000_000_i64, Currency::USD)))
+            .drawn(Money::from((5_000_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(end)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 super::super::types::StochasticUtilizationSpec {
                     utilization_process: super::super::types::UtilizationProcess::MeanReverting {
-                        target_rate: 0.5,
-                        speed: 1.0,
-                        volatility: 0.1,
+                        theta: 0.5,
+                        kappa: 1.0,
+                        sigma: 0.1,
                         spread_sensitivity: 0.0,
                     },
                     use_sobol_qmc: false,

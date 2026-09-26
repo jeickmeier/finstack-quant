@@ -11,9 +11,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, FundingSource,
-    PaymentType, PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon,
+    PaymentType, PoolAsset, Recipient, StructuredCredit, Tranche, TrancheCashflows,
     TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use time::Month;
@@ -60,7 +61,7 @@ fn clo(pool_rate: f64, a_coupon: f64, covers: Option<bool>) -> (StructuredCredit
             b,
             sen,
             usd(bal),
-            TrancheCoupon::Fixed { rate: cpn },
+            RateSpec::Fixed { rate: cpn },
             maturity,
         )
         .expect("tranche")

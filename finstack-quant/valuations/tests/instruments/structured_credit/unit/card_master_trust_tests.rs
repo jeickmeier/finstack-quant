@@ -9,11 +9,12 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AbsExcessSpreadCalculator, AbsPaymentRateCalculator, AssetPool,
     CardPortfolioSpec, ControlledAccumulationSpec, DealFees, DealType, EarlyAmortizationSpec,
     PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche,
-    TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
+    TrancheCashflows, TrancheSeniority, TrancheStructure, WaterfallRules,
 };
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;
@@ -80,7 +81,7 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
             90.0,
             TrancheSeniority::Senior,
             usd(90_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity(),
         )
         .expect("A"),
@@ -90,7 +91,7 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(10_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),

@@ -5,30 +5,14 @@
 use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::instruments::common_impl::traits::Attributes;
+use crate::instruments::fixed_income::loan_terms::{DrawEvent, RateSpec};
 use crate::instruments::fixed_income::structured_credit::{
     AssetPool, BorrowingBaseReport, BorrowingBaseRules, CreditModelConfig, DealFees,
 };
-
-/// A scheduled draw on the facility: the lender advances `amount` on the
-/// first payment date at or after `date`, lifting the facility balance and
-/// funding collateral purchases (or repaying, once the line has turned out).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct FacilityDraw {
-    /// Earliest draw date; applied on the first payment date at or after it.
-    #[serde(with = "finstack_quant_core::wire::date")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "finstack_quant_core::wire::DateWire")
-    )]
-    pub date: Date,
-    /// Amount advanced, in the facility currency.
-    pub amount: Money,
-}
 
 /// Event that ends the revolving period early and turns the facility out
 /// (principal collections then repay the lender sequentially).
@@ -82,8 +66,8 @@ pub struct TermOutSpec {
 /// synthetic two-class deal (the facility note and the residual): a
 /// borrowing-base deficiency is a mandatory repayment ahead of the residual,
 /// collateral principal recycles into new collateral while revolving and
-/// repays the facility sequentially afterwards, the unused commitment
-/// accrues `unused_fee_bp`, and the residual keeps what is left. See
+/// repays the facility sequentially afterwards, the undrawn commitment
+/// accrues `commitment_fee_bp`, and the residual keeps what is left. See
 /// [`Self::synthesized_deal`] for the exact mapping.
 ///
 /// Rates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are
@@ -119,18 +103,18 @@ pub struct AssetBackedFacility {
     /// Amount drawn at closing, in the collateral currency; at most the
     /// commitment and strictly below the collateral balance.
     pub drawn: Money,
-    /// Forward-curve identifier of the floating index; `None` makes
-    /// `spread_bp` the all-in fixed rate.
+    /// Facility coupon: a fixed all-in rate (decimal) or a floating index
+    /// plus spread.
+    pub rate: RateSpec,
+    /// Commitment fee on the undrawn commitment, in basis points per annum
+    /// (`50` = 0.50%). Defaults to zero.
     #[builder(default)]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub forward_curve_id: Option<CurveId>,
-    /// Margin over the index (or the all-in fixed rate when `forward_curve_id`
-    /// is `None`) in basis points (600 = 6%).
-    pub spread_bp: f64,
-    /// Fee on the undrawn commitment in basis points per annum.
-    #[builder(default)]
-    #[serde(default)]
-    pub unused_fee_bp: f64,
+    #[serde(default, with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub commitment_fee_bp: Decimal,
     /// Closing date; the first payment date is one `frequency` later.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -154,7 +138,7 @@ pub struct AssetBackedFacility {
     pub maturity: Date,
     /// Payment frequency of interest, fees and the borrowing-base test.
     pub frequency: Tenor,
-    /// Accrual convention of the facility interest and unused fee.
+    /// Accrual convention of the facility interest and commitment fee.
     #[builder(default = DayCount::Act360)]
     #[serde(default = "default_day_count")]
     pub day_count: DayCount,
@@ -177,10 +161,11 @@ pub struct AssetBackedFacility {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fees: Option<DealFees>,
-    /// Scheduled draws after closing, ascending by date.
+    /// Scheduled draws after closing, ascending by date; each funds on the
+    /// first payment date at or after its date.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub draw_schedule: Vec<FacilityDraw>,
+    pub draws: Vec<DrawEvent>,
     /// Re-advance the facility each revolving period up to the commitment
     /// and the borrowing base.
     #[builder(default)]
@@ -265,8 +250,8 @@ impl AssetBackedFacility {
             })
             .commitment(Money::from((80_000_000_i64, Currency::USD)))
             .drawn(Money::from((70_000_000_i64, Currency::USD)))
-            .spread_bp(600.0)
-            .unused_fee_bp(50.0)
+            .rate(RateSpec::Fixed { rate: 0.06 })
+            .commitment_fee_bp(Decimal::from(50))
             .closing_date(closing)
             .revolving_end(closing.add_months(24))
             .maturity(closing.add_months(72))
@@ -356,15 +341,21 @@ impl AssetBackedFacility {
                 collateral
             )));
         }
-        for (label, value) in [
-            ("spread_bp", self.spread_bp),
-            ("unused_fee_bp", self.unused_fee_bp),
-        ] {
-            if !value.is_finite() || value < 0.0 {
-                return Err(invalid(format!(
-                    "{label} ({value}) must be finite and non-negative"
-                )));
+        match &self.rate {
+            RateSpec::Fixed { rate } => {
+                if !rate.is_finite() || *rate < 0.0 {
+                    return Err(invalid(format!(
+                        "rate.fixed.rate ({rate}) must be finite and non-negative"
+                    )));
+                }
             }
+            RateSpec::Floating(spec) => spec.validate()?,
+        }
+        if self.commitment_fee_bp < Decimal::ZERO {
+            return Err(invalid(format!(
+                "commitment_fee_bp ({}) must be non-negative",
+                self.commitment_fee_bp
+            )));
         }
         if self.closing_date >= self.revolving_end || self.revolving_end > self.maturity {
             return Err(invalid(format!(
@@ -388,23 +379,21 @@ impl AssetBackedFacility {
             }
         }
         let mut previous_draw: Option<Date> = None;
-        for draw in &self.draw_schedule {
+        for draw in &self.draws {
             if draw.amount.currency() != currency || draw.amount.amount() <= 0.0 {
                 return Err(invalid(format!(
-                    "draw_schedule amounts must be positive {currency} amounts, got {}",
+                    "draws amounts must be positive {currency} amounts, got {}",
                     draw.amount
                 )));
             }
             if draw.date <= self.closing_date || draw.date > self.maturity {
                 return Err(invalid(format!(
-                    "draw_schedule date {} must lie inside (closing, maturity]",
+                    "draws date {} must lie inside (closing, maturity]",
                     draw.date
                 )));
             }
             if previous_draw.is_some_and(|prev| draw.date < prev) {
-                return Err(invalid(
-                    "draw_schedule must be ascending by date".to_string(),
-                ));
+                return Err(invalid("draws must be ascending by date".to_string()));
             }
             previous_draw = Some(draw.date);
         }

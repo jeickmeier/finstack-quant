@@ -9,10 +9,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AdvancingPolicy, AssetPool, DealType,
     DelinquencyModel, PeriodDiagnostics, PoolAsset, StepDownSpec, StepDownTrigger,
-    StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority, TrancheStructure,
     WaterfallRules,
 };
 use time::Month;
@@ -66,7 +67,7 @@ fn abs(model: DelinquencyModel) -> StructuredCredit {
             90.0,
             TrancheSeniority::Senior,
             usd(900_000.0),
-            TrancheCoupon::Fixed { rate: 0.06 },
+            RateSpec::Fixed { rate: 0.06 },
             maturity(),
         )
         .expect("A"),
@@ -76,7 +77,7 @@ fn abs(model: DelinquencyModel) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(100_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),
@@ -290,7 +291,7 @@ fn max_delinquency_step_down_trigger_fires_and_reverts() {
                 70.0,
                 TrancheSeniority::Senior,
                 usd(700_000.0),
-                TrancheCoupon::Fixed { rate: 0.04 },
+                RateSpec::Fixed { rate: 0.04 },
                 maturity(),
             )
             .expect("SR"),
@@ -300,7 +301,7 @@ fn max_delinquency_step_down_trigger_fires_and_reverts() {
                 90.0,
                 TrancheSeniority::Mezzanine,
                 usd(200_000.0),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity(),
             )
             .expect("SUB"),
@@ -310,7 +311,7 @@ fn max_delinquency_step_down_trigger_fires_and_reverts() {
                 100.0,
                 TrancheSeniority::Equity,
                 usd(100_000.0),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity(),
             )
             .expect("EQ"),

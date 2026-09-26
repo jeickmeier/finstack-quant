@@ -60,8 +60,9 @@ fn structured_credit_instrument_json() -> String {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::money::Money;
     use finstack_quant_models::credit::pool::{StochasticDefaultSpec, StochasticPrepaySpec};
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
         TrancheStructure,
     };
     use finstack_quant_valuations::instruments::{
@@ -86,7 +87,7 @@ fn structured_credit_instrument_json() -> String {
             80.0,
             TrancheSeniority::Senior,
             Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .unwrap(),
@@ -96,7 +97,7 @@ fn structured_credit_instrument_json() -> String {
             100.0,
             TrancheSeniority::Equity,
             Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .unwrap(),

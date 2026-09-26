@@ -34,7 +34,7 @@ fn test_fixed_coupon_cashflows() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01)) // 1 year
-        .rate(RateSpec::Fixed { rate_bp: 500 }) // 5%
+        .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -70,7 +70,7 @@ fn test_pik_interest_capitalization() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 800 })
+        .rate(RateSpec::Fixed { rate: 0.08 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -108,7 +108,7 @@ fn test_fixed_amount_oid_prorated_across_draws() {
     let oid = 300_000.0;
 
     let ddtl = DdtlSpec {
-        commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+        commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         availability_start: issue,
         availability_end: date!(2025 - 12 - 31),
         draws: vec![
@@ -122,8 +122,8 @@ fn test_fixed_amount_oid_prorated_across_draws() {
             },
         ],
         commitment_steps: vec![],
-        usage_fee_bp: 0.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(0),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: Some(OidPolicy::WithheldAmount(
             Money::new(oid, Currency::USD).expect("valid money fixture"),
@@ -136,7 +136,7 @@ fn test_fixed_amount_oid_prorated_across_draws() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -182,7 +182,7 @@ fn test_fixed_amount_oid_prorated_across_draws() {
     );
 }
 
-/// Property test: PercentPerPeriod with bp such that total amortization would exceed
+/// Property test: PercentOfRemainingPerPeriod with pct such that total amortization would exceed
 /// the notional should be capped so that outstanding never goes negative.
 ///
 /// Here we use bp=5000 (50% per quarter) over 4 quarters = 200% of notional.
@@ -195,7 +195,7 @@ fn test_over_amortization_is_capped() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01)) // 1 year, 4 quarterly periods
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -203,7 +203,7 @@ fn test_over_amortization_is_capped() {
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
         // 50% per quarter × 4 quarters = 200% → should be capped at 100%
-        .amortization(AmortizationSpec::PercentPerPeriod { bp: 5000 })
+        .amortization(AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.5 })
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -233,7 +233,7 @@ fn test_over_amortization_is_capped() {
         total_amort <= 1_000_000.0 + 1e-6,
         "Total amort ({total_amort}) should not exceed notional (1,000,000)"
     );
-    // With PercentPerPeriod applying to current outstanding (geometric decay):
+    // With PercentOfRemainingPerPeriod applying to current outstanding (geometric decay):
     //   Q1: 1,000,000 × 50% = 500,000
     //   Q2:   500,000 × 50% = 250,000
     //   Q3:   250,000 × 50% = 125,000
@@ -258,14 +258,14 @@ fn test_linear_amort_no_event_at_issue_date() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(AmortizationSpec::Linear {
+        .amortization(AmortizationSpec::LinearBetween {
             start: issue, // start == issue
             end: maturity,
         })
@@ -320,7 +320,7 @@ fn test_linear_amort_no_event_at_issue_date() {
     );
 }
 
-/// PercentPerPeriod with 100% (10000 bp) should fully amortize the loan.
+/// PercentOfRemainingPerPeriod with 100% (pct 1.0) should fully amortize the loan.
 /// After capping, total amortization equals the notional.
 #[test]
 fn test_percent_per_period_full_amort() {
@@ -330,7 +330,7 @@ fn test_percent_per_period_full_amort() {
         .notional_limit(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -338,7 +338,7 @@ fn test_percent_per_period_full_amort() {
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
         // 100% per period should amortize everything in Q1
-        .amortization(AmortizationSpec::PercentPerPeriod { bp: 10000 })
+        .amortization(AmortizationSpec::PercentOfRemainingPerPeriod { pct: 1.0 })
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -369,26 +369,26 @@ fn test_percent_per_period_full_amort() {
     );
 }
 
-/// PercentOfOriginalNotional produces flat dollar amortization each period.
-/// All payments should be equal (original_notional * bp / 10_000).
+/// PercentOfOriginalPerPeriod produces flat dollar amortization each period.
+/// All payments should be equal (original_notional * pct).
 #[test]
 fn test_percent_of_original_notional_flat_dollar() {
     let notional = 10_000_000.0;
-    let bp = 250; // 2.5% per period
+    let pct = 0.025; // 2.5% per period
     let loan = TermLoan::builder()
         .id("TL-CF-FLAT-AMORT".into())
         .currency(Currency::USD)
         .notional_limit(Money::new(notional, Currency::USD).expect("valid money fixture"))
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01)) // 1 year, 4 quarterly periods
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(AmortizationSpec::PercentOfOriginalNotional { bp })
+        .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct })
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(None)
@@ -419,7 +419,7 @@ fn test_percent_of_original_notional_flat_dollar() {
     );
 
     // Each payment should be exactly notional * bp / 10000 = 10M * 0.025 = 250,000
-    let expected_payment = notional * f64::from(bp) * 1e-4;
+    let expected_payment = notional * pct;
     for (i, amt) in amort_amounts.iter().enumerate() {
         assert!(
             (*amt - expected_payment).abs() < 0.01,
@@ -428,11 +428,11 @@ fn test_percent_of_original_notional_flat_dollar() {
     }
 }
 
-/// PercentOfOriginalNotional vs PercentPerPeriod: flat dollar differs from geometric decay.
+/// PercentOfOriginalPerPeriod vs PercentOfRemainingPerPeriod: flat dollar differs from geometric decay.
 #[test]
 fn test_flat_vs_geometric_amort_differ() {
     let notional = 10_000_000.0;
-    let bp = 250;
+    let pct = 0.025;
     let make_loan = |amort: AmortizationSpec, id: &str| {
         TermLoan::builder()
             .id(id.into())
@@ -440,7 +440,7 @@ fn test_flat_vs_geometric_amort_differ() {
             .notional_limit(Money::new(notional, Currency::USD).expect("valid money fixture"))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2026 - 01 - 01))
-            .rate(RateSpec::Fixed { rate_bp: 500 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .frequency(Tenor::quarterly())
             .day_count(DayCount::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -458,10 +458,13 @@ fn test_flat_vs_geometric_amort_differ() {
     };
 
     let loan_flat = make_loan(
-        AmortizationSpec::PercentOfOriginalNotional { bp },
+        AmortizationSpec::PercentOfOriginalPerPeriod { pct },
         "TL-FLAT",
     );
-    let loan_geo = make_loan(AmortizationSpec::PercentPerPeriod { bp }, "TL-GEO");
+    let loan_geo = make_loan(
+        AmortizationSpec::PercentOfRemainingPerPeriod { pct },
+        "TL-GEO",
+    );
 
     let market = build_market_context();
     let as_of = date!(2025 - 01 - 01);
@@ -515,7 +518,7 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
     let issue = date!(2025 - 01 - 01);
     let commitment = 10_000_000.0;
     let drawn = 4_000_000.0; // Only 40% drawn
-    let bp = 250; // 2.5% per period
+    let pct = 0.025; // 2.5% per period
 
     let loan = TermLoan::builder()
         .id("TL-DDTL-AMORT".into())
@@ -523,18 +526,18 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
         .notional_limit(Money::new(commitment, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2026 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(AmortizationSpec::PercentOfOriginalNotional { bp })
+        .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct })
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(commitment, Currency::USD).expect("valid money fixture"),
+            commitment: Money::new(commitment, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: date!(2025 - 06 - 01),
             draws: vec![DrawEvent {
@@ -542,8 +545,8 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
                 amount: Money::new(drawn, Currency::USD).expect("valid money fixture"),
             }],
             commitment_steps: vec![],
-            usage_fee_bp: 0.0,
-            commitment_fee_bp: 0.0,
+            usage_fee_bp: rust_decimal_macros::dec!(0),
+            commitment_fee_bp: rust_decimal_macros::dec!(0),
             fee_base: CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -566,7 +569,7 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
 
     // Each payment should be based on drawn amount, not commitment limit:
     // drawn * bp / 10000 = 4M * 0.025 = 100,000 (not 250,000)
-    let expected_payment = drawn * f64::from(bp) * 1e-4;
+    let expected_payment = drawn * pct;
     for (i, amt) in amort_amounts.iter().enumerate() {
         assert!(
             (*amt - expected_payment).abs() < 0.01,
@@ -597,7 +600,7 @@ fn test_commitment_fees_use_correct_kind() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2027 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -608,13 +611,13 @@ fn test_commitment_fees_use_correct_kind() {
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
+            commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             availability_start: issue,
             availability_end: date!(2026 - 01 - 01),
             draws: vec![],
             commitment_steps: vec![],
-            usage_fee_bp: 0.0,
-            commitment_fee_bp: 50.0, // 50bp commitment fee on undrawn
+            usage_fee_bp: rust_decimal_macros::dec!(0),
+            commitment_fee_bp: rust_decimal_macros::dec!(50), // 50bp commitment fee on undrawn
             fee_base: CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))
@@ -684,7 +687,7 @@ mod margin_stepup_period_semantics {
         TermLoanCovenantEvents {
             margin_steps: vec![MarginStep {
                 date: STEP_DATE,
-                delta_bp: 100,
+                delta_bp: rust_decimal_macros::dec!(100),
             }],
             ..Default::default()
         }
@@ -738,7 +741,7 @@ mod margin_stepup_period_semantics {
             .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2026 - 01 - 01))
-            .rate(RateSpec::Fixed { rate_bp: 650 })
+            .rate(RateSpec::Fixed { rate: 0.065 })
             .frequency(Tenor::quarterly())
             .day_count(DayCount::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -962,7 +965,7 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("money"))
         .issue_date(issue)
         .maturity(date!(2026 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::Unadjusted)
@@ -973,7 +976,7 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
         .coupon_type(CouponType::Cash)
         .upfront_fee_opt(None)
         .ddtl_opt(Some(DdtlSpec {
-            commitment_limit: Money::new(10_000_000.0, Currency::USD).expect("money"),
+            commitment: Money::new(10_000_000.0, Currency::USD).expect("money"),
             availability_start: issue,
             availability_end: date!(2025 - 05 - 16),
             draws: vec![DrawEvent {
@@ -981,8 +984,8 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
                 amount: Money::new(5_000_000.0, Currency::USD).expect("money"),
             }],
             commitment_steps: vec![],
-            usage_fee_bp: 0.0,
-            commitment_fee_bp: 50.0,
+            usage_fee_bp: rust_decimal_macros::dec!(0),
+            commitment_fee_bp: rust_decimal_macros::dec!(50),
             fee_base: CommitmentFeeBase::Undrawn,
             oid_policy: None,
         }))

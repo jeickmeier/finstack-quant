@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
     price_convertible_bond, ConvertibleTreeType,
 };
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    ConversionEvent, ConversionPolicy,
+    ConversionEvent, ConversionPolicy, PriceTrigger,
 };
 use time::Month;
 
@@ -173,10 +173,11 @@ fn test_event_triggered_conversion_change_of_control() {
 #[test]
 fn test_event_triggered_conversion_price_trigger() {
     let bond = create_convertible_with_policy(ConversionPolicy::UponEvent(
-        ConversionEvent::PriceTrigger {
-            threshold: 120.0,
-            lookback_days: 20,
-        },
+        ConversionEvent::PriceTrigger(PriceTrigger {
+            threshold_pct: 120.0,
+            observation_days: 20,
+            required_days_above: 20,
+        }),
     ));
     let market = create_market_context();
 
@@ -441,10 +442,11 @@ fn test_all_conversion_policies_price_successfully() {
         },
         ConversionPolicy::UponEvent(ConversionEvent::QualifiedIpo),
         ConversionPolicy::UponEvent(ConversionEvent::ChangeOfControl),
-        ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger {
-            threshold: 120.0,
-            lookback_days: 20,
-        }),
+        ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(PriceTrigger {
+            threshold_pct: 120.0,
+            observation_days: 20,
+            required_days_above: 20,
+        })),
     ];
 
     for policy in policies {

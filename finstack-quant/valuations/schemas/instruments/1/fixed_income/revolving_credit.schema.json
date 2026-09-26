@@ -1,49 +1,8 @@
 {
   "$defs": {
-    "BaseRateSpec": {
-      "description": "Base rate specification for revolving credit interest.\n\nDefines whether the facility pays a fixed rate or a floating rate\ntied to a market index plus margin.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Fixed rate (annualized).",
-          "properties": {
-            "fixed": {
-              "properties": {
-                "rate": {
-                  "description": "Annual interest rate (e.g., 0.05 for 5%).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "rate"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "fixed"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Floating rate using canonical FloatingRateSpec.\n\nComposes the standard floating rate specification with full support\nfor floors, caps, and gearing.",
-          "properties": {
-            "floating": {
-              "$ref": "#/$defs/FloatingRateSpec"
-            }
-          },
-          "required": [
-            "floating"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "CommitmentStep": {
       "additionalProperties": false,
-      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`reduction_fee_bp` must be zero).",
       "properties": {
         "amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
@@ -53,11 +12,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Date the new commitment takes effect (strictly after the commitment\ndate, on or before maturity)."
         },
-        "fee_bp": {
-          "default": 0.0,
-          "description": "Reduction or cancellation fee, in basis points of the reduced amount,\npaid by the borrower on `date` when the commitment steps down. Ignored\non a step up. Defaults to `0.0`.",
-          "format": "double",
-          "type": "number"
+        "reduction_fee_bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "default": "0",
+          "description": "One-off reduction or cancellation fee, in basis points of the reduced\namount (not per annum), paid by the borrower on `date` when the\ncommitment steps down. Ignored on a step up. Defaults to zero."
         }
       },
       "required": [
@@ -574,9 +532,8 @@
           "description": "Effective-from date of the margin change."
         },
         "delta_bp": {
-          "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
-          "format": "int32",
-          "type": "integer"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Change in margin, in basis points (`100` = 1%); negative steps down."
         }
       },
       "required": [
@@ -754,6 +711,48 @@
         }
       ]
     },
+    "RateSpec": {
+      "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`\nand structured-credit `Tranche.coupon`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed all-in annual rate.",
+          "properties": {
+            "fixed": {
+              "additionalProperties": false,
+              "properties": {
+                "rate": {
+                  "description": "Annual rate as a decimal (`0.06` = 6%).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "fixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`].",
+          "properties": {
+            "floating": {
+              "$ref": "#/$defs/FloatingRateSpec"
+            }
+          },
+          "required": [
+            "floating"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "RevolvingCredit": {
       "additionalProperties": false,
       "description": "Revolving credit facility instrument.\n\nModels a credit facility with draws/repayments, interest payments on drawn\namounts, and fees (commitment, usage, facility, upfront). Supports both\ndeterministic schedules and stochastic utilization via Monte Carlo.\n\nSee unit tests and `examples/` for usage.",
@@ -761,10 +760,6 @@
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
-        },
-        "base_rate_spec": {
-          "$ref": "#/$defs/BaseRateSpec",
-          "description": "Base rate specification (fixed or floating)."
         },
         "business_day_convention": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
@@ -783,7 +778,7 @@
           "default": null,
           "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone."
         },
-        "commitment_amount": {
+        "commitment": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Opening commitment of the facility, in force from `issue_date`\nuntil the first entry of `commitment_steps`."
         },
@@ -819,7 +814,7 @@
           "$ref": "#/$defs/DrawRepaySpec",
           "description": "Draw and repayment schedule (deterministic or stochastic)."
         },
-        "drawn_amount": {
+        "drawn": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Drawn balance at the simulation anchor, the later of `issue_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
         },
@@ -896,6 +891,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "rate": {
+          "$ref": "#/$defs/RateSpec",
+          "description": "Base rate specification (fixed or floating)."
+        },
         "recovery_rate": {
           "description": "Recovery rate on default (used when credit_curve_id is present).\n\nRepresents the fraction of exposure recovered in the event of default.\nTypical values: 0.30-0.50 for senior secured facilities.\nCallers must provide the value explicitly; zero recovery remains valid.",
           "format": "double",
@@ -928,11 +927,11 @@
       },
       "required": [
         "id",
-        "commitment_amount",
-        "drawn_amount",
+        "commitment",
+        "drawn",
         "issue_date",
         "maturity",
-        "base_rate_spec",
+        "rate",
         "day_count",
         "frequency",
         "fees",
@@ -1074,7 +1073,7 @@
       ]
     },
     "UpfrontFee": {
-      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the commitment date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
+      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the issue date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -1110,33 +1109,34 @@
       "description": "Utilization process for stochastic draws/repayments.\n\nFor the 80/20 implementation, we support a single mean-reverting process.\nThis can be extended in the future to support other processes (jump-diffusion,\nregime-switching, etc.).",
       "properties": {
         "mean_reverting": {
+          "additionalProperties": false,
           "properties": {
-            "speed": {
-              "description": "Mean reversion speed (annualized).",
+            "kappa": {
+              "description": "Mean-reversion speed κ, per year.",
+              "format": "double",
+              "type": "number"
+            },
+            "sigma": {
+              "description": "Utilization volatility σ, annualized (absolute utilization units).",
               "format": "double",
               "type": "number"
             },
             "spread_sensitivity": {
               "default": 0.0,
-              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
+              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
               "format": "double",
               "type": "number"
             },
-            "target_rate": {
-              "description": "Target utilization rate (0.0 to 1.0).",
-              "format": "double",
-              "type": "number"
-            },
-            "volatility": {
-              "description": "Volatility of utilization changes (annualized).",
+            "theta": {
+              "description": "Long-run utilization level θ, as a fraction in `[0, 1]`.",
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "target_rate",
-            "speed",
-            "volatility"
+            "theta",
+            "kappa",
+            "sigma"
           ],
           "type": "object"
         }
@@ -1173,27 +1173,9 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "base_rate_spec": {
-            "floating": {
-              "all_in_cap_bp": null,
-              "all_in_floor_bp": null,
-              "fixing_calendar_id": null,
-              "forward_curve_id": "USD-SOFR-3M",
-              "gearing": "1",
-              "gearing_includes_spread": true,
-              "index_cap_bp": null,
-              "index_floor_bp": "0",
-              "reset_frequency": {
-                "count": 3,
-                "unit": "months"
-              },
-              "reset_lag_days": 2,
-              "spread_bp": "250"
-            }
-          },
           "business_day_convention": "modified_following",
           "calendar_id": "usny",
-          "commitment_amount": {
+          "commitment": {
             "amount": "50000000",
             "currency": "USD"
           },
@@ -1221,7 +1203,7 @@
               }
             ]
           },
-          "drawn_amount": {
+          "drawn": {
             "amount": "10000000",
             "currency": "USD"
           },
@@ -1254,6 +1236,24 @@
           "maturity": "2027-01-01",
           "oid_eir": null,
           "payment_lag_days": 0,
+          "rate": {
+            "floating": {
+              "all_in_cap_bp": null,
+              "all_in_floor_bp": null,
+              "fixing_calendar_id": null,
+              "forward_curve_id": "USD-SOFR-3M",
+              "gearing": "1",
+              "gearing_includes_spread": true,
+              "index_cap_bp": null,
+              "index_floor_bp": "0",
+              "reset_frequency": {
+                "count": 3,
+                "unit": "months"
+              },
+              "reset_lag_days": 2,
+              "spread_bp": "250"
+            }
+          },
           "recovery_rate": 0.0,
           "scheduled_fees": [],
           "settlement_days": 0,

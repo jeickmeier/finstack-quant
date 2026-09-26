@@ -1317,7 +1317,8 @@ impl PyStepUpCouponSpec {
 }
 
 /// Amortization rule: ``NONE`` (bullet), ``linear_to``, ``step_remaining``,
-/// ``percent_of_original_per_period`` or ``custom_principal``.
+/// ``percent_of_original_per_period``, ``percent_of_remaining_per_period``,
+/// ``linear_between`` or ``custom_principal``.
 ///
 /// Examples
 /// --------
@@ -1382,6 +1383,29 @@ impl PyAmortizationSpec {
         }
     }
 
+    /// Fixed percentage of the remaining outstanding paid each period
+    /// (declining balance; ``0.025`` = 2.5%).
+    #[staticmethod]
+    #[pyo3(text_signature = "(pct)")]
+    fn percent_of_remaining_per_period(pct: f64) -> Self {
+        Self {
+            inner: AmortizationSpec::PercentOfRemainingPerPeriod { pct },
+        }
+    }
+
+    /// Equal principal installments on every payment date in ``(start, end]``,
+    /// fully repaid by ``end``.
+    #[staticmethod]
+    #[pyo3(text_signature = "(start, end)")]
+    fn linear_between(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self {
+            inner: AmortizationSpec::LinearBetween {
+                start: extract_date(start)?,
+                end: extract_date(end)?,
+            },
+        })
+    }
+
     /// Custom principal exchanges on specific dates (absolute cash amounts).
     #[staticmethod]
     #[pyo3(text_signature = "(items)")]
@@ -1394,7 +1418,9 @@ impl PyAmortizationSpec {
     }
 
     /// Variant label: ``"none"``, ``"linear_to"``, ``"step_remaining"``,
-    /// ``"percent_of_original_per_period"`` or ``"custom_principal"``.
+    /// ``"percent_of_original_per_period"``,
+    /// ``"percent_of_remaining_per_period"``, ``"linear_between"`` or
+    /// ``"custom_principal"``.
     #[getter]
     fn kind(&self) -> &'static str {
         match self.inner {
@@ -1402,6 +1428,10 @@ impl PyAmortizationSpec {
             AmortizationSpec::LinearTo { .. } => "linear_to",
             AmortizationSpec::StepRemaining { .. } => "step_remaining",
             AmortizationSpec::PercentOfOriginalPerPeriod { .. } => "percent_of_original_per_period",
+            AmortizationSpec::PercentOfRemainingPerPeriod { .. } => {
+                "percent_of_remaining_per_period"
+            }
+            AmortizationSpec::LinearBetween { .. } => "linear_between",
             AmortizationSpec::CustomPrincipal { .. } => "custom_principal",
         }
     }
@@ -1428,12 +1458,28 @@ impl PyAmortizationSpec {
         }
     }
 
-    /// Per-period percentage for ``percent_of_original_per_period``, else ``None``.
+    /// Per-period decimal percentage for ``percent_of_original_per_period``
+    /// and ``percent_of_remaining_per_period``, else ``None``.
     #[getter]
     fn pct(&self) -> Option<f64> {
         match self.inner {
-            AmortizationSpec::PercentOfOriginalPerPeriod { pct } => Some(pct),
+            AmortizationSpec::PercentOfOriginalPerPeriod { pct }
+            | AmortizationSpec::PercentOfRemainingPerPeriod { pct } => Some(pct),
             _ => None,
+        }
+    }
+
+    /// ``(start, end)`` dates for ``linear_between``, else ``None``.
+    #[getter]
+    fn window<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
+        match self.inner {
+            AmortizationSpec::LinearBetween { start, end } => {
+                Ok(Some((date_to_py(py, start)?, date_to_py(py, end)?)))
+            }
+            _ => Ok(None),
         }
     }
 
@@ -1590,7 +1636,7 @@ impl PyNotional {
 }
 
 /// Economic balance a periodic fee accrues on: ``FeeBase.DRAWN`` or
-/// ``FeeBase.undrawn(facility_limit)``.
+/// ``FeeBase.undrawn(commitment)``.
 ///
 /// Examples
 /// --------
@@ -1622,13 +1668,13 @@ impl PyFeeBase {
         }
     }
 
-    /// Fee accrues on undrawn = max(facility_limit - outstanding, 0).
+    /// Fee accrues on undrawn = max(commitment - outstanding, 0).
     #[staticmethod]
-    #[pyo3(text_signature = "(facility_limit)")]
-    fn undrawn(facility_limit: PyMoney) -> Self {
+    #[pyo3(text_signature = "(commitment)")]
+    fn undrawn(commitment: PyMoney) -> Self {
         Self {
             inner: FeeBase::Undrawn {
-                facility_limit: facility_limit.inner,
+                commitment: commitment.inner,
             },
         }
     }
@@ -1644,9 +1690,9 @@ impl PyFeeBase {
 
     /// Facility limit for ``undrawn`` bases, else ``None``.
     #[getter]
-    fn facility_limit(&self) -> Option<PyMoney> {
+    fn commitment(&self) -> Option<PyMoney> {
         match self.inner {
-            FeeBase::Undrawn { facility_limit } => Some(PyMoney::from_inner(facility_limit)),
+            FeeBase::Undrawn { commitment } => Some(PyMoney::from_inner(commitment)),
             FeeBase::Drawn => None,
         }
     }

@@ -540,15 +540,15 @@ def test_term_loan_builder_and_getters() -> None:
         .day_count(DayCount.ACT_360)
         .stub("none")
         .discount_curve_id("USD-OIS")
-        .amortization({"percent_per_period": {"bp": 250}})
+        .amortization({"percent_of_remaining_per_period": {"pct": 0.025}})
         .build()
     )
-    assert loan.rate == {"fixed": {"rate_bp": 600}}
+    assert loan.rate == {"fixed": {"rate": 0.06}}
     assert loan.currency == "USD"
     assert loan.notional_limit.amount == pytest.approx(10_000_000.0)
     assert loan.stub == StubKind.NONE
     assert loan.settlement_days == 2
-    assert loan.amortization == {"percent_per_period": {"bp": 250}}
+    assert loan.amortization == {"percent_of_remaining_per_period": {"pct": 0.025}}
     example = TermLoan.example()
     assert loan.to_dict()["rate"] == example.to_dict()["rate"]
     assert TermLoan.example_floating_with_ddtl().ddtl is not None

@@ -19,7 +19,7 @@ Import path:
 | Item | Purpose |
 |------|---------|
 | `RevolvingCredit` | The instrument. Build with `RevolvingCredit::builder()`; `RevolvingCredit::example()` for a canonical facility. |
-| `BaseRateSpec` | `Fixed { rate }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
+| `RateSpec` | The shared `loan_terms::RateSpec`: `Fixed { rate }` (decimal) or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
 | `RevolvingCreditFees` | `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp`. Helper: `flat(..)`. |
 | `DrawRepaySpec`, `DrawRepayEvent` | `Deterministic(Vec<DrawRepayEvent>)` or `Stochastic(Box<StochasticUtilizationSpec>)`. |
 | `CommitmentStep`, `MarginStep`, `FeeStep` (from `loan_terms`) | Dated commitment, margin and fee changes; see "Dated terms". |
@@ -58,8 +58,9 @@ revolving_credit/
 ## Construction
 
 ```rust
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
@@ -68,11 +69,11 @@ use time::macros::date;
 
 let facility = RevolvingCredit::builder()
     .id("RC-001".into())
-    .commitment_amount(Money::new(10_000_000.0, Currency::USD)?)
-    .drawn_amount(Money::new(5_000_000.0, Currency::USD)?)
+    .commitment(Money::new(10_000_000.0, Currency::USD)?)
+    .drawn(Money::new(5_000_000.0, Currency::USD)?)
     .issue_date(date!(2025 - 01 - 01))
     .maturity(date!(2028 - 01 - 01))
-    .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+    .rate(RateSpec::Fixed { rate: 0.05 })
     .day_count(DayCount::Act360)
     .frequency(Tenor::quarterly())
     .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0)?)   // commitment / usage / facility, bp
@@ -99,7 +100,7 @@ Notes that bite:
 
 - Builder setters follow the **field names**: `maturity` (not `maturity_date`),
   `frequency` (not `payment_frequency`).
-- `BaseRateSpec::Floating` is a **tuple variant** wrapping the canonical
+- `RateSpec::Floating` is a **tuple variant** wrapping the canonical
   `finstack_quant_cashflows::builder::FloatingRateSpec` — not a struct variant
   with `forward_curve_id` / `spread_bp` fields.
 - `RevolvingCreditFees::flat` returns `Result` (non-finite bp are rejected).
@@ -109,7 +110,7 @@ Notes that bite:
   only; an unknown id fails validation), `payment_lag_days` and
   `settlement_days` (quote metrics only). Attributes metadata is never read
   by the schedule builders.
-- `drawn_amount` is the balance at the **simulation anchor**, the later of the
+- `drawn` is the balance at the **simulation anchor**, the later of the
   commitment date and the valuation date, in both modes. Deterministic
   draw/repay events describe the future only; an event dated on or before the
   anchor is rejected by the cashflow engine. The accrual period containing the
@@ -168,11 +169,11 @@ Three schedules, all optional and all shared with `TermLoan` through
 `instruments::fixed_income::loan_terms`, let a term sheet be entered without
 custom code:
 
-- `commitment_steps: Vec<CommitmentStep { date, amount, fee_bp }>` — the
+- `commitment_steps: Vec<CommitmentStep { date, amount, reduction_fee_bp }>` — the
   commitment in force from each date (amortizing commitments, availability
   expiries, accordions). Utilization is always drawn over the commitment in
   force, so a stochastic facility books the implied principal at a step. A
-  step down pays `fee_bp` on the reduced amount on the step date. The drawn
+  step down pays the one-off `reduction_fee_bp` on the reduced amount on the step date. The drawn
   balance must never exceed the commitment in force: the analyst dates the
   repayment.
 - `margin_steps: Vec<MarginStep { date, delta_bp }>` — cumulative shifts of
@@ -277,9 +278,9 @@ use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
 
 let stochastic = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
     utilization_process: UtilizationProcess::MeanReverting {
-        target_rate: 0.5,
-        speed: 1.0,
-        volatility: 0.15,
+        theta: 0.5,
+        kappa: 1.0,
+        sigma: 0.15,
         spread_sensitivity: 0.0, // > 0 links the target to the simulated spread
     },
     use_sobol_qmc: false,
@@ -297,13 +298,13 @@ Factors, when `McConfig` is supplied:
 
 - **Utilization** — clamped Ornstein-Uhlenbeck. Each step uses the exact OU
   transition and is then clamped to `[0, 1]`. Keep the stationary standard
-  deviation `volatility / sqrt(2 * speed)` small relative to the distance from
-  `target_rate` to the nearest boundary, or the clamp biases the simulated mean
+  deviation `sigma / sqrt(2 * kappa)` small relative to the distance from
+  `theta` to the nearest boundary, or the clamp biases the simulated mean
   toward the interior. With `spread_sensitivity` β > 0 the target follows the
-  simulated spread, `θ(t) = clamp(target_rate + β · (s(t)/s(0) − 1), 0, 1)`:
-  a borrower whose spread doubles draws toward `target_rate + β`. This is the
+  simulated spread, `θ(t) = clamp(theta + β · (s(t)/s(0) − 1), 0, 1)`:
+  a borrower whose spread doubles draws toward `theta + β`. This is the
   "draw on spread level" channel, on top of the shock correlation below; it
-  needs a stochastic spread process to have any effect. Zero `volatility`
+  needs a stochastic spread process to have any effect. Zero `sigma`
   freezes utilization (parity mode) in both the standalone facility and the
   structured-credit pool engine.
 - **Short rate** — `InterestRateProcessSpec::HullWhite1F`. With `sigma > 0` the
@@ -339,7 +340,7 @@ Greeks carry no MC noise.
 on the ACT/365F model clock (`MC_CLOCK_DAY_COUNT`), the clock the rate and
 credit processes are calibrated on; interest and fee accrual keep the
 facility's `day_count`. Seasoned facilities simulate from the valuation date
-with `drawn_amount` as the known t₀ state, the same anchor balance the
+with `drawn` as the known t₀ state, the same anchor balance the
 deterministic engine starts from.
 
 ## Pricing
@@ -389,7 +390,7 @@ are priced in the default leg, not here.
 
 ### Rate conventions
 
-`BaseRateSpec::Fixed` uses the contractual rate. Floating facilities project
+`RateSpec::Fixed` uses the contractual rate. Floating facilities project
 term forwards for term indices (`USD-SOFR-3M`, EURIBOR) and compound daily
 overnight fixings when the index is a registered overnight RFR (`USD-SOFR-OIS`)
 or `FloatingRateSpec.overnight_compounding` is set. Reset lag is applied on the

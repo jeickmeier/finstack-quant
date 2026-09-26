@@ -124,8 +124,10 @@ fn create_quantlib_convertible(
         div_yield_id: Some("EQUITY-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                fixed_coupon,
+            ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -652,8 +654,8 @@ fn quantlib_parity_zero_coupon_convertible() {
         div_yield_id: Some("EQUITY-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: None, // Zero coupon
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default(), // zero coupon
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -943,8 +945,10 @@ fn quantlib_parity_mandatory_conversion() {
         div_yield_id: Some("EQUITY-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                fixed_coupon,
+            ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -1035,8 +1039,10 @@ fn quantlib_parity_window_conversion() {
         div_yield_id: Some("EQUITY-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                fixed_coupon,
+            ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),

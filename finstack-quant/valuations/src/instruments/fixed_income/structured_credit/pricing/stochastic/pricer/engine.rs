@@ -1662,10 +1662,11 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
-        TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        TrancheCashflows, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
@@ -1695,7 +1696,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((1_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
         )
         .expect("senior tranche");
@@ -1775,7 +1776,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((1_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("tranche");
@@ -2174,10 +2175,11 @@ mod per_name_copula_tests {
     }
 
     use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
-        TrancheCoupon, TrancheSeniority, TrancheStructure,
+        TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
@@ -2228,7 +2230,7 @@ mod per_name_copula_tests {
                 80.0,
                 TrancheSeniority::Senior,
                 Money::new(total * 0.80, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.05 },
+                RateSpec::Fixed { rate: 0.05 },
                 maturity(),
             )
             .expect("senior"),
@@ -2238,7 +2240,7 @@ mod per_name_copula_tests {
                 92.0,
                 TrancheSeniority::Mezzanine,
                 Money::new(total * 0.12, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.08 },
+                RateSpec::Fixed { rate: 0.08 },
                 maturity(),
             )
             .expect("mezz"),
@@ -2248,7 +2250,7 @@ mod per_name_copula_tests {
                 100.0,
                 TrancheSeniority::Equity,
                 Money::new(total * 0.08, Currency::USD).expect("valid money fixture"),
-                TrancheCoupon::Fixed { rate: 0.0 },
+                RateSpec::Fixed { rate: 0.0 },
                 maturity(),
             )
             .expect("equity"),

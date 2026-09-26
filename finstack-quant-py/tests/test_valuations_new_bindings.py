@@ -92,11 +92,11 @@ def _revolving_credit_json(*, gearing: str | None = None, credit_curve: bool = F
         "type": "revolving_credit",
         "spec": {
             "id": "RC-PY-BINDING",
-            "commitment_amount": {"amount": "50000000", "currency": "USD"},
-            "drawn_amount": {"amount": "10000000", "currency": "USD"},
+            "commitment": {"amount": "50000000", "currency": "USD"},
+            "drawn": {"amount": "10000000", "currency": "USD"},
             "issue_date": "2024-01-01",
             "maturity": "2027-01-01",
-            "base_rate_spec": (
+            "rate": (
                 {"fixed": {"rate": 0.05}}
                 if gearing is None
                 else {
@@ -170,7 +170,7 @@ def test_revolving_credit_binding_validates_floating_rate_spec() -> None:
 
 
 def test_revolving_credit_custom_metrics_use_as_of_balance() -> None:
-    # ``drawn_amount`` (10M of 50M) is the balance at the valuation date; the
+    # ``drawn`` (10M of 50M) is the balance at the valuation date; the
     # fixture's 5M draw on 2024-06-01 lies in the future of 2024-03-01 and
     # must not enter the as-of metrics.
     result = price_instrument(

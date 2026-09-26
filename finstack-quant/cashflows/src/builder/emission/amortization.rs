@@ -15,6 +15,8 @@ pub(in crate::builder) struct AmortizationParams<'a> {
     pub(in crate::builder) amort_dates: &'a finstack_quant_core::HashSet<Date>,
     pub(in crate::builder) linear_delta: Option<Decimal>,
     pub(in crate::builder) percent_per: Option<Decimal>,
+    pub(in crate::builder) percent_remaining: Option<Decimal>,
+    pub(in crate::builder) linear_between: Option<(Date, Date, Decimal)>,
     pub(in crate::builder) step_remaining_map:
         &'a Option<finstack_quant_core::HashMap<Date, Money>>,
     pub(in crate::builder) custom_principal_map:
@@ -99,6 +101,29 @@ pub(in crate::builder) fn emit_amortization_on(
                     per.min(*outstanding),
                     new_flows,
                 )?;
+            }
+        }
+        AmortizationSpec::PercentOfRemainingPerPeriod { .. } => {
+            if let Some(pct) = params
+                .percent_remaining
+                .filter(|_| params.amort_dates.contains(&d))
+            {
+                let pay = *outstanding * pct;
+                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
+            }
+        }
+        AmortizationSpec::LinearBetween { .. } => {
+            if let Some((_, last, installment)) = params
+                .linear_between
+                .filter(|(start, last, _)| d > *start && d <= *last)
+                .filter(|_| params.amort_dates.contains(&d))
+            {
+                let pay = if d == last {
+                    *outstanding
+                } else {
+                    installment.min(*outstanding)
+                };
+                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
             }
         }
         AmortizationSpec::CustomPrincipal { .. } => {

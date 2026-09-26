@@ -53,9 +53,9 @@ def stochastic_spec(volatility: float, spread: dict[str, object], *, credit: boo
         "stochastic": {
             "utilization_process": {
                 "mean_reverting": {
-                    "target_rate": 0.6,
-                    "speed": 1.0,
-                    "volatility": volatility,
+                    "theta": 0.6,
+                    "kappa": 1.0,
+                    "sigma": volatility,
                     "spread_sensitivity": 0.0,
                 }
             },
@@ -76,11 +76,11 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
         RevolvingCredit
         .builder()
         .id("RCF-PY")
-        .commitment_amount(Money(50_000_000.0, Currency("USD")))
-        .drawn_amount(10_000_000.0, currency="USD")
+        .commitment(Money(50_000_000.0, Currency("USD")))
+        .drawn(10_000_000.0, currency="USD")
         .issue_date(AS_OF)
         .maturity(MATURITY)
-        .base_rate_spec(RevolvingCredit.example().base_rate_spec)
+        .rate(RevolvingCredit.example().rate)
         .day_count("act_360")
         .frequency("3M")
         .fees_flat(25.0, 10.0, 5.0)
@@ -140,11 +140,11 @@ def test_from_json_rejects_other_instrument_types() -> None:
 def test_builder_sets_every_field_and_getters_read_them_back() -> None:
     facility = builder(credit=True).build()
     assert facility.id == "RCF-PY"
-    assert facility.commitment_amount == Money(50_000_000.0, Currency("USD"))
-    assert facility.drawn_amount == Money(10_000_000.0, Currency("USD"))
+    assert facility.commitment == Money(50_000_000.0, Currency("USD"))
+    assert facility.drawn == Money(10_000_000.0, Currency("USD"))
     assert facility.issue_date == AS_OF
     assert facility.maturity == MATURITY
-    assert "floating" in facility.base_rate_spec
+    assert "floating" in facility.rate
     assert str(facility.day_count) == "act_360"
     assert str(facility.frequency) == "3M"
     assert facility.fees["facility_fee_bp"] == 5.0
@@ -163,9 +163,9 @@ def test_builder_sets_every_field_and_getters_read_them_back() -> None:
 
 
 def test_builder_accepts_a_bare_fixed_rate_and_is_consumed_by_build() -> None:
-    b = builder().base_rate_spec(0.06)
+    b = builder().rate(0.06)
     facility = b.build()
-    assert facility.base_rate_spec == {"fixed": {"rate": 0.06}}
+    assert facility.rate == {"fixed": {"rate": 0.06}}
     with pytest.raises(ValueError, match="consumed"):
         b.build()
 
@@ -259,19 +259,21 @@ def test_builder_accepts_dated_commitment_margin_and_fee_steps() -> None:
     facility = (
         builder()
         .fees(fees)
-        .commitment_steps([{"date": "2026-07-15", "amount": {"amount": "30000000", "currency": "USD"}, "fee_bp": 25.0}])
-        .margin_steps([{"date": "2026-01-15", "delta_bp": 100}])
+        .commitment_steps([
+            {"date": "2026-07-15", "amount": {"amount": "30000000", "currency": "USD"}, "reduction_fee_bp": "25"}
+        ])
+        .margin_steps([{"date": "2026-01-15", "delta_bp": "100"}])
         .build()
     )
     assert facility.commitment_steps[0]["amount"]["amount"] == "30000000"
-    assert facility.margin_steps == [{"date": "2026-01-15", "delta_bp": 100}]
+    assert facility.margin_steps == [{"date": "2026-01-15", "delta_bp": "100"}]
     assert facility.fees["steps"][0]["commitment_delta_bp"] == 25.0
     round_trip = RevolvingCredit.from_json(facility.to_json())
     assert round_trip.commitment_steps == facility.commitment_steps
     # A step below the drawn balance is a build-time error naming the step.
     with pytest.raises(ValueError, match="below the drawn balance"):
         builder().commitment_steps([
-            {"date": "2026-07-15", "amount": {"amount": "5000000", "currency": "USD"}, "fee_bp": 0.0}
+            {"date": "2026-07-15", "amount": {"amount": "5000000", "currency": "USD"}, "reduction_fee_bp": "0"}
         ]).build()
 
 

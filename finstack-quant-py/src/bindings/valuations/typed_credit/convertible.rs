@@ -13,7 +13,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DilutionEvent, DividendAdjustment,
-    SoftCallTrigger,
+    PriceTrigger,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
@@ -727,24 +727,13 @@ impl PyConvertibleBond {
         self.inner.recovery_rate
     }
 
-    /// Fixed coupon specification as a dict, or ``None``.
+    /// Coupon/cashflow specification in serde form (``{"fixed": {...}}``,
+    /// ``{"floating": {...}}``, ``{"step_up": {...}}`` or
+    /// ``{"amortizing": {...}}``), the same shape as ``Bond.cashflow_spec``; a
+    /// zero-coupon convertible is a fixed spec with rate ``"0"``.
     #[getter]
-    fn fixed_coupon<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .fixed_coupon
-            .as_ref()
-            .map(|c| serde_to_py(py, c))
-            .transpose()
-    }
-
-    /// Floating coupon specification as a dict, or ``None``.
-    #[getter]
-    fn floating_coupon<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .floating_coupon
-            .as_ref()
-            .map(|c| serde_to_py(py, c))
-            .transpose()
+    fn cashflow_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.cashflow_spec)
     }
 
     /// Maturity as seen by the pricer, or ``None``.
@@ -1087,7 +1076,7 @@ impl PyConvertibleBondBuilder {
     /// Parameters
     /// ----------
     /// value : dict | str
-    ///     ``SoftCallTrigger`` as a dict or JSON object string with fields
+    ///     ``PriceTrigger`` as a dict or JSON object string with fields
     ///     ``threshold_pct`` (percent of conversion price, e.g. ``130.0``),
     ///     ``observation_days`` and ``required_days_above``.
     ///
@@ -1099,14 +1088,14 @@ impl PyConvertibleBondBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` does not match the ``SoftCallTrigger`` shape.
+    ///     If ``value`` does not match the ``PriceTrigger`` shape.
     #[pyo3(text_signature = "($self, value)")]
     fn soft_call_trigger<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let trigger: SoftCallTrigger = serde_from_py(py, value, "soft_call_trigger")?;
+        let trigger: PriceTrigger = serde_from_py(py, value, "soft_call_trigger")?;
         let shown = format!(
             "{{'threshold_pct': {}, 'observation_days': {}, 'required_days_above': {}}}",
             float_repr(trigger.threshold_pct),
@@ -1173,13 +1162,15 @@ impl PyConvertibleBondBuilder {
         )
     }
 
-    /// Set the fixed coupon specification.
+    /// Set the coupon/cashflow specification.
     ///
     /// Parameters
     /// ----------
     /// value : dict | str
-    ///     ``FixedCouponSpec`` as a dict or JSON object string
-    ///     (``coupon_type``, decimal ``rate`` and a ``schedule`` block).
+    ///     Rust ``CashflowSpec`` in serde form, e.g.
+    ///     ``{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}``
+    ///     (the same shape as ``Bond.cashflow_spec``); a zero-coupon
+    ///     convertible uses a fixed spec with rate ``"0"``.
     ///
     /// Returns
     /// -------
@@ -1189,53 +1180,20 @@ impl PyConvertibleBondBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` does not match the ``FixedCouponSpec`` shape.
+    ///     If ``value`` does not deserialize as a ``CashflowSpec``.
     #[pyo3(text_signature = "($self, value)")]
-    fn fixed_coupon<'py>(
+    fn cashflow_spec<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: finstack_quant_cashflows::builder::FixedCouponSpec =
-            serde_from_py(py, value, "fixed_coupon")?;
-        let shown = format!("<fixed coupon rate={}>", spec.rate);
+        let spec: finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec =
+            serde_from_py(py, value, "cashflow_spec")?;
         cb_set!(
             slf,
-            fixed_coupon,
-            shown,
-            |b: ConvertibleBondBuilderInner| b.fixed_coupon(spec)
-        )
-    }
-
-    /// Set the floating coupon specification.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : dict | str
-    ///     ``FloatingCouponSpec`` as a dict or JSON object string.
-    ///
-    /// Returns
-    /// -------
-    /// ConvertibleBondBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` does not match the ``FloatingCouponSpec`` shape.
-    #[pyo3(text_signature = "($self, value)")]
-    fn floating_coupon<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        py: Python<'py>,
-        value: &Bound<'py, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: finstack_quant_cashflows::builder::FloatingCouponSpec =
-            serde_from_py(py, value, "floating_coupon")?;
-        cb_set!(
-            slf,
-            floating_coupon,
-            "<floating coupon>".to_string(),
-            |b: ConvertibleBondBuilderInner| b.floating_coupon(spec)
+            cashflow_spec,
+            "{...}".to_string(),
+            |b: ConvertibleBondBuilderInner| b.cashflow_spec(spec)
         )
     }
 

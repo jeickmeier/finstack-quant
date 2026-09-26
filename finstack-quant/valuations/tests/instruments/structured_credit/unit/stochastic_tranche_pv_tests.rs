@@ -12,9 +12,10 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, PoolAsset, PricingMode, StochasticPricingResult, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{
     InstrumentEnvelope, InstrumentJson, InstrumentPricingOverrides,
@@ -62,7 +63,7 @@ fn pool(balance: f64) -> AssetPool {
 
 fn two_tranches(floating_senior: bool) -> TrancheStructure {
     let senior_coupon = if floating_senior {
-        TrancheCoupon::Floating(FloatingRateSpec {
+        RateSpec::Floating(FloatingRateSpec {
             forward_curve_id: CurveId::new("SOFR-3M"),
             spread_bp: rust_decimal_macros::dec!(150),
             gearing: rust_decimal_macros::dec!(1),
@@ -81,7 +82,7 @@ fn two_tranches(floating_senior: bool) -> TrancheStructure {
             fallback: Default::default(),
         })
     } else {
-        TrancheCoupon::Fixed { rate: 0.05 }
+        RateSpec::Fixed { rate: 0.05 }
     };
 
     TrancheStructure::new(vec![
@@ -101,7 +102,7 @@ fn two_tranches(floating_senior: bool) -> TrancheStructure {
             100.0,
             TrancheSeniority::Equity,
             Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             legal_maturity(),
         )
         .unwrap(),
@@ -405,7 +406,7 @@ fn non_pik_deferred_interest_cannot_consume_principal() {
         sc.credit_model.default_spec.clone(),
     ));
 
-    sc.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.20 };
+    sc.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.20 };
     sc.tranches.tranches[0].pik_enabled = false;
     sc.pool.assets[0].rate = 0.01;
 

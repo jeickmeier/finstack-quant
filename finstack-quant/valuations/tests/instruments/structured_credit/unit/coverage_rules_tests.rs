@@ -13,11 +13,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, run_simulation_with_diagnostics, AssetPool, CccBucketRule, CoverageRules,
     CoverageTestSpec, DealType, DefaultedValuation, DiscountObligationRule, InstrumentCollateral,
-    PoolAsset, StructuredCredit, TestContext, Tranche, TrancheCashflows, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    PoolAsset, StructuredCredit, TestContext, Tranche, TrancheCashflows, TrancheSeniority,
+    TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -65,7 +66,7 @@ fn senior(balance: f64) -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         usd(balance),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity(),
     )
     .expect("tranche")])
@@ -314,7 +315,7 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
             60.0,
             TrancheSeniority::Senior,
             usd(60_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity(),
         )
         .expect("A"),
@@ -324,7 +325,7 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
             75.0,
             TrancheSeniority::Mezzanine,
             usd(15_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.07 },
+            RateSpec::Fixed { rate: 0.07 },
             maturity(),
         )
         .expect("B"),
@@ -334,7 +335,7 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
             100.0,
             TrancheSeniority::Equity,
             usd(25_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),

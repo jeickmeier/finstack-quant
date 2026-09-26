@@ -51,9 +51,9 @@ use finstack_quant_valuations::instruments::fixed_income::convertible::{
 use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
     InflationLinkedBond, InflationLinkedBondParams,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind, FxOption,
@@ -1027,7 +1027,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             100.0,
             TrancheSeniority::Senior,
             Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.04 },
+            RateSpec::Fixed { rate: 0.04 },
             maturity_5y(),
         )
         .unwrap();
@@ -1109,8 +1109,10 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             soft_call_trigger: None,
             settlement_days: None,
             recovery_rate: None,
-            fixed_coupon: Some(fixed_coupon),
-            floating_coupon: None,
+            cashflow_spec:
+                finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                    fixed_coupon,
+                ),
             instrument_pricing_overrides:
                 finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
             metric_pricing_overrides: Default::default(),

@@ -1,6 +1,6 @@
 //! A warehouse line against five first-lien loans: the borrowing base
 //! excludes ineligible and over-concentrated collateral, a deficiency repays
-//! the lender before the residual sees a cent, the unused fee accrues on the
+//! the lender before the residual sees a cent, the commitment fee accrues on the
 //! undrawn commitment, the term-out amortizes the facility sequentially,
 //! and the instrument prices and reports its metrics through the registry.
 
@@ -13,8 +13,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
     AdvanceRate, AmortizationEvent, AssetBackedFacility, BorrowingBaseRules, ConcentrationLimit,
-    ConcentrationScope, EligibilityRule, FacilityDraw, TermOutSpec,
+    ConcentrationScope, EligibilityRule, TermOutSpec,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::{DrawEvent, RateSpec};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, DealType, LiquidationSpec, PoolAsset,
 };
@@ -80,7 +81,7 @@ fn rules() -> BorrowingBaseRules {
     }
 }
 
-/// Clean facility: 6% fixed, 50 bp unused fee, quarterly, two-year revolving
+/// Clean facility: 6% fixed, 50 bp commitment fee, quarterly, two-year revolving
 /// period and a 24-month term-out; no prepayments or defaults.
 fn facility(drawn: f64, commitment: f64) -> AssetBackedFacility {
     let mut facility = AssetBackedFacility::builder()
@@ -89,8 +90,8 @@ fn facility(drawn: f64, commitment: f64) -> AssetBackedFacility {
         .borrowing_base_rules(rules())
         .commitment(usd(commitment))
         .drawn(usd(drawn))
-        .spread_bp(600.0)
-        .unused_fee_bp(50.0)
+        .rate(RateSpec::Fixed { rate: 0.06 })
+        .commitment_fee_bp(rust_decimal::Decimal::from(50))
         .closing_date(close())
         .revolving_end(d(2026, 1, 1))
         .maturity(d(2032, 1, 1))
@@ -254,7 +255,7 @@ fn borrowing_base_deficiency_forces_repayment_before_the_residual() {
 }
 
 #[test]
-fn unused_fee_accrues_on_the_undrawn_commitment() {
+fn commitment_fee_accrues_on_the_undrawn_commitment() {
     let facility = facility(60_000_000.0, 100_000_000.0);
     let projection = facility.project(&market(), close()).expect("projection");
     let period = &projection.facility.accrual_periods[0];
@@ -262,7 +263,7 @@ fn unused_fee_accrues_on_the_undrawn_commitment() {
         .year_fraction(period.start, period.end, DayCountContext::default())
         .expect("accrual");
     let expected = 40_000_000.0 * 0.005 * accrual;
-    let (date, fee) = projection.unused_fees[0];
+    let (date, fee) = projection.commitment_fees[0];
     assert_eq!(date, period.payment_date);
     assert!(
         (fee.amount() - expected).abs() < 1e-6,
@@ -277,7 +278,7 @@ fn unused_fee_accrues_on_the_undrawn_commitment() {
         .iter()
         .filter(|period| period.start < d(2026, 1, 1))
         .count();
-    assert_eq!(projection.unused_fees.len(), revolving_periods);
+    assert_eq!(projection.commitment_fees.len(), revolving_periods);
     assert!(revolving_periods < projection.facility.accrual_periods.len());
 
     let lender: Vec<_> = projection.lender_cashflows().expect("lender flows");
@@ -286,13 +287,13 @@ fn unused_fee_accrues_on_the_undrawn_commitment() {
 
     let no_fee = {
         let mut f = facility;
-        f.unused_fee_bp = 0.0;
+        f.commitment_fee_bp = rust_decimal::Decimal::ZERO;
         f
     };
     assert!(no_fee
         .project(&market(), close())
         .expect("projection")
-        .unused_fees
+        .commitment_fees
         .is_empty());
 }
 
@@ -438,9 +439,9 @@ fn facility_prices_and_reports_metrics_through_the_registry() {
 }
 
 /// A dated amortization event ends the commitment with the revolving
-/// period: no unused fee accrues on accrual periods starting after it.
+/// period: no commitment fee accrues on accrual periods starting after it.
 #[test]
-fn unused_fee_stops_at_a_dated_amortization_event() {
+fn commitment_fee_stops_at_a_dated_amortization_event() {
     let mut facility = facility(60_000_000.0, 100_000_000.0);
     facility.amortization_events = vec![AmortizationEvent::Date {
         date: d(2025, 1, 1),
@@ -448,14 +449,14 @@ fn unused_fee_stops_at_a_dated_amortization_event() {
     let projection = facility.project(&market(), close()).expect("projection");
     assert!(
         projection
-            .unused_fees
+            .commitment_fees
             .iter()
             .all(|(date, _)| *date <= d(2025, 1, 15)),
         "fees after the event: {:?}",
-        projection.unused_fees
+        projection.commitment_fees
     );
     assert_eq!(
-        projection.unused_fees.len(),
+        projection.commitment_fees.len(),
         4,
         "four quarterly accruals before the event"
     );
@@ -545,7 +546,7 @@ fn an_amortization_event_starts_the_term_out_clock() {
 #[test]
 fn a_scheduled_draw_lifts_the_facility_balance_and_interest() {
     let mut facility = facility(60_000_000.0, 100_000_000.0);
-    facility.draw_schedule = vec![FacilityDraw {
+    facility.draws = vec![DrawEvent {
         date: d(2025, 1, 1),
         amount: usd(10_000_000.0),
     }];
@@ -599,7 +600,7 @@ fn a_scheduled_draw_lifts_the_facility_balance_and_interest() {
 /// Interest the undrawn facility pays on the first payment date after `date`.
 fn facility_baseline_interest(facility: &AssetBackedFacility, date: Date) -> f64 {
     let mut undrawn = facility.clone();
-    undrawn.draw_schedule.clear();
+    undrawn.draws.clear();
     let projection = undrawn.project(&market(), close()).expect("projection");
     let period = projection
         .facility
@@ -666,7 +667,7 @@ fn readvance_draws_up_to_the_borrowing_base_while_revolving() {
 #[test]
 fn price_is_the_npv_of_the_lender_flows_including_draws() {
     let mut facility = facility(60_000_000.0, 100_000_000.0);
-    facility.draw_schedule = vec![FacilityDraw {
+    facility.draws = vec![DrawEvent {
         date: d(2025, 1, 1),
         amount: usd(10_000_000.0),
     }];
@@ -712,8 +713,24 @@ fn floating_facility_interest_is_tagged_float_reset() {
 
     let fixed = facility(60_000_000.0, 100_000_000.0);
     let mut floating = fixed.clone();
-    floating.forward_curve_id = Some(CurveId::new("USD-SOFR-3M".to_string()));
-    floating.spread_bp = 250.0;
+    floating.rate = RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+        forward_curve_id: CurveId::new("USD-SOFR-3M".to_string()),
+        spread_bp: rust_decimal::Decimal::from(250),
+        gearing: rust_decimal::Decimal::ONE,
+        gearing_includes_spread: true,
+        index_floor_bp: None,
+        all_in_floor_bp: None,
+        all_in_cap_bp: None,
+        index_cap_bp: None,
+        overnight_index_constraints: Default::default(),
+        reset_frequency: Tenor::quarterly(),
+        index_tenor: None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        overnight_compounding: None,
+        overnight_basis: None,
+        fallback: Default::default(),
+    });
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(close())
         .knots([(0.0, 0.04), (12.0, 0.04)])

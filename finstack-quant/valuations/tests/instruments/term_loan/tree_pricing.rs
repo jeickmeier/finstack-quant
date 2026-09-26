@@ -25,7 +25,7 @@ fn build_callable_loan(as_of: Date) -> TermLoan {
         .maturity(maturity)
         .rate(
             finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec::Fixed {
-                rate_bp: 600,
+                rate: 0.06,
             },
         )
         .frequency(Tenor::quarterly())
@@ -292,7 +292,7 @@ fn call_at_settlement_date_produces_nonzero_pv() {
         .maturity(maturity)
         .rate(
             finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec::Fixed {
-                rate_bp: 600,
+                rate: 0.06,
             },
         )
         .frequency(Tenor::quarterly())
@@ -571,7 +571,7 @@ fn off_cycle_immediate_par_call_includes_accrued() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

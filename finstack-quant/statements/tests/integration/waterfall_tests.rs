@@ -90,7 +90,7 @@ fn test_ecf_sweep_basic() {
                     )
                     .issue_date(issue)
                     .maturity(maturity)
-                    .rate(RateSpec::Fixed { rate_bp: 500 })
+                    .rate(RateSpec::Fixed { rate: 0.05 })
                     .frequency(Tenor::quarterly())
                     .day_count(DayCount::Act360)
                     .business_day_convention(BusinessDayConvention::ModifiedFollowing)

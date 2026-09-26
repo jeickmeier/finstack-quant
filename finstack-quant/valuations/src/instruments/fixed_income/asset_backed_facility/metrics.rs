@@ -14,7 +14,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 
 impl ZSpreadCs01 for AssetBackedFacility {
-    /// The lender's projected receipts (interest, principal, unused fees)
+    /// The lender's projected receipts (interest, principal, commitment fees)
     /// on or after `as_of`, z-bumped at the payment frequency.
     fn z_spread_cs01_inputs(
         &self,

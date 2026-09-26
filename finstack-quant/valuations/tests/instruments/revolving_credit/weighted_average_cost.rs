@@ -9,8 +9,9 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -25,11 +26,11 @@ const AS_OF: Date = date!(2024 - 01 - 15);
 fn facility(maturity: Date) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RCF-WAC".into())
-        .commitment_amount(Money::new(50_000_000.0, Currency::USD).expect("money"))
-        .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("money"))
+        .commitment(Money::new(50_000_000.0, Currency::USD).expect("money"))
+        .drawn(Money::new(10_000_000.0, Currency::USD).expect("money"))
         .issue_date(AS_OF)
         .maturity(maturity)
-        .base_rate_spec(BaseRateSpec::Floating(floating_spec()))
+        .rate(RateSpec::Floating(floating_spec()))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).expect("fees"))

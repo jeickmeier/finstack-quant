@@ -7,11 +7,12 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallDistribution;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AllocationMode, AssetPool, DealType, PaymentCalculation, PaymentType, Recipient, RecipientType,
-    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, Waterfall, WaterfallTier,
+    Tranche, TrancheSeniority, TrancheStructure, Waterfall, WaterfallTier,
 };
 
 /// Helper to create a simple market context
@@ -32,7 +33,7 @@ fn create_single_tranche(currency: Currency) -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
     )
     .unwrap();

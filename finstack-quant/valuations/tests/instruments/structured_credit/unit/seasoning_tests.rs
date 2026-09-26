@@ -12,9 +12,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
-    TrancheCoupon, TrancheSeniority, TrancheStructure,
+    TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -63,7 +64,7 @@ fn abs(rows: impl FnOnce(&mut PoolAsset, &mut PoolAsset)) -> StructuredCredit {
         100.0,
         TrancheSeniority::Senior,
         usd(2_000_000.0),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         maturity(),
     )
     .expect("N")])

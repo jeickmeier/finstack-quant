@@ -175,10 +175,10 @@ const FLAT_MARKET = JSON.stringify({
 test('RevolvingCredit.priceWithPaths keeps every simulated path of a stochastic facility', () => {
   const envelope = JSON.parse(valuations.instruments.RevolvingCredit.example().toJson());
   const spec = envelope.instrument.spec;
-  spec.base_rate_spec = { fixed: { rate: 0.06 } };
+  spec.rate = { fixed: { rate: 0.06 } };
   spec.draw_repay_spec = {
     stochastic: {
-      utilization_process: { mean_reverting: { target_rate: 0.6, speed: 1.0, volatility: 0.25 } },
+      utilization_process: { mean_reverting: { theta: 0.6, kappa: 1.0, sigma: 0.25 } },
       mc_config: { credit_spread_process: { constant: 0.025 } },
     },
   };

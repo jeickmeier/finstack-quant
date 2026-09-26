@@ -53,7 +53,7 @@ mod types;
 
 pub use types::{
     AntiDilutionPolicy, ConversionEvent, ConversionPolicy, ConversionSpec, ConvertibleBond,
-    ConvertibleBondBuilder, ConvertibleGreeks, DilutionEvent, DividendAdjustment, SoftCallTrigger,
+    ConvertibleBondBuilder, ConvertibleGreeks, DilutionEvent, DividendAdjustment, PriceTrigger,
 };
 
 pub use pricing::{

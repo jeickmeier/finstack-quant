@@ -3,12 +3,11 @@
 use super::components::compute_upfront_fee_pv;
 use super::results::PathResult;
 use super::unified::RevolvingCreditPricer;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::revolving_credit::cashflow_engine::{
     CashflowEngine, PathAwareCashflowSchedule, ThreeFactorPathData,
 };
-use crate::instruments::fixed_income::revolving_credit::types::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit,
-};
+use crate::instruments::fixed_income::revolving_credit::types::{DrawRepaySpec, RevolvingCredit};
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -36,15 +35,13 @@ pub(super) fn resolve_fixings<'a>(
     facility: &RevolvingCredit,
     market: &'a MarketContext,
 ) -> Option<&'a ScalarTimeSeries> {
-    match &facility.base_rate_spec {
-        BaseRateSpec::Floating(spec) => {
-            finstack_quant_core::market_data::fixings::get_fixing_series(
-                market,
-                spec.forward_curve_id.as_ref(),
-            )
-            .ok()
-        }
-        BaseRateSpec::Fixed { .. } => None,
+    match &facility.rate {
+        RateSpec::Floating(spec) => finstack_quant_core::market_data::fixings::get_fixing_series(
+            market,
+            spec.forward_curve_id.as_ref(),
+        )
+        .ok(),
+        RateSpec::Fixed { .. } => None,
     }
 }
 
@@ -237,9 +234,9 @@ impl RevolvingCreditPricer {
                 // valuation date with S(as_of).
                 let mut prev_sp = sp_as_of;
 
-                // `drawn_amount` is the balance at the simulation anchor in
+                // `drawn` is the balance at the simulation anchor in
                 // both modes, and deterministic events are future-only.
-                let mut prev_exposure = facility.drawn_amount.amount();
+                let mut prev_exposure = facility.drawn.amount();
 
                 let mut prev_date = as_of;
                 for i in 0..future_grid.len() {
@@ -291,10 +288,10 @@ impl RevolvingCreditPricer {
         };
 
         Ok(PathResult {
-            pv: Money::new(total_pv, facility.commitment_amount.currency())?,
+            pv: Money::new(total_pv, facility.commitment.currency())?,
             path_data: path_schedule.path_data,
             cashflows: path_schedule.schedule,
-            draw_option_cost: Money::new(draw_option_cost, facility.commitment_amount.currency())?,
+            draw_option_cost: Money::new(draw_option_cost, facility.commitment.currency())?,
         })
     }
 

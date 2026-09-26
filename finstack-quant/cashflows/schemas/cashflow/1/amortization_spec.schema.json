@@ -96,6 +96,58 @@
     },
     {
       "additionalProperties": false,
+      "description": "Fixed percentage of the **remaining** outstanding paid each period\n(declining balance): the payment is `outstanding * pct`, so it falls\ngeometrically from period to period.",
+      "properties": {
+        "percent_of_remaining_per_period": {
+          "additionalProperties": false,
+          "properties": {
+            "pct": {
+              "description": "Fraction of the outstanding principal paid per period (e.g.,\n0.025 = 2.5%), in `[0, 1]`.",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "pct"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "percent_of_remaining_per_period"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+      "properties": {
+        "linear_between": {
+          "additionalProperties": false,
+          "properties": {
+            "end": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Amortization end (full repayment), on or before maturity."
+            },
+            "start": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+              "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "linear_between"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
       "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
       "properties": {
         "custom_principal": {

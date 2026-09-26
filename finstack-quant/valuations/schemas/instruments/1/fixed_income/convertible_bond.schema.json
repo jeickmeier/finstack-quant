@@ -1,5 +1,186 @@
 {
   "$defs": {
+    "AmortizationSpec": {
+      "description": "Amortization specification for principal over time.\n\nDescribes how principal amortizes or is exchanged during the life of the contract.\nUsed by instruments (e.g., bonds) and cashflow legs for consistent behavior.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No amortization – principal remains constant until final redemption.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Linear principal paydown towards a target final notional amount over all periods.",
+          "properties": {
+            "linear_to": {
+              "additionalProperties": false,
+              "properties": {
+                "final_notional": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+                  "description": "Target remaining principal at the end of the amortization schedule."
+                }
+              },
+              "required": [
+                "final_notional"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_to"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
+          "properties": {
+            "step_remaining": {
+              "additionalProperties": false,
+              "properties": {
+                "schedule": {
+                  "description": "Ordered list of `(date, remaining_principal_after_date)`.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                      },
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "schedule"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "step_remaining"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fixed percentage of **original** notional paid each period (capped by remaining outstanding).\n\nThis is a sinking-fund style amortization where the payment amount is constant\nacross periods: `initial_notional * pct`. It does **not** compound (i.e., it is\nNOT percentage-of-remaining / declining-balance / mortgage-style).",
+          "properties": {
+            "percent_of_original_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "pct": {
+                  "description": "Fraction of original notional paid per period (e.g., 0.05 = 5%).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_original_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fixed percentage of the **remaining** outstanding paid each period\n(declining balance): the payment is `outstanding * pct`, so it falls\ngeometrically from period to period.",
+          "properties": {
+            "percent_of_remaining_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "pct": {
+                  "description": "Fraction of the outstanding principal paid per period (e.g.,\n0.025 = 2.5%), in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_remaining_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+          "properties": {
+            "linear_between": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                  "description": "Amortization end (full repayment), on or before maturity."
+                },
+                "start": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+                  "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_between"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
+          "properties": {
+            "custom_principal": {
+              "additionalProperties": false,
+              "properties": {
+                "items": {
+                  "description": "List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                      },
+                      {
+                        "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "items"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "custom_principal"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "AntiDilutionPolicy": {
       "description": "Anti-dilution protection applied to conversion terms.\n\nWhen dilutive events occur (stock splits, below-market issuances, special\ndividends), the conversion ratio is adjusted to protect bondholders from\nvalue erosion.\n\n# Industry Practice\n\nMost convertible bonds use **Weighted Average** anti-dilution, which is\nless protective but more issuer-friendly. **Full Ratchet** is mainly seen\nin private placements and venture-style convertibles.",
       "oneOf": [
@@ -81,6 +262,77 @@
       ],
       "type": "object"
     },
+    "CashflowSpec": {
+      "description": "Thin facade over canonical builder coupon specs for bond cashflows.\n\nWraps `FixedCouponSpec` and `FloatingCouponSpec` from the cashflow builder,\nproviding convenience constructors with sensible defaults for common bond use cases.\nThis ensures parity with all builder features (floors/caps, BDC, calendars, PIK, etc.)\nwhile keeping the bond API simple.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Fixed-rate bond using the canonical `FixedCouponSpec`.",
+          "properties": {
+            "fixed": {
+              "$ref": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json"
+            }
+          },
+          "required": [
+            "fixed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Floating-rate note using the canonical `FloatingCouponSpec`.",
+          "properties": {
+            "floating": {
+              "$ref": "#/$defs/FloatingCouponSpec"
+            }
+          },
+          "required": [
+            "floating"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Step-up/step-down coupon bond with scheduled rate changes.",
+          "properties": {
+            "step_up": {
+              "$ref": "#/$defs/StepUpCouponSpec"
+            }
+          },
+          "required": [
+            "step_up"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Amortizing bond (principal payments during life).",
+          "properties": {
+            "amortizing": {
+              "properties": {
+                "base": {
+                  "$ref": "#/$defs/CashflowSpec",
+                  "description": "Base cashflow specification (fixed or floating)."
+                },
+                "schedule": {
+                  "$ref": "#/$defs/AmortizationSpec",
+                  "description": "Amortization schedule."
+                }
+              },
+              "required": [
+                "base",
+                "schedule"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "amortizing"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ConversionEvent": {
       "description": "Events that may trigger conversion.",
       "oneOf": [
@@ -96,27 +348,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Forced conversion if share price meets threshold for a lookback period.",
+          "description": "Contingent conversion once the share price meets the trigger level\n(a percent of the conversion price) over the observation window.",
           "properties": {
             "price_trigger": {
-              "properties": {
-                "lookback_days": {
-                  "description": "Lookback days.",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "threshold": {
-                  "description": "Threshold.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "threshold",
-                "lookback_days"
-              ],
-              "type": "object"
+              "$ref": "#/$defs/PriceTrigger"
             }
           },
           "required": [
@@ -290,6 +525,10 @@
           ],
           "description": "Optional call/put schedule (issuer/holder redemption before maturity)."
         },
+        "cashflow_spec": {
+          "$ref": "#/$defs/CashflowSpec",
+          "description": "Coupon leg (fixed, floating, step-up or amortizing), the same type as\n`Bond.cashflow_spec`. A zero-coupon convertible is a fixed spec with\nrate `0`."
+        },
         "conversion": {
           "$ref": "#/$defs/ConversionSpec",
           "description": "Conversion terms for equity conversion."
@@ -319,28 +558,6 @@
             }
           ],
           "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield; a configured id must\nresolve."
-        },
-        "fixed_coupon": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Fixed coupon specification (if applicable)."
-        },
-        "floating_coupon": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FloatingCouponSpec"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Floating coupon specification (if applicable)."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -390,7 +607,7 @@
         "soft_call_trigger": {
           "anyOf": [
             {
-              "$ref": "#/$defs/SoftCallTrigger"
+              "$ref": "#/$defs/PriceTrigger"
             },
             {
               "type": "null"
@@ -416,6 +633,7 @@
         "conversion",
         "spot_id",
         "vol_surface_id",
+        "cashflow_spec",
         "attributes"
       ],
       "type": "object"
@@ -877,6 +1095,35 @@
         }
       ]
     },
+    "PriceTrigger": {
+      "additionalProperties": false,
+      "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow.",
+      "properties": {
+        "observation_days": {
+          "description": "Number of trading days in the observation window (e.g., 30).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "required_days_above": {
+          "description": "Minimum number of days within the window on which the share price\nmust be at or above the level (e.g., 20 of 30).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "threshold_pct": {
+          "description": "Trigger level as a percent of the conversion price (`130.0` = 130%);\nmust exceed 100.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold_pct",
+        "observation_days",
+        "required_days_above"
+      ],
+      "type": "object"
+    },
     "RollRule": {
       "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
@@ -897,32 +1144,84 @@
         }
       ]
     },
-    "SoftCallTrigger": {
+    "StepUpCouponSpec": {
       "additionalProperties": false,
-      "description": "Soft-call trigger condition for convertible bonds.\n\nA soft call allows the issuer to call the bond only if the underlying stock\nprice has been trading above a threshold (typically 130% of the conversion\nprice) for a sustained period. This protects holders from having their\nconversion option terminated when the stock is only marginally above parity.\n\n# Industry Practice\n\nThe standard soft-call trigger is:\n- **Threshold**: 130% of conversion price (most common)\n- **Observation period**: 20 of 30 consecutive trading days\n\nSome issuances use 120% or 150% thresholds.",
+      "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    schedule: ScheduleParams {\n        frequency: Tenor::semi_annual(),\n        day_count: DayCount::Thirty360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".into(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n};\n```",
       "properties": {
-        "observation_days": {
-          "description": "Number of trading days in the observation window (e.g., 30).",
-          "format": "uint32",
-          "minimum": 0,
+        "adjust_accrual_dates": {
+          "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+          "type": "boolean"
+        },
+        "business_day_convention": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "modified_following",
+          "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+        },
+        "calendar_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
+        },
+        "coupon_type": {
+          "$ref": "#/$defs/CouponType",
+          "default": "cash",
+          "description": "Coupon type (Cash/PIK/Split)."
+        },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
+        },
+        "end_of_month": {
+          "default": false,
+          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+          "type": "boolean"
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Accrual and payment frequency used to generate the schedule boundaries."
+        },
+        "initial_rate": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Initial coupon rate (annual, decimal). Used until the first step date."
+        },
+        "payment_lag_days": {
+          "default": 0,
+          "description": "Payment lag in business days after the adjusted accrual end date.",
+          "format": "int32",
           "type": "integer"
         },
-        "required_days_above": {
-          "description": "Minimum number of days within the window that the stock must exceed\nthe threshold (e.g., 20 out of 30 days).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
-        "threshold_pct": {
-          "description": "Threshold as a percentage of conversion price (e.g., 130.0 = 130%).\n\nThe issuer can only exercise the call if the stock price exceeds\n`threshold_pct / 100 * conversion_price` for the required number of days.",
-          "format": "double",
-          "type": "number"
+        "step_schedule": {
+          "description": "Step schedule: (effective_date, new_rate). Must be sorted by date.\nEach entry sets the rate from that date forward until the next step.\n\n**Date convention:** `effective_date` is compared against each\naccrual period's *unadjusted* `accrual_start`. Specify dates as\nunadjusted accrual-period boundaries (typically the issue date plus\ninteger multiples of `frequency`); business-day adjustment is not\napplied here. The rate is set at accrual start (per market\nconvention for step-up bonds).",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+              },
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub-handling rule used when the start/end dates do not fit an exact\nwhole number of periods."
         }
       },
       "required": [
-        "threshold_pct",
-        "observation_days",
-        "required_days_above"
+        "initial_rate",
+        "step_schedule",
+        "frequency",
+        "day_count",
+        "calendar_id"
       ],
       "type": "object"
     },
@@ -984,6 +1283,22 @@
         "spec": {
           "attributes": {},
           "call_put": null,
+          "cashflow_spec": {
+            "fixed": {
+              "business_day_convention": "following",
+              "calendar_id": "weekends_only",
+              "coupon_type": "cash",
+              "day_count": "30_360",
+              "end_of_month": false,
+              "frequency": {
+                "count": 6,
+                "unit": "months"
+              },
+              "payment_lag_days": 0,
+              "rate": "0.02",
+              "stub": "none"
+            }
+          },
           "conversion": {
             "anti_dilution": "none",
             "dilution_events": [],
@@ -995,21 +1310,6 @@
           "credit_curve_id": "USD-CREDIT-BBB",
           "discount_curve_id": "USD-IG",
           "div_yield_id": null,
-          "fixed_coupon": {
-            "business_day_convention": "following",
-            "calendar_id": "weekends_only",
-            "coupon_type": "cash",
-            "day_count": "30_360",
-            "end_of_month": false,
-            "frequency": {
-              "count": 6,
-              "unit": "months"
-            },
-            "payment_lag_days": 0,
-            "rate": "0.02",
-            "stub": "none"
-          },
-          "floating_coupon": null,
           "id": "CB-TECH-5Y",
           "issue_date": "2024-01-15",
           "maturity": "2029-01-15",

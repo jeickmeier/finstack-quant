@@ -182,6 +182,68 @@ class AmortizationSpec:
         ...
 
     @staticmethod
+    def percent_of_remaining_per_period(pct: float) -> AmortizationSpec:
+        """
+        Fixed percentage of the remaining outstanding paid each period.
+
+        Parameters
+        ----------
+        pct : float
+            Fraction of the outstanding principal paid per period (e.g.
+            ``0.025`` for 2.5%), in ``[0, 1]``; the payment declines
+            geometrically (declining balance).
+
+        Returns
+        -------
+        AmortizationSpec
+            A declining-balance amortization rule.
+
+        Notes
+        -----
+        This method does not raise; the range is validated when a schedule
+        is built.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import AmortizationSpec
+        >>> AmortizationSpec.percent_of_remaining_per_period(0.025).kind
+        'percent_of_remaining_per_period'
+        """
+        ...
+
+    @staticmethod
+    def linear_between(start: datetime.date | str, end: datetime.date | str) -> AmortizationSpec:
+        """
+        Equal principal installments on every payment date in ``(start, end]``.
+
+        Parameters
+        ----------
+        start : datetime.date | str
+            Amortization start; installments fall on payment dates strictly
+            after it.
+        end : datetime.date | str
+            Amortization end, by which the principal is fully repaid.
+
+        Returns
+        -------
+        AmortizationSpec
+            A dated linear amortization rule.
+
+        Raises
+        ------
+        ValueError
+            If either date cannot be parsed.
+
+        Examples
+        --------
+        >>> import datetime
+        >>> from finstack_quant.cashflows.builder import AmortizationSpec
+        >>> AmortizationSpec.linear_between(datetime.date(2025, 1, 1), datetime.date(2029, 1, 1)).kind
+        'linear_between'
+        """
+        ...
+
+    @staticmethod
     def custom_principal(
         items: list[tuple[datetime.date, Money]],
     ) -> AmortizationSpec:
@@ -221,12 +283,12 @@ class AmortizationSpec:
     @property
     def kind(self) -> str:
         """
-        Variant label: ``"none"``, ``"linear_to"``, ``"step_remaining"``, ``"percent_of_original_per_period"`` or ``"custom_principal"``.
+        Variant label: ``"none"``, ``"linear_to"``, ``"step_remaining"``, ``"percent_of_original_per_period"``, ``"percent_of_remaining_per_period"``, ``"linear_between"`` or ``"custom_principal"``.
 
         Returns
         -------
         str
-            Variant label: ``"none"``, ``"linear_to"``, ``"step_remaining"``, ``"percent_of_original_per_period"`` or ``"custom_principal"``.
+            Variant label: ``"none"``, ``"linear_to"``, ``"step_remaining"``, ``"percent_of_original_per_period"``, ``"percent_of_remaining_per_period"``, ``"linear_between"`` or ``"custom_principal"``.
 
         Notes
         -----
@@ -269,16 +331,33 @@ class AmortizationSpec:
     @property
     def pct(self) -> float | None:
         """
-        Per-period percentage for ``percent_of_original_per_period``, else ``None``.
+        Per-period decimal percentage for ``percent_of_original_per_period`` and ``percent_of_remaining_per_period``, else ``None``.
 
         Returns
         -------
         float | None
-            Per-period percentage for ``percent_of_original_per_period``, else ``None``.
+            Per-period decimal percentage for ``percent_of_original_per_period`` and ``percent_of_remaining_per_period``, else ``None``.
 
         Notes
         -----
         This accessor does not raise.
+        """
+        ...
+
+    @property
+    def window(self) -> tuple[datetime.date, datetime.date] | None:
+        """
+        ``(start, end)`` dates for ``linear_between``, else ``None``.
+
+        Returns
+        -------
+        tuple[datetime.date, datetime.date] | None
+            ``(start, end)`` dates for ``linear_between``, else ``None``.
+
+        Raises
+        ------
+        ValueError
+            If a date cannot be converted.
         """
         ...
 
@@ -857,7 +936,7 @@ class CashFlowMeta:
         self,
         representation: str = "contractual",
         calendar_ids: list[str] | None = None,
-        facility_limit: Money | None = None,
+        commitment: Money | None = None,
         issue_date: datetime.date | str | None = None,
         maturity: datetime.date | str | None = None,
         projected_fixings: list[ProjectedFixing] | None = None,
@@ -872,7 +951,7 @@ class CashFlowMeta:
             ``"no_residual"``.
         calendar_ids : list[str], optional
             Holiday calendar identifiers used by the schedule.
-        facility_limit : Money, optional
+        commitment : Money, optional
             Facility limit / commitment for revolving structures.
         issue_date : datetime.date or str, optional
             Instrument issue date.
@@ -932,7 +1011,7 @@ class CashFlowMeta:
         ...
 
     @property
-    def facility_limit(self) -> Money | None:
+    def commitment(self) -> Money | None:
         """
         Optional facility limit / commitment.
 
@@ -2040,13 +2119,13 @@ class FeeBase:
     """Fee accrues on the drawn outstanding balance."""
 
     @staticmethod
-    def undrawn(facility_limit: Money) -> FeeBase:
+    def undrawn(commitment: Money) -> FeeBase:
         """
-        Fee accrues on undrawn = max(facility_limit - outstanding, 0).
+        Fee accrues on undrawn = max(commitment - outstanding, 0).
 
         Parameters
         ----------
-        facility_limit : Money
+        commitment : Money
             Total facility commitment used to compute the undrawn amount.
 
         Returns
@@ -2084,7 +2163,7 @@ class FeeBase:
         ...
 
     @property
-    def facility_limit(self) -> Money | None:
+    def commitment(self) -> Money | None:
         """
         Facility limit for ``undrawn`` bases, else ``None``.
 
@@ -2273,7 +2352,7 @@ class FeeSpec:
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.core.money import Money
         >>> spec = FeeSpec.periodic_bp(
-        ...     base=FeeBase.undrawn(facility_limit=Money(10_000_000.0, "USD")),
+        ...     base=FeeBase.undrawn(commitment=Money(10_000_000.0, "USD")),
         ...     bp=50,
         ...     frequency=Tenor.quarterly(),
         ...     day_count=DayCount.ACT_360,
@@ -5183,7 +5262,7 @@ def merge_cashflow_schedules(
         re-sorted into canonical order. Metadata is merged: ``representation``
         takes the most conservative value across inputs (``Projected``
         dominates, then ``Placeholder``, ``Contractual``, ``NoResidual``);
-        ``calendar_ids`` is the sorted, deduplicated union; ``facility_limit``
+        ``calendar_ids`` is the sorted, deduplicated union; ``commitment``
         and ``issue_date`` are kept only when every input agrees, otherwise
         ``None``. Empty input yields an empty schedule with default metadata.
 

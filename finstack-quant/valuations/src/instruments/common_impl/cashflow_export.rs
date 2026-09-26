@@ -558,8 +558,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::revolving_credit::{
-        BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+        DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
     };
     use crate::instruments::fixed_income::structured_credit::StructuredCredit;
     use crate::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
@@ -605,11 +606,11 @@ mod tests {
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
         let facility = RevolvingCredit::builder()
             .id("RC-CASHFLOW-CREDIT".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(as_of)
             .maturity(maturity)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act365F)
             .frequency(Tenor::annual())
             .fees(RevolvingCreditFees::default())

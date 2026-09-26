@@ -62,7 +62,7 @@ pub use pool::{
 };
 pub(crate) use pool_state::PoolState;
 
-pub use tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheCoupon, TrancheStructure};
+pub use tranches::{CoverageTrigger, Tranche, TrancheBuilder, TrancheStructure};
 
 pub use setup::{DealFees, IncentiveFeeSpec};
 

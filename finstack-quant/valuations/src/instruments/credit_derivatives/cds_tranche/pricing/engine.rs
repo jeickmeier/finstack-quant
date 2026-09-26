@@ -182,7 +182,7 @@ impl CDSTranchePricer {
                             .iter()
                             .map(ToString::to_string)
                             .collect(),
-                        facility_limit: None,
+                        commitment: None,
                         issue_date: tranche.contractual_start_date(as_of),
                         maturity: Some(tranche.maturity),
                     },
@@ -210,7 +210,7 @@ impl CDSTranchePricer {
                         .iter()
                         .map(ToString::to_string)
                         .collect(),
-                    facility_limit: None,
+                    commitment: None,
                     issue_date: tranche.contractual_start_date(valuation_date),
                     maturity: Some(tranche.maturity),
                 },

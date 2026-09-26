@@ -7,7 +7,7 @@ use finstack_quant_core::{Error, Result};
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::fixed_income::convertible::{
-    ConversionEvent, ConversionPolicy, ConvertibleBond, SoftCallTrigger,
+    ConversionEvent, ConversionPolicy, ConvertibleBond, PriceTrigger,
 };
 use finstack_quant_models::trees::tree_framework::map_date_to_step;
 
@@ -33,7 +33,7 @@ pub(super) struct ConvertibleBondValuator {
     /// Conversion price per share (for soft-call trigger evaluation).
     conversion_price: f64,
     /// Optional soft-call trigger condition.
-    soft_call_trigger: Option<SoftCallTrigger>,
+    soft_call_trigger: Option<PriceTrigger>,
     /// Per-step risk-free discount factors: `rf_step_dfs[i] = curve.df(t_{i+1}) / curve.df(t_i)`.
     /// Uses the full discount curve term structure instead of a flat rate.
     pub(super) rf_step_dfs: Vec<f64>,
@@ -332,6 +332,7 @@ impl ConvertibleBondValuator {
             put_map,
             conversion_window: Self::conversion_window(
                 &bond.conversion.policy,
+                conversion_price,
                 base_date,
                 bond.maturity,
                 steps,
@@ -365,7 +366,8 @@ impl ConvertibleBondValuator {
     /// comparison issues that could cause conversion to never trigger.
     ///
     /// For `PriceTrigger`, we use a barrier approximation: the node spot price
-    /// is compared against the trigger threshold.
+    /// is compared against the trigger level (a percent of the conversion
+    /// price).
     ///
     /// ## Modeling scope (mandatory convertibles)
     ///
@@ -387,11 +389,13 @@ impl ConvertibleBondValuator {
     ///
     /// Date-based policies map to the nearest tree step with
     /// `map_date_to_step` on the ACT/365F model clock. `PriceTrigger` uses
-    /// the instantaneous node spot as a barrier approximation (its lookback is
+    /// the instantaneous node spot against `conversion_price × threshold_pct /
+    /// 100` as a barrier approximation (its k-of-n-day observation window is
     /// path-dependent and not modeled); IPO / change-of-control events need
     /// external event probabilities and are treated as no conversion.
     fn conversion_window(
         policy: &ConversionPolicy,
+        conversion_price: f64,
         base_date: Date,
         maturity: Date,
         steps: usize,
@@ -428,8 +432,8 @@ impl ConvertibleBondValuator {
                 start: to_step(*start)?,
                 end: to_step(*end)?,
             },
-            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger { threshold, .. }) => {
-                ConversionWindow::SpotAtLeast(*threshold)
+            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(trigger)) => {
+                ConversionWindow::SpotAtLeast(trigger.level(conversion_price))
             }
             ConversionPolicy::UponEvent(
                 ConversionEvent::QualifiedIpo | ConversionEvent::ChangeOfControl,
@@ -528,7 +532,7 @@ impl ConvertibleBondValuator {
     pub(super) fn soft_call_triggered(&self, node_spot: f64) -> bool {
         match self.soft_call_trigger {
             Some(ref trigger) => {
-                let nominal_trigger = self.conversion_price * (trigger.threshold_pct / 100.0);
+                let nominal_trigger = trigger.level(self.conversion_price);
 
                 let required_fraction =
                     trigger.required_days_above as f64 / trigger.observation_days.max(1) as f64;

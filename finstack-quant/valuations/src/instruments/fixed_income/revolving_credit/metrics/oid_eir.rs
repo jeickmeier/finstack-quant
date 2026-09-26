@@ -30,14 +30,14 @@ impl MetricCalculator for OidEirAmortizationCalculator {
         if upfront.amount() > 0.0 {
             extra.push((origination, upfront.amount()));
         }
-        let opening_funding = (facility.drawn_amount.amount() > 0.0)
-            .then(|| (origination, -facility.drawn_amount.amount()));
+        let opening_funding =
+            (facility.drawn.amount() > 0.0).then(|| (origination, -facility.drawn.amount()));
         let eir = oid_eir_schedule_from_flows(
             &schedule,
             &extra,
             opening_funding,
             facility.day_count,
-            facility.commitment_amount.currency(),
+            facility.commitment.currency(),
             spec.include_fees,
         )?;
 

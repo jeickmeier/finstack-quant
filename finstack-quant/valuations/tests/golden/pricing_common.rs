@@ -439,7 +439,7 @@ mod tests {
     #[test]
     fn structured_credit_default_claim_is_paid_once_without_repeating_historical_loss() {
         use finstack_quant_core::{currency::Currency, money::Money};
-        use finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheCoupon;
+        use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
         use time::macros::date;
 
         let fixture = structured_credit_fixture();
@@ -458,7 +458,7 @@ mod tests {
         deal.pool.reserve_account = zero;
         deal.pool.excess_spread_account = zero;
         for tranche in &mut deal.tranches.tranches {
-            tranche.coupon = TrancheCoupon::Fixed { rate: 0.0 };
+            tranche.coupon = RateSpec::Fixed { rate: 0.0 };
         }
         let flows = generate_tranche_cashflows(
             &deal,

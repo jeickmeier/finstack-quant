@@ -9,12 +9,13 @@ use finstack_quant_core::money::Money;
 use finstack_quant_models::credit::pool::{
     CorrelationStructure, StochasticDefaultSpec, StochasticPrepaySpec,
 };
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::RepLine;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CoverageTrigger, DealType, DefaultModelSpec, HedgeSwap, PoolAsset,
     PrepaymentModelSpec, RecoveryModelSpec, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, SwapNotional, SwapPriority, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure, TriggerConsequence,
+    StructuredCredit, SwapNotional, SwapPriority, Tranche, TrancheSeniority, TrancheStructure,
+    TriggerConsequence,
 };
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::Attributes;
@@ -97,7 +98,7 @@ fn test_clo_json_roundtrip() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -141,7 +142,7 @@ fn test_rmbs_credit_model_serialization() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity_date(),
     )
     .unwrap();
@@ -299,7 +300,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         10.0,
         TrancheSeniority::Equity,
         Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.12 },
+        RateSpec::Fixed { rate: 0.12 },
         legal,
     )
     .unwrap()
@@ -341,7 +342,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         100.0,
         TrancheSeniority::Senior,
         Money::new(45_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Floating(floating_coupon),
+        RateSpec::Floating(floating_coupon),
         legal,
     )
     .unwrap();
@@ -572,7 +573,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
             80.0,
             TrancheSeniority::Senior,
             Money::new(800_000.0, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.06 },
+            RateSpec::Fixed { rate: 0.06 },
             mat,
         )
         .unwrap(),
@@ -582,7 +583,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
             100.0,
             TrancheSeniority::Equity,
             Money::new(200_000.0, Currency::USD).expect("valid money fixture"),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             mat,
         )
         .unwrap(),

@@ -35,9 +35,10 @@ use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 
 use super::super::cashflow_engine::ThreeFactorPathData;
 use super::super::types::{
-    BaseRateSpec, CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
+    CreditSpreadProcessSpec, InterestRateProcessSpec, McConfig, RevolvingCredit,
     RevolvingCreditMcRun, StochasticUtilizationSpec, UtilizationProcess,
 };
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 
 /// Generate 3-factor MC paths using the existing process infrastructure.
 ///
@@ -101,18 +102,18 @@ pub fn generate_three_factor_paths(
     };
     let (util_params, is_zero_vol) = match &stoch_spec.utilization_process {
         UtilizationProcess::MeanReverting {
-            target_rate,
-            speed,
-            volatility,
+            theta,
+            kappa,
+            sigma,
             spread_sensitivity,
         } => {
             // Zero (or effectively-zero) volatility is parity mode: pass a
             // true σ = 0 so the utilization diffusion term vanishes exactly
             // rather than substituting a tiny placeholder volatility.
-            let is_zero = volatility.abs() < 1e-8;
-            let vol = if is_zero { 0.0 } else { *volatility };
+            let is_zero = sigma.abs() < 1e-8;
+            let vol = if is_zero { 0.0 } else { *sigma };
             (
-                UtilizationParams::new(*speed, *target_rate, vol)?
+                UtilizationParams::new(*kappa, *theta, vol)?
                     .with_spread_sensitivity(*spread_sensitivity)?,
                 is_zero,
             )
@@ -128,9 +129,9 @@ pub fn generate_three_factor_paths(
         InterestRateSpec,
         Option<Vec<f64>>,
         f64,
-    ) = match &facility.base_rate_spec {
-        BaseRateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
-        BaseRateSpec::Floating(spec) => {
+    ) = match &facility.rate {
+        RateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
+        RateSpec::Floating(spec) => {
             let overnight = crate::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
                 spec.forward_curve_id.as_str(),
                 spec.overnight_compounding.as_ref(),
@@ -874,9 +875,9 @@ mod tests {
         };
         let stochastic = StochasticUtilizationSpec {
             utilization_process: UtilizationProcess::MeanReverting {
-                target_rate: 0.5,
-                speed: 1.0,
-                volatility: 0.1,
+                theta: 0.5,
+                kappa: 1.0,
+                sigma: 0.1,
                 spread_sensitivity: 0.0,
             },
             use_sobol_qmc: false,

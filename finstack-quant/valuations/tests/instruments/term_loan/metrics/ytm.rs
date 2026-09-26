@@ -25,7 +25,7 @@ fn test_ytm_par_loan() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -88,7 +88,7 @@ fn test_ytm_discount_loan() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 300 })
+        .rate(RateSpec::Fixed { rate: 0.03 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -133,7 +133,7 @@ fn test_ytm_uses_quoted_clean_price_pct_when_present() {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -192,10 +192,12 @@ fn test_ytm_quoted_price_applies_to_outstanding_not_commitment() {
     let commitment = 10_000_000.0;
 
     // Custom amortization: 30% repaid in 2026 → 70% outstanding at as_of.
-    let amort = AmortizationSpec::Custom(vec![(
-        date!(2026 - 01 - 01),
-        Money::new(0.3 * commitment, Currency::USD).expect("valid money fixture"),
-    )]);
+    let amort = AmortizationSpec::CustomPrincipal {
+        items: vec![(
+            date!(2026 - 01 - 01),
+            Money::new(0.3 * commitment, Currency::USD).expect("valid money fixture"),
+        )],
+    };
 
     let mut loan = TermLoan::builder()
         .id("TL-YTM-AMORT-QUOTE".into())
@@ -203,7 +205,7 @@ fn test_ytm_quoted_price_applies_to_outstanding_not_commitment() {
         .notional_limit(Money::new(commitment, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

@@ -8,9 +8,10 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, AfcSpec, AssetPool, DealType, PoolAsset, SimulationRun,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
+    StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, WaterfallRules,
 };
 use time::Month;
 
@@ -58,7 +59,7 @@ fn deal(carryover: bool) -> StructuredCredit {
             80.0,
             TrancheSeniority::Senior,
             usd(800_000.0),
-            TrancheCoupon::Fixed { rate: 0.06 },
+            RateSpec::Fixed { rate: 0.06 },
             maturity(),
         )
         .expect("SR"),
@@ -68,7 +69,7 @@ fn deal(carryover: bool) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(200_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("EQ"),

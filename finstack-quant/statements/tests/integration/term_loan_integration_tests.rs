@@ -48,7 +48,7 @@ fn term_loan_capital_structure_evaluates_with_market() {
         .notional_limit(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(issue)
         .maturity(maturity)
-        .rate(RateSpec::Fixed { rate_bp: 800 })
+        .rate(RateSpec::Fixed { rate: 0.08 })
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

@@ -14,10 +14,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AssetPool, CmbsDscrCalculator,
-    DealType, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    DealType, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche, TrancheSeniority,
+    TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext, MetricId};
@@ -40,7 +41,7 @@ fn rmbs_instrument() -> StructuredCredit {
         100.0,
         TrancheSeniority::Senior,
         Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -84,7 +85,7 @@ fn cmbs_instrument() -> StructuredCredit {
         100.0,
         TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -123,7 +124,7 @@ fn abs_instrument() -> StructuredCredit {
         80.0,
         TrancheSeniority::Senior,
         Money::new(80_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -133,7 +134,7 @@ fn abs_instrument() -> StructuredCredit {
         100.0,
         TrancheSeniority::Subordinated,
         Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.08 },
+        RateSpec::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -189,7 +190,7 @@ fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
         100.0,
         TrancheSeniority::Senior,
         Money::new(0.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
     )
     .unwrap();

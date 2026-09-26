@@ -28,8 +28,9 @@ use super::enums::AssetType;
 use super::pool::PoolAsset;
 use crate::cashflow::builder::FloatingRateSpec;
 use crate::instruments::fixed_income::bond::{Bond, CashflowSpec};
-use crate::instruments::fixed_income::revolving_credit::{BaseRateSpec, RevolvingCredit};
-use crate::instruments::fixed_income::term_loan::{RateSpec, TermLoan};
+use crate::instruments::fixed_income::loan_terms::RateSpec;
+use crate::instruments::fixed_income::revolving_credit::RevolvingCredit;
+use crate::instruments::fixed_income::term_loan::TermLoan;
 
 /// Rule the pool engine applies to issuer call options on the collateral.
 ///
@@ -278,7 +279,7 @@ impl InstrumentCollateral {
                 }
                 CollateralInstrument::Revolver(facility) => {
                     facility.validate()?;
-                    require_currency(facility.commitment_amount.currency(), base_currency, id)?;
+                    require_currency(facility.commitment.currency(), base_currency, id)?;
                 }
             }
         }
@@ -372,7 +373,7 @@ impl InstrumentCollateral {
         }
         for loan in &self.term_loans {
             let (rate, spread_bp, forward_curve_id) = match &loan.rate {
-                RateSpec::Fixed { rate_bp } => (f64::from(*rate_bp) / 10_000.0, None, None),
+                RateSpec::Fixed { rate } => (*rate, None, None),
                 RateSpec::Floating(spec) => floating_economics(spec)?,
             };
             rows.push(PoolAsset {
@@ -397,7 +398,7 @@ impl InstrumentCollateral {
                 smm_override: None,
                 mdr_override: None,
                 recovery_rate: None,
-                commitment: loan.ddtl.as_ref().map(|ddtl| ddtl.commitment_limit),
+                commitment: loan.ddtl.as_ref().map(|ddtl| ddtl.commitment),
                 contractual_payment: None,
                 amortization_term_months: None,
                 io_months: None,
@@ -411,14 +412,14 @@ impl InstrumentCollateral {
             });
         }
         for facility in &self.revolvers {
-            let (rate, spread_bp, forward_curve_id) = match &facility.base_rate_spec {
-                BaseRateSpec::Fixed { rate } => (*rate, None, None),
-                BaseRateSpec::Floating(spec) => floating_economics(spec)?,
+            let (rate, spread_bp, forward_curve_id) = match &facility.rate {
+                RateSpec::Fixed { rate } => (*rate, None, None),
+                RateSpec::Floating(spec) => floating_economics(spec)?,
             };
             rows.push(PoolAsset {
                 id: facility.id.clone(),
                 asset_type: AssetType::RevolverLoan {},
-                balance: facility.drawn_amount,
+                balance: facility.drawn,
                 rate,
                 spread_bp,
                 forward_curve_id,
@@ -437,7 +438,7 @@ impl InstrumentCollateral {
                 smm_override: None,
                 mdr_override: None,
                 recovery_rate: Some(facility.recovery_rate),
-                commitment: Some(facility.commitment_amount),
+                commitment: Some(facility.commitment),
                 contractual_payment: None,
                 amortization_term_months: None,
                 io_months: None,
@@ -476,7 +477,7 @@ fn current_balance(instrument: CollateralInstrument<'_>, as_of: Option<Date>) ->
                 }),
             None => Ok(loan.notional_limit),
         },
-        CollateralInstrument::Revolver(facility) => Ok(facility.drawn_amount),
+        CollateralInstrument::Revolver(facility) => Ok(facility.drawn),
     }
 }
 

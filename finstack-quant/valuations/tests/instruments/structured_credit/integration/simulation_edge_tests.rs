@@ -12,9 +12,10 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, AssetType, DealType, PoolAsset, ReinvestmentCriteria, ReinvestmentPeriod,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -80,7 +81,7 @@ fn single_tranche_high_coupon(balance: f64) -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(balance, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.20 }, // 20% -- binds against pool
+        RateSpec::Fixed { rate: 0.20 }, // 20% -- binds against pool
         legal_maturity(),
     )
     .expect("valid tranche");
@@ -96,7 +97,7 @@ fn single_tranche(balance: f64) -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(balance, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         legal_maturity(),
     )
     .expect("valid tranche");

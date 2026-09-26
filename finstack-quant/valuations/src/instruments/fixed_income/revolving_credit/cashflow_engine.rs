@@ -26,7 +26,8 @@ use finstack_quant_core::Result;
 use crate::cashflow::builder::{periods::SchedulePeriod, CashFlowSchedule};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
-use super::types::{BaseRateSpec, DrawRepaySpec, RevolvingCredit};
+use super::types::{DrawRepaySpec, RevolvingCredit};
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 
 /// Path data from 3-factor Monte Carlo simulation.
 ///
@@ -155,7 +156,7 @@ impl<'a> CashflowEngine<'a> {
             projected_fixings: Vec::new(),
             representation: crate::cashflow::builder::CashflowRepresentation::Projected,
             calendar_ids: Vec::new(),
-            facility_limit: Some(self.facility.commitment_amount),
+            commitment: Some(self.facility.commitment),
             issue_date: Some(self.facility.issue_date),
             maturity: None,
         }
@@ -252,7 +253,7 @@ impl<'a> CashflowEngine<'a> {
         };
         draw_repay_events.sort_by_key(|event| event.date);
 
-        // `drawn_amount` is the balance at the simulation anchor (the later of
+        // `drawn` is the balance at the simulation anchor (the later of
         // the commitment and valuation dates) in both engines, so events are
         // future-only. An event dated on or before the anchor would be
         // replayed on top of a balance that already includes it: interest
@@ -262,7 +263,7 @@ impl<'a> CashflowEngine<'a> {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "RevolvingCredit draw/repay event dated {} is on or before the simulation anchor \
                  {} (the later of the commitment date {} and the valuation date {}); the drawn \
-                 balance at the anchor is defined by drawn_amount, so date events strictly after it",
+                 balance at the anchor is defined by drawn, so date events strictly after it",
                 event.date, anchor, self.facility.issue_date, self.as_of
             )));
         }
@@ -271,16 +272,16 @@ impl<'a> CashflowEngine<'a> {
         let step_dates = self.facility.step_dates();
         let mut flows = Vec::new();
         let rc = RoundingContext::default();
-        let ccy = self.facility.commitment_amount.currency();
+        let ccy = self.facility.commitment.currency();
 
         // Add initial draw at issue_date (from lender perspective: negative cashflow)
         if self.facility.issue_date > self.as_of
-            && !rc.is_effectively_zero(self.facility.drawn_amount.amount(), ZeroKind::Money(ccy))
+            && !rc.is_effectively_zero(self.facility.drawn.amount(), ZeroKind::Money(ccy))
         {
             flows.push(CashFlow::new(
                 self.facility.issue_date,
                 None,
-                self.facility.drawn_amount * -1.0,
+                self.facility.drawn * -1.0,
                 CFKind::Notional,
                 0.0,
                 None,
@@ -291,8 +292,8 @@ impl<'a> CashflowEngine<'a> {
         flows.reserve(self.payment_periods.len() * 4 + draw_repay_events.len() + 2);
 
         // Resolve forward curve once if floating rate (required for rate projection)
-        let fwd_curve = match &self.facility.base_rate_spec {
-            BaseRateSpec::Floating(spec) => {
+        let fwd_curve = match &self.facility.rate {
+            RateSpec::Floating(spec) => {
                 if let Some(market) = self.market {
                     Some(market.get_forward(&spec.forward_curve_id)?)
                 } else {
@@ -302,18 +303,18 @@ impl<'a> CashflowEngine<'a> {
                     )));
                 }
             }
-            BaseRateSpec::Fixed { .. } => None,
+            RateSpec::Fixed { .. } => None,
         };
 
         // Term-index facilities re-fix the coupon at every reset date, so the
         // sub-period timeline must also be sliced on resets that fall inside
         // an accrual period (reset frequency shorter than payment frequency).
         // Overnight facilities compound daily fixings over the whole window.
-        let slice_on_resets = match &self.facility.base_rate_spec {
-            BaseRateSpec::Floating(spec) => {
+        let slice_on_resets = match &self.facility.rate {
+            RateSpec::Floating(spec) => {
                 super::utils::resolved_overnight_compounding(spec)?.is_none()
             }
-            BaseRateSpec::Fixed { .. } => false,
+            RateSpec::Fixed { .. } => false,
         };
 
         for (i, period) in self.payment_periods.iter().enumerate() {
@@ -363,7 +364,7 @@ impl<'a> CashflowEngine<'a> {
             // otherwise bypass validation and let the balance exceed the
             // commitment (negative undrawn fees).
             let mut current_balance = if i == 0 {
-                self.facility.drawn_amount
+                self.facility.drawn
             } else {
                 self.facility
                     .drawn_balance_at(&draw_repay_events, anchor, period_start)?
@@ -417,8 +418,8 @@ impl<'a> CashflowEngine<'a> {
                 };
 
                 // Determine reset date for floating rates
-                let sub_reset_effective_date = match &self.facility.base_rate_spec {
-                    BaseRateSpec::Floating(_) => {
+                let sub_reset_effective_date = match &self.facility.rate {
+                    RateSpec::Floating(_) => {
                         if let Some(ref reset_grid) = self.reset_dates {
                             reset_grid
                                 .iter()
@@ -430,13 +431,12 @@ impl<'a> CashflowEngine<'a> {
                             Some(period_start)
                         }
                     }
-                    BaseRateSpec::Fixed { .. } => None,
+                    RateSpec::Fixed { .. } => None,
                 };
 
                 if reset_date_opt.is_none() {
-                    reset_date_opt = match (&self.facility.base_rate_spec, sub_reset_effective_date)
-                    {
-                        (BaseRateSpec::Floating(spec), Some(date)) => {
+                    reset_date_opt = match (&self.facility.rate, sub_reset_effective_date) {
+                        (RateSpec::Floating(spec), Some(date)) => {
                             Some(super::utils::floating_fixing_date(
                                 spec,
                                 date,
@@ -447,14 +447,14 @@ impl<'a> CashflowEngine<'a> {
                     };
                 }
 
-                let interest_rate = match &self.facility.base_rate_spec {
-                    BaseRateSpec::Fixed { rate } => {
+                let interest_rate = match &self.facility.rate {
+                    RateSpec::Fixed { rate } => {
                         let rate = super::utils::fixed_rate_at(self.facility, *rate, sub_start);
                         let interest = current_balance * (rate * dt);
                         total_interest = total_interest.checked_add(interest)?;
                         rate
                     }
-                    BaseRateSpec::Floating(spec) => {
+                    RateSpec::Floating(spec) => {
                         let params =
                             super::utils::floating_params_at(self.facility, spec, sub_start)?;
                         let reset_effective = sub_reset_effective_date.unwrap_or(period_start);
@@ -616,9 +616,9 @@ impl<'a> CashflowEngine<'a> {
                     payment_date,
                     reset_date_opt,
                     total_interest,
-                    match &self.facility.base_rate_spec {
-                        BaseRateSpec::Fixed { .. } => CFKind::Fixed,
-                        BaseRateSpec::Floating(_) => CFKind::FloatReset,
+                    match &self.facility.rate {
+                        RateSpec::Fixed { .. } => CFKind::Fixed,
+                        RateSpec::Floating(_) => CFKind::FloatReset,
                     },
                     total_accrual,
                     avg_interest_rate,
@@ -735,10 +735,7 @@ impl<'a> CashflowEngine<'a> {
             flows,
             self.facility.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::from((
-                    0_i64,
-                    self.facility.commitment_amount.currency(),
-                ))),
+                notional_hint: Some(Money::from((0_i64, self.facility.commitment.currency()))),
                 meta: crate::cashflow::builder::CashFlowMeta {
                     projected_fixings,
                     ..self.schedule_meta()
@@ -751,11 +748,11 @@ impl<'a> CashflowEngine<'a> {
     fn check_anchor_capacity(&self, anchor: Date) -> Result<()> {
         let commitment = self.facility.commitment_at(anchor);
         let lc = self.facility.lc_outstanding_at(anchor);
-        if self.facility.drawn_amount.amount() + lc.amount() > commitment.amount() + 1e-9 {
+        if self.facility.drawn.amount() + lc.amount() > commitment.amount() + 1e-9 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "RevolvingCredit drawn_amount {} plus letters of credit {} exceeds the \
+                "RevolvingCredit drawn {} plus letters of credit {} exceeds the \
                  commitment {} in force on the simulation anchor {anchor}",
-                self.facility.drawn_amount, lc, commitment
+                self.facility.drawn, lc, commitment
             )));
         }
         if let Some(event) = self
@@ -801,7 +798,7 @@ impl<'a> CashflowEngine<'a> {
         };
         let mut flows = Vec::new();
         let rc = RoundingContext::default();
-        let ccy = self.facility.commitment_amount.currency();
+        let ccy = self.facility.commitment.currency();
 
         // Overnight facilities compound the forward curve over the whole
         // period. Term-index facilities on a stochastic (Hull-White) short-rate
@@ -809,8 +806,8 @@ impl<'a> CashflowEngine<'a> {
         // simulated rate is the OIS numeraire rate, so the deterministic
         // index-over-OIS basis must be added back or the index forward curve
         // is silently ignored.
-        let (overnight_fwd, term_basis_curves) = match &self.facility.base_rate_spec {
-            BaseRateSpec::Floating(spec) => {
+        let (overnight_fwd, term_basis_curves) = match &self.facility.rate {
+            RateSpec::Floating(spec) => {
                 let overnight = super::utils::resolved_overnight_compounding(spec)?.is_some();
                 match self.market {
                     Some(market) if overnight => (
@@ -834,17 +831,17 @@ impl<'a> CashflowEngine<'a> {
                     Some(_) | None => (None, None),
                 }
             }
-            BaseRateSpec::Fixed { .. } => (None, None),
+            RateSpec::Fixed { .. } => (None, None),
         };
 
         // Add initial draw at issue_date (from lender perspective: negative cashflow)
         if self.facility.issue_date > self.as_of
-            && !rc.is_effectively_zero(self.facility.drawn_amount.amount(), ZeroKind::Money(ccy))
+            && !rc.is_effectively_zero(self.facility.drawn.amount(), ZeroKind::Money(ccy))
         {
             flows.push(CashFlow::new(
                 self.facility.issue_date,
                 None,
-                self.facility.drawn_amount * -1.0,
+                self.facility.drawn * -1.0,
                 CFKind::Notional,
                 0.0,
                 None,
@@ -857,11 +854,11 @@ impl<'a> CashflowEngine<'a> {
         // Running drawn balance at the last observation, for the principal
         // leg: `C(t) · u(t)` where `C` is the commitment in force. The first
         // observation on or before the valuation date records the t₀ state,
-        // which the path generator seeds from `drawn_amount`.
+        // which the path generator seeds from `drawn`.
         let mut prev_balance = if path.payment_dates[0] <= self.as_of {
             self.facility.commitment_at(anchor).amount() * path.utilization_path[0].clamp(0.0, 1.0)
         } else {
-            self.facility.drawn_amount.amount()
+            self.facility.drawn.amount()
         };
 
         // Process each contractual accrual period. Interest and fees accrue
@@ -948,11 +945,11 @@ impl<'a> CashflowEngine<'a> {
                 // Contractual fixings override the simulated short rate once
                 // the fixing date has passed. Future reset dates remain
                 // stochastic.
-                let coupon_rate = match &self.facility.base_rate_spec {
-                    BaseRateSpec::Fixed { rate } => {
+                let coupon_rate = match &self.facility.rate {
+                    RateSpec::Fixed { rate } => {
                         super::utils::fixed_rate_at(self.facility, *rate, sub_start)
                     }
-                    BaseRateSpec::Floating(spec) => {
+                    RateSpec::Floating(spec) => {
                         let reset_effective = self.reset_effective_at(sub_start);
                         let fixing_date = super::utils::floating_fixing_date(
                             spec,
@@ -1079,9 +1076,9 @@ impl<'a> CashflowEngine<'a> {
                         payment_date,
                         first_fixing,
                         interest,
-                        match &self.facility.base_rate_spec {
-                            BaseRateSpec::Fixed { .. } => CFKind::Fixed,
-                            BaseRateSpec::Floating(_) => CFKind::FloatReset,
+                        match &self.facility.rate {
+                            RateSpec::Fixed { .. } => CFKind::Fixed,
+                            RateSpec::Floating(_) => CFKind::FloatReset,
                         },
                         accrual,
                         (accrual > 0.0).then(|| weighted_rate / accrual),
@@ -1125,7 +1122,7 @@ impl<'a> CashflowEngine<'a> {
                 * path.utilization_path[idx_end].clamp(0.0, 1.0);
             if period_end <= self.as_of {
                 // History: the anchor balance is the known state, nothing to book.
-                prev_balance = self.facility.drawn_amount.amount();
+                prev_balance = self.facility.drawn.amount();
                 continue;
             }
             let balance_change = end_balance - prev_balance - step_legs;
@@ -1185,10 +1182,7 @@ impl<'a> CashflowEngine<'a> {
             flows,
             self.facility.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::from((
-                    0_i64,
-                    self.facility.commitment_amount.currency(),
-                ))),
+                notional_hint: Some(Money::from((0_i64, self.facility.commitment.currency()))),
                 meta: self.schedule_meta(),
             },
         ))
@@ -1197,16 +1191,16 @@ impl<'a> CashflowEngine<'a> {
 
 /// Drawn balance of a deterministic facility on `target_date`.
 ///
-/// Starts from `drawn_amount`, the balance at the simulation anchor, and
+/// Starts from `drawn`, the balance at the simulation anchor, and
 /// replays the draw/repay events dated after `as_of` up to and including
-/// `target_date`. Dates on or before the anchor return `drawn_amount`.
+/// `target_date`. Dates on or before the anchor return `drawn`.
 ///
 /// # Arguments
 ///
 /// * `facility` - Facility with a `DrawRepaySpec::Deterministic` schedule;
 ///   a stochastic facility is a validation error.
 /// * `as_of` - Valuation date; with the commitment date it defines the
-///   anchor `drawn_amount` refers to. Events dated on or before `as_of` are
+///   anchor `drawn` refers to. Events dated on or before `as_of` are
 ///   not replayed (the cashflow engine rejects them).
 /// * `target_date` - Date the balance is wanted for; events dated on it are
 ///   applied.
@@ -1237,7 +1231,8 @@ pub fn calculate_drawn_balance_at_date(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::revolving_credit::{BaseRateSpec, RevolvingCreditFees};
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
+    use crate::instruments::fixed_income::revolving_credit::RevolvingCreditFees;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use time::Month;
@@ -1249,11 +1244,11 @@ mod tests {
         let adjusted = Date::from_calendar_date(2027, Month::January, 4).expect("date");
         let facility = RevolvingCredit::builder()
             .id("RC-BDC-BOUNDARY".into())
-            .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((1_000_000_i64, Currency::USD)))
             .issue_date(start)
             .maturity(maturity)
-            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act365F)
             .frequency(Tenor::annual())
             .fees(RevolvingCreditFees::default())

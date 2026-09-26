@@ -9,9 +9,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, DealType, PoolAsset, PricingMode, StructuredCredit, Tranche,
-    TrancheCoupon, TrancheSeniority, TrancheStructure,
+    TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -32,7 +33,7 @@ fn note(id: &str, seniority: TrancheSeniority, balance: f64, rate: f64) -> Tranc
         id,
         seniority,
         usd(balance),
-        TrancheCoupon::Fixed { rate },
+        RateSpec::Fixed { rate },
         maturity(),
     )
     .expect("tranche")
@@ -52,7 +53,7 @@ fn declared(
         b,
         seniority,
         usd(balance),
-        TrancheCoupon::Fixed { rate },
+        RateSpec::Fixed { rate },
         maturity(),
     )
     .expect("tranche")
@@ -193,7 +194,7 @@ fn from_balances_discards_declared_points_and_missing_points_are_filled() {
         .attach_detach(0.0, 10.0)
         .seniority(TrancheSeniority::Equity)
         .balance(usd(1.0))
-        .coupon(TrancheCoupon::Fixed { rate: 0.0 })
+        .coupon(RateSpec::Fixed { rate: 0.0 })
         .maturity(maturity())
         .build()
         .is_ok());
@@ -201,7 +202,7 @@ fn from_balances_discards_declared_points_and_missing_points_are_filled() {
         .id("X")
         .seniority(TrancheSeniority::Equity)
         .balance(usd(1.0))
-        .coupon(TrancheCoupon::Fixed { rate: 0.0 })
+        .coupon(RateSpec::Fixed { rate: 0.0 })
         .maturity(maturity())
         .build()
         .expect("no points");

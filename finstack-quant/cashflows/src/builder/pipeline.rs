@@ -104,6 +104,8 @@ impl<'a> DateProcessor<'a> {
             amort_dates: &self.amort_setup.amort_dates,
             linear_delta: self.amort_setup.linear_delta,
             percent_per: self.amort_setup.percent_per,
+            percent_remaining: self.amort_setup.percent_remaining,
+            linear_between: self.amort_setup.linear_between,
             step_remaining_map: &self.amort_setup.step_remaining_map,
             custom_principal_map: &self.amort_setup.custom_principal_map,
         };

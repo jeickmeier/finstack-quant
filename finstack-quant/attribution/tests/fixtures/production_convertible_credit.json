@@ -15,21 +15,22 @@
         },
         "credit_curve_id": "USD-CREDIT",
         "discount_curve_id": "USD-OIS",
-        "fixed_coupon": {
-          "business_day_convention": "following",
-          "calendar_id": "weekends_only",
-          "coupon_type": "cash",
-          "day_count": "act_365f",
-          "end_of_month": false,
-          "frequency": {
-            "count": 6,
-            "unit": "months"
-          },
-          "payment_lag_days": 0,
-          "rate": "0.05",
-          "stub": "none"
+        "cashflow_spec": {
+          "fixed": {
+            "business_day_convention": "following",
+            "calendar_id": "weekends_only",
+            "coupon_type": "cash",
+            "day_count": "act_365f",
+            "end_of_month": false,
+            "frequency": {
+              "count": 6,
+              "unit": "months"
+            },
+            "payment_lag_days": 0,
+            "rate": "0.05",
+            "stub": "none"
+          }
         },
-        "floating_coupon": null,
         "id": "CONV-CREDIT-ATTR",
         "issue_date": "2025-01-01",
         "maturity": "2030-01-01",

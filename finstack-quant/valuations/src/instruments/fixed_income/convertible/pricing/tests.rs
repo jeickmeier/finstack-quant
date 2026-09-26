@@ -75,8 +75,7 @@ fn create_test_bond() -> ConvertibleBond {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec: crate::instruments::fixed_income::bond::CashflowSpec::Fixed(fixed_coupon),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -142,7 +141,7 @@ fn coupon_on_valuation_date_is_not_added_to_tree_step_zero() {
 fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let mut bond = create_test_bond();
-    bond.fixed_coupon = None; // zero-coupon: isolates the equity claim
+    bond.cashflow_spec = crate::instruments::fixed_income::bond::CashflowSpec::default(); // zero-coupon: isolates the equity claim
     bond.conversion.policy = ConversionPolicy::Window {
         start: bond.maturity,
         end: bond.maturity,
@@ -201,7 +200,7 @@ fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
 fn dividend_protection_restores_parity_independent_of_yield() {
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let mut bond = create_test_bond();
-    bond.fixed_coupon = None; // zero-coupon: isolates the equity claim
+    bond.cashflow_spec = crate::instruments::fixed_income::bond::CashflowSpec::default(); // zero-coupon: isolates the equity claim
     bond.conversion.policy = ConversionPolicy::Window {
         start: bond.maturity,
         end: bond.maturity,
@@ -420,11 +419,12 @@ fn test_accrued_interest() {
 fn settlement_date_uses_coupon_holiday_calendar() {
     let mut bond = create_test_bond();
     bond.settlement_days = Some(1);
-    bond.fixed_coupon
-        .as_mut()
-        .expect("test bond has fixed coupon")
-        .schedule
-        .calendar_id = "usny".into();
+    let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(coupon) =
+        &mut bond.cashflow_spec
+    else {
+        panic!("test bond has fixed coupon");
+    };
+    coupon.schedule.calendar_id = "usny".into();
 
     // Thursday July 3, 2025 + one USNY business day skips Independence Day
     // and the weekend, settling Monday July 7.
@@ -629,8 +629,7 @@ fn test_thirty_360_day_count_corporate_convention() {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec: crate::instruments::fixed_income::bond::CashflowSpec::Fixed(fixed_coupon),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),

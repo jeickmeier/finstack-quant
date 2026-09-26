@@ -718,6 +718,58 @@
         },
         {
           "additionalProperties": false,
+          "description": "Fixed percentage of the **remaining** outstanding paid each period\n(declining balance): the payment is `outstanding * pct`, so it falls\ngeometrically from period to period.",
+          "properties": {
+            "percent_of_remaining_per_period": {
+              "additionalProperties": false,
+              "properties": {
+                "pct": {
+                  "description": "Fraction of the outstanding principal paid per period (e.g.,\n0.025 = 2.5%), in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pct"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "percent_of_remaining_per_period"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+          "properties": {
+            "linear_between": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "$ref": "#/$defs/DateWire",
+                  "description": "Amortization end (full repayment), on or before maturity."
+                },
+                "start": {
+                  "$ref": "#/$defs/DateWire",
+                  "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_between"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
           "properties": {
             "custom_principal": {
@@ -902,7 +954,7 @@
     },
     "AssetBackedFacility": {
       "additionalProperties": false,
-      "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the unused commitment\naccrues `unused_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are\npercent values (`20.0` = 20%) and loss thresholds are decimal fractions\n(`max_cumulative_loss`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "description": "Committed asset-backed facility (warehouse line) against a collateral pool.\n\nThe facility lends `drawn` of a `commitment` against `collateral`; the\nborrowing base is the advance-rate-weighted eligible collateral after the\nconcentration limits. Each period the structured-credit engine runs a\nsynthetic two-class deal (the facility note and the residual): a\nborrowing-base deficiency is a mandatory repayment ahead of the residual,\ncollateral principal recycles into new collateral while revolving and\nrepays the facility sequentially afterwards, the undrawn commitment\naccrues `commitment_fee_bp`, and the residual keeps what is left. See\n[`Self::synthesized_deal`] for the exact mapping.\n\nRates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are\npercent values (`20.0` = 20%) and loss thresholds are decimal fractions\n(`max_cumulative_loss`).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;\n\nlet facility = AssetBackedFacility::example()?;\nlet report = facility.borrowing_base()?;\nassert!(report.borrowing_base.amount() >= facility.drawn.amount());\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
         "amortization_events": {
           "description": "Events that end revolving early.",
@@ -954,6 +1006,11 @@
           "$ref": "#/$defs/Money",
           "description": "Total commitment in the collateral currency."
         },
+        "commitment_fee_bp": {
+          "$ref": "#/$defs/DecimalWire",
+          "default": "0",
+          "description": "Commitment fee on the undrawn commitment, in basis points per annum\n(`50` = 0.50%). Defaults to zero."
+        },
         "correlation_structure": {
           "anyOf": [
             {
@@ -968,7 +1025,7 @@
         "day_count": {
           "$ref": "#/$defs/DayCount",
           "default": "act_360",
-          "description": "Accrual convention of the facility interest and unused fee."
+          "description": "Accrual convention of the facility interest and commitment fee."
         },
         "default_spec": {
           "$ref": "#/$defs/DefaultModelSpec",
@@ -993,16 +1050,16 @@
           "$ref": "#/$defs/Id",
           "description": "Discount curve for the facility and residual cashflows."
         },
-        "draw_schedule": {
-          "description": "Scheduled draws after closing, ascending by date.",
-          "items": {
-            "$ref": "#/$defs/FacilityDraw"
-          },
-          "type": "array"
-        },
         "drawn": {
           "$ref": "#/$defs/Money",
           "description": "Amount drawn at closing, in the collateral currency; at most the\ncommitment and strictly below the collateral balance."
+        },
+        "draws": {
+          "description": "Scheduled draws after closing, ascending by date; each funds on the\nfirst payment date at or after its date.",
+          "items": {
+            "$ref": "#/$defs/DrawEvent"
+          },
+          "type": "array"
         },
         "fees": {
           "anyOf": [
@@ -1014,17 +1071,6 @@
             }
           ],
           "description": "Transaction fees paid through the synthetic deal's waterfall ahead of\nthe facility's interest (trustee, servicing, ...); `None` for none."
-        },
-        "forward_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Id"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Forward-curve identifier of the floating index; `None` makes\n`spread_bp` the all-in fixed rate."
         },
         "frequency": {
           "$ref": "#/$defs/Tenor",
@@ -1062,6 +1108,10 @@
           },
           "description": "Prepayment model specification."
         },
+        "rate": {
+          "$ref": "#/$defs/RateSpec",
+          "description": "Facility coupon: a fixed all-in rate (decimal) or a floating index\nplus spread."
+        },
         "readvance_to_borrowing_base": {
           "default": false,
           "description": "Re-advance the facility each revolving period up to the commitment\nand the borrowing base.",
@@ -1082,11 +1132,6 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "description": "Scenario-only pricing adjustments."
-        },
-        "spread_bp": {
-          "description": "Margin over the index (or the all-in fixed rate when `forward_curve_id`\nis `None`) in basis points (600 = 6%).",
-          "format": "double",
-          "type": "number"
         },
         "stochastic_default_spec": {
           "anyOf": [
@@ -1131,12 +1176,6 @@
             }
           ],
           "description": "Term-out window after revolving; `None` lets the collateral run to\n`maturity`."
-        },
-        "unused_fee_bp": {
-          "default": 0.0,
-          "description": "Fee on the undrawn commitment in basis points per annum.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
@@ -1145,7 +1184,7 @@
         "borrowing_base_rules",
         "commitment",
         "drawn",
-        "spread_bp",
+        "rate",
         "closing_date",
         "revolving_end",
         "maturity",
@@ -2669,47 +2708,6 @@
           "const": "down_and_in",
           "description": "Down-and-in: activated when spot touches or falls below the barrier.",
           "type": "string"
-        }
-      ]
-    },
-    "BaseRateSpec": {
-      "description": "Base rate specification for revolving credit interest.\n\nDefines whether the facility pays a fixed rate or a floating rate\ntied to a market index plus margin.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Fixed rate (annualized).",
-          "properties": {
-            "fixed": {
-              "properties": {
-                "rate": {
-                  "description": "Annual interest rate (e.g., 0.05 for 5%).",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "rate"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "fixed"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Floating rate using canonical FloatingRateSpec.\n\nComposes the standard floating rate specification with full support\nfor floors, caps, and gearing.",
-          "properties": {
-            "floating": {
-              "$ref": "#/$defs/FloatingRateSpec"
-            }
-          },
-          "required": [
-            "floating"
-          ],
-          "type": "object"
         }
       ]
     },
@@ -5280,7 +5278,7 @@
           },
           "type": "array"
         },
-        "facility_limit": {
+        "commitment": {
           "anyOf": [
             {
               "$ref": "#/$defs/Money"
@@ -5289,7 +5287,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional facility limit/commitment for instruments like RCFs."
+          "description": "Total facility commitment for revolving and delayed-draw facilities;\n`None` for instruments without one."
         },
         "issue_date": {
           "anyOf": [
@@ -6681,7 +6679,7 @@
     },
     "CommitmentStep": {
       "additionalProperties": false,
-      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`fee_bp` must be `0.0`).",
+      "description": "A scheduled change of a facility's commitment.\n\nThe commitment equals `amount` from `date` forward until the next step.\nSteps down are amortizing commitments, availability expiries and voluntary\nreductions; steps up are accordion exercises. Utilization is always drawn\nbalance over the commitment in force, so a stochastic revolving facility\nbooks the implied principal change at the step.\n\nA delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only\nnon-increasing steps inside its availability window and no reduction fee\n(`reduction_fee_bp` must be zero).",
       "properties": {
         "amount": {
           "$ref": "#/$defs/Money",
@@ -6691,11 +6689,10 @@
           "$ref": "#/$defs/DateWire",
           "description": "Date the new commitment takes effect (strictly after the commitment\ndate, on or before maturity)."
         },
-        "fee_bp": {
-          "default": 0.0,
-          "description": "Reduction or cancellation fee, in basis points of the reduced amount,\npaid by the borrower on `date` when the commitment steps down. Ignored\non a step up. Defaults to `0.0`.",
-          "format": "double",
-          "type": "number"
+        "reduction_fee_bp": {
+          "$ref": "#/$defs/DecimalWire",
+          "default": "0",
+          "description": "One-off reduction or cancellation fee, in basis points of the reduced\namount (not per annum), paid by the borrower on `date` when the\ncommitment steps down. Ignored on a step up. Defaults to zero."
         }
       },
       "required": [
@@ -7969,27 +7966,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Forced conversion if share price meets threshold for a lookback period.",
+          "description": "Contingent conversion once the share price meets the trigger level\n(a percent of the conversion price) over the observation window.",
           "properties": {
             "price_trigger": {
-              "properties": {
-                "lookback_days": {
-                  "description": "Lookback days.",
-                  "format": "uint32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "threshold": {
-                  "description": "Threshold.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "threshold",
-                "lookback_days"
-              ],
-              "type": "object"
+              "$ref": "#/$defs/PriceTrigger"
             }
           },
           "required": [
@@ -8163,6 +8143,10 @@
           ],
           "description": "Optional call/put schedule (issuer/holder redemption before maturity)."
         },
+        "cashflow_spec": {
+          "$ref": "#/$defs/CashflowSpec",
+          "description": "Coupon leg (fixed, floating, step-up or amortizing), the same type as\n`Bond.cashflow_spec`. A zero-coupon convertible is a fixed spec with\nrate `0`."
+        },
         "conversion": {
           "$ref": "#/$defs/ConversionSpec",
           "description": "Conversion terms for equity conversion."
@@ -8192,28 +8176,6 @@
             }
           ],
           "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield; a configured id must\nresolve."
-        },
-        "fixed_coupon": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FixedCouponSpec"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Fixed coupon specification (if applicable)."
-        },
-        "floating_coupon": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FloatingCouponSpec"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Floating coupon specification (if applicable)."
         },
         "id": {
           "$ref": "#/$defs/Id",
@@ -8263,7 +8225,7 @@
         "soft_call_trigger": {
           "anyOf": [
             {
-              "$ref": "#/$defs/SoftCallTrigger"
+              "$ref": "#/$defs/PriceTrigger"
             },
             {
               "type": "null"
@@ -8289,6 +8251,7 @@
         "conversion",
         "spot_id",
         "vol_surface_id",
+        "cashflow_spec",
         "attributes"
       ],
       "type": "object"
@@ -11011,7 +10974,7 @@
     },
     "DdtlSpec": {
       "additionalProperties": false,
-      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment_limit: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_steps: vec![],\n    usage_fee_bp: 50.0,        // 50 bp usage fee\n    commitment_fee_bp: 25.0,   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
+      "description": "Delayed-draw term loan (DDTL) specification.\n\nModels a term loan with commitment period during which borrower may draw\ndown funds, subject to availability dates, step-downs, and fees.\n\n# Industry Practice\n\nDDTLs are common in:\n- **Construction financing**: Funds released as construction milestones are met\n- **Acquisition financing**: Delayed funding for earn-outs or contingent payments\n- **Working capital facilities**: Drawn as needed within commitment period\n\nTypical features:\n- Commitment period: 6-24 months\n- Commitment fees: 25-50 bp on undrawn amounts\n- Usage fees: 0-25 bp on drawn amounts\n- Step-downs: Commitment reduces at milestones (e.g., construction completion)\n\n# Fee Conventions\n\n- **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)\n- **Usage fee**: Paid on drawn amounts (additive to interest margin)\n- **OID**: May be withheld at each draw or tracked separately\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::create_date;\nuse time::Month;\n\n# fn example() -> Result<(), Box<dyn std::error::Error>> {\nlet ddtl = DdtlSpec {\n    commitment: Money::from((10_000_000_i64, Currency::USD)),\n    availability_start: create_date(2025, Month::January, 1)?,\n    availability_end: create_date(2026, Month::January, 1)?,\n    draws: vec![],\n    commitment_steps: vec![],\n    usage_fee_bp: dec!(50),        // 50 bp usage fee\n    commitment_fee_bp: dec!(25),   // 25 bp commitment fee\n    fee_base: CommitmentFeeBase::Undrawn,\n    oid_policy: None,\n};\n# Ok(())\n# }\n```",
       "properties": {
         "availability_end": {
           "$ref": "#/$defs/DateWire",
@@ -11021,17 +10984,16 @@
           "$ref": "#/$defs/DateWire",
           "description": "First date draws are permitted"
         },
-        "commitment_fee_bp": {
-          "description": "Commitment fee on the undrawn commitment, in basis points per annum\n(non-negative, finite; `50.0` = 0.50%).",
-          "format": "double",
-          "type": "number"
-        },
-        "commitment_limit": {
+        "commitment": {
           "$ref": "#/$defs/Money",
-          "description": "Total commitment limit available for draws"
+          "description": "Total commitment available for draws, in the loan currency."
+        },
+        "commitment_fee_bp": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Commitment fee on the undrawn commitment, in basis points per annum\n(non-negative; `50` = 0.50%)."
         },
         "commitment_steps": {
-          "description": "Commitment steps, each effective from its date: strictly increasing\ndates inside the availability window, non-increasing `amount`s in the\nloan currency, and `fee_bp == 0.0` (term loans carry no reduction fee).",
+          "description": "Commitment steps, each effective from its date: strictly increasing\ndates inside the availability window, non-increasing `amount`s in the\nloan currency, and a zero `reduction_fee_bp` (term loans carry no\nreduction fee).",
           "items": {
             "$ref": "#/$defs/CommitmentStep"
           },
@@ -11060,13 +11022,12 @@
           "description": "Original issue discount policy, if applicable"
         },
         "usage_fee_bp": {
-          "description": "Usage fee on drawn amounts, in basis points per annum (non-negative,\nfinite; `25.0` = 0.25%).",
-          "format": "double",
-          "type": "number"
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Usage fee on drawn amounts, in basis points per annum (non-negative;\n`25` = 0.25%)."
         }
       },
       "required": [
-        "commitment_limit",
+        "commitment",
         "availability_start",
         "availability_end",
         "draws",
@@ -12139,15 +12100,15 @@
     },
     "DrawEvent": {
       "additionalProperties": false,
-      "description": "Draw event for delayed-draw term loans (DDTL).\n\nRepresents a scheduled or actual draw against the commitment, reducing\navailable capacity and increasing outstanding principal.",
+      "description": "A scheduled draw `{date, amount}` on a committed facility.\n\nA delayed-draw term loan funds on `date` (inside its availability\nwindow); an asset-backed facility funds on the first payment date on or\nafter `date`.",
       "properties": {
         "amount": {
           "$ref": "#/$defs/Money",
-          "description": "Amount drawn from available commitment"
+          "description": "Amount drawn from the available commitment, in the facility currency\n(positive)."
         },
         "date": {
           "$ref": "#/$defs/DateWire",
-          "description": "Date of the draw"
+          "description": "Date of the draw."
         }
       },
       "required": [
@@ -13443,25 +13404,6 @@
         "schedule",
         "side",
         "attributes"
-      ],
-      "type": "object"
-    },
-    "FacilityDraw": {
-      "additionalProperties": false,
-      "description": "A scheduled draw on the facility: the lender advances `amount` on the\nfirst payment date at or after `date`, lifting the facility balance and\nfunding collateral purchases (or repaying, once the line has turned out).",
-      "properties": {
-        "amount": {
-          "$ref": "#/$defs/Money",
-          "description": "Amount advanced, in the facility currency."
-        },
-        "date": {
-          "$ref": "#/$defs/DateWire",
-          "description": "Earliest draw date; applied on the first payment date at or after it."
-        }
-      },
-      "required": [
-        "date",
-        "amount"
       ],
       "type": "object"
     },
@@ -20100,7 +20042,7 @@
     },
     "LoanCall": {
       "additionalProperties": false,
-      "description": "Borrower call option on term loan.\n\nRepresents the borrower's right to prepay the loan at a specified\nredemption price (typically at premium to par for early calls,\napproaching par near maturity).\n\n# Call Types\n\nThe `call_type` field determines how the call is exercised:\n- `Hard`: Standard call at `price_pct_of_par` on or after `date`\n- `Soft`: Premium call during protection period\n- `MakeWhole`: PV-based redemption at Treasury + spread\n\nFor `MakeWhole` calls, `price_pct_of_par` serves as the minimum\n(floor) redemption price. The actual price is the greater of\n`price_pct_of_par` and the make-whole amount.",
+      "description": "Borrower call option on term loan.\n\nRepresents the borrower's right to prepay the loan at a specified\nredemption price (typically at premium to par for early calls,\napproaching par near maturity).\n\n# Call Types\n\nThe `call_type` field determines how the call is exercised:\n- `Hard`: Standard call at `price_pct_of_par` on or after `date`\n- `Soft`: Premium call during protection period\n- `MakeWhole`: PV-based redemption at the reference curve plus spread\n\nFor `MakeWhole` calls, `price_pct_of_par` serves as the minimum\n(floor) redemption price. The actual price is the greater of\n`price_pct_of_par` and the make-whole amount.",
       "properties": {
         "call_type": {
           "$ref": "#/$defs/LoanCallType",
@@ -20155,21 +20097,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Make-whole call: borrower pays PV of remaining cashflows at a reference\nrate plus the specified spread. Ensures lender receives full economic value.",
+          "description": "Make-whole call: borrower pays PV of remaining cashflows at the\nreference curve plus spread of the shared [`MakeWholeSpec`] (the same\ntype bonds use). The term-loan tree pricer and yield-to-call metrics\nnever exercise it: paying at least the make-whole amount leaves the\nlender indifferent, so the loan is not economically callable.",
           "properties": {
             "make_whole": {
-              "additionalProperties": false,
-              "properties": {
-                "treasury_spread_bp": {
-                  "description": "Spread over the reference rate in basis points (e.g., 50 = T+50bps).",
-                  "format": "int32",
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "treasury_spread_bp"
-              ],
-              "type": "object"
+              "$ref": "#/$defs/MakeWholeSpec"
             }
           },
           "required": [
@@ -20470,9 +20401,8 @@
           "description": "Effective-from date of the margin change."
         },
         "delta_bp": {
-          "description": "Change in margin, in basis points (100 = 1%); negative steps down.",
-          "format": "int32",
-          "type": "integer"
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Change in margin, in basis points (`100` = 1%); negative steps down."
         }
       },
       "required": [
@@ -22230,15 +22160,14 @@
       "type": "object"
     },
     "OidPolicy": {
-      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(200);  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
+      "description": "Original Issue Discount (OID) policy for term loan origination.\n\nOID represents the discount from par value at loan origination. The policy\ndetermines how the discount is handled: withheld from proceeds or tracked separately.\n\n# Industry Practice\n\nOID is common in institutional term loans and private credit, particularly for:\n- Leveraged buyout financing (LBO loans)\n- Distressed refinancings\n- High-yield institutional term loans\n\nTypical OID ranges from 1-5% (100-500 bp) of par value.\n\n# Accounting Treatment\n\nOID affects accounting under GAAP/IFRS:\n- **Withheld**: Reduces initial cash proceeds, increases effective yield\n- **Separate**: May be accounted as upfront fee or amortized discount\n\nFor effective interest rate (EIR) amortization schedules, see [`OidEirSpec`].\n\n# Variants\n\n- `WithheldBp`: Discount in basis points of each funded draw, withheld\n  from proceeds\n- `WithheldAmount`: Fixed facility-level amount withheld from funded\n  proceeds, pro-rated across draws by draw size\n- `SeparateBp`: Discount in basis points of each draw, tracked\n  separately and not withheld\n- `SeparateAmount`: Fixed facility-level amount tracked separately,\n  pro-rated across draws by draw size\n\n# Examples\n\n```text\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// 2% OID withheld from proceeds\nlet oid = OidPolicy::WithheldBp(dec!(200));  // 200 bp = 2%\n\n// $50,000 fixed OID\nlet oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
           "description": "Discount in basis points of each funded draw (`200` = 2%), withheld\nfrom proceeds",
           "properties": {
             "withheld_bp": {
-              "format": "int32",
-              "type": "integer"
+              "$ref": "#/$defs/DecimalWire"
             }
           },
           "required": [
@@ -22264,8 +22193,7 @@
           "description": "Discount in basis points of each draw (`200` = 2%), tracked\nseparately for amortization",
           "properties": {
             "separate_bp": {
-              "format": "int32",
-              "type": "integer"
+              "$ref": "#/$defs/DecimalWire"
             }
           },
           "required": [
@@ -24019,6 +23947,35 @@
         }
       ]
     },
+    "PriceTrigger": {
+      "additionalProperties": false,
+      "description": "Share-price trigger of a convertible bond: the last sale price must be at\nleast `threshold_pct` of the conversion price on `required_days_above` of\n`observation_days` consecutive trading days.\n\nUsed for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and\nthe holder's contingent conversion\n(`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).\n\n# Industry Practice\n\nThe standard trigger is 130% of the conversion price on 20 of 30\nconsecutive trading days; some issues use 120% or 150%.\n\n# Modeling scope\n\nThe tree evaluates the trigger on the instantaneous node spot. The soft\ncall applies a Broadie-Glasserman-Kou-style barrier shift scaled by\n`required_days_above / observation_days`; contingent conversion compares\nthe node spot with the nominal level and does not model the observation\nwindow.",
+      "properties": {
+        "observation_days": {
+          "description": "Number of trading days in the observation window (e.g., 30).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "required_days_above": {
+          "description": "Minimum number of days within the window on which the share price\nmust be at or above the level (e.g., 20 of 30).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "threshold_pct": {
+          "description": "Trigger level as a percent of the conversion price (`130.0` = 130%);\nmust exceed 100.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "threshold_pct",
+        "observation_days",
+        "required_days_above"
+      ],
+      "type": "object"
+    },
     "PricingMode": {
       "description": "Strategy used when extracting factor sensitivities.",
       "oneOf": [
@@ -25296,22 +25253,23 @@
       ]
     },
     "RateSpec": {
-      "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    forward_curve_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bp spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: Default::default(),\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
+      "description": "Contractual coupon of a loan facility or note: a fixed all-in rate or a\nfloating index plus spread.\n\nShared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`\nand structured-credit `Tranche.coupon`.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;\n\nlet fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in\nassert!(matches!(fixed, RateSpec::Fixed { .. }));\n```",
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Fixed annual rate in basis points",
+          "description": "Fixed all-in annual rate.",
           "properties": {
             "fixed": {
+              "additionalProperties": false,
               "properties": {
-                "rate_bp": {
-                  "description": "Fixed rate in basis points (e.g., 600 = 6%)",
-                  "format": "int32",
-                  "type": "integer"
+                "rate": {
+                  "description": "Annual rate as a decimal (`0.06` = 6%).",
+                  "format": "double",
+                  "type": "number"
                 }
               },
               "required": [
-                "rate_bp"
+                "rate"
               ],
               "type": "object"
             }
@@ -25323,7 +25281,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Floating rate using canonical FloatingRateSpec.\n\nUses the standard floating rate specification with full support\nfor floors, caps, gearing, and reset conventions.\n\nEvery field of the spec is honored. The loan-level\n`TermLoan::calendar_id` drives the payment schedule and business-day\nadjustments; `fixing_calendar_id` (the loan calendar when unset) drives\nthe reset lag and overnight observations. Covenant and override margin\nstep-ups add to `spread_bp` from the next accrual period. Overnight\nindices compound per `overnight_compounding` and apply index floors and\ncaps per `overnight_index_constraints` (each daily fixing by default).",
+          "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`].",
           "properties": {
             "floating": {
               "$ref": "#/$defs/FloatingRateSpec"
@@ -26840,10 +26798,6 @@
           "$ref": "#/$defs/Attributes",
           "description": "Attributes for scenario selection and tagging"
         },
-        "base_rate_spec": {
-          "$ref": "#/$defs/BaseRateSpec",
-          "description": "Base rate specification (fixed or floating)."
-        },
         "business_day_convention": {
           "$ref": "#/$defs/BusinessDayConvention",
           "default": "modified_following",
@@ -26861,7 +26815,7 @@
           "default": null,
           "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone."
         },
-        "commitment_amount": {
+        "commitment": {
           "$ref": "#/$defs/Money",
           "description": "Opening commitment of the facility, in force from `issue_date`\nuntil the first entry of `commitment_steps`."
         },
@@ -26897,7 +26851,7 @@
           "$ref": "#/$defs/DrawRepaySpec",
           "description": "Draw and repayment schedule (deterministic or stochastic)."
         },
-        "drawn_amount": {
+        "drawn": {
           "$ref": "#/$defs/Money",
           "description": "Drawn balance at the simulation anchor, the later of `issue_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
         },
@@ -26974,6 +26928,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "rate": {
+          "$ref": "#/$defs/RateSpec",
+          "description": "Base rate specification (fixed or floating)."
+        },
         "recovery_rate": {
           "description": "Recovery rate on default (used when credit_curve_id is present).\n\nRepresents the fraction of exposure recovered in the event of default.\nTypical values: 0.30-0.50 for senior secured facilities.\nCallers must provide the value explicitly; zero recovery remains valid.",
           "format": "double",
@@ -27006,11 +26964,11 @@
       },
       "required": [
         "id",
-        "commitment_amount",
-        "drawn_amount",
+        "commitment",
+        "drawn",
         "issue_date",
         "maturity",
-        "base_rate_spec",
+        "rate",
         "day_count",
         "frequency",
         "fees",
@@ -27805,35 +27763,6 @@
           "type": "string"
         }
       ]
-    },
-    "SoftCallTrigger": {
-      "additionalProperties": false,
-      "description": "Soft-call trigger condition for convertible bonds.\n\nA soft call allows the issuer to call the bond only if the underlying stock\nprice has been trading above a threshold (typically 130% of the conversion\nprice) for a sustained period. This protects holders from having their\nconversion option terminated when the stock is only marginally above parity.\n\n# Industry Practice\n\nThe standard soft-call trigger is:\n- **Threshold**: 130% of conversion price (most common)\n- **Observation period**: 20 of 30 consecutive trading days\n\nSome issuances use 120% or 150% thresholds.",
-      "properties": {
-        "observation_days": {
-          "description": "Number of trading days in the observation window (e.g., 30).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "required_days_above": {
-          "description": "Minimum number of days within the window that the stock must exceed\nthe threshold (e.g., 20 out of 30 days).",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "threshold_pct": {
-          "description": "Threshold as a percentage of conversion price (e.g., 130.0 = 130%).\n\nThe issuer can only exercise the call if the stock price exceeds\n`threshold_pct / 100 * conversion_price` for the required number of days.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "threshold_pct",
-        "observation_days",
-        "required_days_above"
-      ],
-      "type": "object"
     },
     "SpecialServicingSpec": {
       "additionalProperties": false,
@@ -29157,8 +29086,8 @@
       "description": "Term loan instrument with covenant and DDTL support.\n\nRepresents a fully-validated institutional term loan with support for:\n- Fixed or floating interest rates\n- Delayed-draw term loan (DDTL) features\n- Payment-in-kind (PIK) interest\n- Flexible amortization schedules\n- Covenant-driven events (margin step-ups, cash sweeps, PIK toggles)\n- Original issue discount (OID) handling\n- Borrower call schedules\n\n# Construction\n\nBuild with [`TermLoan::builder()`]; `build()` validates the complete\ncontract (dates, currencies, DDTL draws against the commitment in force,\ncovenant and call schedules):\n\n```\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;\n\nlet loan = TermLoan::example()?;\nloan.validate()?;\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\n# Cashflow Generation\n\nUses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:\n- `dated_cashflows()` returns signed canonical schedule flows (coupons, amortization, redemptions)\n- `cashflow_schedule()` returns the signed canonical schedule with `CFKind` metadata\n\n# Pricing\n\nImplements [`Instrument::value()`](crate::instruments::common_impl::traits::Instrument::value)\nusing deterministic cashflow discounting. PIK interest is capitalized and excluded from PV.\n\n# Invariants\n\n- `issue < maturity`\n- `notional_limit.currency() == currency`\n- All monetary amounts are in the same currency\n- Amortization does not exceed outstanding principal\n\n# Thread Safety\n\nThis type is `Send + Sync` as all fields are thread-safe.",
       "properties": {
         "amortization": {
-          "$ref": "#/$defs/TermLoanAmortizationSpec",
-          "description": "Amortization specification"
+          "$ref": "#/$defs/AmortizationSpec",
+          "description": "Scheduled principal amortization (the shared cashflows\n`AmortizationSpec`). `LinearTo` and `StepRemaining` are rejected;\n`PercentOfOriginalPerPeriod` and `LinearBetween` apply per funded draw."
         },
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -29303,13 +29232,13 @@
         "upfront_fee": {
           "anyOf": [
             {
-              "$ref": "#/$defs/Money"
+              "$ref": "#/$defs/UpfrontFee"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Upfront fee at issue (if any)"
+          "description": "Upfront (arrangement or OID) fee paid on `issue_date`, as an amount or\na fraction of the commitment (the DDTL `commitment`, else\n`notional_limit`)."
         }
       },
       "required": [
@@ -29326,118 +29255,6 @@
         "attributes"
       ],
       "type": "object"
-    },
-    "TermLoanAmortizationSpec": {
-      "description": "Principal amortization schedule specification.\n\nDefines how the loan principal is amortized over its life,\nfrom no amortization (bullet) to custom schedules.",
-      "oneOf": [
-        {
-          "const": "none",
-          "description": "Bullet loan with no scheduled amortization",
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Linear amortization between start and end dates",
-          "properties": {
-            "linear": {
-              "additionalProperties": false,
-              "properties": {
-                "end": {
-                  "$ref": "#/$defs/DateWire",
-                  "description": "Amortization end date (full repayment)"
-                },
-                "start": {
-                  "$ref": "#/$defs/DateWire",
-                  "description": "Amortization start date"
-                }
-              },
-              "required": [
-                "start",
-                "end"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "linear"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Percentage of current outstanding principal per period (geometric decay).\n\nEach period, the amortization amount equals `bp / 10000 × current_outstanding`.\nBecause the percentage is applied to the declining balance, the dollar amount\ndecreases geometrically each period.\n\n**Note**: This is NOT the same as a flat percentage of original notional\n(which would produce equal dollar payments each period).  For example,\n250 bp (2.5%) per quarter applied to $10M produces:\n- Q1: $250,000 (2.5% × $10M)\n- Q2: $243,750 (2.5% × $9.75M)\n- Q3: $237,656 (2.5% × $9.506M)\n- etc.",
-          "properties": {
-            "percent_per_period": {
-              "additionalProperties": false,
-              "properties": {
-                "bp": {
-                  "description": "Percentage in basis points per payment period (applied to current outstanding)",
-                  "format": "int32",
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "bp"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "percent_per_period"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Flat dollar amortization each period (percentage of original notional).\n\nEach period, the amortization amount equals `bp / 10000 × original_notional`.\nBecause the percentage is applied to the fixed original balance, the dollar\namount is identical every period (unlike `PercentPerPeriod` which decays).\n\nFor example, 250 bp (2.5%) per quarter applied to $10M produces:\n- Q1: $250,000 (2.5% × $10M)\n- Q2: $250,000 (2.5% × $10M)\n- Q3: $250,000 (2.5% × $10M)\n- etc.",
-          "properties": {
-            "percent_of_original_notional": {
-              "additionalProperties": false,
-              "properties": {
-                "bp": {
-                  "description": "Percentage in basis points per payment period (applied to original notional)",
-                  "format": "int32",
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "bp"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "percent_of_original_notional"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Custom amortization schedule with explicit principal payments",
-          "properties": {
-            "custom": {
-              "items": {
-                "maxItems": 2,
-                "minItems": 2,
-                "prefixItems": [
-                  {
-                    "$ref": "#/$defs/DateWire"
-                  },
-                  {
-                    "$ref": "#/$defs/Money"
-                  }
-                ],
-                "type": "array"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "custom"
-          ],
-          "type": "object"
-        }
-      ]
     },
     "TermLoanCovenantEvents": {
       "additionalProperties": false,
@@ -29706,7 +29523,7 @@
           "description": "Attributes for scenario selection"
         },
         "coupon": {
-          "$ref": "#/$defs/TrancheCoupon",
+          "$ref": "#/$defs/RateSpec",
           "description": "Interest specification"
         },
         "current_balance": {
@@ -29808,48 +29625,6 @@
         "attributes"
       ],
       "type": "object"
-    },
-    "TrancheCoupon": {
-      "description": "Tranche coupon specification\n\nSupports fixed and floating rate coupons used in standard structured credit instruments.",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Fixed rate coupon (rate as decimal, e.g., 0.05 for 5%)",
-          "properties": {
-            "fixed": {
-              "additionalProperties": false,
-              "properties": {
-                "rate": {
-                  "description": "Fixed interest rate as decimal (e.g., 0.05 for 5%)",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "rate"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "fixed"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Floating rate coupon using canonical FloatingRateSpec.\n\nUses the standard floating rate specification with all rates in basis points.",
-          "properties": {
-            "floating": {
-              "$ref": "#/$defs/FloatingRateSpec"
-            }
-          },
-          "required": [
-            "floating"
-          ],
-          "type": "object"
-        }
-      ]
     },
     "TrancheDraw": {
       "additionalProperties": false,
@@ -30066,7 +29841,7 @@
       ]
     },
     "UpfrontFee": {
-      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the commitment date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
+      "description": "Upfront (arrangement or original-issue-discount) fee of a facility.\n\nPaid by the borrower to the lender on the issue date. Enters the\npresent value only while the commitment date lies after the valuation\ndate, and the effective-interest-rate metrics always.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -30102,33 +29877,34 @@
       "description": "Utilization process for stochastic draws/repayments.\n\nFor the 80/20 implementation, we support a single mean-reverting process.\nThis can be extended in the future to support other processes (jump-diffusion,\nregime-switching, etc.).",
       "properties": {
         "mean_reverting": {
+          "additionalProperties": false,
           "properties": {
-            "speed": {
-              "description": "Mean reversion speed (annualized).",
+            "kappa": {
+              "description": "Mean-reversion speed κ, per year.",
+              "format": "double",
+              "type": "number"
+            },
+            "sigma": {
+              "description": "Utilization volatility σ, annualized (absolute utilization units).",
               "format": "double",
               "type": "number"
             },
             "spread_sensitivity": {
               "default": 0.0,
-              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(target_rate + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
+              "description": "Sensitivity of the utilization target to the simulated credit\nspread (adverse selection), as a decimal per unit of relative\nspread change.\n\nThe target used by the OU step becomes\n`θ(t) = clamp(theta + spread_sensitivity · (s(t) / s(0) − 1), 0, 1)`\nwhere `s(t)` is the simulated spread and `s(0)` its initial level,\nso a spread that doubles raises the target by `spread_sensitivity`.\nDefaults to `0.0` (no link); the utilization/credit shock\ncorrelation in `McConfig` applies on top of it. Ignored when the\nfacility has no credit-spread process.",
               "format": "double",
               "type": "number"
             },
-            "target_rate": {
-              "description": "Target utilization rate (0.0 to 1.0).",
-              "format": "double",
-              "type": "number"
-            },
-            "volatility": {
-              "description": "Volatility of utilization changes (annualized).",
+            "theta": {
+              "description": "Long-run utilization level θ, as a fraction in `[0, 1]`.",
               "format": "double",
               "type": "number"
             }
           },
           "required": [
-            "target_rate",
-            "speed",
-            "volatility"
+            "theta",
+            "kappa",
+            "sigma"
           ],
           "type": "object"
         }

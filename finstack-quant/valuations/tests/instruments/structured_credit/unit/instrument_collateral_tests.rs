@@ -7,11 +7,12 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_pool_stats, AssetPool, AssetType, CallExercisePolicy, DealType, InstrumentCollateral,
     InstrumentExerciseOverride, PutExercisePolicy, ReserveInterestDestination, Tranche,
-    TrancheCoupon, TrancheSeniority, TrancheStructure,
+    TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 use time::macros::date;
@@ -91,7 +92,7 @@ fn tranches() -> TrancheStructure {
         90.0,
         TrancheSeniority::Senior,
         usd(90_000_000.0),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         date!(2034 - 01 - 15),
     )
     .expect("senior");
@@ -101,7 +102,7 @@ fn tranches() -> TrancheStructure {
         100.0,
         TrancheSeniority::Equity,
         usd(10_000_000.0),
-        TrancheCoupon::Fixed { rate: 0.0 },
+        RateSpec::Fixed { rate: 0.0 },
         date!(2034 - 01 - 15),
     )
     .expect("equity");

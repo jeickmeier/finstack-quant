@@ -182,7 +182,7 @@
       "type": "asset_backed_facility",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json",
-        "sha256": "34fb6a74672ba22ad8b6e49eeb98d6eb0668d16beccee7a0a041c6d56952585e",
+        "sha256": "023fe824b6439837bfe85bb2b3da75d6f4303ef4b400b4c8657c5c4183aa197f",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -200,10 +200,10 @@
         "marketHistory": null
       },
       "edit": {
-        "path": ["instrument", "spec", "spread_bp"],
-        "from": 600,
-        "to": 650,
-        "description": "Change spread_bp from 600 to 650; native present value must change."
+        "path": ["instrument", "spec", "rate", "fixed", "rate"],
+        "from": 0.06,
+        "to": 0.065,
+        "description": "Change rate.fixed.rate from 0.06 to 0.065; native present value must change."
       },
       "reference": {
         "baseline": {
@@ -1247,13 +1247,13 @@
       "type": "convertible_bond",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_convertible.json",
-        "sha256": "99f796e955481fa23ff0e75ec58a0183462c31b0e5d57c832b7815dbaf5d993c",
+        "sha256": "8811f33350384a9f67e60d8cc763da1948a316e0fb0fa596ed0b2f8b3fc97b1d",
         "pointer": ["instrument"]
       },
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant/valuations/tests/fixtures/production_convertible.json",
-        "sha256": "99f796e955481fa23ff0e75ec58a0183462c31b0e5d57c832b7815dbaf5d993c",
+        "sha256": "8811f33350384a9f67e60d8cc763da1948a316e0fb0fa596ed0b2f8b3fc97b1d",
         "pointer": ["market"]
       },
       "marketPatches": [],
@@ -2582,7 +2582,7 @@
       "type": "revolving_credit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/revolving_credit.json",
-        "sha256": "5444b7e597ecebb2d253546c973af34d0057ea0584ddec3ee1088e87a845aac9",
+        "sha256": "372260fd61b64e4971923826848af9a5cb2e195395eea95b91eea4b0ff943115",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2600,10 +2600,10 @@
         "marketHistory": null
       },
       "edit": {
-        "path": ["instrument", "spec", "drawn_amount", "amount"],
+        "path": ["instrument", "spec", "drawn", "amount"],
         "from": "10000000",
         "to": "11000000",
-        "description": "Change drawn_amount.amount from 10000000 to 11000000; native present value must change."
+        "description": "Change drawn.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
         "baseline": {
@@ -2805,7 +2805,7 @@
       "type": "term_loan",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/term_loan.json",
-        "sha256": "7677e0d2b6ffcb6f1e873f1f7d5256094dfb0212b83545b31044dc0543432574",
+        "sha256": "791c96b1b97d1c29373efc136a8817f2e1cf0e8cbb802db3716e0b9c6da8955b",
         "pointer": []
       },
       "instrumentPatches": [],

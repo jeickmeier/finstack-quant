@@ -2,13 +2,13 @@
 
 // InterestSpec removed with loan; retain coupon for metadata only
 use crate::instruments::common_impl::traits::Attributes;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 #[cfg(test)]
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::types::InstrumentId;
-use rust_decimal::prelude::ToPrimitive;
 
 use serde::{Deserialize, Serialize};
 
@@ -97,121 +97,6 @@ impl CoverageTrigger {
     }
 }
 
-/// Tranche coupon specification
-///
-/// Supports fixed and floating rate coupons used in standard structured credit instruments.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[non_exhaustive]
-#[allow(clippy::large_enum_variant)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub enum TrancheCoupon {
-    /// Fixed rate coupon (rate as decimal, e.g., 0.05 for 5%)
-    Fixed {
-        /// Fixed interest rate as decimal (e.g., 0.05 for 5%)
-        rate: f64,
-    },
-
-    /// Floating rate coupon using canonical FloatingRateSpec.
-    ///
-    /// Uses the standard floating rate specification with all rates in basis points.
-    Floating(crate::cashflow::builder::FloatingRateSpec),
-}
-
-impl TrancheCoupon {
-    /// Get current rate for a given date (without index lookup)
-    ///
-    /// For Fixed: returns the fixed rate
-    /// For Floating: returns just the spread component (use
-    /// `try_current_rate_with_index` for the full projected rate)
-    pub fn current_rate(&self, _date: Date) -> f64 {
-        match self {
-            TrancheCoupon::Fixed { rate } => *rate,
-            TrancheCoupon::Floating(spec) => spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0,
-        }
-    }
-
-    /// Compute current rate including index forward where applicable (fallible).
-    ///
-    /// This method returns an error if required market data is missing or if the
-    /// rate projection fails. Prefer this in pricing/valuation code paths to avoid
-    /// silent mispricing.
-    pub fn try_current_rate_with_index(
-        &self,
-        date: Date,
-        context: &finstack_quant_core::market_data::context::MarketContext,
-    ) -> finstack_quant_core::Result<f64> {
-        let as_of = match self {
-            TrancheCoupon::Fixed { .. } => date,
-            TrancheCoupon::Floating(spec) => context
-                .get_forward(spec.forward_curve_id.as_str())?
-                .base_date(),
-        };
-        self.try_rate_for_period(date, as_of, context)
-    }
-
-    /// Resolve the contractual coupon for an explicit accrual period.
-    pub fn try_rate_for_period(
-        &self,
-        accrual_start: Date,
-        as_of: Date,
-        context: &finstack_quant_core::market_data::context::MarketContext,
-    ) -> finstack_quant_core::Result<f64> {
-        match self {
-            TrancheCoupon::Fixed { rate } => Ok(*rate),
-            TrancheCoupon::Floating(spec) => {
-                let fwd = context.get_forward(spec.forward_curve_id.as_str())?;
-                let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
-                let calendar_id = spec
-                    .fixing_calendar_id
-                    .as_deref()
-                    .unwrap_or("weekends_only");
-                let calendar =
-                    finstack_quant_core::dates::calendar_by_id(calendar_id).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(format!(
-                            "structured-credit tranche fixing calendar '{}' is not registered",
-                            calendar_id
-                        ))
-                    })?;
-                let reset_date = finstack_quant_core::dates::DateExt::add_business_days(
-                    accrual_start,
-                    -spec.reset_lag_days,
-                    calendar,
-                )?;
-                if reset_date <= as_of {
-                    if spec.overnight_compounding.is_some() {
-                        return Err(finstack_quant_core::Error::Validation(
-                            "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
-                                .into(),
-                        ));
-                    }
-                    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
-                        context,
-                        spec.forward_curve_id.as_str(),
-                    )?;
-                    let raw =
-                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                            Some(fixings),
-                            spec.forward_curve_id.as_str(),
-                            reset_date,
-                            as_of,
-                        )?;
-                    return Ok(
-                        crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                            raw, &params,
-                        ),
-                    );
-                }
-                crate::cashflow::builder::project_floating_rate(
-                    accrual_start,
-                    fwd.as_ref(),
-                    &params,
-                )
-            }
-        }
-    }
-}
-
 /// Structured credit tranche with attachment/detachment points
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -243,7 +128,7 @@ pub struct Tranche {
     /// Current outstanding balance (after amortization and losses)
     pub current_balance: Money,
     /// Interest specification
-    pub coupon: TrancheCoupon,
+    pub coupon: RateSpec,
 
     /// Coverage test triggers
     pub oc_trigger: Option<CoverageTrigger>,
@@ -314,7 +199,7 @@ impl Tranche {
         detach_pct: f64,
         seniority: TrancheSeniority,
         original_balance: Money,
-        coupon: TrancheCoupon,
+        coupon: RateSpec,
         maturity: Date,
     ) -> finstack_quant_core::Result<Self> {
         if attach_pct < 0.0 || detach_pct <= attach_pct {
@@ -373,7 +258,7 @@ impl Tranche {
         id: impl Into<String>,
         seniority: TrancheSeniority,
         original_balance: Money,
-        coupon: TrancheCoupon,
+        coupon: RateSpec,
         maturity: Date,
     ) -> finstack_quant_core::Result<Self> {
         if original_balance.amount() <= 0.0 {
@@ -501,7 +386,7 @@ pub struct TrancheBuilder {
     detach_pct: Option<f64>,
     seniority: Option<TrancheSeniority>,
     original_balance: Option<Money>,
-    coupon: Option<TrancheCoupon>,
+    coupon: Option<RateSpec>,
     maturity: Option<Date>,
     rating: Option<CreditRating>,
     frequency: Tenor,
@@ -570,7 +455,7 @@ impl TrancheBuilder {
 
     /// Set coupon specification (fixed or floating)
     #[must_use]
-    pub fn coupon(mut self, coupon: TrancheCoupon) -> Self {
+    pub fn coupon(mut self, coupon: RateSpec) -> Self {
         self.coupon = Some(coupon);
         self
     }
@@ -1108,7 +993,7 @@ mod tests {
             10.0,
             TrancheSeniority::Equity,
             Money::from((100_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.12 },
+            RateSpec::Fixed { rate: 0.12 },
             test_date(),
         )
         .expect("should succeed");
@@ -1127,7 +1012,7 @@ mod tests {
             15.0,
             TrancheSeniority::Mezzanine,
             Money::from((50_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.08 },
+            RateSpec::Fixed { rate: 0.08 },
             test_date(),
         )
         .expect("should succeed");
@@ -1153,7 +1038,7 @@ mod tests {
             .attach_detach(0.0, 10.0)
             .seniority(TrancheSeniority::Equity)
             .balance(Money::from((100_000_000_i64, Currency::USD)))
-            .coupon(TrancheCoupon::Fixed { rate: 0.12 })
+            .coupon(RateSpec::Fixed { rate: 0.12 })
             .maturity(test_date())
             .build()
             .expect("should succeed");
@@ -1163,7 +1048,7 @@ mod tests {
             .attach_detach(10.0, 100.0)
             .seniority(TrancheSeniority::Senior)
             .balance(Money::from((900_000_000_i64, Currency::USD)))
-            .coupon(TrancheCoupon::Floating(
+            .coupon(RateSpec::Floating(
                 crate::cashflow::builder::FloatingRateSpec {
                     forward_curve_id: CurveId::new("SOFR-3M".to_string()),
                     spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),

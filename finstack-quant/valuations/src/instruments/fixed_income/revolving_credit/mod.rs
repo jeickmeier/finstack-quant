@@ -46,7 +46,7 @@
 //!
 //! # Rate conventions
 //!
-//! `BaseRateSpec::Fixed` uses the contractual rate. Floating facilities choose
+//! `RateSpec::Fixed` uses the contractual rate. Floating facilities choose
 //! term vs overnight from the index and `FloatingRateSpec`:
 //! - term indices such as `USD-SOFR-3M` project a single forward
 //! - registered overnight RFR indices such as `USD-SOFR-OIS`, or an explicit
@@ -103,8 +103,8 @@ pub use pricing::unified::EnhancedMonteCarloResult;
 pub use pricing::unified::PathResult;
 pub use pricing::unified::RevolvingCreditPricer;
 pub use types::{
-    BaseRateSpec, DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditBuilder,
-    RevolvingCreditFees, UtilizationProcess,
+    DrawRepayEvent, DrawRepaySpec, RevolvingCredit, RevolvingCreditBuilder, RevolvingCreditFees,
+    UtilizationProcess,
 };
 
 pub use types::{

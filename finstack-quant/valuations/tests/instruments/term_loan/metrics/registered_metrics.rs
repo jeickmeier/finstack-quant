@@ -32,7 +32,7 @@ fn term_loan(upfront_fee: Option<Money>, callable: bool) -> TermLoan {
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
+        .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -41,7 +41,9 @@ fn term_loan(upfront_fee: Option<Money>, callable: bool) -> TermLoan {
         .discount_curve_id(CurveId::from("USD-OIS"))
         .amortization(AmortizationSpec::None)
         .coupon_type(CouponType::Cash)
-        .upfront_fee_opt(upfront_fee)
+        .upfront_fee_opt(upfront_fee.map(
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::UpfrontFee::Amount,
+        ))
         .ddtl_opt(None)
         .covenants_opt(None)
         .attributes(Default::default())

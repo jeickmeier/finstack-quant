@@ -30,13 +30,13 @@
             "undrawn": {
               "additionalProperties": false,
               "properties": {
-                "facility_limit": {
+                "commitment": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
                   "description": "Total facility commitment used to compute the undrawn amount."
                 }
               },
               "required": [
-                "facility_limit"
+                "commitment"
               ],
               "type": "object"
             }

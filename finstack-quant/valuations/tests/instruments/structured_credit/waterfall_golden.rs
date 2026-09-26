@@ -19,13 +19,14 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::WaterfallDistribution;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AllocationMode, AssetPool, DealType, ManagementFeeType, PaymentCalculation, PaymentType,
-    Recipient, RecipientType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-    Waterfall, WaterfallTier,
+    Recipient, RecipientType, Tranche, TrancheSeniority, TrancheStructure, Waterfall,
+    WaterfallTier,
 };
 use time::Duration;
 
@@ -103,7 +104,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         70.0,
         TrancheSeniority::Senior,
         Money::new(175_000_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -114,7 +115,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         85.0,
         TrancheSeniority::Mezzanine,
         Money::new(37_500_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.065 },
+        RateSpec::Fixed { rate: 0.065 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -125,7 +126,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         95.0,
         TrancheSeniority::Subordinated,
         Money::new(25_000_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.08 },
+        RateSpec::Fixed { rate: 0.08 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -136,7 +137,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         100.0,
         TrancheSeniority::Equity,
         Money::new(12_500_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.0 },
+        RateSpec::Fixed { rate: 0.0 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -501,7 +502,7 @@ fn test_golden_cmbs_sequential_pay() {
         70.0,
         TrancheSeniority::Senior,
         Money::new(350_000_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.04 },
+        RateSpec::Fixed { rate: 0.04 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -512,7 +513,7 @@ fn test_golden_cmbs_sequential_pay() {
         85.0,
         TrancheSeniority::Mezzanine,
         Money::new(75_000_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.045 },
+        RateSpec::Fixed { rate: 0.045 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -523,7 +524,7 @@ fn test_golden_cmbs_sequential_pay() {
         100.0,
         TrancheSeniority::Subordinated,
         Money::new(75_000_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -622,7 +623,7 @@ fn test_golden_cre_pro_rata_distribution() {
         95.0,
         TrancheSeniority::Equity,
         Money::new(47_500_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.08 },
+        RateSpec::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
     )
     .unwrap();
@@ -633,7 +634,7 @@ fn test_golden_cre_pro_rata_distribution() {
         100.0,
         TrancheSeniority::Equity,
         Money::new(2_500_000.0, currency).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.08 },
+        RateSpec::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
     )
     .unwrap();

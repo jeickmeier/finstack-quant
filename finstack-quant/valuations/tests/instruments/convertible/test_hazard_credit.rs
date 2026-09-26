@@ -163,21 +163,24 @@ fn deep_otm_convertible(steps: usize) -> ConvertibleBond {
     bond.conversion.ratio = Some(1e-6);
     bond.credit_curve_id = Some("USD-CREDIT".into());
     bond.recovery_rate = Some(0.0);
-    bond.fixed_coupon = Some(FixedCouponSpec {
-        coupon_type: CouponType::Cash,
-        rate: rust_decimal::Decimal::new(5, 2),
-        schedule: ScheduleParams {
-            frequency: Tenor::semi_annual(),
-            day_count: DayCount::Thirty360,
-            business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".into(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
-            adjust_accrual_dates: true,
-            roll_rule: RollRule::None,
-        },
-    });
+    bond.cashflow_spec =
+        finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+            FixedCouponSpec {
+                coupon_type: CouponType::Cash,
+                rate: rust_decimal::Decimal::new(5, 2),
+                schedule: ScheduleParams {
+                    frequency: Tenor::semi_annual(),
+                    day_count: DayCount::Thirty360,
+                    business_day_convention: BusinessDayConvention::Following,
+                    calendar_id: "weekends_only".into(),
+                    stub: StubKind::ShortFront,
+                    end_of_month: false,
+                    payment_lag_days: 0,
+                    adjust_accrual_dates: true,
+                    roll_rule: RollRule::None,
+                },
+            },
+        );
     with_tree_steps(&bond, steps)
 }
 

@@ -42,8 +42,9 @@ use finstack_quant_core::dates::{
     calendar::calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::InputError;
+use rust_decimal::Decimal;
 
 use super::spec::{
     AmortizationSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents,
@@ -52,92 +53,12 @@ use crate::cashflow::builder::specs::CouponType;
 use crate::cashflow::builder::FloatingRateSpec;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
+pub use crate::instruments::fixed_income::loan_terms::RateSpec;
+use crate::instruments::fixed_income::loan_terms::UpfrontFee;
 use crate::instruments::pricing_overrides::InstrumentPricingOverrides;
 
 fn default_settlement_days() -> u32 {
     2
-}
-
-/// Rate specification for term loans.
-///
-///  Defines whether the loan uses fixed or floating rate interest, with full
-/// support for floating rate features including floors, caps, and leverage.
-///
-/// # Variants
-///
-/// - [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points
-/// - [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits
-///
-/// # Examples
-///
-/// Fixed rate loan:
-/// ```rust
-/// use finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;
-///
-/// let fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed
-/// ```
-///
-/// Floating rate with floor:
-/// ```rust
-/// use finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;
-/// use finstack_quant_cashflows::builder::FloatingRateSpec;
-/// use finstack_quant_core::dates::Tenor;
-/// use finstack_quant_core::types::CurveId;
-/// use rust_decimal_macros::dec;
-///
-/// let floating = RateSpec::Floating(FloatingRateSpec {
-///     forward_curve_id: CurveId::new("USD-SOFR-3M"),
-///     spread_bp: dec!(300),     // +300 bp spread
-///     gearing: dec!(1),
-///     gearing_includes_spread: true,
-///     index_floor_bp: Some(dec!(0)),  // 0% floor
-///     all_in_floor_bp: None,
-///     all_in_cap_bp: None,
-///     index_cap_bp: None,
-///     overnight_index_constraints: Default::default(),
-///     reset_frequency: Tenor::quarterly(),
-///     index_tenor: None,
-///     reset_lag_days: 2,
-///     fixing_calendar_id: None,
-///     overnight_compounding: None,
-///     overnight_basis: None,
-///     fallback: Default::default(),
-/// });
-/// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[allow(clippy::large_enum_variant)]
-#[non_exhaustive]
-#[serde(rename_all = "snake_case")]
-pub enum RateSpec {
-    /// Fixed annual rate in basis points
-    Fixed {
-        /// Fixed rate in basis points (e.g., 600 = 6%)
-        rate_bp: i32,
-    },
-
-    /// Floating rate using canonical FloatingRateSpec.
-    ///
-    /// Uses the standard floating rate specification with full support
-    /// for floors, caps, gearing, and reset conventions.
-    ///
-    /// Every field of the spec is honored. The loan-level
-    /// `TermLoan::calendar_id` drives the payment schedule and business-day
-    /// adjustments; `fixing_calendar_id` (the loan calendar when unset) drives
-    /// the reset lag and overnight observations. Covenant and override margin
-    /// step-ups add to `spread_bp` from the next accrual period. Overnight
-    /// indices compound per `overnight_compounding` and apply index floors and
-    /// caps per `overnight_index_constraints` (each daily fixing by default).
-    Floating(FloatingRateSpec),
-}
-
-impl RateSpec {
-    /// Create a fixed-rate spec using a typed rate.
-    pub fn fixed_rate(rate: Rate) -> Self {
-        Self::Fixed {
-            rate_bp: rate.as_bp(),
-        }
-    }
 }
 
 /// Term loan instrument with covenant and DDTL support.
@@ -249,7 +170,9 @@ pub struct TermLoan {
     /// Optional credit curve identifier (defaults to discount_curve_id if None)
     pub credit_curve_id: Option<CurveId>,
 
-    /// Amortization specification
+    /// Scheduled principal amortization (the shared cashflows
+    /// `AmortizationSpec`). `LinearTo` and `StepRemaining` are rejected;
+    /// `PercentOfOriginalPerPeriod` and `LinearBetween` apply per funded draw.
     pub amortization: AmortizationSpec,
 
     /// Coupon split type (Cash/PIK/Split)
@@ -257,8 +180,10 @@ pub struct TermLoan {
     #[serde(default)]
     pub coupon_type: CouponType,
 
-    /// Upfront fee at issue (if any)
-    pub upfront_fee: Option<Money>,
+    /// Upfront (arrangement or OID) fee paid on `issue_date`, as an amount or
+    /// a fraction of the commitment (the DDTL `commitment`, else
+    /// `notional_limit`).
+    pub upfront_fee: Option<UpfrontFee>,
 
     /// Optional DDTL parameters; None => plain term loan
     pub ddtl: Option<DdtlSpec>,
@@ -361,8 +286,16 @@ impl TermLoan {
                 )));
             }
         }
-        if let Some(fee) = self.upfront_fee {
-            self.validate_money(fee, "upfront_fee", false)?;
+        match &self.upfront_fee {
+            Some(UpfrontFee::Amount(fee)) => self.validate_money(*fee, "upfront_fee", false)?,
+            Some(UpfrontFee::FractionOfCommitment(fraction))
+                if !(fraction.is_finite() && (0.0..=1.0).contains(fraction)) =>
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} upfront_fee.fraction_of_commitment must be in [0, 1]"
+                )));
+            }
+            _ => {}
         }
         self.validate_amortization(&context)?;
         if let Some(ddtl) = &self.ddtl {
@@ -383,15 +316,15 @@ impl TermLoan {
                         "{context} call prices must be positive and finite"
                     )));
                 }
-                if matches!(
-                    call.call_type,
-                    super::spec::LoanCallType::MakeWhole {
-                        treasury_spread_bp
-                    } if treasury_spread_bp < 0
-                ) {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "{context} make-whole treasury spread cannot be negative"
-                    )));
+                if let super::spec::LoanCallType::MakeWhole(spec) = &call.call_type {
+                    if !(spec.spread_bp.is_finite() && spec.spread_bp >= 0.0)
+                        || spec.reference_curve_id.as_str().trim().is_empty()
+                    {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "{context} call_schedule make_whole spread_bp must be finite and \
+                             non-negative with a non-empty reference_curve_id"
+                        )));
+                    }
                 }
             }
             if schedule
@@ -461,22 +394,29 @@ impl TermLoan {
     fn validate_amortization(&self, context: &str) -> finstack_quant_core::Result<()> {
         match &self.amortization {
             AmortizationSpec::None => {}
-            AmortizationSpec::Linear { start, end } => {
+            AmortizationSpec::LinearTo { .. } | AmortizationSpec::StepRemaining { .. } => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{context} amortization supports none, linear_between, \
+                     percent_of_original_per_period, percent_of_remaining_per_period and \
+                     custom_principal"
+                )));
+            }
+            AmortizationSpec::LinearBetween { start, end } => {
                 if *start < self.issue_date || *start >= *end || *end > self.maturity {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "{context} linear amortization dates must lie in loan life and be ordered"
                     )));
                 }
             }
-            AmortizationSpec::PercentPerPeriod { bp }
-            | AmortizationSpec::PercentOfOriginalNotional { bp } => {
-                if !(0..=10_000).contains(bp) {
+            AmortizationSpec::PercentOfRemainingPerPeriod { pct }
+            | AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
+                if !(pct.is_finite() && (0.0..=1.0).contains(pct)) {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "{context} amortization percentage must be in [0, 10000] bp"
+                        "{context} amortization pct must be a decimal in [0, 1]"
                     )));
                 }
             }
-            AmortizationSpec::Custom(items) => {
+            AmortizationSpec::CustomPrincipal { items } => {
                 let mut total = 0.0;
                 for (date, amount) in items {
                     if *date <= self.issue_date || *date > self.maturity {
@@ -500,17 +440,17 @@ impl TermLoan {
     }
 
     fn validate_ddtl(&self, ddtl: &DdtlSpec, context: &str) -> finstack_quant_core::Result<()> {
-        self.validate_money(ddtl.commitment_limit, "DDTL commitment_limit", true)?;
-        if self.notional_limit.amount() > ddtl.commitment_limit.amount() {
+        self.validate_money(ddtl.commitment, "ddtl.commitment", true)?;
+        if self.notional_limit.amount() > ddtl.commitment.amount() {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} notional_limit cannot exceed DDTL commitment_limit"
+                "{context} notional_limit cannot exceed ddtl.commitment"
             )));
         }
         if ddtl.availability_start < self.issue_date
             || ddtl.availability_start > ddtl.availability_end
             || ddtl.availability_end > self.maturity
-            || !(ddtl.usage_fee_bp.is_finite() && ddtl.usage_fee_bp >= 0.0)
-            || !(ddtl.commitment_fee_bp.is_finite() && ddtl.commitment_fee_bp >= 0.0)
+            || ddtl.usage_fee_bp < Decimal::ZERO
+            || ddtl.commitment_fee_bp < Decimal::ZERO
         {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} DDTL availability must lie inside the loan life and fees cannot be negative"
@@ -541,7 +481,7 @@ impl TermLoan {
                 "{context} DDTL draw dates must be strictly increasing"
             )));
         }
-        let mut prior_limit = ddtl.commitment_limit.amount();
+        let mut prior_limit = ddtl.commitment.amount();
         for step in &ddtl.commitment_steps {
             if step.date < ddtl.availability_start || step.date > ddtl.availability_end {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -554,9 +494,9 @@ impl TermLoan {
                     "{context} ddtl.commitment_steps amounts cannot increase"
                 )));
             }
-            if step.fee_bp != 0.0 {
+            if !step.reduction_fee_bp.is_zero() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} ddtl.commitment_steps carry no reduction fee; fee_bp must be 0"
+                    "{context} ddtl.commitment_steps carry no reduction fee; reduction_fee_bp must be 0"
                 )));
             }
             prior_limit = step.amount.amount();
@@ -573,7 +513,7 @@ impl TermLoan {
         match &ddtl.oid_policy {
             Some(
                 super::spec::OidPolicy::WithheldBp(bp) | super::spec::OidPolicy::SeparateBp(bp),
-            ) if !(0..=10_000).contains(bp) => {
+            ) if *bp < Decimal::ZERO || *bp > Decimal::from(10_000) => {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} ddtl.oid_policy basis points must be in [0, 10000]"
                 )));
@@ -583,9 +523,9 @@ impl TermLoan {
                 | super::spec::OidPolicy::SeparateAmount(amount),
             ) => {
                 self.validate_money(*amount, "DDTL OID amount", false)?;
-                if amount.amount() > ddtl.commitment_limit.amount() {
+                if amount.amount() > ddtl.commitment.amount() {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "{context} DDTL OID amount cannot exceed commitment_limit"
+                        "{context} DDTL OID amount cannot exceed ddtl.commitment"
                     )));
                 }
             }
@@ -600,7 +540,10 @@ impl TermLoan {
         context: &str,
     ) -> finstack_quant_core::Result<()> {
         for step in &covenants.margin_steps {
-            if step.date < self.issue_date || step.date > self.maturity || step.delta_bp < 0 {
+            if step.date < self.issue_date
+                || step.date > self.maturity
+                || step.delta_bp < Decimal::ZERO
+            {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{context} covenants.margin_steps must be non-negative and inside the loan life"
                 )));
@@ -683,7 +626,7 @@ impl TermLoan {
             .notional_limit(Money::from((10_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 01))
             .maturity(date!(2029 - 01 - 01))
-            .rate(RateSpec::Fixed { rate_bp: 600 }) // 6%
+            .rate(RateSpec::Fixed { rate: 0.06 })
             .frequency(Tenor::quarterly())
             .day_count(DayCount::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -691,7 +634,7 @@ impl TermLoan {
             .stub(StubKind::None)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .amortization(super::spec::AmortizationSpec::PercentPerPeriod { bp: 250 }) // 2.5% per period
+            .amortization(AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.025 })
             .coupon_type(crate::cashflow::builder::specs::CouponType::Cash)
             .upfront_fee_opt(None)
             .ddtl_opt(None)
@@ -714,7 +657,6 @@ impl TermLoan {
     pub fn example_floating_with_ddtl() -> finstack_quant_core::Result<Self> {
         use finstack_quant_core::dates::BusinessDayConvention;
         use finstack_quant_core::dates::StubKind;
-        use rust_decimal::Decimal;
         use time::macros::date;
 
         let floating_rate = FloatingRateSpec {
@@ -737,7 +679,7 @@ impl TermLoan {
         };
 
         let ddtl = DdtlSpec {
-            commitment_limit: Money::from((20_000_000_i64, Currency::USD)),
+            commitment: Money::from((20_000_000_i64, Currency::USD)),
             availability_start: date!(2024 - 01 - 15),
             availability_end: date!(2025 - 01 - 15),
             draws: vec![
@@ -753,10 +695,10 @@ impl TermLoan {
             commitment_steps: vec![super::super::loan_terms::CommitmentStep {
                 date: date!(2024 - 10 - 15),
                 amount: Money::from((15_000_000_i64, Currency::USD)),
-                fee_bp: 0.0,
+                reduction_fee_bp: Decimal::ZERO,
             }],
-            usage_fee_bp: 25.0,
-            commitment_fee_bp: 50.0,
+            usage_fee_bp: Decimal::from(25),
+            commitment_fee_bp: Decimal::from(50),
             fee_base: super::spec::CommitmentFeeBase::Undrawn,
             oid_policy: None,
         };
@@ -775,7 +717,7 @@ impl TermLoan {
             .stub(StubKind::ShortFront)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .amortization(AmortizationSpec::PercentOfOriginalNotional { bp: 100 })
+            .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.01 })
             .coupon_type(CouponType::Cash)
             .upfront_fee_opt(None)
             .ddtl_opt(Some(ddtl))
@@ -803,9 +745,10 @@ impl TermLoan {
                 super::spec::LoanCall {
                     date: date!(2025 - 01 - 15),
                     price_pct_of_par: 100.0,
-                    call_type: super::spec::LoanCallType::MakeWhole {
-                        treasury_spread_bp: 50,
-                    },
+                    call_type: super::spec::LoanCallType::MakeWhole(super::spec::MakeWholeSpec {
+                        reference_curve_id: CurveId::new("USD-OIS"),
+                        spread_bp: 50.0,
+                    }),
                 },
                 super::spec::LoanCall {
                     date: date!(2027 - 01 - 15),
@@ -826,7 +769,7 @@ impl TermLoan {
             .notional_limit(Money::from((30_000_000_i64, Currency::USD)))
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2031 - 01 - 15))
-            .rate(RateSpec::Fixed { rate_bp: 450 })
+            .rate(RateSpec::Fixed { rate: 0.045 })
             .frequency(Tenor::semi_annual())
             .day_count(DayCount::Thirty360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -993,13 +936,16 @@ impl finstack_quant_covenants::InstrumentMutator for TermLoan {
     }
 
     fn increase_rate(&mut self, increase: f64) -> finstack_quant_core::Result<()> {
-        let bp_increase = (increase * 10_000.0).round() as i32;
+        // Covenant margin increases apply in whole basis points.
+        let bp_increase = Decimal::from((increase * 10_000.0).round() as i64);
         match &mut self.rate {
-            RateSpec::Fixed { rate_bp } => {
-                *rate_bp += bp_increase;
+            RateSpec::Fixed { rate } => {
+                let stepped = finstack_quant_core::decimal::f64_to_decimal(*rate)?
+                    + bp_increase / Decimal::from(10_000);
+                *rate = finstack_quant_core::decimal::decimal_to_f64(stepped)?;
             }
             RateSpec::Floating(spec) => {
-                spec.spread_bp += rust_decimal::Decimal::new(bp_increase as i64, 0);
+                spec.spread_bp += bp_increase;
             }
         }
         self.validate()

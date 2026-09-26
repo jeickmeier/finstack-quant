@@ -9,46 +9,49 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Error;
 
-use crate::cashflow::builder::specs::{FixedCouponSpec, FloatingCouponSpec};
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::fixed_income::bond::CallPutSchedule;
+use crate::instruments::fixed_income::bond::{CallPutSchedule, CashflowSpec};
 use crate::instruments::model_params::ModelParamsSnapshot;
 
 use super::pricing;
 use crate::impl_instrument_base;
 
-/// Soft-call trigger condition for convertible bonds.
+/// Share-price trigger of a convertible bond: the last sale price must be at
+/// least `threshold_pct` of the conversion price on `required_days_above` of
+/// `observation_days` consecutive trading days.
 ///
-/// A soft call allows the issuer to call the bond only if the underlying stock
-/// price has been trading above a threshold (typically 130% of the conversion
-/// price) for a sustained period. This protects holders from having their
-/// conversion option terminated when the stock is only marginally above parity.
+/// Used for the issuer's soft call (`ConvertibleBond::soft_call_trigger`) and
+/// the holder's contingent conversion
+/// (`ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(..))`).
 ///
 /// # Industry Practice
 ///
-/// The standard soft-call trigger is:
-/// - **Threshold**: 130% of conversion price (most common)
-/// - **Observation period**: 20 of 30 consecutive trading days
+/// The standard trigger is 130% of the conversion price on 20 of 30
+/// consecutive trading days; some issues use 120% or 150%.
 ///
-/// Some issuances use 120% or 150% thresholds.
+/// # Modeling scope
+///
+/// The tree evaluates the trigger on the instantaneous node spot. The soft
+/// call applies a Broadie-Glasserman-Kou-style barrier shift scaled by
+/// `required_days_above / observation_days`; contingent conversion compares
+/// the node spot with the nominal level and does not model the observation
+/// window.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
-pub struct SoftCallTrigger {
-    /// Threshold as a percentage of conversion price (e.g., 130.0 = 130%).
-    ///
-    /// The issuer can only exercise the call if the stock price exceeds
-    /// `threshold_pct / 100 * conversion_price` for the required number of days.
+pub struct PriceTrigger {
+    /// Trigger level as a percent of the conversion price (`130.0` = 130%);
+    /// must exceed 100.
     pub threshold_pct: f64,
     /// Number of trading days in the observation window (e.g., 30).
     pub observation_days: u32,
-    /// Minimum number of days within the window that the stock must exceed
-    /// the threshold (e.g., 20 out of 30 days).
+    /// Minimum number of days within the window on which the share price
+    /// must be at or above the level (e.g., 20 of 30).
     pub required_days_above: u32,
 }
 
-impl Default for SoftCallTrigger {
+impl Default for PriceTrigger {
     /// Standard market convention: 130% trigger, 20 of 30 days.
     fn default() -> Self {
         Self {
@@ -59,32 +62,52 @@ impl Default for SoftCallTrigger {
     }
 }
 
-impl SoftCallTrigger {
-    /// Validate soft-call trigger parameters.
+impl PriceTrigger {
+    /// Share-price level of the trigger: `conversion_price × threshold_pct / 100`.
     ///
-    /// - `threshold_pct` must exceed 100% (otherwise the trigger is trivially satisfied).
+    /// # Arguments
+    ///
+    /// * `conversion_price` - Conversion price per share in the bond currency
+    ///   (face amount divided by the effective conversion ratio).
+    pub fn level(&self, conversion_price: f64) -> f64 {
+        conversion_price * (self.threshold_pct / 100.0)
+    }
+
+    /// Validate the trigger parameters.
+    ///
+    /// - `threshold_pct` must be finite and exceed 100% (otherwise the trigger
+    ///   is trivially satisfied).
     /// - `observation_days` and `required_days_above` must be non-zero.
     /// - `required_days_above` cannot exceed `observation_days`.
-    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+    ///
+    /// # Arguments
+    ///
+    /// * `field` - Wire path of the trigger quoted in error messages (e.g.
+    ///   `soft_call_trigger`).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` naming the violated rule.
+    pub fn validate(&self, field: &str) -> finstack_quant_core::Result<()> {
         if !self.threshold_pct.is_finite() || self.threshold_pct <= 100.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "soft-call threshold_pct ({:.1}%) must be finite and exceed 100%",
+                "{field}.threshold_pct ({:.1}%) must be finite and exceed 100%",
                 self.threshold_pct,
             )));
         }
         if self.observation_days == 0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "soft-call observation_days must be greater than zero".to_string(),
-            ));
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{field}.observation_days must be greater than zero"
+            )));
         }
         if self.required_days_above == 0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "soft-call required_days_above must be greater than zero".to_string(),
-            ));
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{field}.required_days_above must be greater than zero"
+            )));
         }
         if self.required_days_above > self.observation_days {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "soft-call required_days_above ({}) cannot exceed observation_days ({})",
+                "{field}.required_days_above ({}) cannot exceed observation_days ({})",
                 self.required_days_above, self.observation_days,
             )));
         }
@@ -169,7 +192,7 @@ pub struct ConvertibleBond {
     /// k-of-n-days observation window; the realized path is not tracked.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub soft_call_trigger: Option<SoftCallTrigger>,
+    pub soft_call_trigger: Option<PriceTrigger>,
     /// Number of business days from trade date to settlement date.
     ///
     /// When set, accrued interest and clean price are computed relative to the
@@ -196,12 +219,10 @@ pub struct ConvertibleBond {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recovery_rate: Option<f64>,
-    /// Fixed coupon specification (if applicable).
-    #[builder(optional)]
-    pub fixed_coupon: Option<FixedCouponSpec>,
-    /// Floating coupon specification (if applicable).
-    #[builder(optional)]
-    pub floating_coupon: Option<FloatingCouponSpec>,
+    /// Coupon leg (fixed, floating, step-up or amortizing), the same type as
+    /// `Bond.cashflow_spec`. A zero-coupon convertible is a fixed spec with
+    /// rate `0`.
+    pub cashflow_spec: CashflowSpec,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -349,13 +370,9 @@ pub enum ConversionEvent {
     QualifiedIpo,
     /// Change Of Control variant.
     ChangeOfControl,
-    /// Forced conversion if share price meets threshold for a lookback period.
-    PriceTrigger {
-        /// Threshold.
-        threshold: f64,
-        /// Lookback days.
-        lookback_days: u32,
-    },
+    /// Contingent conversion once the share price meets the trigger level
+    /// (a percent of the conversion price) over the observation window.
+    PriceTrigger(PriceTrigger),
 }
 
 /// Anti-dilution protection applied to conversion terms.
@@ -552,20 +569,8 @@ impl ConvertibleBond {
                 validate_conversion_date(*start, self.issue_date, self.maturity, "window start")?;
                 validate_conversion_date(*end, self.issue_date, self.maturity, "window end")?;
             }
-            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger {
-                threshold,
-                lookback_days,
-            }) => {
-                validation::validate_f64_positive(
-                    *threshold,
-                    "convertible price-trigger threshold",
-                )?;
-                if *lookback_days == 0 {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "convertible price-trigger lookback_days must be greater than zero"
-                            .to_string(),
-                    ));
-                }
+            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(trigger)) => {
+                trigger.validate("conversion.policy.upon_event.price_trigger")?;
             }
             ConversionPolicy::MandatoryVariable {
                 conversion_date,
@@ -641,17 +646,10 @@ impl ConvertibleBond {
             ));
         }
 
-        if self.fixed_coupon.is_some() && self.floating_coupon.is_some() {
-            return Err(finstack_quant_core::Error::Validation(
-                "convertible bond cannot have simultaneous fixed and floating coupon schedules"
-                    .to_string(),
-            ));
-        }
-        if let Some(fixed_coupon) = &self.fixed_coupon {
-            if fixed_coupon.rate.is_sign_negative() {
+        if let Some(rate) = self.cashflow_spec.fixed_coupon_rate() {
+            if rate < 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "convertible bond fixed coupon rate must be non-negative, got {}",
-                    fixed_coupon.rate
+                    "convertible bond cashflow_spec fixed coupon rate must be non-negative, got {rate}"
                 )));
             }
         }
@@ -670,7 +668,7 @@ impl ConvertibleBond {
             )));
         }
         if let Some(trigger) = &self.soft_call_trigger {
-            trigger.validate()?;
+            trigger.validate("soft_call_trigger")?;
         }
         if let Some(call_put) = &self.call_put {
             call_put.validate_for_life(self.issue_date, self.maturity, "Convertible bond")?;
@@ -799,7 +797,7 @@ impl ConvertibleBond {
             .spot_id(PriceId::new("TECH"))
             .vol_surface_id(CurveId::new("TECH-VOL"))
             .call_put_opt(None)
-            .fixed_coupon_opt(Some(FixedCouponSpec {
+            .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
                 coupon_type: CouponType::Cash,
                 rate: coupon_rate,
                 schedule: finstack_quant_cashflows::builder::ScheduleParams {
@@ -821,7 +819,6 @@ impl ConvertibleBond {
                     roll_rule: crate::cashflow::builder::specs::RollRule::None,
                 },
             }))
-            .floating_coupon_opt(None)
             .attributes(Attributes::new())
             .build()
     }
@@ -898,13 +895,13 @@ impl ConvertibleBond {
                     make_whole: None,
                 }],
             }))
-            .soft_call_trigger_opt(Some(SoftCallTrigger {
+            .soft_call_trigger_opt(Some(PriceTrigger {
                 threshold_pct: 130.0,
                 observation_days: 30,
                 required_days_above: 20,
             }))
             .recovery_rate_opt(Some(0.35))
-            .fixed_coupon_opt(Some(FixedCouponSpec {
+            .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
                 coupon_type: CouponType::Cash,
                 rate: coupon_rate,
                 schedule: finstack_quant_cashflows::builder::ScheduleParams {
@@ -926,7 +923,6 @@ impl ConvertibleBond {
                     roll_rule: crate::cashflow::builder::specs::RollRule::None,
                 },
             }))
-            .floating_coupon_opt(None)
             .attributes(Attributes::new())
             .build()
     }
@@ -1096,10 +1092,10 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
         }
-        if let Some(floating_coupon) = &self.floating_coupon {
-            deps.add_forward_curve(floating_coupon.rate_spec.forward_curve_id.clone());
+        if let Some(rate_spec) = self.cashflow_spec.floating_rate_spec() {
+            deps.add_forward_curve(rate_spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                floating_coupon.rate_spec.forward_curve_id.as_str(),
+                rate_spec.forward_curve_id.as_str(),
             ));
         }
         if let Some(call_put) = &self.call_put {
@@ -1134,7 +1130,7 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         if let Some(ref trigger) = self.soft_call_trigger {
-            trigger.validate()?;
+            trigger.validate("soft_call_trigger")?;
         }
         pricing::price_convertible_bond(
             self,
@@ -1239,15 +1235,14 @@ mod tests {
         let floating_bond = crate::instruments::fixed_income::bond::Bond::example_floating()
             .expect("floating bond example");
         let crate::instruments::fixed_income::bond::CashflowSpec::Floating(floating_coupon) =
-            floating_bond.cashflow_spec
+            &floating_bond.cashflow_spec
         else {
             unreachable!("floating example must have a floating coupon")
         };
         let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
             floating_coupon.rate_spec.forward_curve_id.as_str(),
         );
-        bond.fixed_coupon = None;
-        bond.floating_coupon = Some(floating_coupon);
+        bond.cashflow_spec = floating_bond.cashflow_spec.clone();
 
         let deps =
             crate::instruments::Instrument::market_dependencies(&bond).expect("dependencies");
@@ -1284,7 +1279,7 @@ mod tests {
             .contains("conversion.ratio"));
 
         bond.conversion.ratio = Some(25.0);
-        bond.soft_call_trigger = Some(SoftCallTrigger {
+        bond.soft_call_trigger = Some(PriceTrigger {
             threshold_pct: f64::NAN,
             observation_days: 30,
             required_days_above: 20,
@@ -1392,24 +1387,8 @@ mod tests {
     }
 
     #[test]
-    fn validation_rejects_double_coupon_and_inconsistent_conversion_quotes() {
+    fn validation_rejects_inconsistent_conversion_quotes() {
         let mut bond = ConvertibleBond::example().expect("example");
-        bond.floating_coupon = Some(
-            match crate::instruments::fixed_income::bond::Bond::example_floating()
-                .expect("floating example")
-                .cashflow_spec
-            {
-                crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => spec,
-                _ => unreachable!("floating example"),
-            },
-        );
-        assert!(bond
-            .validate_for_pricing()
-            .expect_err("simultaneous coupon schedules must fail")
-            .to_string()
-            .contains("simultaneous"));
-
-        bond.floating_coupon = None;
         bond.conversion.price = Some(100.0);
         assert!(bond
             .validate_for_pricing()

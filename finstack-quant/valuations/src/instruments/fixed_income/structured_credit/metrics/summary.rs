@@ -7,6 +7,7 @@
 //! cashflows, reusing the standalone calculators the registry wraps.
 
 use crate::constants::ONE_BASIS_POINT;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::metrics::{
     calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_spread_convexity,
     calculate_tranche_wal, calculate_tranche_z_spread,
@@ -14,7 +15,7 @@ use crate::instruments::fixed_income::structured_credit::metrics::{
 use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::{
     CallAssumption, CallScope, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows,
-    TrancheCoupon, TrancheSeniority,
+    TrancheSeniority,
 };
 use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
@@ -333,7 +334,7 @@ pub fn calculate_tranche_metrics(
         z_spread_bp * 1e-4,
         quote.settlement,
     )?;
-    let dm_bp = if matches!(tranche.coupon, TrancheCoupon::Floating(_)) {
+    let dm_bp = if matches!(tranche.coupon, RateSpec::Floating(_)) {
         Some(
             calculate_tranche_discount_margin(
                 projection_deal,
@@ -367,7 +368,7 @@ pub fn calculate_tranche_metrics(
             let z_spread =
                 calculate_tranche_z_spread(&flows.cashflows, curve, target_pv, quote.settlement)?;
             // The discount margin is the z-spread of a floater's projected flows.
-            let dm = matches!(tranche.coupon, TrancheCoupon::Floating(_)).then_some(z_spread);
+            let dm = matches!(tranche.coupon, RateSpec::Floating(_)).then_some(z_spread);
             (Some(wal), Some(z_spread), dm)
         }
     };

@@ -21,7 +21,7 @@ fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
             100.0,
             finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
             Money::new(100.0, currency).expect("valid money fixture"),
-            finstack_quant_valuations::instruments::fixed_income::structured_credit::TrancheCoupon::Fixed {
+            finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec::Fixed {
                 rate: 0.05,
             },
             Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),

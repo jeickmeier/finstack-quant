@@ -1,10 +1,11 @@
-//! Dated loan terms shared by term loans and revolving credit facilities.
+//! Loan terms shared by term loans, revolving credit facilities, asset-backed
+//! facilities and structured-credit notes.
 //!
-//! These are the contractual schedules a credit agreement carries beyond the
-//! coupon: commitment changes, margin and fee steps, letters of credit,
-//! upfront economics and the effective-interest-rate reporting switch. Both
-//! `TermLoan` and `RevolvingCredit` compose them so an analyst enters a term
-//! sheet the same way for either instrument.
+//! These are the contractual terms a credit agreement carries: the coupon
+//! ([`RateSpec`]), commitment changes, draws, margin and fee steps, letters of
+//! credit, upfront economics and the effective-interest-rate reporting switch.
+//! `TermLoan`, `RevolvingCredit` and `AssetBackedFacility` compose them so an
+//! analyst enters a term sheet the same way for any facility.
 //!
 //! # Quick Example
 //! ```rust
@@ -13,22 +14,210 @@
 //! };
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::money::Money;
+//! use rust_decimal_macros::dec;
 //! use time::macros::date;
 //!
 //! // Commitment steps down to 6M on 2027-01-15 with a 25 bp reduction fee.
 //! let step = CommitmentStep {
 //!     date: date!(2027 - 01 - 15),
 //!     amount: Money::new(6_000_000.0, Currency::USD)?,
-//!     fee_bp: 25.0,
+//!     reduction_fee_bp: dec!(25),
 //! };
 //! // Margin rises 100 bp on the same date.
-//! let margin = MarginStep { date: step.date, delta_bp: 100 };
-//! assert_eq!(margin.delta_bp, 100);
+//! let margin = MarginStep { date: step.date, delta_bp: dec!(100) };
+//! assert_eq!(margin.delta_bp, dec!(100));
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+use crate::cashflow::builder::FloatingRateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::Rate;
+use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
+
+/// Contractual coupon of a loan facility or note: a fixed all-in rate or a
+/// floating index plus spread.
+///
+/// Shared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`
+/// and structured-credit `Tranche.coupon`.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+///
+/// let fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in
+/// assert!(matches!(fixed, RateSpec::Fixed { .. }));
+/// ```
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[allow(clippy::large_enum_variant)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum RateSpec {
+    /// Fixed all-in annual rate.
+    Fixed {
+        /// Annual rate as a decimal (`0.06` = 6%).
+        rate: f64,
+    },
+    /// Floating index plus spread, with the canonical floor, cap, gearing and
+    /// reset conventions of [`FloatingRateSpec`].
+    Floating(FloatingRateSpec),
+}
+
+impl RateSpec {
+    /// Fixed-rate spec from a typed rate.
+    ///
+    /// # Arguments
+    ///
+    /// * `rate` - All-in annual rate; stored as its decimal value.
+    pub fn fixed_rate(rate: Rate) -> Self {
+        Self::Fixed {
+            rate: rate.as_decimal(),
+        }
+    }
+
+    /// Current rate for a date without an index lookup, as a decimal.
+    ///
+    /// Returns the fixed rate, or only the spread of a floating spec (use
+    /// [`Self::try_current_rate_with_index`] for the projected all-in rate).
+    ///
+    /// # Arguments
+    ///
+    /// * `_date` - Date the rate is wanted for; unused because neither arm
+    ///   reads market data.
+    pub fn current_rate(&self, _date: Date) -> f64 {
+        match self {
+            Self::Fixed { rate } => *rate,
+            Self::Floating(spec) => spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0,
+        }
+    }
+
+    /// Current rate including the index forward where applicable, as a
+    /// decimal.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Accrual start the rate is projected for.
+    /// * `context` - Market holding the forward curve and fixings named by
+    ///   the floating spec's `forward_curve_id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the forward curve or a required fixing is missing
+    /// or the projection fails.
+    pub fn try_current_rate_with_index(
+        &self,
+        date: Date,
+        context: &finstack_quant_core::market_data::context::MarketContext,
+    ) -> finstack_quant_core::Result<f64> {
+        let as_of = match self {
+            Self::Fixed { .. } => date,
+            Self::Floating(spec) => context
+                .get_forward(spec.forward_curve_id.as_str())?
+                .base_date(),
+        };
+        self.try_rate_for_period(date, as_of, context)
+    }
+
+    /// Contractual rate for an explicit accrual period, as a decimal.
+    ///
+    /// A floating rate whose reset date (accrual start less `reset_lag_days`
+    /// business days on the fixing calendar) is on or before `as_of` reads the
+    /// fixing series; later resets project from the forward curve.
+    ///
+    /// # Arguments
+    ///
+    /// * `accrual_start` - Start of the accrual period.
+    /// * `as_of` - Valuation date separating observed fixings from projections.
+    /// * `context` - Market holding the forward curve and fixings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the fixing calendar is unknown, a required fixing
+    /// is missing, a seasoned compounded-overnight coupon is requested, or
+    /// the projection fails.
+    pub fn try_rate_for_period(
+        &self,
+        accrual_start: Date,
+        as_of: Date,
+        context: &finstack_quant_core::market_data::context::MarketContext,
+    ) -> finstack_quant_core::Result<f64> {
+        match self {
+            Self::Fixed { rate } => Ok(*rate),
+            Self::Floating(spec) => {
+                let fwd = context.get_forward(spec.forward_curve_id.as_str())?;
+                let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+                let calendar_id = spec
+                    .fixing_calendar_id
+                    .as_deref()
+                    .unwrap_or("weekends_only");
+                let calendar =
+                    finstack_quant_core::dates::calendar_by_id(calendar_id).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "structured-credit tranche fixing calendar '{}' is not registered",
+                            calendar_id
+                        ))
+                    })?;
+                let reset_date = finstack_quant_core::dates::DateExt::add_business_days(
+                    accrual_start,
+                    -spec.reset_lag_days,
+                    calendar,
+                )?;
+                if reset_date <= as_of {
+                    if spec.overnight_compounding.is_some() {
+                        return Err(finstack_quant_core::Error::Validation(
+                            "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
+                                .into(),
+                        ));
+                    }
+                    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+                        context,
+                        spec.forward_curve_id.as_str(),
+                    )?;
+                    let raw =
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            Some(fixings),
+                            spec.forward_curve_id.as_str(),
+                            reset_date,
+                            as_of,
+                        )?;
+                    return Ok(
+                        crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                            raw, &params,
+                        ),
+                    );
+                }
+                crate::cashflow::builder::project_floating_rate(
+                    accrual_start,
+                    fwd.as_ref(),
+                    &params,
+                )
+            }
+        }
+    }
+}
+
+/// A scheduled draw `{date, amount}` on a committed facility.
+///
+/// A delayed-draw term loan funds on `date` (inside its availability
+/// window); an asset-backed facility funds on the first payment date on or
+/// after `date`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DrawEvent {
+    /// Date of the draw.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub date: Date,
+    /// Amount drawn from the available commitment, in the facility currency
+    /// (positive).
+    pub amount: Money,
+}
 
 /// Dated margin step (covenant penalty, scheduled change or pricing-grid move).
 ///
@@ -46,8 +235,13 @@ pub struct MarginStep {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub date: Date,
-    /// Change in margin, in basis points (100 = 1%); negative steps down.
-    pub delta_bp: i32,
+    /// Change in margin, in basis points (`100` = 1%); negative steps down.
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub delta_bp: Decimal,
 }
 
 /// Optional configuration for effective interest rate (EIR) amortization schedules.
@@ -80,7 +274,7 @@ impl Default for OidEirSpec {
 ///
 /// A delayed-draw term loan (`DdtlSpec::commitment_steps`) accepts only
 /// non-increasing steps inside its availability window and no reduction fee
-/// (`fee_bp` must be `0.0`).
+/// (`reduction_fee_bp` must be zero).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -97,11 +291,15 @@ pub struct CommitmentStep {
     /// availability, as at a term-out). The drawn balance plus outstanding
     /// letters of credit must not exceed it.
     pub amount: Money,
-    /// Reduction or cancellation fee, in basis points of the reduced amount,
-    /// paid by the borrower on `date` when the commitment steps down. Ignored
-    /// on a step up. Defaults to `0.0`.
-    #[serde(default)]
-    pub fee_bp: f64,
+    /// One-off reduction or cancellation fee, in basis points of the reduced
+    /// amount (not per annum), paid by the borrower on `date` when the
+    /// commitment steps down. Ignored on a step up. Defaults to zero.
+    #[serde(default, with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub reduction_fee_bp: Decimal,
 }
 
 /// A dated change of a revolving facility's running fees.
@@ -154,7 +352,7 @@ pub struct ScheduledFee {
 
 /// Upfront (arrangement or original-issue-discount) fee of a facility.
 ///
-/// Paid by the borrower to the lender on the commitment date. Enters the
+/// Paid by the borrower to the lender on the issue date. Enters the
 /// present value only while the commitment date lies after the valuation
 /// date, and the effective-interest-rate metrics always.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

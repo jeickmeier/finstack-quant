@@ -45,10 +45,10 @@ rationale = "TermLoan.rate: RateSpec lacks PartialEq across fixed, floating, and
 tag = "revolving_credit"
 fixture = "json_examples/revolving_credit.json"
 lossless = false
-partial_eq_blocker = "RevolvingCredit.base_rate_spec: BaseRateSpec"
+partial_eq_blocker = "RevolvingCredit.rate: RateSpec"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "RevolvingCredit.base_rate_spec: BaseRateSpec lacks PartialEq across index and fallback terms."
+rationale = "RevolvingCredit.rate: RateSpec lacks PartialEq across index and fallback terms."
 
 [[instrument]]
 tag = "asset_backed_facility"

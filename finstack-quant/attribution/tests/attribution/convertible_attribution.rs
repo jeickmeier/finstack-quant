@@ -82,8 +82,10 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                fixed_coupon,
+            ),
         instrument_pricing_overrides:
             finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
         metric_pricing_overrides: Default::default(),

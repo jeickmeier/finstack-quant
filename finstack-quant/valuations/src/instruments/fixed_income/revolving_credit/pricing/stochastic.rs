@@ -86,7 +86,7 @@ impl RevolvingCreditPricer {
         facility.validate()?;
         let enhanced = Self::price_monte_carlo(facility, market, as_of)?;
         let num_paths = enhanced.path_results.len() as f64;
-        let ccy = facility.commitment_amount.currency();
+        let ccy = facility.commitment.currency();
 
         // Insertion order of the first appearance keeps the schedule stable
         // (paths share dates and emission order).
@@ -137,7 +137,7 @@ impl RevolvingCreditPricer {
                     projected_fixings: Vec::new(),
                     representation: CashflowRepresentation::Projected,
                     calendar_ids: Vec::new(),
-                    facility_limit: Some(facility.commitment_amount),
+                    commitment: Some(facility.commitment),
                     issue_date: Some(facility.issue_date),
                     maturity: None,
                 },
@@ -323,7 +323,7 @@ impl RevolvingCreditPricer {
             .map(|r| r.draw_option_cost.amount())
             .collect();
         let use_antithetic = run.antithetic && !stoch_spec.use_sobol_qmc;
-        let currency = facility.commitment_amount.currency();
+        let currency = facility.commitment.currency();
         let estimate = MoneyEstimate::from_estimate(path_estimate(&pvs, use_antithetic), currency)?;
         let draw_option_cost =
             MoneyEstimate::from_estimate(path_estimate(&costs, use_antithetic), currency)?;

@@ -562,7 +562,7 @@ mod tests {
             projected_fixings: Vec::new(),
             representation: CashflowRepresentation::Contractual,
             calendar_ids: vec!["weekends_only".to_string()],
-            facility_limit: Some(Money::from((500_i64, Currency::USD))),
+            commitment: Some(Money::from((500_i64, Currency::USD))),
             issue_date: Some(date),
             maturity: None,
         };
@@ -581,7 +581,7 @@ mod tests {
             notional.initial.amount()
         );
         assert_eq!(schedule.meta.issue_date, meta.issue_date);
-        assert_eq!(schedule.meta.facility_limit, meta.facility_limit);
+        assert_eq!(schedule.meta.commitment, meta.commitment);
         assert_eq!(schedule.meta.calendar_ids, meta.calendar_ids);
     }
 }

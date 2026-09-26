@@ -14,10 +14,11 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, AssetPool, CoverageTestSpec, DealType, HedgeSwap,
     PaymentType, PoolAsset, Recipient, StructuredCredit, SwapPriority, Tranche, TrancheCashflows,
-    TrancheCoupon, TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
+    TrancheSeniority, TrancheStructure, Waterfall, WaterfallContext, WaterfallTier,
 };
 use finstack_quant_valuations::instruments::PayReceive;
 use time::macros::date;
@@ -88,7 +89,7 @@ fn abs(hedged: bool) -> StructuredCredit {
             80.0,
             TrancheSeniority::Senior,
             usd(80_000_000.0),
-            TrancheCoupon::Floating(floating(150.0)),
+            RateSpec::Floating(floating(150.0)),
             MATURITY,
         )
         .expect("senior"),
@@ -98,7 +99,7 @@ fn abs(hedged: bool) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(20_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             MATURITY,
         )
         .expect("equity"),
@@ -279,7 +280,7 @@ fn swap_payments_rank_as_fees_and_tighten_the_ic_test() {
     // A's coupon needs the SOFR fixing; use a fixed-coupon twin of the deal
     // for the executor-level comparison.
     let mut fixed_deal = deal;
-    fixed_deal.tranches.tranches[0].coupon = TrancheCoupon::Fixed { rate: 0.055 };
+    fixed_deal.tranches.tranches[0].coupon = RateSpec::Fixed { rate: 0.055 };
     let without = execute_waterfall(
         &waterfall,
         &fixed_deal.tranches,

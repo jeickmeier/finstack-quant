@@ -17,12 +17,12 @@ Import path:
 | Item | Purpose |
 |------|---------|
 | `TermLoan` | The runtime instrument. Build with `TermLoan::builder()`; examples: `example`, `example_floating_with_ddtl`, `example_callable`. |
-| `RateSpec` | `Fixed { rate_bp }` or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
-| `AmortizationSpec` | `None` (bullet), `Linear { start, end }`, `PercentPerPeriod { bp }`, `PercentOfOriginalNotional { .. }`, `Custom(..)`. |
+| `RateSpec` | The shared `loan_terms::RateSpec`: `Fixed { rate }` (decimal) or `Floating(FloatingRateSpec)` (floors, caps, gearing, reset lag). |
+| `AmortizationSpec` | The shared cashflows `AmortizationSpec`: `None` (bullet), `LinearBetween { start, end }`, `PercentOfRemainingPerPeriod { pct }`, `PercentOfOriginalPerPeriod { pct }`, `CustomPrincipal { items }`; `LinearTo` and `StepRemaining` are rejected. |
 | `DdtlSpec`, `DrawEvent`, `CommitmentStep`, `CommitmentFeeBase` | Delayed-draw commitment, draw calendar, step-downs (the `loan_terms::CommitmentStep` shared with the revolver; no reduction fee), commitment/usage fee bases. |
 | `TermLoanCovenantEvents`, `MarginStep`, `PikToggle`, `CashSweepEvent` | Covenant-driven margin steps (`margin_steps`), PIK toggles, cash sweeps, draw-stop dates. |
 | `OidPolicy`, `OidEirSpec` | OID withheld from proceeds vs tracked separately, plus EIR amortization settings. |
-| `LoanCallSchedule`, `LoanCall`, `LoanCallType` | Borrower prepayment options: `Hard`, `Soft`, `MakeWhole { treasury_spread_bp }`. |
+| `LoanCallSchedule`, `LoanCall`, `LoanCallType` | Borrower prepayment options: `Hard`, `Soft`, `MakeWhole(MakeWholeSpec)` (the bond `MakeWholeSpec`). |
 | `TermLoanDiscountingPricer`, `TermLoanTreePricer` | The two registered pricers. |
 
 Field-level documentation is in the rustdoc; this file covers the layout,
@@ -67,13 +67,13 @@ let loan = TermLoan::builder()
     .notional_limit(Money::new(10_000_000.0, Currency::USD)?)
     .issue_date(date!(2024 - 01 - 01))
     .maturity(date!(2029 - 01 - 01))
-    .rate(RateSpec::Fixed { rate_bp: 600 })          // 6.00%
+    .rate(RateSpec::Fixed { rate: 0.06 })            // 6.00%
     .frequency(Tenor::quarterly())
     .day_count(DayCount::Act360)
     .business_day_convention(BusinessDayConvention::ModifiedFollowing)
     .stub(StubKind::None)
     .discount_curve_id(CurveId::new("USD-OIS"))
-    .amortization(AmortizationSpec::PercentPerPeriod { bp: 250 })
+    .amortization(AmortizationSpec::PercentOfRemainingPerPeriod { pct: 0.025 })
     .coupon_type(CouponType::Cash)
     .instrument_pricing_overrides(InstrumentPricingOverrides::default())
     .attributes(Attributes::new())
@@ -85,13 +85,14 @@ Notes that bite:
 - Every `Option<T>` field has two setters: `.ddtl(spec)` for the inner value,
   `.ddtl_opt(Some(spec))` for the `Option` — the builder rejects a build that
   leaves a required field unset.
-- Rate inputs on the spec types are **integer basis points** (`rate_bp`,
-  `treasury_spread_bp`, `AmortizationSpec::PercentPerPeriod { bp }`); the DDTL
-  running fees `usage_fee_bp` and `commitment_fee_bp` are `f64` basis points,
-  matching the revolver's fee units.
+- The fixed rate and amortization percentages are **decimals** (`rate: 0.06`,
+  `pct: 0.025`); contractual margin and fee inputs (`MarginStep.delta_bp`, the
+  DDTL `usage_fee_bp` / `commitment_fee_bp`, `OidPolicy::*Bp`) are `Decimal`
+  basis points (JSON strings); the make-whole `spread_bp` is an `f64` model
+  input.
 - `notional_limit` is the *commitment*, not the funded balance. Without a
   `DdtlSpec` the loan funds the full commitment at issue.
-- `AmortizationSpec::PercentPerPeriod { bp }` applies to the **declining**
+- `AmortizationSpec::PercentOfRemainingPerPeriod { pct }` applies to the **declining**
   outstanding balance, so dollar amortization decays geometrically. It is not a
   flat percentage of original notional.
 - Every `FloatingRateSpec` field is honored. The loan-level `calendar_id`

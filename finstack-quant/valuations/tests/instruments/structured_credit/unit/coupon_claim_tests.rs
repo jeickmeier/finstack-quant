@@ -8,9 +8,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    run_simulation, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -48,7 +49,7 @@ fn capital_structure() -> TrancheStructure {
             60.0,
             TrancheSeniority::Senior,
             usd(60_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity(),
         )
         .expect("A"),
@@ -58,7 +59,7 @@ fn capital_structure() -> TrancheStructure {
             80.0,
             TrancheSeniority::Mezzanine,
             usd(20_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.07 },
+            RateSpec::Fixed { rate: 0.07 },
             maturity(),
         )
         .expect("B"),
@@ -68,7 +69,7 @@ fn capital_structure() -> TrancheStructure {
             100.0,
             TrancheSeniority::Equity,
             usd(20_000_000.0),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity(),
         )
         .expect("E"),

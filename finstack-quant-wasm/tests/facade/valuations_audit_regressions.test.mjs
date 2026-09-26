@@ -62,7 +62,7 @@ test('convertible cross gamma follows scalar and override volatility', () => {
   );
   const spec = fixture.instrument.instrument.spec;
   spec.call_put = null;
-  spec.fixed_coupon = null;
+  spec.cashflow_spec.fixed.rate = "0";
   spec.conversion.ratio = 10;
   const price = (spot, vol, metrics = []) => {
     fixture.market.prices.AAPL.unitless = spot;

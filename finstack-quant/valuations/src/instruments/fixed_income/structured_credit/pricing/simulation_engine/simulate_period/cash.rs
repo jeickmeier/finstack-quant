@@ -30,7 +30,7 @@ pub(super) fn record_opening_accruals(
             .try_rate_for_period(period.accrual_start, as_of, context)?;
         if matches!(
             tranche.coupon,
-            crate::instruments::fixed_income::structured_credit::TrancheCoupon::Floating(_)
+            crate::instruments::fixed_income::loan_terms::RateSpec::Floating(_)
         ) {
             rate = (rate + state.floating_rate_shift).max(0.0);
         }

@@ -436,10 +436,10 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     // A floating coupon rides the simulated rate path (shift-then-floor,
     // matching the engine's interest-due kernel). Fixed coupons are contractual.
     let rate = match tranche.coupon {
-        crate::instruments::fixed_income::structured_credit::types::TrancheCoupon::Floating(_) => {
+        crate::instruments::fixed_income::loan_terms::RateSpec::Floating(_) => {
             (rate + context.floating_rate_shift).max(0.0)
         }
-        _ => rate,
+        crate::instruments::fixed_income::loan_terms::RateSpec::Fixed { .. } => rate,
     };
     // The waterfall spec defines the CLAIM the test measures coverage of:
     // capped claims accrue at the capped rate (applied after the shift, like
@@ -694,8 +694,9 @@ fn uncapped_claims(ids: &[&'static str]) -> HashMap<&'static str, Option<f64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
-        AssetPool, DealType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, Tranche, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -718,7 +719,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
         .expect("Valid tranche");
@@ -765,7 +766,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
         .expect("Valid tranche");
@@ -814,7 +815,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
         .expect("Valid tranche");
@@ -871,7 +872,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
         .expect("Valid tranche");
@@ -933,7 +934,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
         .expect("Valid tranche");
@@ -1012,7 +1013,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
         .expect("Valid tranche");
@@ -1077,7 +1078,7 @@ mod tests {
     fn test_same_seniority_notes_get_distinct_priorities_and_oc_denominator() {
         use finstack_quant_core::dates::Date as D;
         let mat = D::from_calendar_date(2034, Month::January, 1).expect("date");
-        let cpn = || TrancheCoupon::Fixed { rate: 0.05 };
+        let cpn = || RateSpec::Fixed { rate: 0.05 };
         // Three Senior notes at distinct attachment points + an Equity note.
         // Capital stack (most senior first, lowest attachment): A-1 0-25,
         // A-2 25-50, A-3 50-75, Equity 75-100. Passed in seniority order.
@@ -1179,7 +1180,7 @@ mod tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
         )
         .expect("Valid tranche");
@@ -1226,8 +1227,9 @@ mod tests {
 mod haircut_tests {
     use super::*;
     use crate::cashflow::builder::FloatingRateSpec;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
     use crate::instruments::fixed_income::structured_credit::types::{
-        AssetPool, DealType, PoolAsset, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, PoolAsset, Tranche, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -1269,7 +1271,7 @@ mod haircut_tests {
             100.0,
             TrancheSeniority::Senior,
             Money::from((500_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity(),
         )
         .expect("tranche")])
@@ -1439,7 +1441,7 @@ mod haircut_tests {
             50.0,
             TrancheSeniority::Senior,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.04 },
+            RateSpec::Fixed { rate: 0.04 },
             maturity,
         )
         .expect("senior tranche");
@@ -1449,7 +1451,7 @@ mod haircut_tests {
             100.0,
             TrancheSeniority::Subordinated,
             Money::from((100_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.16 },
+            RateSpec::Fixed { rate: 0.16 },
             maturity,
         )
         .expect("test tranche");
@@ -1530,7 +1532,7 @@ mod haircut_tests {
         let fixing = ScalarTimeSeries::new(fixing_series_id("USD-3M"), vec![(as_of, 0.04)], None)
             .expect("fixing series");
         let market = MarketContext::new().insert(forward).insert_series(fixing);
-        let floating_coupon = TrancheCoupon::Floating(FloatingRateSpec {
+        let floating_coupon = RateSpec::Floating(FloatingRateSpec {
             forward_curve_id,
             spread_bp: Decimal::from(100),
             gearing: Decimal::ONE,

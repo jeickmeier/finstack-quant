@@ -11,9 +11,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, PricingMode, StructuredCredit, Tranche, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, PricingMode, StructuredCredit, Tranche, TrancheSeniority,
+    TrancheStructure,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use std::hint::black_box;
@@ -46,7 +47,7 @@ fn single_tranche_structure(balance: f64) -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(balance, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         legal_maturity(),
     )
     .unwrap();

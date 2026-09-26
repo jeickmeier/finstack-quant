@@ -13,9 +13,9 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_core::types::InstrumentId;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, AssetType, DealType, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    AssetPool, AssetType, DealType, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -85,7 +85,7 @@ fn create_test_tranches() -> TrancheStructure {
         10.0,
         TrancheSeniority::Equity,
         Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Fixed { rate: 0.15 },
+        RateSpec::Fixed { rate: 0.15 },
         maturity_date(),
     )
     .expect("Failed to create equity tranche");
@@ -96,7 +96,7 @@ fn create_test_tranches() -> TrancheStructure {
         100.0,
         TrancheSeniority::Senior,
         Money::new(135_000_000.0, Currency::USD).expect("valid money fixture"),
-        TrancheCoupon::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+        RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
             forward_curve_id: finstack_quant_core::types::CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

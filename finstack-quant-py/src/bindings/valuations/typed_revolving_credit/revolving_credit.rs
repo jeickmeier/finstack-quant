@@ -24,8 +24,9 @@ use crate::bindings::valuations::PyValuationResult;
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_cashflows::traits::CashflowScheduleSource;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees, RevolvingCreditPricer,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees, RevolvingCreditPricer,
 };
 use finstack_quant_valuations::instruments::InstrumentJson;
 
@@ -400,15 +401,15 @@ impl PyRevolvingCredit {
 
     /// Total committed amount.
     #[getter]
-    fn commitment_amount(&self) -> PyMoney {
-        money_to_py(self.inner.commitment_amount)
+    fn commitment(&self) -> PyMoney {
+        money_to_py(self.inner.commitment)
     }
 
     /// Drawn balance at the simulation anchor (the later of the commitment
     /// and valuation dates), in both deterministic and stochastic mode.
     #[getter]
-    fn drawn_amount(&self) -> PyMoney {
-        money_to_py(self.inner.drawn_amount)
+    fn drawn(&self) -> PyMoney {
+        money_to_py(self.inner.drawn)
     }
 
     /// Date the facility becomes available, as ``datetime.date``.
@@ -423,11 +424,11 @@ impl PyRevolvingCredit {
         date_to_py(py, self.inner.maturity)
     }
 
-    /// Base-rate specification as its serde ``dict`` (``{"fixed": {"rate": r}}``
-    /// or ``{"floating": {...}}``).
+    /// Coupon specification as its serde ``dict`` (``{"fixed": {"rate": r}}``
+    /// with a decimal rate, or ``{"floating": {...}}``).
     #[getter]
-    fn base_rate_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.base_rate_spec)
+    fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.rate)
     }
 
     /// Interest accrual day count.
@@ -449,7 +450,8 @@ impl PyRevolvingCredit {
     }
 
     /// Scheduled commitment changes as a ``list`` of serde ``dict`` rows
-    /// (``date``, ``amount``, ``fee_bp``), empty when the commitment is flat.
+    /// (``date``, ``amount``, ``reduction_fee_bp``), empty when the commitment
+    /// is flat.
     #[getter]
     fn commitment_steps<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.commitment_steps)
@@ -601,10 +603,10 @@ impl PyRevolvingCredit {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "RevolvingCredit(id={:?}, commitment_amount={}, drawn_amount={}, maturity={}, stochastic={})",
+            "RevolvingCredit(id={:?}, commitment={}, drawn={}, maturity={}, stochastic={})",
             self.inner.id.as_str(),
-            money_repr(self.inner.commitment_amount),
-            money_repr(self.inner.drawn_amount),
+            money_repr(self.inner.commitment),
+            money_repr(self.inner.drawn),
             self.inner.maturity,
             self.inner.is_stochastic(),
         )
@@ -615,7 +617,7 @@ impl PyRevolvingCredit {
 /// `FinancialBuilder`-generated builder (consuming setters).
 ///
 /// Builders are consumed by ``build()``; create a new builder per facility.
-/// Nested specs (``base_rate_spec`` when floating, ``fees``,
+/// Nested specs (``rate`` when floating, ``fees``,
 /// ``draw_repay_spec``) accept a ``dict`` or a JSON ``str`` in the Rust
 /// serde shape.
 ///
@@ -628,11 +630,11 @@ impl PyRevolvingCredit {
 /// >>> facility = (
 /// ...     RevolvingCredit.builder()
 /// ...     .id("RCF-1")
-/// ...     .commitment_amount(Money(50_000_000.0, Currency("USD")))
-/// ...     .drawn_amount(Money(10_000_000.0, Currency("USD")))
+/// ...     .commitment(Money(50_000_000.0, Currency("USD")))
+/// ...     .drawn(Money(10_000_000.0, Currency("USD")))
 /// ...     .issue_date(datetime.date(2024, 1, 15))
 /// ...     .maturity(datetime.date(2027, 1, 15))
-/// ...     .base_rate_spec(0.06)
+/// ...     .rate(0.06)
 /// ...     .day_count("act_360")
 /// ...     .frequency("3M")
 /// ...     .fees_flat(25.0, 10.0, 5.0)
@@ -709,15 +711,15 @@ impl PyRevolvingCreditBuilder {
     ///     If ``value`` is neither ``Money`` nor a number.
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
-    fn commitment_amount<'py>(
+    fn commitment<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "commitment_amount")?;
+        let money = money_from_py(value, currency, "commitment")?;
         let b = take_builder(&mut slf)?;
-        slf.inner = Some(b.commitment_amount(money));
-        slf.fields.push(("commitment_amount", money_repr(money)));
+        slf.inner = Some(b.commitment(money));
+        slf.fields.push(("commitment", money_repr(money)));
         Ok(slf)
     }
 
@@ -746,15 +748,15 @@ impl PyRevolvingCreditBuilder {
     ///     If ``value`` is neither ``Money`` nor a number.
     #[pyo3(signature = (value, currency=None))]
     #[pyo3(text_signature = "($self, value, currency=None)")]
-    fn drawn_amount<'py>(
+    fn drawn<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = money_from_py(value, currency, "drawn_amount")?;
+        let money = money_from_py(value, currency, "drawn")?;
         let b = take_builder(&mut slf)?;
-        slf.inner = Some(b.drawn_amount(money));
-        slf.fields.push(("drawn_amount", money_repr(money)));
+        slf.inner = Some(b.drawn(money));
+        slf.fields.push(("drawn", money_repr(money)));
         Ok(slf)
     }
 
@@ -814,13 +816,13 @@ impl PyRevolvingCreditBuilder {
         Ok(slf)
     }
 
-    /// Set the base rate.
+    /// Set the facility coupon.
     ///
     /// Parameters
     /// ----------
     /// value : float | dict | str
     ///     A bare decimal builds a fixed rate (``0.06`` = 6%); a ``dict`` or
-    ///     JSON ``str`` in the ``BaseRateSpec`` serde shape
+    ///     JSON ``str`` in the ``RateSpec`` serde shape
     ///     (``{"fixed": {"rate": 0.06}}`` or ``{"floating": {...}}`` with a
     ///     ``FloatingRateSpec``) is used verbatim.
     ///
@@ -835,20 +837,20 @@ impl PyRevolvingCreditBuilder {
     ///     If the spec does not match the serde shape or the builder was
     ///     already consumed.
     #[pyo3(text_signature = "($self, value)")]
-    fn base_rate_spec<'py>(
+    fn rate<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'py>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let spec: BaseRateSpec = if let Ok(rate) = value.extract::<f64>() {
-            BaseRateSpec::Fixed { rate }
+        let spec: RateSpec = if let Ok(rate) = value.extract::<f64>() {
+            RateSpec::Fixed { rate }
         } else {
-            spec_from_py(py, value, "base_rate_spec")?
+            spec_from_py(py, value, "rate")?
         };
         let repr = serde_json::to_string(&spec).unwrap_or_default();
         let b = take_builder(&mut slf)?;
-        slf.inner = Some(b.base_rate_spec(spec));
-        slf.fields.push(("base_rate_spec", repr));
+        slf.inner = Some(b.rate(spec));
+        slf.fields.push(("rate", repr));
         Ok(slf)
     }
 
@@ -952,10 +954,11 @@ impl PyRevolvingCreditBuilder {
     /// Parameters
     /// ----------
     /// value : list[dict[str, Any]] | str
-    ///     Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict, "fee_bp":
-    ///     float}`` (a ``list`` of dicts or a JSON ``str``), each the
-    ///     commitment in force from its date; ``fee_bp`` is the reduction fee
-    ///     on a step down, in basis points of the reduced amount. Dates must
+    ///     Rows of ``{"date": "YYYY-MM-DD", "amount": Money-dict,
+    ///     "reduction_fee_bp": str}`` (a ``list`` of dicts or a JSON ``str``),
+    ///     each the commitment in force from its date; ``reduction_fee_bp`` is
+    ///     the one-off reduction fee on a step down, a decimal string in basis
+    ///     points of the reduced amount (default ``"0"``). Dates must
     ///     be strictly increasing, after the commitment date and on or before
     ///     maturity.
     ///
@@ -1097,7 +1100,8 @@ impl PyRevolvingCreditBuilder {
     /// Parameters
     /// ----------
     /// value : list[dict[str, Any]] | str
-    ///     Rows of ``{"date": "YYYY-MM-DD", "delta_bp": int}`` (a ``list`` of
+    ///     Rows of ``{"date": "YYYY-MM-DD", "delta_bp": str}`` (a decimal
+    ///     string in basis points; a ``list`` of
     ///     dicts or a JSON ``str``); each delta shifts the floating spread or
     ///     the fixed rate from its date, cumulatively. Dates must be strictly
     ///     increasing and strictly inside the facility life.

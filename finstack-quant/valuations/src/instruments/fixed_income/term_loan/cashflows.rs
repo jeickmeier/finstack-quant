@@ -14,6 +14,7 @@ use crate::instruments::fixed_income::term_loan::types::TermLoan;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
 
@@ -73,7 +74,7 @@ pub(crate) fn generate_cashflows(
             if let Some(oid) = &ddtl.oid_policy {
                 match oid {
                     super::spec::OidPolicy::WithheldBp(bp) => {
-                        let pct = f64::from(*bp) * 1e-4;
+                        let pct = bp_to_f64(*bp)? * 1e-4;
                         cash_inflow =
                             Money::new(ev.amount.amount() * (1.0 - pct), ev.amount.currency())?;
                     }
@@ -83,7 +84,7 @@ pub(crate) fn generate_cashflows(
                             .checked_sub(Money::new(m.amount() * draw_share, m.currency())?)?;
                     }
                     super::spec::OidPolicy::SeparateBp(bp) => {
-                        let pct = f64::from(*bp) * 1e-4;
+                        let pct = bp_to_f64(*bp)? * 1e-4;
                         let fee_amt = Money::new(ev.amount.amount() * pct, ev.amount.currency())?;
                         if fee_amt.amount() > 0.0 {
                             fees.push(FeeSpec::Fixed {
@@ -123,7 +124,12 @@ pub(crate) fn generate_cashflows(
     }
 
     // Upfront fee
-    if let Some(fee) = loan.upfront_fee {
+    if let Some(upfront) = &loan.upfront_fee {
+        let commitment = loan
+            .ddtl
+            .as_ref()
+            .map_or(loan.notional_limit, |ddtl| ddtl.commitment);
+        let fee = upfront.amount(commitment);
         if fee.amount() > 0.0 {
             fees.push(FeeSpec::Fixed {
                 date: loan.issue_date,
@@ -174,7 +180,14 @@ pub(crate) fn generate_cashflows(
     // Amortization → principal events
     match &loan.amortization {
         super::spec::AmortizationSpec::None => {}
-        super::spec::AmortizationSpec::Custom(items) => {
+        super::spec::AmortizationSpec::LinearTo { .. }
+        | super::spec::AmortizationSpec::StepRemaining { .. } => {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Term loan '{}' amortization does not support linear_to or step_remaining",
+                loan.id.as_str()
+            )));
+        }
+        super::spec::AmortizationSpec::CustomPrincipal { items } => {
             for (dt, amt) in items {
                 principal_events.push(PrincipalEvent {
                     date: *dt,
@@ -185,8 +198,8 @@ pub(crate) fn generate_cashflows(
                 });
             }
         }
-        super::spec::AmortizationSpec::PercentPerPeriod { bp } => {
-            let pct = f64::from(*bp) * 1e-4;
+        super::spec::AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
+            let pct = *pct;
             // Replay actual funding, sweep, and repayment events chronologically.
             // This is essential for delayed-draw facilities: undrawn commitment
             // is not principal and must never be amortized.
@@ -214,13 +227,13 @@ pub(crate) fn generate_cashflows(
                 running_balance -= amort_amount;
             }
         }
-        super::spec::AmortizationSpec::PercentOfOriginalNotional { bp } => {
+        super::spec::AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
             let funding: Vec<_> = principal_events
                 .iter()
                 .filter(|event| event.kind == CFKind::Notional && event.delta.amount() > 0.0)
                 .map(|event| (event.date, event.delta.amount()))
                 .collect();
-            let pct = f64::from(*bp) * 1e-4;
+            let pct = *pct;
             for (d, payment_date) in coupon_dates.iter().copied().skip(1) {
                 let funded: f64 = funding
                     .iter()
@@ -238,7 +251,7 @@ pub(crate) fn generate_cashflows(
                 });
             }
         }
-        super::spec::AmortizationSpec::Linear { start, end } => {
+        super::spec::AmortizationSpec::LinearBetween { start, end } => {
             // Each funded draw has its own remaining contractual repayment
             // schedule. Undrawn commitment never enters the principal base.
             let mut repayments = BTreeMap::<(Date, Date), f64>::new();
@@ -284,7 +297,7 @@ pub(crate) fn generate_cashflows(
     // Cap amortization events to prevent negative outstanding balance.
     // Track running outstanding from funding events and cap each amort at
     // the remaining balance.  This guards against over-amortization when
-    // PercentPerPeriod bp × num_periods > 10 000 or when cash sweeps
+    // PercentOfOriginalPerPeriod pct × num_periods > 1 or when cash sweeps
     // combine with scheduled amortization to exceed the notional.
     {
         let mut running = 0.0_f64;
@@ -326,10 +339,8 @@ pub(crate) fn generate_cashflows(
     }
 
     match &loan.rate {
-        super::types::RateSpec::Fixed { rate_bp } => {
-            // Convert rate from basis points to decimal using exact Decimal arithmetic
-            // to avoid f64 representation errors (e.g., 333 bp → 0.0333 exactly).
-            let initial_rate = Decimal::from(*rate_bp) / Decimal::from(10_000);
+        super::types::RateSpec::Fixed { rate } => {
+            let initial_rate = finstack_quant_core::decimal::f64_to_decimal(*rate)?;
             let margin_steps = loan
                 .covenants
                 .as_ref()
@@ -337,7 +348,7 @@ pub(crate) fn generate_cashflows(
             let mut running_rate = initial_rate;
             let mut step_schedule = Vec::with_capacity(margin_steps.len());
             for step in margin_steps {
-                running_rate += Decimal::from(step.delta_bp) / Decimal::from(10_000);
+                running_rate += step.delta_bp / Decimal::from(10_000);
                 step_schedule.push((step.date, running_rate));
             }
 
@@ -368,7 +379,7 @@ pub(crate) fn generate_cashflows(
                         .copied()
                         .find(|start| *start >= step.date)
                         .unwrap_or(loan.maturity);
-                    *snapped_deltas.entry(effective).or_default() += Decimal::from(step.delta_bp);
+                    *snapped_deltas.entry(effective).or_default() += step.delta_bp;
                 }
             }
 
@@ -447,15 +458,10 @@ pub(crate) fn generate_cashflows(
         let _ = builder.fee(fee);
     }
     if let Some(ddtl) = &loan.ddtl {
-        if ddtl.usage_fee_bp != 0.0 {
+        if !ddtl.usage_fee_bp.is_zero() {
             let _ = builder.fee(FeeSpec::PeriodicBp {
                 base: FeeBase::Drawn,
-                bp: Decimal::try_from(ddtl.usage_fee_bp).map_err(|_| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "TermLoan '{}' DDTL usage_fee_bp {} is not representable",
-                        loan.id, ddtl.usage_fee_bp
-                    ))
-                })?,
+                bp: ddtl.usage_fee_bp,
                 frequency: loan.frequency,
                 day_count: loan.day_count,
                 business_day_convention: loan.business_day_convention,
@@ -474,7 +480,7 @@ pub(crate) fn generate_cashflows(
     let mut schedule = builder.build(Some(market))?;
 
     if let Some(ddtl) = &loan.ddtl {
-        if ddtl.commitment_fee_bp != 0.0 {
+        if !ddtl.commitment_fee_bp.is_zero() {
             let commitment_fees = build_commitment_fee_flows(loan, ddtl, draw_stop, &schedule)?;
             if !commitment_fees.is_empty() {
                 let notional = schedule.get_notional().clone();
@@ -496,6 +502,13 @@ pub(crate) fn generate_cashflows(
     // Keep the full engine schedule here; `TermLoan::cashflow_schedule()` applies
     // the public signed canonical schedule projection on top of this internal representation.
     Ok(schedule)
+}
+
+/// Contractual basis points as `f64` for the fee and OID arithmetic.
+fn bp_to_f64(bp: Decimal) -> finstack_quant_core::Result<f64> {
+    bp.to_f64().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!("{bp} bp is not representable as f64"))
+    })
 }
 
 fn effective_draw_stop(loan: &TermLoan) -> Option<Date> {
@@ -572,7 +585,7 @@ fn build_commitment_fee_flows(
         last
     };
 
-    let fee_rate = ddtl.commitment_fee_bp * 1e-4;
+    let fee_rate = bp_to_f64(ddtl.commitment_fee_bp)? * 1e-4;
     let mut by_payment_date = std::collections::BTreeMap::<Date, f64>::new();
     let mut prev = dates[0];
     for &d in dates.iter().skip(1) {

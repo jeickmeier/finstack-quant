@@ -198,8 +198,10 @@ pub fn create_convertible_with_policy(policy: ConversionPolicy) -> ConvertibleBo
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                fixed_coupon,
+            ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -259,8 +261,10 @@ pub fn create_convertible_with_conversion_price() -> ConvertibleBond {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: Some(fixed_coupon),
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Fixed(
+                fixed_coupon,
+            ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -330,8 +334,10 @@ pub fn create_floating_convertible() -> ConvertibleBond {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: None,
-        floating_coupon: Some(floating),
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::Floating(
+                floating,
+            ),
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
@@ -436,8 +442,8 @@ pub fn create_zero_coupon_convertible() -> ConvertibleBond {
         div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
-        fixed_coupon: None,
-        floating_coupon: None,
+        cashflow_spec:
+            finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec::default(), // zero coupon
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),

@@ -11,11 +11,12 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation, AssetPool, CoverageTestAction, CoverageTestSpec, DealType,
     InstrumentCollateral, PoolAsset, ReinvestmentAssumptions, ReinvestmentCriteria,
-    ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCashflows, TrancheSeniority,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -81,7 +82,7 @@ fn clo(
             b,
             sen,
             usd(bal),
-            TrancheCoupon::Fixed { rate: cpn },
+            RateSpec::Fixed { rate: cpn },
             maturity,
         )
         .expect("tranche")
@@ -407,7 +408,7 @@ fn instrument_collateral_pools_cannot_reinvest() {
         100.0,
         TrancheSeniority::Senior,
         usd(1_000_000.0),
-        TrancheCoupon::Fixed { rate: 0.05 },
+        RateSpec::Fixed { rate: 0.05 },
         maturity,
     )
     .expect("tranche")])

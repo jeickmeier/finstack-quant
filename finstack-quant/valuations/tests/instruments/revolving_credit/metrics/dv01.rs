@@ -5,8 +5,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
+    DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
@@ -20,11 +21,11 @@ fn test_dv01_sensitivity() {
     let as_of = date!(2025 - 01 - 01);
     let facility = RevolvingCredit::builder()
         .id("RC-DV01-001".into())
-        .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
+        .commitment(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .drawn(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .issue_date(as_of)
         .maturity(date!(2028 - 01 - 01))
-        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+        .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
@@ -69,14 +70,14 @@ fn floating_dv01_reflects_forward_reprojection() {
     let rate = 0.04;
     let commitment = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
 
-    let build = |id: &str, base_rate_spec: BaseRateSpec| -> RevolvingCredit {
+    let build = |id: &str, rate: RateSpec| -> RevolvingCredit {
         RevolvingCredit::builder()
             .id(id.into())
-            .commitment_amount(commitment)
-            .drawn_amount(commitment) // fully drawn: pure interest-rate exposure
+            .commitment(commitment)
+            .drawn(commitment) // fully drawn: pure interest-rate exposure
             .issue_date(as_of)
             .maturity(date!(2030 - 01 - 01))
-            .base_rate_spec(base_rate_spec)
+            .rate(rate)
             .day_count(DayCount::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
@@ -89,7 +90,7 @@ fn floating_dv01_reflects_forward_reprojection() {
 
     let floating = build(
         "RC-DV01-FLOAT",
-        BaseRateSpec::Floating(FloatingRateSpec {
+        RateSpec::Floating(FloatingRateSpec {
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             gearing: rust_decimal::Decimal::ONE,
@@ -108,7 +109,7 @@ fn floating_dv01_reflects_forward_reprojection() {
             fallback: Default::default(),
         }),
     );
-    let fixed = build("RC-DV01-FIXED", BaseRateSpec::Fixed { rate });
+    let fixed = build("RC-DV01-FIXED", RateSpec::Fixed { rate });
 
     let market = MarketContext::new()
         .insert(flat_discount_curve(rate, as_of, "USD-OIS"))

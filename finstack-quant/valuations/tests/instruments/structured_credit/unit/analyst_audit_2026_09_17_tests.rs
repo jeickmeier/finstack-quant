@@ -15,13 +15,14 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     execute_waterfall, run_simulation, run_simulation_with_diagnostics, AllocationMode, AssetPool,
     AssetType, CallAssumption, CardPortfolioSpec, ControlledAccumulationSpec, CoverageRules,
     CoverageTestSpec, DealType, LiquidationSpec, PaymentCalculation, PaymentType, PoolAsset,
     PricingMode, Recipient, RecipientType, ReinvestmentCriteria, ReinvestmentPeriod, StepDownSpec,
-    StepDownTrigger, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-    Waterfall, WaterfallContext, WaterfallRules, WaterfallTier,
+    StepDownTrigger, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure, Waterfall,
+    WaterfallContext, WaterfallRules, WaterfallTier,
 };
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
@@ -62,7 +63,7 @@ fn tranche(
         detachment,
         seniority,
         usd(balance),
-        TrancheCoupon::Fixed { rate: coupon },
+        RateSpec::Fixed { rate: coupon },
         maturity,
     )
     .expect("tranche")

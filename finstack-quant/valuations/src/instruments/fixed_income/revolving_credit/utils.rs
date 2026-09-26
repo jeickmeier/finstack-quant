@@ -3,12 +3,13 @@
 //! Consolidates schedule and calendar logic to avoid duplication across
 //! cashflow generation and pricing implementations.
 
-use super::types::{BaseRateSpec, RevolvingCredit};
+use super::types::RevolvingCredit;
 use crate::instruments::common_impl::pricing::overnight::{
     adjust_overnight_accrual_boundaries, project_overnight_coupon, OvernightCouponProjectionInput,
     OvernightProjectionCurve,
 };
 use crate::instruments::common_impl::pricing::overnight_conventions;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, Tenor};
@@ -200,8 +201,8 @@ pub(super) fn index_basis_at(
 ///
 /// Returns an error if the schedule builder fails for floating rate facilities.
 pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec<Date>>> {
-    match &facility.base_rate_spec {
-        BaseRateSpec::Floating(spec) => {
+    match &facility.rate {
+        RateSpec::Floating(spec) => {
             use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
             let periods = build_periods(BuildPeriodsParams {
@@ -225,7 +226,7 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
                     .collect(),
             ))
         }
-        BaseRateSpec::Fixed { .. } => Ok(None),
+        RateSpec::Fixed { .. } => Ok(None),
     }
 }
 
@@ -421,7 +422,7 @@ pub(super) fn project_revolver_floating_rate(
 ///
 /// * `current_balance` - Current drawn balance
 /// * `event` - Draw or repayment event to apply
-/// * `commitment_amount` - Total facility commitment (for draw validation)
+/// * `commitment` - Total facility commitment (for draw validation)
 ///
 /// # Returns
 ///
@@ -435,15 +436,15 @@ pub(super) fn project_revolver_floating_rate(
 pub(super) fn apply_draw_repay_event(
     current_balance: finstack_quant_core::money::Money,
     event: &super::types::DrawRepayEvent,
-    commitment_amount: finstack_quant_core::money::Money,
+    commitment: finstack_quant_core::money::Money,
 ) -> Result<finstack_quant_core::money::Money> {
     if event.is_draw {
         let new_balance = current_balance.checked_add(event.amount)?;
         // Validate draw does not exceed commitment
-        if new_balance.amount() > commitment_amount.amount() {
+        if new_balance.amount() > commitment.amount() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Draw on {} would exceed commitment: {} > {}",
-                event.date, new_balance, commitment_amount
+                event.date, new_balance, commitment
             )));
         }
         Ok(new_balance)
@@ -505,18 +506,18 @@ mod tests {
         start: Date,
         end: Date,
         payment_frequency: Tenor,
-        base_rate_spec: BaseRateSpec,
+        rate: RateSpec,
         calendar_id: Option<&str>,
     ) -> RevolvingCredit {
         use finstack_quant_core::dates::StubKind;
 
         RevolvingCredit {
             id: "TEST-RC".into(),
-            commitment_amount: Money::from((10_000_000_i64, Currency::USD)),
-            drawn_amount: Money::from((5_000_000_i64, Currency::USD)),
+            commitment: Money::from((10_000_000_i64, Currency::USD)),
+            drawn: Money::from((5_000_000_i64, Currency::USD)),
             issue_date: start,
             maturity: end,
-            base_rate_spec,
+            rate,
             day_count: DayCount::Act360,
             frequency: payment_frequency,
             commitment_steps: Vec::new(),
@@ -551,7 +552,7 @@ mod tests {
             start,
             end,
             Tenor::quarterly(),
-            BaseRateSpec::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             None,
         );
 
@@ -570,7 +571,7 @@ mod tests {
             start,
             maturity,
             Tenor::annual(),
-            BaseRateSpec::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             None,
         );
 
@@ -594,7 +595,7 @@ mod tests {
             start,
             end,
             Tenor::quarterly(),
-            BaseRateSpec::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             None,
         );
 
@@ -611,7 +612,7 @@ mod tests {
             start,
             end,
             Tenor::quarterly(),
-            BaseRateSpec::Floating(crate::cashflow::builder::FloatingRateSpec {
+            RateSpec::Floating(crate::cashflow::builder::FloatingRateSpec {
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
                 gearing: rust_decimal::Decimal::ONE,
@@ -870,7 +871,7 @@ mod tests {
             start,
             end,
             Tenor::quarterly(),
-            BaseRateSpec::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             None,
         );
         let dates_no_cal = build_payment_dates(&facility_no_cal)
@@ -881,7 +882,7 @@ mod tests {
             start,
             end,
             Tenor::quarterly(),
-            BaseRateSpec::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             Some("nyse"),
         );
         let dates_with_cal = build_payment_dates(&facility_with_cal)

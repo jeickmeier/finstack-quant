@@ -5,9 +5,10 @@
 
 use super::{
     AssetPool, CreditModelConfig, DealType, DefaultModelSpec, MarketConditions, Metadata,
-    PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, StructuredCredit, Tranche, TrancheCoupon,
-    TrancheSeniority, TrancheStructure,
+    PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, StructuredCredit, Tranche, TrancheSeniority,
+    TrancheStructure,
 };
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::assumptions::{
     embedded_registry_or_panic, required_assumption,
 };
@@ -142,7 +143,7 @@ impl StructuredCredit {
             100.0,
             TrancheSeniority::Senior,
             Money::from((100_000_000_i64, Currency::USD)),
-            TrancheCoupon::Fixed { rate: 0.06 },
+            RateSpec::Fixed { rate: 0.06 },
             legal,
         )
         .expect("Tranche build should not fail");

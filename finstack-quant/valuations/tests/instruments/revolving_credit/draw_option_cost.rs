@@ -9,9 +9,10 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
-    BaseRateSpec, CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit,
-    RevolvingCreditFees, RevolvingCreditPricer, StochasticUtilizationSpec, UtilizationProcess,
+    CreditSpreadProcessSpec, DrawRepaySpec, McConfig, RevolvingCredit, RevolvingCreditFees,
+    RevolvingCreditPricer, StochasticUtilizationSpec, UtilizationProcess,
 };
 use finstack_quant_valuations::instruments::{
     Instrument, InstrumentPricingOverrides, PricingOptions,
@@ -85,20 +86,20 @@ pub(crate) fn revolver(
     let anchored = matches!(spread, CreditSpreadProcessSpec::MarketAnchored { .. });
     let mut builder = RevolvingCredit::builder()
         .id(id.into())
-        .commitment_amount(usd(50_000_000.0))
-        .drawn_amount(usd(10_000_000.0))
+        .commitment(usd(50_000_000.0))
+        .drawn(usd(10_000_000.0))
         .issue_date(AS_OF)
         .maturity(MATURITY)
-        .base_rate_spec(BaseRateSpec::Floating(floating_spec()))
+        .rate(RateSpec::Floating(floating_spec()))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).expect("fees"))
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
             StochasticUtilizationSpec {
                 utilization_process: UtilizationProcess::MeanReverting {
-                    target_rate: 0.6,
-                    speed: 1.0,
-                    volatility: utilization_vol,
+                    theta: 0.6,
+                    kappa: 1.0,
+                    sigma: utilization_vol,
                     spread_sensitivity: 0.0,
                 },
                 use_sobol_qmc: false,
@@ -224,7 +225,7 @@ fn draw_option_cost_is_independent_of_the_margin_level() {
     // One id for both, so they share the derived seed (common random numbers).
     let tight = revolver("RCF-MARGIN", 0.25, spread(), 16);
     let mut wide = revolver("RCF-MARGIN", 0.25, spread(), 16);
-    if let BaseRateSpec::Floating(spec) = &mut wide.base_rate_spec {
+    if let RateSpec::Floating(spec) = &mut wide.rate {
         spec.spread_bp = rust_decimal::Decimal::from(MARGIN_BP + 400);
     }
     let a = RevolvingCreditPricer::price_with_paths(&tight, &market, AS_OF).expect("tight");

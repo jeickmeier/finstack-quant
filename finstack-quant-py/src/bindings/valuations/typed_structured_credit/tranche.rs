@@ -10,8 +10,9 @@ use crate::bindings::valuations::convert::{
 };
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    CoverageTrigger, Tranche, TrancheCoupon, TrancheSeniority,
+    CoverageTrigger, Tranche, TrancheSeniority,
 };
 
 use super::super::instruments::enum_from_str;
@@ -143,7 +144,7 @@ impl PyTranche {
         money_to_py(self.inner.current_balance)
     }
 
-    /// Coupon definition as a plain ``dict`` (``TrancheCoupon`` serde shape).
+    /// Coupon definition as a plain ``dict`` (``RateSpec`` serde shape).
     #[getter]
     fn coupon<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.coupon)
@@ -427,11 +428,11 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let rate = rate_decimal_from_py(rate, "rate")?;
         let b = take_tranche(&mut slf)?;
-        slf.inner = Some(b.coupon(TrancheCoupon::Fixed { rate }));
+        slf.inner = Some(b.coupon(RateSpec::Fixed { rate }));
         Ok(slf)
     }
 
-    /// Set a floating-rate coupon from a JSON ``TrancheCoupon::Floating`` payload.
+    /// Set a floating-rate coupon from a JSON ``RateSpec::Floating`` payload.
     ///
     /// The floating-rate spec (``FloatingRateSpec``: index, spread, gearing,
     /// floors/caps, reset conventions) stays JSON per the nested-spec rule —
@@ -440,7 +441,7 @@ impl PyTrancheBuilder {
     /// Parameters
     /// ----------
     /// value : str
-    ///     JSON-encoded, externally-tagged ``TrancheCoupon`` value, e.g.
+    ///     JSON-encoded, externally-tagged ``RateSpec`` value, e.g.
     ///     ``{"floating": {...FloatingRateSpec fields...}}``.
     ///
     /// Returns
@@ -451,15 +452,14 @@ impl PyTrancheBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` is not valid JSON for the ``TrancheCoupon`` shape.
+    ///     If ``value`` is not valid JSON for the ``RateSpec`` shape.
     #[pyo3(text_signature = "($self, value)")]
     fn coupon_floating<'py>(
         mut slf: PyRefMut<'py, Self>,
         py: Python<'_>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let coupon: TrancheCoupon =
-            crate::bindings::module_utils::py_to_serde(py, value, "coupon")?;
+        let coupon: RateSpec = crate::bindings::module_utils::py_to_serde(py, value, "coupon")?;
         let b = take_tranche(&mut slf)?;
         slf.inner = Some(b.coupon(coupon));
         Ok(slf)

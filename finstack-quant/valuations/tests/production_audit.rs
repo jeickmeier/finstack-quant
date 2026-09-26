@@ -345,13 +345,13 @@ fn delayed_draw_loan() -> TermLoan {
     loan.day_count = DayCount::Act360;
     loan.business_day_convention = BusinessDayConvention::Unadjusted;
     loan.stub = StubKind::None;
-    loan.rate = RateSpec::Fixed { rate_bp: 500 };
-    loan.amortization = AmortizationSpec::Linear {
+    loan.rate = RateSpec::Fixed { rate: 0.05 };
+    loan.amortization = AmortizationSpec::LinearBetween {
         start: loan.issue_date,
         end: loan.maturity,
     };
     loan.ddtl = Some(DdtlSpec {
-        commitment_limit: loan.notional_limit,
+        commitment: loan.notional_limit,
         availability_start: loan.issue_date,
         availability_end: date!(2025 - 09 - 01),
         draws: vec![
@@ -365,8 +365,8 @@ fn delayed_draw_loan() -> TermLoan {
             },
         ],
         commitment_steps: vec![],
-        usage_fee_bp: 50.0,
-        commitment_fee_bp: 0.0,
+        usage_fee_bp: rust_decimal_macros::dec!(50),
+        commitment_fee_bp: rust_decimal_macros::dec!(0),
         fee_base: CommitmentFeeBase::Undrawn,
         oid_policy: None,
     });
@@ -406,7 +406,7 @@ fn b14_ddtl_usage_fee_begins_at_the_draw_date() {
 #[test]
 fn b14_ddtl_original_principal_excludes_future_draws() {
     let mut loan = delayed_draw_loan();
-    loan.amortization = AmortizationSpec::PercentOfOriginalNotional { bp: 500 };
+    loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.05 };
     let schedule = loan
         .cashflow_schedule(&MarketContext::new(), loan.issue_date)
         .expect("cashflows");
@@ -424,7 +424,7 @@ fn m28_model_yield_does_not_repeat_settlement_carry() {
     loan.ddtl = None;
     loan.amortization = AmortizationSpec::None;
     loan.day_count = DayCount::Act365F;
-    loan.rate = RateSpec::Fixed { rate_bp: 0 };
+    loan.rate = RateSpec::Fixed { rate: 0.0 };
     loan.calendar_id = None;
     loan.settlement_days = 7;
     let as_of = date!(2025 - 03 - 28);
@@ -454,7 +454,7 @@ fn m28_coupon_date_purchase_uses_balance_after_settled_amortization() {
     let mut loan = delayed_draw_loan();
     loan.ddtl = None;
     loan.notional_limit = Money::from((1_000_000_i64, Currency::USD));
-    loan.amortization = AmortizationSpec::PercentOfOriginalNotional { bp: 2500 };
+    loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 };
     loan.day_count = DayCount::Act365F;
     loan.calendar_id = None;
     loan.settlement_days = 2;

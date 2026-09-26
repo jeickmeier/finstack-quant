@@ -9,9 +9,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     run_simulation_with_diagnostics, AssetPool, AssetType, DealType, PoolAsset, RepLine,
-    SimulationRun, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    SimulationRun, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -50,7 +51,7 @@ fn cmbs(pool: AssetPool, maturity: Date) -> StructuredCredit {
             90.0,
             TrancheSeniority::Senior,
             usd(total * 0.9),
-            TrancheCoupon::Fixed { rate: 0.05 },
+            RateSpec::Fixed { rate: 0.05 },
             maturity,
         )
         .expect("A"),
@@ -60,7 +61,7 @@ fn cmbs(pool: AssetPool, maturity: Date) -> StructuredCredit {
             100.0,
             TrancheSeniority::Equity,
             usd(total * 0.1),
-            TrancheCoupon::Fixed { rate: 0.0 },
+            RateSpec::Fixed { rate: 0.0 },
             maturity,
         )
         .expect("E"),

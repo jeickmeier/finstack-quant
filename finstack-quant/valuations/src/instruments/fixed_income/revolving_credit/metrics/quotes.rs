@@ -27,7 +27,7 @@ use crate::instruments::fixed_income::loan_quotes::{
     all_in_rate_from_schedule, compounding_frequency, pv_with_discount_margin,
     solve_discount_margin,
 };
-use crate::instruments::fixed_income::revolving_credit::types::BaseRateSpec;
+use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::RevolvingCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
 
@@ -58,7 +58,7 @@ fn drawn_at(facility: &RevolvingCredit, as_of: Date, date: Date) -> Result<f64> 
                 .amount(),
         )
     } else {
-        Ok(facility.drawn_amount.amount())
+        Ok(facility.drawn.amount())
     }
 }
 
@@ -146,14 +146,14 @@ fn target_price(
 /// Contractual margin at `as_of` for the discount-margin guess and the
 /// floating-only guard.
 fn contractual_margin(facility: &RevolvingCredit, as_of: Date) -> Result<f64> {
-    match &facility.base_rate_spec {
-        BaseRateSpec::Floating(spec) => Ok(spec
+    match &facility.rate {
+        RateSpec::Floating(spec) => Ok(spec
             .spread_bp
             .to_f64()
             .ok_or(finstack_quant_core::InputError::Invalid)?
             * 1e-4
             + facility.margin_delta_bp_at(as_of) * 1e-4),
-        BaseRateSpec::Fixed { .. } => Err(finstack_quant_core::Error::Validation(format!(
+        RateSpec::Fixed { .. } => Err(finstack_quant_core::Error::Validation(format!(
             "RevolvingCredit {}: discount margin is defined for floating-rate facilities only",
             facility.id
         ))),
@@ -266,12 +266,12 @@ impl MetricCalculator for AllInRateCalculator {
         let mut with_opening = (*schedule).clone();
         // The outstanding path needs the opening funding leg; a seasoned
         // facility's schedule starts at the anchor balance without one.
-        if facility.issue_date <= context.as_of && facility.drawn_amount.amount() > 0.0 {
+        if facility.issue_date <= context.as_of && facility.drawn.amount() > 0.0 {
             let mut flows = with_opening.get_flows().to_vec();
             flows.push(finstack_quant_core::cashflow::CashFlow::new(
                 facility.issue_date,
                 None,
-                facility.drawn_amount * -1.0,
+                facility.drawn * -1.0,
                 CFKind::Notional,
                 0.0,
                 None,
@@ -282,7 +282,7 @@ impl MetricCalculator for AllInRateCalculator {
                 crate::cashflow::traits::ScheduleBuildOpts {
                     notional_hint: Some(finstack_quant_core::money::Money::from((
                         0_i64,
-                        facility.commitment_amount.currency(),
+                        facility.commitment.currency(),
                     ))),
                     meta: with_opening.get_meta().clone(),
                 },
