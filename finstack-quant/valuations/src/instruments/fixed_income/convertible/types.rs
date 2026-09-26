@@ -809,7 +809,7 @@ impl ConvertibleBond {
 
                     business_day_convention: BusinessDayConvention::Following,
 
-                    calendar_id: "weekends_only".to_string(),
+                    calendar_id: "weekends_only".into(),
 
                     stub: StubKind::None,
 
@@ -886,14 +886,14 @@ impl ConvertibleBond {
             })
             .call_put_opt(Some(CallPutSchedule {
                 calls: vec![CallPut {
-                    start_date: date!(2026 - 03 - 15),
-                    end_date: maturity,
+                    start: date!(2026 - 03 - 15),
+                    end: maturity,
                     price_pct_of_par: 101.0,
                     make_whole: None,
                 }],
                 puts: vec![CallPut {
-                    start_date: date!(2025 - 03 - 15),
-                    end_date: date!(2025 - 03 - 15),
+                    start: date!(2025 - 03 - 15),
+                    end: date!(2025 - 03 - 15),
                     price_pct_of_par: 100.0,
                     make_whole: None,
                 }],
@@ -914,7 +914,7 @@ impl ConvertibleBond {
 
                     business_day_convention: BusinessDayConvention::Following,
 
-                    calendar_id: "weekends_only".to_string(),
+                    calendar_id: "weekends_only".into(),
 
                     stub: StubKind::None,
 

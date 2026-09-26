@@ -20,7 +20,7 @@ pub(crate) const MAX_STRIKE: f64 = 0.10;
 pub(crate) fn validate_common_terms(
     strike: &CDSOptionStrike,
     expiry: Date,
-    cds_maturity: Date,
+    underlying_maturity: Date,
     index_factor: f64,
 ) -> finstack_quant_core::Result<()> {
     match strike {
@@ -49,10 +49,10 @@ pub(crate) fn validate_common_terms(
             }
         }
     }
-    if expiry >= cds_maturity {
+    if expiry >= underlying_maturity {
         return Err(finstack_quant_core::Error::Validation(format!(
             "option expiry ({}) must be before CDS maturity ({})",
-            expiry, cds_maturity
+            expiry, underlying_maturity
         )));
     }
     if !index_factor.is_finite() || index_factor <= 0.0 || index_factor > 1.0 {
@@ -74,7 +74,7 @@ pub(crate) fn default_index_factor() -> f64 {
 pub struct CDSOptionParams {
     /// Typed option strike: forward spread or clean price.
     pub strike: CDSOptionStrike,
-    /// Option expiry date. Must precede `cds_maturity`.
+    /// Option expiry date. Must precede `underlying_maturity`.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
@@ -87,7 +87,7 @@ pub struct CDSOptionParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub cds_maturity: Date,
+    pub underlying_maturity: Date,
     /// Notional amount.
     pub notional: Money,
     /// Option type (Call = payer, Put = receiver).
@@ -133,7 +133,7 @@ impl CDSOptionParams {
         validate_common_terms(
             &self.strike,
             self.expiry,
-            self.cds_maturity,
+            self.underlying_maturity,
             self.index_factor,
         )
     }
@@ -142,14 +142,14 @@ impl CDSOptionParams {
     pub fn new(
         strike: CDSOptionStrike,
         expiry: Date,
-        cds_maturity: Date,
+        underlying_maturity: Date,
         notional: Money,
         option_type: OptionType,
     ) -> finstack_quant_core::Result<Self> {
         let params = Self {
             strike,
             expiry,
-            cds_maturity,
+            underlying_maturity,
             notional,
             option_type,
             settlement: SettlementType::Cash,
@@ -167,20 +167,32 @@ impl CDSOptionParams {
     pub fn call(
         strike: CDSOptionStrike,
         expiry: Date,
-        cds_maturity: Date,
+        underlying_maturity: Date,
         notional: Money,
     ) -> finstack_quant_core::Result<Self> {
-        Self::new(strike, expiry, cds_maturity, notional, OptionType::Call)
+        Self::new(
+            strike,
+            expiry,
+            underlying_maturity,
+            notional,
+            OptionType::Call,
+        )
     }
 
     /// Convenience constructor for a receiver (put on spread) option.
     pub fn put(
         strike: CDSOptionStrike,
         expiry: Date,
-        cds_maturity: Date,
+        underlying_maturity: Date,
         notional: Money,
     ) -> finstack_quant_core::Result<Self> {
-        Self::new(strike, expiry, cds_maturity, notional, OptionType::Put)
+        Self::new(
+            strike,
+            expiry,
+            underlying_maturity,
+            notional,
+            OptionType::Put,
+        )
     }
 
     /// Mark this option as referencing a CDS index and set its index factor.

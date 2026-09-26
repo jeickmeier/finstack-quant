@@ -115,7 +115,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -134,7 +134,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -186,7 +186,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Floating(
                 finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -224,7 +224,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Floating(
                 finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -296,7 +296,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -315,7 +315,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -414,7 +414,7 @@ mod tests {
                     Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 )
                 .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
-                .commitment_date(start)
+                .issue_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
                 .day_count(DayCount::Act360)
@@ -432,7 +432,7 @@ mod tests {
                     Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 )
                 .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
-                .commitment_date(start)
+                .issue_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
                 .day_count(DayCount::Act360)
@@ -504,7 +504,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -525,7 +525,7 @@ mod tests {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(4_500_000.0, Currency::USD).expect("valid money fixture")) // 45% utilization
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -591,7 +591,7 @@ mod tests {
                     Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 )
                 .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-                .commitment_date(start)
+                .issue_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
                 .day_count(DayCount::Act360)
@@ -609,7 +609,7 @@ mod tests {
                     Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 )
                 .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-                .commitment_date(start)
+                .issue_date(start)
                 .maturity(end)
                 .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
                 .day_count(DayCount::Act360)

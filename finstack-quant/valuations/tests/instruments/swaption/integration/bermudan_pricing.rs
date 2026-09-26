@@ -367,7 +367,10 @@ fn test_bermudan_to_european_conversion() {
     // Check European parameters match Bermudan
     assert_eq!(european.get_strike(), bermudan.get_strike());
     assert_eq!(european.notional.amount(), bermudan.notional.amount());
-    assert_eq!(european.get_swap_end(), bermudan.get_swap_end());
+    assert_eq!(
+        european.get_underlying_maturity(),
+        bermudan.get_underlying_maturity()
+    );
 
     // European expiry should be the first Bermudan exercise date
     assert_eq!(european.expiry, first_exercise);

@@ -133,7 +133,7 @@ fn test_example_has_expected_defaults() {
 
     assert_eq!(sc.tranches.tranches.len(), 1);
     assert_eq!(waterfall.tiers.len(), 3);
-    assert_eq!(sc.payment_calendar_id.as_deref(), Some("nyse"));
+    assert_eq!(sc.calendar_id.as_deref(), Some("nyse"));
 }
 
 #[test]

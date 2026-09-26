@@ -31,13 +31,13 @@ fn create_cds_option(
 ) -> CDSOption {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let expiry = base + time::Duration::days((expiry_months * 30) as i64);
-    let cds_maturity = base + time::Duration::days((cds_tenor_years * 365) as i64);
+    let underlying_maturity = base + time::Duration::days((cds_tenor_years * 365) as i64);
 
     let option_params = CDSOptionParams {
         strike: CDSOptionStrike::Spread(Decimal::new(1, 2)), // 0.01 = 100bp
         option_type,
         expiry,
-        cds_maturity,
+        underlying_maturity,
         notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         settlement: finstack_quant_valuations::instruments::SettlementType::Cash,
         underlying_is_index: false,

@@ -328,7 +328,7 @@ mod tests {
     fn settlement_rejects_unknown_calendar() {
         let mut bond = t2_bond();
         if let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
-            spec.schedule.calendar_id = "missing-calendar".to_string();
+            spec.schedule.calendar_id = "missing-calendar".into();
         }
         let err = settlement_date(&bond, date!(2025 - 01 - 02))
             .expect_err("unknown settlement calendar must fail");

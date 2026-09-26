@@ -338,8 +338,8 @@ fn test_oas_metric_uses_bond_tree_pricing_overrides() {
         .hw1f_mean_reversion = Some(0.03);
     base_bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -413,8 +413,8 @@ fn test_oas_metric_uses_tree_discount_curve_override() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 04 - 01),
-            end_date: date!(2028 - 04 - 01),
+            start: date!(2028 - 04 - 01),
+            end: date!(2028 - 04 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -491,8 +491,8 @@ fn test_embedded_option_value_uses_solved_oas_and_holder_sign() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -566,8 +566,8 @@ fn test_embedded_option_value_uses_as_of_oas_pricing_basis() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 02),
-            end_date: date!(2028 - 01 - 02),
+            start: date!(2028 - 01 - 02),
+            end: date!(2028 - 01 - 02),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -636,8 +636,8 @@ fn test_callable_bond_vega_is_registered_and_bumps_hw1f_sigma() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -696,8 +696,8 @@ fn test_callable_bond_oas_and_vega_use_explicit_bdt_tree_path() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -780,8 +780,8 @@ fn test_callable_bond_vega_is_invariant_to_vol_bump_size() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -845,8 +845,8 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 02),
-            end_date: date!(2028 - 01 - 02),
+            start: date!(2028 - 01 - 02),
+            end: date!(2028 - 01 - 02),
             price_pct_of_par: 150.0,
             make_whole: None,
         }],
@@ -920,8 +920,8 @@ fn test_callable_bond_value_uses_same_bdt_tree_dispatch_as_oas_pricer() {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -1649,8 +1649,8 @@ fn callable_i_spread_uses_par_rate_to_workout_and_round_trips() {
         .with_hw1f_mean_reversion(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2027 - 01 - 15),
-            end_date: date!(2027 - 01 - 15),
+            start: date!(2027 - 01 - 15),
+            end: date!(2027 - 01 - 15),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

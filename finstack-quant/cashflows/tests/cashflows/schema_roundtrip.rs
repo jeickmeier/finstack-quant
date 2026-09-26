@@ -126,7 +126,7 @@ fn fixed_schedule_build_spec() -> serde_json::Value {
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none"
         },
-        "issue": "2024-08-31",
+        "issue_date": "2024-08-31",
         "maturity": "2025-08-31",
         "coupon_program": [{
             "kind": "fixed",
@@ -187,7 +187,7 @@ fn canonical_build_spec(
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none"
         },
-        "issue": "2025-01-01",
+        "issue_date": "2025-01-01",
         "maturity": "2027-01-01",
         "coupon_program": coupon_program,
         "payment_program": payment_program
@@ -617,7 +617,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none"
         },
-        "issue": "2025-01-15",
+        "issue_date": "2025-01-15",
         "maturity": "2026-01-15",
         "coupon_program": [{
             "kind": "floating",
@@ -682,7 +682,7 @@ fn legacy_coupon_arrays_are_rejected() {
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none"
         },
-        "issue": "2024-01-01",
+        "issue_date": "2024-01-01",
         "maturity": "2025-01-01",
         "fixed_coupons": [{
             "coupon_type": "cash",
@@ -726,7 +726,7 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none"
         },
-        "issue": "2024-01-01",
+        "issue_date": "2024-01-01",
         "maturity": "2026-01-01",
         "coupon_program": [{
             "kind": "step_up",
@@ -977,4 +977,35 @@ fn floating_margin_program_step_rejects_retired_rate_key() {
     }))
     .expect_err("retired steps[].rate key must be rejected");
     assert!(err.to_string().contains("unknown field `rate`"), "{err}");
+}
+
+#[test]
+// schema-rejection-test: CashflowScheduleBuildSpec `issue` (now issue_date)
+fn schedule_build_spec_rejects_retired_issue_key() {
+    let mut spec = fixed_schedule_build_spec();
+    let obj = spec.as_object_mut().expect("object");
+    let issue_date = obj.remove("issue_date").expect("issue_date");
+    obj.insert("issue".to_string(), issue_date);
+    let err = serde_json::from_value::<finstack_quant_cashflows::CashflowScheduleBuildSpec>(spec)
+        .expect_err("retired issue key must be rejected");
+    assert!(err.to_string().contains("unknown field `issue`"), "{err}");
+}
+
+#[test]
+// schema-rejection-test: CashFlowMeta `maturity_date` (now maturity)
+fn cashflow_meta_rejects_retired_maturity_date_key() {
+    let err = serde_json::from_value::<finstack_quant_cashflows::builder::CashFlowMeta>(json!({
+        "representation": "contractual",
+        "calendar_ids": [],
+        "maturity_date": "2030-01-15"
+    }))
+    .expect_err("retired maturity_date key must be rejected");
+    assert!(err.to_string().contains("maturity_date"), "{err}");
+    let meta = serde_json::from_value::<finstack_quant_cashflows::builder::CashFlowMeta>(json!({
+        "representation": "contractual",
+        "calendar_ids": [],
+        "maturity": "2030-01-15"
+    }))
+    .expect("canonical maturity key");
+    assert!(meta.maturity.is_some());
 }

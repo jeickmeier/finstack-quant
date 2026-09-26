@@ -849,7 +849,7 @@ mod tests {
             )
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
-            .accrual_start_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
+            .start_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
             .index_id_opt(Some("SOFR".into()))
             .forward_curve_id_opt(Some(CurveId::new("USD-OIS")))
             .index_tenor_opt(Some(
@@ -874,7 +874,7 @@ mod tests {
             call_provision: BermudanCallProvision::new(
                 vec![Date::from_calendar_date(2025, Month::July, 1).expect("date")],
                 100.0,
-                0,
+                None,
             ),
             instrument_pricing_overrides,
             metric_pricing_overrides: Default::default(),
@@ -902,7 +902,7 @@ mod tests {
             option_type: CmsSpreadOptionType::Call,
             notional: Money::new(10_000_000.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
-            expiry_date: Date::from_calendar_date(2026, Month::January, 1).expect("date"),
+            expiry: Date::from_calendar_date(2026, Month::January, 1).expect("date"),
             payment_date: Date::from_calendar_date(2026, Month::January, 5).expect("date"),
             long_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-10Y"),
             short_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-2Y"),

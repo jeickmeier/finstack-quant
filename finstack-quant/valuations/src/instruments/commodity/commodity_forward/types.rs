@@ -204,7 +204,7 @@ pub struct CommodityForward {
     /// is set, uses the convention's calendar unless explicitly overridden.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settlement_calendar_id: Option<String>,
+    pub settlement_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Business day convention for settlement date adjustment.
     ///
     /// Defaults to `Following` for energy commodities, `ModifiedFollowing`

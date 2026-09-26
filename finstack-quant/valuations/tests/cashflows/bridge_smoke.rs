@@ -35,7 +35,7 @@ fn bridge_builder_schedule_builds() {
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 
@@ -72,7 +72,7 @@ fn bridge_period_generation_works() {
         frequency: Tenor::quarterly(),
         day_count: DayCount::Act360,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: "usny".to_string(),
+        calendar_id: "usny".into(),
         stub: StubKind::ShortFront,
         end_of_month: false,
         payment_lag_days: 0,

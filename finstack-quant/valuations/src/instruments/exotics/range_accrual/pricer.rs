@@ -629,7 +629,7 @@ mod tests {
     ) {
         let as_of = date(2024, 4, 30);
         let mut inst = RangeAccrual::example();
-        inst.terms.accrual_start_date = date(2023, 12, 31);
+        inst.terms.start_date = date(2023, 12, 31);
         inst.terms.observation_dates = vec![as_of];
         inst.terms.payment_date = Some(as_of);
         inst.terms.past_observations_in_range = None;

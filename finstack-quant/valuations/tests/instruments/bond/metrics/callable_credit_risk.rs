@@ -40,8 +40,8 @@ fn build_callable_credit_bond(as_of: time::Date) -> Bond {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2026 - 01 - 01),
-            end_date: date!(2026 - 01 - 01),
+            start: date!(2026 - 01 - 01),
+            end: date!(2026 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

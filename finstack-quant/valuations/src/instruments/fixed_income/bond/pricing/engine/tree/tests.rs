@@ -56,8 +56,8 @@ fn create_callable_bond() -> Bond {
     let call_date = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: call_date,
-        end_date: call_date,
+        start: call_date,
+        end: call_date,
         price_pct_of_par: 102.0,
         make_whole: None,
     });
@@ -73,8 +73,8 @@ fn create_make_whole_callable_bond() -> Bond {
     let call_date = Date::from_calendar_date(2027, Month::January, 1).expect("Valid test date");
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: call_date,
-        end_date: call_date,
+        start: call_date,
+        end: call_date,
         price_pct_of_par: 102.0,
         make_whole: Some(crate::instruments::fixed_income::bond::MakeWholeSpec {
             reference_curve_id: CurveId::from("USD-TSY"),
@@ -194,8 +194,8 @@ fn test_bond_valuator_maps_call_window_to_exercise_candidates() {
             "call_put".to_string(),
             serde_json::json!({
                 "calls": [{
-                    "start_date": "2027-01-01",
-                    "end_date": "2028-01-01",
+                    "start": "2027-01-01",
+                    "end": "2028-01-01",
                     "price_pct_of_par": 101.0
                 }],
                 "puts": []
@@ -226,8 +226,8 @@ fn test_windowed_call_lowers_pv_vs_endpoint_only_exercise() {
     let mut single = create_test_bond();
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
-        end_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+        start: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+        end: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
         price_pct_of_par: 100.0,
         make_whole: None,
     });
@@ -236,8 +236,8 @@ fn test_windowed_call_lowers_pv_vs_endpoint_only_exercise() {
     let mut windowed = create_test_bond();
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
-        end_date: Date::from_calendar_date(2029, Month::January, 1).expect("date"),
+        start: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+        end: Date::from_calendar_date(2029, Month::January, 1).expect("date"),
         price_pct_of_par: 100.0,
         make_whole: None,
     });
@@ -288,8 +288,8 @@ fn test_bond_valuator_street_call_redemption_includes_accrued_interest() {
     let call_date = Date::from_calendar_date(2027, Month::April, 1).expect("Valid test date");
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: call_date,
-        end_date: call_date,
+        start: call_date,
+        end: call_date,
         price_pct_of_par: 100.0,
         make_whole: None,
     });
@@ -478,8 +478,8 @@ fn bdt_tree_accepts_more_than_one_thousand_steps() {
     let mut bond = create_test_bond();
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
-            end_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+            start: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+            end: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -679,8 +679,8 @@ fn risk_free_callable_frn(maturity: Date) -> Bond {
     .expect("floating bond builds");
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: call_date,
-            end_date: call_date,
+            start: call_date,
+            end: call_date,
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

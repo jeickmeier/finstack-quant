@@ -416,8 +416,8 @@ mod tests {
         bond.settlement_convention = None;
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2028 - 01 - 15),
-                end_date: date!(2028 - 01 - 15),
+                start: date!(2028 - 01 - 15),
+                end: date!(2028 - 01 - 15),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

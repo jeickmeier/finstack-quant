@@ -526,7 +526,7 @@ mod tests {
             .start_date(as_of)
             .maturity(maturity)
             .observation_frequency(Tenor::daily())
-            .observation_calendar_id("USNY".to_string())
+            .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
                 finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
@@ -603,7 +603,7 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_frequency(Tenor::daily())
-            .observation_calendar_id("USNY".to_string())
+            .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
                 finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
@@ -752,7 +752,7 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_frequency(Tenor::daily())
-            .observation_calendar_id("USNY".to_string())
+            .observation_calendar_id("USNY".into())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .price_series_policy(
                 finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,

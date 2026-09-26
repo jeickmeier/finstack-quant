@@ -111,7 +111,7 @@ impl PyStructuredCredit {
     ///     Legal final maturity date.
     /// discount_curve_id : str
     ///     Discount curve identifier for valuation.
-    /// payment_calendar_id : str, optional
+    /// calendar_id : str, optional
     ///     Holiday calendar for the payment schedule (e.g. ``"nyse"``);
     ///     required before pricing, so pass it here or set it on the JSON.
     ///
@@ -157,9 +157,9 @@ impl PyStructuredCredit {
     /// >>> "ABS-1" in repr(deal)
     /// True
     #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None))]
+    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
     #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None)"
+        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -170,7 +170,7 @@ impl PyStructuredCredit {
         closing_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        payment_calendar_id: Option<&str>,
+        calendar_id: Option<&str>,
     ) -> PyResult<Self> {
         let mut inner = StructuredCredit::new_abs(
             id,
@@ -180,8 +180,8 @@ impl PyStructuredCredit {
             extract_date(maturity)?,
             discount_curve_id,
         );
-        if let Some(calendar_id) = payment_calendar_id {
-            inner = inner.with_payment_calendar(calendar_id);
+        if let Some(calendar_id) = calendar_id {
+            inner = inner.with_calendar(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -192,9 +192,9 @@ impl PyStructuredCredit {
     /// See :meth:`new_abs` for parameter and return documentation; the
     /// signature is identical, only the deal-type calibration differs.
     #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None))]
+    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
     #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None)"
+        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -205,7 +205,7 @@ impl PyStructuredCredit {
         closing_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        payment_calendar_id: Option<&str>,
+        calendar_id: Option<&str>,
     ) -> PyResult<Self> {
         let mut inner = StructuredCredit::new_clo(
             id,
@@ -215,8 +215,8 @@ impl PyStructuredCredit {
             extract_date(maturity)?,
             discount_curve_id,
         );
-        if let Some(calendar_id) = payment_calendar_id {
-            inner = inner.with_payment_calendar(calendar_id);
+        if let Some(calendar_id) = calendar_id {
+            inner = inner.with_calendar(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -227,9 +227,9 @@ impl PyStructuredCredit {
     /// See :meth:`new_abs` for parameter and return documentation; the
     /// signature is identical, only the deal-type calibration differs.
     #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None))]
+    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
     #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None)"
+        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -240,7 +240,7 @@ impl PyStructuredCredit {
         closing_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        payment_calendar_id: Option<&str>,
+        calendar_id: Option<&str>,
     ) -> PyResult<Self> {
         let mut inner = StructuredCredit::new_cmbs(
             id,
@@ -250,8 +250,8 @@ impl PyStructuredCredit {
             extract_date(maturity)?,
             discount_curve_id,
         );
-        if let Some(calendar_id) = payment_calendar_id {
-            inner = inner.with_payment_calendar(calendar_id);
+        if let Some(calendar_id) = calendar_id {
+            inner = inner.with_calendar(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -262,9 +262,9 @@ impl PyStructuredCredit {
     /// See :meth:`new_abs` for parameter and return documentation; the
     /// signature is identical, only the deal-type calibration differs.
     #[staticmethod]
-    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None))]
+    #[pyo3(signature = (id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None))]
     #[pyo3(
-        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, payment_calendar_id=None)"
+        text_signature = "(id, pool, tranches, closing_date, maturity, discount_curve_id, calendar_id=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -275,7 +275,7 @@ impl PyStructuredCredit {
         closing_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         discount_curve_id: &str,
-        payment_calendar_id: Option<&str>,
+        calendar_id: Option<&str>,
     ) -> PyResult<Self> {
         let mut inner = StructuredCredit::new_rmbs(
             id,
@@ -285,8 +285,8 @@ impl PyStructuredCredit {
             extract_date(maturity)?,
             discount_curve_id,
         );
-        if let Some(calendar_id) = payment_calendar_id {
-            inner = inner.with_payment_calendar(calendar_id);
+        if let Some(calendar_id) = calendar_id {
+            inner = inner.with_calendar(calendar_id);
         }
         inner.validate_for_pricing().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -674,15 +674,15 @@ impl PyStructuredCredit {
 
     /// Payment calendar identifier, or ``None``.
     #[getter]
-    fn payment_calendar_id(&self) -> Option<String> {
-        self.inner.payment_calendar_id.clone()
+    fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Payment business-day convention string, or ``None`` for the default.
     #[getter]
-    fn payment_business_day_convention(&self) -> PyResult<Option<String>> {
+    fn business_day_convention(&self) -> PyResult<Option<String>> {
         self.inner
-            .payment_business_day_convention
+            .business_day_convention
             .as_ref()
             .map(enum_to_py_string)
             .transpose()
@@ -1233,12 +1233,12 @@ impl PyStructuredCreditBuilder {
     ///     If this builder was already consumed by a prior call to
     ///     :meth:`StructuredCreditBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
-    fn payment_calendar_id<'py>(
+    fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_sc(&mut slf)?;
-        slf.inner = Some(b.payment_calendar_id(value.to_string()));
+        slf.inner = Some(b.calendar_id(value.into()));
         Ok(slf)
     }
 
@@ -1261,14 +1261,14 @@ impl PyStructuredCreditBuilder {
     /// ValueError
     ///     If ``value`` is not a recognized business day convention.
     #[pyo3(text_signature = "($self, value)")]
-    fn payment_business_day_convention<'py>(
+    fn business_day_convention<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let business_day_convention: BusinessDayConvention =
-            enum_from_str(value, "payment_business_day_convention")?;
+            enum_from_str(value, "business_day_convention")?;
         let b = take_sc(&mut slf)?;
-        slf.inner = Some(b.payment_business_day_convention(business_day_convention));
+        slf.inner = Some(b.business_day_convention(business_day_convention));
         Ok(slf)
     }
 

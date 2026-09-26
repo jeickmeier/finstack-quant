@@ -281,7 +281,7 @@ pub(crate) fn lower_return_floor(
         .map(|call_put| call_put.calls.iter().collect())
         .unwrap_or_default();
     for call in &contractual_calls {
-        event_dates.extend([call.start_date.max(as_of), call.end_date.min(bond.maturity)]);
+        event_dates.extend([call.start.max(as_of), call.end.min(bond.maturity)]);
     }
     event_dates.sort_unstable();
     event_dates.dedup();
@@ -337,14 +337,14 @@ pub(crate) fn lower_return_floor(
     let mut contractual_dates = BTreeSet::<Date>::new();
     for call in contractual_calls {
         for date in BondValuator::exercise_candidates(
-            call.start_date.max(as_of),
-            call.end_date.min(bond.maturity),
+            call.start.max(as_of),
+            call.end.min(bond.maturity),
             &event_dates,
         ) {
             contractual_dates.insert(date);
             calls.push(CallPut {
-                start_date: date,
-                end_date: date,
+                start: date,
+                end: date,
                 price_pct_of_par: floor_by_date
                     .get(&date)
                     .copied()
@@ -358,14 +358,14 @@ pub(crate) fn lower_return_floor(
     for (date, floor_pct) in floor_by_date {
         if !contractual_dates.contains(&date) {
             calls.push(CallPut {
-                start_date: date,
-                end_date: date,
+                start: date,
+                end: date,
                 price_pct_of_par: floor_pct,
                 make_whole: None,
             });
         }
     }
-    calls.sort_by_key(|call| (call.start_date, call.end_date));
+    calls.sort_by_key(|call| (call.start, call.end));
 
     // Preserve any existing puts (contractual calls already folded into `calls`).
     let puts = bond
@@ -506,7 +506,7 @@ mod tests {
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
-                maturity_date: Some(maturity),
+                maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
         );
@@ -580,7 +580,7 @@ mod tests {
         let yr1 = sched
             .calls
             .iter()
-            .find(|c| c.start_date == date!(2025 - 01 - 15))
+            .find(|c| c.start == date!(2025 - 01 - 15))
             .unwrap();
         assert!(
             (yr1.price_pct_of_par - 115.0).abs() < 0.5,
@@ -600,7 +600,7 @@ mod tests {
         let yr1 = sched
             .calls
             .iter()
-            .find(|c| c.start_date == date!(2025 - 01 - 15))
+            .find(|c| c.start == date!(2025 - 01 - 15))
             .unwrap();
         // Realized cashflows if called at year 1: -100 invested, two $5 coupons, redemption.
         let redemption = yr1.price_pct_of_par; // % of par == cash on $100 notional
@@ -650,9 +650,9 @@ mod tests {
         let call = schedule
             .calls
             .iter()
-            .find(|call| call.start_date == between_coupon_date)
+            .find(|call| call.start == between_coupon_date)
             .expect("the protection window starts at as_of");
-        assert_eq!(call.end_date, between_coupon_date);
+        assert_eq!(call.end, between_coupon_date);
         let full_schedule = bond.full_cashflow_schedule(&curves).unwrap();
         let accrued =
             crate::cashflow::accrual::AccrualIndex::build(&full_schedule, &bond.accrual_config())
@@ -686,7 +686,7 @@ mod tests {
         let call = schedule
             .calls
             .iter()
-            .find(|call| call.start_date == exercise_date)
+            .find(|call| call.start == exercise_date)
             .expect("between-coupon floor date");
         let full_schedule = bond.full_cashflow_schedule(&curves).unwrap();
         let accrued =
@@ -712,8 +712,8 @@ mod tests {
         let exercise_date = date!(2025 - 01 - 15);
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise_date,
-                end_date: exercise_date,
+                start: exercise_date,
+                end: exercise_date,
                 price_pct_of_par: 101.0,
                 make_whole: Some(MakeWholeSpec {
                     reference_curve_id: CurveId::new("USD-TREASURY"),
@@ -732,7 +732,7 @@ mod tests {
         let call = schedule
             .calls
             .iter()
-            .find(|call| call.start_date == exercise_date && call.make_whole.is_some())
+            .find(|call| call.start == exercise_date && call.make_whole.is_some())
             .expect("contractual make-whole must survive return-floor lowering");
         assert!((call.price_pct_of_par - 115.0).abs() < 0.5);
     }
@@ -951,20 +951,20 @@ mod tests {
             for call in &sched.calls {
                 let cash_incl = dist
                     .iter()
-                    .filter(|point| point.date <= call.start_date)
+                    .filter(|point| point.date <= call.start)
                     .map(|point| point.coupon)
                     .sum::<f64>();
                 // Schedule prices are clean; exercise pays accrued once.
                 let redemption = call.price_pct_of_par / 100.0 * v0
                     + accrual_index
-                        .accrued_at(call.start_date)
+                        .accrued_at(call.start)
                         .expect("call-date accrued");
                 let moic = (cash_incl + redemption) / v0;
 
                 assert!(
                     moic >= moic_target - 1e-9,
                     "MOIC floor violated: rate={r}, date={}, moic={moic:.8}, target={moic_target}",
-                    call.start_date
+                    call.start
                 );
             }
         }
@@ -1008,13 +1008,13 @@ mod tests {
 
         let cash_incl = dist
             .iter()
-            .filter(|point| point.date <= binding_call.start_date)
+            .filter(|point| point.date <= binding_call.start)
             .map(|point| point.coupon)
             .sum::<f64>();
 
         // Sanity: the lowered redemption hits the target exactly (within tol).
         let accrued = accrual_index
-            .accrued_at(binding_call.start_date)
+            .accrued_at(binding_call.start)
             .expect("call-date accrued");
         let at_floor = binding_call.price_pct_of_par / 100.0 * v0 + accrued;
         let moic_at_floor = (cash_incl + at_floor) / v0;
@@ -1028,7 +1028,7 @@ mod tests {
         assert!(
             (cash_incl + short) / v0 < moic_target,
             "lowered redemption is not the binding minimum (date={}, price_pct={})",
-            binding_call.start_date,
+            binding_call.start,
             binding_call.price_pct_of_par
         );
     }
@@ -1067,16 +1067,16 @@ mod tests {
 
         for call in &sched.calls {
             // Reconstruct the investor cashflow stream for this call path:
-            //   (issue, -V0), then each coupon point.date <= call.start_date,
-            //   then the redemption at call.start_date.
+            //   (issue, -V0), then each coupon point.date <= call.start,
+            //   then the redemption at call.start.
             let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> =
                 vec![(bond.issue_date, -v0)];
 
             for p in &dist {
-                if p.date > call.start_date {
+                if p.date > call.start {
                     break;
                 }
-                if p.date < call.start_date {
+                if p.date < call.start {
                     flows.push((p.date, p.coupon));
                 }
             }
@@ -1085,23 +1085,22 @@ mod tests {
             // exercise; between coupon dates this component is zero.
             let distribution_on_call = dist
                 .iter()
-                .filter(|point| point.date == call.start_date)
+                .filter(|point| point.date == call.start)
                 .map(|point| point.coupon)
                 .sum::<f64>();
             let redemption = call.price_pct_of_par / 100.0 * v0
                 + accrual_index
-                    .accrued_at(call.start_date)
+                    .accrued_at(call.start)
                     .expect("call-date accrued");
-            flows.push((call.start_date, distribution_on_call + redemption));
+            flows.push((call.start, distribution_on_call + redemption));
 
-            let realized = finstack_quant_core::cashflow::xirr(&flows, None).unwrap_or_else(|e| {
-                panic!("XIRR solver failed at call date {}: {e}", call.start_date)
-            });
+            let realized = finstack_quant_core::cashflow::xirr(&flows, None)
+                .unwrap_or_else(|e| panic!("XIRR solver failed at call date {}: {e}", call.start));
 
             assert!(
                 realized >= xirr_target - 1e-6,
                 "XIRR floor violated: date={}, realized={realized:.8}, target={xirr_target}",
-                call.start_date
+                call.start
             );
         }
     }
@@ -1166,19 +1165,19 @@ mod tests {
             for call in &sched.calls {
                 let cash_incl = dist
                     .iter()
-                    .filter(|point| point.date <= call.start_date)
+                    .filter(|point| point.date <= call.start)
                     .map(|point| point.coupon)
                     .sum::<f64>();
                 let redemption = call.price_pct_of_par / 100.0 * v0
                     + accrual_index
-                        .accrued_at(call.start_date)
+                        .accrued_at(call.start)
                         .expect("call-date accrued");
                 let moic = (cash_incl + redemption) / v0;
 
                 assert!(
                     moic >= moic_target - 1e-9,
                     "Floating MOIC floor violated: fwd={fwd_rate}, date={}, moic={moic:.8}, target={moic_target}",
-                    call.start_date
+                    call.start
                 );
             }
         }

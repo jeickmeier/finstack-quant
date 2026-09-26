@@ -868,7 +868,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .start_date(base)
             .maturity(maturity_2y())
             .observation_frequency(Tenor::daily())
-            .observation_calendar_id("USNY".to_string())
+            .observation_calendar_id("USNY".into())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .price_series_policy(
                 finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
@@ -914,7 +914,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
@@ -1040,7 +1040,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             maturity_5y(),
             "USD-OIS",
         )
-        .with_payment_calendar("nyse");
+        .with_calendar("nyse");
         // Spread metrics require an external quote; using model dirty price
         // as its own Z-spread target would force a circular zero spread.
         sc.instrument_pricing_overrides
@@ -1082,7 +1082,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 

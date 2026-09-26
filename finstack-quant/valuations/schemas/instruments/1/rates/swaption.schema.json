@@ -49,11 +49,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding_simple": {
           "description": "If true, use simple interest on accrual fraction",
@@ -132,11 +136,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",
@@ -161,12 +169,16 @@
           "type": "boolean"
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag)",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag)"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",

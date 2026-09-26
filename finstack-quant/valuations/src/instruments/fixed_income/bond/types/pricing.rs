@@ -636,8 +636,8 @@ mod tests {
             .implied_volatility = Some(0.01);
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2027 - 01 - 01),
-                end_date: date!(2027 - 01 - 01),
+                start: date!(2027 - 01 - 01),
+                end: date!(2027 - 01 - 01),
                 price_pct_of_par: f64::NAN,
                 make_whole: None,
             }],
@@ -831,8 +831,8 @@ mod tests {
         let mut callable = vanilla;
         callable.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2027 - 01 - 01),
-                end_date: date!(2027 - 01 - 01),
+                start: date!(2027 - 01 - 01),
+                end: date!(2027 - 01 - 01),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

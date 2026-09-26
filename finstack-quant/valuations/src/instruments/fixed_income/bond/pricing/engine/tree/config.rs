@@ -405,8 +405,8 @@ mod tests {
         .expect("fixed bond should build");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2027 - 01 - 01),
-                end_date: date!(2028 - 01 - 01),
+                start: date!(2027 - 01 - 01),
+                end: date!(2028 - 01 - 01),
                 price_pct_of_par: 101.0,
                 make_whole: None,
             }],
@@ -439,8 +439,8 @@ mod tests {
         .expect("fixed bond should build");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2027 - 01 - 01),
-                end_date: date!(2028 - 01 - 01),
+                start: date!(2027 - 01 - 01),
+                end: date!(2028 - 01 - 01),
                 price_pct_of_par: 101.0,
                 make_whole: None,
             }],

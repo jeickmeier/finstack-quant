@@ -37,8 +37,8 @@ fn callable_bond(as_of: Date) -> Bond {
 
     let mut schedule = CallPutSchedule::default();
     schedule.calls.push(CallPut {
-        start_date: date!(2027 - 01 - 01),
-        end_date: date!(2027 - 01 - 01),
+        start: date!(2027 - 01 - 01),
+        end: date!(2027 - 01 - 01),
         price_pct_of_par: 102.0,
         make_whole: None,
     });

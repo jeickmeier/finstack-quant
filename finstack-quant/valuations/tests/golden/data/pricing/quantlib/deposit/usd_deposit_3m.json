@@ -24,7 +24,6 @@
           "amount": "10000000",
           "currency": "USD"
         },
-        "settlement_days": 0,
         "start_date": "2026-04-30"
       },
       "type": "deposit"

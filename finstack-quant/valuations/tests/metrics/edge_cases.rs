@@ -230,7 +230,7 @@ fn test_zero_volatility_option_limits() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -274,7 +274,7 @@ fn test_zero_volatility_option_limits() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -332,7 +332,7 @@ fn test_zero_quantity_is_rejected() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -373,7 +373,7 @@ fn test_deep_otm_option_greeks() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -429,7 +429,7 @@ fn test_deep_itm_put_greeks() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -484,7 +484,7 @@ fn test_deep_otm_put_greeks() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -554,7 +554,7 @@ fn test_atm_option_gamma_peak() {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            exercise_schedule: None,
+            exercise_dates: None,
             attributes: Default::default(),
         };
 
@@ -619,7 +619,7 @@ fn test_extreme_volatility_handling() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -678,7 +678,7 @@ fn test_very_short_dated_option() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -759,7 +759,7 @@ fn test_very_low_interest_rate_greeks() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -845,7 +845,7 @@ fn test_vol_smile_greeks() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 

@@ -108,7 +108,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
             .map(|&t| tree.step_at_time(t))
             .collect::<Result<_>>()?;
         let mut exercise_cashflows = finstack_quant_core::HashMap::default();
-        for &date in &swaption.bermudan_schedule.exercise_dates {
+        for &date in &swaption.exercise_schedule.exercise_dates {
             let time = model_time(as_of, date);
             if !exercise_times.iter().any(|&t| (t - time).abs() < 1e-10) {
                 continue;

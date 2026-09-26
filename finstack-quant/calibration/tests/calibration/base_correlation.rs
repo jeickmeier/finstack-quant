@@ -104,7 +104,7 @@ fn tranche_upfront_frac(
         .discount_curve_id(CurveId::from("USD-OIS"))
         .credit_index_id(CurveId::from("CDX"))
         .side(TrancheSide::BuyProtection)
-        .effective_date_opt(None)
+        .start_date_opt(None)
         .realized_loss(0.0)
         .roll_rule(finstack_quant_cashflows::builder::specs::RollRule::CdsImm)
         .attributes(Attributes::new())

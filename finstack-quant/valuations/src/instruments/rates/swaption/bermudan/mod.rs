@@ -576,7 +576,7 @@ impl BermudanSwaptionPricer {
         }
 
         let exercise_cashflows = swaption
-            .bermudan_schedule
+            .exercise_schedule
             .effective_dates()
             .into_iter()
             .filter(|date| *date > as_of)

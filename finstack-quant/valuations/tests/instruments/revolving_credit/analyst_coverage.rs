@@ -46,7 +46,7 @@ fn seasoned(draw_repay_spec: DrawRepaySpec) -> RevolvingCredit {
         .id("RC-ANCHOR".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(4_000_000.0))
-        .commitment_date(COMMITMENT)
+        .issue_date(COMMITMENT)
         .maturity(MATURITY)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
@@ -179,7 +179,7 @@ fn conventions(
         .id("RC-CAL".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(4_000_000.0))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
@@ -188,7 +188,7 @@ fn conventions(
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())
         .recovery_rate(0.4)
-        .calendar_id_opt(calendar_id.map(str::to_string))
+        .calendar_id_opt(calendar_id.map(str::to_string).map(Into::into))
         .business_day_convention(bdc)
         .payment_lag_days(payment_lag_days)
         .build()
@@ -343,7 +343,7 @@ fn stepped(
         .id("RC-STEP".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(drawn))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(date!(2027 - 01 - 15))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
@@ -520,7 +520,7 @@ fn with_steps(
         .id("RC-MARGIN".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(5_000_000.0))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(date!(2027 - 01 - 15))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)
@@ -700,7 +700,7 @@ fn with_lc(
         .id("RC-LC".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(3_000_000.0))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(date!(2027 - 01 - 15))
         .base_rate_spec(sofr_plus(325))
         .day_count(DayCount::Act360)
@@ -926,7 +926,7 @@ fn quote_facility(
         .id("RC-QUOTE".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(drawn))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(date!(2028 - 01 - 15))
         .base_rate_spec(base_rate_spec)
         .day_count(DayCount::Act360)
@@ -1004,7 +1004,7 @@ fn discount_margin_and_price_from_dm_round_trip_a_quote() {
 #[test]
 fn accrued_interest_is_pro_rata_within_the_current_period() {
     let mut facility = quote_facility(BaseRateSpec::Fixed { rate: 0.06 }, 5_000_000.0, None, None);
-    facility.commitment_date = date!(2024 - 10 - 15);
+    facility.issue_date = date!(2024 - 10 - 15);
     // Valuation 2025-01-15 sits 92 days into the 2024-10-15 -> 2025-01-15 ... no:
     // the period is 2025-01-15 -> 2025-04-15 with settlement on its start, so
     // accrued is zero there; move settlement 30 days in.
@@ -1084,7 +1084,7 @@ fn exposure_facility(drawn: f64, leq: f64, credit: bool) -> RevolvingCredit {
         .id("RC-EXPOSURE".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(drawn))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(date!(2028 - 01 - 15))
         .base_rate_spec(sofr_plus(325))
         .day_count(DayCount::Act360)
@@ -1229,7 +1229,7 @@ fn origination_facility(upfront: Option<UpfrontFee>, fees_bp: f64) -> RevolvingC
         .id("RC-ORIG".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(10_000_000.0))
-        .commitment_date(date!(2025 - 02 - 15))
+        .issue_date(date!(2025 - 02 - 15))
         .maturity(date!(2028 - 02 - 15))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 })
         .day_count(DayCount::Act360)

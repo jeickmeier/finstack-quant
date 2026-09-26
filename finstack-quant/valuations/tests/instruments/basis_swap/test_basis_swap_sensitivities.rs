@@ -70,7 +70,7 @@ fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> 
         frequency: Tenor::quarterly(),
         day_count: DayCount::Act360,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: Some(CALENDAR_ID.to_string()),
+        calendar_id: Some(CALENDAR_ID.into()),
         stub: StubKind::ShortFront,
         spread_bp,
         payment_lag_days: 0,

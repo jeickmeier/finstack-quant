@@ -117,7 +117,7 @@ impl PyExCouponRule {
         Self {
             inner: ExCouponRule {
                 days_before_coupon,
-                calendar_id,
+                calendar_id: calendar_id.map(Into::into),
             },
         }
     }
@@ -131,7 +131,7 @@ impl PyExCouponRule {
     /// Optional business-day calendar identifier.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Ex-coupon date for a coupon paid on ``payment_date``.

@@ -135,7 +135,7 @@ fn bench_schedule_builder_fixed(c: &mut Criterion) {
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 

@@ -281,7 +281,7 @@ mod discount_margin_tests {
         ])
         .unwrap();
         StructuredCredit::new_abs("ABS-DM", pool, tranches, closing(), maturity(), "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
     }
 
     /// At the model PV (no extra spread), canonical discount margin is zero.
@@ -477,7 +477,7 @@ mod breakeven_cdr_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-BE", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
         sc
@@ -578,7 +578,7 @@ mod scenario_table_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-SCN", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
         sc
@@ -736,7 +736,7 @@ mod oas_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-OAS", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);

@@ -23,7 +23,7 @@ def _cashflow_spec() -> str:
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none",
         },
-        "issue": "2024-08-31",
+        "issue_date": "2024-08-31",
         "maturity": "2025-08-31",
         "coupon_program": [
             {
@@ -81,7 +81,7 @@ def _floating_cashflow_spec() -> str:
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none",
         },
-        "issue": "2025-01-15",
+        "issue_date": "2025-01-15",
         "maturity": "2026-01-15",
         "coupon_program": [
             {
@@ -162,7 +162,7 @@ def test_cashflows_builds_floating_schedule_with_market_json() -> None:
 
 def test_cashflows_builds_step_up_with_payment_program() -> None:
     spec = json.loads(_cashflow_spec())
-    spec["issue"] = "2024-01-01"
+    spec["issue_date"] = "2024-01-01"
     spec["maturity"] = "2026-01-01"
     fixed = spec["coupon_program"][0]["spec"]
     initial_rate = fixed.pop("rate")
@@ -211,7 +211,7 @@ def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none",
         },
-        "issue": "2025-01-01",
+        "issue_date": "2025-01-01",
         "maturity": "2027-01-01",
     }
 
@@ -252,7 +252,7 @@ def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
 
 def test_cashflows_reports_overlapping_payment_windows() -> None:
     spec = json.loads(_cashflow_spec())
-    spec["issue"] = "2025-01-01"
+    spec["issue_date"] = "2025-01-01"
     spec["maturity"] = "2027-01-01"
     spec["payment_program"] = [
         {
@@ -375,17 +375,17 @@ def test_cashflows_reject_amortization_over_notional() -> None:
 
 
 @pytest.mark.parametrize(
-    ("issue", "maturity", "day_count", "as_of", "expected"),
+    ("issue_date", "maturity", "day_count", "as_of", "expected"),
     [
         ("2025-01-15", "2025-10-15", "act_act_isma", "2025-07-15", 50_000.0),
         ("2024-08-31", "2025-02-28", "30e_360_isda", "2025-01-31", 100_000 * 150 / 360),
     ],
 )
 def test_accrual_retains_contractual_day_count_context(
-    issue: str, maturity: str, day_count: str, as_of: str, expected: float
+    issue_date: str, maturity: str, day_count: str, as_of: str, expected: float
 ) -> None:
     spec = json.loads(_cashflow_spec())
-    spec.update(issue=issue, maturity=maturity)
+    spec.update(issue_date=issue_date, maturity=maturity)
     spec["coupon_program"][0]["spec"].update(
         rate="0.1",
         frequency={"count": 6, "unit": "months"},

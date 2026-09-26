@@ -311,7 +311,7 @@ fn schedule_from_projection(
                 calendar_ids: Vec::new(),
                 facility_limit: None,
                 issue_date: Some(mbs.issue_date),
-                maturity_date: None,
+                maturity: None,
             },
         },
     ))

@@ -81,8 +81,8 @@ impl ZSpreadCs01 for RevolvingCredit {
                 // Upfront fee is a separate PV term in the pricer, paid at the
                 // commitment date and only when that date is in the future.
                 let upfront = self.upfront_fee_amount();
-                if upfront.amount() > 0.0 && self.commitment_date > as_of {
-                    flows.push((self.commitment_date, upfront));
+                if upfront.amount() > 0.0 && self.issue_date > as_of {
+                    flows.push((self.issue_date, upfront));
                 }
                 flows
             }

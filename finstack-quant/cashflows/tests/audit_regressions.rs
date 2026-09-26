@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 fn spec(issue: &str, maturity: &str) -> Value {
     json!({"notional":{"initial":{"amount":"1000000","currency":"USD"},"amort":"none"},
-    "issue":issue,"maturity":maturity,"coupon_program":[{"kind":"fixed","spec":{
+    "issue_date":issue,"maturity":maturity,"coupon_program":[{"kind":"fixed","spec":{
         "coupon_type":"cash","rate":"0.1","frequency":{"count":3,"unit":"months"},
         "day_count":"act_360","business_day_convention":"unadjusted",
         "calendar_id":"weekends_only","stub":"short_back","payment_lag_days":0}}]})
@@ -23,7 +23,7 @@ fn build(v: Value) -> CashFlowSchedule {
 fn date(s: &str) -> cf::Date {
     serde_json::from_value::<cf::CashflowScheduleBuildSpec>(spec(s, "2030-01-01"))
         .expect("date")
-        .issue
+        .issue_date
 }
 fn close(actual: f64, expected: f64) {
     assert!(

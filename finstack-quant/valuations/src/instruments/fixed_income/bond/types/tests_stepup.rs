@@ -103,7 +103,7 @@ fn test_bond_serde_allows_missing_issue_date_with_custom_cashflows() {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 
@@ -191,7 +191,7 @@ fn test_bond_custom_cashflows_serde_roundtrip() {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 

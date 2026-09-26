@@ -170,7 +170,7 @@ fn deep_otm_convertible(steps: usize) -> ConvertibleBond {
             frequency: Tenor::semi_annual(),
             day_count: DayCount::Thirty360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,

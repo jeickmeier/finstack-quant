@@ -41,13 +41,13 @@ use finstack_quant_core::types::IndexId;
 /// The instrument supports optional settlement convention fields for proper
 /// business-day adjusted cashflow generation:
 ///
-/// - `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)
 /// - `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)
 /// - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
 ///
-/// When these fields are set, the effective start date is computed as
-/// `start + settlement_days` adjusted by the business day convention. In this case,
-/// `start` is treated as the trade date; otherwise it is the accrual start date.
+/// `start_date` is always the accrual start (spot) date. Callers holding a
+/// trade date compute the spot date before building (see
+/// [`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and
+/// `maturity` are adjusted by the business day convention.
 #[derive(
     Clone,
     Debug,
@@ -118,13 +118,6 @@ pub struct Deposit {
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 
-    /// Optional T+N settlement (spot) lag in business days from trade date to effective start.
-    ///
-    /// Market convention: T+2 for USD/EUR/JPY, T+0 for GBP.
-    /// If not set, the raw `start` date is used without adjustment.
-    #[builder(optional)]
-    pub settlement_days: Option<u32>,
-
     /// Business day convention for date adjustments.
     ///
     /// Used to adjust the effective start/end dates to valid business days.
@@ -165,19 +158,19 @@ pub struct ConventionDepositParams<'a> {
 impl Deposit {
     /// Create a canonical example deposit for testing and documentation.
     ///
-    /// Returns a 6-month USD deposit with 4.5% quoted rate and standard
-    /// T+2 spot settlement with ModifiedFollowing business day convention.
+    /// Returns a 6-month USD deposit with 4.5% quoted rate accruing from its
+    /// spot date (2024-01-03, T+2 weekdays from a 2024-01-01 trade) with the
+    /// ModifiedFollowing business day convention.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("DEP-USD-6M"))
             .notional(Money::from((100_000_i64, Currency::USD)))
-            .start_date(date!(2024 - 01 - 01))
+            .start_date(date!(2024 - 01 - 03))
             .maturity(date!(2024 - 07 - 01))
             .day_count(DayCount::Act360)
             .fixed_rate_opt(Decimal::try_from(0.045).ok())
             .discount_curve_id(CurveId::new("USD-OIS"))
             .attributes(Attributes::new())
-            .settlement_days_opt(Some(2))
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .build()
     }
@@ -186,6 +179,14 @@ impl Deposit {
     ///
     /// This constructor is the preferred shortcut for standard money-market
     /// deposits when the caller knows the trade date, maturity, and quoted rate.
+    /// The accrual start date is the spot date: `trade_date` plus the index's
+    /// `market_settlement_days` business days on its market calendar.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Deposit identity, notional, trade date, maturity, decimal
+    ///   simple rate (0.045 = 4.5%), rate index id used to resolve conventions,
+    ///   discount curve id and attributes.
     ///
     /// # Errors
     ///
@@ -209,11 +210,18 @@ impl Deposit {
             finstack_quant_core::Error::Validation("ConventionRegistry not initialized.".into())
         })?;
         let conv = registry.require_rate_index(&IndexId::new(index_id))?;
+        let calendar = calendar_by_id(&conv.market_calendar_id).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "rate index '{index_id}' references unknown market_calendar_id '{}'",
+                conv.market_calendar_id
+            ))
+        })?;
+        let spot_date = trade_date.add_business_days(conv.market_settlement_days, calendar)?;
 
         let deposit = Self::builder()
             .id(id)
             .notional(notional)
-            .start_date(trade_date)
+            .start_date(spot_date)
             .maturity(maturity)
             .day_count(conv.day_count)
             .fixed_rate_opt(Some(finstack_quant_core::decimal::f64_to_decimal(
@@ -221,14 +229,6 @@ impl Deposit {
             )?))
             .discount_curve_id(CurveId::new(discount_curve_id))
             .attributes(attributes)
-            .settlement_days_opt(Some(u32::try_from(conv.market_settlement_days).map_err(
-                |_| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "rate index convention market_settlement_days must be non-negative, got {}",
-                        conv.market_settlement_days
-                    ))
-                },
-            )?))
             .business_day_convention(conv.market_business_day_convention)
             .calendar_id_opt(Some(conv.market_calendar_id.clone().into()))
             .build()?;
@@ -400,12 +400,8 @@ impl Deposit {
         Ok(())
     }
 
-    /// Compute the effective start date considering spot lag and business day adjustments.
-    ///
-    /// If `settlement_days` is set, computes the start date as `start + settlement_days` business days
-    /// (or calendar days if no calendar is set), then applies the business day convention.
-    ///
-    /// If `settlement_days` is not set, returns the raw `start` date optionally adjusted by BDC.
+    /// Compute the effective start date: `start_date` adjusted by the business
+    /// day convention when `calendar_id` is set, otherwise `start_date` unchanged.
     ///
     /// # Returns
     /// The effective start date after all adjustments.
@@ -422,29 +418,10 @@ impl Deposit {
 
         let business_day_convention = self.business_day_convention;
 
-        let base_start = if let Some(settlement_days) = self.settlement_days {
-            // Compute spot date: start + settlement_days business days
-            let lag_days = i32::try_from(settlement_days).map_err(|_| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Deposit '{}' settlement_days {settlement_days} exceeds the supported range",
-                    self.id
-                ))
-            })?;
-            if let Some(cal) = calendar {
-                self.start_date.add_business_days(lag_days, cal)?
-            } else {
-                self.start_date.add_weekdays(lag_days)
-            }
-        } else {
-            // Use raw start date
-            self.start_date
-        };
-
-        // Apply business day adjustment if calendar is available
         if let Some(cal) = calendar {
-            adjust(base_start, business_day_convention, cal)
+            adjust(self.start_date, business_day_convention, cal)
         } else {
-            Ok(base_start)
+            Ok(self.start_date)
         }
     }
 
@@ -454,9 +431,8 @@ impl Deposit {
     ///
     /// # Convention note
     ///
-    /// Spot lag is only applied to the start leg (`effective_start_date`), not to this
-    /// end leg. This follows common money-market convention where maturity is determined
-    /// from the agreed term after spot settlement, then adjusted by BDC/calendar.
+    /// Maturity is determined from the agreed term after spot settlement, then
+    /// adjusted by BDC/calendar (common money-market convention).
     ///
     /// # Returns
     /// The effective end date after all adjustments.
@@ -496,9 +472,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         // (includes effective date ordering check)
         self.validate()?;
 
-        // Compute effective dates with spot lag and business day adjustments.
-        // When settlement_days is set, compute effective start from trade date (start).
-        // Otherwise, use the raw start/end dates (optionally BDC-adjusted).
+        // Effective dates: start/end optionally BDC-adjusted.
         let effective_start = self.effective_start_date()?;
         let effective_end = self.effective_end_date()?;
 
@@ -578,7 +552,8 @@ mod tests {
             deposit.notional,
             Money::from((1_000_000_i64, Currency::USD))
         );
-        assert_eq!(deposit.start_date, date!(2025 - 01 - 02));
+        // Spot date: 2025-01-02 (Thu) + 2 USNY business days = 2025-01-06 (Mon).
+        assert_eq!(deposit.start_date, date!(2025 - 01 - 06));
         assert_eq!(deposit.maturity, date!(2025 - 07 - 02));
         assert_eq!(deposit.day_count, DayCount::Act360);
         assert_eq!(
@@ -586,7 +561,6 @@ mod tests {
             Some(0.045)
         );
         assert_eq!(deposit.discount_curve_id, CurveId::new("USD-OIS"));
-        assert_eq!(deposit.settlement_days, Some(2));
         assert_eq!(
             deposit.business_day_convention,
             BusinessDayConvention::ModifiedFollowing

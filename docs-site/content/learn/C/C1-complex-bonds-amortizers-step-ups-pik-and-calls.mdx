@@ -97,7 +97,7 @@ print(pd.Series({'as_of':AS_OF.isoformat(),'id':complex_terms['id'],
     'PIK_share':coupon_terms['coupon_type']['split']['pik_fraction'],
     'step':coupon_terms['step_schedule'][0],
     'amortization_payments':len(amortization_items),
-    'first_call_start':first_call['start_date'],'first_call_price_pct':first_call['price_pct_of_par']}))
+    'first_call_start':first_call['start'],'first_call_price_pct':first_call['price_pct_of_par']}))
 complex_json=json.dumps(complex_payload)
 validate_instrument_json(complex_json)
 roundtrip=Bond.from_json(complex_json).to_json()
@@ -241,8 +241,8 @@ amort_dates=[f"{year}-{month:02d}-15" for year in [2030,2031,2032]
              for month in [1,4,7,10] if (year,month)>(2030,1)]
 a["cashflow_spec"]={"amortizing":{"base":{"step_up":coupon},"schedule":{
     "custom_principal":{"items":[[day,{"amount":"10000","currency":"USD"}] for day in amort_dates]}}}}
-a["call_put"]={"puts":[],"calls":[{"start_date":f"{year}-01-15",
-    "end_date":f"{year+1}-01-14" if year<2032 else "2033-01-15",
+a["call_put"]={"puts":[],"calls":[{"start":f"{year}-01-15",
+    "end":f"{year+1}-01-14" if year<2032 else "2033-01-15",
     "price_pct_of_par":call_price} for year,call_price in [(2028,103.),(2029,102.),(2030,101.),(2031,100.),(2032,100.)]]}
 a["settlement_days"]=1
 a["instrument_pricing_overrides"]={"model_config":{"hw1f_mean_reversion":.03,"hw1f_sigma":.01}}

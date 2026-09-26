@@ -87,7 +87,7 @@ pub(crate) fn revolver(
         .id(id.into())
         .commitment_amount(usd(50_000_000.0))
         .drawn_amount(usd(10_000_000.0))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(MATURITY)
         .base_rate_spec(BaseRateSpec::Floating(floating_spec()))
         .day_count(DayCount::Act360)

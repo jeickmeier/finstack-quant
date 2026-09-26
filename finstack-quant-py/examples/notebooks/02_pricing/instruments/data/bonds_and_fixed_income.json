@@ -59,9 +59,9 @@
       "call_put": {
         "calls": [
           {
-            "end_date": "2027-01-15",
+            "end": "2027-01-15",
             "price_pct_of_par": 100.0,
-            "start_date": "2027-01-15"
+            "start": "2027-01-15"
           }
         ],
         "puts": []

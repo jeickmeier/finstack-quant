@@ -396,7 +396,7 @@ fn ohlc_swap(method: RealizedVarMethod) -> VarianceSwap {
         .start_date(start)
         .maturity(end)
         .observation_frequency(Tenor::daily())
-        .observation_calendar_id("USNY".to_string())
+        .observation_calendar_id("USNY".into())
         .realized_var_method(method)
         .price_series_policy(
             finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,
@@ -470,7 +470,7 @@ fn test_ohlc_missing_series_id_returns_error() {
         .start_date(start)
         .maturity(end)
         .observation_frequency(Tenor::daily())
-        .observation_calendar_id("USNY".to_string())
+        .observation_calendar_id("USNY".into())
         .realized_var_method(RealizedVarMethod::Parkinson)
         .price_series_policy(
             finstack_quant_valuations::instruments::EquityPriceSeriesPolicy::Adjusted,

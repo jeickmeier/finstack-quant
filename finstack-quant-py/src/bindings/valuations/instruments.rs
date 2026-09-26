@@ -363,7 +363,7 @@ impl PyBond {
     ///     Principal amount; a bare number needs ``currency``.
     /// coupon_rate : float | Rate
     ///     Annual coupon rate as a decimal (``0.05`` = 5%) or a ``Rate``.
-    /// issue : datetime.date | datetime.datetime | pandas.Timestamp | str
+    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Issue date (ISO 8601 strings accepted).
     /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Maturity date.
@@ -392,7 +392,7 @@ impl PyBond {
     /// ValueError
     ///     If ``convention``/``stub`` is not a recognized name, a bare
     ///     ``notional`` has no ``currency``, or validation fails (e.g.
-    ///     maturity not after issue).
+    ///     maturity not after issue_date).
     /// TypeError
     ///     If ``coupon_rate`` or ``notional`` has an unsupported type, or a
     ///     date cannot be interpreted.
@@ -407,9 +407,9 @@ impl PyBond {
     /// >>> bond.id
     /// 'BOND-1'
     #[staticmethod]
-    #[pyo3(signature = (id, notional, coupon_rate, issue, maturity, stub, discount_curve_id, *, convention = None, currency = None))]
+    #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, convention = None, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, coupon_rate, issue, maturity, stub, discount_curve_id, *, convention=None, currency=None)"
+        text_signature = "(id, notional, coupon_rate, issue_date, maturity, stub, discount_curve_id, *, convention=None, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -417,7 +417,7 @@ impl PyBond {
         id: &str,
         notional: &Bound<'_, PyAny>,
         coupon_rate: &Bound<'_, PyAny>,
-        issue: &Bound<'_, PyAny>,
+        issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         stub: &Bound<'_, PyAny>,
         discount_curve_id: &str,
@@ -427,14 +427,14 @@ impl PyBond {
         let notional = money_from_py(notional, currency, "notional")?;
         let coupon_rate = rate_from_py(coupon_rate, "coupon_rate")?;
         let stub = stub_kind_from_py(Some(stub), "stub")?;
-        let issue = extract_date(issue)?;
+        let issue_date = extract_date(issue_date)?;
         let maturity = extract_date(maturity)?;
         let inner = match convention {
             None => finstack_quant_valuations::instruments::Bond::fixed(
                 id,
                 notional,
                 coupon_rate,
-                issue,
+                issue_date,
                 maturity,
                 stub,
                 discount_curve_id,
@@ -444,7 +444,7 @@ impl PyBond {
                 id,
                 notional,
                 coupon_rate,
-                issue,
+                issue_date,
                 maturity,
                 bond_convention_from_str(name)?,
                 discount_curve_id,
@@ -468,7 +468,7 @@ impl PyBond {
     ///     Principal amount; a bare number needs ``currency``.
     /// coupon_rate : float | Rate
     ///     Annual coupon rate as a decimal (``0.05`` = 5%) or a ``Rate``.
-    /// issue : datetime.date | datetime.datetime | pandas.Timestamp | str
+    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Issue date.
     /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Maturity date.
@@ -505,9 +505,9 @@ impl PyBond {
     /// >>> gilt.settlement_days
     /// 1
     #[staticmethod]
-    #[pyo3(signature = (id, notional, coupon_rate, issue, maturity, convention, discount_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, coupon_rate, issue_date, maturity, convention, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, coupon_rate, issue, maturity, convention, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, coupon_rate, issue_date, maturity, convention, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -515,7 +515,7 @@ impl PyBond {
         id: &str,
         notional: &Bound<'_, PyAny>,
         coupon_rate: &Bound<'_, PyAny>,
-        issue: &Bound<'_, PyAny>,
+        issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         convention: &str,
         discount_curve_id: &str,
@@ -525,7 +525,7 @@ impl PyBond {
             id,
             money_from_py(notional, currency, "notional")?,
             rate_from_py(coupon_rate, "coupon_rate")?,
-            extract_date(issue)?,
+            extract_date(issue_date)?,
             extract_date(maturity)?,
             bond_convention_from_str(convention)?,
             discount_curve_id,
@@ -554,7 +554,7 @@ impl PyBond {
     /// spread_bp : float | Bps
     ///     Spread over the index in whole basis points (fractions are
     ///     rounded).
-    /// issue : datetime.date | datetime.datetime | pandas.Timestamp | str
+    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Issue date.
     /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Maturity date.
@@ -576,7 +576,7 @@ impl PyBond {
     /// ------
     /// ValueError
     ///     If the notional currency has no mapped settlement convention,
-    ///     ``notional`` is not finite and positive, or ``issue`` is not
+    ///     ``notional`` is not finite and positive, or ``issue_date`` is not
     ///     strictly before ``maturity``.
     /// TypeError
     ///     If ``spread_bp``/``notional`` has an unsupported type or a date
@@ -593,9 +593,9 @@ impl PyBond {
     /// >>> frn.has_floating_coupons
     /// True
     #[staticmethod]
-    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -604,7 +604,7 @@ impl PyBond {
         notional: &Bound<'_, PyAny>,
         forward_curve_id: &str,
         spread_bp: &Bound<'_, PyAny>,
-        issue: &Bound<'_, PyAny>,
+        issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         frequency: PyRef<'_, PyTenor>,
         day_count: PyRef<'_, PyDayCount>,
@@ -616,7 +616,7 @@ impl PyBond {
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
             bps_value_from_py(spread_bp, "spread_bp")?,
-            extract_date(issue)?,
+            extract_date(issue_date)?,
             extract_date(maturity)?,
             frequency.inner,
             day_count.inner,
@@ -641,7 +641,7 @@ impl PyBond {
     /// spread_bp : float | Bps
     ///     Spread over the index in whole basis points (fractions are
     ///     rounded).
-    /// issue : datetime.date | datetime.datetime | pandas.Timestamp | str
+    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Issue date.
     /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Maturity date.
@@ -681,9 +681,9 @@ impl PyBond {
     /// >>> frn.settlement_days
     /// 2
     #[staticmethod]
-    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, forward_curve_id, spread_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, forward_curve_id, spread_bp, issue_date, maturity, frequency, day_count, convention, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -692,7 +692,7 @@ impl PyBond {
         notional: &Bound<'_, PyAny>,
         forward_curve_id: &str,
         spread_bp: &Bound<'_, PyAny>,
-        issue: &Bound<'_, PyAny>,
+        issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         frequency: PyRef<'_, PyTenor>,
         day_count: PyRef<'_, PyDayCount>,
@@ -705,7 +705,7 @@ impl PyBond {
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
             bps_value_from_py(spread_bp, "spread_bp")?,
-            extract_date(issue)?,
+            extract_date(issue_date)?,
             extract_date(maturity)?,
             frequency.inner,
             day_count.inner,
@@ -726,7 +726,7 @@ impl PyBond {
     ///     Unique instrument identifier.
     /// notional : Money | float
     ///     Redemption amount; a bare number needs ``currency``.
-    /// issue : datetime.date | datetime.datetime | pandas.Timestamp | str
+    /// issue_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Issue date.
     /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Maturity (redemption) date.
@@ -744,7 +744,7 @@ impl PyBond {
     /// ------
     /// ValueError
     ///     If a bare ``notional`` has no ``currency`` or ``maturity`` is not
-    ///     after ``issue``.
+    ///     after ``issue_date``.
     /// TypeError
     ///     If ``notional`` has an unsupported type or a date cannot be
     ///     interpreted.
@@ -756,12 +756,14 @@ impl PyBond {
     /// >>> zc.has_floating_coupons
     /// False
     #[staticmethod]
-    #[pyo3(signature = (id, notional, issue, maturity, discount_curve_id, *, currency = None))]
-    #[pyo3(text_signature = "(id, notional, issue, maturity, discount_curve_id, *, currency=None)")]
+    #[pyo3(signature = (id, notional, issue_date, maturity, discount_curve_id, *, currency = None))]
+    #[pyo3(
+        text_signature = "(id, notional, issue_date, maturity, discount_curve_id, *, currency=None)"
+    )]
     fn zero_coupon(
         id: &str,
         notional: &Bound<'_, PyAny>,
-        issue: &Bound<'_, PyAny>,
+        issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
         discount_curve_id: &str,
         currency: Option<&str>,
@@ -769,7 +771,7 @@ impl PyBond {
         let inner = finstack_quant_valuations::instruments::Bond::zero_coupon(
             id,
             money_from_py(notional, currency, "notional")?,
-            extract_date(issue)?,
+            extract_date(issue_date)?,
             extract_date(maturity)?,
             discount_curve_id,
         )
@@ -1520,7 +1522,7 @@ impl PyBondBuilder {
     /// ----------
     /// value : dict | str
     ///     Rust ``CallPutSchedule`` in serde form:
-    ///     ``{"calls": [{"start_date": "2027-01-15", "end_date": "2029-01-15",
+    ///     ``{"calls": [{"start": "2027-01-15", "end": "2029-01-15",
     ///     "price_pct_of_par": 100.0}], "puts": []}``.
     ///
     /// Returns
@@ -2072,7 +2074,7 @@ impl PyTermLoan {
     /// Holiday calendar identifier, or ``None``.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Stub rule.
@@ -2473,7 +2475,7 @@ impl PyTermLoanBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_term_loan(&mut slf)?;
-        slf.inner = Some(b.calendar_id(value.to_string()));
+        slf.inner = Some(b.calendar_id(value.into()));
         slf.fields.push(("calendar_id", format!("{value:?}")));
         Ok(slf)
     }

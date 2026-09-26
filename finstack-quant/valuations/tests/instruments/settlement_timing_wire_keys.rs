@@ -72,18 +72,19 @@ fn deposit_retired_spot_lag_days_is_rejected() {
     let deposit = Deposit::example().expect("example");
     assert_rejects(
         &deposit,
-        "settlement_days",
+        "start_date",
         "spot_lag_days",
         serde_json::json!(2),
     );
 }
 
 #[test]
-fn deposit_negative_settlement_days_fail_deserialization() {
-    // `settlement_days` is an unsigned T+N lag; a negative lag cannot be expressed.
+// schema-rejection-test: Deposit `settlement_days` (start_date is the spot date)
+fn deposit_retired_settlement_days_is_rejected() {
     let mut json = serde_json::to_value(Deposit::example().expect("example")).expect("ser");
-    json["settlement_days"] = serde_json::json!(-1);
-    serde_json::from_value::<Deposit>(json).expect_err("negative lag must be rejected");
+    json["settlement_days"] = serde_json::json!(2);
+    let err = serde_json::from_value::<Deposit>(json).expect_err("settlement_days is retired");
+    assert!(err.to_string().contains("settlement_days"), "{err}");
 }
 
 #[test]

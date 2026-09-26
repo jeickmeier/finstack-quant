@@ -859,7 +859,7 @@ class CashFlowMeta:
         calendar_ids: list[str] | None = None,
         facility_limit: Money | None = None,
         issue_date: datetime.date | str | None = None,
-        maturity_date: datetime.date | str | None = None,
+        maturity: datetime.date | str | None = None,
         projected_fixings: list[ProjectedFixing] | None = None,
     ) -> None:
         """
@@ -876,7 +876,7 @@ class CashFlowMeta:
             Facility limit / commitment for revolving structures.
         issue_date : datetime.date or str, optional
             Instrument issue date.
-        maturity_date : datetime.date or str, optional
+        maturity : datetime.date or str, optional
             Contractual maturity date.
         projected_fixings : list[ProjectedFixing], optional
             Raw rate or FX observations from canonical coupon projection, before
@@ -966,7 +966,7 @@ class CashFlowMeta:
         ...
 
     @property
-    def maturity_date(self) -> datetime.date | None:
+    def maturity(self) -> datetime.date | None:
         """
         Contractual maturity date, when known.
 

@@ -61,7 +61,7 @@ fn build_cashflow_schedule_json(
 /// ----------
 /// spec : dict or str
 ///     ``CashflowScheduleBuildSpec`` as a JSON string or an equivalent
-///     ``dict`` (keys ``notional``, ``issue``, ``maturity``,
+///     ``dict`` (keys ``notional``, ``issue_date``, ``maturity``,
 ///     ``coupon_program``, ``payment_program``, ``fees``,
 ///     ``principal_events``, ``principal_exchange``).
 /// market : MarketContext or str, optional
@@ -85,7 +85,7 @@ fn build_cashflow_schedule_json(
 /// >>> from finstack_quant.cashflows import build_cashflow_schedule
 /// >>> spec = {
 /// ...     "notional": {"initial": {"amount": 1000000.0, "currency": "USD"}, "amort": "none"},
-/// ...     "issue": "2025-01-15", "maturity": "2026-01-15",
+/// ...     "issue_date": "2025-01-15", "maturity": "2026-01-15",
 /// ...     "coupon_program": [{"kind": "fixed", "rate": "0.05", "coupon_type": "cash",
 /// ...         "frequency": "6M", "day_count": "30/360", "calendar_id": "weekends_only"}],
 /// ... }

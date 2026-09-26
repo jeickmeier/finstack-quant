@@ -72,7 +72,7 @@ fn test_yield_duration_convexity_act_act_isma() {
         spec.schedule.day_count = DayCount::ActActIsma;
         spec.schedule.business_day_convention =
             finstack_quant_core::dates::BusinessDayConvention::Unadjusted;
-        spec.schedule.calendar_id = "weekends_only".to_string();
+        spec.schedule.calendar_id = "weekends_only".into();
     }
     bond.settlement_convention = None;
     bond.instrument_pricing_overrides =
@@ -228,8 +228,8 @@ fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
         .hw1f_mean_reversion = Some(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -463,8 +463,8 @@ fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
         .hw1f_mean_reversion = Some(0.03);
     callable.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 01),
-            end_date: date!(2028 - 01 - 01),
+            start: date!(2028 - 01 - 01),
+            end: date!(2028 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

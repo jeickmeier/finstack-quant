@@ -61,13 +61,16 @@ impl StructuredCredit {
     /// use finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
     ///
     /// let clo = StructuredCredit::example()
-    ///     .with_payment_calendar("nyse")
-    ///     .with_payment_business_day_convention(BusinessDayConvention::ModifiedFollowing);
+    ///     .with_calendar("nyse")
+    ///     .with_business_day_convention(BusinessDayConvention::ModifiedFollowing);
     /// # let _ = clo;
     /// ```
     #[must_use]
-    pub fn with_payment_calendar(mut self, calendar_id: impl Into<String>) -> Self {
-        self.payment_calendar_id = Some(calendar_id.into());
+    pub fn with_calendar(
+        mut self,
+        calendar_id: impl Into<finstack_quant_core::types::CalendarId>,
+    ) -> Self {
+        self.calendar_id = Some(calendar_id.into());
         self
     }
 
@@ -75,11 +78,8 @@ impl StructuredCredit {
     ///
     /// If not specified, defaults to `BusinessDayConvention::ModifiedFollowing`.
     #[must_use]
-    pub fn with_payment_business_day_convention(
-        mut self,
-        convention: BusinessDayConvention,
-    ) -> Self {
-        self.payment_business_day_convention = Some(convention);
+    pub fn with_business_day_convention(mut self, convention: BusinessDayConvention) -> Self {
+        self.business_day_convention = Some(convention);
         self
     }
 

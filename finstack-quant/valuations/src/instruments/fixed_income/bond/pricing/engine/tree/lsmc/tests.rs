@@ -145,7 +145,7 @@ fn overnight_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
     spec.rate_spec.overnight_compounding =
         Some(crate::cashflow::builder::OvernightCompoundingMethod::CompoundedInArrears);
     spec.rate_spec.overnight_basis = Some(DayCount::Act360);
-    spec.rate_spec.fixing_calendar_id = Some("weekends_only".to_string());
+    spec.rate_spec.fixing_calendar_id = Some("weekends_only".into());
     spec.rate_spec.index_floor_bp = Some(Decimal::from(100));
     spec.rate_spec.index_cap_bp = Some(Decimal::from(300));
     spec.rate_spec.fallback = FloatingRateFallback::FixedRate(Decimal::new(4, 2));
@@ -323,8 +323,8 @@ fn stochastic_option_ordering_is_reproducible_with_exact_stage_counts() {
     let mut callable = bullet.clone();
     callable.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: exercise,
-            end_date: exercise,
+            start: exercise,
+            end: exercise,
             price_pct_of_par: 80.0,
             make_whole: None,
         }],
@@ -334,8 +334,8 @@ fn stochastic_option_ordering_is_reproducible_with_exact_stage_counts() {
     puttable.call_put = Some(CallPutSchedule {
         calls: Vec::new(),
         puts: vec![CallPut {
-            start_date: exercise,
-            end_date: exercise,
+            start: exercise,
+            end: exercise,
             price_pct_of_par: 120.0,
             make_whole: None,
         }],
@@ -547,8 +547,8 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
     let mut callable = bullet.clone();
     callable.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: time::macros::date!(2025 - 08 - 15),
-            end_date: time::macros::date!(2025 - 08 - 15),
+            start: time::macros::date!(2025 - 08 - 15),
+            end: time::macros::date!(2025 - 08 - 15),
             price_pct_of_par: 80.0,
             make_whole: None,
         }],
@@ -632,8 +632,8 @@ fn overnight_pik_replays_daily_caps_and_mid_accrual_exercise_state() {
     let exercise = time::macros::date!(2025 - 02 - 14);
     callable.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: exercise,
-            end_date: exercise,
+            start: exercise,
+            end: exercise,
             price_pct_of_par: 90.0,
             make_whole: None,
         }],
@@ -736,8 +736,8 @@ fn stochastic_maturity_make_whole_uses_contractual_floor_without_training_target
     let mut bond = stochastic_test_bond(as_of, maturity);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: maturity,
-            end_date: maturity,
+            start: maturity,
+            end: maturity,
             price_pct_of_par: 100.0,
             make_whole: Some(crate::instruments::fixed_income::bond::MakeWholeSpec {
                 reference_curve_id: CurveId::new("USD-OIS"),
@@ -774,8 +774,8 @@ fn rolled_maturity_make_whole_retains_later_reference_cash() {
     let mut bond = stochastic_test_bond(as_of, maturity);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: maturity,
-            end_date: maturity,
+            start: maturity,
+            end: maturity,
             price_pct_of_par: 100.0,
             make_whole: Some(crate::instruments::fixed_income::bond::MakeWholeSpec {
                 reference_curve_id: CurveId::new("USD-OIS"),
@@ -812,8 +812,8 @@ fn option_bearing_custom_cashflows_are_rejected_before_replay() {
     let mut bond = stochastic_test_bond(as_of, maturity);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: time::macros::date!(2025 - 02 - 15),
-            end_date: time::macros::date!(2025 - 02 - 15),
+            start: time::macros::date!(2025 - 02 - 15),
+            end: time::macros::date!(2025 - 02 - 15),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

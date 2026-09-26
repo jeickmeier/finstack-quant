@@ -19,9 +19,9 @@ pub struct SwaptionParams {
     /// Swaption expiry date
     pub expiry: Date,
     /// Underlying swap start date
-    pub swap_start: Date,
+    pub underlying_start_date: Date,
     /// Underlying swap end date
-    pub swap_end: Date,
+    pub underlying_maturity: Date,
     /// Payer/receiver side
     pub side: PayReceive,
     /// Optional override: fixed-leg payment frequency.
@@ -54,8 +54,8 @@ impl SwaptionParams {
             notional,
             strike: strike_decimal(strike)?,
             expiry,
-            swap_start,
-            swap_end,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
             side: PayReceive::Pay,
             fixed_frequency: None,
             float_frequency: None,
@@ -82,8 +82,8 @@ impl SwaptionParams {
             notional,
             strike: strike_decimal(strike)?,
             expiry,
-            swap_start,
-            swap_end,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
             side: PayReceive::Receive,
             fixed_frequency: None,
             float_frequency: None,
@@ -171,8 +171,8 @@ mod tests {
         assert_eq!(payer.strike, Decimal::new(325, 4));
         assert_eq!(payer.side, PayReceive::Pay);
         assert_eq!(payer.expiry, expiry);
-        assert_eq!(payer.swap_start, swap_start);
-        assert_eq!(payer.swap_end, swap_end);
+        assert_eq!(payer.underlying_start_date, swap_start);
+        assert_eq!(payer.underlying_maturity, swap_end);
         assert_eq!(payer.fixed_frequency, None);
         assert_eq!(payer.float_frequency, None);
         assert_eq!(payer.fixed_day_count, None);

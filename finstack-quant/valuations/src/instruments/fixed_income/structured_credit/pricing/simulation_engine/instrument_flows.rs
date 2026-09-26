@@ -1138,8 +1138,8 @@ fn build_schedule(
                     .calls
                     .iter()
                     .map(|c| ExerciseWindow {
-                        start: c.start_date,
-                        end: c.end_date,
+                        start: c.start,
+                        end: c.end,
                         price_pct: c.price_pct_of_par,
                     })
                     .collect(),
@@ -1147,8 +1147,8 @@ fn build_schedule(
                     .puts
                     .iter()
                     .map(|p| ExerciseWindow {
-                        start: p.start_date,
-                        end: p.end_date,
+                        start: p.start,
+                        end: p.end,
                         price_pct: p.price_pct_of_par,
                     })
                     .collect(),
@@ -1332,7 +1332,7 @@ fn utilization_terms(
         volatility,
         spread_sensitivity,
     } = &spec.utilization_process;
-    let anchor = as_of.max(facility.commitment_date);
+    let anchor = as_of.max(facility.issue_date);
     let synthesized;
     let mc_config: &McConfig = match &spec.mc_config {
         Some(config) => config,

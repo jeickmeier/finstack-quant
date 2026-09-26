@@ -44,13 +44,13 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
         },
-        "bermudan_schedule": {
-          "$ref": "#/$defs/BermudanSchedule",
-          "description": "Bermudan exercise schedule"
-        },
         "bermudan_type": {
           "$ref": "#/$defs/BermudanType",
           "description": "Co-terminal or non-co-terminal exercise"
+        },
+        "exercise_schedule": {
+          "$ref": "#/$defs/BermudanSchedule",
+          "description": "Bermudan exercise schedule"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -99,7 +99,7 @@
         "notional",
         "settlement",
         "vol_surface_id",
-        "bermudan_schedule",
+        "exercise_schedule",
         "bermudan_type",
         "underlying_fixed_leg",
         "underlying_float_leg",
@@ -132,11 +132,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding_simple": {
           "description": "If true, use simple interest on accrual fraction",
@@ -215,11 +219,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",
@@ -244,12 +252,16 @@
           "type": "boolean"
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag)",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag)"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -488,7 +500,8 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "bermudan_schedule": {
+          "bermudan_type": "co_terminal",
+          "exercise_schedule": {
             "exercise_dates": [
               "2029-01-17",
               "2029-07-17",
@@ -510,7 +523,6 @@
             "lockout_end": null,
             "notice_days": 0
           },
-          "bermudan_type": "co_terminal",
           "id": "BERM-10NC2-USD",
           "notional": {
             "amount": "10000000",

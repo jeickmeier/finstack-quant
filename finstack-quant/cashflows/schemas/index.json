@@ -10,7 +10,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
-      "bytes": 10271,
+      "bytes": 10323,
       "kind": "component",
       "path": "schemas/cashflow/1/coupon_specs.schema.json",
       "summary": "Coupon rate, frequency, day count and stub handling for one leg.",
@@ -50,7 +50,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
-      "bytes": 8158,
+      "bytes": 8210,
       "kind": "component",
       "path": "schemas/cashflow/1/schedule_params.schema.json",
       "summary": "Start, end, frequency, calendar and roll rules for a payment schedule.",

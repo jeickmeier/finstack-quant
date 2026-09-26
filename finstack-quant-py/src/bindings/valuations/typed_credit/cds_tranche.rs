@@ -553,7 +553,7 @@ impl PyCDSTranche {
     /// Holiday calendar identifier, if any.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Discount curve identifier.
@@ -574,13 +574,10 @@ impl PyCDSTranche {
         enum_to_py_string(&self.inner.side)
     }
 
-    /// Explicit effective date for schedule anchoring, or ``None``.
+    /// Explicit contract start (effective) date for schedule anchoring, or ``None``.
     #[getter]
-    fn effective_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .effective_date
-            .map(|d| date_to_py(py, d))
-            .transpose()
+    fn start_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner.start_date.map(|d| date_to_py(py, d)).transpose()
     }
 
     /// Realized portfolio loss so far (fraction of original notional).
@@ -966,7 +963,7 @@ impl PyCDSTrancheBuilder {
             slf,
             calendar_id,
             format!("{value:?}"),
-            |b: CdsTrancheBuilderInner| b.calendar_id(value.to_string())
+            |b: CdsTrancheBuilderInner| b.calendar_id(value.into())
         )
     }
 
@@ -1045,7 +1042,7 @@ impl PyCDSTrancheBuilder {
         )
     }
 
-    /// Set the effective date for schedule anchoring.
+    /// Set the contract start (effective) date for schedule anchoring.
     ///
     /// Parameters
     /// ----------
@@ -1058,16 +1055,16 @@ impl PyCDSTrancheBuilder {
     /// CDSTrancheBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn effective_date<'py>(
+    fn start_date<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let effective_date = extract_date(value)?;
+        let start_date = extract_date(value)?;
         tranche_set!(
             slf,
-            effective_date,
-            date_repr(effective_date),
-            |b: CdsTrancheBuilderInner| b.effective_date(effective_date)
+            start_date,
+            date_repr(start_date),
+            |b: CdsTrancheBuilderInner| b.start_date(start_date)
         )
     }
 

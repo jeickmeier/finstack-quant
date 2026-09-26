@@ -88,7 +88,7 @@ pub struct CDSTranche {
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub business_day_convention: BusinessDayConvention,
     /// Optional holiday calendar id
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Discount curve identifier (by quote currency)
     pub discount_curve_id: CurveId,
     /// Credit index identifier for survival/loss modeling (placeholder)
@@ -101,7 +101,7 @@ pub struct CDSTranche {
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
-    pub effective_date: Option<Date>,
+    pub start_date: Option<Date>,
     /// Realized (settled) loss on the reference pool as a decimal fraction of
     /// the original portfolio notional, in `[0, 1]`.
     pub realized_loss: f64,
@@ -151,9 +151,9 @@ pub struct CDSTranche {
 }
 
 impl CDSTranche {
-    pub(crate) fn contractual_effective_date(&self, as_of: Date) -> Option<Date> {
-        if let Some(effective_date) = self.effective_date {
-            return Some(effective_date);
+    pub(crate) fn contractual_start_date(&self, as_of: Date) -> Option<Date> {
+        if let Some(start_date) = self.start_date {
+            return Some(start_date);
         }
 
         if self.roll_rule != RollRule::CdsImm {
@@ -341,7 +341,7 @@ impl CDSTranche {
             discount_curve_id: discount_curve_id.into(),
             credit_index_id: credit_index_id.into(),
             side,
-            effective_date: None,
+            start_date: None,
             realized_loss: tranche_params.realized_loss,
             roll_rule: schedule_params.roll_rule,
             stub: schedule_params.stub,
@@ -386,7 +386,7 @@ impl CDSTranche {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
@@ -570,7 +570,7 @@ impl Instrument for CDSTranche {
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        self.effective_date
+        self.start_date
     }
 
     crate::impl_focused_pricing_overrides!();

@@ -698,7 +698,7 @@ impl PyScheduleParams {
             frequency: extract_tenor(frequency)?,
             day_count: day_count.inner,
             business_day_convention,
-            calendar_id: calendar_id.to_string(),
+            calendar_id: calendar_id.into(),
             stub: stub.map_or_else(serde_defaults::stub_short_front, |s| s.inner),
             end_of_month,
             payment_lag_days,
@@ -741,7 +741,7 @@ impl PyScheduleParams {
     /// Holiday calendar identifier.
     #[getter]
     fn calendar_id(&self) -> String {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.to_string()
     }
 
     /// Stub-handling rule.
@@ -958,7 +958,7 @@ impl PyFloatingRateSpec {
                 reset_frequency: extract_tenor(reset_frequency)?,
                 index_tenor: index_tenor.map(extract_tenor).transpose()?,
                 reset_lag_days,
-                fixing_calendar_id,
+                fixing_calendar_id: fixing_calendar_id.map(Into::into),
                 overnight_compounding: overnight_compounding.map(|m| m.inner),
                 overnight_basis: overnight_basis.map(|d| d.inner),
                 fallback: fallback.map_or(FloatingRateFallback::Error, |f| f.inner.clone()),
@@ -1088,7 +1088,10 @@ impl PyFloatingRateSpec {
     /// Fixing calendar identifier, if set.
     #[getter]
     fn fixing_calendar_id(&self) -> Option<String> {
-        self.inner.fixing_calendar_id.clone()
+        self.inner
+            .fixing_calendar_id
+            .as_ref()
+            .map(ToString::to_string)
     }
 
     /// Overnight compounding method, if set.

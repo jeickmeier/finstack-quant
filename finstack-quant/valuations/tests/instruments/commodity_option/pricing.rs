@@ -185,7 +185,7 @@ fn test_futures_based_bermudan_prices_between_european_and_american() {
             .strike(100.0)
             .option_type(OptionType::Call)
             .exercise_style(style)
-            .exercise_schedule_opt(Some(vec![
+            .exercise_dates_opt(Some(vec![
                 date(2025, 4, 1),
                 date(2025, 7, 1),
                 date(2025, 10, 1),

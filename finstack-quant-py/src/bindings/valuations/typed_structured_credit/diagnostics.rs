@@ -55,7 +55,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Sim
 /// ... )
 /// >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
 /// >>> envelope = json.loads(deal.to_json())
-/// >>> envelope["instrument"]["spec"]["payment_calendar_id"] = "nyse"
+/// >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
 /// >>> deal = StructuredCredit.from_json(json.dumps(envelope))
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
 /// >>> diagnostics = deal.run_simulation_with_diagnostics(market, as_of)

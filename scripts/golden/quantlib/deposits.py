@@ -97,7 +97,6 @@ def build_deposit() -> dict[str, Any]:
                     "fixed_rate": str(QUOTE_RATE),
                     "discount_curve_id": "USD-OIS",
                     "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
-                    "settlement_days": 0,
                     "calendar_id": None,
                 },
             },

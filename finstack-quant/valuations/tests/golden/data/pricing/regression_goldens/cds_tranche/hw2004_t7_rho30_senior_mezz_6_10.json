@@ -148,7 +148,7 @@
         "discount_curve_id": "HW-DISC",
         "credit_index_id": "HW.POOL",
         "side": "buy_protection",
-        "effective_date": "2006-09-01",
+        "start_date": "2006-09-01",
         "realized_loss": 0.0,
         "roll_rule": "none",
         "attributes": {

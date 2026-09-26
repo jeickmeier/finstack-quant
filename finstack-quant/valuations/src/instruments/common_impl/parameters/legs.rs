@@ -120,7 +120,7 @@ pub struct FixedLegSpec {
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub business_day_convention: BusinessDayConvention,
     /// Optional calendar for business day adjustments
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Stub period handling rule
     #[serde(default = "crate::serde_defaults::stub_short_front")]
     pub stub: StubKind,
@@ -214,7 +214,7 @@ pub struct FloatLegSpec {
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub business_day_convention: BusinessDayConvention,
     /// Optional calendar for business day adjustments
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Stub period handling rule
     #[serde(default = "crate::serde_defaults::stub_short_front")]
     pub stub: StubKind,
@@ -234,7 +234,7 @@ pub struct FloatLegSpec {
     pub reset_lag_days: i32,
     /// Optional calendar for rate fixing (reset lag)
     #[serde(default)]
-    pub fixing_calendar_id: Option<String>,
+    pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Start date of the floating leg
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -350,7 +350,7 @@ pub struct BasisSwapLeg {
     pub business_day_convention: BusinessDayConvention,
     /// Optional calendar identifier for business day adjustments
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Stub period handling rule
     #[serde(default = "crate::serde_defaults::stub_short_front")]
     pub stub: StubKind,
@@ -431,7 +431,7 @@ pub struct PremiumLegSpec {
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub business_day_convention: BusinessDayConvention,
     /// Holiday calendar identifier
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Day count convention
     pub day_count: DayCount,
     /// Contractual running coupon in basis points (e.g., `100` = 1% per

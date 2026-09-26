@@ -269,7 +269,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     pool.assets.push(bond);
 
     pool.reinvestment_period = Some(ReinvestmentPeriod {
-        end_date: reinvestment_end,
+        end: reinvestment_end,
         is_active: true,
         amortizing_tranches: Vec::new(),
         assumptions: None,
@@ -329,7 +329,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         reset_frequency: Tenor::quarterly(),
         index_tenor: None,
         reset_lag_days: 2,
-        fixing_calendar_id: Some("usny".to_string()),
+        fixing_calendar_id: Some("usny".into()),
         overnight_compounding: None,
         overnight_basis: None,
         fallback: Default::default(),
@@ -425,8 +425,8 @@ fn test_structured_credit_full_feature_json_roundtrip() {
         parsed.pool.assets[0].mdr_override
     );
     assert_eq!(
-        original.pool.reinvestment_period.as_ref().unwrap().end_date,
-        parsed.pool.reinvestment_period.as_ref().unwrap().end_date
+        original.pool.reinvestment_period.as_ref().unwrap().end,
+        parsed.pool.reinvestment_period.as_ref().unwrap().end
     );
     assert_eq!(
         original.pool.collection_account,
@@ -589,7 +589,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
     ])
     .unwrap();
     let mut sc = StructuredCredit::new_abs("ABS-WF", pool, tranches, closing, mat, "USD-OIS")
-        .with_payment_calendar("nyse");
+        .with_calendar("nyse");
     sc.waterfall_rules = Some(WaterfallRules {
         afc: Some(AfcSpec {
             capped_tranches: vec!["SR".to_string()],

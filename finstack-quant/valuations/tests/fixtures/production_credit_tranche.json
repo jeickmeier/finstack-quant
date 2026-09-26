@@ -13,7 +13,7 @@
         "day_count": "act_360",
         "detach_pct": 3.0,
         "discount_curve_id": "USD-OIS",
-        "effective_date": "2025-01-01",
+        "start_date": "2025-01-01",
         "frequency": {
           "count": 3,
           "unit": "months"

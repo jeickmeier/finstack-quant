@@ -307,7 +307,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
         let lmm_params = Self::build_lmm_params(swaption, disc.as_ref(), market, as_of, base_vol)?;
 
         let exercise_times = swaption
-            .bermudan_schedule
+            .exercise_schedule
             .exercise_times(as_of, swaption.get_fixed_day_count())
             .map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -335,7 +335,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
 
         // Terminal discount factor P(0, T_N) for the last tenor
         let df_terminal = disc
-            .df_between_dates(as_of, swaption.get_swap_end())
+            .df_between_dates(as_of, swaption.get_underlying_maturity())
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),

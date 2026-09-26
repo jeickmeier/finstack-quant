@@ -98,7 +98,7 @@ fn structured_credit() -> StructuredCredit {
         legal_maturity(),
         "USD-OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -371,7 +371,7 @@ fn reinvestment_window_moves_the_senior_paydown() {
 
     let mut retained = base.clone();
     retained.pool.reinvestment_period = Some(ReinvestmentPeriod {
-        end_date: window_end,
+        end: window_end,
         is_active: true,
         criteria: ReinvestmentCriteria::default(),
         amortizing_tranches: Vec::new(),

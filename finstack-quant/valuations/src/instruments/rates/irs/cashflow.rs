@@ -437,7 +437,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 calendar_id: float
                     .calendar_id
                     .clone()
-                    .unwrap_or_else(|| "weekends_only".to_string()),
+                    .unwrap_or_else(|| "weekends_only".into()),
                 stub: float.stub,
                 end_of_month: float.end_of_month,
                 payment_lag_days: float.payment_lag_days,
@@ -575,7 +575,7 @@ mod tests {
         irs.float.frequency = Tenor::semi_annual();
         irs.float.day_count = DayCount::Act360;
         irs.float.business_day_convention = BusinessDayConvention::ModifiedFollowing;
-        irs.float.calendar_id = Some("usny".to_string());
+        irs.float.calendar_id = Some("usny".into());
         irs.float.forward_curve_id = "USD-SOFR".into();
         irs.float.spread_bp = Decimal::from(100);
         irs.float.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };

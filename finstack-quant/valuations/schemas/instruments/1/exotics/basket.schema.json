@@ -878,6 +878,17 @@
           "$ref": "#/$defs/BorrowingBaseRules",
           "description": "Advance rates, eligibility and concentration limits that define the\nborrowing base."
         },
+        "calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Holiday calendar for the payment schedule (e.g. `\"nyse\"`); required\nfor pricing."
+        },
         "card": {
           "anyOf": [
             {
@@ -1000,13 +1011,6 @@
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
-        },
-        "payment_calendar_id": {
-          "description": "Holiday calendar for the payment schedule (e.g. `\"nyse\"`); required\nfor pricing.",
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "prepayment_spec": {
           "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
@@ -2328,11 +2332,15 @@
           "description": "Business day convention for date adjustments"
         },
         "calendar_id": {
-          "description": "Optional calendar identifier for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar identifier for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",
@@ -2558,7 +2566,7 @@
     },
     "BermudanCallProvision": {
       "additionalProperties": false,
-      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
+      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_end`: Optional end of the no-call period; call dates on or\n  before it are not exercisable (exclusive bound, matching\n  `BermudanSchedule.lockout_end` on Bermudan swaptions).",
       "properties": {
         "call_dates": {
           "description": "Dates on which the issuer can call (must be sorted ascending).",
@@ -2567,11 +2575,16 @@
           },
           "type": "array"
         },
-        "lockout_periods": {
-          "description": "Lockout period in number of coupon periods before first call.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
+        "lockout_end": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "End of the no-call (lockout) period. Call dates on or before this\ndate are dropped (exclusive bound); `None` means no lockout."
         },
         "price_pct_of_par": {
           "description": "Redemption price in percent of par (`100.0` = par). The pricer pays\n`notional * price_pct_of_par / 100` at exercise.",
@@ -2581,8 +2594,7 @@
       },
       "required": [
         "call_dates",
-        "price_pct_of_par",
-        "lockout_periods"
+        "price_pct_of_par"
       ],
       "type": "object"
     },
@@ -2630,13 +2642,13 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
         },
-        "bermudan_schedule": {
-          "$ref": "#/$defs/BermudanSchedule",
-          "description": "Bermudan exercise schedule"
-        },
         "bermudan_type": {
           "$ref": "#/$defs/BermudanType",
           "description": "Co-terminal or non-co-terminal exercise"
+        },
+        "exercise_schedule": {
+          "$ref": "#/$defs/BermudanSchedule",
+          "description": "Bermudan exercise schedule"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -2685,7 +2697,7 @@
         "notional",
         "settlement",
         "vol_surface_id",
-        "bermudan_schedule",
+        "exercise_schedule",
         "bermudan_type",
         "underlying_fixed_leg",
         "underlying_float_leg",
@@ -2833,11 +2845,15 @@
           "description": "Discount curve identifier for pricing."
         },
         "ex_coupon_calendar_id": {
-          "description": "Calendar identifier for ex-coupon day counting.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Calendar identifier for ex-coupon day counting."
         },
         "ex_coupon_days": {
           "default": 0,
@@ -3242,10 +3258,6 @@
           "default": {},
           "description": "Additional attributes"
         },
-        "cds_maturity": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Underlying CDS maturity date"
-        },
         "coupon_bp": {
           "anyOf": [
             {
@@ -3330,7 +3342,7 @@
         "protection_start_convention": {
           "$ref": "#/$defs/ProtectionStartConvention",
           "default": "spot",
-          "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_effective_date` is not explicitly supplied."
+          "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied."
         },
         "realized_loss": {
           "default": 0.0,
@@ -3368,7 +3380,16 @@
           "default": "isda_na",
           "description": "Convention used by the underlying CDS contract.\n\nThis controls the CDS schedule, settlement lag, business day convention,\nand other market-standard mechanics used when deriving forward spread and\nrisky annuity for the option's underlying."
         },
-        "underlying_effective_date": {
+        "underlying_is_index": {
+          "default": false,
+          "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it.",
+          "type": "boolean"
+        },
+        "underlying_maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Underlying CDS maturity date"
+        },
+        "underlying_start_date": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -3378,11 +3399,6 @@
             }
           ],
           "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
-        },
-        "underlying_is_index": {
-          "default": false,
-          "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it.",
-          "type": "boolean"
         },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -3395,7 +3411,7 @@
         "option_type",
         "exercise_style",
         "expiry",
-        "cds_maturity",
+        "underlying_maturity",
         "notional",
         "settlement",
         "recovery_rate",
@@ -3455,11 +3471,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Optional holiday calendar id",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional holiday calendar id"
         },
         "coupon_bp": {
           "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
@@ -3482,18 +3502,6 @@
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve identifier (by quote currency)"
-        },
-        "effective_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -3547,6 +3555,18 @@
         "side": {
           "$ref": "#/$defs/TrancheSide",
           "description": "Tranche side (buy/sell protection)"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -3829,11 +3849,11 @@
     },
     "CallPut": {
       "additionalProperties": false,
-      "description": "Call or put option on a bond.\n\nRepresents a single call or put option with an exercise period and redemption price.\nCall options allow the issuer to redeem early; put options allow the holder to redeem early.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::CallPut;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027\nlet call = CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n};\n```",
+      "description": "Call or put option on a bond.\n\nRepresents a single call or put option with an exercise period and redemption price.\nCall options allow the issuer to redeem early; put options allow the holder to redeem early.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::CallPut;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027\nlet call = CallPut {\n    start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n};\n```",
       "properties": {
-        "end_date": {
+        "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start_date` for one-day/discrete exercise."
+          "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start` for one-day/discrete exercise."
         },
         "make_whole": {
           "anyOf": [
@@ -3851,21 +3871,21 @@
           "format": "double",
           "type": "number"
         },
-        "start_date": {
+        "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "First date when the option can be exercised."
         }
       },
       "required": [
-        "start_date",
-        "end_date",
+        "start",
+        "end",
         "price_pct_of_par"
       ],
       "type": "object"
     },
     "CallPutSchedule": {
       "additionalProperties": false,
-      "description": "Schedule of call and put options for a bond.\n\nContains lists of call and put options that can be exercised during the bond's life.\nUsed for pricing callable/putable bonds and calculating yield-to-worst.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet mut schedule = CallPutSchedule::default();\nschedule.calls.push(CallPut {\n    start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n});\n```",
+      "description": "Schedule of call and put options for a bond.\n\nContains lists of call and put options that can be exercised during the bond's life.\nUsed for pricing callable/putable bonds and calculating yield-to-worst.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet mut schedule = CallPutSchedule::default();\nschedule.calls.push(CallPut {\n    start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),\n    price_pct_of_par: 102.0,\n    make_whole: None,\n});\n```",
       "properties": {
         "calls": {
           "description": "Call options (issuer can redeem early).",
@@ -4355,7 +4375,7 @@
           ],
           "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days."
         },
-        "maturity_date": {
+        "maturity": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -5226,7 +5246,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID."
         },
-        "expiry_date": {
+        "expiry": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Option expiry date."
         },
@@ -5345,7 +5365,7 @@
         "strike",
         "option_type",
         "notional",
-        "expiry_date",
+        "expiry",
         "payment_date",
         "long_vol_surface_id",
         "short_vol_surface_id",
@@ -6042,11 +6062,15 @@
           "description": "Business day convention for settlement date adjustment.\n\nDefaults to `Following` for energy commodities, `ModifiedFollowing`\nfor precious metals."
         },
         "settlement_calendar_id": {
-          "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Calendar ID for settlement date adjustments.\n\nUsed for business day adjustment of the settlement date. If `convention`\nis set, uses the convention's calendar unless explicitly overridden."
         },
         "settlement_days": {
           "description": "Settlement lag in business days (T+N).\n\nDefaults to 2 for most commodity markets (T+2). If `convention` is set,\nuses the convention's default unless explicitly overridden here.\n\n# Market Standards\n\n| Market | Settlement |\n|--------|------------|\n| Energy (WTI, Brent, NG) | T+2 |\n| Precious metals | T+2 |\n| Base metals (LME) | T+2 |\n| Power | T+1 |",
@@ -6287,7 +6311,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID for present value."
         },
-        "exercise_schedule": {
+        "exercise_dates": {
           "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -6634,7 +6658,7 @@
     },
     "CommoditySwaption": {
       "additionalProperties": false,
-      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .swap_start(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
+      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6710,15 +6734,15 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
         },
-        "swap_end": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Underlying swap end date."
-        },
         "swap_frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Underlying swap payment frequency."
         },
-        "swap_start": {
+        "underlying_maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Underlying swap end date."
+        },
+        "underlying_start_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Underlying swap start date."
         },
@@ -6743,8 +6767,8 @@
         "currency",
         "option_type",
         "expiry",
-        "swap_start",
-        "swap_end",
+        "underlying_start_date",
+        "underlying_maturity",
         "swap_frequency",
         "fixed_price",
         "quantity",
@@ -6992,13 +7016,13 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Date the accumulated funding account is released as a bullet payment."
         },
-        "start_date": {
+        "start": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "First date principal is accumulated into the funding account."
         }
       },
       "required": [
-        "start_date",
+        "start",
         "bullet_date"
       ],
       "type": "object"
@@ -8601,7 +8625,7 @@
     },
     "Deposit": {
       "additionalProperties": false,
-      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + settlement_days` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
+      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\n`start_date` is always the accrual start (spot) date. Callers holding a\ntrade date compute the spot date before building (see\n[`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and\n`maturity` are adjusted by the business day convention.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -8666,15 +8690,6 @@
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "description": "Scenario-only pricing adjustments."
-        },
-        "settlement_days": {
-          "description": "Optional T+N settlement (spot) lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
         },
         "start_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -9633,7 +9648,7 @@
           ],
           "description": "Observed exercise or expiry state.\n\nRequired from expiry onward. It fixes cash-settled intrinsic value or\nidentifies a physical-delivery obligation through its settlement date."
         },
-        "exercise_schedule": {
+        "exercise_dates": {
           "description": "Exercise schedule for Bermudan options.\n\nRequired when `exercise_style` is `Bermudan`. Each date represents a time\nat which early exercise is permitted. Dates before as_of or after expiry\nare filtered out automatically.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -10534,11 +10549,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding_simple": {
           "description": "If true, use simple interest on accrual fraction",
@@ -10617,11 +10636,15 @@
           "description": "Business day convention for payment dates"
         },
         "calendar_id": {
-          "description": "Optional calendar for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",
@@ -10646,12 +10669,16 @@
           "type": "boolean"
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag)",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag)"
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -10712,8 +10739,8 @@
           "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
         },
         "coupon_type": {
           "$ref": "#/$defs/CouponType",
@@ -10907,12 +10934,16 @@
           "description": "Policy when forward curve lookup fails during emission.\n\nDefaults to `Error`, which surfaces curve lookup failures.\nSet to `SpreadOnly` for spread-only projection, or `FixedRate(r)`\nto use a fixed index rate."
         },
         "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar."
         },
         "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -12723,8 +12754,8 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "description": "Base-currency calendar used in the joint observation calendar.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Base-currency calendar used in the joint observation calendar."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -12809,8 +12840,8 @@
           ]
         },
         "quote_calendar_id": {
-          "description": "Quote-currency calendar used in the joint observation calendar.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Quote-currency calendar used in the joint observation calendar."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -13126,11 +13157,15 @@
           "description": "Business day convention for schedule and payments."
         },
         "calendar_id": {
-          "description": "Optional holiday calendar identifier.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional holiday calendar identifier."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
@@ -15091,11 +15126,15 @@
           "description": "Discount curve identifier"
         },
         "fixing_calendar_id": {
-          "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used."
         },
         "fixing_date": {
           "anyOf": [
@@ -17800,11 +17839,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Holiday calendar identifier"
         },
         "coupon_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
@@ -18526,10 +18569,6 @@
       "additionalProperties": false,
       "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`index_id`, `forward_curve_id`,\n`index_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
       "properties": {
-        "accrual_start_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Contractual accrual-period start date."
-        },
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and grouping"
@@ -18664,6 +18703,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Spot price identifier"
         },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual accrual-period start date."
+        },
         "total_past_observations": {
           "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
@@ -18696,7 +18739,7 @@
         "coupon_rate",
         "notional",
         "day_count",
-        "accrual_start_date",
+        "start_date",
         "discount_curve_id",
         "spot_id",
         "vol_surface_id",
@@ -18708,10 +18751,6 @@
       "additionalProperties": false,
       "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
       "properties": {
-        "accrual_start_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Contractual accrual-period start date."
-        },
         "bounds_type": {
           "$ref": "#/$defs/BoundsType",
           "default": "absolute",
@@ -18826,6 +18865,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Spot price identifier"
         },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual accrual-period start date."
+        },
         "total_past_observations": {
           "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
@@ -18857,7 +18900,7 @@
         "coupon_rate",
         "notional",
         "day_count",
-        "accrual_start_date",
+        "start_date",
         "discount_curve_id",
         "spot_id",
         "vol_surface_id"
@@ -19703,7 +19746,7 @@
           "$ref": "#/$defs/ReinvestmentCriteria",
           "description": "Eligibility criteria for purchases."
         },
-        "end_date": {
+        "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Inclusive end date of the reinvestment period."
         },
@@ -19713,7 +19756,7 @@
         }
       },
       "required": [
-        "end_date",
+        "end",
         "is_active",
         "criteria"
       ],
@@ -20341,24 +20384,24 @@
           "description": "Business-day convention applied to payment dates (interest, fees and\nprincipal) and to the fixing-date roll. Accrual boundaries stay\nunadjusted. Defaults to `ModifiedFollowing`."
         },
         "calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Holiday calendar identifier (for example `\"usny\"`) used to adjust\npayment dates, roll fixing dates and count settlement days. `None`\nadjusts for weekends only. Validation rejects an unknown identifier.\n`FloatingRateSpec::fixing_calendar_id` overrides it for the fixing\ndate alone."
         },
         "commitment_amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Opening commitment of the facility, in force from `commitment_date`\nuntil the first entry of `commitment_steps`."
-        },
-        "commitment_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Date when the facility becomes available."
+          "description": "Opening commitment of the facility, in force from `issue_date`\nuntil the first entry of `commitment_steps`."
         },
         "commitment_steps": {
           "default": [],
-          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `commitment_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
+          "description": "Scheduled commitment changes (amortizing commitments, availability\nexpiries, accordions), each in force from its date until the next.\nDates must be strictly increasing, after `issue_date` and on or\nbefore `maturity`; the drawn balance plus outstanding letters of\ncredit must never exceed the commitment in force. A step down pays its\n`fee_bp` on the reduced amount. Empty by default.",
           "items": {
             "$ref": "#/$defs/CommitmentStep"
           },
@@ -20390,7 +20433,7 @@
         },
         "drawn_amount": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Drawn balance at the simulation anchor, the later of `commitment_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
+          "description": "Drawn balance at the simulation anchor, the later of `issue_date`\nand the valuation date, in both deterministic and stochastic mode.\n\nFor a new facility this is the balance funded at commitment; for a\nseasoned facility it is the balance observed on the valuation date.\nDeterministic draw/repay events describe the future only: an event\ndated on or before the valuation date is rejected by the cashflow\nengine, because the position at the anchor is defined by this field\nalone. The accrual period containing the valuation date accrues on\nthis balance from its accrual start."
         },
         "fees": {
           "$ref": "#/$defs/RevolvingCreditFees",
@@ -20407,6 +20450,10 @@
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
+        },
+        "issue_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Date when the facility becomes available."
         },
         "lc": {
           "anyOf": [
@@ -20495,7 +20542,7 @@
         "id",
         "commitment_amount",
         "drawn_amount",
-        "commitment_date",
+        "issue_date",
         "maturity",
         "base_rate_spec",
         "day_count",
@@ -21148,7 +21195,7 @@
     },
     "StepUpCouponSpec": {
       "additionalProperties": false,
-      "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    schedule: ScheduleParams {\n        frequency: Tenor::semi_annual(),\n        day_count: DayCount::Thirty360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n};\n```",
+      "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    schedule: ScheduleParams {\n        frequency: Tenor::semi_annual(),\n        day_count: DayCount::Thirty360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".into(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n};\n```",
       "properties": {
         "adjust_accrual_dates": {
           "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
@@ -21160,8 +21207,8 @@
           "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
         },
         "coupon_type": {
           "$ref": "#/$defs/CouponType",
@@ -21576,6 +21623,28 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection."
         },
+        "business_day_convention": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Business day convention for tranche payments (defaults to\nModifiedFollowing)."
+        },
+        "calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional payment calendar identifier for schedule adjustments."
+        },
         "call_assumption": {
           "anyOf": [
             {
@@ -21753,24 +21822,6 @@
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
-        },
-        "payment_business_day_convention": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Business day convention for tranche payments (defaults to\nModifiedFollowing)."
-        },
-        "payment_calendar_id": {
-          "description": "Optional payment calendar identifier for schedule adjustments.",
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "pool": {
           "$ref": "#/$defs/AssetPool",
@@ -22278,11 +22329,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Optional calendar id for adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar id for adjustments"
         },
         "call_schedule": {
           "anyOf": [
@@ -22999,7 +23054,7 @@
     },
     "TrsScheduleSpec": {
       "additionalProperties": false,
-      "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        frequency: Tenor::quarterly(),\n        day_count: DayCount::Act360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n);\n```",
+      "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        frequency: Tenor::quarterly(),\n        day_count: DayCount::Act360,\n        business_day_convention: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".into(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,\n    },\n);\n```",
       "properties": {
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -23233,8 +23288,8 @@
           "description": "Business-day convention applied to observation dates."
         },
         "observation_calendar_id": {
-          "description": "Exchange/fixing calendar used for every realized-variance observation.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Exchange/fixing calendar used for every realized-variance observation."
         },
         "observation_end_of_month": {
           "default": false,
@@ -23866,11 +23921,15 @@
           "description": "Business day convention for schedule dates."
         },
         "calendar_id": {
-          "description": "Calendar identifier for schedule generation and lags.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Calendar identifier for schedule generation and lags."
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",

@@ -45,17 +45,17 @@ fn build_flat_forward_curve(
 
 /// Build a seasoned floating-rate facility.
 ///
-/// commitment_date is in the past relative to as_of, so some reset dates
+/// issue_date is in the past relative to as_of, so some reset dates
 /// will fall before the valuation date.
 fn build_seasoned_floating_facility(
-    commitment_date: time::Date,
+    issue_date: time::Date,
     maturity_date: time::Date,
 ) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id("RC-FIXING-TEST".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Floating(FloatingRateSpec {
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -93,16 +93,16 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     // Valuation date is 2025-01-15 (6+ months seasoned).
     // Quarterly resets: 2024-07-01, 2024-10-01, 2025-01-01, 2025-04-01
     // Resets on 2024-07-01 and 2024-10-01 are in the past (before as_of).
-    let commitment_date = date!(2024 - 07 - 01);
+    let issue_date = date!(2024 - 07 - 01);
     let maturity_date = date!(2025 - 07 - 01);
     let as_of = date!(2025 - 01 - 15);
 
-    let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
+    let facility = build_seasoned_floating_facility(issue_date, maturity_date);
 
     // Forward curve: flat 4% (this is what would be used without fixings)
-    // Flat curve based at commitment_date: seasoned resets strictly before
+    // Flat curve based at issue_date: seasoned resets strictly before
     // the curve base now error under the default FloatingRateFallback.
-    let fwd_curve = build_flat_forward_curve(0.04, commitment_date, "USD-SOFR-3M", 0.25);
+    let fwd_curve = build_flat_forward_curve(0.04, issue_date, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
 
     // Fixings: provide historical rates significantly different from the forward curve
@@ -182,15 +182,15 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
 /// Missing fixings for a seasoned facility are a hard market-data error.
 #[test]
 fn test_seasoned_facility_without_fixings_errors() {
-    let commitment_date = date!(2024 - 07 - 01);
+    let issue_date = date!(2024 - 07 - 01);
     let maturity_date = date!(2025 - 07 - 01);
     let as_of = date!(2025 - 01 - 15);
 
-    let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
+    let facility = build_seasoned_floating_facility(issue_date, maturity_date);
 
-    // Flat curve based at commitment_date: seasoned resets strictly before
+    // Flat curve based at issue_date: seasoned resets strictly before
     // the curve base now error under the default FloatingRateFallback.
-    let fwd_curve = build_flat_forward_curve(0.04, commitment_date, "USD-SOFR-3M", 0.25);
+    let fwd_curve = build_flat_forward_curve(0.04, issue_date, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
@@ -206,7 +206,7 @@ fn test_seasoned_facility_without_fixings_errors() {
 /// should be applied to the index rate before adding spread.
 #[test]
 fn test_fixings_respect_floor() {
-    let commitment_date = date!(2024 - 07 - 01);
+    let issue_date = date!(2024 - 07 - 01);
     let maturity_date = date!(2025 - 07 - 01);
     let as_of = date!(2025 - 01 - 15);
 
@@ -215,7 +215,7 @@ fn test_fixings_respect_floor() {
         .id("RC-FIXING-FLOOR".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Floating(FloatingRateSpec {
             forward_curve_id: "USD-SOFR-3M".into(),
@@ -296,11 +296,11 @@ fn test_fixings_respect_floor() {
 /// identically with or without fixings.
 #[test]
 fn test_non_seasoned_facility_ignores_fixings() {
-    let commitment_date = date!(2025 - 01 - 15); // Same as as_of
+    let issue_date = date!(2025 - 01 - 15); // Same as as_of
     let maturity_date = date!(2026 - 01 - 15);
     let as_of = date!(2025 - 01 - 15);
 
-    let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
+    let facility = build_seasoned_floating_facility(issue_date, maturity_date);
 
     let fwd_curve = build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
@@ -400,15 +400,15 @@ fn valuation_date_reset_uses_contractual_t_minus_two_fixing() {
 fn test_pricer_integration_with_fixings() {
     use finstack_quant_valuations::instruments::Instrument;
 
-    let commitment_date = date!(2024 - 07 - 01);
+    let issue_date = date!(2024 - 07 - 01);
     let maturity_date = date!(2025 - 07 - 01);
     let as_of = date!(2025 - 01 - 15);
 
-    let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
+    let facility = build_seasoned_floating_facility(issue_date, maturity_date);
 
-    // Flat curve based at commitment_date: seasoned resets strictly before
+    // Flat curve based at issue_date: seasoned resets strictly before
     // the curve base now error under the default FloatingRateFallback.
-    let fwd_curve = build_flat_forward_curve(0.04, commitment_date, "USD-SOFR-3M", 0.25);
+    let fwd_curve = build_flat_forward_curve(0.04, issue_date, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
 
     // Fixings with higher rates than the forward curve
@@ -437,13 +437,13 @@ fn test_pricer_integration_with_fixings() {
 
 #[test]
 fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2025 - 07 - 01);
     let as_of = date!(2025 - 01 - 15);
-    let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
+    let facility = build_seasoned_floating_facility(issue_date, maturity_date);
 
     let coupon_rate = |fixing: f64| {
-        let payment_dates = vec![commitment_date, date!(2025 - 04 - 01), maturity_date];
+        let payment_dates = vec![issue_date, date!(2025 - 04 - 01), maturity_date];
         let path = ThreeFactorPathData {
             utilization_path: vec![0.5; 3],
             short_rate_path: vec![0.01; 3],
@@ -457,15 +457,15 @@ fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
         // the market must carry both curves; the first coupon below still
         // comes from the contractual fixing.
         let market = MarketContext::new()
-            .insert(build_flat_discount_curve(0.03, commitment_date, "USD-OIS"))
+            .insert(build_flat_discount_curve(0.03, issue_date, "USD-OIS"))
             .insert(build_flat_forward_curve(
                 0.04,
-                commitment_date,
+                issue_date,
                 "USD-SOFR-3M",
                 0.25,
             ))
             .insert_series(
-                ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(commitment_date, fixing)], None)
+                ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(issue_date, fixing)], None)
                     .expect("fixing series"),
             );
         let fixings =

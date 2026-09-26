@@ -1707,7 +1707,7 @@ mod tests {
             Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
             "USD-OIS",
         );
-        deal.payment_calendar_id = Some("nyse".to_string());
+        deal.calendar_id = Some("nyse".into());
         deal
     }
 
@@ -1787,7 +1787,7 @@ mod tests {
             maturity,
             "USD-OIS",
         )
-        .with_payment_calendar("nyse");
+        .with_calendar("nyse");
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
         instrument
@@ -2262,7 +2262,7 @@ mod per_name_copula_tests {
             maturity(),
             "USD-OIS",
         )
-        .with_payment_calendar("nyse");
+        .with_calendar("nyse");
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
         sc

@@ -143,8 +143,8 @@
           "description": "Business-day convention applied to observation dates."
         },
         "observation_calendar_id": {
-          "description": "Exchange/fixing calendar used for every realized-variance observation.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Exchange/fixing calendar used for every realized-variance observation."
         },
         "observation_end_of_month": {
           "default": false,

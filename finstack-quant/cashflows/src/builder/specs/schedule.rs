@@ -85,7 +85,7 @@ pub struct ScheduleParams {
     /// Holiday calendar identifier used together with `business_day_convention`.
     ///
     /// Use `"weekends_only"` when only Saturday/Sunday adjustment is needed.
-    pub calendar_id: String,
+    pub calendar_id: finstack_quant_core::types::CalendarId,
     /// Stub-handling rule used when the start/end dates do not fit an exact
     /// whole number of periods.
     #[serde(default = "crate::serde_defaults::stub_short_front")]
@@ -136,7 +136,7 @@ impl ScheduleParams {
             frequency,
             day_count,
             business_day_convention,
-            calendar_id: calendar_id.to_string(),
+            calendar_id: calendar_id.into(),
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
@@ -528,7 +528,7 @@ impl ScheduleParams {
     ///
     /// assert!(ScheduleParams::usd_sofr_swap().validate().is_ok());
     /// let mut bad = ScheduleParams::usd_sofr_swap();
-    /// bad.calendar_id = "not-a-calendar".to_string();
+    /// bad.calendar_id = "not-a-calendar".into();
     /// assert!(bad.validate().is_err());
     /// ```
     pub fn validate(&self) -> finstack_quant_core::Result<()> {

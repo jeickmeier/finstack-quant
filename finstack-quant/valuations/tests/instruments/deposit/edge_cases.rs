@@ -373,16 +373,11 @@ fn test_multiple_currencies_independent() {
 /// (effective_end <= effective_start).
 ///
 /// Scenario:
-/// - Start: Friday Jan 3, 2025
-/// - End: Monday Jan 6, 2025 (just 1 business day later)
-/// - Spot lag: 2 business days (T+2)
+/// - Start: Saturday Jan 4, 2025 -> ModifiedFollowing -> Monday Jan 6
+/// - End: Sunday Jan 5, 2025 -> ModifiedFollowing -> Monday Jan 6
 /// - Calendar: NYSE
 ///
-/// With T+2 spot lag from Friday Jan 3:
-/// - Effective start = Tuesday Jan 7, 2025
-/// - Effective end = Monday Jan 6, 2025 (no adjustment needed, already business day)
-///
-/// This results in effective_end < effective_start, which should fail validation.
+/// This results in effective_end == effective_start, which should fail validation.
 #[test]
 fn test_business_day_convention_adjustment_causes_effective_date_crossover() {
     use finstack_quant_core::dates::BusinessDayConvention;
@@ -392,12 +387,11 @@ fn test_business_day_convention_adjustment_causes_effective_date_crossover() {
     let result = Deposit::builder()
         .id(InstrumentId::new("DEP-CROSSOVER"))
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .start_date(date(2025, 1, 3)) // Friday - trade date
-        .maturity(date(2025, 1, 6)) // Monday - just 1 business day after Friday
+        .start_date(date(2025, 1, 4)) // Saturday - rolls to Monday Jan 6
+        .maturity(date(2025, 1, 5)) // Sunday - rolls to Monday Jan 6
         .day_count(DayCount::Act360)
         .fixed_rate_opt(Some(Decimal::try_from(0.03).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
-        .settlement_days_opt(Some(2)) // T+2: Friday + 2 biz days = Tuesday Jan 7
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(Some("nyse".into()))
         .build();

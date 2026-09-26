@@ -227,8 +227,8 @@ mod tests {
 
         let mut schedule = CallPutSchedule::default();
         schedule.calls.push(CallPut {
-            start_date: call_date,
-            end_date: maturity,
+            start: call_date,
+            end: maturity,
             price_pct_of_par: 100.0,
             make_whole: None,
         });
@@ -356,8 +356,8 @@ mod tests {
             .expect("valid bond");
         let mut schedule = CallPutSchedule::default();
         schedule.calls.push(CallPut {
-            start_date: call_date,
-            end_date: maturity,
+            start: call_date,
+            end: maturity,
             price_pct_of_par: 100.0,
             make_whole: None,
         });
@@ -451,8 +451,8 @@ mod tests {
             .expect("valid bond");
         let mut schedule = CallPutSchedule::default();
         schedule.calls.push(CallPut {
-            start_date: call_date,
-            end_date: maturity,
+            start: call_date,
+            end: maturity,
             price_pct_of_par: 100.0,
             make_whole: None,
         });
@@ -530,8 +530,8 @@ mod tests {
             .expect("valid bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: maturity,
-                end_date: maturity,
+                start: maturity,
+                end: maturity,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

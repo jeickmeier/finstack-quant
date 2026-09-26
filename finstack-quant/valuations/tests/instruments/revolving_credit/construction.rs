@@ -39,7 +39,7 @@ fn test_builder_fixed_rate_facility() {
         .id("RC-FIXED-001".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2028 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 }) // 5%
         .day_count(DayCount::Act360)
@@ -67,7 +67,7 @@ fn test_builder_floating_rate_facility() {
         .id("RC-FLOAT-001".into())
         .commitment_amount(Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Floating(floating_rate_spec(
             "USD-SOFR-3M",
@@ -97,7 +97,7 @@ fn test_builder_with_tiered_fees() {
         .id("RC-TIERED-001".into())
         .commitment_amount(Money::new(50_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
@@ -141,7 +141,7 @@ fn test_validation_maturity_after_commitment() {
         .id("RC-INVALID-001".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(date!(2030 - 01 - 01))
+        .issue_date(date!(2030 - 01 - 01))
         .maturity(date!(2025 - 01 - 01)) // Before commitment!
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -163,7 +163,7 @@ fn test_validation_drawn_within_commitment() {
         .id("RC-OVERDRAWN".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(15_000_000.0, Currency::USD).expect("valid money fixture")) // Over commitment!
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2030 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)

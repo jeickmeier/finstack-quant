@@ -47,7 +47,7 @@ fn create_test_bond() -> ConvertibleBond {
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 
@@ -424,7 +424,7 @@ fn settlement_date_uses_coupon_holiday_calendar() {
         .as_mut()
         .expect("test bond has fixed coupon")
         .schedule
-        .calendar_id = "usny".to_string();
+        .calendar_id = "usny".into();
 
     // Thursday July 3, 2025 + one USNY business day skips Independence Day
     // and the weekend, settling Monday July 7.
@@ -529,8 +529,8 @@ fn call_branch_does_not_force_disallowed_conversion() {
         .implied_volatility = Some(0.01);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: issue,
-            end_date: maturity,
+            start: issue,
+            end: maturity,
             price_pct_of_par: 102.0,
             make_whole: None,
         }],
@@ -605,7 +605,7 @@ fn test_thirty_360_day_count_corporate_convention() {
             day_count: DayCount::Thirty360,
             // US corporate convention
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
@@ -823,8 +823,8 @@ fn put_at_maturity_floors_terminal_payoff() {
     let mut puttable_bond = create_test_bond();
     let mut schedule = CallPutSchedule::default();
     schedule.puts.push(CallPut {
-        start_date: puttable_bond.maturity,
-        end_date: puttable_bond.maturity,
+        start: puttable_bond.maturity,
+        end: puttable_bond.maturity,
         price_pct_of_par: 105.0, // accreting put above par at maturity
         make_whole: None,
     });

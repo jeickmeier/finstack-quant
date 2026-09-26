@@ -181,7 +181,7 @@ class Bond:
         id: str,
         notional: Money | float,
         coupon_rate: float | Rate,
-        issue: datetime.date | datetime.datetime | pd.Timestamp | str,
+        issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"],
         discount_curve_id: str,
@@ -207,7 +207,7 @@ class Bond:
             Principal amount; a bare number is tagged with ``currency``.
         coupon_rate : float | Rate
             Annual coupon as a decimal (``0.05`` = 5%) or a ``Rate``.
-        issue : datetime.date | datetime.datetime | pd.Timestamp | str
+        issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date (ISO 8601 strings accepted).
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity date.
@@ -233,7 +233,7 @@ class Bond:
         ValueError
             If ``convention``/``stub`` is not a recognized name, a bare
             ``notional`` has no ``currency``, or validation fails (e.g. maturity
-            not after issue).
+            not after issue_date).
         TypeError
             If ``coupon_rate`` or ``notional`` has an unsupported type or a date
             cannot be interpreted.
@@ -261,7 +261,7 @@ class Bond:
         id: str,
         notional: Money | float,
         coupon_rate: float | Rate,
-        issue: datetime.date | datetime.datetime | pd.Timestamp | str,
+        issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         convention: Literal[
             "us_treasury", "us_agency", "german_bund", "uk_gilt", "french_oat", "jgb", "us_corporate", "eur_corporate"
@@ -284,7 +284,7 @@ class Bond:
             Principal amount; a bare number is tagged with ``currency``.
         coupon_rate : float | Rate
             Annual coupon as a decimal (``0.05`` = 5%) or a ``Rate``.
-        issue : datetime.date | datetime.datetime | pd.Timestamp | str
+        issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity date.
@@ -334,7 +334,7 @@ class Bond:
         notional: Money | float,
         forward_curve_id: str,
         spread_bp: float | Bps,
-        issue: datetime.date | datetime.datetime | pd.Timestamp | str,
+        issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         frequency: Tenor,
         day_count: DayCount,
@@ -361,7 +361,7 @@ class Bond:
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
         spread_bp : float | Bps
             Spread over the index in whole basis points (fractions are rounded).
-        issue : datetime.date | datetime.datetime | pd.Timestamp | str
+        issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity date.
@@ -383,7 +383,7 @@ class Bond:
         ------
         ValueError
             If the notional currency has no mapped settlement convention,
-            ``notional`` is not finite and positive, or ``issue`` is not strictly
+            ``notional`` is not finite and positive, or ``issue_date`` is not strictly
             before ``maturity``.
         TypeError
             If ``spread_bp``/``notional`` has an unsupported type or a date cannot
@@ -415,7 +415,7 @@ class Bond:
         notional: Money | float,
         forward_curve_id: str,
         spread_bp: float | Bps,
-        issue: datetime.date | datetime.datetime | pd.Timestamp | str,
+        issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         frequency: Tenor,
         day_count: DayCount,
@@ -441,7 +441,7 @@ class Bond:
             Forward curve identifier (e.g. ``"EUR-EURIBOR-3M"``).
         spread_bp : float | Bps
             Spread over the index in whole basis points (fractions are rounded).
-        issue : datetime.date | datetime.datetime | pd.Timestamp | str
+        issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity date.
@@ -495,7 +495,7 @@ class Bond:
     def zero_coupon(
         id: str,
         notional: Money | float,
-        issue: datetime.date | datetime.datetime | pd.Timestamp | str,
+        issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         discount_curve_id: str,
         *,
@@ -512,7 +512,7 @@ class Bond:
             Unique instrument identifier.
         notional : Money | float
             Redemption amount; a bare number is tagged with ``currency``.
-        issue : datetime.date | datetime.datetime | pd.Timestamp | str
+        issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity (redemption) date.
@@ -530,7 +530,7 @@ class Bond:
         ------
         ValueError
             If a bare ``notional`` has no ``currency`` or ``maturity`` is not after
-            ``issue``.
+            ``issue_date``.
         TypeError
             If ``notional`` has an unsupported type or a date cannot be
             interpreted.
@@ -1219,7 +1219,7 @@ class BondBuilder:
     ...     .discount_curve_id("USD-OIS")
     ...     .credit_curve_id("ACME-HZD")
     ...     .call_put({
-    ...         "calls": [{"start_date": "2029-01-15", "end_date": "2034-01-15", "price_pct_of_par": 100.0}],
+    ...         "calls": [{"start": "2029-01-15", "end": "2034-01-15", "price_pct_of_par": 100.0}],
     ...         "puts": [],
     ...     })
     ...     .build()
@@ -1397,7 +1397,7 @@ class BondBuilder:
         Parameters
         ----------
         value : dict[str, object] | str
-            Rust ``CallPutSchedule`` in serde form (``dict`` or JSON string), e.g. ``{"calls": [{"start_date": "2027-01-15", "end_date": "2029-01-15", "price_pct_of_par": 100.0}], "puts": []}``.
+            Rust ``CallPutSchedule`` in serde form (``dict`` or JSON string), e.g. ``{"calls": [{"start": "2027-01-15", "end": "2029-01-15", "price_pct_of_par": 100.0}], "puts": []}``.
 
         Returns
         -------
@@ -5123,8 +5123,8 @@ class InterestRateSwap:
         notional: Money | builtins.float,
         side: Literal["pay", "receive"],
         fixed_rate: builtins.float | Rate,
-        start: datetime.date | datetime.datetime | pd.Timestamp | str,
-        end: datetime.date | datetime.datetime | pd.Timestamp | str,
+        start_date: datetime.date | datetime.datetime | pd.Timestamp | str,
+        maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
         index_id: str,
         discount_curve_id: str,
         forward_curve_id: str,
@@ -5149,9 +5149,9 @@ class InterestRateSwap:
             ``"pay"`` pays fixed / receives floating; ``"receive"`` the opposite.
         fixed_rate : float | Rate
             Fixed coupon as a decimal (``0.03`` = 3%) or a ``Rate``.
-        start : datetime.date | datetime.datetime | pd.Timestamp | str
+        start_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Effective date (ISO 8601 strings accepted).
-        end : datetime.date | datetime.datetime | pd.Timestamp | str
+        maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity date.
         index_id : str
             Registered rate index (e.g. ``"USD-SOFR"``, ``"USD-SOFR-3M"``,
@@ -5755,7 +5755,7 @@ class Swaption:
     Construct via :meth:`Swaption.builder`, :meth:`Swaption.example` /
     :meth:`Swaption.example_bermudan` or :meth:`Swaption.from_json`. Every
     public Rust field is readable as a property; ``get_strike`` /
-    ``get_swap_start`` / ``get_swap_end`` / ``forward_swap_rate`` mirror the
+    ``get_underlying_start_date`` / ``get_underlying_maturity`` / ``forward_swap_rate`` mirror the
     Rust accessors and :meth:`Swaption.price` / :meth:`Swaption.metric` run
     the same pricer as :func:`price_instrument`.
 
@@ -6037,9 +6037,9 @@ class Swaption:
         This accessor does not raise; it returns the stored value.
         """
         ...
-    def get_swap_start(self) -> datetime.date:
+    def get_underlying_start_date(self) -> datetime.date:
         """
-        Effective date of the underlying swap (mirrors Rust ``get_swap_start``).
+        Effective date of the underlying swap (mirrors Rust ``get_underlying_start_date``).
 
         Returns
         -------
@@ -6051,9 +6051,9 @@ class Swaption:
         This accessor does not raise; it returns the stored value.
         """
         ...
-    def get_swap_end(self) -> datetime.date:
+    def get_underlying_maturity(self) -> datetime.date:
         """
-        Maturity of the underlying swap (mirrors Rust ``get_swap_end``).
+        Maturity of the underlying swap (mirrors Rust ``get_underlying_maturity``).
 
         Returns
         -------
@@ -10320,9 +10320,9 @@ class CDSTranche:
         """
         ...
     @property
-    def effective_date(self) -> datetime.date | None:
+    def start_date(self) -> datetime.date | None:
         """
-        Explicit effective date for schedule anchoring.
+        Explicit contract start (effective) date for schedule anchoring.
 
         Returns
         -------
@@ -10769,9 +10769,9 @@ class CDSTrancheBuilder:
             If the builder was already consumed by ``build()`` or ``value`` is not a recognized side.
         """
         ...
-    def effective_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CDSTrancheBuilder:
+    def start_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> CDSTrancheBuilder:
         """
-        Set the effective date for schedule anchoring.
+        Set the contract start (effective) date for schedule anchoring.
 
         Parameters
         ----------
@@ -14975,7 +14975,7 @@ class EquityOption:
         """
         ...
     @property
-    def exercise_schedule(self) -> list[datetime.date] | None:
+    def exercise_dates(self) -> list[datetime.date] | None:
         """
         Bermudan exercise dates.
 
@@ -15374,7 +15374,7 @@ class EquityOptionBuilder:
             If the builder was already consumed by ``build()`` or a date cannot be interpreted.
         """
         ...
-    def exercise_schedule(
+    def exercise_dates(
         self, value: list[datetime.date | datetime.datetime | pd.Timestamp | str]
     ) -> EquityOptionBuilder:
         """
@@ -16194,7 +16194,7 @@ class AssetPool:
         ----------
         value : dict[str, Any] | str
             ``ReinvestmentPeriod`` in its serde shape, or that JSON as a
-            string: ISO ``end_date`` (inclusive), ``is_active``, ``criteria``
+            string: ISO ``end`` (inclusive), ``is_active``, ``criteria``
             (``max_price_pct`` percent of par, ``min_yield`` annual decimal current
             yield below which a surviving asset is skipped), optional
             ``amortizing_tranches`` (note ids paid down inside the window) and
@@ -16221,7 +16221,7 @@ class AssetPool:
         >>> from finstack_quant.core.currency import Currency
         >>> from finstack_quant.valuations.instruments import AssetPool
         >>> pool = AssetPool("POOL-1", "clo", Currency("USD")).with_reinvestment_period({
-        ...     "end_date": "2028-01-01",
+        ...     "end": "2028-01-01",
         ...     "is_active": True,
         ...     "criteria": {
         ...         "max_price_pct": 100.0,
@@ -21115,7 +21115,7 @@ class Waterfall:
     ...     .build()
     ... )
     >>> deal = StructuredCredit.new_clo(
-    ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", payment_calendar_id="nyse"
+    ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", calendar_id="nyse"
     ... )
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
     >>> waterfall = deal.create_waterfall()
@@ -21318,7 +21318,7 @@ class TrancheCashflows:
     ...     .build()
     ... )
     >>> deal = StructuredCredit.new_clo(
-    ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", payment_calendar_id="nyse"
+    ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", calendar_id="nyse"
     ... )
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
     >>> flows = deal.tranche_cashflows("A", market, as_of)
@@ -21975,7 +21975,7 @@ class StructuredCredit:
         closing_date: datetime.date,
         maturity: datetime.date,
         discount_curve_id: str,
-        payment_calendar_id: str | None = None,
+        calendar_id: str | None = None,
     ) -> StructuredCredit:
         """
         Create a new ABS deal with registry-calibrated defaults.
@@ -21994,7 +21994,7 @@ class StructuredCredit:
             Legal final maturity date.
         discount_curve_id : str
             Discount curve identifier for valuation.
-        payment_calendar_id : str, optional
+        calendar_id : str, optional
             Holiday calendar for the payment schedule (e.g. ``"nyse"``);
             required before pricing, so pass it here or set it on the JSON.
 
@@ -22077,7 +22077,7 @@ class StructuredCredit:
         closing_date: datetime.date,
         maturity: datetime.date,
         discount_curve_id: str,
-        payment_calendar_id: str | None = None,
+        calendar_id: str | None = None,
     ) -> StructuredCredit:
         """
         Create a new CLO deal with registry-calibrated defaults.
@@ -22099,7 +22099,7 @@ class StructuredCredit:
             Legal final maturity date.
         discount_curve_id : str
             Discount curve identifier for valuation.
-        payment_calendar_id : str, optional
+        calendar_id : str, optional
             Holiday calendar for the payment schedule (e.g. ``"nyse"``);
             required before pricing, so pass it here or set it on the JSON.
 
@@ -22150,7 +22150,7 @@ class StructuredCredit:
         closing_date: datetime.date,
         maturity: datetime.date,
         discount_curve_id: str,
-        payment_calendar_id: str | None = None,
+        calendar_id: str | None = None,
     ) -> StructuredCredit:
         """
         Create a new CMBS deal with registry-calibrated defaults.
@@ -22172,7 +22172,7 @@ class StructuredCredit:
             Legal final maturity date.
         discount_curve_id : str
             Discount curve identifier for valuation.
-        payment_calendar_id : str, optional
+        calendar_id : str, optional
             Holiday calendar for the payment schedule (e.g. ``"nyse"``);
             required before pricing, so pass it here or set it on the JSON.
 
@@ -22223,7 +22223,7 @@ class StructuredCredit:
         closing_date: datetime.date,
         maturity: datetime.date,
         discount_curve_id: str,
-        payment_calendar_id: str | None = None,
+        calendar_id: str | None = None,
     ) -> StructuredCredit:
         """
         Create a new RMBS deal with registry-calibrated defaults.
@@ -22245,7 +22245,7 @@ class StructuredCredit:
             Legal final maturity date.
         discount_curve_id : str
             Discount curve identifier for valuation.
-        payment_calendar_id : str, optional
+        calendar_id : str, optional
             Holiday calendar for the payment schedule (e.g. ``"nyse"``);
             required before pricing, so pass it here or set it on the JSON.
 
@@ -22622,7 +22622,7 @@ class StructuredCredit:
         ...
 
     @property
-    def payment_calendar_id(self) -> str | None:
+    def calendar_id(self) -> str | None:
         """
         Payment calendar identifier.
 
@@ -22638,7 +22638,7 @@ class StructuredCredit:
         ...
 
     @property
-    def payment_business_day_convention(self) -> str | None:
+    def business_day_convention(self) -> str | None:
         """
         Payment business-day convention string.
 
@@ -23411,7 +23411,7 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def payment_calendar_id(self, value: str) -> StructuredCreditBuilder:
+    def calendar_id(self, value: str) -> StructuredCreditBuilder:
         """
         Set the payment calendar identifier for schedule adjustments.
 
@@ -23434,7 +23434,7 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def payment_business_day_convention(self, value: str) -> StructuredCreditBuilder:
+    def business_day_convention(self, value: str) -> StructuredCreditBuilder:
         """
         Set the business day convention for tranche payments.
 
@@ -25611,7 +25611,7 @@ class AssetBackedFacility:
         """
         ...
     @property
-    def payment_calendar_id(self) -> str | None:
+    def calendar_id(self) -> str | None:
         """
         Payment calendar identifier, or ``None``.
 
@@ -25865,7 +25865,7 @@ class AssetBackedFacilityBuilder:
     ...     .revolving_end(datetime.date(2026, 1, 15))
     ...     .maturity(datetime.date(2030, 1, 15))
     ...     .frequency("3M")
-    ...     .payment_calendar_id("nyse")
+    ...     .calendar_id("nyse")
     ...     .term_out(24)
     ...     .discount_curve_id("USD-OIS")
     ...     .build()
@@ -26155,7 +26155,7 @@ class AssetBackedFacilityBuilder:
             consumed.
         """
         ...
-    def payment_calendar_id(self, value: str) -> AssetBackedFacilityBuilder:
+    def calendar_id(self, value: str) -> AssetBackedFacilityBuilder:
         """
         Set the payment calendar.
 
@@ -27017,7 +27017,7 @@ class RevolvingCredit:
         """
         ...
     @property
-    def commitment_date(self) -> datetime.date:
+    def issue_date(self) -> datetime.date:
         """
         Date the facility becomes available.
 
@@ -27408,7 +27408,7 @@ class RevolvingCreditBuilder:
 
     Builders are consumed by ``build()``; create a new builder per facility.
     Required fields: ``id``, ``commitment_amount``, ``drawn_amount``,
-    ``commitment_date``, ``maturity``, ``base_rate_spec``, ``day_count``,
+    ``issue_date``, ``maturity``, ``base_rate_spec``, ``day_count``,
     ``frequency``, ``fees`` (or :meth:`fees_flat`), ``draw_repay_spec``,
     ``discount_curve_id`` and ``recovery_rate``. Nested specs accept a
     ``dict`` or JSON ``str`` in the Rust serde shape.
@@ -27425,7 +27425,7 @@ class RevolvingCreditBuilder:
     ...     .id("RCF-1")
     ...     .commitment_amount(Money(50_000_000.0, Currency("USD")))
     ...     .drawn_amount(Money(10_000_000.0, Currency("USD")))
-    ...     .commitment_date(datetime.date(2024, 1, 15))
+    ...     .issue_date(datetime.date(2024, 1, 15))
     ...     .maturity(datetime.date(2027, 1, 15))
     ...     .base_rate_spec(0.06)
     ...     .day_count("act_360")
@@ -27510,7 +27510,7 @@ class RevolvingCreditBuilder:
             If ``value`` is neither ``Money`` nor a number.
         """
         ...
-    def commitment_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> RevolvingCreditBuilder:
+    def issue_date(self, value: datetime.date | datetime.datetime | pd.Timestamp | str) -> RevolvingCreditBuilder:
         """
         Set the date the facility becomes available.
 
@@ -28436,7 +28436,7 @@ class StochasticPricingResult:
     ... )
     >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
     >>> envelope = json.loads(deal.to_json())
-    >>> envelope["instrument"]["spec"]["payment_calendar_id"] = "nyse"
+    >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
     >>> result = deal.price_stochastic(market, as_of, num_paths=4)
@@ -28839,7 +28839,7 @@ class SimulationDiagnostics:
     ... )
     >>> deal = StructuredCredit.new_abs("ABS-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC")
     >>> envelope = json.loads(deal.to_json())
-    >>> envelope["instrument"]["spec"]["payment_calendar_id"] = "nyse"
+    >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
     >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
     >>> diagnostics = deal.run_simulation_with_diagnostics(market, as_of)
@@ -31070,7 +31070,7 @@ class ConversionSpec:
 class CallPutSchedule:
     """
     Issuer call and holder put windows (typed wrapper for the Rust
-    ``CallPutSchedule``). Each window is a dict ``{"start_date", "end_date",
+    ``CallPutSchedule``). Each window is a dict ``{"start", "end",
     "price_pct_of_par", "make_whole"?}`` with dates as ISO strings and prices
     in percent of par (``101.0`` = 101%). Accepted by
     :meth:`ConvertibleBondBuilder.call_put` alongside dicts / JSON of the
@@ -31079,9 +31079,7 @@ class CallPutSchedule:
     Examples
     --------
     >>> from finstack_quant.valuations.instruments import CallPutSchedule
-    >>> sched = CallPutSchedule(
-    ...     calls=[{"start_date": "2026-03-15", "end_date": "2027-03-15", "price_pct_of_par": 101.0}]
-    ... )
+    >>> sched = CallPutSchedule(calls=[{"start": "2026-03-15", "end": "2027-03-15", "price_pct_of_par": 101.0}])
     >>> (len(sched.calls), len(sched.puts))
     (1, 0)
     """
@@ -31097,7 +31095,7 @@ class CallPutSchedule:
         Parameters
         ----------
         calls : list[dict[str, object]] | str | None
-            Issuer call windows (``start_date``, ``end_date``,
+            Issuer call windows (``start``, ``end``,
             ``price_pct_of_par``, optional ``make_whole``); default none.
         puts : list[dict[str, object]] | str | None
             Holder put windows of the same shape; default none.

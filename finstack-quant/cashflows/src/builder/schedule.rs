@@ -170,11 +170,11 @@ pub(crate) fn finalize_flows(
 
     let mut cals: Vec<String> = fixed
         .iter()
-        .map(|schedule| schedule.spec.schedule.calendar_id.clone())
+        .map(|schedule| schedule.spec.schedule.calendar_id.to_string())
         .chain(
             floating
                 .iter()
-                .map(|schedule| schedule.spec.schedule.calendar_id.clone()),
+                .map(|schedule| schedule.spec.schedule.calendar_id.to_string()),
         )
         .collect();
     cals.sort_unstable();
@@ -184,7 +184,7 @@ pub(crate) fn finalize_flows(
         calendar_ids: cals,
         facility_limit: None,
         issue_date,
-        maturity_date,
+        maturity: maturity_date,
         representation: CashflowRepresentation::default(),
     };
 
@@ -267,7 +267,7 @@ pub struct CashFlowMeta {
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
-    pub maturity_date: Option<Date>,
+    pub maturity: Option<Date>,
 }
 
 /// Cashflow schedule output from the composable builder.
@@ -947,7 +947,7 @@ where
         projected_fixings.extend(schedule_meta.projected_fixings);
         merge_matching_option(&mut facility_limit, schedule_meta.facility_limit);
         merge_matching_option(&mut issue_date, schedule_meta.issue_date);
-        merge_matching_option(&mut maturity_date, schedule_meta.maturity_date);
+        merge_matching_option(&mut maturity_date, schedule_meta.maturity);
     }
 
     calendar_ids.sort_unstable();
@@ -964,7 +964,7 @@ where
             calendar_ids,
             facility_limit: facility_limit.unwrap_or(None),
             issue_date: issue_date.unwrap_or(None),
-            maturity_date: maturity_date.unwrap_or(None),
+            maturity: maturity_date.unwrap_or(None),
         },
     )
 }
@@ -1485,7 +1485,7 @@ mod tests {
                 calendar_ids: vec!["nyc".to_string()],
                 facility_limit: None,
                 issue_date: Some(d1),
-                maturity_date: None,
+                maturity: None,
             },
         );
         let right = CashFlowSchedule::from_parts(
@@ -1508,7 +1508,7 @@ mod tests {
                 calendar_ids: vec!["lon".to_string(), "nyc".to_string()],
                 facility_limit: None,
                 issue_date: Some(d1),
-                maturity_date: None,
+                maturity: None,
             },
         );
 

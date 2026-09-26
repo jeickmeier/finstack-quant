@@ -48,7 +48,7 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
@@ -984,7 +984,7 @@ fn make_overnight_float_spec(
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
@@ -1534,7 +1534,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::ShortBack,
             end_of_month: false,
             payment_lag_days: 0,
@@ -1647,7 +1647,7 @@ fn test_overnight_empty_fixing_window_errors() {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Unadjusted,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
@@ -1773,7 +1773,7 @@ fn test_overnight_sampling_uses_fixing_calendar() {
             FloatingRateFallback::Error,
             dec!(0.0),
         );
-        spec.rate_spec.fixing_calendar_id = fixing_calendar_id;
+        spec.rate_spec.fixing_calendar_id = fixing_calendar_id.map(Into::into);
         let mut b = CashFlowSchedule::builder();
         let _ = b.principal(init, issue, maturity).floating_cf(spec);
         b.build(Some(&market)).expect("schedule builds")

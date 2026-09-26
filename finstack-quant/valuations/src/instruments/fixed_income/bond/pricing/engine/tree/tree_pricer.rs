@@ -131,7 +131,7 @@ impl TreePricer {
                 .calls
                 .iter()
                 .chain(&schedule.puts)
-                .any(|option| option.start_date <= date && date <= option.end_date)
+                .any(|option| option.start <= date && date <= option.end)
         });
         let floored = bond.return_floor.as_ref().is_some_and(|floor| {
             if date >= bond.maturity {
@@ -262,13 +262,8 @@ impl TreePricer {
         let exercise_times: Vec<f64> = call_put
             .calls
             .iter()
-            .flat_map(|call| [call.start_date, call.end_date])
-            .chain(
-                call_put
-                    .puts
-                    .iter()
-                    .flat_map(|put| [put.start_date, put.end_date]),
-            )
+            .flat_map(|call| [call.start, call.end])
+            .chain(call_put.puts.iter().flat_map(|put| [put.start, put.end]))
             .filter(|date| *date > as_of && *date < bond.maturity)
             .filter_map(|date| {
                 day_count
@@ -769,8 +764,8 @@ mod tests {
             let mut bond = bullet.clone();
             bond.call_put = Some(CallPutSchedule {
                 calls: vec![CallPut {
-                    start_date: maturity,
-                    end_date: maturity,
+                    start: maturity,
+                    end: maturity,
                     price_pct_of_par,
                     make_whole: None,
                 }],
@@ -783,8 +778,8 @@ mod tests {
             bond.call_put = Some(CallPutSchedule {
                 calls: Vec::new(),
                 puts: vec![CallPut {
-                    start_date: maturity,
-                    end_date: maturity,
+                    start: maturity,
+                    end: maturity,
                     price_pct_of_par,
                     make_whole: None,
                 }],

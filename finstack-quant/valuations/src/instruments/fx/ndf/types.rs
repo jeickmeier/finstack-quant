@@ -369,11 +369,11 @@ pub struct Ndf {
     /// Optional base currency calendar.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_calendar_id: Option<String>,
+    pub base_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Optional settlement currency calendar.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quote_calendar_id: Option<String>,
+    pub quote_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[builder(default)]
@@ -485,8 +485,8 @@ impl TryFrom<NdfUnchecked> for Ndf {
             fixing_source_enum: value.fixing_source_enum,
             quoted_spot: value.quoted_spot,
             quoted_forward: value.quoted_forward,
-            base_calendar_id: value.base_calendar_id,
-            quote_calendar_id: value.quote_calendar_id,
+            base_calendar_id: value.base_calendar_id.map(Into::into),
+            quote_calendar_id: value.quote_calendar_id.map(Into::into),
             instrument_pricing_overrides: value.instrument_pricing_overrides,
             metric_pricing_overrides: value.metric_pricing_overrides,
             scenario_pricing_overrides: value.scenario_pricing_overrides,
@@ -731,8 +731,8 @@ impl Ndf {
             .contract_rate(contract_rate)
             .domestic_discount_curve_id(domestic_discount_curve_id.into())
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .base_calendar_id_opt(base_calendar_id)
-            .quote_calendar_id_opt(quote_calendar_id)
+            .base_calendar_id_opt(base_calendar_id.map(Into::into))
+            .quote_calendar_id_opt(quote_calendar_id.map(Into::into))
             .attributes(Attributes::new())
             .build()
     }

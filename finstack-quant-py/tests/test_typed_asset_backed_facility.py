@@ -53,7 +53,7 @@ def _facility(drawn: float = 60_000_000.0) -> AssetBackedFacility:
         .maturity(datetime.date(2030, 1, 15))
         .frequency("3M")
         .day_count("act_360")
-        .payment_calendar_id("nyse")
+        .calendar_id("nyse")
         .term_out(24)
         .discount_curve_id("USD-OIS")
         .build()
@@ -89,7 +89,7 @@ def test_builder_exposes_every_field_and_rejects_an_overdrawn_line() -> None:
     assert facility.maturity == datetime.date(2030, 1, 15)
     assert str(facility.frequency) == "3M"
     assert str(facility.day_count) == "act_360"
-    assert facility.payment_calendar_id == "nyse"
+    assert facility.calendar_id == "nyse"
     assert facility.amortization_events == []
     assert facility.term_out == {"months": 24}
     assert facility.liquidation_price_pct is None
@@ -122,7 +122,7 @@ def test_amortization_events_pull_the_revolving_end_forward() -> None:
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
         .frequency("3M")
-        .payment_calendar_id("nyse")
+        .calendar_id("nyse")
         .amortization_events([
             {"kind": "date", "date": "2025-01-15"},
             {"kind": "cumulative_loss", "max_cumulative_loss": 0.05},
@@ -218,7 +218,7 @@ def test_every_amortization_event_kind_projects_with_documented_units() -> None:
             .revolving_end(datetime.date(2026, 1, 15))
             .maturity(datetime.date(2030, 1, 15))
             .frequency("3M")
-            .payment_calendar_id("nyse")
+            .calendar_id("nyse")
             .term_out(24)
             .amortization_events(events)
             .discount_curve_id("USD-OIS")
@@ -247,7 +247,7 @@ def test_draws_fees_and_readvance_round_trip_and_project() -> None:
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
         .frequency("3M")
-        .payment_calendar_id("nyse")
+        .calendar_id("nyse")
         .term_out(24)
         .draw_schedule([{"date": "2025-01-15", "amount": {"amount": "5000000", "currency": "USD"}}])
         .readvance_to_borrowing_base(False)

@@ -484,9 +484,9 @@ pub(crate) fn prepare_deal_simulation(
     // Resolve payment calendar - required for structured credit deals.
     // Silent fallback to weekends-only would shift coupons around holidays,
     // breaking WAC/WAL and OC tests.
-    let calendar_id = instrument.payment_calendar_id.as_deref().ok_or_else(|| {
+    let calendar_id = instrument.calendar_id.as_deref().ok_or_else(|| {
         finstack_quant_core::Error::Validation(
-            "Structured credit instruments require a payment_calendar_id for accurate \
+            "Structured credit instruments require a calendar_id for accurate \
              schedule generation. Specify a valid calendar ID (e.g., 'nyse', 'target2') \
              to ensure payment dates are adjusted correctly for business days."
                 .to_string(),
@@ -495,7 +495,7 @@ pub(crate) fn prepare_deal_simulation(
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
 
     let convention = instrument
-        .payment_business_day_convention
+        .business_day_convention
         .unwrap_or(BusinessDayConvention::ModifiedFollowing);
 
     // Generate the full contractual payment schedule, then filter future dates.
@@ -508,7 +508,7 @@ pub(crate) fn prepare_deal_simulation(
         frequency: instrument.frequency,
         day_count: DayCount::Act360,
         business_day_convention: convention,
-        calendar_id: calendar_id.to_string(),
+        calendar_id: calendar_id.into(),
         stub: StubKind::ShortBack,
         end_of_month: false,
         payment_lag_days: 0,

@@ -265,7 +265,7 @@ class TestDateAcceptanceIsUniform:
         return build_cashflow_schedule_json(
             json.dumps({
                 "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-                "issue": "2024-08-31",
+                "issue_date": "2024-08-31",
                 "maturity": "2025-08-31",
                 "coupon_program": [
                     {

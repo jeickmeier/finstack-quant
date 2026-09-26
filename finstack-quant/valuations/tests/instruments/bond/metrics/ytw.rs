@@ -149,8 +149,8 @@ fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
         .implied_volatility = Some(0.01);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: call_date,
-            end_date: call_date,
+            start: call_date,
+            end: call_date,
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

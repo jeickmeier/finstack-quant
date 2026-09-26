@@ -76,9 +76,9 @@ pub struct FxVarianceSwap {
     /// Observation frequency
     pub observation_frequency: Tenor,
     /// Base-currency calendar used in the joint observation calendar.
-    pub base_calendar_id: String,
+    pub base_calendar_id: finstack_quant_core::types::CalendarId,
     /// Quote-currency calendar used in the joint observation calendar.
-    pub quote_calendar_id: String,
+    pub quote_calendar_id: finstack_quant_core::types::CalendarId,
     /// Business-day convention applied to observation dates.
     #[serde(default = "default_observation_business_day_convention")]
     #[builder(default = BusinessDayConvention::Following)]
@@ -214,8 +214,8 @@ impl FxVarianceSwap {
                 Date::from_calendar_date(2025, Month::January, 2).expect("Valid example date"),
             )
             .observation_frequency(Tenor::daily())
-            .base_calendar_id("TARGET2".to_string())
-            .quote_calendar_id("USNY".to_string())
+            .base_calendar_id("TARGET2".into())
+            .quote_calendar_id("USNY".into())
             .observation_business_day_convention(BusinessDayConvention::Following)
             .observation_end_of_month(false)
             .realized_var_method(RealizedVarMethod::CloseToClose)
@@ -505,8 +505,8 @@ mod tests {
             .start_date(date(2025, Month::January, 6)) // Monday
             .maturity(date(2025, Month::January, 10)) // Friday
             .observation_frequency(Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture"))
-            .base_calendar_id("TARGET2".to_string())
-            .quote_calendar_id("USNY".to_string())
+            .base_calendar_id("TARGET2".into())
+            .quote_calendar_id("USNY".into())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -549,8 +549,8 @@ mod tests {
             .start_date(date(2025, Month::January, 2))
             .maturity(date(2025, Month::December, 31))
             .observation_frequency(Tenor::new(1, TenorUnit::Days).expect("valid tenor fixture"))
-            .base_calendar_id("TARGET2".to_string())
-            .quote_calendar_id("USNY".to_string())
+            .base_calendar_id("TARGET2".into())
+            .quote_calendar_id("USNY".into())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -588,8 +588,8 @@ mod tests {
             .start_date(date(2025, Month::January, 4)) // Saturday
             .maturity(date(2025, Month::January, 25)) // Saturday
             .observation_frequency(Tenor::new(1, TenorUnit::Weeks).expect("valid tenor fixture"))
-            .base_calendar_id("TARGET2".to_string())
-            .quote_calendar_id("USNY".to_string())
+            .base_calendar_id("TARGET2".into())
+            .quote_calendar_id("USNY".into())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

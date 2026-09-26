@@ -270,8 +270,8 @@ fn mid_period_call_prices_with_stochastic_rates() {
     let mut bond = floating_credit_bond();
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2027 - 02 - 15),
-            end_date: date!(2027 - 02 - 15),
+            start: date!(2027 - 02 - 15),
+            end: date!(2027 - 02 - 15),
             price_pct_of_par: 95.0,
             make_whole: None,
         }],
@@ -440,8 +440,8 @@ fn callable_floater_prices_in_all_regimes() {
     // A live call struck at par-ish, on coupon dates only.
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2027 - 01 - 01),
-            end_date: date!(2029 - 01 - 01),
+            start: date!(2027 - 01 - 01),
+            end: date!(2029 - 01 - 01),
             price_pct_of_par: 101.0,
             make_whole: None,
         }],

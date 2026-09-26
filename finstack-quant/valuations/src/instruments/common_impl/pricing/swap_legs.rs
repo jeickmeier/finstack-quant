@@ -639,7 +639,7 @@ pub struct FloatingLegParams {
     /// Payment delay in business days after period end.
     pub payment_lag_days: i32,
     /// Optional calendar ID for payment date adjustments.
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Compounding method for calculating the period rate.
     ///
     /// Defaults to [`CompoundingMethod::Simple`] for IBOR-style rates.
@@ -668,7 +668,7 @@ impl FloatingLegParams {
         all_in_floor_bp: Option<f64>,
         all_in_cap_bp: Option<f64>,
         payment_lag_days: i32,
-        calendar_id: Option<String>,
+        calendar_id: Option<finstack_quant_core::types::CalendarId>,
     ) -> Self {
         Self {
             rate_params: FloatingRateParams {
@@ -990,7 +990,7 @@ pub struct FixedLegParams {
     /// Payment delay in business days after period end.
     pub payment_lag_days: i32,
     /// Optional calendar ID for payment date adjustments.
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
 }
 
 impl FixedLegParams {

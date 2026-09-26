@@ -114,8 +114,8 @@ fn test_day_count_propagation_for_call_put() {
 
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: call_date,
-        end_date: call_date,
+        start: call_date,
+        end: call_date,
         price_pct_of_par: 101.0,
         make_whole: None,
     });
@@ -209,7 +209,7 @@ fn test_time_mapping_with_quarterly_coupons() {
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 
@@ -300,14 +300,14 @@ fn test_call_put_on_same_date() {
     let mut bond = create_standard_convertible();
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: option_date,
-        end_date: option_date,
+        start: option_date,
+        end: option_date,
         price_pct_of_par: 102.0,
         make_whole: None,
     });
     call_put.puts.push(CallPut {
-        start_date: option_date,
-        end_date: option_date,
+        start: option_date,
+        end: option_date,
         price_pct_of_par: 98.0,
         make_whole: None,
     });
@@ -336,8 +336,8 @@ fn test_call_put_at_maturity() {
     let mut bond = create_standard_convertible();
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: bond.maturity,
-        end_date: bond.maturity,
+        start: bond.maturity,
+        end: bond.maturity,
         price_pct_of_par: 100.0,
         make_whole: None,
     });
@@ -370,8 +370,8 @@ fn test_call_put_before_issue() {
     // Call date before issue is an invalid economic contract.
     let before_issue = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     call_put.calls.push(CallPut {
-        start_date: before_issue,
-        end_date: before_issue,
+        start: before_issue,
+        end: before_issue,
         price_pct_of_par: 102.0,
         make_whole: None,
     });
@@ -403,8 +403,8 @@ fn test_call_put_after_maturity() {
     // Call date after maturity is an invalid economic contract.
     let after_maturity = Date::from_calendar_date(2031, Month::January, 1).unwrap();
     call_put.calls.push(CallPut {
-        start_date: after_maturity,
-        end_date: after_maturity,
+        start: after_maturity,
+        end: after_maturity,
         price_pct_of_par: 102.0,
         make_whole: None,
     });

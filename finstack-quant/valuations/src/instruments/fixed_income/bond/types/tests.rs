@@ -27,7 +27,7 @@ fn test_bond_with_custom_cashflows() {
         frequency: Tenor::semi_annual(),
         day_count: DayCount::Act365F,
         business_day_convention: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
+        calendar_id: "weekends_only".into(),
         stub: StubKind::None,
         end_of_month: false,
         payment_lag_days: 0,
@@ -115,7 +115,7 @@ fn test_bond_builder_with_custom_cashflows() {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 
@@ -194,7 +194,7 @@ fn test_bond_with_cashflows_method() {
                 frequency: Tenor::quarterly(),
                 day_count: DayCount::Act365F,
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::None,
                 end_of_month: false,
                 payment_lag_days: 0,
@@ -249,7 +249,7 @@ fn test_custom_cashflows_override_regular_generation() {
                 // Different frequency
                 day_count: DayCount::Act365F,
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::None,
                 end_of_month: false,
                 payment_lag_days: 0,

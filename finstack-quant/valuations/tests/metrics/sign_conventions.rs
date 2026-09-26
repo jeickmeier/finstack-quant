@@ -115,7 +115,7 @@ fn test_call_delta_positive() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -164,7 +164,7 @@ fn test_put_delta_negative() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -216,7 +216,7 @@ fn test_theta_negative_for_long_positions() {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            exercise_schedule: None,
+            exercise_dates: None,
             attributes: Default::default(),
         };
 
@@ -314,7 +314,7 @@ fn test_vega_always_positive() {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            exercise_schedule: None,
+            exercise_dates: None,
             attributes: Default::default(),
         };
 
@@ -372,7 +372,7 @@ fn test_gamma_always_positive() {
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
-            exercise_schedule: None,
+            exercise_dates: None,
             attributes: Default::default(),
         };
 
@@ -429,7 +429,7 @@ fn test_call_rho_positive() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -476,7 +476,7 @@ fn test_put_rho_negative() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -680,7 +680,7 @@ fn test_put_call_parity() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -705,7 +705,7 @@ fn test_put_call_parity() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -778,7 +778,7 @@ fn test_put_call_parity_delta_relationship() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -802,7 +802,7 @@ fn test_put_call_parity_delta_relationship() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 

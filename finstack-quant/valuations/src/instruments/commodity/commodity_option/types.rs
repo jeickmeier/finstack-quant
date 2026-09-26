@@ -133,7 +133,7 @@ pub struct CommodityOption {
         feature = "json-schema",
         schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
     )]
-    pub exercise_schedule: Option<Vec<Date>>,
+    pub exercise_dates: Option<Vec<Date>>,
     /// Option expiry date.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -249,23 +249,23 @@ impl CommodityOption {
             self.multiplier,
             "CommodityOption multiplier",
         )?;
-        if let Some(schedule) = &self.exercise_schedule {
+        if let Some(schedule) = &self.exercise_dates {
             if schedule.windows(2).any(|w| w[0] >= w[1]) {
                 return Err(finstack_quant_core::Error::Validation(
-                    "CommodityOption exercise_schedule must be strictly increasing".to_string(),
+                    "CommodityOption exercise_dates must be strictly increasing".to_string(),
                 ));
             }
             if schedule.iter().any(|date| *date > self.expiry) {
                 return Err(finstack_quant_core::Error::Validation(
-                    "CommodityOption exercise_schedule cannot extend beyond expiry".to_string(),
+                    "CommodityOption exercise_dates cannot extend beyond expiry".to_string(),
                 ));
             }
         }
         if matches!(self.exercise_style, ExerciseStyle::Bermudan)
-            && self.exercise_schedule.as_ref().is_none_or(Vec::is_empty)
+            && self.exercise_dates.as_ref().is_none_or(Vec::is_empty)
         {
             return Err(finstack_quant_core::Error::Validation(
-                "Commodity Bermudan option requires exercise_schedule".to_string(),
+                "Commodity Bermudan option requires exercise_dates".to_string(),
             ));
         }
         Ok(())
@@ -759,9 +759,9 @@ impl Instrument for CommodityOption {
                 tree.price_american(&params)?
             }
             ExerciseStyle::Bermudan => {
-                let schedule = self.exercise_schedule.as_ref().ok_or_else(|| {
+                let schedule = self.exercise_dates.as_ref().ok_or_else(|| {
                     finstack_quant_core::Error::Validation(
-                        "Commodity Bermudan option requires exercise_schedule".to_string(),
+                        "Commodity Bermudan option requires exercise_dates".to_string(),
                     )
                 })?;
                 let steps = self
@@ -1339,7 +1339,7 @@ mod tests {
         let err = option
             .value(&market, as_of)
             .expect_err("Bermudan commodity options should require an exercise schedule");
-        assert!(err.to_string().contains("exercise_schedule"));
+        assert!(err.to_string().contains("exercise_dates"));
     }
 
     /// W-13: `implied_carry` must guard against non-finite `forward` / `spot`.

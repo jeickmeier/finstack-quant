@@ -37,7 +37,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::Tra
 /// ...     .coupon_fixed(0.05).maturity(maturity).build()
 /// ... )
 /// >>> deal = StructuredCredit.new_clo(
-/// ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", payment_calendar_id="nyse"
+/// ...     "CLO-1", pool, TrancheStructure([note]), as_of, maturity, "USD-SOFR-DISC", calendar_id="nyse"
 /// ... )
 /// >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
 /// >>> flows = deal.tranche_cashflows("A", market, as_of)

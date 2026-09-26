@@ -23,7 +23,7 @@ fn test_interest_on_drawn_amounts() {
         .id("RC-CF-INTEREST".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -54,7 +54,7 @@ fn test_commitment_fee_on_undrawn() {
         .id("RC-CF-COMMIT".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture")) // 80% undrawn
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -85,7 +85,7 @@ fn test_utilization_fee_at_threshold() {
         .id("RC-CF-UTIL".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(8_000_000.0, Currency::USD).expect("valid money fixture")) // 80% utilization
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)

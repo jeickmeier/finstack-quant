@@ -222,7 +222,7 @@ impl CDSIndex {
     fn premium_with_standard_defaults(&self) -> PremiumLegSpec {
         let mut premium = self.premium.clone();
         if premium.calendar_id.is_none() {
-            premium.calendar_id = Some(self.convention.default_calendar().to_string());
+            premium.calendar_id = Some(self.convention.default_calendar().into());
         }
         premium
     }
@@ -261,7 +261,7 @@ impl CDSIndex {
                 frequency,
                 stub,
                 business_day_convention,
-                calendar_id: Some(convention.default_calendar().to_string()),
+                calendar_id: Some(convention.default_calendar().into()),
                 day_count,
                 coupon_bp: Decimal::from(60),
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -351,7 +351,7 @@ impl CDSIndex {
                 frequency,
                 stub,
                 business_day_convention,
-                calendar_id: Some(convention.default_calendar().to_string()),
+                calendar_id: Some(convention.default_calendar().into()),
                 day_count,
                 coupon_bp,
                 discount_curve_id: discount_curve_id.into(),

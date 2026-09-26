@@ -282,7 +282,7 @@ pub struct XccySwapLeg {
     pub payment_lag_days: i32,
     /// Calendar identifier for schedule generation and lags.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Reset lag in business days before the accrual start (e.g. 2 for T-2 fixing).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reset_lag_days: Option<i32>,
@@ -1705,7 +1705,7 @@ mod tests {
             stub: StubKind::ShortFront,
             spread_bp: Decimal::ZERO,
             payment_lag_days: 0,
-            calendar_id: Some("target2".to_string()),
+            calendar_id: Some("target2".into()),
             reset_lag_days: None,
             allow_calendar_fallback: false,
             compounding: compounding.clone(),
@@ -1784,7 +1784,7 @@ mod tests {
             stub: StubKind::ShortFront,
             spread_bp: Decimal::ZERO,
             payment_lag_days: 0,
-            calendar_id: Some("not-a-calendar".to_string()),
+            calendar_id: Some("not-a-calendar".into()),
             reset_lag_days: None,
             allow_calendar_fallback: false,
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
@@ -1812,7 +1812,7 @@ mod tests {
                 leg.forward_curve_id = CurveId::new("USD-SOFR-3M");
                 leg.discount_curve_id = CurveId::new("USD-OIS");
                 leg.compounding = FloatingLegCompounding::Simple;
-                leg.calendar_id = Some("usny".to_string());
+                leg.calendar_id = Some("usny".into());
                 leg
             },
             Currency::USD,

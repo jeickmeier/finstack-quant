@@ -8,8 +8,8 @@
         "call_put": {
           "calls": [
             {
-              "start_date": "2025-04-01",
-              "end_date": "2025-04-02",
+              "start": "2025-04-01",
+              "end": "2025-04-02",
               "price_pct_of_par": 100.0,
               "make_whole": null
             }

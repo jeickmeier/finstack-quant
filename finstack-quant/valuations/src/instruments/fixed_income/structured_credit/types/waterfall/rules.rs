@@ -67,7 +67,7 @@ impl WaterfallRules {
     /// - The shifting-interest schedule is non-empty and strictly ascending in
     ///   `months_from_closing` (so the per-period shifting-interest step lookup
     ///   is unambiguous).
-    /// - `controlled_accumulation.start_date <= bullet_date`.
+    /// - `controlled_accumulation.start <= bullet_date`.
     ///
     /// # Errors
     ///
@@ -200,11 +200,11 @@ impl WaterfallRules {
         }
 
         if let Some(ca) = &self.controlled_accumulation {
-            if ca.start_date > ca.bullet_date {
+            if ca.start > ca.bullet_date {
                 return Err(invalid(format!(
-                    "waterfall_rules: controlled_accumulation.start_date ({}) must be on or before \
+                    "waterfall_rules: controlled_accumulation.start ({}) must be on or before \
                      bullet_date ({})",
-                    ca.start_date, ca.bullet_date
+                    ca.start, ca.bullet_date
                 )));
             }
         }
@@ -644,7 +644,7 @@ pub struct ControlledAccumulationSpec {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub start_date: Date,
+    pub start: Date,
     /// Date the accumulated funding account is released as a bullet payment.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(

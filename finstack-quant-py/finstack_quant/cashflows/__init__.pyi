@@ -135,7 +135,7 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
     ----------
     spec : dict or str
         ``CashflowScheduleBuildSpec`` as a JSON string or an equivalent dict
-        (``notional``, ``issue``, ``maturity``, ``coupon_program``,
+        (``notional``, ``issue_date``, ``maturity``, ``coupon_program``,
         ``payment_program``, ``fees``, ``principal_events``,
         ``principal_exchange``). Each principal event requires economic ``date``
         and cash ``payment_date``; these dates may differ after payment adjustment.
@@ -159,7 +159,7 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
     >>> from finstack_quant.cashflows import build_cashflow_schedule
     >>> spec = {
     ...     "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-    ...     "issue": "2025-01-15",
+    ...     "issue_date": "2025-01-15",
     ...     "maturity": "2026-01-15",
     ...     "coupon_program": [
     ...         {
@@ -328,7 +328,7 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     >>> import json
     >>> spec = {
     ...     "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-    ...     "issue": "2024-08-31",
+    ...     "issue_date": "2024-08-31",
     ...     "maturity": "2025-08-31",
     ...     "coupon_program": [
     ...         {

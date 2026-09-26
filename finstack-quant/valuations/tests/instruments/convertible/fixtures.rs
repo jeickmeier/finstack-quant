@@ -170,7 +170,7 @@ pub fn create_convertible_with_policy(policy: ConversionPolicy) -> ConvertibleBo
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 
@@ -231,7 +231,7 @@ pub fn create_convertible_with_conversion_price() -> ConvertibleBond {
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 
@@ -306,7 +306,7 @@ pub fn create_floating_convertible() -> ConvertibleBond {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
@@ -345,8 +345,8 @@ pub fn create_callable_convertible(call_date: Date, call_price_pct: f64) -> Conv
 
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: call_date,
-        end_date: call_date,
+        start: call_date,
+        end: call_date,
         price_pct_of_par: call_price_pct,
         make_whole: None,
     });
@@ -364,8 +364,8 @@ pub fn create_puttable_convertible(put_date: Date, put_price_pct: f64) -> Conver
 
     let mut call_put = CallPutSchedule::default();
     call_put.puts.push(CallPut {
-        start_date: put_date,
-        end_date: put_date,
+        start: put_date,
+        end: put_date,
         price_pct_of_par: put_price_pct,
         make_whole: None,
     });
@@ -388,14 +388,14 @@ pub fn create_callable_puttable_convertible(
 
     let mut call_put = CallPutSchedule::default();
     call_put.calls.push(CallPut {
-        start_date: call_date,
-        end_date: call_date,
+        start: call_date,
+        end: call_date,
         price_pct_of_par: call_price_pct,
         make_whole: None,
     });
     call_put.puts.push(CallPut {
-        start_date: put_date,
-        end_date: put_date,
+        start: put_date,
+        end: put_date,
         price_pct_of_par: put_price_pct,
         make_whole: None,
     });

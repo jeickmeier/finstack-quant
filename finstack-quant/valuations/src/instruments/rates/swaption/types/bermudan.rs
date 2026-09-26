@@ -66,7 +66,7 @@ pub struct BermudanSwaption {
     /// Volatility surface ID for calibration
     pub vol_surface_id: CurveId,
     /// Bermudan exercise schedule
-    pub bermudan_schedule: BermudanSchedule,
+    pub exercise_schedule: BermudanSchedule,
     /// Co-terminal or non-co-terminal exercise
     pub bermudan_type: BermudanType,
     /// Complete fixed leg of the underlying swap.
@@ -125,22 +125,22 @@ impl BermudanSwaption {
                 "{context} underlying legs must use the same discount curve"
             )));
         }
-        if self.bermudan_schedule.exercise_dates.is_empty() {
+        if self.exercise_schedule.exercise_dates.is_empty() {
             return Err(Error::Validation(format!(
                 "{context} requires at least one exercise date"
             )));
         }
-        for dates in self.bermudan_schedule.exercise_dates.windows(2) {
+        for dates in self.exercise_schedule.exercise_dates.windows(2) {
             if dates[0] >= dates[1] {
                 return Err(Error::Validation(format!(
                     "{context} exercise dates must be strictly increasing"
                 )));
             }
         }
-        let swap_start = self.get_swap_start();
-        let swap_end = self.get_swap_end();
+        let swap_start = self.get_underlying_start_date();
+        let swap_end = self.get_underlying_maturity();
         if self
-            .bermudan_schedule
+            .exercise_schedule
             .exercise_dates
             .iter()
             .any(|date| *date < swap_start || *date >= swap_end)
@@ -150,7 +150,7 @@ impl BermudanSwaption {
             )));
         }
         if self
-            .bermudan_schedule
+            .exercise_schedule
             .lockout_end
             .is_some_and(|lockout| lockout >= swap_end)
         {
@@ -158,7 +158,7 @@ impl BermudanSwaption {
                 "{context} lockout_end must precede swap maturity"
             )));
         }
-        if self.bermudan_schedule.effective_dates().is_empty() {
+        if self.exercise_schedule.effective_dates().is_empty() {
             return Err(Error::Validation(format!(
                 "{context} lockout removes every exercise opportunity"
             )));
@@ -194,7 +194,7 @@ impl BermudanSwaption {
             notional: Money::from((10_000_000_i64, Currency::USD)),
             settlement: SwaptionSettlement::Physical,
             vol_surface_id: CurveId::new("USD-SWPNVOL"),
-            bermudan_schedule: BermudanSchedule::co_terminal(
+            exercise_schedule: BermudanSchedule::co_terminal(
                 first_exercise,
                 swap_end,
                 Tenor::semi_annual(),
@@ -222,7 +222,7 @@ impl BermudanSwaption {
     /// * `strike` - Fixed rate of the underlying swap as a decimal (0.03 = 3%).
     /// * `swap_start` - Effective date of the underlying swap.
     /// * `swap_end` - Maturity of the underlying swap (co-terminal for every exercise).
-    /// * `bermudan_schedule` - Exercise dates.
+    /// * `exercise_schedule` - Exercise dates.
     /// * `discount_curve_id` - Discount curve for both legs.
     /// * `forward_curve_id` - Projection curve for the floating leg.
     /// * `vol_surface_id` - Swaption volatility cube.
@@ -239,7 +239,7 @@ impl BermudanSwaption {
         strike: f64,
         swap_start: Date,
         swap_end: Date,
-        bermudan_schedule: BermudanSchedule,
+        exercise_schedule: BermudanSchedule,
         discount_curve_id: impl Into<CurveId>,
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
@@ -259,7 +259,7 @@ impl BermudanSwaption {
             notional,
             settlement: SwaptionSettlement::Physical,
             vol_surface_id: vol_surface_id.into(),
-            bermudan_schedule,
+            exercise_schedule,
             bermudan_type: BermudanType::CoTerminal,
             underlying_fixed_leg,
             underlying_float_leg,
@@ -278,12 +278,12 @@ impl BermudanSwaption {
     }
 
     /// Start date shared by both underlying legs.
-    pub fn get_swap_start(&self) -> Date {
+    pub fn get_underlying_start_date(&self) -> Date {
         self.underlying_fixed_leg.start
     }
 
     /// End date shared by both underlying legs.
-    pub fn get_swap_end(&self) -> Date {
+    pub fn get_underlying_maturity(&self) -> Date {
         self.underlying_fixed_leg.end
     }
 
@@ -350,20 +350,20 @@ impl BermudanSwaption {
     /// Set the holiday calendar for schedule generation.
     pub fn with_calendar(mut self, calendar_id: impl Into<CalendarId>) -> Self {
         let calendar_id = calendar_id.into().to_string();
-        self.underlying_fixed_leg.calendar_id = Some(calendar_id.clone());
-        self.underlying_float_leg.calendar_id = Some(calendar_id.clone());
-        self.underlying_float_leg.fixing_calendar_id = Some(calendar_id);
+        self.underlying_fixed_leg.calendar_id = Some(calendar_id.clone().into());
+        self.underlying_float_leg.calendar_id = Some(calendar_id.clone().into());
+        self.underlying_float_leg.fixing_calendar_id = Some(calendar_id.into());
         self
     }
 
     /// Get the first exercise date.
     pub fn first_exercise(&self) -> Option<Date> {
-        self.bermudan_schedule.effective_dates().first().copied()
+        self.exercise_schedule.effective_dates().first().copied()
     }
 
     /// Get the last exercise date.
     pub fn last_exercise(&self) -> Option<Date> {
-        self.bermudan_schedule.effective_dates().last().copied()
+        self.exercise_schedule.effective_dates().last().copied()
     }
 
     /// Calculate ACT/365F model time to the first exercise.
@@ -391,7 +391,7 @@ impl BermudanSwaption {
     ///
     /// * `as_of` - Valuation date defining model time zero; matured swaps return zero.
     pub fn time_to_maturity(&self, as_of: Date) -> Result<f64> {
-        if as_of >= self.get_swap_end() {
+        if as_of >= self.get_underlying_maturity() {
             return Ok(0.0);
         }
         let flows =
@@ -410,7 +410,7 @@ impl BermudanSwaption {
     ///
     /// * `as_of` - Valuation date defining model time zero; past exercises are excluded.
     pub fn exercise_times(&self, as_of: Date) -> Result<Vec<f64>> {
-        self.bermudan_schedule
+        self.exercise_schedule
             .exercise_times(as_of, finstack_quant_core::dates::DayCount::Act365F)
     }
 
@@ -436,7 +436,7 @@ impl BermudanSwaption {
     pub(crate) fn fixed_schedule_periods(
         &self,
     ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
-        self.fixed_schedule_periods_at(self.get_swap_start())
+        self.fixed_schedule_periods_at(self.get_underlying_start_date())
     }
 
     fn fixed_schedule_periods_at(
@@ -541,7 +541,7 @@ impl BermudanSwaption {
         as_of: Date,
         exercise_date: Date,
     ) -> Result<f64> {
-        if exercise_date >= self.get_swap_end() {
+        if exercise_date >= self.get_underlying_maturity() {
             return Ok(0.0);
         }
         let periods = self.fixed_schedule_periods_at(exercise_date)?;
@@ -628,7 +628,7 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.get_swap_start())
+        Some(self.get_underlying_start_date())
     }
 
     crate::impl_focused_pricing_overrides!();

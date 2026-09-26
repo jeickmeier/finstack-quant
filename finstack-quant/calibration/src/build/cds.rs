@@ -260,7 +260,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
             frequency: conv.frequency,
             stub: conv.stub,
             business_day_convention: conv.business_day_convention,
-            calendar_id: Some(conv.calendar_id.clone()),
+            calendar_id: Some(conv.calendar_id.clone().into()),
             day_count: conv.day_count,
             coupon_bp: Decimal::try_from(spread_bp).map_err(|e| {
                 finstack_quant_core::Error::Validation(format!(

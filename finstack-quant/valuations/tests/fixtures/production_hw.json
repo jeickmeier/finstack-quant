@@ -58,7 +58,7 @@
         },
         "attributes": {},
         "bermudan_type": "co_terminal",
-        "bermudan_schedule": {
+        "exercise_schedule": {
           "exercise_dates": [
             "2026-04-01"
           ],

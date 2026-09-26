@@ -89,7 +89,7 @@ fn test_all_flows_preserve_currency() {
 
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::ShortFront,
 

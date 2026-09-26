@@ -58,7 +58,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
         ));
     }
     pool.reinvestment_period = Some(ReinvestmentPeriod {
-        end_date: MATURITY,
+        end: MATURITY,
         is_active: true,
         amortizing_tranches: Vec::new(),
         assumptions: None,
@@ -89,7 +89,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-TRIGGERS", pool, tranches, CLOSE, MATURITY, "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
             .with_coverage_triggers(tests)
             .expect("tests");
     deal.fees = None;

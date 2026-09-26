@@ -497,8 +497,8 @@ fn test_bond_deserialization_defaults_accrual_method_and_call_put_period() {
         "call_put".to_string(),
         serde_json::json!({
             "calls": [{
-                "start_date": "2027-01-01",
-                "end_date": "2028-01-01",
+                "start": "2027-01-01",
+                "end": "2028-01-01",
                 "price_pct_of_par": 101.0
             }],
             "puts": []
@@ -512,8 +512,8 @@ fn test_bond_deserialization_defaults_accrual_method_and_call_put_period() {
     let roundtrip =
         serde_json::to_value(&deserialized).expect("Bond serialization should succeed in test");
     let call = &roundtrip["call_put"]["calls"][0];
-    assert_eq!(call["start_date"], "2027-01-01");
-    assert_eq!(call["end_date"], "2028-01-01");
+    assert_eq!(call["start"], "2027-01-01");
+    assert_eq!(call["end"], "2028-01-01");
     assert!(call.get("date").is_none());
     assert!(roundtrip.get("accrual_method").is_none());
 }

@@ -557,8 +557,8 @@ mod tests {
         let mut callable = straight.clone();
         callable.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2027 - 01 - 15),
-                end_date: date!(2027 - 01 - 15),
+                start: date!(2027 - 01 - 15),
+                end: date!(2027 - 01 - 15),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -586,8 +586,8 @@ mod tests {
         puttable.call_put = Some(CallPutSchedule {
             calls: Vec::new(),
             puts: vec![CallPut {
-                start_date: date!(2027 - 01 - 15),
-                end_date: date!(2027 - 01 - 15),
+                start: date!(2027 - 01 - 15),
+                end: date!(2027 - 01 - 15),
                 price_pct_of_par: 110.0,
                 make_whole: None,
             }],

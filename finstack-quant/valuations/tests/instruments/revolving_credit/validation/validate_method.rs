@@ -23,7 +23,7 @@ fn valid_facility() -> RevolvingCredit {
         .id("RC-VALIDATE".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(date!(2025 - 01 - 01))
+        .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -242,7 +242,7 @@ fn test_validate_maturity_before_commitment() {
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(
-        err_msg.contains("commitment_date") && err_msg.contains("maturity"),
+        err_msg.contains("issue_date") && err_msg.contains("maturity"),
         "Expected date ordering error, got: {}",
         err_msg
     );

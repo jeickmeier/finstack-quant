@@ -469,9 +469,9 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
 
     /// Bermudan exercise dates, or ``None``.
     #[getter]
-    fn exercise_schedule<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
+    fn exercise_dates<'py>(&self, py: Python<'py>) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
         self.inner
-            .exercise_schedule
+            .exercise_dates
             .as_ref()
             .map(|dates| dates.iter().map(|d| date_to_py(py, *d)).collect())
             .transpose()
@@ -967,7 +967,7 @@ impl PyEquityOptionBuilder {
     /// EquityOptionBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn exercise_schedule<'py>(
+    fn exercise_dates<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: Vec<Bound<'py, PyAny>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
@@ -983,12 +983,8 @@ impl PyEquityOptionBuilder {
                 .collect::<Vec<_>>()
                 .join(", ")
         );
-        eq_set!(
-            slf,
-            exercise_schedule,
-            shown,
-            |b: EquityOptionBuilderInner| b.exercise_schedule(dates)
-        )
+        eq_set!(slf, exercise_dates, shown, |b: EquityOptionBuilderInner| b
+            .exercise_dates(dates))
     }
 
     /// Set free-form instrument attributes (tags and metadata).

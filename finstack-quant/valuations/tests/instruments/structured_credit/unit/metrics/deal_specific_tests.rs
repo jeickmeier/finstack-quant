@@ -53,7 +53,7 @@ fn rmbs_instrument() -> StructuredCredit {
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         "USD-OIS",
     )
-    .with_payment_calendar("nyse")
+    .with_calendar("nyse")
 }
 
 fn flat_discount_curve(base: Date) -> DiscountCurve {

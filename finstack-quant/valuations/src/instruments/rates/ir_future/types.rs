@@ -141,7 +141,7 @@ pub struct InterestRateFuture {
     /// overnight calendar. Otherwise the currency standard is used.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fixing_calendar_id: Option<String>,
+    pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Optional volatility surface identifier for convexity adjustment
     pub vol_surface_id: Option<CurveId>,
     /// Instrument-owned pricing inputs.

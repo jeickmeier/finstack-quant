@@ -456,7 +456,7 @@ pub(super) fn has_exercise_claim_on_date(bond: &Bond, date: Date) -> Result<bool
             .calls
             .iter()
             .chain(&rights.puts)
-            .any(|right| right.start_date <= date && date <= right.end_date)
+            .any(|right| right.start <= date && date <= right.end)
     }) {
         return Ok(true);
     }
@@ -477,8 +477,8 @@ pub(super) fn exercise_dates(
     event_dates: &[Date],
 ) -> Vec<Date> {
     BondValuator::exercise_candidates(
-        option.start_date.max(as_of),
-        option.end_date.min(maturity),
+        option.start.max(as_of),
+        option.end.min(maturity),
         event_dates,
     )
 }

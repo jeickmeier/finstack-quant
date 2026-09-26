@@ -752,12 +752,12 @@ pub(crate) fn enumerate_exit_paths(
     let push_period_candidates = |candidates: &mut Vec<ExitCandidate>,
                                   option: &crate::instruments::fixed_income::bond::CallPut,
                                   retain_make_whole: bool| {
-        let mut exercise_dates = vec![option.start_date, option.end_date];
+        let mut exercise_dates = vec![option.start, option.end];
         exercise_dates.extend(
             flows
                 .iter()
                 .map(|(date, _)| *date)
-                .filter(|date| *date >= option.start_date && *date <= option.end_date),
+                .filter(|date| *date >= option.start && *date <= option.end),
         );
         exercise_dates.sort_unstable();
         exercise_dates.dedup();
@@ -819,7 +819,7 @@ fn workout_cashflow_paths(
             .calls
             .iter()
             .chain(&option_schedule.puts)
-            .any(|option| option.start_date <= quote_date && quote_date <= option.end_date)
+            .any(|option| option.start <= quote_date && quote_date <= option.end)
     });
     let inclusive_flows;
     let path_flows = if has_quote_date_exercise {
@@ -1142,8 +1142,8 @@ mod tests {
         let end = date!(2027 - 01 - 20);
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: start,
-                end_date: end,
+                start,
+                end,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -1165,8 +1165,8 @@ mod tests {
         bond.call_put = Some(CallPutSchedule {
             calls: vec![
                 CallPut {
-                    start_date: date!(2027 - 01 - 10),
-                    end_date: exercise_date,
+                    start: date!(2027 - 01 - 10),
+                    end: exercise_date,
                     price_pct_of_par: 100.0,
                     make_whole: Some(MakeWholeSpec {
                         reference_curve_id: "REF-A".into(),
@@ -1174,8 +1174,8 @@ mod tests {
                     }),
                 },
                 CallPut {
-                    start_date: exercise_date,
-                    end_date: date!(2027 - 01 - 20),
+                    start: exercise_date,
+                    end: date!(2027 - 01 - 20),
                     price_pct_of_par: 99.0,
                     make_whole: Some(MakeWholeSpec {
                         reference_curve_id: "REF-B".into(),
@@ -1185,14 +1185,14 @@ mod tests {
             ],
             puts: vec![
                 CallPut {
-                    start_date: exercise_date,
-                    end_date: exercise_date,
+                    start: exercise_date,
+                    end: exercise_date,
                     price_pct_of_par: 98.0,
                     make_whole: None,
                 },
                 CallPut {
-                    start_date: exercise_date,
-                    end_date: exercise_date,
+                    start: exercise_date,
+                    end: exercise_date,
                     price_pct_of_par: 101.0,
                     make_whole: None,
                 },
@@ -1238,8 +1238,8 @@ mod tests {
         bond.settlement_convention = None;
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise_date,
-                end_date: exercise_date,
+                start: exercise_date,
+                end: exercise_date,
                 price_pct_of_par: 50.0,
                 make_whole: Some(MakeWholeSpec {
                     reference_curve_id: "USD-REF".into(),
@@ -1309,8 +1309,8 @@ mod tests {
             .quoted_clean_price_pct = Some(100.0);
         make_whole_bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise_date,
-                end_date: exercise_date,
+                start: exercise_date,
+                end: exercise_date,
                 price_pct_of_par: 50.0,
                 make_whole: Some(MakeWholeSpec {
                     reference_curve_id: "USD-REF".into(),
@@ -1438,8 +1438,8 @@ mod tests {
         bond.settlement_convention = None;
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: as_of,
-                end_date: as_of,
+                start: as_of,
+                end: as_of,
                 price_pct_of_par: 101.0,
                 make_whole: None,
             }],
@@ -1591,7 +1591,7 @@ mod tests {
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
-                maturity_date: Some(maturity),
+                maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
         );

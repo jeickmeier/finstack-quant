@@ -79,8 +79,8 @@ fn explicit_credit_bond_json(
         let calls = call_price_pct
             .map(|price_pct_of_par| {
                 serde_json::json!({
-                    "start_date": "2024-06-30",
-                    "end_date": "2024-06-30",
+                    "start": "2024-06-30",
+                    "end": "2024-06-30",
                     "price_pct_of_par": price_pct_of_par,
                 })
             })
@@ -89,8 +89,8 @@ fn explicit_credit_bond_json(
         let puts = put_price_pct
             .map(|price_pct_of_par| {
                 serde_json::json!({
-                    "start_date": "2024-06-30",
-                    "end_date": "2024-06-30",
+                    "start": "2024-06-30",
+                    "end": "2024-06-30",
                     "price_pct_of_par": price_pct_of_par,
                 })
             })

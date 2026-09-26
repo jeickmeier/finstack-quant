@@ -164,13 +164,13 @@ pub struct FxSpot {
     /// Per market convention, FX settlement uses the joint calendar of both currencies.
     /// A date is a good business day only if it's valid in both calendars.
     #[builder(optional)]
-    pub base_calendar_id: Option<String>,
+    pub base_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Optional quote currency calendar for joint calendar settlement adjustment.
     ///
     /// Per market convention, FX settlement uses the joint calendar of both currencies.
     /// A date is a good business day only if it's valid in both calendars.
     #[builder(optional)]
-    pub quote_calendar_id: Option<String>,
+    pub quote_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -251,8 +251,8 @@ impl TryFrom<FxSpotUnchecked> for FxSpot {
             metric_pricing_overrides: value.metric_pricing_overrides,
             scenario_pricing_overrides: value.scenario_pricing_overrides,
             business_day_convention: value.business_day_convention,
-            base_calendar_id: value.base_calendar_id,
-            quote_calendar_id: value.quote_calendar_id,
+            base_calendar_id: value.base_calendar_id.map(Into::into),
+            quote_calendar_id: value.quote_calendar_id.map(Into::into),
             attributes: value.attributes,
         };
         spot.validate_economics()?;
@@ -449,7 +449,7 @@ impl FxSpot {
     ///     .with_quote_calendar_id("USNY");    // US New York calendar for USD
     /// ```
     pub fn with_base_calendar_id(mut self, id: impl Into<String>) -> Self {
-        self.base_calendar_id = Some(id.into());
+        self.base_calendar_id = Some(id.into().into());
         self
     }
 
@@ -458,7 +458,7 @@ impl FxSpot {
     /// Per market convention, FX settlement uses the joint calendar of both currencies.
     /// A date is a good business day only if it's valid in both calendars.
     pub fn with_quote_calendar_id(mut self, id: impl Into<String>) -> Self {
-        self.quote_calendar_id = Some(id.into());
+        self.quote_calendar_id = Some(id.into().into());
         self
     }
 

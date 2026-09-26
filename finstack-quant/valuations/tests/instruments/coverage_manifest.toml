@@ -173,10 +173,10 @@ rationale = "Swaption.underlying_fixed_leg: FixedLegSpec lacks PartialEq across 
 tag = "bermudan_swaption"
 fixture = "json_examples/bermudan_swaption.json"
 lossless = false
-partial_eq_blocker = "BermudanSwaption.bermudan_schedule: BermudanSchedule"
+partial_eq_blocker = "BermudanSwaption.exercise_schedule: BermudanSchedule"
 required_keys = ["id"]
 no_market_dependencies = false
-rationale = "BermudanSwaption.bermudan_schedule: BermudanSchedule lacks PartialEq across exercise dates and notice rules."
+rationale = "BermudanSwaption.exercise_schedule: BermudanSchedule lacks PartialEq across exercise dates and notice rules."
 
 [[instrument]]
 tag = "interest_rate_future"

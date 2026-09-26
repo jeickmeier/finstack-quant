@@ -14,11 +14,15 @@
           "description": "Business day convention for schedule and payments."
         },
         "calendar_id": {
-          "description": "Optional holiday calendar identifier.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional holiday calendar identifier."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",

@@ -154,7 +154,7 @@ fn test_odd_first_coupon_ytm() {
                 frequency: Tenor::semi_annual(),
                 day_count: DayCount::Thirty360,
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::ShortFront,
                 // Short stub at front
                 end_of_month: false,
@@ -274,7 +274,7 @@ fn test_long_first_coupon_ytm() {
                 frequency: Tenor::semi_annual(),
                 day_count: DayCount::Act365F,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::LongFront,
                 // Long stub at front
                 end_of_month: false,

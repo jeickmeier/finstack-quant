@@ -236,7 +236,7 @@ pub struct TermLoan {
     pub business_day_convention: BusinessDayConvention,
 
     /// Optional calendar id for adjustments
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
 
     /// Stub rule
     #[builder(default = StubKind::ShortFront)]

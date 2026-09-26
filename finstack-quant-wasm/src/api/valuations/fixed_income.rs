@@ -40,18 +40,18 @@ impl JsBond {
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal amount of the bond.
     /// @param couponRate - Annual coupon rate.
-    /// @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param stub - Stub policy: `none`, `short_front`, `short_back`,
     /// `long_front`, or `long_back`.
     /// @param discountCurveId - Discount curve identifier used for pricing.
     /// @returns The validated fixed-rate bond.
-    /// @throws If validation fails (e.g. maturity not after issue).
+    /// @throws If validation fails (e.g. maturity not after issue_date).
     pub fn fixed(
         id: &str,
         notional: &JsMoney,
         coupon_rate: &JsRate,
-        issue: &str,
+        issue_date: &str,
         maturity: &str,
         stub: &str,
         discount_curve_id: &str,
@@ -60,7 +60,7 @@ impl JsBond {
             id,
             notional.inner,
             coupon_rate.inner,
-            parse_iso_date(issue)?,
+            parse_iso_date(issue_date)?,
             parse_iso_date(maturity)?,
             stub.parse::<StubKind>().map_err(to_js_err)?,
             discount_curve_id,
@@ -81,7 +81,7 @@ impl JsBond {
     /// @param spreadBp - Spread over the index in whole basis points
     /// (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp
     /// margins, which preserves the exact decimal spread).
-    /// @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param issue_date - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
     /// @param dayCount - Day count convention (e.g. `DayCount.act360()`).
@@ -95,7 +95,7 @@ impl JsBond {
         notional: &JsMoney,
         forward_curve_id: &str,
         spread_bp: &JsBps,
-        issue: &str,
+        issue_date: &str,
         maturity: &str,
         frequency: &JsTenor,
         day_count: &JsDayCount,
@@ -106,7 +106,7 @@ impl JsBond {
             notional.inner,
             forward_curve_id,
             spread_bp.inner,
-            parse_iso_date(issue)?,
+            parse_iso_date(issue_date)?,
             parse_iso_date(maturity)?,
             frequency.inner,
             day_count.inner,

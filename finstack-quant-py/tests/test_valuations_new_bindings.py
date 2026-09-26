@@ -94,7 +94,7 @@ def _revolving_credit_json(*, gearing: str | None = None, credit_curve: bool = F
             "id": "RC-PY-BINDING",
             "commitment_amount": {"amount": "50000000", "currency": "USD"},
             "drawn_amount": {"amount": "10000000", "currency": "USD"},
-            "commitment_date": "2024-01-01",
+            "issue_date": "2024-01-01",
             "maturity": "2027-01-01",
             "base_rate_spec": (
                 {"fixed": {"rate": 0.05}}

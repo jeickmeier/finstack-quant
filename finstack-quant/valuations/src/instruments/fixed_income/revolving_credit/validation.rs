@@ -20,13 +20,13 @@ use crate::instruments::fixed_income::loan_terms::UpfrontFee;
 fn validate_step_dates(
     dates: impl Iterator<Item = Date>,
     context: &str,
-    commitment_date: Date,
+    issue_date: Date,
     maturity: Date,
     allow_maturity: bool,
 ) -> finstack_quant_core::Result<()> {
     let mut previous: Option<Date> = None;
     for (index, date) in dates.enumerate() {
-        let inside = date > commitment_date
+        let inside = date > issue_date
             && if allow_maturity {
                 date <= maturity
             } else {
@@ -35,7 +35,7 @@ fn validate_step_dates(
         validation::require_with(inside, || {
             format!(
                 "RevolvingCredit {context}[{index}] dated {date} must lie after the commitment \
-                 date {commitment_date} and {} maturity {maturity}",
+                 date {issue_date} and {} maturity {maturity}",
                 if allow_maturity {
                     "on or before"
                 } else {
@@ -162,11 +162,11 @@ impl RevolvingCredit {
 
         // Date ordering: commitment must be before maturity
         validation::validate_date_range_strict_with(
-            self.commitment_date,
+            self.issue_date,
             self.maturity,
             |start, end| {
                 format!(
-                    "RevolvingCredit commitment_date ({}) must be before maturity ({})",
+                    "RevolvingCredit issue_date ({}) must be before maturity ({})",
                     start, end
                 )
             },
@@ -208,7 +208,7 @@ impl RevolvingCredit {
         validate_step_dates(
             self.commitment_steps.iter().map(|step| step.date),
             "commitment_steps",
-            self.commitment_date,
+            self.issue_date,
             self.maturity,
             true,
         )?;
@@ -294,7 +294,7 @@ impl RevolvingCredit {
             let mut previous: Option<Date> = None;
             for (index, event) in lc.events.iter().enumerate() {
                 validation::require_with(
-                    event.date > self.commitment_date && event.date <= self.maturity,
+                    event.date > self.issue_date && event.date <= self.maturity,
                     || {
                         format!(
                             "RevolvingCredit lc.events[{index}] dated {} must be after the \
@@ -340,14 +340,14 @@ impl RevolvingCredit {
         validate_step_dates(
             self.margin_steps.iter().map(|step| step.date),
             "margin_steps",
-            self.commitment_date,
+            self.issue_date,
             self.maturity,
             false,
         )?;
         validate_step_dates(
             self.fees.steps.iter().map(|step| step.date),
             "fees.steps",
-            self.commitment_date,
+            self.issue_date,
             self.maturity,
             false,
         )?;
@@ -399,7 +399,7 @@ impl RevolvingCredit {
 
         for (index, fee) in self.scheduled_fees.iter().enumerate() {
             validation::require_with(
-                fee.date > self.commitment_date && fee.date <= self.maturity,
+                fee.date > self.issue_date && fee.date <= self.maturity,
                 || {
                     format!(
                         "RevolvingCredit scheduled_fees[{index}] dated {} must lie after the \
@@ -484,12 +484,12 @@ impl RevolvingCredit {
                 let mut balance = self.drawn_amount.amount();
                 for event in &events {
                     validation::require_with(
-                        event.date > self.commitment_date && event.date <= self.maturity,
+                        event.date > self.issue_date && event.date <= self.maturity,
                         || {
                             format!(
                                 "RevolvingCredit draw/repay event dated {} must be after \
                                  commitment ({}) and on or before maturity ({})",
-                                event.date, self.commitment_date, self.maturity
+                                event.date, self.issue_date, self.maturity
                             )
                         },
                     )?;
@@ -531,7 +531,7 @@ impl RevolvingCredit {
                 // commitment: the analyst dates the repayment.
                 for step in &self.commitment_steps {
                     let balance_at_step = self
-                        .drawn_balance_at(events.iter().copied(), self.commitment_date, step.date)?
+                        .drawn_balance_at(events.iter().copied(), self.issue_date, step.date)?
                         .amount();
                     validation::require_with(balance_at_step <= step.amount.amount(), || {
                         format!(

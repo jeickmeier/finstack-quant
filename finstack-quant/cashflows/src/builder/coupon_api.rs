@@ -270,7 +270,7 @@ impl CashFlowBuilder {
     ///         frequency: Tenor::quarterly(),
     ///         day_count: DayCount::Act360,
     ///         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-    ///         calendar_id: "weekends_only".to_string(),
+    ///         calendar_id: "weekends_only".into(),
     ///         stub: StubKind::None,
     ///         accrual_basis: Default::default(),
     ///     });

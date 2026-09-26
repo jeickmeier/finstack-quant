@@ -264,7 +264,7 @@ pub(crate) fn synthetic_underlying_cds(
         option.underlying_convention,
         coupon_bp,
         option.effective_underlying_effective_date(as_of),
-        option.cds_maturity,
+        option.underlying_maturity,
         option.recovery_rate,
         option.discount_curve_id.to_owned(),
         option.credit_curve_id.to_owned(),

@@ -436,11 +436,8 @@ impl CommoditySwap {
             business_day_convention,
             calendar_id: self
                 .calendar_id
-                .as_ref()
-                .map(|id| id.as_str().to_string())
-                .unwrap_or_else(|| {
-                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
-                }),
+                .clone()
+                .unwrap_or_else(|| crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.into()),
             stub: finstack_quant_core::dates::StubKind::ShortBack,
             end_of_month: false,
             payment_lag_days: 0,

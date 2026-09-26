@@ -367,8 +367,8 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
     bond.settlement_convention = None;
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2027 - 01 - 01),
-            end_date: date!(2027 - 01 - 01),
+            start: date!(2027 - 01 - 01),
+            end: date!(2027 - 01 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -420,8 +420,8 @@ fn quote_engine_ytw_input_uses_callable_workout_inverse() {
         .with_hw1f_mean_reversion(0.03);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2027 - 01 - 15),
-            end_date: date!(2027 - 01 - 15),
+            start: date!(2027 - 01 - 15),
+            end: date!(2027 - 01 - 15),
             price_pct_of_par: 70.0,
             make_whole: None,
         }],
@@ -479,8 +479,8 @@ fn compute_quotes_preserves_custom_tree_and_metric_registries_for_oas_roundtrip(
     });
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2028 - 01 - 15),
-            end_date: date!(2028 - 01 - 15),
+            start: date!(2028 - 01 - 15),
+            end: date!(2028 - 01 - 15),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

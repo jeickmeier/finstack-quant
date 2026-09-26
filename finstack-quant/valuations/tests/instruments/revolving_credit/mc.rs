@@ -26,7 +26,7 @@ fn build_flat_discount_curve(
 fn test_mc_pricer_stochastic_utilization() {
     // Setup dates
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     // Create a revolving credit facility with stochastic utilization
@@ -34,7 +34,7 @@ fn test_mc_pricer_stochastic_utilization() {
         .id("RC-MC-001".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture")) // 50% initial utilization
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 }) // 5% interest
         .day_count(DayCount::Act360)
@@ -92,7 +92,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
 
     // Setup dates
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2028 - 01 - 01); // 3 years
 
     // Flat discount at 3%
@@ -115,7 +115,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
         .id("RC-MC-ANCHOR".into())
         .commitment_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
@@ -160,7 +160,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
         .id("RC-MC-ANCHOR-HV".into())
         .commitment_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
@@ -207,14 +207,14 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
 fn test_mc_pricer_deterministic_reproducibility() {
     // Test that MC pricer is deterministic with fixed seed
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     let facility = RevolvingCredit::builder()
         .id("RC-MC-002".into())
         .commitment_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(2_500_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.04 })
         .day_count(DayCount::Act360)
@@ -260,7 +260,7 @@ fn test_mc_pricer_deterministic_reproducibility() {
 fn test_mc_pricer_convergence() {
     // Test that more paths lead to better estimates (less variance)
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
@@ -277,7 +277,7 @@ fn test_mc_pricer_convergence() {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(6_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(commitment_date)
+            .issue_date(issue_date)
             .maturity(maturity_date)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
             .day_count(DayCount::Act360)
@@ -326,7 +326,7 @@ fn test_mc_pricer_convergence() {
 fn test_mc_utilization_mean_reversion() {
     // Test that the mean-reverting process behaves correctly
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2027 - 01 - 01); // 2 years
 
     // Start with very low utilization (10%), target 80%
@@ -334,7 +334,7 @@ fn test_mc_utilization_mean_reversion() {
         .id("RC-MC-004".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture")) // 10% initial
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -375,7 +375,7 @@ fn test_mc_utilization_mean_reversion() {
         .id("RC-MC-005".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(8_000_000.0, Currency::USD).expect("valid money fixture")) // 80% constant
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -431,7 +431,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
     use rust_decimal::Decimal;
 
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     // Flat forward curve at 8% — well above the 3% cap
@@ -486,7 +486,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(commitment_date)
+            .issue_date(issue_date)
             .maturity(maturity_date)
             .base_rate_spec(BaseRateSpec::Floating(make_float_spec(all_in_cap_bp)))
             .day_count(DayCount::Act360)
@@ -605,7 +605,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
             )
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(val_date)
+            .issue_date(val_date)
             .maturity(maturity_date)
             .base_rate_spec(BaseRateSpec::Floating(float_spec.clone()))
             .day_count(DayCount::Act360)

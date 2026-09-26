@@ -380,7 +380,7 @@
         "discount_curve_id": "USD-OIS",
         "credit_index_id": "CDX.NA.IG.HAZARD",
         "side": "buy_protection",
-        "effective_date": "2026-04-30",
+        "start_date": "2026-04-30",
         "realized_loss": 0.0,
         "roll_rule": "none",
         "attributes": {

@@ -176,7 +176,7 @@ fn example_schedule() -> finstack_quant_core::Result<crate::builder::SchedulePar
         })?,
         day_count: finstack_quant_core::dates::DayCount::ActActIsma,
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention::Following,
-        calendar_id: "sifma".to_string(),
+        calendar_id: "sifma".into(),
         stub: Default::default(),
         end_of_month: false,
         payment_lag_days: 0,

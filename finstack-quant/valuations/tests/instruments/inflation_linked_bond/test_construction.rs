@@ -217,7 +217,7 @@ fn test_parameter_struct_tips() {
         params.real_coupon,
         Decimal::try_from(0.02).expect("valid decimal")
     );
-    assert_eq!(params.issue, issue);
+    assert_eq!(params.issue_date, issue);
     assert_eq!(params.maturity, maturity);
     assert_eq!(params.base_cpi, 200.0);
     assert_eq!(params.frequency, Tenor::semi_annual());
@@ -241,7 +241,7 @@ fn test_parameter_struct_uk_linker() {
         params.real_coupon,
         Decimal::try_from(0.005).expect("valid decimal")
     );
-    assert_eq!(params.issue, issue);
+    assert_eq!(params.issue_date, issue);
     assert_eq!(params.maturity, maturity);
     assert_eq!(params.base_cpi, 300.0);
     assert_eq!(params.frequency, Tenor::semi_annual());

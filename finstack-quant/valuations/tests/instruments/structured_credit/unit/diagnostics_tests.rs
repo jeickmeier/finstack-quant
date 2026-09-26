@@ -93,7 +93,7 @@ fn clo(cdr: f64) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-DIAG", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
             .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.20)])
             .expect("coverage test");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);

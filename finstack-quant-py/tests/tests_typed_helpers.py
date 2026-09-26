@@ -54,10 +54,10 @@ _STRUCTURED_CREDIT_FIXTURE = (
 )
 
 
-def canonical_structured_credit_json(*, payment_calendar_id: str = "nyse") -> str:
+def canonical_structured_credit_json(*, calendar_id: str = "nyse") -> str:
     """Load the registry-generated, priceable structured-credit envelope."""
     envelope = json.loads(_STRUCTURED_CREDIT_FIXTURE.read_text(encoding="utf-8"))
-    envelope["instrument"]["spec"]["payment_calendar_id"] = payment_calendar_id
+    envelope["instrument"]["spec"]["calendar_id"] = calendar_id
     return json.dumps(envelope)
 
 

@@ -67,7 +67,7 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
         ));
     }
     pool.reinvestment_period = Some(ReinvestmentPeriod {
-        end_date: revolving_end,
+        end: revolving_end,
         is_active: true,
         criteria: ReinvestmentCriteria::default(),
         amortizing_tranches: Vec::new(),
@@ -98,7 +98,7 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_abs("CARD-MT", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
             .with_fees(fees(0.0));
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -262,7 +262,7 @@ fn controlled_accumulation_releases_the_fixed_allocation_principal_as_a_bullet()
             trust(card(charge_off), revolving_end),
             WaterfallRules {
                 controlled_accumulation: Some(ControlledAccumulationSpec {
-                    start_date: revolving_end,
+                    start: revolving_end,
                     bullet_date,
                 }),
                 ..no_rules()
@@ -417,7 +417,7 @@ fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
         trust(spec, revolving_end),
         WaterfallRules {
             controlled_accumulation: Some(ControlledAccumulationSpec {
-                start_date: revolving_end,
+                start: revolving_end,
                 bullet_date,
             }),
             ..no_rules()
@@ -451,7 +451,7 @@ fn fixed_allocation_pct_applies_to_the_level_trust_receivables() {
         floating,
         WaterfallRules {
             controlled_accumulation: Some(ControlledAccumulationSpec {
-                start_date: revolving_end,
+                start: revolving_end,
                 bullet_date,
             }),
             ..no_rules()

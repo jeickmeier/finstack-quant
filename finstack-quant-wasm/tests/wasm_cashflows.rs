@@ -14,7 +14,7 @@ fn cashflow_spec_json() -> String {
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none",
         },
-        "issue": "2024-08-31",
+        "issue_date": "2024-08-31",
         "maturity": "2025-08-31",
         "coupon_program": [{
             "kind": "fixed",
@@ -53,7 +53,7 @@ fn floating_cashflow_spec_json() -> String {
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none",
         },
-        "issue": "2025-01-15",
+        "issue_date": "2025-01-15",
         "maturity": "2026-01-15",
         "coupon_program": [{
             "kind": "floating",
@@ -93,7 +93,7 @@ fn step_up_cashflow_spec_json() -> String {
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none",
         },
-        "issue": "2024-01-01",
+        "issue_date": "2024-01-01",
         "maturity": "2026-01-01",
         "coupon_program": [{
             "kind": "step_up",
@@ -160,7 +160,7 @@ fn canonical_program_spec_json(
             "initial": {"amount": "1000000", "currency": "USD"},
             "amort": "none",
         },
-        "issue": "2025-01-01",
+        "issue_date": "2025-01-01",
         "maturity": "2027-01-01",
         "coupon_program": coupon_program,
         "payment_program": payment_program,

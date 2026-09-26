@@ -682,11 +682,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Holiday calendar identifier",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Holiday calendar identifier"
         },
         "coupon_bp": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",

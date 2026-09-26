@@ -90,7 +90,7 @@ def pool_deal(
 
 def _with_calendar(envelope: dict[str, object]) -> dict[str, object]:
     spec = envelope["instrument"]["spec"]
-    spec["payment_calendar_id"] = "nyse"
+    spec["calendar_id"] = "nyse"
     spec["prepayment_spec"] = {"cpr": 0.0, "curve": None}
     spec["default_spec"] = {"cdr": 0.0, "curve": None}
     return envelope
@@ -226,7 +226,7 @@ def test_stochastic_pool_reports_draws_and_the_option_cost_by_tranche() -> None:
 
 def test_reinvestment_period_round_trips_but_is_rejected_for_instrument_collateral() -> None:
     period = {
-        "end_date": "2028-01-15",
+        "end": "2028-01-15",
         "is_active": True,
         "criteria": {"max_price_pct": 100.0, "min_yield": 0.0},
         "amortizing_tranches": ["A"],
@@ -245,4 +245,4 @@ def test_reinvestment_period_round_trips_but_is_rejected_for_instrument_collater
     with pytest.raises(ValueError, match="reinvestment_period is not supported for instrument collateral"):
         StructuredCredit.new_clo("POOL-DEAL", pool, tranches(48_600_000.0, 5_400_000.0), AS_OF, MATURITY, "USD-OIS")
     with pytest.raises(ValueError, match="reinvestment_period"):
-        AssetPool("P", "clo", Currency("USD")).with_reinvestment_period({"end_date": "2028-01-15"})
+        AssetPool("P", "clo", Currency("USD")).with_reinvestment_period({"end": "2028-01-15"})

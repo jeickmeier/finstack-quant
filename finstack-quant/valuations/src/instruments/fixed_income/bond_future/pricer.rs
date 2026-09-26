@@ -132,7 +132,7 @@ impl BondFuturePricer {
         let redemption_date = bond
             .call_put
             .as_ref()
-            .and_then(|cp| cp.calls.iter().map(|c| c.start_date).min())
+            .and_then(|cp| cp.calls.iter().map(|c| c.start).min())
             .unwrap_or(bond.maturity);
         if redemption_date <= month_start {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -342,7 +342,7 @@ impl BondFuturePricer {
     /// against its entry price, following the listed-future lifecycle in
     /// `future.terms`: live contracts mark to `terms.terms.entry_price` when
     /// supplied and otherwise to the CTD model price
-    /// ([`Self::fair_price_for_future`]); after `terms.last_trading_date` the
+    /// (`fair_price_for_future`); after `terms.last_trading_date` the
     /// official `terms.settlement_price` is required; after
     /// `terms.settlement_date` the value is zero.
     ///

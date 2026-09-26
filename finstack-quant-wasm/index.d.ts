@@ -4915,7 +4915,7 @@ export declare const margin: MarginNamespace;
  * await init();
  * const spec = JSON.stringify({
  *   notional: { initial: { amount: "1000000", currency: "USD" }, amort: "none" },
- *   issue: "2026-01-02",
+ *   issue_date: "2026-01-02",
  *   maturity: "2027-01-02",
  *   coupon_program: [{
  *     kind: "fixed",
@@ -5256,7 +5256,7 @@ export interface BondConstructor {
    * @param id - Unique instrument identifier.
    * @param notional - Principal amount of the bond.
    * @param couponRate - Annual coupon rate.
-   * @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
    * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
    * @param stub - Stub policy: `none`, `short_front`, `short_back`, `long_front`, or `long_back`.
    * @param discountCurveId - Discount curve identifier used for pricing.
@@ -5267,7 +5267,7 @@ export interface BondConstructor {
     id: string,
     notional: Money,
     couponRate: Rate,
-    issue: string,
+    issueDate: string,
     maturity: string,
     stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back',
     discountCurveId: string
@@ -5278,7 +5278,7 @@ export interface BondConstructor {
    * @param notional - Principal amount of the bond.
    * @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
    * @param spreadBp - Spread over the index in whole basis points (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp margins, which preserves the exact decimal spread).
-   * @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
    * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
    * @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
    * @param dayCount - Day count convention (e.g. `DayCount.act360()`).
@@ -5291,7 +5291,7 @@ export interface BondConstructor {
     notional: Money,
     forwardCurveId: string,
     spreadBp: Bps,
-    issue: string,
+    issueDate: string,
     maturity: string,
     frequency: Tenor,
     dayCount: DayCount,

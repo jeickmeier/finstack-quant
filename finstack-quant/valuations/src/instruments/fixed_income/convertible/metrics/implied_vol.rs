@@ -188,7 +188,7 @@ mod tests {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 

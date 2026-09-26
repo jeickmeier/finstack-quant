@@ -164,7 +164,7 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
                 business_day_convention,
                 "business_day_convention",
             )?,
-            calendar_id,
+            calendar_id: calendar_id.map(Into::into),
             stub: stub_kind_from_py(stub, "stub")?,
             start: extract_date(start)?,
             end: extract_date(end)?,
@@ -261,7 +261,7 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
     /// Payment calendar identifier, or ``None``.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Stub rule.
@@ -482,10 +482,10 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
                 business_day_convention,
                 "business_day_convention",
             )?,
-            calendar_id,
+            calendar_id: calendar_id.map(Into::into),
             stub: stub_kind_from_py(stub, "stub")?,
             reset_lag_days,
-            fixing_calendar_id,
+            fixing_calendar_id: fixing_calendar_id.map(Into::into),
             start: extract_date(start)?,
             end: extract_date(end)?,
             compounding,
@@ -584,7 +584,7 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
     /// Payment calendar identifier, or ``None``.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Stub rule.
@@ -602,7 +602,10 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
     /// Fixing calendar identifier, or ``None``.
     #[getter]
     fn fixing_calendar_id(&self) -> Option<String> {
-        self.inner.fixing_calendar_id.clone()
+        self.inner
+            .fixing_calendar_id
+            .as_ref()
+            .map(ToString::to_string)
     }
 
     /// Accrual start date.
@@ -774,7 +777,7 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
                 business_day_convention,
                 "business_day_convention",
             )?,
-            calendar_id,
+            calendar_id: calendar_id.map(Into::into),
             day_count: day_count.inner,
             coupon_bp: decimal_from_f64(coupon_bp, "coupon_bp")?,
             discount_curve_id: finstack_quant_core::types::CurveId::new(
@@ -872,7 +875,7 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
     /// Payment calendar identifier, or ``None``.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Accrual day-count convention.

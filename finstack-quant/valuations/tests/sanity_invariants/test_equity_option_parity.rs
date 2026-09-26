@@ -94,7 +94,7 @@ fn create_option(expiry: Date, option_type: OptionType) -> EquityOption {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Attributes::new(),
     }
 }

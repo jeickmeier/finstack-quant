@@ -46,9 +46,9 @@ pub(crate) fn compute_pv(
             }
         }
         ExerciseStyle::Bermudan => {
-            let schedule = inst.exercise_schedule.as_ref().ok_or_else(|| {
+            let schedule = inst.exercise_dates.as_ref().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
-                    "Bermudan equity option requires exercise_schedule".to_string(),
+                    "Bermudan equity option requires exercise_dates".to_string(),
                 )
             })?;
             let steps = inst
@@ -261,9 +261,9 @@ pub(crate) fn compute_greeks(
             )
         }
         ExerciseStyle::Bermudan => {
-            let schedule = inst.exercise_schedule.as_ref().ok_or_else(|| {
+            let schedule = inst.exercise_dates.as_ref().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
-                    "Bermudan equity option requires exercise_schedule".to_string(),
+                    "Bermudan equity option requires exercise_dates".to_string(),
                 )
             })?;
             let steps = inst

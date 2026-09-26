@@ -104,7 +104,7 @@ fn clo(adjust: impl FnOnce(&mut DealFees)) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-FEES", pool, tranches, close, maturity, "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
             .with_standard_fees();
     let mut fees = deal.fees.take().expect("standard fees");
     adjust(&mut fees);
@@ -358,7 +358,7 @@ fn incentive_fee_shares_principal_proceeds_above_the_hurdle() {
     revolving.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
     revolving.pool.reinvestment_period = Some(
         finstack_quant_valuations::instruments::fixed_income::structured_credit::ReinvestmentPeriod {
-            end_date: d(2028, 1, 1),
+            end: d(2028, 1, 1),
             is_active: true,
             criteria: Default::default(),
             amortizing_tranches: Vec::new(),

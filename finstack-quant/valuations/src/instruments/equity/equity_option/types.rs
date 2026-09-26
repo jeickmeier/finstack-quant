@@ -242,7 +242,7 @@ pub struct EquityOption {
         feature = "json-schema",
         schemars(with = "Option<Vec<finstack_quant_core::wire::DateWire>>")
     )]
-    pub exercise_schedule: Option<Vec<Date>>,
+    pub exercise_dates: Option<Vec<Date>>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -350,12 +350,12 @@ impl EquityOption {
                 ExerciseStyle::Bermudan
                     if exercise.exercised
                         && self
-                            .exercise_schedule
+                            .exercise_dates
                             .as_ref()
                             .is_none_or(|dates| !dates.contains(&exercise.date)) =>
                 {
                     return Err(finstack_quant_core::Error::Validation(
-                        "Bermudan equity option exercise date is not in exercise_schedule".into(),
+                        "Bermudan equity option exercise date is not in exercise_dates".into(),
                     ));
                 }
                 _ => {}
@@ -470,7 +470,7 @@ impl EquityOption {
             vol_surface_id,
             div_yield_id: underlying_params.div_yield_id.clone(),
             discrete_dividends: Vec::new(),
-            exercise_schedule: None,
+            exercise_dates: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -1207,7 +1207,7 @@ mod tests {
             option.option_type = OptionType::Put;
             option.exercise_style = style;
             option.day_count = DayCount::Act360;
-            option.exercise_schedule = Some(vec![date(2025, 7, 3), expiry]);
+            option.exercise_dates = Some(vec![date(2025, 7, 3), expiry]);
             option.discrete_dividends = vec![(date(2025, 4, 3), 2.0)];
             option.instrument_pricing_overrides =
                 InstrumentPricingOverrides::default().with_implied_vol(0.45);

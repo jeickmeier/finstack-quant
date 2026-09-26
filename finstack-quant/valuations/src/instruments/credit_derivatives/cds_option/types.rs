@@ -111,7 +111,7 @@ pub struct CDSOption {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub cds_maturity: Date,
+    pub underlying_maturity: Date,
     /// Notional amount
     pub notional: Money,
     /// Settlement type
@@ -149,9 +149,9 @@ pub struct CDSOption {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     #[builder(default)]
-    pub underlying_effective_date: Option<Date>,
+    pub underlying_start_date: Option<Date>,
     /// Convention used to select the synthetic underlying CDS accrual start
-    /// when `underlying_effective_date` is not explicitly supplied.
+    /// when `underlying_start_date` is not explicitly supplied.
     #[serde(default)]
     #[builder(default)]
     pub protection_start_convention: ProtectionStartConvention,
@@ -283,7 +283,7 @@ impl CDSOption {
         super::parameters::validate_common_terms(
             &self.strike,
             self.expiry,
-            self.cds_maturity,
+            self.underlying_maturity,
             self.index_factor,
         )?;
         self.validate_strike_state()?;
@@ -306,18 +306,18 @@ impl CDSOption {
                     "exercise_settlement_date ({exercise_settlement}) must be on or after legal expiry ({})", self.expiry,
                 )));
             }
-            if exercise_settlement >= self.cds_maturity {
+            if exercise_settlement >= self.underlying_maturity {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "exercise_settlement_date ({}) must be before CDS maturity ({})",
-                    exercise_settlement, self.cds_maturity
+                    exercise_settlement, self.underlying_maturity
                 )));
             }
         }
-        if let Some(underlying_effective_date) = self.underlying_effective_date {
-            if underlying_effective_date >= self.cds_maturity {
+        if let Some(underlying_start_date) = self.underlying_start_date {
+            if underlying_start_date >= self.underlying_maturity {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "underlying_effective_date ({}) must be before CDS maturity ({})",
-                    underlying_effective_date, self.cds_maturity
+                    "underlying_start_date ({}) must be before CDS maturity ({})",
+                    underlying_start_date, self.underlying_maturity
                 )));
             }
         }
@@ -492,12 +492,12 @@ impl CDSOption {
             option_type: option_params.option_type,
             exercise_style: ExerciseStyle::European,
             expiry: option_params.expiry,
-            cds_maturity: option_params.cds_maturity,
+            underlying_maturity: option_params.underlying_maturity,
             notional: option_params.notional,
             settlement: option_params.settlement,
             premium_settlement_date: None,
             exercise_settlement_date: None,
-            underlying_effective_date: None,
+            underlying_start_date: None,
             protection_start_convention: option_params.protection_start_convention,
             knockout: false,
             recovery_rate: credit_params.recovery_rate,
@@ -576,13 +576,13 @@ impl CDSOption {
     }
 
     /// Effective accrual-start date for the synthetic underlying CDS. When
-    /// the user specifies `underlying_effective_date` explicitly we honour
+    /// the user specifies `underlying_start_date` explicitly we honour
     /// it (e.g. Bloomberg CDSW screen value). Otherwise the typed protection
     /// convention selects either standard spot-protection accrual from the
     /// prior CDS roll relative to valuation date, or forward accrual from
     /// legal option expiry.
     pub(crate) fn effective_underlying_effective_date(&self, as_of: Date) -> Date {
-        if let Some(date) = self.underlying_effective_date {
+        if let Some(date) = self.underlying_start_date {
             return date;
         }
         match self.protection_start_convention {
@@ -781,7 +781,7 @@ mod tests {
             date!(2026 - 05 - 07)
         );
 
-        // No explicit underlying_effective_date → default Spot convention uses
+        // No explicit underlying_start_date → default Spot convention uses
         // the standard prior CDS roll relative to valuation date.
         assert_eq!(
             option.effective_underlying_effective_date(as_of),

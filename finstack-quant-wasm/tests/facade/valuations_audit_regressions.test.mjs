@@ -348,7 +348,7 @@ test('equity LR prices and implied volatility match independent QuantLib cases',
   for (const row of oracle.cases.filter((row) => row.style !== 'european')) {
     spec.option_type = row.side;
     spec.exercise_style = row.style;
-    spec.exercise_schedule = oracle.exercise_days.map((days) =>
+    spec.exercise_dates = oracle.exercise_days.map((days) =>
       new Date(Date.parse(fixture.as_of) + days * 86400000).toISOString().slice(0, 10)
     );
     spec.instrument_pricing_overrides = {

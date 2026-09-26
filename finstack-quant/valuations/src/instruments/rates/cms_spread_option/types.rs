@@ -78,7 +78,7 @@ pub struct CmsSpreadOption {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub expiry_date: Date,
+    pub expiry: Date,
     /// Payment date (may differ from expiry).
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -184,10 +184,10 @@ impl CmsSpreadOption {
 
         self.strike_rate()?;
 
-        validation::require_with(self.payment_date >= self.expiry_date, || {
+        validation::require_with(self.payment_date >= self.expiry, || {
             format!(
-                "CmsSpreadOption payment_date ({}) must be on or after expiry_date ({})",
-                self.payment_date, self.expiry_date
+                "CmsSpreadOption payment_date ({}) must be on or after expiry ({})",
+                self.payment_date, self.expiry
             )
         })?;
 
@@ -231,7 +231,7 @@ impl CmsSpreadOption {
             strike: Decimal::new(5, 3), // 50bp
             option_type: CmsSpreadOptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
-            expiry_date: Date::from_calendar_date(2027, Month::March, 29).expect("valid"),
+            expiry: Date::from_calendar_date(2027, Month::March, 29).expect("valid"),
             payment_date: Date::from_calendar_date(2027, Month::March, 31).expect("valid"),
             long_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-10Y"),
             short_vol_surface_id: CurveId::new("USD-SWAPTION-VOL-2Y"),
@@ -326,7 +326,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSpreadOption {
     }
 
     fn effective_start_date(&self) -> Option<Date> {
-        Some(self.expiry_date)
+        Some(self.expiry)
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -458,7 +458,7 @@ mod tests {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.030);
         let mut opt = CmsSpreadOption::example();
-        opt.expiry_date = date(2026, Month::January, 1);
+        opt.expiry = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
         opt.strike = Decimal::new(5, 3);
         opt.correlation = 0.50;
@@ -475,7 +475,7 @@ mod tests {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.035);
         let mut low_corr = CmsSpreadOption::example();
-        low_corr.expiry_date = date(2026, Month::January, 1);
+        low_corr.expiry = date(2026, Month::January, 1);
         low_corr.payment_date = date(2026, Month::January, 5);
         low_corr.strike = Decimal::new(10, 3);
         low_corr.correlation = 0.0;
@@ -493,7 +493,7 @@ mod tests {
     fn higher_sabr_volatility_increases_option_value() {
         let as_of = date(2025, Month::January, 1);
         let mut opt = CmsSpreadOption::example();
-        opt.expiry_date = date(2026, Month::January, 1);
+        opt.expiry = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
         opt.strike = Decimal::new(10, 3);
         opt.correlation = 0.50;
@@ -576,7 +576,7 @@ mod tests {
         let market = market(as_of, 0.035);
 
         let mut usd = CmsSpreadOption::example();
-        usd.expiry_date = date(2026, Month::January, 1);
+        usd.expiry = date(2026, Month::January, 1);
         usd.payment_date = date(2026, Month::January, 5);
         usd.strike = Decimal::ZERO;
         usd.correlation = 0.50;

@@ -27,7 +27,7 @@ fn facility(maturity: Date) -> RevolvingCredit {
         .id("RCF-WAC".into())
         .commitment_amount(Money::new(50_000_000.0, Currency::USD).expect("money"))
         .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("money"))
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(floating_spec()))
         .day_count(DayCount::Act360)

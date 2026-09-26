@@ -503,9 +503,7 @@ fn build_schedule(
         }
     }
 
-    let eligible_call_dates = inst
-        .call_provision
-        .eligible_call_dates(&range.observation_dates);
+    let eligible_call_dates = inst.call_provision.eligible_call_dates();
     for &date in &eligible_call_dates {
         if date > as_of {
             event_dates.entry(date).or_default();
@@ -616,7 +614,7 @@ mod tests {
 
     fn test_callable(
         call_dates: Vec<Date>,
-        lockout_periods: usize,
+        lockout_end: Option<Date>,
         coupon_rate: f64,
     ) -> CallableRangeAccrual {
         let observation_dates = vec![
@@ -636,7 +634,7 @@ mod tests {
                 .notional(Money::from((1_000_000_i64, Currency::USD)))
                 .day_count(DayCount::Act365F)
                 .discount_curve_id(CurveId::new("USD-OIS"))
-                .accrual_start_date(date(2025, Month::January, 1))
+                .start_date(date(2025, Month::January, 1))
                 .index_id_opt(Some("SOFR".into()))
                 .forward_curve_id_opt(Some(CurveId::new("USD-OIS")))
                 .index_tenor_opt(Some(
@@ -654,7 +652,7 @@ mod tests {
                 .total_past_observations_opt(None)
                 .build()
                 .expect("range accrual"),
-            call_provision: BermudanCallProvision::new(call_dates, 100.0, lockout_periods),
+            call_provision: BermudanCallProvision::new(call_dates, 100.0, lockout_end),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
@@ -701,7 +699,7 @@ mod tests {
         let curves = market(as_of, 0.02, 0.03);
         // One mid-life call date, no lockout, rich coupon so the issuer call
         // is genuinely in play and the regression drives exercise decisions.
-        let inst = test_callable(vec![date(2025, Month::July, 1)], 0, 0.06);
+        let inst = test_callable(vec![date(2025, Month::July, 1)], None, 0.06);
 
         let pricer_for_degree = |degree: usize| {
             CallableRangeAccrualPricer::with_hw_params(
@@ -747,7 +745,7 @@ mod tests {
     fn rate_exotic_default_pv_unchanged() {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
-        let inst = test_callable(vec![date(2025, Month::July, 1)], 0, 0.06);
+        let inst = test_callable(vec![date(2025, Month::July, 1)], None, 0.06);
         let estimate = CallableRangeAccrualPricer::with_hw_params(
             HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw params"),
         )
@@ -770,7 +768,7 @@ mod tests {
     fn bermudan_call_pct_of_par_is_pv_bit_identical() {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
-        let mut inst = test_callable(vec![date(2025, Month::July, 1)], 0, 0.06);
+        let mut inst = test_callable(vec![date(2025, Month::July, 1)], None, 0.06);
         inst.call_provision.price_pct_of_par = 102.0;
         let pricer = || {
             CallableRangeAccrualPricer::with_hw_params(
@@ -784,7 +782,7 @@ mod tests {
             .amount();
         let at_par = pricer()
             .price_estimate(
-                &test_callable(vec![date(2025, Month::July, 1)], 0, 0.06),
+                &test_callable(vec![date(2025, Month::July, 1)], None, 0.06),
                 &curves,
                 as_of,
             )
@@ -802,7 +800,11 @@ mod tests {
     fn implied_volatility_is_not_used_as_hw1f_sigma() {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
-        let no_iv = test_callable(vec![date(2025, Month::July, 1)], 10, 0.06);
+        let no_iv = test_callable(
+            vec![date(2025, Month::July, 1)],
+            Some(date(2030, Month::January, 1)),
+            0.06,
+        );
         let mut with_iv = no_iv.clone();
         with_iv
             .instrument_pricing_overrides
@@ -832,7 +834,11 @@ mod tests {
         let curves = market(as_of, 0.02, 0.03);
         // Lockout of 10 periods makes the single call date ineligible, so the note
         // is never called and prices as a bullet: coupon + principal redemption.
-        let inst = test_callable(vec![date(2025, Month::July, 1)], 10, 0.06);
+        let inst = test_callable(
+            vec![date(2025, Month::July, 1)],
+            Some(date(2030, Month::January, 1)),
+            0.06,
+        );
         let maturity = *inst
             .range_accrual
             .observation_dates
@@ -868,9 +874,9 @@ mod tests {
         let curves = market(as_of, 0.02, 0.03);
         let call_date = date(2025, Month::July, 1);
         // Callable: one eligible call date (no lockout) at a realistic 6% coupon.
-        let callable = test_callable(vec![call_date], 0, 0.06);
+        let callable = test_callable(vec![call_date], None, 0.06);
         // Bullet: the same note but the call is locked out, so it never fires.
-        let bullet = test_callable(vec![call_date], 10, 0.06);
+        let bullet = test_callable(vec![call_date], Some(date(2030, Month::January, 1)), 0.06);
 
         let callable_pv = deterministic_pricer(8)
             .price_estimate(&callable, &curves, as_of)
@@ -898,7 +904,7 @@ mod tests {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
         let call_date = date(2025, Month::July, 1);
-        let inst = test_callable(vec![call_date], 0, 2.0);
+        let inst = test_callable(vec![call_date], None, 2.0);
         let call_df = curves
             .get_discount("USD-OIS")
             .expect("discount")
@@ -917,7 +923,11 @@ mod tests {
     fn price_dyn_returns_mc_measures() {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
-        let inst = test_callable(vec![date(2025, Month::July, 1)], 10, 0.06);
+        let inst = test_callable(
+            vec![date(2025, Month::July, 1)],
+            Some(date(2030, Month::January, 1)),
+            0.06,
+        );
         let result = deterministic_pricer(8)
             .price_dyn(&inst, &curves, as_of)
             .expect("price");

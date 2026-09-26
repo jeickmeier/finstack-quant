@@ -1558,18 +1558,18 @@
         "call_put": {
           "calls": [
             {
-              "start_date": "2028-04-15",
-              "end_date": "2029-04-15",
+              "start": "2028-04-15",
+              "end": "2029-04-15",
               "price_pct_of_par": 105.0
             },
             {
-              "start_date": "2029-04-15",
-              "end_date": "2030-04-15",
+              "start": "2029-04-15",
+              "end": "2030-04-15",
               "price_pct_of_par": 102.5
             },
             {
-              "start_date": "2030-04-15",
-              "end_date": "2032-04-15",
+              "start": "2030-04-15",
+              "end": "2032-04-15",
               "price_pct_of_par": 100.0
             }
           ],

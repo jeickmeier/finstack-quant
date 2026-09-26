@@ -117,9 +117,9 @@ impl PyInterestRateSwap {
     ///     ``"pay"`` pays fixed / receives floating.
     /// fixed_rate : float | Rate
     ///     Fixed coupon as a decimal (``0.03`` = 3%) or a ``Rate``.
-    /// start : datetime.date | datetime.datetime | pandas.Timestamp | str
+    /// start_date : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Effective date.
-    /// end : datetime.date | datetime.datetime | pandas.Timestamp | str
+    /// maturity : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Maturity date.
     /// index_id : str
     ///     Registered rate index (e.g. ``"USD-SOFR"``, ``"USD-SOFR-3M"``,
@@ -155,9 +155,9 @@ impl PyInterestRateSwap {
     /// >>> swap.float.reset_lag_days
     /// 0
     #[staticmethod]
-    #[pyo3(signature = (id, notional, side, fixed_rate, start, end, index_id, discount_curve_id, forward_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, side, fixed_rate, start, end, index_id, discount_curve_id, forward_curve_id, *, currency=None)"
+        text_signature = "(id, notional, side, fixed_rate, start_date, maturity, index_id, discount_curve_id, forward_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
@@ -166,8 +166,8 @@ impl PyInterestRateSwap {
         notional: &Bound<'_, PyAny>,
         side: &str,
         fixed_rate: &Bound<'_, PyAny>,
-        start: &Bound<'_, PyAny>,
-        end: &Bound<'_, PyAny>,
+        start_date: &Bound<'_, PyAny>,
+        maturity: &Bound<'_, PyAny>,
         index_id: &str,
         discount_curve_id: &str,
         forward_curve_id: &str,
@@ -178,8 +178,8 @@ impl PyInterestRateSwap {
             notional: money_from_py(notional, currency, "notional")?,
             side: enum_from_str(side, "side")?,
             fixed_rate: rate_decimal_from_py(fixed_rate, "fixed_rate")?,
-            start: extract_date(start)?,
-            end: extract_date(end)?,
+            start_date: extract_date(start_date)?,
+            maturity: extract_date(maturity)?,
             index_id,
             discount_curve_id,
             forward_curve_id,
@@ -707,8 +707,8 @@ impl PyInterestRateSwapBuilder {
 ///
 /// Construct via ``Swaption.builder()``, ``Swaption.example()`` /
 /// ``Swaption.example_bermudan()`` or ``Swaption.from_json``. Every public
-/// Rust field is readable as a property; ``get_strike`` / ``get_swap_start``
-/// / ``get_swap_end`` / ``forward_swap_rate`` mirror the Rust accessors and
+/// Rust field is readable as a property; ``get_strike`` / ``get_underlying_start_date``
+/// / ``get_underlying_maturity`` / ``forward_swap_rate`` mirror the Rust accessors and
 /// ``price`` / ``metric`` run the same pricer as ``price_instrument``.
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
@@ -1002,16 +1002,16 @@ impl PySwaption {
         decimal_f64(self.inner.get_strike())
     }
 
-    /// Effective date of the underlying swap (mirrors Rust ``get_swap_start``).
+    /// Effective date of the underlying swap (mirrors Rust ``get_underlying_start_date``).
     #[pyo3(text_signature = "($self)")]
-    fn get_swap_start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.get_swap_start())
+    fn get_underlying_start_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.get_underlying_start_date())
     }
 
-    /// Maturity of the underlying swap (mirrors Rust ``get_swap_end``).
+    /// Maturity of the underlying swap (mirrors Rust ``get_underlying_maturity``).
     #[pyo3(text_signature = "($self)")]
-    fn get_swap_end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.get_swap_end())
+    fn get_underlying_maturity<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.get_underlying_maturity())
     }
 
     /// Instrument identifier.
@@ -1117,14 +1117,14 @@ impl PySwaption {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "Swaption(id={:?}, option_type={:?}, notional={}, expiry={}, strike={}, swap_start={}, swap_end={}, vol_surface_id={:?})",
+            "Swaption(id={:?}, option_type={:?}, notional={}, expiry={}, strike={}, underlying_start_date={}, underlying_maturity={}, vol_surface_id={:?})",
             self.inner.id.as_str(),
             enum_to_py_string(&self.inner.option_type).unwrap_or_default(),
             money_repr(self.inner.notional),
             self.inner.expiry,
             self.inner.get_strike(),
-            self.inner.get_swap_start(),
-            self.inner.get_swap_end(),
+            self.inner.get_underlying_start_date(),
+            self.inner.get_underlying_maturity(),
             self.inner.vol_surface_id.as_str(),
         )
     }

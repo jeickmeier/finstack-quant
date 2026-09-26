@@ -95,7 +95,7 @@ fn m2_lsmc_partial_coupon_and_spread_match_cashflows() {
     let as_of = date!(2025 - 01 - 01);
     let exercise = date!(2026 - 04 - 01);
     let mut swaption = BermudanSwaption::example();
-    swaption.bermudan_schedule.exercise_dates = vec![exercise];
+    swaption.exercise_schedule.exercise_dates = vec![exercise];
     let fixed = &mut swaption.underlying_fixed_leg;
     fixed.start = date!(2026 - 01 - 01);
     fixed.end = date!(2028 - 01 - 01);

@@ -22,7 +22,7 @@ pub(crate) struct OidEirAmortizationCalculator;
 impl MetricCalculator for OidEirAmortizationCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let facility: &RevolvingCredit = context.instrument_as()?;
-        let origination = facility.commitment_date;
+        let origination = facility.issue_date;
         let schedule = facility.raw_cashflow_schedule(&context.curves, origination)?;
         let spec = facility.oid_eir.clone().unwrap_or_default();
         let mut extra = Vec::new();

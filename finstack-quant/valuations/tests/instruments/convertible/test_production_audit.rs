@@ -41,8 +41,8 @@ fn production_convertible_clean_call_includes_accrued() {
     bond.conversion.ratio = Some(0.001);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: as_of,
-            end_date: as_of + time::Duration::days(1),
+            start: as_of,
+            end: as_of + time::Duration::days(1),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -73,8 +73,8 @@ fn production_convertible_clean_put_includes_accrued() {
     bond.call_put = Some(CallPutSchedule {
         calls: vec![],
         puts: vec![CallPut {
-            start_date: as_of,
-            end_date: as_of + time::Duration::days(1),
+            start: as_of,
+            end: as_of + time::Duration::days(1),
             price_pct_of_par: 120.0,
             make_whole: None,
         }],
@@ -103,8 +103,8 @@ fn production_convertible_discrete_call_on_valuation_date_is_exercisable() {
     bond.conversion.ratio = Some(0.001);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: as_of,
-            end_date: as_of,
+            start: as_of,
+            end: as_of,
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -125,8 +125,8 @@ fn production_convertible_coupon_date_call_does_not_duplicate_coupon() {
     bond.conversion.ratio = Some(0.001);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2025 - 07 - 01),
-            end_date: date!(2025 - 07 - 01),
+            start: date!(2025 - 07 - 01),
+            end: date!(2025 - 07 - 01),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -165,8 +165,8 @@ fn production_convertible_make_whole_reference_and_floor_pay_accrued_once() {
     bond.conversion.ratio = Some(0.001);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: as_of,
-            end_date: as_of,
+            start: as_of,
+            end: as_of,
             price_pct_of_par: 100.0,
             make_whole: Some(MakeWholeSpec {
                 reference_curve_id: "REFERENCE".into(),

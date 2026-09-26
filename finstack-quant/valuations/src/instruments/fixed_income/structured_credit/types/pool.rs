@@ -439,7 +439,7 @@ pub struct ReinvestmentPeriod {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub end_date: Date,
+    pub end: Date,
     /// Whether reinvestment is currently active.
     pub is_active: bool,
     /// Eligibility criteria for purchases.

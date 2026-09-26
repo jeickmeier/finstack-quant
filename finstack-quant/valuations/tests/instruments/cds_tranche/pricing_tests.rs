@@ -113,7 +113,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
         TrancheSide::SellProtection,
     )
     .expect("bespoke tranche");
-    explicit.effective_date = Some(date!(2024 - 11 - 15));
+    explicit.start_date = Some(date!(2024 - 11 - 15));
 
     let accrued_explicit = explicit
         .accrued_premium(&market, as_of)
@@ -121,7 +121,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
     assert!(accrued_explicit > 0.0);
 
     let mut missing_effective = explicit;
-    missing_effective.effective_date = None;
+    missing_effective.start_date = None;
 
     let err = missing_effective
         .accrued_premium(&market, as_of)

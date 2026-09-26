@@ -368,10 +368,10 @@ impl InflationLinkedBond {
             real_coupon: bond_params.real_coupon,
             frequency: bond_params.frequency,
             day_count: bond_params.day_count,
-            issue_date: bond_params.issue,
+            issue_date: bond_params.issue_date,
             maturity: bond_params.maturity,
             base_cpi: bond_params.base_cpi,
-            base_date: bond_params.issue,
+            base_date: bond_params.issue_date,
             indexation_method: IndexationMethod::Tips,
             lag: IndexationMethod::Tips.standard_lag(),
             deflation_protection: DeflationProtection::MaturityOnly,
@@ -426,7 +426,7 @@ impl InflationLinkedBond {
     ///     real_coupon: Decimal::try_from(0.025).unwrap(),
     ///     frequency: Tenor::semi_annual(),
     ///     day_count: DayCount::ActActIsma,
-    ///     issue: date!(1999-07-26),  // Pre-2005 issue
+    ///     issue_date: date!(1999-07-26),  // Pre-2005 issue
     ///     maturity: date!(2020-07-26),
     ///     base_cpi: 162.9,
     /// };
@@ -461,7 +461,7 @@ impl InflationLinkedBond {
             real_coupon: bond_params.real_coupon,
             frequency: bond_params.frequency,
             day_count: bond_params.day_count,
-            issue_date: bond_params.issue,
+            issue_date: bond_params.issue_date,
             maturity: bond_params.maturity,
             base_cpi: bond_params.base_cpi,
             base_date,

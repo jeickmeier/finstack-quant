@@ -141,10 +141,10 @@ fn test_standard_tranche_derives_contractual_effective_date_for_seasoned_trade()
         TrancheSide::SellProtection,
     )
     .expect("standard tranche");
-    explicit.effective_date = Some(date!(2024 - 12 - 20));
+    explicit.start_date = Some(date!(2024 - 12 - 20));
 
     let mut derived = explicit.clone();
-    derived.effective_date = None;
+    derived.start_date = None;
 
     let explicit_pv = pricer
         .price_tranche(&explicit, &market, as_of)

@@ -27,7 +27,7 @@ fn test_call_constructor() {
 
     assert_eq!(params.strike.spread_decimal(), Some(Decimal::new(1, 2))); // 0.01 = 100bp
     assert_eq!(params.expiry, expiry);
-    assert_eq!(params.cds_maturity, maturity);
+    assert_eq!(params.underlying_maturity, maturity);
     assert_eq!(params.notional.amount(), 10_000_000.0);
     assert_eq!(params.notional.currency(), Currency::USD);
     assert!(matches!(params.option_type, OptionType::Call));

@@ -99,7 +99,7 @@ proptest! {
             .id("TEST".into())
             .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
             .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
-            .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
+            .issue_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -132,7 +132,7 @@ proptest! {
             .id("TEST".into())
             .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
             .drawn_amount(Money::new(drawn, Currency::USD).expect("valid money fixture"))
-            .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
+            .issue_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -171,7 +171,7 @@ proptest! {
             .id("TEST".into())
             .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
             .drawn_amount(Money::new(initial_drawn, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -192,7 +192,7 @@ proptest! {
         // Calculate balance after draw
         use finstack_quant_valuations::instruments::fixed_income::revolving_credit::cashflow_engine::calculate_drawn_balance_at_date;
         let balance_after =
-            calculate_drawn_balance_at_date(&facility, facility.commitment_date, draw_date).unwrap();
+            calculate_drawn_balance_at_date(&facility, facility.issue_date, draw_date).unwrap();
 
         let expected_balance = initial_drawn + draw_amount;
 
@@ -216,7 +216,7 @@ proptest! {
             .id("TEST".into())
             .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .drawn_amount(Money::new(initial_drawn, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -254,7 +254,7 @@ proptest! {
             .id("TEST".into())
             .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
             .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -318,7 +318,7 @@ mod deterministic_tests {
             .id("ZERO".into())
             .commitment_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
             .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
-            .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
+            .issue_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)
@@ -339,7 +339,7 @@ mod deterministic_tests {
             .id("FULL".into())
             .commitment_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
             .drawn_amount(Money::new(commitment, Currency::USD).expect("valid money fixture"))
-            .commitment_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
+            .issue_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .maturity(Date::from_calendar_date(2026, Month::January, 1).unwrap())
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act360)

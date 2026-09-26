@@ -48,9 +48,9 @@ pub struct IrsLegConventions {
     /// Payment date business day convention.
     pub business_day_convention: BusinessDayConvention,
     /// Calendar id used for payment date adjustment on both legs.
-    pub payment_calendar_id: Option<String>,
+    pub payment_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Calendar id used for fixing/reset date adjustment.
-    pub fixing_calendar_id: Option<String>,
+    pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Stub handling.
     pub stub: StubKind,
     /// Reset lag in business days (start - reset_lag_days).
@@ -74,8 +74,8 @@ impl IrsLegConventions {
             fixed_day_count: conv.default_fixed_leg_day_count,
             float_day_count: conv.day_count,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            payment_calendar_id: Some(conv.market_calendar_id.clone()),
-            fixing_calendar_id: Some(conv.market_calendar_id.clone()),
+            payment_calendar_id: Some(conv.market_calendar_id.clone().into()),
+            fixing_calendar_id: Some(conv.market_calendar_id.clone().into()),
             stub: StubKind::ShortFront,
             reset_lag_days: conv.default_reset_lag_days,
             payment_lag_days: conv.default_payment_lag_days,
@@ -194,9 +194,9 @@ pub struct ConventionSwapParams<'a> {
     /// Fixed coupon rate (as a decimal, e.g. 0.03 = 3%).
     pub fixed_rate: f64,
     /// Effective (start) date.
-    pub start: Date,
+    pub start_date: Date,
     /// Maturity (end) date.
-    pub end: Date,
+    pub maturity: Date,
     /// Rate index identifier used to resolve conventions (e.g. `"USD-SOFR"`).
     pub index_id: &'a str,
     /// Discount curve identifier.
@@ -217,8 +217,8 @@ impl InterestRateSwap {
             notional,
             side,
             fixed_rate,
-            start,
-            end,
+            start_date: start,
+            maturity: end,
             index_id,
             discount_curve_id,
             forward_curve_id,
@@ -546,7 +546,7 @@ impl InterestRateSwap {
                 frequency: Tenor::semi_annual(),
                 day_count: DayCount::Thirty360,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: Some("usny".to_string()),
+                calendar_id: Some("usny".into()),
                 stub: StubKind::ShortFront,
                 start,
                 end,
@@ -562,10 +562,10 @@ impl InterestRateSwap {
                 frequency: Tenor::quarterly(),
                 day_count: DayCount::Act360,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: Some("usny".to_string()),
+                calendar_id: Some("usny".into()),
                 stub: StubKind::ShortFront,
                 reset_lag_days: 2,
-                fixing_calendar_id: Some("usny".to_string()),
+                fixing_calendar_id: Some("usny".into()),
                 start,
                 end,
                 compounding: Default::default(),
@@ -816,8 +816,8 @@ mod tests {
             notional: Money::from((1_000_000_i64, Currency::USD)),
             side: PayReceive::Pay,
             fixed_rate: 0.04,
-            start: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
-            end: Date::from_calendar_date(2030, time::Month::January, 13).expect("end"),
+            start_date: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
+            maturity: Date::from_calendar_date(2030, time::Month::January, 13).expect("end"),
             index_id: "USD-SOFR-OIS",
             discount_curve_id: "USD-OIS",
             forward_curve_id: "USD-SOFR-OIS",
@@ -836,8 +836,8 @@ mod tests {
             notional: Money::from((1_000_000_i64, Currency::USD)),
             side: PayReceive::Pay,
             fixed_rate: 0.04,
-            start: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
-            end: Date::from_calendar_date(2030, time::Month::January, 13).expect("end"),
+            start_date: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
+            maturity: Date::from_calendar_date(2030, time::Month::January, 13).expect("end"),
             index_id: "USD-SOFR-OIS",
             discount_curve_id: "USD-SOFR-OIS",
             forward_curve_id: "USD-SOFR-OIS",

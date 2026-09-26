@@ -607,7 +607,7 @@ mod tests {
             .id("RC-CASHFLOW-CREDIT".into())
             .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
             .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .commitment_date(as_of)
+            .issue_date(as_of)
             .maturity(maturity)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act365F)

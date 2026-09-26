@@ -2,7 +2,8 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "bermudan_schedule": {
+      "bermudan_type": "co_terminal",
+      "exercise_schedule": {
         "exercise_dates": [
           "2029-01-17",
           "2029-07-17",
@@ -24,7 +25,6 @@
         "lockout_end": null,
         "notice_days": 0
       },
-      "bermudan_type": "co_terminal",
       "id": "BERM-10NC2-USD",
       "notional": {
         "amount": "10000000",

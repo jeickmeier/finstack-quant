@@ -46,7 +46,7 @@ fn create_test_option(expiry: Date, strike: f64, option_type: OptionType) -> Equ
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     }
 }

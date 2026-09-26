@@ -42,7 +42,7 @@ impl Bond {
     /// * `id` - Unique identifier for the bond
     /// * `notional` - Principal amount of the bond
     /// * `coupon_rate` - Annual coupon rate as a typed `Rate`
-    /// * `issue` - Issue date of the bond
+    /// * `issue_date` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
     /// * `stub` - Stub placement for irregular coupon schedules
     /// * `discount_curve_id` - Discount curve identifier for pricing
@@ -115,13 +115,13 @@ impl Bond {
     ///
     /// // US Corporate bond (default)
     /// let notional = Money::from((1_000_000_i64, Currency::USD));
-    /// let issue = date!(2025-01-15);
+    /// let issue_date = date!(2025-01-15);
     /// let maturity = date!(2030-01-15);
     /// let corp_bond = Bond::fixed(
     ///     "CORP-001",
     ///     notional,
     ///     finstack_quant_core::types::Rate::from_percent(5.0).expect("valid rate fixture"),
-    ///     issue,
+    ///     issue_date,
     ///     maturity,
     ///     StubKind::None,
     ///     "USD-OIS",
@@ -131,7 +131,7 @@ impl Bond {
     ///
     /// // For US Treasury, use with_convention:
     /// // let treasury = Bond::with_convention("UST-001", notional,
-    /// //     finstack_quant_core::types::Rate::from_percent(4.0).expect("valid rate fixture"), issue, maturity,
+    /// //     finstack_quant_core::types::Rate::from_percent(4.0).expect("valid rate fixture"), issue_date, maturity,
     /// //                                       BondConvention::UsTreasury, "USD-TREASURY").unwrap();
     /// ```
     /// # Errors
@@ -141,7 +141,7 @@ impl Bond {
         id: impl Into<InstrumentId>,
         notional: Money,
         coupon_rate: impl Into<Rate>,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         stub: StubKind,
         discount_curve_id: impl Into<CurveId>,
@@ -150,7 +150,7 @@ impl Bond {
             id,
             notional,
             coupon_rate,
-            issue,
+            issue_date,
             maturity,
             crate::instruments::common_impl::parameters::BondConvention::UsCorporate,
             discount_curve_id,
@@ -170,7 +170,7 @@ impl Bond {
     /// * `id` - Unique identifier for the bond
     /// * `notional` - Principal amount of the bond
     /// * `coupon_rate` - Annual coupon rate as a typed `Rate`
-    /// * `issue` - Issue date of the bond
+    /// * `issue_date` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
     /// * `convention` - Regional bond convention (e.g., `BondConvention::UsTreasury`)
     /// * `discount_curve_id` - Discount curve identifier for pricing
@@ -192,13 +192,13 @@ impl Bond {
     /// use time::macros::date;
     ///
     /// let notional = Money::from((1_000_000_i64, Currency::USD));
-    /// let issue = date!(2025-01-15);
+    /// let issue_date = date!(2025-01-15);
     /// let maturity = date!(2030-01-15);
     /// let treasury = Bond::with_convention(
     ///     "UST-5Y",
     ///     notional,
     ///     finstack_quant_core::types::Rate::from_decimal(0.03).expect("valid rate fixture"),
-    ///     issue,
+    ///     issue_date,
     ///     maturity,
     ///     BondConvention::UsTreasury,
     ///     "USD-TREASURY"
@@ -212,7 +212,7 @@ impl Bond {
         id: impl Into<InstrumentId>,
         notional: Money,
         coupon_rate: impl Into<Rate>,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         convention: crate::instruments::common_impl::parameters::BondConvention,
         discount_curve_id: impl Into<CurveId>,
@@ -226,14 +226,14 @@ impl Bond {
             spec.schedule.calendar_id = convention
                 .calendar_id()
                 .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
-                .to_string();
+                .into();
             spec.schedule.end_of_month =
-                issue.end_of_month() == issue && maturity.end_of_month() == maturity;
+                issue_date.end_of_month() == issue_date && maturity.end_of_month() == maturity;
         }
         let bond = Self::builder()
             .id(id.into())
             .notional(notional)
-            .issue_date(issue)
+            .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
@@ -243,7 +243,10 @@ impl Bond {
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: convention.settlement_days(),
                 ex_coupon_days: convention.ex_coupon_days().unwrap_or(0),
-                ex_coupon_calendar_id: convention.calendar_id().map(|id| id.to_string()),
+                ex_coupon_calendar_id: convention
+                    .calendar_id()
+                    .map(|id| id.to_string())
+                    .map(Into::into),
             }))
             .build()?;
 
@@ -302,7 +305,7 @@ impl Bond {
     /// * `notional` - Principal amount of the bond
     /// * `forward_curve_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
     /// * `spread_bp` - Spread over index in typed basis points (e.g., `Bps::new(200)`)
-    /// * `issue` - Issue date of the bond
+    /// * `issue_date` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
     /// * `frequency` - Payment frequency (e.g., `Tenor::quarterly()`)
     /// * `day_count` - Day count convention (e.g., `DayCount::Act360`)
@@ -322,14 +325,14 @@ impl Bond {
     ///
     /// // 3M SOFR + 200bps, quarterly payments
     /// let notional = Money::from((1_000_000_i64, Currency::USD));
-    /// let issue = date!(2025-01-15);
+    /// let issue_date = date!(2025-01-15);
     /// let maturity = date!(2030-01-15);
     /// let frn = Bond::floating(
     ///     "FRN-001",
     ///     notional,
     ///     "USD-SOFR-3M",
     ///     finstack_quant_core::types::Bps::new(200),
-    ///     issue,
+    ///     issue_date,
     ///     maturity,
     ///     Tenor::quarterly(),
     ///     DayCount::Act360,
@@ -347,7 +350,7 @@ impl Bond {
         notional: Money,
         forward_curve_id: impl Into<CurveId>,
         spread_bp: impl Into<Bps>,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         frequency: finstack_quant_core::dates::Tenor,
         day_count: DayCount,
@@ -372,7 +375,7 @@ impl Bond {
             notional,
             forward_curve_id,
             spread_bp,
-            issue,
+            issue_date,
             maturity,
             frequency,
             day_count,
@@ -392,7 +395,7 @@ impl Bond {
     /// * `notional` - Principal amount of the bond
     /// * `forward_curve_id` - Forward curve identifier (e.g., `USD-SOFR-3M`)
     /// * `spread_bp` - Spread over the index in typed basis points
-    /// * `issue` - Issue date of the bond
+    /// * `issue_date` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
     /// * `frequency` - Payment frequency
     /// * `day_count` - Accrual day-count for floating coupons
@@ -432,7 +435,7 @@ impl Bond {
         notional: Money,
         forward_curve_id: impl Into<CurveId>,
         spread_bp: impl Into<Bps>,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         frequency: finstack_quant_core::dates::Tenor,
         day_count: DayCount,
@@ -447,12 +450,12 @@ impl Bond {
             spec.schedule.calendar_id = convention
                 .calendar_id()
                 .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
-                .to_string();
+                .into();
         }
         let bond = Self::builder()
             .id(id.into())
             .notional(notional)
-            .issue_date(issue)
+            .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
@@ -462,7 +465,10 @@ impl Bond {
             .settlement_convention_opt(Some(BondSettlementConvention {
                 settlement_days: convention.settlement_days(),
                 ex_coupon_days: convention.ex_coupon_days().unwrap_or(0),
-                ex_coupon_calendar_id: convention.calendar_id().map(|id| id.to_string()),
+                ex_coupon_calendar_id: convention
+                    .calendar_id()
+                    .map(|id| id.to_string())
+                    .map(Into::into),
             }))
             .build()?;
 
@@ -476,7 +482,7 @@ impl Bond {
     ///
     /// * `id` - Unique identifier for the bond
     /// * `notional` - Face value of the bond (paid at maturity)
-    /// * `issue` - Issue date of the bond
+    /// * `issue_date` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
     /// * `discount_curve_id` - Discount curve identifier for pricing
     ///
@@ -503,18 +509,18 @@ impl Bond {
     ///
     /// # Errors
     ///
-    /// Returns an error if the builder fails validation (e.g., maturity <= issue).
+    /// Returns an error if the builder fails validation (e.g., maturity <= issue_date).
     pub fn zero_coupon(
         id: impl Into<InstrumentId>,
         notional: Money,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let bond = Self::builder()
             .id(id.into())
             .notional(notional)
-            .issue_date(issue)
+            .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(CashflowSpec::fixed(
                 0.0,
@@ -570,7 +576,7 @@ impl Bond {
     ///
     /// # fn main() -> finstack_quant_core::Result<()> {
     /// // Build a custom schedule (PIK, step-ups, amortization, etc.) with `CashFlowSchedule::builder()`.
-    /// let issue = date!(2025-01-15);
+    /// let issue_date = date!(2025-01-15);
     /// let maturity = date!(2027-01-15);
     /// let fixed_spec = FixedCouponSpec {
     ///     coupon_type: CouponType::Cash,
@@ -579,7 +585,7 @@ impl Bond {
     ///         frequency: Tenor::semi_annual(),
     ///         day_count: DayCount::Act365F,
     ///         business_day_convention: BusinessDayConvention::Following,
-    ///         calendar_id: "weekends_only".to_string(),
+    ///         calendar_id: "weekends_only".into(),
     ///         stub: StubKind::None,
     ///         end_of_month: false,
     ///         payment_lag_days: 0,
@@ -588,7 +594,7 @@ impl Bond {
     ///     },
     /// };
     /// let schedule = CashFlowSchedule::builder()
-    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue, maturity)
+    ///     .principal(Money::from((1_000_000_i64, Currency::USD)), issue_date, maturity)
     ///     .fixed_cf(fixed_spec)
     ///     .build(None)?;
     ///
@@ -610,17 +616,17 @@ impl Bond {
         if dates.len() < 2 {
             return Err(finstack_quant_core::InputError::TooFewPoints.into());
         }
-        let issue = schedule.get_meta().issue_date.unwrap_or(dates[0]);
-        let maturity = schedule.get_meta().maturity_date.unwrap_or(
+        let issue_date = schedule.get_meta().issue_date.unwrap_or(dates[0]);
+        let maturity = schedule.get_meta().maturity.unwrap_or(
             dates
                 .last()
                 .copied()
                 .ok_or(finstack_quant_core::InputError::TooFewPoints)?,
         );
-        if issue >= maturity {
+        if issue_date >= maturity {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "custom bond issue date {} must be before maturity date {}",
-                issue, maturity
+                "custom bond issue_date date {} must be before maturity date {}",
+                issue_date, maturity
             )));
         }
 
@@ -705,7 +711,7 @@ impl Bond {
         Self::builder()
             .id(id.into())
             .notional(notional)
-            .issue_date(issue)
+            .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
             .discount_curve_id(discount_curve_id.into())
@@ -911,7 +917,7 @@ impl Bond {
                 frequency: Tenor::quarterly(),
                 day_count: DayCount::Act360,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::ShortFront,
                 end_of_month: false,
                 payment_lag_days: 0,
@@ -955,20 +961,20 @@ impl Bond {
         let call_put = CallPutSchedule {
             calls: vec![
                 CallPut {
-                    start_date: date!(2027 - 01 - 15),
-                    end_date: date!(2027 - 01 - 15),
+                    start: date!(2027 - 01 - 15),
+                    end: date!(2027 - 01 - 15),
                     price_pct_of_par: 103.0,
                     make_whole: None,
                 },
                 CallPut {
-                    start_date: date!(2029 - 01 - 15),
-                    end_date: date!(2029 - 01 - 15),
+                    start: date!(2029 - 01 - 15),
+                    end: date!(2029 - 01 - 15),
                     price_pct_of_par: 101.0,
                     make_whole: None,
                 },
                 CallPut {
-                    start_date: date!(2031 - 01 - 15),
-                    end_date: date!(2031 - 01 - 15),
+                    start: date!(2031 - 01 - 15),
+                    end: date!(2031 - 01 - 15),
                     price_pct_of_par: 100.0,
                     make_whole: None,
                 },
@@ -1015,7 +1021,7 @@ impl Bond {
                 frequency: Tenor::semi_annual(),
                 day_count: DayCount::Thirty360,
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::ShortFront,
                 end_of_month: false,
                 payment_lag_days: 0,
@@ -1061,7 +1067,7 @@ impl Bond {
     ///
     /// # Arguments
     ///
-    /// * `spec` - The [`ReturnFloorSpec`] describing the floor kind, issue price,
+    /// * `spec` - The [`ReturnFloorSpec`] describing the floor kind, issue_date price,
     ///   and protection window.
     ///
     /// # Returns

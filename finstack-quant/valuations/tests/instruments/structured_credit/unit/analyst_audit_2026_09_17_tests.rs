@@ -4,7 +4,7 @@
 //! Every test asserts the economically correct behaviour the audit expected.
 //! Tests start `#[ignore]`d with the task that fixes them; each task removes
 //! its ignore attribute. Fixture conventions: flat 5% continuously
-//! compounded USD-OIS curve, `with_payment_calendar("nyse")`, fees `None`,
+//! compounded USD-OIS curve, `with_calendar("nyse")`, fees `None`,
 //! `constant_cpr(0)`, `constant_cdr(0)`, `RecoveryModelSpec::with_lag(0.40, 0)`
 //! unless a test says otherwise.
 
@@ -73,7 +73,7 @@ fn quiet(mut deal: StructuredCredit, cpr: f64) -> StructuredCredit {
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
-    deal.with_payment_calendar("nyse")
+    deal.with_calendar("nyse")
 }
 
 fn flows_on(flows: &[(Date, Money)], date: Date) -> f64 {
@@ -661,7 +661,7 @@ fn card_accumulation_uses_a_fixed_investor_allocation() {
         ));
     }
     pool.reinvestment_period = Some(ReinvestmentPeriod {
-        end_date: revolving_end,
+        end: revolving_end,
         is_active: true,
         criteria: ReinvestmentCriteria::default(),
         amortizing_tranches: Vec::new(),
@@ -696,7 +696,7 @@ fn card_accumulation_uses_a_fixed_investor_allocation() {
     deal.credit_model.card = Some(CardPortfolioSpec::new(0.15, 0.18, 0.0));
     deal.waterfall_rules = Some(WaterfallRules {
         controlled_accumulation: Some(ControlledAccumulationSpec {
-            start_date: revolving_end,
+            start: revolving_end,
             bullet_date,
         }),
         ..Default::default()

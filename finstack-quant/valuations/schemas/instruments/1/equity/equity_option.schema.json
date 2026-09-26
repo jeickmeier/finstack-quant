@@ -62,7 +62,7 @@
           ],
           "description": "Observed exercise or expiry state.\n\nRequired from expiry onward. It fixes cash-settled intrinsic value or\nidentifies a physical-delivery obligation through its settlement date."
         },
-        "exercise_schedule": {
+        "exercise_dates": {
           "description": "Exercise schedule for Bermudan options.\n\nRequired when `exercise_style` is `Bermudan`. Each date represents a time\nat which early exercise is permitted. Dates before as_of or after expiry\nare filtered out automatically.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"

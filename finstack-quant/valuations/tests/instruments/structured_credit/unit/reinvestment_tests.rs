@@ -45,7 +45,7 @@ const MATURITY: (i32, u8, u8) = (2032, 1, 1);
 
 fn window(amortizing: &[&str], assumptions: Option<ReinvestmentAssumptions>) -> ReinvestmentPeriod {
     ReinvestmentPeriod {
-        end_date: d(WINDOW_END.0, WINDOW_END.1, WINDOW_END.2),
+        end: d(WINDOW_END.0, WINDOW_END.1, WINDOW_END.2),
         is_active: true,
         criteria: ReinvestmentCriteria::default(),
         amortizing_tranches: amortizing.iter().map(|id| (*id).to_string()).collect(),
@@ -124,7 +124,7 @@ fn clo(
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-REINVEST", pool, tranches, close, maturity, "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
             .with_coverage_triggers(tests)
             .expect("coverage tests");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
@@ -413,7 +413,7 @@ fn instrument_collateral_pools_cannot_reinvest() {
     .expect("tranche")])
     .expect("structure");
     let deal = StructuredCredit::new_clo("CLO-INSTR", pool, tranches, close, maturity, "USD-OIS")
-        .with_payment_calendar("nyse");
+        .with_calendar("nyse");
     let err = run_simulation(&deal, &market(close), close)
         .expect_err("instrument pools reject reinvestment periods");
     assert!(

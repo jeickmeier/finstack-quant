@@ -390,7 +390,7 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
                 .maturity(maturity)
                 .fixed_rate(Decimal::try_from(0.047).expect("decimal rate"))
                 .day_count(DayCount::Act360)
-                .reset_lag(2)
+                .reset_lag_days(2)
                 .discount_curve_id(CurveId::new("USD-OIS"))
                 .forward_curve_id(CurveId::new("USD-SOFR-3M"))
                 .side(PayReceive::Pay)

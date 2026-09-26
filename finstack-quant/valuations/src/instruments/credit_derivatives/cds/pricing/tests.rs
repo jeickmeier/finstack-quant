@@ -323,7 +323,7 @@ fn test_doc_clause_default_when_omitted() {
                 stub: finstack_quant_core::dates::StubKind::ShortFront,
                 business_day_convention:
                     finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                calendar_id: Some("nyse".to_string()),
+                calendar_id: Some("nyse".into()),
                 day_count: finstack_quant_core::dates::DayCount::Act360,
                 coupon_bp: Decimal::try_from(100.0).expect("valid"),
                 discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),

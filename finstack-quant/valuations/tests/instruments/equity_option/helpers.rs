@@ -105,7 +105,7 @@ pub fn create_call(_as_of: Date, expiry: Date, strike: f64) -> EquityOption {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     }
 }
@@ -132,7 +132,7 @@ pub fn create_put(_as_of: Date, expiry: Date, strike: f64) -> EquityOption {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     }
 }

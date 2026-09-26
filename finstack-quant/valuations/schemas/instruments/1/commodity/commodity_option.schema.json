@@ -82,7 +82,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID for present value."
         },
-        "exercise_schedule": {
+        "exercise_dates": {
           "description": "Optional Bermudan exercise schedule.\n\nRequired when `exercise_style == ExerciseStyle::Bermudan`.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"

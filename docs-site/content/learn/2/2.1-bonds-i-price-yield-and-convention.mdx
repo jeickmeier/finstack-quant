@@ -141,7 +141,7 @@ built=(Bond.builder().id('TYPED-BOND').notional(Money(2_000_000,'USD'))
        .cashflow_spec(raw['cashflow_spec']).discount_curve_id('USD-OIS').build())
 market=build_market('foundations')
 callable_spec=instruments('foundations')['USD-CORP']
-callable_spec['instrument']['spec']['call_put']={'calls':[{'start_date':'2027-01-15','end_date':'2029-01-15','price_pct_of_par':101.0}],'puts':[]}
+callable_spec['instrument']['spec']['call_put']={'calls':[{'start':'2027-01-15','end':'2029-01-15','price_pct_of_par':101.0}],'puts':[]}
 callable_spec['instrument']['spec']['instrument_pricing_overrides']={'market_quotes':{'quoted_clean_price_pct':102.0},'model_config':{'hw1f_sigma':0.01,'hw1f_mean_reversion':0.03}}
 workouts=price_instrument(json.dumps(callable_spec),market,AS_OF,metrics=['ytm','ytw'])
 print({'typed_price':price_instrument(built,market,AS_OF).price,'ytm_decimal':workouts.get_metric('ytm'),'ytw_decimal':workouts.get_metric('ytw')})

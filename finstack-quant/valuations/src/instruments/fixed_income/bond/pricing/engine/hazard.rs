@@ -442,10 +442,8 @@ mod tests {
         let mut callable = build_test_bond(issue, maturity);
         callable.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: Date::from_calendar_date(2027, Month::January, 1)
-                    .expect("valid call date"),
-                end_date: Date::from_calendar_date(2027, Month::January, 1)
-                    .expect("valid call date"),
+                start: Date::from_calendar_date(2027, Month::January, 1).expect("valid call date"),
+                end: Date::from_calendar_date(2027, Month::January, 1).expect("valid call date"),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -473,8 +471,8 @@ mod tests {
         let mut callable = bullet.clone();
         callable.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise,
-                end_date: exercise,
+                start: exercise,
+                end: exercise,
                 price_pct_of_par: 90.0,
                 make_whole: None,
             }],
@@ -597,8 +595,8 @@ mod tests {
         let mut callable = bullet.clone();
         callable.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise,
-                end_date: exercise,
+                start: exercise,
+                end: exercise,
                 price_pct_of_par: 80.0,
                 make_whole: None,
             }],
@@ -609,8 +607,8 @@ mod tests {
         puttable.call_put = Some(CallPutSchedule {
             calls: Vec::new(),
             puts: vec![CallPut {
-                start_date: exercise,
-                end_date: exercise,
+                start: exercise,
+                end: exercise,
                 price_pct_of_par: 130.0,
                 make_whole: None,
             }],
@@ -714,9 +712,8 @@ mod tests {
         let mut bond = build_test_bond(issue, maturity);
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: Date::from_calendar_date(2025, Month::July, 1)
-                    .expect("valid call date"),
-                end_date: Date::from_calendar_date(2025, Month::July, 1).expect("valid call date"),
+                start: Date::from_calendar_date(2025, Month::July, 1).expect("valid call date"),
+                end: Date::from_calendar_date(2025, Month::July, 1).expect("valid call date"),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

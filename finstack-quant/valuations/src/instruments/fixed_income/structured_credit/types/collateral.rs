@@ -432,7 +432,7 @@ impl InstrumentCollateral {
                 default_date: None,
                 purchase_price: None,
                 acquisition_date: None,
-                origination_date: Some(facility.commitment_date),
+                origination_date: Some(facility.issue_date),
                 day_count: facility.day_count,
                 smm_override: None,
                 mdr_override: None,

@@ -96,7 +96,7 @@ fn npl_deal(spec: LiquidationSpec) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_rmbs("NPL-T18", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_payment_calendar("nyse");
+            .with_calendar("nyse");
     deal.fees = None;
     deal.loss_allocation = Some(LossAllocationPolicy::ParPreserving);
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);

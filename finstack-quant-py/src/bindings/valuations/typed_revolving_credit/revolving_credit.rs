@@ -413,8 +413,8 @@ impl PyRevolvingCredit {
 
     /// Date the facility becomes available, as ``datetime.date``.
     #[getter]
-    fn commitment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.commitment_date)
+    fn issue_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.issue_date)
     }
 
     /// Expiry of the commitment, as ``datetime.date``.
@@ -548,7 +548,7 @@ impl PyRevolvingCredit {
     /// rolls, or ``None`` for weekends only.
     #[getter]
     fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Business days between an accrual end and its payment date.
@@ -630,7 +630,7 @@ impl PyRevolvingCredit {
 /// ...     .id("RCF-1")
 /// ...     .commitment_amount(Money(50_000_000.0, Currency("USD")))
 /// ...     .drawn_amount(Money(10_000_000.0, Currency("USD")))
-/// ...     .commitment_date(datetime.date(2024, 1, 15))
+/// ...     .issue_date(datetime.date(2024, 1, 15))
 /// ...     .maturity(datetime.date(2027, 1, 15))
 /// ...     .base_rate_spec(0.06)
 /// ...     .day_count("act_360")
@@ -775,14 +775,14 @@ impl PyRevolvingCreditBuilder {
     /// ValueError
     ///     If ``value`` is not a date or the builder was already consumed.
     #[pyo3(text_signature = "($self, value)")]
-    fn commitment_date<'py>(
+    fn issue_date<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
         let b = take_builder(&mut slf)?;
-        slf.inner = Some(b.commitment_date(date));
-        slf.fields.push(("commitment_date", date.to_string()));
+        slf.inner = Some(b.issue_date(date));
+        slf.fields.push(("issue_date", date.to_string()));
         Ok(slf)
     }
 
@@ -1405,7 +1405,7 @@ impl PyRevolvingCreditBuilder {
         value: Option<String>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_builder(&mut slf)?;
-        slf.inner = Some(b.calendar_id_opt(value.clone()));
+        slf.inner = Some(b.calendar_id_opt(value.clone().map(Into::into)));
         slf.fields.push(("calendar_id", format!("{value:?}")));
         Ok(slf)
     }

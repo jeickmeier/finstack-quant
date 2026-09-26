@@ -138,8 +138,8 @@ impl RevolvingCreditPricer {
                     representation: CashflowRepresentation::Projected,
                     calendar_ids: Vec::new(),
                     facility_limit: Some(facility.commitment_amount),
-                    issue_date: Some(facility.commitment_date),
-                    maturity_date: None,
+                    issue_date: Some(facility.issue_date),
+                    maturity: None,
                 },
             },
         ))

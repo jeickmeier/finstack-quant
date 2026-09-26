@@ -74,7 +74,7 @@ fn revolving_credit_floating(maturity: Date) -> RevolvingCredit {
         .id("RC-BENCH".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(as_of())
+        .issue_date(as_of())
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -389,7 +389,7 @@ fn bench_fi_trs_pv(c: &mut Criterion) {
                 frequency: Tenor::quarterly(),
                 day_count: DayCount::Act360,
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::None,
                 end_of_month: false,
                 payment_lag_days: 0,

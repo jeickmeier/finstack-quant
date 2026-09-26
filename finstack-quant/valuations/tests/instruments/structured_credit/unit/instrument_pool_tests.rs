@@ -30,12 +30,12 @@ pub(crate) fn usd(amount: f64) -> Money {
 }
 
 /// Fixed-rate revolver with one draw and one repayment inside its life.
-pub(crate) fn fixed_revolver(commitment_date: Date, maturity: Date) -> RevolvingCredit {
+pub(crate) fn fixed_revolver(issue_date: Date, maturity: Date) -> RevolvingCredit {
     RevolvingCredit::builder()
         .id(InstrumentId::new("RCF"))
         .commitment_amount(usd(50_000_000.0))
         .drawn_amount(usd(10_000_000.0))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
@@ -108,7 +108,7 @@ pub(crate) fn deal_with(spec: DealSpec) -> StructuredCredit {
         spec.maturity,
         "USD-OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal
@@ -361,8 +361,8 @@ fn callable_eight_percent_bond(calls: Vec<CallPut>, puts: Vec<CallPut>) -> Bond 
 
 fn one_day(date: Date, price: f64) -> CallPut {
     CallPut {
-        start_date: date,
-        end_date: date,
+        start: date,
+        end: date,
         price_pct_of_par: price,
         make_whole: None,
     }

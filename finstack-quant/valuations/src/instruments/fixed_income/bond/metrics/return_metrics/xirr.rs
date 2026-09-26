@@ -251,8 +251,8 @@ mod tests {
             .expect("amortization date");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: call_date,
-                end_date: call_date,
+                start: call_date,
+                end: call_date,
                 price_pct_of_par: 90.0,
                 make_whole: None,
             }],
@@ -333,8 +333,8 @@ mod tests {
         .expect("bond");
         make_whole_bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: call_date,
-                end_date: call_date,
+                start: call_date,
+                end: call_date,
                 price_pct_of_par: 50.0,
                 make_whole: Some(MakeWholeSpec {
                     reference_curve_id: "USD-REF".into(),

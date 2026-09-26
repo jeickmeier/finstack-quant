@@ -47,7 +47,7 @@ fn term_leg(curve: &str, compounding: FloatingLegCompounding) -> BasisSwapLeg {
         frequency: Tenor::quarterly(),
         day_count: DayCount::Act360,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: Some("usny".to_string()),
+        calendar_id: Some("usny".into()),
         stub: StubKind::ShortFront,
         spread_bp: Decimal::ZERO,
         payment_lag_days: 0,

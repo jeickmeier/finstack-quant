@@ -16,7 +16,7 @@ fn prepare_dm_roundtrip_frn(mut bond: Bond) -> Bond {
     bond.settlement_convention = None;
     if let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec {
         spec.schedule.business_day_convention = BusinessDayConvention::Unadjusted;
-        spec.schedule.calendar_id = "weekends_only".to_string();
+        spec.schedule.calendar_id = "weekends_only".into();
     }
     bond
 }

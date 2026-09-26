@@ -25,7 +25,7 @@ fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
         calendar_id: loan
             .calendar_id
             .clone()
-            .unwrap_or_else(|| crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()),
+            .unwrap_or_else(|| crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.into()),
         stub: loan.stub,
         end_of_month: false,
         payment_lag_days: 0,
@@ -459,9 +459,11 @@ pub(crate) fn generate_cashflows(
                 frequency: loan.frequency,
                 day_count: loan.day_count,
                 business_day_convention: loan.business_day_convention,
-                calendar_id: loan.calendar_id.clone().unwrap_or_else(|| {
-                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
-                }),
+                calendar_id: loan
+                    .calendar_id
+                    .as_deref()
+                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
+                    .to_string(),
                 stub: loan.stub,
                 accrual_basis: crate::cashflow::builder::FeeAccrualBasis::TimeWeightedAverage,
             });

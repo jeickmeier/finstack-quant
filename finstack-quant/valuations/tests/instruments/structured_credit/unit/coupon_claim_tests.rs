@@ -90,7 +90,7 @@ fn starved_abs(tranches: TrancheStructure) -> StructuredCredit {
     ));
     let mut deal =
         StructuredCredit::new_abs("ABS-CLAIMS", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_payment_calendar("nyse");
+            .with_calendar("nyse");
     deal.fees = None;
     deal.principal_covers_senior_interest = Some(true);
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.30);

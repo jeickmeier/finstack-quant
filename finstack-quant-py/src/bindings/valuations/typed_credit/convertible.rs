@@ -248,14 +248,14 @@ impl PyConversionSpec {
 
 /// Issuer call and holder put windows (typed wrapper for Rust ``CallPutSchedule``).
 ///
-/// Each window is a dict ``{"start_date", "end_date", "price_pct_of_par",
+/// Each window is a dict ``{"start", "end", "price_pct_of_par",
 /// "make_whole"?}`` with prices in percent of par (``101.0`` = 101%).
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.valuations.instruments import CallPutSchedule
 /// >>> sched = CallPutSchedule(
-/// ...     calls=[{"start_date": "2026-03-15", "end_date": "2027-03-15", "price_pct_of_par": 101.0}]
+/// ...     calls=[{"start": "2026-03-15", "end": "2027-03-15", "price_pct_of_par": 101.0}]
 /// ... )
 /// >>> (len(sched.calls), len(sched.puts))
 /// (1, 0)
@@ -290,7 +290,7 @@ impl PyCallPutSchedule {
     /// Parameters
     /// ----------
     /// calls : list[dict] | str | None
-    ///     Issuer call windows (``start_date``, ``end_date``,
+    ///     Issuer call windows (``start``, ``end``,
     ///     ``price_pct_of_par``, optional ``make_whole``); default none.
     /// puts : list[dict] | str | None
     ///     Holder put windows of the same shape; default none.

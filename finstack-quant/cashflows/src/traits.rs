@@ -564,7 +564,7 @@ mod tests {
             calendar_ids: vec!["weekends_only".to_string()],
             facility_limit: Some(Money::from((500_i64, Currency::USD))),
             issue_date: Some(date),
-            maturity_date: None,
+            maturity: None,
         };
 
         let schedule = schedule_from_classified_flows(

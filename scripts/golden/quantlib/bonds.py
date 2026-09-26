@@ -492,8 +492,8 @@ def build_fixed_callable_oas_bond() -> dict[str, Any]:
     spec["call_put"] = {
         "calls": [
             {
-                "start_date": "2030-04-30",
-                "end_date": "2030-04-30",
+                "start": "2030-04-30",
+                "end": "2030-04-30",
                 "price_pct_of_par": 100.0,
             }
         ],

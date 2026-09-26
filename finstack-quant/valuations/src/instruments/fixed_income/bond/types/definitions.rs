@@ -24,7 +24,7 @@ pub struct BondSettlementConvention {
     pub ex_coupon_days: u32,
     /// Calendar identifier for ex-coupon day counting.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ex_coupon_calendar_id: Option<String>,
+    pub ex_coupon_calendar_id: Option<finstack_quant_core::types::CalendarId>,
 }
 
 /// Bond instrument with fixed, floating, or amortizing cashflows.
@@ -193,7 +193,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             Some(BondSettlementConvention {
                 settlement_days: helper.settlement_days.unwrap_or(0),
                 ex_coupon_days: helper.ex_coupon_days.unwrap_or(0),
-                ex_coupon_calendar_id: helper.ex_coupon_calendar_id,
+                ex_coupon_calendar_id: helper.ex_coupon_calendar_id.map(Into::into),
             })
         } else {
             None
@@ -235,8 +235,8 @@ impl<'de> serde::Deserialize<'de> for Bond {
 ///
 /// // Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027
 /// let call = CallPut {
-///     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-///     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
 ///     price_pct_of_par: 102.0,
 ///     make_whole: None,
 /// };
@@ -251,16 +251,16 @@ pub struct CallPut {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub start_date: Date,
+    pub start: Date,
     /// Last date when the option can be exercised, inclusive.
     ///
-    /// Use the same value as `start_date` for one-day/discrete exercise.
+    /// Use the same value as `start` for one-day/discrete exercise.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub end_date: Date,
+    pub end: Date,
     /// Clean redemption price as percentage of par amount (100 means par).
     /// Accrued coupon interest at exercise is added to determine the cash payment.
     pub price_pct_of_par: f64,
@@ -314,8 +314,8 @@ pub struct MakeWholeSpec {
 ///
 /// let mut schedule = CallPutSchedule::default();
 /// schedule.calls.push(CallPut {
-///     start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-///     end_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+///     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
 ///     price_pct_of_par: 102.0,
 ///     make_whole: None,
 /// });
@@ -372,32 +372,32 @@ fn validate_call_put_entries(
         if !entry.price_pct_of_par.is_finite() || entry.price_pct_of_par <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{instrument_name} {side} price must be finite and positive, got {} for period [{}, {}]",
-                entry.price_pct_of_par, entry.start_date, entry.end_date
+                entry.price_pct_of_par, entry.start, entry.end
             )));
         }
-        if entry.start_date < issue_date || entry.start_date > maturity {
+        if entry.start < issue_date || entry.start > maturity {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{instrument_name} {side} exercise start date {} is outside instrument life [{}, {}]",
-                entry.start_date, issue_date, maturity
+                entry.start, issue_date, maturity
             )));
         }
-        if entry.end_date > maturity {
+        if entry.end > maturity {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{instrument_name} {side} exercise end date {} is after maturity {}",
-                entry.end_date, maturity
+                entry.end, maturity
             )));
         }
-        if entry.start_date > entry.end_date {
+        if entry.start > entry.end {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{instrument_name} {side} exercise start date {} is after end date {}",
-                entry.start_date, entry.end_date
+                entry.start, entry.end
             )));
         }
         if let Some(make_whole) = &entry.make_whole {
             if !make_whole.spread_bp.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{instrument_name} {side} make-whole spread must be finite, got {} for period [{}, {}]",
-                    make_whole.spread_bp, entry.start_date, entry.end_date
+                    make_whole.spread_bp, entry.start, entry.end
                 )));
             }
         }

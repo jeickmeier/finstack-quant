@@ -18,7 +18,6 @@ const SCHEDULE = new Set([
   "base_calendar_id",
   "quote_calendar_id",
   "business_day_convention",
-  "payment_business_day_convention",
   "end_of_month",
   "stub",
   "payment_lag_days",

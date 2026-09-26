@@ -231,8 +231,8 @@ fn create_callable_bond(maturity_years: i32) -> Bond {
         if first_call_year < maturity_year {
             let first_call = Date::from_calendar_date(first_call_year, Month::January, 1).unwrap();
             schedule.calls.push(CallPut {
-                start_date: first_call,
-                end_date: first_call,
+                start: first_call,
+                end: first_call,
                 price_pct_of_par: 101.0,
                 make_whole: None,
             });
@@ -242,8 +242,8 @@ fn create_callable_bond(maturity_years: i32) -> Bond {
             let second_call =
                 Date::from_calendar_date(first_call_year + 1, Month::January, 1).unwrap();
             schedule.calls.push(CallPut {
-                start_date: second_call,
-                end_date: second_call,
+                start: second_call,
+                end: second_call,
                 price_pct_of_par: 100.5,
                 make_whole: None,
             });
@@ -476,8 +476,8 @@ fn create_stochastic_hazard_callable(
     bond.credit_curve_id = Some(CurveId::new("USD-HAZARD"));
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-            end_date: Date::from_calendar_date(2024 + maturity_years, Month::January, 1).unwrap(),
+            start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
+            end: Date::from_calendar_date(2024 + maturity_years, Month::January, 1).unwrap(),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],
@@ -528,8 +528,8 @@ fn create_call_window_bond() -> Bond {
     let mut bond = create_test_bond(10);
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-            end_date: Date::from_calendar_date(2035, Month::January, 1).unwrap(),
+            start: Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+            end: Date::from_calendar_date(2035, Month::January, 1).unwrap(),
             price_pct_of_par: 100.0,
             make_whole: None,
         }],

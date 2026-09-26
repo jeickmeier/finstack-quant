@@ -1093,7 +1093,7 @@ mod tests {
         inst.call_provision = Some(BermudanCallProvision::new(
             vec![date(2026, Month::January, 1)],
             100.0,
-            1,
+            None,
         ));
 
         let err = deterministic_mc_pricer(8)

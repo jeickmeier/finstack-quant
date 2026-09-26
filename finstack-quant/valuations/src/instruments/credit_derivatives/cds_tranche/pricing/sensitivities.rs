@@ -349,7 +349,7 @@ impl CDSTranchePricer {
         tranche: &CDSTranche,
         as_of: Date,
     ) -> Result<Vec<Date>> {
-        let start_date = tranche.contractual_effective_date(as_of).unwrap_or(as_of);
+        let start_date = tranche.contractual_start_date(as_of).unwrap_or(as_of);
 
         let dates = if tranche.roll_rule == RollRule::CdsImm {
             // Business-day-adjust IMM roll dates with the tranche's calendar
@@ -855,9 +855,9 @@ impl CDSTranchePricer {
         as_of: Date,
     ) -> Result<f64> {
         tranche.validate()?;
-        let start_date = tranche.contractual_effective_date(as_of).ok_or_else(|| {
+        let start_date = tranche.contractual_start_date(as_of).ok_or_else(|| {
             Error::Validation(
-                "CDS tranche accrued premium requires an explicit effective_date for non-standard schedules"
+                "CDS tranche accrued premium requires an explicit start_date for non-standard schedules"
                     .to_string(),
             )
         })?;

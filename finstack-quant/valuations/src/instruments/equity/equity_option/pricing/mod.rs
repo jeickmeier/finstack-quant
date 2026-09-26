@@ -612,8 +612,8 @@ mod tests {
             .model_config
             .tree_steps = Some(51);
         noisy.instrument_pricing_overrides.model_config.tree_steps = Some(51);
-        filtered.exercise_schedule = Some(vec![date(2025, 3, 1), date(2025, 5, 1)]);
-        noisy.exercise_schedule = Some(vec![
+        filtered.exercise_dates = Some(vec![date(2025, 3, 1), date(2025, 5, 1)]);
+        noisy.exercise_dates = Some(vec![
             as_of,
             date(2024, 12, 15),
             date(2025, 3, 1),

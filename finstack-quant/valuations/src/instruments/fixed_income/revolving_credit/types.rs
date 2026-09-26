@@ -40,13 +40,13 @@ pub struct RevolvingCredit {
     /// Unique identifier for the facility.
     pub id: InstrumentId,
 
-    /// Opening commitment of the facility, in force from `commitment_date`
+    /// Opening commitment of the facility, in force from `issue_date`
     /// until the first entry of `commitment_steps`.
     pub commitment_amount: Money,
 
     /// Scheduled commitment changes (amortizing commitments, availability
     /// expiries, accordions), each in force from its date until the next.
-    /// Dates must be strictly increasing, after `commitment_date` and on or
+    /// Dates must be strictly increasing, after `issue_date` and on or
     /// before `maturity`; the drawn balance plus outstanding letters of
     /// credit must never exceed the commitment in force. A step down pays its
     /// `fee_bp` on the reduced amount. Empty by default.
@@ -86,7 +86,7 @@ pub struct RevolvingCredit {
     #[serde(default)]
     pub oid_eir: Option<OidEirSpec>,
 
-    /// Drawn balance at the simulation anchor, the later of `commitment_date`
+    /// Drawn balance at the simulation anchor, the later of `issue_date`
     /// and the valuation date, in both deterministic and stochastic mode.
     ///
     /// For a new facility this is the balance funded at commitment; for a
@@ -104,7 +104,7 @@ pub struct RevolvingCredit {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub commitment_date: Date,
+    pub issue_date: Date,
 
     /// Date when the facility expires.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -187,7 +187,7 @@ pub struct RevolvingCredit {
     /// date alone.
     #[builder(default)]
     #[serde(default)]
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
 
     /// Business days between an accrual end and its payment date, on
     /// `calendar_id`. `0` (the default) pays on the adjusted accrual end.
@@ -278,7 +278,7 @@ impl RevolvingCredit {
             .id(InstrumentId::new("RCF-USD-3Y"))
             .commitment_amount(commitment)
             .drawn_amount(initial_draw)
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(end)
             .base_rate_spec(base_rate)
             .day_count(DayCount::Act360)
@@ -289,7 +289,7 @@ impl RevolvingCredit {
             .credit_curve_id_opt(None)
             .recovery_rate(0.0)
             .stub(StubKind::ShortFront)
-            .calendar_id("usny".to_string())
+            .calendar_id("usny".into())
             .attributes(Attributes::new())
             .build()
     }
@@ -1298,7 +1298,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
     }
 
     fn effective_start_date(&self) -> Option<Date> {
-        Some(self.commitment_date)
+        Some(self.issue_date)
     }
 
     crate::impl_focused_pricing_overrides!();
@@ -1429,7 +1429,7 @@ mod dependency_tests {
             .expect("chronologically valid events must not depend on input order");
         let balance = super::super::cashflow_engine::calculate_drawn_balance_at_date(
             &facility,
-            facility.commitment_date,
+            facility.issue_date,
             date!(2025 - 12 - 31),
         )
         .expect("balance");

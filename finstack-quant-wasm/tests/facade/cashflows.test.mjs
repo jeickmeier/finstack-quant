@@ -42,7 +42,7 @@ const cashflowSpec = JSON.stringify({
     initial: { amount: '1000000', currency: 'USD' },
     amort: 'none',
   },
-  issue: '2024-08-31',
+  issue_date: '2024-08-31',
   maturity: '2025-08-31',
   coupon_program: [
     {
@@ -137,7 +137,7 @@ test('cashflows facade builds fixed-to-float and preserves Rust window errors', 
       initial: { amount: '1000000', currency: 'USD' },
       amort: 'none',
     },
-    issue: '2025-01-01',
+    issue_date: '2025-01-01',
     maturity: '2027-01-01',
   };
   const fixedToFloat = JSON.stringify({

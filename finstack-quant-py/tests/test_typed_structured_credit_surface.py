@@ -104,7 +104,7 @@ def _clo() -> StructuredCredit:
         .first_payment_date(datetime.date(2024, 4, 1))
         .maturity(MATURITY)
         .frequency(Tenor.quarterly())
-        .payment_calendar_id("nyse")
+        .calendar_id("nyse")
         .discount_curve_id("USD-OIS")
         .prepayment_spec(PrepaymentModelSpec.constant_cpr(0.10))
         .default_spec(DefaultModelSpec.constant_cdr(0.02))
@@ -200,7 +200,7 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
         CLOSE,
         MATURITY,
         "USD-OIS",
-        payment_calendar_id="nyse",
+        calendar_id="nyse",
     )
     assert deal.pool.assets[0].liquidation["modified_rate"] == 0.04
     periods = deal.run_simulation_with_diagnostics(_market(), CLOSE).periods
@@ -218,7 +218,7 @@ def test_npl_liquidation_terms_replace_the_default_flag() -> None:
             CLOSE,
             MATURITY,
             "USD-OIS",
-            payment_calendar_id="nyse",
+            calendar_id="nyse",
         )
 
 
@@ -281,7 +281,7 @@ def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
     assert deal.loss_allocation == "par_preserving"
     assert deal.principal_covers_senior_interest is True
     assert deal.frequency == Tenor.quarterly()
-    assert deal.payment_calendar_id == "nyse"
+    assert deal.calendar_id == "nyse"
     assert deal.attributes.items() == [("desk", "abs")]
     assert deal.fees is None
     assert deal.waterfall is None
@@ -309,7 +309,7 @@ def test_credit_model_can_be_replaced_whole_and_then_refined() -> None:
         .first_payment_date(datetime.date(2024, 2, 1))
         .maturity(MATURITY)
         .frequency(Tenor.monthly())
-        .payment_calendar_id("nyse")
+        .calendar_id("nyse")
         .discount_curve_id("USD-OIS")
         .credit_model(whole)
         .default_spec(DefaultModelSpec.cumulative_loss([0.5, 1.0, 1.5], 0.6))
@@ -394,7 +394,7 @@ def test_waterfall_introspection_and_custom_waterfall_round_trip() -> None:
         .first_payment_date(datetime.date(2024, 4, 1))
         .maturity(MATURITY)
         .frequency(Tenor.quarterly())
-        .payment_calendar_id("nyse")
+        .calendar_id("nyse")
         .discount_curve_id("USD-OIS")
         .waterfall(waterfall)
         .build()
@@ -460,9 +460,9 @@ def test_typed_constructors_accept_the_payment_calendar() -> None:
         CLOSE,
         MATURITY,
         "USD-OIS",
-        payment_calendar_id="nyse",
+        calendar_id="nyse",
     )
-    assert deal.payment_calendar_id == "nyse"
+    assert deal.calendar_id == "nyse"
     flows = deal.tranche_cashflows("A", _market(), CLOSE)
     # Registry defaults carry defaults and recoveries, so the note is not made whole.
     assert 0.0 < flows.total_principal.amount < 100_000_000.0
@@ -534,7 +534,7 @@ def test_attachment_points_are_derived_from_balances() -> None:
         .first_payment_date(datetime.date(2024, 4, 1))
         .maturity(MATURITY)
         .frequency(Tenor.quarterly())
-        .payment_calendar_id("nyse")
+        .calendar_id("nyse")
         .discount_curve_id("USD-OIS")
         .prepayment_spec(PrepaymentModelSpec.constant_cpr(0.10))
         .default_spec(DefaultModelSpec.constant_cdr(0.02))
@@ -667,8 +667,8 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
         .maturity(_date(spec["maturity"]))
         .frequency(_tenor(spec["frequency"]))
         .discount_curve_id(spec["discount_curve_id"])
-        .payment_calendar_id(spec["payment_calendar_id"])
-        .payment_business_day_convention(spec["payment_business_day_convention"])
+        .calendar_id(spec["calendar_id"])
+        .business_day_convention(spec["business_day_convention"])
         .attributes(spec["attributes"]["meta"] | {"tags": spec["attributes"]["tags"]})
         .prepayment_spec(PrepaymentModelSpec.from_json(json.dumps(spec["prepayment_spec"])))
         .default_spec(DefaultModelSpec.from_json(json.dumps(spec["default_spec"])))

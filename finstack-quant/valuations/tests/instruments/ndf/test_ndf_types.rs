@@ -48,8 +48,8 @@ fn test_ndf_builder_with_optional_fields() {
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
         .fixing_source_enum_opt(Some(NdfFixingSource::Cnhfix))
         .quoted_spot_opt(Some(7.25))
-        .base_calendar_id_opt(Some("CNY".to_string()))
-        .quote_calendar_id_opt(Some("USD".to_string()))
+        .base_calendar_id_opt(Some("CNY".into()))
+        .quote_calendar_id_opt(Some("USD".into()))
         .attributes(Attributes::new().with_tag("ndf"))
         .build()
         .expect("should build");

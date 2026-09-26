@@ -266,10 +266,10 @@ impl MetricCalculator for AllInRateCalculator {
         let mut with_opening = (*schedule).clone();
         // The outstanding path needs the opening funding leg; a seasoned
         // facility's schedule starts at the anchor balance without one.
-        if facility.commitment_date <= context.as_of && facility.drawn_amount.amount() > 0.0 {
+        if facility.issue_date <= context.as_of && facility.drawn_amount.amount() > 0.0 {
             let mut flows = with_opening.get_flows().to_vec();
             flows.push(finstack_quant_core::cashflow::CashFlow::new(
-                facility.commitment_date,
+                facility.issue_date,
                 None,
                 facility.drawn_amount * -1.0,
                 CFKind::Notional,

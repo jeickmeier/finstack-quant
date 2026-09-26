@@ -108,7 +108,7 @@ def _structured_credit_json() -> str:
         "first_payment_date": "2025-02-01",
         "maturity": "2026-01-01",
         "frequency": {"count": 1, "unit": "months"},
-        "payment_calendar_id": "nyse",
+        "calendar_id": "nyse",
         "discount_curve_id": "USD-OIS",
         "instrument_pricing_overrides": {"model_config": {"mc_paths": 1}},
         "attributes": {},
@@ -375,7 +375,7 @@ def _callable_range_accrual_json() -> str:
                 "notional": {"amount": "1000000", "currency": "USD"},
                 "day_count": "act_365f",
                 "discount_curve_id": "USD-OIS",
-                "accrual_start_date": "2025-01-01",
+                "start_date": "2025-01-01",
                 "index_id": "USD-SOFR",
                 "forward_curve_id": "USD-OIS",
                 "index_tenor": {"count": 6, "unit": "months"},
@@ -390,7 +390,6 @@ def _callable_range_accrual_json() -> str:
             "call_provision": {
                 "call_dates": ["2025-07-01"],
                 "price_pct_of_par": 100.0,
-                "lockout_periods": 0,
             },
             "instrument_pricing_overrides": {
                 "market_quotes": {"implied_volatility": 1e-12},
@@ -446,7 +445,7 @@ def _bermudan_swaption_json() -> str:
                 "forward_curve_id": "USD-OIS",
                 "compounding": "simple",
             },
-            "bermudan_schedule": {
+            "exercise_schedule": {
                 "exercise_dates": ["2029-01-17", "2030-01-17"],
                 "lockout_end": None,
                 "notice_days": 0,
@@ -467,7 +466,7 @@ def _cms_spread_option_json() -> str:
             "strike": "0.005",
             "option_type": "call",
             "notional": {"amount": "10000000", "currency": "USD"},
-            "expiry_date": "2026-01-01",
+            "expiry": "2026-01-01",
             "payment_date": "2026-01-05",
             "long_vol_surface_id": "USD-SWAPTION-VOL-10Y",
             "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",

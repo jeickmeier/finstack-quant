@@ -148,7 +148,7 @@ impl StructuredCredit {
         .expect("Tranche build should not fail");
         let tranches = TrancheStructure::new(vec![tranche]).expect("TrancheStructure should build");
         StructuredCredit::new_clo("CLO-EXAMPLE", pool, tranches, closing, legal, "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
     }
 
     /// Internal helper to create structured credit with common fields
@@ -174,8 +174,8 @@ impl StructuredCredit {
             maturity: params.maturity,
             quote_settlement_date: None,
             frequency: config.frequency,
-            payment_calendar_id: None,
-            payment_business_day_convention: None,
+            calendar_id: None,
+            business_day_convention: None,
             discount_curve_id: CurveId::new(params.discount_curve_id.to_string()),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),

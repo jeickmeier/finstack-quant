@@ -9,10 +9,6 @@
           "default": {},
           "description": "Additional attributes"
         },
-        "cds_maturity": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Underlying CDS maturity date"
-        },
         "coupon_bp": {
           "anyOf": [
             {
@@ -97,7 +93,7 @@
         "protection_start_convention": {
           "$ref": "#/$defs/ProtectionStartConvention",
           "default": "spot",
-          "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_effective_date` is not explicitly supplied."
+          "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_start_date` is not explicitly supplied."
         },
         "realized_loss": {
           "default": 0.0,
@@ -135,7 +131,16 @@
           "default": "isda_na",
           "description": "Convention used by the underlying CDS contract.\n\nThis controls the CDS schedule, settlement lag, business day convention,\nand other market-standard mechanics used when deriving forward spread and\nrisky annuity for the option's underlying."
         },
-        "underlying_effective_date": {
+        "underlying_is_index": {
+          "default": false,
+          "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it.",
+          "type": "boolean"
+        },
+        "underlying_maturity": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Underlying CDS maturity date"
+        },
+        "underlying_start_date": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -145,11 +150,6 @@
             }
           ],
           "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry."
-        },
-        "underlying_is_index": {
-          "default": false,
-          "description": "If true, the underlying is a CDS index; else single-name CDS.\n\nThe Bloomberg CDSO model treats the two cases differently in the\nno-knockout calibration `F_0 = E[V_te]` (DOCS 2055833 §1.2): index\noptions trade no-knockout and the calibration target includes the\n`(1−R)·(1−q_te)` FEP-equivalent contribution; single-name options\nknock out on default and skip it.",
-          "type": "boolean"
         },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -162,7 +162,7 @@
         "option_type",
         "exercise_style",
         "expiry",
-        "cds_maturity",
+        "underlying_maturity",
         "notional",
         "settlement",
         "recovery_rate",
@@ -325,7 +325,6 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "cds_maturity": "2030-06-20",
           "coupon_bp": null,
           "credit_curve_id": "CORP-HAZARD",
           "discount_curve_id": "USD-OIS",
@@ -348,6 +347,7 @@
           },
           "underlying_convention": "isda_na",
           "underlying_is_index": false,
+          "underlying_maturity": "2030-06-20",
           "vol_surface_id": "CDSOPT-VOL"
         },
         "type": "cds_option"

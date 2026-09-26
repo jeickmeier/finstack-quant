@@ -2,7 +2,7 @@
   "$defs": {
     "BermudanCallProvision": {
       "additionalProperties": false,
-      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
+      "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `price_pct_of_par`: Redemption price in percent of par (`100.0` = par,\n  `102.0` = callable at 102).\n- `lockout_end`: Optional end of the no-call period; call dates on or\n  before it are not exercisable (exclusive bound, matching\n  `BermudanSchedule.lockout_end` on Bermudan swaptions).",
       "properties": {
         "call_dates": {
           "description": "Dates on which the issuer can call (must be sorted ascending).",
@@ -11,11 +11,16 @@
           },
           "type": "array"
         },
-        "lockout_periods": {
-          "description": "Lockout period in number of coupon periods before first call.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
+        "lockout_end": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "End of the no-call (lockout) period. Call dates on or before this\ndate are dropped (exclusive bound); `None` means no lockout."
         },
         "price_pct_of_par": {
           "description": "Redemption price in percent of par (`100.0` = par). The pricer pays\n`notional * price_pct_of_par / 100` at exercise.",
@@ -25,8 +30,7 @@
       },
       "required": [
         "call_dates",
-        "price_pct_of_par",
-        "lockout_periods"
+        "price_pct_of_par"
       ],
       "type": "object"
     },
@@ -136,10 +140,6 @@
       "additionalProperties": false,
       "description": "Contract terms of a range accrual note, without identity or pricing overrides.\n\n[`RangeAccrual`] flattens these terms into its own payload, and\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual::CallableRangeAccrual)\nnests them under `range_accrual`, so the callable note has exactly one\n`id`, one `attributes` map and one set of pricing overrides.",
       "properties": {
-        "accrual_start_date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Contractual accrual-period start date."
-        },
         "bounds_type": {
           "$ref": "#/$defs/BoundsType",
           "default": "absolute",
@@ -254,6 +254,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Spot price identifier"
         },
+        "start_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual accrual-period start date."
+        },
         "total_past_observations": {
           "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
@@ -285,7 +289,7 @@
         "coupon_rate",
         "notional",
         "day_count",
-        "accrual_start_date",
+        "start_date",
         "discount_curve_id",
         "spot_id",
         "vol_surface_id"
@@ -325,12 +329,11 @@
               "2026-09-30",
               "2026-12-31"
             ],
-            "lockout_periods": 1,
+            "lockout_end": "2026-01-31",
             "price_pct_of_par": 100.0
           },
           "id": "CALLABLE-RA-SOFR-1Y",
           "range_accrual": {
-            "accrual_start_date": "2025-12-31",
             "bounds_type": "absolute",
             "coupon_rate": 0.065,
             "day_count": "act_360",
@@ -364,6 +367,7 @@
             "past_observations_in_range": null,
             "payment_date": null,
             "spot_id": "SOFR-RATE",
+            "start_date": "2025-12-31",
             "total_past_observations": null,
             "underlying_ticker": "SOFR",
             "upper_bound": 0.06,

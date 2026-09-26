@@ -76,7 +76,7 @@ fn clo(cpr: f64) -> StructuredCredit {
         ));
     }
     pool.reinvestment_period = Some(ReinvestmentPeriod {
-        end_date: d(2027, 1, 1),
+        end: d(2027, 1, 1),
         is_active: true,
         criteria: ReinvestmentCriteria::default(),
         amortizing_tranches: Vec::new(),
@@ -117,7 +117,7 @@ fn clo(cpr: f64) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-CALL", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_payment_calendar("nyse");
+            .with_calendar("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 0);

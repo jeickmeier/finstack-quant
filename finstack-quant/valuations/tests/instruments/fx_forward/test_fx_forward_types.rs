@@ -42,16 +42,16 @@ fn test_fx_forward_builder_with_optional_fields() {
         .quoted_spot_opt(Some(1.10))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
-        .base_calendar_id_opt(Some("EUR".to_string()))
-        .quote_calendar_id_opt(Some("USD".to_string()))
+        .base_calendar_id_opt(Some("EUR".into()))
+        .quote_calendar_id_opt(Some("USD".into()))
         .attributes(Attributes::new().with_tag("test"))
         .build()
         .expect("should build");
 
     assert_eq!(forward.contract_rate, Some(1.12));
     assert_eq!(forward.quoted_spot, Some(1.10));
-    assert_eq!(forward.base_calendar_id, Some("EUR".to_string()));
-    assert_eq!(forward.quote_calendar_id, Some("USD".to_string()));
+    assert_eq!(forward.base_calendar_id, Some("EUR".into()));
+    assert_eq!(forward.quote_calendar_id, Some("USD".into()));
     assert!(forward.attributes.has_tag("test"));
 }
 

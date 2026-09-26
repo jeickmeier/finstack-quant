@@ -491,7 +491,7 @@ fn build_future(
         .forward_curve_id(CurveId::new(ctx.require_curve_id("forward")?.to_string()))
         .rate_averaging(fut_conv.rate_averaging)
         .index_id_opt(Some(fut_conv.index_id.clone()))
-        .fixing_calendar_id_opt(Some(fut_conv.calendar_id.clone()))
+        .fixing_calendar_id_opt(Some(fut_conv.calendar_id.clone().into()))
         .attributes(Default::default())
         .build()?;
 
@@ -533,8 +533,8 @@ fn build_swap(
         fixed_day_count: conv.default_fixed_leg_day_count,
         float_day_count: conv.day_count,
         business_day_convention: conv.market_business_day_convention,
-        payment_calendar_id: Some(conv.market_calendar_id.clone()),
-        fixing_calendar_id: Some(conv.market_calendar_id.clone()),
+        payment_calendar_id: Some(conv.market_calendar_id.clone().into()),
+        fixing_calendar_id: Some(conv.market_calendar_id.clone().into()),
         stub: finstack_quant_core::dates::StubKind::ShortFront,
         reset_lag_days: conv.default_reset_lag_days,
         payment_lag_days: conv.default_payment_lag_days,

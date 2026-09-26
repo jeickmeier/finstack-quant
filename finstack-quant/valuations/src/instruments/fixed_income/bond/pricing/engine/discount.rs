@@ -240,8 +240,8 @@ mod tests {
         let mut bond = Bond::example().expect("example bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2027 - 01 - 01),
-                end_date: date!(2027 - 01 - 01),
+                start: date!(2027 - 01 - 01),
+                end: date!(2027 - 01 - 01),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

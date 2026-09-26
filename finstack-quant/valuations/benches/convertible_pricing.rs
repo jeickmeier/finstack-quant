@@ -101,7 +101,7 @@ fn create_standard_convertible() -> ConvertibleBond {
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 
@@ -144,8 +144,8 @@ fn create_callable_convertible() -> ConvertibleBond {
     let mut call_put = CallPutSchedule::default();
 
     call_put.calls.push(CallPut {
-        start_date: maturity_3y(),
-        end_date: maturity_3y(),
+        start: maturity_3y(),
+        end: maturity_3y(),
         price_pct_of_par: 105.0,
         make_whole: None,
     });

@@ -117,7 +117,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
         spread_bp: Decimal::try_from(basis_spread_bp)
             .map_err(|_| finstack_quant_core::InputError::ConversionOverflow)?,
         payment_lag_days: base_index.default_payment_lag_days,
-        calendar_id: Some(conv.base_calendar_id.clone()),
+        calendar_id: Some(conv.base_calendar_id.clone().into()),
         reset_lag_days: Some(base_index.default_reset_lag_days),
         allow_calendar_fallback: false,
         compounding: foreign_compounding,
@@ -137,7 +137,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
         stub: finstack_quant_core::dates::StubKind::ShortFront,
         spread_bp: Decimal::ZERO,
         payment_lag_days: quote_index.default_payment_lag_days,
-        calendar_id: Some(conv.quote_calendar_id.clone()),
+        calendar_id: Some(conv.quote_calendar_id.clone().into()),
         reset_lag_days: Some(quote_index.default_reset_lag_days),
         allow_calendar_fallback: false,
         compounding: domestic_compounding,

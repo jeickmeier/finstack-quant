@@ -62,7 +62,7 @@ fn create_deal(id: &str, balance: f64) -> StructuredCredit {
         legal_maturity(),
         "USD-OIS",
     )
-    .with_payment_calendar("nyse")
+    .with_calendar("nyse")
 }
 
 fn create_market() -> MarketContext {

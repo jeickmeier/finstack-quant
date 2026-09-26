@@ -112,7 +112,7 @@ fn baseline() -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-KNOBS", pool, tranches, close(), maturity(), "USD-OIS")
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
             .with_fees(DealFees::clo_standard(Currency::USD))
             .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.20)])
             .expect("coverage test");
@@ -124,7 +124,7 @@ fn baseline() -> StructuredCredit {
 
 fn window() -> ReinvestmentPeriod {
     ReinvestmentPeriod {
-        end_date: ymd(2027, 1, 1),
+        end: ymd(2027, 1, 1),
         is_active: true,
         criteria: ReinvestmentCriteria::default(),
         amortizing_tranches: Vec::new(),
@@ -415,9 +415,9 @@ fn knobs() -> Vec<Knob> {
             change: |d| d.frequency = Tenor::monthly(),
         },
         Knob {
-            name: "payment_business_day_convention",
+            name: "business_day_convention",
             common: none,
-            change: |d| d.payment_business_day_convention = Some(BusinessDayConvention::Preceding),
+            change: |d| d.business_day_convention = Some(BusinessDayConvention::Preceding),
         },
         Knob {
             name: "credit_model.prepayment_spec",
@@ -902,9 +902,9 @@ fn knobs() -> Vec<Knob> {
             change: open_window,
         },
         Knob {
-            name: "pool.reinvestment_period.end_date",
+            name: "pool.reinvestment_period.end",
             common: open_window,
-            change: |d| reinvestment(d).end_date = ymd(2029, 1, 1),
+            change: |d| reinvestment(d).end = ymd(2029, 1, 1),
         },
         Knob {
             name: "pool.reinvestment_period.is_active",

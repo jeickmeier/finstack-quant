@@ -8,12 +8,11 @@
           "2026-09-30",
           "2026-12-31"
         ],
-        "lockout_periods": 1,
+        "lockout_end": "2026-01-31",
         "price_pct_of_par": 100.0
       },
       "id": "CALLABLE-RA-SOFR-1Y",
       "range_accrual": {
-        "accrual_start_date": "2025-12-31",
         "bounds_type": "absolute",
         "coupon_rate": 0.065,
         "day_count": "act_360",
@@ -47,6 +46,7 @@
         "past_observations_in_range": null,
         "payment_date": null,
         "spot_id": "SOFR-RATE",
+        "start_date": "2025-12-31",
         "total_past_observations": null,
         "underlying_ticker": "SOFR",
         "upper_bound": 0.06,

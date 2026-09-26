@@ -81,7 +81,7 @@ def credit_extension() -> dict[str, dict[str, Any]]:
         "id": "ANALYST-REVOLVER",
         "commitment_amount": {"amount": "10000000", "currency": "USD"},
         "drawn_amount": {"amount": "4000000", "currency": "USD"},
-        "commitment_date": AS_OF.isoformat(),
+        "issue_date": AS_OF.isoformat(),
         "maturity": "2030-01-15",
         "recovery_rate": 0.4,
         "draw_repay_spec": {"deterministic": []},
@@ -163,8 +163,8 @@ def complex_bond() -> dict[str, Any]:
             "puts": [],
             "calls": [
                 {
-                    "start_date": f"{year}-01-15",
-                    "end_date": f"{year + 1}-01-{15 if year == 2032 else 14}",
+                    "start": f"{year}-01-15",
+                    "end": f"{year + 1}-01-{15 if year == 2032 else 14}",
                     "price_pct_of_par": price,
                 }
                 for year, price in ((2028, 103.0), (2029, 102.0), (2030, 101.0), (2031, 100.0), (2032, 100.0))
@@ -203,7 +203,7 @@ def structured_index_inputs() -> dict[str, dict[str, Any]]:
             "credit_index_id": "CDX-INDEX-DATA",
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
-            "effective_date": "2024-12-20",
+            "start_date": "2024-12-20",
             "frequency": {"count": 3, "unit": "months"},
             "index_name": "CDX.NA.IG",
             "maturity": "2029-12-20",
@@ -240,7 +240,7 @@ def credit_index_inputs() -> dict[str, dict[str, Any]]:
         "spec": {
             "id": "CDX-PAYER",
             "attributes": {},
-            "cds_maturity": "2029-12-20",
+            "underlying_maturity": "2029-12-20",
             "credit_curve_id": "CDX-HAZ",
             "discount_curve_id": "USD-OIS",
             "exercise_style": "european",
@@ -440,8 +440,8 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
     spec = payload["instrument"]["spec"]
     spec.update({
         "first_payment_date": "2025-04-15",
-        "payment_calendar_id": "weekends_only",
-        "payment_business_day_convention": "unadjusted",
+        "calendar_id": "weekends_only",
+        "business_day_convention": "unadjusted",
         "fees": None,
         "coverage_triggers": []
         if oc_trigger is None

@@ -47,7 +47,7 @@ fn _generate_deterministic_cashflows_with_curves_replaced(
 #[test]
 fn test_upfront_fee_sign() {
     // Test that upfront fee increases PV when valued before commitment
-    // (borrower pays lender, lender inflow). When as_of >= commitment_date
+    // (borrower pays lender, lender inflow). When as_of >= issue_date
     // the fee is excluded because it's already been paid.
     let as_of = Date::from_calendar_date(2024, Month::December, 31).unwrap();
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -57,7 +57,7 @@ fn test_upfront_fee_sign() {
         .id("RC-UPFRONT-TEST".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(start)
+        .issue_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
@@ -123,7 +123,7 @@ fn test_mid_period_draw_accrual() {
         .id("RC-MID-DRAW".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(start)
+        .issue_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 }) // 5% annual
         .day_count(DayCount::Act360)
@@ -197,7 +197,7 @@ fn test_floating_vs_margin_only() {
         .id("RC-FLOATING-TEST".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(start)
+        .issue_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -288,7 +288,7 @@ fn test_reset_frequency_mismatch() {
         .id("RC-RESET-TEST".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(start)
+        .issue_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -390,7 +390,7 @@ fn test_utilization_tier() {
         .id("RC-TIER-LOW".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture")) // 30% utilization
-        .commitment_date(start)
+        .issue_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
@@ -410,7 +410,7 @@ fn test_utilization_tier() {
         .id("RC-TIER-HIGH".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(7_000_000.0, Currency::USD).expect("valid money fixture")) // 70% utilization
-        .commitment_date(start)
+        .issue_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
@@ -478,7 +478,7 @@ fn test_as_of_filtering() {
         .id("RC-ASOF-TEST".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(start)
+        .issue_date(start)
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)

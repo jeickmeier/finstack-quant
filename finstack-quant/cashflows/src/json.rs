@@ -29,7 +29,7 @@ pub struct CashflowScheduleBuildSpec {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub issue: Date,
+    pub issue_date: Date,
     /// Contract maturity date.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
@@ -291,7 +291,7 @@ impl CashflowScheduleBuildSpec {
     ///     "initial": { "amount": "1000000", "currency": "USD" },
     ///     "amort": "none"
     ///   },
-    ///   "issue": "2024-08-31",
+    ///   "issue_date": "2024-08-31",
     ///   "maturity": "2025-08-31",
     ///   "coupon_program": [{
     ///     "kind": "fixed",
@@ -320,7 +320,7 @@ impl CashflowScheduleBuildSpec {
     pub fn build(&self, market: Option<&MarketContext>) -> Result<CashFlowSchedule> {
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
-            .principal(self.notional.initial, self.issue, self.maturity)
+            .principal(self.notional.initial, self.issue_date, self.maturity)
             .principal_exchange(self.principal_exchange)
             .amortization(self.notional.amort.clone());
 
@@ -419,7 +419,7 @@ impl CashflowScheduleBuildSpec {
 ///     "initial": { "amount": "1000000", "currency": "USD" },
 ///     "amort": "none"
 ///   },
-///   "issue": "2024-08-31",
+///   "issue_date": "2024-08-31",
 ///   "maturity": "2025-08-31",
 ///   "coupon_program": [{
 ///     "kind": "fixed",
@@ -488,7 +488,7 @@ pub fn build_cashflow_schedule_json(spec_json: &str, market_json: Option<&str>) 
 ///     "initial": { "amount": "1000000", "currency": "USD" },
 ///     "amort": "none"
 ///   },
-///   "issue": "2024-08-31",
+///   "issue_date": "2024-08-31",
 ///   "maturity": "2025-08-31",
 ///   "coupon_program": []
 /// }"#;
@@ -534,7 +534,7 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 ///     "initial": { "amount": "1000000", "currency": "USD" },
 ///     "amort": "none"
 ///   },
-///   "issue": "2024-08-31",
+///   "issue_date": "2024-08-31",
 ///   "maturity": "2025-08-31",
 ///   "coupon_program": []
 /// }"#;
@@ -591,7 +591,7 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
 ///     "initial": { "amount": "1000000", "currency": "USD" },
 ///     "amort": "none"
 ///   },
-///   "issue": "2024-08-31",
+///   "issue_date": "2024-08-31",
 ///   "maturity": "2025-08-31",
 ///   "coupon_program": [{
 ///     "kind": "fixed",

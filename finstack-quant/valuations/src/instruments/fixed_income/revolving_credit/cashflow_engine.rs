@@ -156,8 +156,8 @@ impl<'a> CashflowEngine<'a> {
             representation: crate::cashflow::builder::CashflowRepresentation::Projected,
             calendar_ids: Vec::new(),
             facility_limit: Some(self.facility.commitment_amount),
-            issue_date: Some(self.facility.commitment_date),
-            maturity_date: None,
+            issue_date: Some(self.facility.issue_date),
+            maturity: None,
         }
     }
 
@@ -257,13 +257,13 @@ impl<'a> CashflowEngine<'a> {
         // future-only. An event dated on or before the anchor would be
         // replayed on top of a balance that already includes it: interest
         // accrued on 2X and 2X repaid at maturity.
-        let anchor = self.facility.commitment_date.max(self.as_of);
+        let anchor = self.facility.issue_date.max(self.as_of);
         if let Some(event) = draw_repay_events.iter().find(|e| e.date <= anchor) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "RevolvingCredit draw/repay event dated {} is on or before the simulation anchor \
                  {} (the later of the commitment date {} and the valuation date {}); the drawn \
                  balance at the anchor is defined by drawn_amount, so date events strictly after it",
-                event.date, anchor, self.facility.commitment_date, self.as_of
+                event.date, anchor, self.facility.issue_date, self.as_of
             )));
         }
 
@@ -273,12 +273,12 @@ impl<'a> CashflowEngine<'a> {
         let rc = RoundingContext::default();
         let ccy = self.facility.commitment_amount.currency();
 
-        // Add initial draw at commitment_date (from lender perspective: negative cashflow)
-        if self.facility.commitment_date > self.as_of
+        // Add initial draw at issue_date (from lender perspective: negative cashflow)
+        if self.facility.issue_date > self.as_of
             && !rc.is_effectively_zero(self.facility.drawn_amount.amount(), ZeroKind::Money(ccy))
         {
             flows.push(CashFlow::new(
-                self.facility.commitment_date,
+                self.facility.issue_date,
                 None,
                 self.facility.drawn_amount * -1.0,
                 CFKind::Notional,
@@ -837,12 +837,12 @@ impl<'a> CashflowEngine<'a> {
             BaseRateSpec::Fixed { .. } => (None, None),
         };
 
-        // Add initial draw at commitment_date (from lender perspective: negative cashflow)
-        if self.facility.commitment_date > self.as_of
+        // Add initial draw at issue_date (from lender perspective: negative cashflow)
+        if self.facility.issue_date > self.as_of
             && !rc.is_effectively_zero(self.facility.drawn_amount.amount(), ZeroKind::Money(ccy))
         {
             flows.push(CashFlow::new(
-                self.facility.commitment_date,
+                self.facility.issue_date,
                 None,
                 self.facility.drawn_amount * -1.0,
                 CFKind::Notional,
@@ -851,7 +851,7 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        let anchor = self.facility.commitment_date.max(self.as_of);
+        let anchor = self.facility.issue_date.max(self.as_of);
         self.check_anchor_capacity(anchor)?;
 
         // Running drawn balance at the last observation, for the principal
@@ -1230,7 +1230,7 @@ pub fn calculate_drawn_balance_at_date(
     };
     draw_repay_events.sort_by_key(|event| event.date);
 
-    let anchor = facility.commitment_date.max(as_of);
+    let anchor = facility.issue_date.max(as_of);
     facility.drawn_balance_at(&draw_repay_events, anchor, target_date)
 }
 
@@ -1251,7 +1251,7 @@ mod tests {
             .id("RC-BDC-BOUNDARY".into())
             .commitment_amount(Money::from((1_000_000_i64, Currency::USD)))
             .drawn_amount(Money::from((1_000_000_i64, Currency::USD)))
-            .commitment_date(start)
+            .issue_date(start)
             .maturity(maturity)
             .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act365F)

@@ -122,7 +122,7 @@ impl CallableRangeAccrual {
                 .coupon_rate(0.065)
                 .notional(Money::from((1_000_000_i64, Currency::USD)))
                 .day_count(DayCount::Act360)
-                .accrual_start_date(date!(2025 - 12 - 31))
+                .start_date(date!(2025 - 12 - 31))
                 .index_id(finstack_quant_core::types::IndexId::new("SOFR"))
                 .forward_curve_id(CurveId::new("USD-OIS"))
                 .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
@@ -135,7 +135,11 @@ impl CallableRangeAccrual {
                 .total_past_observations_opt(None)
                 .build()
                 .expect("example range accrual terms should build"),
-            call_provision: BermudanCallProvision::new(call_dates, 100.0, 1),
+            call_provision: BermudanCallProvision::new(
+                call_dates,
+                100.0,
+                Some(Date::from_calendar_date(2026, Month::January, 31).expect("valid")),
+            ),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),

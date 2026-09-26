@@ -93,9 +93,9 @@ pub fn generate_three_factor_paths(
     // All stochastic factors start at the valuation date for seasoned
     // facilities.  Keep path time on the facility axis, but retain the
     // simulation anchor so curve-fitted models can use their own t=0.
-    let simulation_anchor = as_of.max(facility.commitment_date);
-    let t_asof = if as_of > facility.commitment_date {
-        day_count.year_fraction(facility.commitment_date, as_of, DayCountContext::default())?
+    let simulation_anchor = as_of.max(facility.issue_date);
+    let t_asof = if as_of > facility.issue_date {
+        day_count.year_fraction(facility.issue_date, as_of, DayCountContext::default())?
     } else {
         0.0
     };
@@ -201,7 +201,7 @@ pub fn generate_three_factor_paths(
                     let rates = fwd.forwards().to_vec();
                     let curve_offset = fwd.day_count().signed_year_fraction(
                         fwd.base_date(),
-                        facility.commitment_date,
+                        facility.issue_date,
                         DayCountContext::default(),
                     )?;
                     let observed = payment_dates
@@ -261,7 +261,7 @@ pub fn generate_three_factor_paths(
     );
 
     // Convert payment dates to time points using facility's day count
-    let raw_time_points = dates_to_times(payment_dates, facility.commitment_date, day_count)?;
+    let raw_time_points = dates_to_times(payment_dates, facility.issue_date, day_count)?;
 
     // Seasoned facilities simulate from the VALUATION date, not the
     // commitment date: the current utilization is a KNOWN t₀ state, and
@@ -647,12 +647,12 @@ const MAX_MC_TIME_STEP: f64 = 1.0 / 52.0; // ~1 week
 /// across the facility's cashflow engine and path generation.
 fn dates_to_times(
     payment_dates: &[Date],
-    commitment_date: Date,
+    issue_date: Date,
     day_count: DayCount,
 ) -> Result<Vec<f64>> {
     payment_dates
         .iter()
-        .map(|&date| day_count.year_fraction(commitment_date, date, DayCountContext::default()))
+        .map(|&date| day_count.year_fraction(issue_date, date, DayCountContext::default()))
         .collect()
 }
 

@@ -84,8 +84,8 @@ impl StructuredCredit {
             }
         }
         if let Some(period) = &pool.reinvestment_period {
-            if period.end_date < self.closing_date
-                || period.end_date > self.maturity
+            if period.end < self.closing_date
+                || period.end > self.maturity
                 || !period.criteria.max_price_pct.is_finite()
                 || period.criteria.max_price_pct <= 0.0
                 || !period.criteria.min_yield.is_finite()

@@ -127,7 +127,7 @@ let terms = RangeAccrualTerms::builder()
         date!(2024 - 02 - 29),
         date!(2024 - 03 - 31),
     ])
-    .accrual_start_date(date!(2023 - 12 - 31))
+    .start_date(date!(2023 - 12 - 31))
     .lower_bound(0.95)
     .upper_bound(1.05)
     .bounds_type(BoundsType::RelativeToInitialSpot)
@@ -191,7 +191,7 @@ pricing; normal or displaced surface quotes produce a validation error.
 - `past_observations_in_range` and `total_past_observations` are both set or both
   unset, with `in_range <= total`;
 - `payment_date` (when set) is on or after the final observation date;
-- the accrual factor from `accrual_start_date` to the final observation is
+- the accrual factor from `start_date` to the final observation is
   finite and positive;
 - `index_id`, `forward_curve_id` and `index_tenor` are supplied
   together (all three or none).

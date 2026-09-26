@@ -88,8 +88,8 @@ fn test_callable_exercise_coupon_always_paid() {
     // Callable bond with call at 100% of par
     let mut call_schedule = CallPutSchedule::default();
     call_schedule.calls.push(CallPut {
-        start_date: call_date,
-        end_date: call_date,
+        start: call_date,
+        end: call_date,
         price_pct_of_par: 100.0,
         make_whole: None,
     });
@@ -160,8 +160,8 @@ fn test_putable_bond_worth_more() {
     // Putable bond with put at 100% of par
     let mut put_schedule = CallPutSchedule::default();
     put_schedule.puts.push(CallPut {
-        start_date: put_date,
-        end_date: put_date,
+        start: put_date,
+        end: put_date,
         price_pct_of_par: 100.0,
         make_whole: None,
     });

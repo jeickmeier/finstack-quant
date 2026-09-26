@@ -84,7 +84,7 @@ fn create_test_market() -> MarketContext {
 
 #[test]
 fn test_missing_calendar_fails_with_helpful_message() {
-    // Arrange: Create CLO WITHOUT setting payment_calendar_id
+    // Arrange: Create CLO WITHOUT setting calendar_id
     let clo = StructuredCredit::new_clo(
         "NO_CALENDAR_CLO",
         create_test_pool(),
@@ -93,7 +93,7 @@ fn test_missing_calendar_fails_with_helpful_message() {
         maturity_date(),
         "USD_OIS",
     );
-    // Note: NOT calling .with_payment_calendar()
+    // Note: NOT calling .with_calendar()
 
     let market = create_test_market();
 
@@ -106,8 +106,8 @@ fn test_missing_calendar_fails_with_helpful_message() {
     let error = result.unwrap_err();
     let error_msg = format!("{}", error);
     assert!(
-        error_msg.contains("payment_calendar_id"),
-        "Error should mention payment_calendar_id: {}",
+        error_msg.contains("calendar_id"),
+        "Error should mention calendar_id: {}",
         error_msg
     );
 }
@@ -123,7 +123,7 @@ fn test_invalid_calendar_id_fails_with_available_options() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_payment_calendar("NONEXISTENT_CALENDAR");
+    .with_calendar("NONEXISTENT_CALENDAR");
 
     let market = create_test_market();
 
@@ -155,7 +155,7 @@ fn test_valid_nyse_calendar_succeeds() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
 
     let market = create_test_market();
 
@@ -184,7 +184,7 @@ fn test_valid_target2_calendar_succeeds() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_payment_calendar("target2");
+    .with_calendar("target2");
 
     let market = create_test_market();
 
@@ -213,7 +213,7 @@ fn test_clo_schedule_avoids_us_holidays() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
 
     let market = create_test_market();
 
@@ -241,7 +241,7 @@ fn test_seasoned_clo_keeps_contractual_coupon_grid() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
 
     clo.first_payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
 
@@ -270,7 +270,7 @@ fn test_payment_schedule_is_deterministic_with_calendar() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
 
     let clo2 = StructuredCredit::new_clo(
         "DETERMINISTIC_CLO_2",
@@ -280,7 +280,7 @@ fn test_payment_schedule_is_deterministic_with_calendar() {
         maturity_date(),
         "USD_OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
 
     let market = create_test_market();
 

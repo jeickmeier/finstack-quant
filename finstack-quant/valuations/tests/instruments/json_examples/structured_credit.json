@@ -2,6 +2,7 @@
   "instrument": {
     "spec": {
       "attributes": {},
+      "calendar_id": "nyse",
       "closing_date": "2024-01-01",
       "deal_metadata": {
         "manager_id": null,
@@ -27,7 +28,6 @@
         "refi_rate": 0.04
       },
       "maturity": "2034-01-01",
-      "payment_calendar_id": "nyse",
       "pool": {
         "assets": [
           {

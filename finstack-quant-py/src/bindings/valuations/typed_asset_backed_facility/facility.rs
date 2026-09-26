@@ -512,8 +512,8 @@ impl PyAssetBackedFacility {
 
     /// Payment calendar identifier, or ``None``.
     #[getter]
-    fn payment_calendar_id(&self) -> Option<String> {
-        self.inner.payment_calendar_id.clone()
+    fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
     /// Amortization events as ``AmortizationEvent`` serde dicts (``kind`` =
@@ -1284,13 +1284,13 @@ impl PyAssetBackedFacilityBuilder {
     /// ValueError
     ///     If this builder was already consumed by ``build``.
     #[pyo3(text_signature = "($self, value)")]
-    fn payment_calendar_id<'py>(
+    fn calendar_id<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted = value.to_string();
         let b = take_facility(&mut slf)?;
-        slf.inner = Some(b.payment_calendar_id(converted));
+        slf.inner = Some(b.calendar_id(converted.into()));
         Ok(slf)
     }
 

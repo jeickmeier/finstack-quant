@@ -129,7 +129,7 @@ pub(super) fn simulate_period(
                 .pool
                 .reinvestment_period
                 .as_ref()
-                .is_some_and(|window| window.is_active && pay_date <= window.end_date);
+                .is_some_and(|window| window.is_active && pay_date <= window.end);
         if !revolving {
             state.card_flow_base = Some(base.clone());
         }
@@ -302,7 +302,7 @@ pub(super) fn simulate_period(
             .pool
             .reinvestment_period
             .as_ref()
-            .is_some_and(|period| period.is_active && pay_date <= period.end_date);
+            .is_some_and(|period| period.is_active && pay_date <= period.end);
 
     if let (Some(base), false, true) = (
         card_opening_balances,
@@ -325,7 +325,7 @@ pub(super) fn simulate_period(
     let is_accumulating = accumulation_spec.is_some_and(|spec| {
         !early_amortization
             && !is_reinvestment_active
-            && pay_date >= spec.start_date
+            && pay_date >= spec.start
             && pay_date < spec.bullet_date
     });
     let principal_diverted = is_accumulating;
@@ -653,7 +653,7 @@ fn apply_tranche_draws(
                 .pool
                 .reinvestment_period
                 .as_ref()
-                .is_some_and(|window| window.is_active && pay_date <= window.end_date);
+                .is_some_and(|window| window.is_active && pay_date <= window.end);
         if revolving {
             if let Some(rules) = instrument
                 .coverage_rules

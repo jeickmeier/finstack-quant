@@ -193,7 +193,7 @@ listed_manual=1000*market.get_discount("USD-OIS").df(t)*(72*normal.cdf(d1)-75*no
 
 swaption=instrument_envelope({"type":"commodity_swaption","spec":{
     "id":"NG-SWAPTION","commodity_type":"Energy","underlying_ticker":"NG","unit":"MMBTU","currency":"USD",
-    "option_type":"call","expiry":"2025-06-16","swap_start":"2025-06-16","swap_end":"2025-12-16",
+    "option_type":"call","expiry":"2025-06-16","underlying_start_date":"2025-06-16","underlying_maturity":"2025-12-16",
     "swap_frequency":{"count":3,"unit":"months"},"fixed_price":3.2,"quantity":10000.,
     "forward_curve_id":"NG-FORWARD","discount_curve_id":"USD-OIS","vol_surface_id":"NG-VOL",
     "calendar_id":"weekends_only","business_day_convention":"modified_following","day_count":"act_365f","attributes":{}}})

@@ -75,7 +75,7 @@ pub struct ExCouponRule {
     ///
     /// - `Some(id)`: Subtract N business days from payment date.
     /// - `None`: Subtract N calendar days from payment date.
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
 }
 
 impl ExCouponRule {
@@ -114,7 +114,7 @@ impl ExCouponRule {
         if let Some(cal_id) = &self.calendar_id {
             let cal = calendar_by_id(cal_id).ok_or_else(|| {
                 finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
-                    id: cal_id.clone(),
+                    id: cal_id.to_string(),
                 })
             })?;
             Ok(payment_date.add_business_days(-days, cal)?)

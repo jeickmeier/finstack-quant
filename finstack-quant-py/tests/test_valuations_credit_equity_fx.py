@@ -392,8 +392,8 @@ class TestConvertibleBond:
 
     def test_call_put_schedule_pickles_and_round_trips(self) -> None:
         sched = CallPutSchedule(
-            calls=[{"start_date": "2026-01-15", "end_date": "2029-01-15", "price_pct_of_par": 101.0}],
-            puts='[{"start_date": "2027-01-15", "end_date": "2027-01-15", "price_pct_of_par": 100.0}]',
+            calls=[{"start": "2026-01-15", "end": "2029-01-15", "price_pct_of_par": 101.0}],
+            puts='[{"start": "2027-01-15", "end": "2027-01-15", "price_pct_of_par": 100.0}]',
         )
         assert len(sched.calls) == 1
         assert sched.puts[0]["price_pct_of_par"] == 100.0
@@ -433,7 +433,7 @@ class TestEquityOption:
         assert option.exercise is None
         assert option.div_yield_id == "EQUITY-DIVYIELD"
         assert option.discrete_dividends == []
-        assert option.exercise_schedule is None
+        assert option.exercise_dates is None
 
         market = _equity_market()
         result = option.price(market, "2024-01-15")
@@ -463,7 +463,7 @@ class TestEquityOption:
             .spot_id("EQUITY-SPOT")
             .vol_surface_id("EQUITY-VOL")
             .discrete_dividends([(datetime.date(2024, 3, 15), 20.0)])
-            .exercise_schedule([datetime.date(2024, 3, 21), datetime.date(2024, 6, 21)])
+            .exercise_dates([datetime.date(2024, 3, 21), datetime.date(2024, 6, 21)])
             .build()
         )
         market = _equity_market()

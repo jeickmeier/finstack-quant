@@ -57,7 +57,7 @@ fn create_bond_with_daycount(
                 business_day_convention:
                     finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: finstack_quant_core::dates::StubKind::None,
 

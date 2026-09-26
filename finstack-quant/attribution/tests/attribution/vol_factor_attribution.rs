@@ -92,7 +92,7 @@ fn build_option() -> EquityOption {
         instrument_pricing_overrides: InstrumentPricingOverrides::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     }
 }

@@ -59,8 +59,8 @@ use finstack_quant_core::Result;
 ///     .underlying(CommodityUnderlyingParams::new("Energy", "NG", "MMBTU", Currency::USD))
 ///     .option_type(OptionType::Call)
 ///     .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())
-///     .swap_start(Date::from_calendar_date(2025, Month::July, 1).unwrap())
-///     .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())
+///     .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())
+///     .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())
 ///     .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
 ///     .fixed_price(3.50)
 ///     .quantity(10000.0)
@@ -100,14 +100,14 @@ pub struct CommoditySwaption {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub swap_start: Date,
+    pub underlying_start_date: Date,
     /// Underlying swap end date.
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub swap_end: Date,
+    pub underlying_maturity: Date,
     /// Underlying swap payment frequency.
     pub swap_frequency: Tenor,
     /// Fixed price (strike) of the underlying swap.
@@ -185,16 +185,16 @@ impl CommoditySwaption {
     /// Validate commodity swaption input invariants.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.underlying.validate("CommoditySwaption")?;
-        // expiry <= swap_start < swap_end
+        // expiry <= underlying_start_date < underlying_maturity
         crate::instruments::common_impl::validation::validate_date_range_non_strict(
             self.expiry,
-            self.swap_start,
-            "CommoditySwaption expiry/swap_start",
+            self.underlying_start_date,
+            "CommoditySwaption expiry/underlying_start_date",
         )?;
         crate::instruments::common_impl::validation::validate_date_range_strict(
-            self.swap_start,
-            self.swap_end,
-            "CommoditySwaption swap_start/swap_end",
+            self.underlying_start_date,
+            self.underlying_maturity,
+            "CommoditySwaption underlying_start_date/underlying_maturity",
         )?;
         // quantity > 0
         crate::instruments::common_impl::validation::validate_f64_positive(
@@ -227,10 +227,10 @@ impl CommoditySwaption {
             .expiry(
                 Date::from_calendar_date(2025, time::Month::June, 15).expect("valid example date"),
             )
-            .swap_start(
+            .underlying_start_date(
                 Date::from_calendar_date(2025, time::Month::July, 1).expect("valid example date"),
             )
-            .swap_end(
+            .underlying_maturity(
                 Date::from_calendar_date(2026, time::Month::June, 30).expect("valid example date"),
             )
             .swap_frequency(Tenor::monthly())
@@ -247,9 +247,10 @@ impl CommoditySwaption {
 
     /// Generate the underlying swap payment schedule.
     pub fn swap_payment_schedule(&self) -> Result<Vec<Date>> {
-        let mut builder = ScheduleBuilder::new(self.swap_start, self.swap_end)?
-            .frequency(self.swap_frequency)
-            .stub_rule(finstack_quant_core::dates::StubKind::ShortBack);
+        let mut builder =
+            ScheduleBuilder::new(self.underlying_start_date, self.underlying_maturity)?
+                .frequency(self.swap_frequency)
+                .stub_rule(finstack_quant_core::dates::StubKind::ShortBack);
 
         if let Some(ref cal_id) = self.calendar_id {
             let cal = calendar_by_id(cal_id).ok_or_else(|| {
@@ -328,13 +329,13 @@ impl CommoditySwaption {
             }
             true
         };
-        // The swap underlying a swaption is forward-starting (swap_start ≥
+        // The swap underlying a swaption is forward-starting (underlying_start_date ≥
         // expiry ≥ as_of), so every observation projects from the curve;
         // coverage failures propagate (W-11).
         let get_price = |date: Date| -> Result<f64> { price_curve.price_on_date(date) };
 
         let last_payment = schedule.last().copied();
-        let mut prev_period_end = self.swap_start;
+        let mut prev_period_end = self.underlying_start_date;
         let mut sum_fwd = 0.0;
         let mut weighted_fwd = 0.0;
         let mut weight_total = 0.0;
@@ -546,7 +547,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
     }
 
     fn effective_start_date(&self) -> Option<Date> {
-        Some(self.swap_start)
+        Some(self.underlying_start_date)
     }
 
     fn expiry(&self) -> Option<Date> {
@@ -742,8 +743,12 @@ mod tests {
             ))
             .option_type(OptionType::Call)
             .expiry(Date::from_calendar_date(2025, time::Month::June, 15).expect("valid date"))
-            .swap_start(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
-            .swap_end(Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"))
+            .underlying_start_date(
+                Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"),
+            )
+            .underlying_maturity(
+                Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"),
+            )
             .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(3.50)
             .quantity(10_000.0)
@@ -759,14 +764,18 @@ mod tests {
 
     #[test]
     fn validation_rejects_swap_start_after_swap_end() {
-        // swap_start == swap_end: invalid
+        // underlying_start_date == underlying_maturity: invalid
         let result = base_swaption_builder()
-            .swap_start(Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"))
-            .swap_end(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
+            .underlying_start_date(
+                Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"),
+            )
+            .underlying_maturity(
+                Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"),
+            )
             .build();
         assert!(
             result.is_err(),
-            "CommoditySwaption must reject swap_start > swap_end"
+            "CommoditySwaption must reject underlying_start_date > underlying_maturity"
         );
     }
 
@@ -774,39 +783,41 @@ mod tests {
     fn validation_rejects_swap_start_equal_swap_end() {
         let same_date = Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
         let result = base_swaption_builder()
-            .swap_start(same_date)
-            .swap_end(same_date)
+            .underlying_start_date(same_date)
+            .underlying_maturity(same_date)
             .build();
         assert!(
             result.is_err(),
-            "CommoditySwaption must reject swap_start == swap_end"
+            "CommoditySwaption must reject underlying_start_date == underlying_maturity"
         );
     }
 
     #[test]
     fn validation_rejects_expiry_after_swap_start() {
-        // expiry > swap_start: invalid
+        // expiry > underlying_start_date: invalid
         let result = base_swaption_builder()
             .expiry(Date::from_calendar_date(2025, time::Month::August, 1).expect("valid date"))
-            .swap_start(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
+            .underlying_start_date(
+                Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"),
+            )
             .build();
         assert!(
             result.is_err(),
-            "CommoditySwaption must reject expiry > swap_start"
+            "CommoditySwaption must reject expiry > underlying_start_date"
         );
     }
 
     #[test]
     fn validation_accepts_expiry_equal_swap_start() {
-        // expiry == swap_start is allowed (option expires exactly when swap starts)
+        // expiry == underlying_start_date is allowed (option expires exactly when swap starts)
         let same_date = Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
         let result = base_swaption_builder()
             .expiry(same_date)
-            .swap_start(same_date)
+            .underlying_start_date(same_date)
             .build();
         assert!(
             result.is_ok(),
-            "CommoditySwaption must allow expiry == swap_start"
+            "CommoditySwaption must allow expiry == underlying_start_date"
         );
     }
 
@@ -955,8 +966,12 @@ mod tests {
             ))
             .option_type(OptionType::Call)
             .expiry(Date::from_calendar_date(2025, Month::June, 1).expect("valid date"))
-            .swap_start(Date::from_calendar_date(2025, Month::July, 1).expect("valid date"))
-            .swap_end(Date::from_calendar_date(2026, Month::July, 1).expect("valid date"))
+            .underlying_start_date(
+                Date::from_calendar_date(2025, Month::July, 1).expect("valid date"),
+            )
+            .underlying_maturity(
+                Date::from_calendar_date(2026, Month::July, 1).expect("valid date"),
+            )
             .swap_frequency(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(4.0)
             .quantity(10000.0)
@@ -982,7 +997,7 @@ mod tests {
         };
 
         let last_pay = *schedule.last().expect("non-empty schedule");
-        let mut prev = swaption.swap_start;
+        let mut prev = swaption.underlying_start_date;
         let mut avg_weighted = 0.0;
         let mut pay_weighted = 0.0;
         let mut weight_total = 0.0;
@@ -1082,8 +1097,8 @@ mod tests {
             ))
             .option_type(OptionType::Call)
             .expiry(Date::from_calendar_date(2025, Month::June, 1).expect("valid date"))
-            .swap_start(swap_start)
-            .swap_end(swap_end)
+            .underlying_start_date(swap_start)
+            .underlying_maturity(swap_end)
             .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(strike)
             .quantity(10_000.0)
@@ -1190,8 +1205,8 @@ mod tests {
             ))
             .option_type(option_type)
             .expiry(date(2025, 6, 15))
-            .swap_start(date(2025, 7, 1))
-            .swap_end(date(2026, 6, 30))
+            .underlying_start_date(date(2025, 7, 1))
+            .underlying_maturity(date(2026, 6, 30))
             .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(fixed_price)
             .quantity(10000.0)

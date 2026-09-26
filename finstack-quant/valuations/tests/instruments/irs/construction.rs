@@ -50,7 +50,7 @@ fn test_irs_builder_pattern() {
             frequency: Tenor::semi_annual(),
             day_count: DayCount::Thirty360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("usny".to_string()),
+            calendar_id: Some("usny".into()),
             stub: StubKind::None,
             start: date!(2024 - 01 - 15),
             end: date!(2034 - 01 - 15),
@@ -66,8 +66,8 @@ fn test_irs_builder_pattern() {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("usny".to_string()),
-            fixing_calendar_id: Some("usny".to_string()),
+            calendar_id: Some("usny".into()),
+            fixing_calendar_id: Some("usny".into()),
             stub: StubKind::None,
             reset_lag_days: 0, // Use 0 for spot-starting swaps to avoid needing historical fixings
             compounding: Default::default(),
@@ -276,7 +276,7 @@ fn test_irs_calendar_specification() {
             frequency: Tenor::semi_annual(),
             day_count: DayCount::Thirty360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("usny".to_string()),
+            calendar_id: Some("usny".into()),
             stub: StubKind::None,
             start: date!(2024 - 01 - 01),
             end: date!(2029 - 01 - 01),
@@ -292,8 +292,8 @@ fn test_irs_calendar_specification() {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("usny".to_string()),
-            fixing_calendar_id: Some("usny".to_string()),
+            calendar_id: Some("usny".into()),
+            fixing_calendar_id: Some("usny".into()),
             stub: StubKind::None,
             reset_lag_days: 0, // Use 0 for spot-starting swaps to avoid needing historical fixings
             compounding: Default::default(),
@@ -305,8 +305,8 @@ fn test_irs_calendar_specification() {
         .build()
         .unwrap();
 
-    assert_eq!(swap.fixed.calendar_id, Some("usny".to_string()));
-    assert_eq!(swap.float.calendar_id, Some("usny".to_string()));
+    assert_eq!(swap.fixed.calendar_id, Some("usny".into()));
+    assert_eq!(swap.float.calendar_id, Some("usny".into()));
 }
 
 #[test]

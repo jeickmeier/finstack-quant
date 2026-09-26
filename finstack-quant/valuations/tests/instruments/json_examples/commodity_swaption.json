@@ -13,12 +13,12 @@
       "id": "NG-SWAPTION-2025",
       "option_type": "call",
       "quantity": 10000.0,
-      "swap_end": "2026-06-30",
       "swap_frequency": {
         "count": 1,
         "unit": "months"
       },
-      "swap_start": "2025-07-01",
+      "underlying_maturity": "2026-06-30",
+      "underlying_start_date": "2025-07-01",
       "underlying_ticker": "NG",
       "unit": "MMBTU",
       "vol_surface_id": "NG-VOL"

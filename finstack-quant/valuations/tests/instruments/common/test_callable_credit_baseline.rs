@@ -93,8 +93,8 @@ fn callable_credit_bond() -> Bond {
     bond.credit_curve_id = Some(CurveId::from("USD-HAZ"));
     bond.call_put = Some(CallPutSchedule {
         calls: vec![CallPut {
-            start_date: date!(2027 - 01 - 01),
-            end_date: date!(2029 - 01 - 01),
+            start: date!(2027 - 01 - 01),
+            end: date!(2029 - 01 - 01),
             price_pct_of_par: 102.0,
             make_whole: None,
         }],

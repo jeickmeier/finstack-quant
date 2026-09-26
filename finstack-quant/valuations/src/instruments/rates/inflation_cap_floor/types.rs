@@ -152,7 +152,7 @@ pub struct InflationCapFloor {
     pub business_day_convention: BusinessDayConvention,
     /// Optional holiday calendar identifier.
     #[builder(optional)]
-    pub calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Inflation index/curve identifier (e.g., US-CPI-U).
     pub inflation_index_id: CurveId,
     /// Discount curve identifier.

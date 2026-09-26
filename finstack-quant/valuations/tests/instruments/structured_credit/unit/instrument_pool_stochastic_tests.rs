@@ -43,7 +43,7 @@ fn stochastic_revolver(volatility: f64, spread_sensitivity: f64, credit: bool) -
         .id("RCF-STOCH".into())
         .commitment_amount(usd(50_000_000.0))
         .drawn_amount(usd(10_000_000.0))
-        .commitment_date(CLOSING)
+        .issue_date(CLOSING)
         .maturity(date!(2027 - 01 - 15))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)

@@ -172,8 +172,8 @@ mod tests {
         bond.credit_curve_id = Some(CurveId::new("USD-CREDIT"));
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2028 - 01 - 01),
-                end_date: date!(2028 - 01 - 01),
+                start: date!(2028 - 01 - 01),
+                end: date!(2028 - 01 - 01),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -251,8 +251,8 @@ mod tests {
         clean_bond.settlement_convention = None;
         clean_bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2028 - 01 - 15),
-                end_date: date!(2028 - 01 - 15),
+                start: date!(2028 - 01 - 15),
+                end: date!(2028 - 01 - 15),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

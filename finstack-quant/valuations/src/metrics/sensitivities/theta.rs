@@ -588,13 +588,13 @@ mod tests {
 
     #[test]
     fn opening_notional_draw_date_uses_deposit_effective_start() {
-        let deposit = Deposit::example().expect("example deposit");
+        let mut deposit = Deposit::example().expect("example deposit");
+        // Saturday start rolls to Monday under ModifiedFollowing on the NYSE calendar.
+        deposit.start_date = date!(2024 - 01 - 06);
+        deposit.calendar_id = Some("nyse".into());
         let expected = deposit.effective_start_date().expect("effective start");
+        assert_eq!(expected, date!(2024 - 01 - 08));
         assert_eq!(opening_notional_draw_date(&deposit), Some(expected));
-        assert_ne!(
-            expected, deposit.start_date,
-            "example deposit applies spot lag so effective start differs from trade date"
-        );
     }
 
     #[test]

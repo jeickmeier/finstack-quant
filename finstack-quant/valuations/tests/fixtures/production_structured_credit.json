@@ -30,7 +30,7 @@
           "refi_rate": 0.04
         },
         "maturity": "2034-01-01",
-        "payment_calendar_id": "nyse",
+        "calendar_id": "nyse",
         "pool": {
           "assets": [
             {

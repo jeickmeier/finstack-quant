@@ -237,13 +237,13 @@ pub struct StructuredCredit {
     /// Optional payment calendar identifier for schedule adjustments.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub payment_calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
 
     /// Business day convention for tranche payments (defaults to
     /// ModifiedFollowing).
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub payment_business_day_convention: Option<BusinessDayConvention>,
+    pub business_day_convention: Option<BusinessDayConvention>,
 
     /// Discount curve for valuation.
     pub discount_curve_id: CurveId,

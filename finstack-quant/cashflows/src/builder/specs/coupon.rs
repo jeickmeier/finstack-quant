@@ -495,7 +495,7 @@ pub struct FloatingRateSpec {
     ///
     /// If not provided, defaults to the coupon schedule calendar.
     #[serde(default)]
-    pub fixing_calendar_id: Option<String>,
+    pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
 
     /// Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
     ///
@@ -601,7 +601,7 @@ impl FloatingRateSpec {
             reset_frequency,
             index_tenor,
             reset_lag_days,
-            fixing_calendar_id: Some(fixing_calendar_id.to_string()),
+            fixing_calendar_id: Some(fixing_calendar_id.into()),
             overnight_compounding: None,
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
@@ -787,7 +787,7 @@ impl From<RawFloatingCouponSpec> for FloatingCouponSpec {
 ///         frequency: Tenor::semi_annual(),
 ///         day_count: DayCount::Thirty360,
 ///         business_day_convention: BusinessDayConvention::Following,
-///         calendar_id: "weekends_only".to_string(),
+///         calendar_id: "weekends_only".into(),
 ///         stub: StubKind::None,
 ///         end_of_month: false,
 ///         payment_lag_days: 0,

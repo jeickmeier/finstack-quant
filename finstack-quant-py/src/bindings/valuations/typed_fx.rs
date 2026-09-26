@@ -790,13 +790,19 @@ end_of_month=False)"
     /// Base-currency holiday calendar identifier, if any.
     #[getter]
     fn base_calendar_id(&self) -> Option<String> {
-        self.inner.base_calendar_id.clone()
+        self.inner
+            .base_calendar_id
+            .as_ref()
+            .map(ToString::to_string)
     }
 
     /// Quote-currency holiday calendar identifier, if any.
     #[getter]
     fn quote_calendar_id(&self) -> Option<String> {
-        self.inner.quote_calendar_id.clone()
+        self.inner
+            .quote_calendar_id
+            .as_ref()
+            .map(ToString::to_string)
     }
 
     /// Expiry as seen by the pricer (``None``: FX forwards carry no option expiry).
@@ -1092,7 +1098,7 @@ impl PyFxForwardBuilder {
             slf,
             base_calendar_id,
             format!("{value:?}"),
-            |b: FxForwardBuilderInner| b.base_calendar_id(value.to_string())
+            |b: FxForwardBuilderInner| b.base_calendar_id(value.into())
         )
     }
 
@@ -1116,7 +1122,7 @@ impl PyFxForwardBuilder {
             slf,
             quote_calendar_id,
             format!("{value:?}"),
-            |b: FxForwardBuilderInner| b.quote_calendar_id(value.to_string())
+            |b: FxForwardBuilderInner| b.quote_calendar_id(value.into())
         )
     }
 

@@ -330,7 +330,7 @@ impl EquityTotalReturnSwap {
                     frequency: Tenor::quarterly(),
                     day_count: DayCount::Act360,
                     business_day_convention: BusinessDayConvention::Following,
-                    calendar_id: "weekends_only".to_string(),
+                    calendar_id: "weekends_only".into(),
                     stub: StubKind::None,
                     end_of_month: false,
                     payment_lag_days: 0,

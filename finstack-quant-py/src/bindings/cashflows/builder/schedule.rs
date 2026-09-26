@@ -44,7 +44,7 @@ pub(crate) fn parse_representation(label: &str) -> PyResult<CashflowRepresentati
 ///     Facility limit / commitment for revolving structures.
 /// issue_date : datetime.date or str, optional
 ///     Instrument issue date.
-/// maturity_date : datetime.date or str, optional
+/// maturity : datetime.date or str, optional
 ///     Contractual maturity date.
 ///
 /// Raises
@@ -75,15 +75,15 @@ impl PyCashFlowMeta {
     /// Construct schedule metadata; see the class docstring for parameters.
     #[new]
     #[pyo3(
-        signature = (representation="contractual", calendar_ids=None, facility_limit=None, issue_date=None, maturity_date=None, projected_fixings=None),
-        text_signature = "(representation=\"contractual\", calendar_ids=None, facility_limit=None, issue_date=None, maturity_date=None, projected_fixings=None)"
+        signature = (representation="contractual", calendar_ids=None, facility_limit=None, issue_date=None, maturity=None, projected_fixings=None),
+        text_signature = "(representation=\"contractual\", calendar_ids=None, facility_limit=None, issue_date=None, maturity=None, projected_fixings=None)"
     )]
     fn new(
         representation: &str,
         calendar_ids: Option<Vec<String>>,
         facility_limit: Option<PyMoney>,
         issue_date: Option<&Bound<'_, PyAny>>,
-        maturity_date: Option<&Bound<'_, PyAny>>,
+        maturity: Option<&Bound<'_, PyAny>>,
         projected_fixings: Option<Vec<PyProjectedFixing>>,
     ) -> PyResult<Self> {
         Ok(Self {
@@ -97,7 +97,7 @@ impl PyCashFlowMeta {
                 calendar_ids: calendar_ids.unwrap_or_default(),
                 facility_limit: facility_limit.map(|m| m.inner),
                 issue_date: issue_date.map(extract_date).transpose()?,
-                maturity_date: maturity_date.map(extract_date).transpose()?,
+                maturity: maturity.map(extract_date).transpose()?,
             },
         })
     }
@@ -128,11 +128,8 @@ impl PyCashFlowMeta {
 
     /// Contractual maturity date, when known.
     #[getter]
-    fn maturity_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .maturity_date
-            .map(|d| date_to_py(py, d))
-            .transpose()
+    fn maturity<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner.maturity.map(|d| date_to_py(py, d)).transpose()
     }
 
     /// Raw observations needed to fix coupons crossed by a market time roll.

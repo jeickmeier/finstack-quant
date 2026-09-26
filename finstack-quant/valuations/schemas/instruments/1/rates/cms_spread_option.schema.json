@@ -20,7 +20,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID."
         },
-        "expiry_date": {
+        "expiry": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Option expiry date."
         },
@@ -139,7 +139,7 @@
         "strike",
         "option_type",
         "notional",
-        "expiry_date",
+        "expiry",
         "payment_date",
         "long_vol_surface_id",
         "short_vol_surface_id",
@@ -208,7 +208,7 @@
           "correlation": 0.85,
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
-          "expiry_date": "2027-03-29",
+          "expiry": "2027-03-29",
           "forward_curve_id": "USD-SOFR-3M",
           "id": "CMS-SPREAD-10Y2Y",
           "index_id": "USD-SOFR-OIS",

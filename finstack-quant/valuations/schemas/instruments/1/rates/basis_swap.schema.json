@@ -66,11 +66,15 @@
           "description": "Business day convention for date adjustments"
         },
         "calendar_id": {
-          "description": "Optional calendar identifier for business day adjustments",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar identifier for business day adjustments"
         },
         "compounding": {
           "$ref": "#/$defs/FloatingLegCompounding",

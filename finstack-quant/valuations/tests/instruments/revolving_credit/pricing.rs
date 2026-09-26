@@ -20,7 +20,7 @@ fn test_pricing_fixed_utilization() {
         .id("RC-FIXED-UTIL".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture")) // 50% drawn
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -53,7 +53,7 @@ fn test_pricing_zero_utilization() {
         .id("RC-ZERO-UTIL".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture")) // Undrawn
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -84,7 +84,7 @@ fn test_pricing_full_utilization() {
         .id("RC-FULL-UTIL".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture")) // 100% drawn
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)

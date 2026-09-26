@@ -503,7 +503,7 @@
             "currency": "USD"
           },
           "reinvestment_period": {
-            "end_date": "2026-01-01",
+            "end": "2026-01-01",
             "is_active": true,
             "amortizing_tranches": ["SENIOR"],
             "criteria": {
@@ -677,8 +677,8 @@
           "prepay_default": -0.18
         },
         "hedge_swaps": [],
-        "payment_calendar_id": "nyse",
-        "payment_business_day_convention": "modified_following",
+        "calendar_id": "nyse",
+        "business_day_convention": "modified_following",
         "instrument_pricing_overrides": {
           "market_quotes": {
             "quoted_dirty_price_currency": 10952985.036977235

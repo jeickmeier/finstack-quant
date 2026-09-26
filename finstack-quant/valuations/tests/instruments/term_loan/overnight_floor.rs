@@ -81,7 +81,7 @@ fn term_loan(application: OvernightIndexConstraintApplication) -> TermLoan {
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
-        .calendar_id_opt(Some("usny".to_string()))
+        .calendar_id_opt(Some("usny".into()))
         .stub(StubKind::None)
         .discount_curve_id(CurveId::from("USD-OIS"))
         .amortization(AmortizationSpec::None)
@@ -99,7 +99,7 @@ fn revolver(application: OvernightIndexConstraintApplication) -> RevolvingCredit
         .id("RC-SOFR".into())
         .commitment_amount(usd(NOTIONAL))
         .drawn_amount(usd(NOTIONAL))
-        .commitment_date(ISSUE)
+        .issue_date(ISSUE)
         .maturity(MATURITY)
         .base_rate_spec(BaseRateSpec::Floating(spec(application)))
         .day_count(DayCount::Act360)
@@ -110,7 +110,7 @@ fn revolver(application: OvernightIndexConstraintApplication) -> RevolvingCredit
         .recovery_rate(0.0)
         .build()
         .expect("revolver");
-    facility.calendar_id = Some("usny".to_string());
+    facility.calendar_id = Some("usny".into());
     facility.business_day_convention = BusinessDayConvention::ModifiedFollowing;
     facility
 }

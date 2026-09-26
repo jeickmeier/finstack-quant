@@ -176,7 +176,7 @@ call_rows=[]
 for threshold,required_days in [(120.,20),(130.,10),(130.,20),(130.,30),(150.,20)]:
     called=deepcopy(convert)
     called["instrument"]["spec"]["call_put"]={"puts":[],"calls":[
-        {"start_date":"2027-01-15","end_date":"2030-01-15","price_pct_of_par":100.}]}
+        {"start":"2027-01-15","end":"2030-01-15","price_pct_of_par":100.}]}
     called["instrument"]["spec"]["soft_call_trigger"]={"threshold_pct":threshold,"observation_days":30,
                                                        "required_days_above":required_days}
     value=price_instrument(json.dumps(called),credit_market,AS_OF,model="tree").value.amount

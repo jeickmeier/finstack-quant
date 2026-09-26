@@ -177,10 +177,14 @@ impl CDSTranchePricer {
                     meta: CashFlowMeta {
                         projected_fixings: Vec::new(),
                         representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                        calendar_ids: tranche.calendar_id.clone().into_iter().collect(),
+                        calendar_ids: tranche
+                            .calendar_id
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect(),
                         facility_limit: None,
-                        issue_date: tranche.contractual_effective_date(as_of),
-                        maturity_date: Some(tranche.maturity),
+                        issue_date: tranche.contractual_start_date(as_of),
+                        maturity: Some(tranche.maturity),
                     },
                 },
             ));
@@ -201,10 +205,14 @@ impl CDSTranchePricer {
                 meta: CashFlowMeta {
                     projected_fixings: Vec::new(),
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                    calendar_ids: tranche.calendar_id.clone().into_iter().collect(),
+                    calendar_ids: tranche
+                        .calendar_id
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
                     facility_limit: None,
-                    issue_date: tranche.contractual_effective_date(valuation_date),
-                    maturity_date: Some(tranche.maturity),
+                    issue_date: tranche.contractual_start_date(valuation_date),
+                    maturity: Some(tranche.maturity),
                 },
             },
         ))
@@ -266,7 +274,7 @@ impl CDSTranchePricer {
                 tranche_notional * (1.0 - prev_el_fraction - prev_wd_fraction).max(0.0);
             let period_start = if i == 0 {
                 let effective = tranche
-                    .contractual_effective_date(valuation_date)
+                    .contractual_start_date(valuation_date)
                     .unwrap_or(valuation_date);
                 // A seasoned tranche accrues the next premium from the latest
                 // contractual coupon boundary, never from the original trade
@@ -482,7 +490,7 @@ impl CDSTranchePricer {
 
     /// Calculate the settlement date based on ISDA conventions.
     ///
-    /// - If effective_date is set, uses as_of directly (explicit settlement)
+    /// - If start_date is set, uses as_of directly (explicit settlement)
     /// - For index tranches (CDX, iTraxx): T+1 business days
     /// - For bespoke tranches: T+3 business days
     ///
@@ -495,7 +503,7 @@ impl CDSTranchePricer {
         as_of: Date,
     ) -> Result<Date> {
         // If effective date is explicitly set, use as_of directly
-        if tranche.effective_date.is_some() {
+        if tranche.start_date.is_some() {
             return Ok(as_of);
         }
 

@@ -216,7 +216,7 @@ fn test_custom_cashflows_from_schedule() {
         frequency: Tenor::semi_annual(),
         day_count: DayCount::Act365F,
         business_day_convention: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
+        calendar_id: "weekends_only".into(),
         stub: StubKind::None,
         end_of_month: false,
         payment_lag_days: 0,
@@ -270,7 +270,7 @@ fn test_pik_cashflows() {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 
@@ -352,7 +352,7 @@ fn test_cashflows_with_short_front_stub() {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::ShortFront,
 
@@ -582,7 +582,7 @@ fn test_actact_isma_daycount_context() {
                 day_count: DayCount::ActActIsma,
                 // ISMA convention requires frequency context
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
                 stub: StubKind::None,
                 end_of_month: false,
                 payment_lag_days: 0,
@@ -670,7 +670,7 @@ fn test_bus252_daycount_with_calendar() {
                 day_count: DayCount::Bus252,
                 // Requires calendar context
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id: "USNY".to_string(),
+                calendar_id: "USNY".into(),
                 // New York calendar
                 stub: StubKind::None,
                 end_of_month: false,

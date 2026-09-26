@@ -29,7 +29,7 @@ pub(super) fn build_payment_periods(
     use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
     let periods = build_periods(BuildPeriodsParams {
-        start: facility.commitment_date,
+        start: facility.issue_date,
         end: facility.maturity,
         frequency: facility.frequency,
         stub: facility.stub,
@@ -67,7 +67,7 @@ pub(super) fn build_payment_periods(
 /// Returns an error if the schedule builder fails or produces fewer than 2 dates.
 pub(super) fn build_payment_dates(facility: &RevolvingCredit) -> Result<Vec<Date>> {
     let periods = build_payment_periods(facility)?;
-    let payment_dates: Vec<Date> = std::iter::once(facility.commitment_date)
+    let payment_dates: Vec<Date> = std::iter::once(facility.issue_date)
         .chain(periods.into_iter().map(|period| period.payment_date))
         .collect();
 
@@ -85,7 +85,7 @@ pub(super) fn build_payment_dates(facility: &RevolvingCredit) -> Result<Vec<Date
 /// corresponding cashflow.
 pub(super) fn build_accrual_boundary_dates(facility: &RevolvingCredit) -> Result<Vec<Date>> {
     let periods = build_payment_periods(facility)?;
-    Ok(std::iter::once(facility.commitment_date)
+    Ok(std::iter::once(facility.issue_date)
         .chain(periods.into_iter().map(|period| period.accrual_end))
         .collect())
 }
@@ -103,7 +103,7 @@ pub(super) fn build_observation_dates(facility: &RevolvingCredit) -> Result<Vec<
         dates.extend(
             resets
                 .into_iter()
-                .filter(|&reset| reset > facility.commitment_date && reset < facility.maturity),
+                .filter(|&reset| reset > facility.issue_date && reset < facility.maturity),
         );
     }
     // Commitment, margin and fee steps slice accrual in both engines, so the
@@ -112,7 +112,7 @@ pub(super) fn build_observation_dates(facility: &RevolvingCredit) -> Result<Vec<
         facility
             .step_dates()
             .into_iter()
-            .filter(|&step| step > facility.commitment_date && step < facility.maturity),
+            .filter(|&step| step > facility.issue_date && step < facility.maturity),
     );
     dates.sort_unstable();
     dates.dedup();
@@ -205,7 +205,7 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
             use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
             let periods = build_periods(BuildPeriodsParams {
-                start: facility.commitment_date,
+                start: facility.issue_date,
                 end: facility.maturity,
                 frequency: spec.reset_frequency,
                 stub: facility.stub,
@@ -514,7 +514,7 @@ mod tests {
             id: "TEST-RC".into(),
             commitment_amount: Money::from((10_000_000_i64, Currency::USD)),
             drawn_amount: Money::from((5_000_000_i64, Currency::USD)),
-            commitment_date: start,
+            issue_date: start,
             maturity: end,
             base_rate_spec,
             day_count: DayCount::Act360,
@@ -533,7 +533,7 @@ mod tests {
             stub: StubKind::ShortFront,
             business_day_convention:
                 finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-            calendar_id: calendar_id.map(str::to_string),
+            calendar_id: calendar_id.map(str::to_string).map(Into::into),
             payment_lag_days: 0,
             settlement_days: 0,
             instrument_pricing_overrides: Default::default(),

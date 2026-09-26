@@ -475,7 +475,7 @@ mod tests {
 
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
 
-                calendar_id: "USGS".to_string(),
+                calendar_id: "USGS".into(),
 
                 stub: StubKind::None,
 
@@ -526,7 +526,7 @@ mod tests {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::ShortFront,
 
@@ -566,7 +566,7 @@ mod tests {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::LongBack,
 

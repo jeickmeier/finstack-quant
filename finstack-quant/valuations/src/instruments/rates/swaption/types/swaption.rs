@@ -113,8 +113,8 @@ pub struct Swaption {
 
 pub(super) struct VanillaSwaptionUnderlier {
     pub strike: Decimal,
-    pub swap_start: Date,
-    pub swap_end: Date,
+    pub underlying_start_date: Date,
+    pub underlying_maturity: Date,
     pub fixed_frequency: Tenor,
     pub float_frequency: Tenor,
     pub fixed_day_count: DayCount,
@@ -137,8 +137,8 @@ impl VanillaSwaptionUnderlier {
     ) -> Self {
         Self {
             strike,
-            swap_start,
-            swap_end,
+            underlying_start_date: swap_start,
+            underlying_maturity: swap_end,
             fixed_frequency: Tenor::semi_annual(),
             float_frequency: Tenor::quarterly(),
             fixed_day_count: DayCount::Thirty360,
@@ -160,10 +160,10 @@ pub(super) fn vanilla_underlier(
         frequency: underlier.fixed_frequency,
         day_count: underlier.fixed_day_count,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: calendar.clone(),
+        calendar_id: calendar.clone().map(Into::into),
         stub: StubKind::None,
-        start: underlier.swap_start,
-        end: underlier.swap_end,
+        start: underlier.underlying_start_date,
+        end: underlier.underlying_maturity,
         par_method: None,
         compounding_simple: true,
         payment_lag_days: 0,
@@ -185,12 +185,12 @@ pub(super) fn vanilla_underlier(
         // fixed-leg convention (for example SONIA uses ACT/365F).
         day_count: underlier.float_day_count,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: calendar.clone(),
+        calendar_id: calendar.clone().map(Into::into),
         stub: StubKind::None,
         reset_lag_days: 0,
-        fixing_calendar_id: calendar,
-        start: underlier.swap_start,
-        end: underlier.swap_end,
+        fixing_calendar_id: calendar.map(Into::into),
+        start: underlier.underlying_start_date,
+        end: underlier.underlying_maturity,
         compounding,
         payment_lag_days: 0,
         end_of_month: false,
@@ -205,12 +205,12 @@ impl Swaption {
     }
 
     /// Start date shared by both underlying legs.
-    pub fn get_swap_start(&self) -> Date {
+    pub fn get_underlying_start_date(&self) -> Date {
         self.underlying_fixed_leg.start
     }
 
     /// End date shared by both underlying legs.
-    pub fn get_swap_end(&self) -> Date {
+    pub fn get_underlying_maturity(&self) -> Date {
         self.underlying_fixed_leg.end
     }
 
@@ -252,7 +252,7 @@ impl Swaption {
 
     /// Validate structural invariants.
     ///
-    /// Checks date ordering (expiry <= swap_start < swap_end), notional
+    /// Checks date ordering (expiry <= underlying_start_date < underlying_maturity), notional
     /// finiteness and positivity, and strike finiteness and magnitude.
     pub fn validate(&self) -> Result<()> {
         validation::validate_money_finite(self.notional, "swaption notional")?;
@@ -260,13 +260,13 @@ impl Swaption {
 
         validation::validate_date_range_non_strict(
             self.expiry,
-            self.get_swap_start(),
-            "swaption expiry vs swap_start",
+            self.get_underlying_start_date(),
+            "swaption expiry vs underlying_start_date",
         )?;
         validation::validate_date_range_strict(
-            self.get_swap_start(),
-            self.get_swap_end(),
-            "swaption swap_start vs swap_end",
+            self.get_underlying_start_date(),
+            self.get_underlying_maturity(),
+            "swaption underlying_start_date vs underlying_maturity",
         )?;
 
         let strike = self.strike_f64()?;
@@ -412,8 +412,8 @@ impl Swaption {
                 float_day_count: params.float_day_count.unwrap_or(DayCount::Act360),
                 ..VanillaSwaptionUnderlier::standard(
                     params.strike,
-                    params.swap_start,
-                    params.swap_end,
+                    params.underlying_start_date,
+                    params.underlying_maturity,
                     discount_curve_id.into(),
                     forward_curve_id.into(),
                 )
@@ -472,9 +472,9 @@ impl Swaption {
     ///   (e.g., `"nyse"` for USD, `"target"` for EUR)
     pub fn with_calendar(mut self, calendar_id: impl Into<CalendarId>) -> Self {
         let calendar_id = calendar_id.into().to_string();
-        self.underlying_fixed_leg.calendar_id = Some(calendar_id.clone());
-        self.underlying_float_leg.calendar_id = Some(calendar_id.clone());
-        self.underlying_float_leg.fixing_calendar_id = Some(calendar_id);
+        self.underlying_fixed_leg.calendar_id = Some(calendar_id.clone().into());
+        self.underlying_float_leg.calendar_id = Some(calendar_id.clone().into());
+        self.underlying_float_leg.fixing_calendar_id = Some(calendar_id.into());
         self
     }
 
@@ -508,7 +508,10 @@ impl Swaption {
     }
 
     fn underlying_tenor_years(&self) -> Result<f64> {
-        super::super::contractual_swap_tenor_years(self.get_swap_start(), self.get_swap_end())
+        super::super::contractual_swap_tenor_years(
+            self.get_underlying_start_date(),
+            self.get_underlying_maturity(),
+        )
     }
 
     /// Set the cash settlement annuity method.
@@ -862,8 +865,8 @@ impl Swaption {
     pub fn cash_annuity_par_yield(&self, forward_rate: f64) -> Result<f64> {
         let tenor_years = year_fraction(
             self.get_fixed_day_count(),
-            self.get_swap_start(),
-            self.get_swap_end(),
+            self.get_underlying_start_date(),
+            self.get_underlying_maturity(),
         )?;
         Ok(crate::instruments::rates::cms_common::par_annuity(
             forward_rate,
@@ -891,10 +894,10 @@ impl Swaption {
 
         let tenor = year_fraction(
             self.get_fixed_day_count(),
-            self.get_swap_start(),
-            self.get_swap_end(),
+            self.get_underlying_start_date(),
+            self.get_underlying_maturity(),
         )?;
-        let df = relative_df_discounting(disc, as_of, self.get_swap_end())?;
+        let df = relative_df_discounting(disc, as_of, self.get_underlying_maturity())?;
         Ok(tenor * df)
     }
 
@@ -1248,7 +1251,7 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.get_swap_start())
+        Some(self.get_underlying_start_date())
     }
 
     crate::impl_focused_pricing_overrides!();

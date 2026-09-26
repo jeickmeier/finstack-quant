@@ -9,8 +9,8 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "description": "Base-currency calendar used in the joint observation calendar.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Base-currency calendar used in the joint observation calendar."
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -95,8 +95,8 @@
           ]
         },
         "quote_calendar_id": {
-          "description": "Quote-currency calendar used in the joint observation calendar.",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Quote-currency calendar used in the joint observation calendar."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",

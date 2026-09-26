@@ -826,7 +826,7 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
             frequency: Tenor::semi_annual(),
             day_count: DayCount::Thirty360, // USD fixed leg: 30/360
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("usny".to_string()),
+            calendar_id: Some("usny".into()),
             stub: StubKind::None,
             par_method: None,
             compounding_simple: true,
@@ -842,8 +842,8 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360, // USD float leg: ACT/360
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("usny".to_string()), // Payment calendar
-            fixing_calendar_id: Some("usny".to_string()), // Fixing calendar for T-2
+            calendar_id: Some("usny".into()), // Payment calendar
+            fixing_calendar_id: Some("usny".into()), // Fixing calendar for T-2
             stub: StubKind::None,
             reset_lag_days: 2, // T-2 reset lag per ISDA standard
             compounding: Default::default(),

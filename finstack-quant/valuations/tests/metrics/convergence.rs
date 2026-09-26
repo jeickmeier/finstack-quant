@@ -186,7 +186,7 @@ fn test_equity_option_instantaneous_analytical_greeks() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -235,7 +235,7 @@ fn test_equity_option_fd_matches_analytical_greeks() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 
@@ -395,7 +395,7 @@ fn test_bucketed_vega_reports_raw_total_and_residual() {
         instrument_pricing_overrides: Default::default(),
         metric_pricing_overrides: Default::default(),
         scenario_pricing_overrides: Default::default(),
-        exercise_schedule: None,
+        exercise_dates: None,
         attributes: Default::default(),
     };
 

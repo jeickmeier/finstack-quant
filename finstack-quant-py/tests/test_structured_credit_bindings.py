@@ -58,7 +58,7 @@ def _approx(value: float) -> object:
 
 
 def _deal_json() -> str:
-    return canonical_structured_credit_json(payment_calendar_id="NOT_A_CALENDAR")
+    return canonical_structured_credit_json(calendar_id="NOT_A_CALENDAR")
 
 
 def _valid_deal_json() -> str:

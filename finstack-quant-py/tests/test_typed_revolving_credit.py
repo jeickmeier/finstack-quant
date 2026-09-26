@@ -78,7 +78,7 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
         .id("RCF-PY")
         .commitment_amount(Money(50_000_000.0, Currency("USD")))
         .drawn_amount(10_000_000.0, currency="USD")
-        .commitment_date(AS_OF)
+        .issue_date(AS_OF)
         .maturity(MATURITY)
         .base_rate_spec(RevolvingCredit.example().base_rate_spec)
         .day_count("act_360")
@@ -142,7 +142,7 @@ def test_builder_sets_every_field_and_getters_read_them_back() -> None:
     assert facility.id == "RCF-PY"
     assert facility.commitment_amount == Money(50_000_000.0, Currency("USD"))
     assert facility.drawn_amount == Money(10_000_000.0, Currency("USD"))
-    assert facility.commitment_date == AS_OF
+    assert facility.issue_date == AS_OF
     assert facility.maturity == MATURITY
     assert "floating" in facility.base_rate_spec
     assert str(facility.day_count) == "act_360"

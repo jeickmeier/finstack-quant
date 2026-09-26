@@ -162,7 +162,7 @@ pub struct AssetBackedFacility {
     /// for pricing.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub payment_calendar_id: Option<String>,
+    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Events that end revolving early.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -271,7 +271,7 @@ impl AssetBackedFacility {
             .revolving_end(closing.add_months(24))
             .maturity(closing.add_months(72))
             .frequency(Tenor::quarterly())
-            .payment_calendar_id("nyse".to_string())
+            .calendar_id("nyse".into())
             .term_out(TermOutSpec { months: 24 })
             .discount_curve_id(CurveId::new("USD-OIS".to_string()))
             .credit_model(deal.credit_model)

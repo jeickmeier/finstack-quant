@@ -71,7 +71,7 @@ fn production_structured_constructor_uses_closing_date() {
     ] {
         assert_eq!(deal.first_payment_date, expected);
         assert!(deal
-            .with_payment_calendar("nyse")
+            .with_calendar("nyse")
             .value(&market(closing), closing)
             .is_ok());
     }

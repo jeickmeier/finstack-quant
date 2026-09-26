@@ -271,8 +271,9 @@ fn test_rate_quote_vs_price_quote() {
 /// Expected spot date: Tuesday (2025-01-07) - skips Saturday and Sunday
 /// Maturity: 1 month later (2025-02-07)
 ///
-/// This validates that business-day aware spot lag correctly handles weekends
-/// and that PV is computed using the adjusted effective dates.
+/// The caller computes the spot date before building (the deposit's
+/// `start_date` is always the accrual start); this validates PV and metrics
+/// on the NYSE-adjusted dates.
 #[test]
 fn test_usd_deposit_friday_trade_with_nyse_calendar() {
     // Setup: Friday trade date
@@ -288,13 +289,12 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-USD-1M-FRIDAY"))
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .start_date(trade_date) // Will be adjusted by spot lag
+        .start_date(expected_spot_date) // Spot date computed by the caller (T+2 NYSE)
         .maturity(date(2025, 2, 7)) // 1 month maturity from spot
         .day_count(DayCount::Act360)
         .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
-        .settlement_days_opt(Some(2))
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(Some("nyse".into()))
         .build()
@@ -351,14 +351,14 @@ fn test_usd_deposit_friday_trade_with_nyse_calendar() {
 
 /// Test that deposit without spot lag uses raw dates.
 ///
-/// When settlement_days is not set, the raw start/end dates should be used
+/// The raw start/end dates are used
 /// (optionally BDC-adjusted if calendar is set).
 #[test]
 fn test_deposit_without_spot_lag_uses_raw_dates() {
     let trade_date = date(2025, 1, 3); // Friday
     let ctx = ctx_with_flat_rate(trade_date, "USD-OIS", 0.02);
 
-    // Build deposit WITHOUT settlement_days - should use raw start date
+    // start_date is the accrual start; no calendar means no adjustment
     let dep = Deposit::builder()
         .id(InstrumentId::new("DEP-USD-RAW"))
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
@@ -368,7 +368,6 @@ fn test_deposit_without_spot_lag_uses_raw_dates() {
         .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
-        // No settlement_days_opt - should use raw dates
         .build()
         .expect("Valid deposit");
 
@@ -376,7 +375,7 @@ fn test_deposit_without_spot_lag_uses_raw_dates() {
     let effective_start = dep.effective_start_date().unwrap();
     assert_eq!(
         effective_start, trade_date,
-        "Without settlement_days, effective start should equal raw start"
+        "Effective start should equal raw start"
     );
 
     // Execute - should price without error
@@ -402,7 +401,6 @@ fn test_gbp_deposit_t0_settlement() {
         .fixed_rate_opt(Some(Decimal::try_from(0.02).expect("valid decimal")))
         .discount_curve_id(CurveId::new("GBP-OIS"))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
-        .settlement_days_opt(Some(0)) // T+0 for GBP
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .build()
         .expect("Valid deposit");

@@ -409,8 +409,8 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
         {
             "calls": [
                 {
-                    "start_date": AS_OF.isoformat(),
-                    "end_date": AS_OF.isoformat(),
+                    "start": AS_OF.isoformat(),
+                    "end": AS_OF.isoformat(),
                     "price_pct_of_par": 80.0,
                 }
             ],
@@ -423,8 +423,8 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
             "calls": [],
             "puts": [
                 {
-                    "start_date": AS_OF.isoformat(),
-                    "end_date": AS_OF.isoformat(),
+                    "start": AS_OF.isoformat(),
+                    "end": AS_OF.isoformat(),
                     "price_pct_of_par": 120.0,
                 }
             ],
@@ -580,8 +580,8 @@ def test_swaption_examples_getters_and_accessors() -> None:
     swpn = Swaption.example()
     assert swpn.option_type == "call"
     assert swpn.get_strike() == pytest.approx(0.03)
-    assert swpn.get_swap_start() == datetime.date(2027, 1, 17)
-    assert swpn.get_swap_end() == datetime.date(2032, 1, 17)
+    assert swpn.get_underlying_start_date() == datetime.date(2027, 1, 17)
+    assert swpn.get_underlying_maturity() == datetime.date(2032, 1, 17)
     assert isinstance(swpn.underlying_fixed_leg, FixedLegSpec)
     assert swpn.sabr_params is None
     assert swpn.exercise_style == "european"

@@ -131,7 +131,7 @@
               "count": 3,
               "unit": "months"
             },
-            "payment_calendar_id": "nyse",
+            "calendar_id": "nyse",
             "discount_curve_id": "USD-OIS",
             "attributes": {},
             "prepayment_spec": {
@@ -381,7 +381,7 @@
               "count": 3,
               "unit": "months"
             },
-            "payment_calendar_id": "nyse",
+            "calendar_id": "nyse",
             "discount_curve_id": "USD-OIS",
             "attributes": {},
             "prepayment_spec": {

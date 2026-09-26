@@ -134,7 +134,7 @@ pub struct VarianceSwap {
     /// Observation frequency
     pub observation_frequency: Tenor,
     /// Exchange/fixing calendar used for every realized-variance observation.
-    pub observation_calendar_id: String,
+    pub observation_calendar_id: finstack_quant_core::types::CalendarId,
     /// Business-day convention applied to observation dates.
     #[serde(default = "default_observation_business_day_convention")]
     #[builder(default = BusinessDayConvention::Following)]
@@ -358,7 +358,7 @@ impl VarianceSwap {
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2025 - 01 - 01))
             .observation_frequency(finstack_quant_core::dates::Tenor::daily())
-            .observation_calendar_id("USNY".to_string())
+            .observation_calendar_id("USNY".into())
             .observation_business_day_convention(BusinessDayConvention::Following)
             .observation_end_of_month(false)
             .realized_var_method(RealizedVarMethod::CloseToClose)

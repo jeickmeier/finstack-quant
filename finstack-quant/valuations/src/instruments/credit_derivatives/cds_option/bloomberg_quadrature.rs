@@ -1896,8 +1896,9 @@ mod tests {
                 .amount();
             // With no discounting and a par clean-price strike, add back
             // the running premium PV to isolate the complete protection leg.
-            let t =
-                (payer.cds_maturity + time::Duration::days(1) - as_of).whole_days() as f64 / 365.0;
+            let t = (payer.underlying_maturity + time::Duration::days(1) - as_of).whole_days()
+                as f64
+                / 365.0;
             let ctx = context_for(&payer, &curves, as_of, 0.3);
             let expiry_t = (payer.expiry - as_of).whole_days() as f64 / 365.0;
             let annuity: f64 = ctx
@@ -1926,8 +1927,9 @@ mod tests {
             option.knockout = true;
             let ctx = context_for(&option, &curves, as_of, 0.3);
             let expiry_t = (option.expiry - as_of).whole_days() as f64 / 365.0;
-            let maturity_t =
-                (option.cds_maturity + time::Duration::days(1) - as_of).whole_days() as f64 / 365.0;
+            let maturity_t = (option.underlying_maturity + time::Duration::days(1) - as_of)
+                .whole_days() as f64
+                / 365.0;
             let expected = 0.6 * ((-0.02 * expiry_t).exp() - (-0.02 * maturity_t).exp());
             let actual = (ctx.forward_value() + ctx.coupon * ctx.bootstrapped_l_at_expiry)
                 * ctx.df_to_settlement

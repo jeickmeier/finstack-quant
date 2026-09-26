@@ -565,7 +565,7 @@
         },
         "option_type": "call",
         "expiry": "2026-06-17",
-        "cds_maturity": "2031-06-20",
+        "underlying_maturity": "2031-06-20",
         "notional": {
           "amount": "100000000",
           "currency": "USD"
@@ -582,7 +582,7 @@
         },
         "premium_settlement_date": "2026-05-12",
         "exercise_settlement_date": "2026-06-23",
-        "underlying_effective_date": "2026-03-20",
+        "underlying_start_date": "2026-03-20",
         "underlying_is_index": true,
         "index_factor": 1.0,
         "realized_loss": 0.0,

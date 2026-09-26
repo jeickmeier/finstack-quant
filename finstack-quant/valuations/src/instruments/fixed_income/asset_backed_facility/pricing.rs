@@ -173,7 +173,7 @@ impl AssetBackedFacility {
             None
         } else {
             Some(ReinvestmentPeriod {
-                end_date: self.effective_revolving_end(),
+                end: self.effective_revolving_end(),
                 is_active: true,
                 criteria: ReinvestmentCriteria::default(),
                 amortizing_tranches: Vec::new(),
@@ -234,8 +234,8 @@ impl AssetBackedFacility {
             })
             .loss_allocation(LossAllocationPolicy::ParPreserving)
             .principal_covers_senior_interest(true);
-        if let Some(calendar) = &self.payment_calendar_id {
-            builder = builder.payment_calendar_id(calendar.clone());
+        if let Some(calendar) = &self.calendar_id {
+            builder = builder.calendar_id(calendar.clone());
         }
         if let Some(rules) = waterfall_rules {
             builder = builder.waterfall_rules(rules);

@@ -19,11 +19,15 @@
           "description": "Business day convention"
         },
         "calendar_id": {
-          "description": "Optional holiday calendar id",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional holiday calendar id"
         },
         "coupon_bp": {
           "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
@@ -46,18 +50,6 @@
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve identifier (by quote currency)"
-        },
-        "effective_date": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -111,6 +103,18 @@
         "side": {
           "$ref": "#/$defs/TrancheSide",
           "description": "Tranche side (buy/sell protection)"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional effective date for schedule anchoring (if None, uses as_of date)"
         },
         "stub": {
           "$ref": "#/$defs/StubKind",
@@ -260,7 +264,6 @@
           "day_count": "act_360",
           "detach_pct": 3.0,
           "discount_curve_id": "USD-OIS",
-          "effective_date": null,
           "frequency": {
             "count": 3,
             "unit": "months"
@@ -276,6 +279,7 @@
           "roll_rule": "cds_imm",
           "series": 42,
           "side": "buy_protection",
+          "start_date": null,
           "stub": "short_front",
           "upfront": null
         },

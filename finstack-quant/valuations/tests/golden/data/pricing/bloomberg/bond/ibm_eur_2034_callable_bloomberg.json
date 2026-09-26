@@ -591,8 +591,8 @@
         "call_put": {
           "calls": [
             {
-              "start_date": "2033-11-03",
-              "end_date": "2034-02-03",
+              "start": "2033-11-03",
+              "end": "2034-02-03",
               "price_pct_of_par": 100.0
             }
           ],

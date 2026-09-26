@@ -786,8 +786,8 @@ the floater's discount margin to maturity at `target_price_pct`.
 
 - **Tranche interest** accrues on each tranche's own `day_count` (typically
   ACT/360) over the deal's payment schedule: every class pays on
-  `StructuredCredit::frequency` (business days per `payment_calendar_id`,
-  adjusted `ModifiedFollowing` unless `payment_business_day_convention` says
+  `StructuredCredit::frequency` (business days per `calendar_id`,
+  adjusted `ModifiedFollowing` unless `business_day_convention` says
   otherwise). `Tranche::frequency` is the note's quoted coupon frequency and
   sets the compounding of its yield, not a separate payment schedule.
 - **Pool interest collections** use asset-level day count when available,

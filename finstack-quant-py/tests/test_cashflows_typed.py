@@ -258,7 +258,7 @@ class TestBuilderSpecs:
 
         json_spec = json.dumps({
             "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-            "issue": "2025-01-15",
+            "issue_date": "2025-01-15",
             "maturity": "2026-02-15",
             "coupon_program": [
                 {
@@ -345,7 +345,7 @@ class TestBuilderSpecs:
 
         json_spec = json.dumps({
             "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-            "issue": "2025-01-15",
+            "issue_date": "2025-01-15",
             "maturity": "2026-01-15",
             "coupon_program": [
                 {
@@ -436,7 +436,7 @@ class TestBuilderSpecs:
 
         json_spec = json.dumps({
             "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-            "issue": "2025-01-15",
+            "issue_date": "2025-01-15",
             "maturity": "2026-01-15",
             "coupon_program": [
                 {
@@ -513,7 +513,7 @@ class TestBuilderSpecs:
 
         json_spec = json.dumps({
             "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-            "issue": "2025-01-15",
+            "issue_date": "2025-01-15",
             "maturity": "2026-01-15",
             "coupon_program": [
                 {
@@ -808,7 +808,7 @@ class TestCashFlowSchedule:
         assert schedule.get_day_count() == DayCount.ACT_360
         meta = schedule.get_meta()
         assert meta.issue_date == dt.date(2025, 1, 15)
-        assert meta.maturity_date == dt.date(2026, 1, 15)
+        assert meta.maturity == dt.date(2026, 1, 15)
         assert "weekends_only" in meta.calendar_ids
         schedule.validate()
 
@@ -1146,7 +1146,7 @@ class TestTypedTwinsAndWire:
 
         spec = {
             "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-            "issue": "2025-01-15",
+            "issue_date": "2025-01-15",
             "maturity": "2026-01-15",
             "coupon_program": [
                 {
@@ -1332,7 +1332,7 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
 
     spec = {
         "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
-        "issue": "2025-01-01",
+        "issue_date": "2025-01-01",
         "maturity": "2025-07-01",
         "coupon_program": [
             {

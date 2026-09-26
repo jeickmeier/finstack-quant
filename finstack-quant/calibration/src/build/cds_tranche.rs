@@ -252,7 +252,8 @@ pub fn build_cds_tranche_instrument(
         calendar_id: overrides
             .calendar_id
             .clone()
-            .unwrap_or_else(|| conv.calendar_id.clone()),
+            .unwrap_or_else(|| conv.calendar_id.clone())
+            .into(),
         stub: conv.stub,
         end_of_month: false,
         payment_lag_days: 0,
@@ -272,7 +273,7 @@ pub fn build_cds_tranche_instrument(
         CurveId::new(credit_id),
         side,
     )?;
-    instrument.effective_date = Some(effective_date);
+    instrument.start_date = Some(effective_date);
     instrument.upfront = upfront;
 
     Ok(Box::new(instrument))
@@ -344,7 +345,7 @@ mod tests {
         let maturity_adj =
             adjust(maturity, conv.business_day_convention, cal).expect("maturity adjustment");
 
-        assert_eq!(tranche.effective_date, Some(spot));
+        assert_eq!(tranche.start_date, Some(spot));
         assert_eq!(tranche.maturity, maturity_adj);
     }
 

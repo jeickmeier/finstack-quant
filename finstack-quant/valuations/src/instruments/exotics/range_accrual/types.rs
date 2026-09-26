@@ -162,7 +162,7 @@ pub struct RangeAccrualTerms {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    pub accrual_start_date: Date,
+    pub start_date: Date,
     /// Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -240,7 +240,7 @@ impl RangeAccrual {
                 RangeAccrualTerms::builder()
                     .underlying_ticker("SPX".to_string())
                     .observation_dates(observation_dates)
-                    .accrual_start_date(
+                    .start_date(
                         Date::from_calendar_date(2023, Month::December, 31)
                             .expect("Valid example date"),
                     )
@@ -282,7 +282,7 @@ impl RangeAccrual {
                 RangeAccrualTerms::builder()
                     .underlying_ticker("SOFR".to_string())
                     .observation_dates(observation_dates)
-                    .accrual_start_date(
+                    .start_date(
                         Date::from_calendar_date(2023, Month::December, 31)
                             .expect("Valid example date"),
                     )
@@ -323,10 +323,10 @@ impl RangeAccrualTerms {
                 "RangeAccrual requires at least one observation date".to_string(),
             )
         })?;
-        let accrual_start = self.accrual_start_date;
+        let accrual_start = self.start_date;
         if accrual_start >= accrual_end {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "RangeAccrual accrual_start_date ({accrual_start}) must precede final observation ({accrual_end})"
+                "RangeAccrual start_date ({accrual_start}) must precede final observation ({accrual_end})"
             )));
         }
         self.day_count.year_fraction(
@@ -597,7 +597,7 @@ mod audit_regression_tests {
     fn accrual_factor_uses_explicit_contractual_period() {
         let mut range = RangeAccrual::example().terms;
         range.day_count = finstack_quant_core::dates::DayCount::Act360;
-        range.accrual_start_date = date!(2024 - 01 - 01);
+        range.start_date = date!(2024 - 01 - 01);
         range.observation_dates = vec![date!(2024 - 01 - 31), date!(2024 - 04 - 01)];
         range.payment_date = Some(date!(2024 - 04 - 03));
         let factor = range.accrual_year_fraction().expect("accrual factor");

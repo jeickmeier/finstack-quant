@@ -231,11 +231,7 @@ impl BondValuator {
         maturity: Date,
         event_dates: &[Date],
     ) -> Vec<Date> {
-        Self::exercise_candidates(
-            right.start_date.max(as_of),
-            right.end_date.min(maturity),
-            event_dates,
-        )
+        Self::exercise_candidates(right.start.max(as_of), right.end.min(maturity), event_dates)
     }
 
     pub(crate) fn make_whole_call_price(
@@ -1406,8 +1402,8 @@ mod tests {
         .expect("bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise,
-                end_date: exercise,
+                start: exercise,
+                end: exercise,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -1471,7 +1467,7 @@ mod tests {
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
-                maturity_date: Some(maturity),
+                maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
         );
@@ -1479,14 +1475,14 @@ mod tests {
             Bond::from_cashflows("SEASONED-PIK", schedule, "USD-OIS", None).expect("custom bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: as_of,
-                end_date: as_of,
+                start: as_of,
+                end: as_of,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
             puts: vec![CallPut {
-                start_date: maturity,
-                end_date: maturity,
+                start: maturity,
+                end: maturity,
                 price_pct_of_par: 110.0,
                 make_whole: None,
             }],
@@ -1521,7 +1517,7 @@ mod tests {
             DayCount::Act365F,
             CashFlowMeta {
                 issue_date: Some(issue),
-                maturity_date: Some(maturity),
+                maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
         );
@@ -1529,8 +1525,8 @@ mod tests {
             Bond::from_cashflows("SAME-DAY-EXERCISE", schedule, "USD-OIS", None).expect("bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: as_of,
-                end_date: as_of,
+                start: as_of,
+                end: as_of,
                 price_pct_of_par: 90.0,
                 make_whole: None,
             }],
@@ -1570,8 +1566,8 @@ mod tests {
         .expect("bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise,
-                end_date: exercise,
+                start: exercise,
+                end: exercise,
                 price_pct_of_par: 50.0,
                 make_whole: Some(MakeWholeSpec {
                     reference_curve_id: "USD-OIS".into(),
@@ -1643,14 +1639,14 @@ mod tests {
         .expect("bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: exercise,
-                end_date: exercise,
+                start: exercise,
+                end: exercise,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
             puts: vec![CallPut {
-                start_date: exercise,
-                end_date: exercise,
+                start: exercise,
+                end: exercise,
                 price_pct_of_par: 101.0,
                 make_whole: None,
             }],
@@ -1705,8 +1701,8 @@ mod tests {
             .implied_volatility = Some(0.01);
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: call_date,
-                end_date: call_date,
+                start: call_date,
+                end: call_date,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -1803,8 +1799,8 @@ mod tests {
             .implied_volatility = Some(0.01);
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: call_date,
-                end_date: call_date,
+                start: call_date,
+                end: call_date,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -1902,8 +1898,8 @@ mod tests {
             .implied_volatility = Some(0.01);
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: call_date,
-                end_date: call_date,
+                start: call_date,
+                end: call_date,
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

@@ -42,7 +42,7 @@ fn test_cds_option_construction() {
     assert_eq!(option.strike.spread_decimal(), Some(Decimal::new(1, 2)));
     assert!(matches!(option.option_type, OptionType::Call));
     assert_eq!(option.expiry, expiry);
-    assert_eq!(option.cds_maturity, maturity);
+    assert_eq!(option.underlying_maturity, maturity);
     assert_eq!(option.notional.amount(), 10_000_000.0);
     assert_eq!(option.notional.currency(), Currency::USD);
     assert_eq!(option.discount_curve_id.as_str(), "USD-OIS");
@@ -115,7 +115,7 @@ fn test_various_maturities() {
 
             // Verify dates are correctly set
             assert!(option.expiry > as_of);
-            assert!(option.cds_maturity > option.expiry);
+            assert!(option.underlying_maturity > option.expiry);
         }
     }
 }

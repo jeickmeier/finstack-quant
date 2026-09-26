@@ -136,7 +136,7 @@ fn build_clo(cpr: f64, cdr: f64, recovery: f64, lag: u32) -> StructuredCredit {
         maturity_5y(),
         "USD_OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
     clo.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
@@ -444,7 +444,7 @@ mod afc_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-AFC", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -539,7 +539,7 @@ mod afc_tests {
             maturity(),
             "USD-OIS",
         )
-        .with_payment_calendar("nyse");
+        .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -644,7 +644,7 @@ mod excess_spread_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-ES", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -800,7 +800,7 @@ mod excess_spread_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-DRAW", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -946,7 +946,7 @@ mod step_down_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-SD", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1192,7 +1192,7 @@ mod shifting_interest_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-SI", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1322,7 +1322,7 @@ mod shifting_interest_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_rmbs("RMBS-SI", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1421,7 +1421,7 @@ mod shifting_interest_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-SI2", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1522,7 +1522,7 @@ mod early_amortization_tests {
             DayCount::Thirty360,
         ));
         pool.reinvestment_period = Some(ReinvestmentPeriod {
-            end_date: revolving_end(),
+            end: revolving_end(),
             is_active: true,
             amortizing_tranches: Vec::new(),
             assumptions: None,
@@ -1553,7 +1553,7 @@ mod early_amortization_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-EA", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1678,7 +1678,7 @@ mod controlled_accumulation_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-CA", pool, tranches, closing(), maturity(), "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -1708,7 +1708,7 @@ mod controlled_accumulation_tests {
         // in the funding account), whereas the plain amortizing deal pays the
         // senior down from prepayments throughout.
         let accum = deal(Some(ControlledAccumulationSpec {
-            start_date: closing(),
+            start: closing(),
             bullet_date: bullet(),
         }));
         let plain = deal(None);
@@ -1726,7 +1726,7 @@ mod controlled_accumulation_tests {
         // The principal accumulated over the 3y window is released to the senior
         // as a bullet at/after the bullet date.
         let accum = deal(Some(ControlledAccumulationSpec {
-            start_date: closing(),
+            start: closing(),
             bullet_date: bullet(),
         }));
         let sp_bullet = senior_principal_between(&accum, bullet(), maturity());
@@ -1754,7 +1754,7 @@ mod controlled_accumulation_tests {
         use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 
         let mut accum = deal(Some(ControlledAccumulationSpec {
-            start_date: closing(),
+            start: closing(),
             bullet_date: bullet(),
         }));
         // The deal is heavily over-collateralized, so any OC breach during
@@ -1795,7 +1795,7 @@ mod controlled_accumulation_tests {
 
         let build = |max_loss: f64| {
             let mut sc = deal(Some(ControlledAccumulationSpec {
-                start_date: closing(),
+                start: closing(),
                 bullet_date: bullet(),
             }));
             if let Some(rules) = sc.waterfall_rules.as_mut() {
@@ -1853,7 +1853,7 @@ mod controlled_accumulation_tests {
         // stranded and the senior would receive almost no principal.
         let late_bullet = Date::from_calendar_date(2031, Month::January, 1).unwrap();
         let accum = deal(Some(ControlledAccumulationSpec {
-            start_date: closing(),
+            start: closing(),
             bullet_date: late_bullet,
         }));
         let sr_principal = senior_principal_between(&accum, closing(), late_bullet);

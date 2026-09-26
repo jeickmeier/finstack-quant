@@ -644,7 +644,7 @@ mod tests {
                     end,
                     compounding: FloatingLegCompounding::sofr(),
                     // This calendar ID does not exist in the registry
-                    fixing_calendar_id: Some("NONEXISTENT-CALENDAR-XYZ".to_string()),
+                    fixing_calendar_id: Some("NONEXISTENT-CALENDAR-XYZ".into()),
                     payment_lag_days: 0,
                     end_of_month: false,
                 },

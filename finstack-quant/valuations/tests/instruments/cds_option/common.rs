@@ -273,7 +273,7 @@ impl CDSOptionBuilder {
 
     pub fn build(self, as_of: Date) -> CDSOption {
         let expiry = as_of.add_months(self.expiry_months);
-        let cds_maturity = as_of.add_months(self.cds_maturity_months);
+        let underlying_maturity = as_of.add_months(self.cds_maturity_months);
 
         let strike = match self.clean_price_strike_pct {
             Some(pct) => CDSOptionStrike::CleanPricePct(
@@ -284,7 +284,7 @@ impl CDSOptionBuilder {
         let mut option_params = CDSOptionParams::new(
             strike,
             expiry,
-            cds_maturity,
+            underlying_maturity,
             self.notional,
             self.option_type,
         )

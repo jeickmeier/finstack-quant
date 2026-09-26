@@ -164,7 +164,7 @@ impl CashflowSpec {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::ShortFront,
 
@@ -200,7 +200,7 @@ impl CashflowSpec {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::ShortFront,
 
@@ -328,7 +328,7 @@ impl CashflowSpec {
                 frequency,
                 day_count,
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id,
+                calendar_id: calendar_id.into(),
                 stub: StubKind::ShortFront,
                 end_of_month: false,
                 payment_lag_days: 0,
@@ -437,7 +437,7 @@ impl CashflowSpec {
                 frequency,
                 day_count,
                 business_day_convention: BusinessDayConvention::Following,
-                calendar_id,
+                calendar_id: calendar_id.into(),
                 stub: StubKind::ShortFront,
                 end_of_month: false,
                 payment_lag_days: 0,
@@ -513,7 +513,7 @@ impl CashflowSpec {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::ShortFront,
 
@@ -666,7 +666,7 @@ impl Default for CashflowSpec {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::ShortFront,
 

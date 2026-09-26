@@ -204,7 +204,7 @@ def test_equity_option_builder_setters_accept_keyword_value() -> None:
         .vol_surface_id(value="AAPL-VOL")
         .div_yield_id(value="AAPL-DIVYIELD")
         .discrete_dividends(value=[(datetime.date(2025, 3, 1), 0.5)])
-        .exercise_schedule(value=[datetime.date(2025, 3, 20), datetime.date(2025, 6, 20)])
+        .exercise_dates(value=[datetime.date(2025, 3, 20), datetime.date(2025, 6, 20)])
         .build()
     )
     assert opt.id == "EQOPT-KW"

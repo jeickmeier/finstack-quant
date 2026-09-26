@@ -2,6 +2,84 @@
 
 ## [Unreleased]
 
+### Dates and calendars (2026-09-24)
+
+Flat contract dates are `start_date` / `maturity`; bonds, loans and revolvers
+carry `issue_date`; an option's underlying contract uses
+`underlying_start_date` / `underlying_maturity`; every option expiry is
+`expiry`; Bermudan exercise dates are `exercise_dates` (inside
+`exercise_schedule` when a lockout travels with them); a call lockout is the
+date `lockout_end`; window structs use `start` / `end`; a single-schedule deal
+names its calendar `calendar_id` and its convention `business_day_convention`;
+and every `*_calendar_id` field is typed `CalendarId`. Retired keys are rejected
+by `deny_unknown_fields`. Numbers do not change.
+
+#### Changed (BREAKING)
+
+- `RangeAccrualTerms.accrual_start_date` (now `start_date`; also inside
+  `CallableRangeAccrual.range_accrual`); Rust/JSON.
+- `CDSTranche.effective_date` (now `start_date`); Python `CDSTranche.effective_date`
+  getter and `CDSTrancheBuilder.effective_date` (now `start_date`);
+  Rust/Python/JSON.
+- `CommoditySwaption.swap_start`/`swap_end` (now
+  `underlying_start_date`/`underlying_maturity`, fields and builder setters);
+  `SwaptionParams.swap_start`/`swap_end` (now
+  `underlying_start_date`/`underlying_maturity`); `Swaption::get_swap_start`/
+  `get_swap_end` (now `get_underlying_start_date`/`get_underlying_maturity`,
+  also on Python `Swaption`); Rust/Python/JSON.
+- `ConventionSwapParams.start`/`end` (now `start_date`/`maturity`, matching
+  `ConventionFraParams`); Python `InterestRateSwap.from_conventions` keywords
+  `start`/`end` (now `start_date`/`maturity`); Rust/Python.
+- `CDSOption.underlying_effective_date`/`cds_maturity` and
+  `CDSOptionParams.cds_maturity` (now `underlying_start_date`/
+  `underlying_maturity`); Rust/JSON.
+- `CmsSpreadOption.expiry_date` (now `expiry`); Rust/JSON.
+- `BermudanSwaption.bermudan_schedule` (now `exercise_schedule`);
+  `EquityOption.exercise_schedule` and `CommodityOption.exercise_schedule` (now
+  `exercise_dates`; Python `EquityOption.exercise_schedule` getter and
+  `EquityOptionBuilder.exercise_schedule` now `exercise_dates`);
+  Rust/Python/JSON.
+- `BermudanCallProvision.lockout_periods: usize` (a count of observation
+  periods) (now `lockout_end: Option<Date>`, an exclusive date bound matching
+  `BermudanSchedule.lockout_end`); `BermudanCallProvision::new` takes
+  `lockout_end` and `eligible_call_dates()` takes no argument. Migrate
+  `lockout_periods = k > 0` to `lockout_end = observation_dates[k - 1]` and
+  `k = 0` to omitting the key; Rust/JSON.
+- `CallPut.start_date`/`end_date` (now `start`/`end`, for bond and convertible
+  `call_put.calls[]`/`puts[]`); `ReinvestmentPeriod.end_date` (now `end`);
+  `ControlledAccumulationSpec.start_date` (now `start`); Rust/Python/JSON.
+- `StructuredCredit.payment_calendar_id`/`payment_business_day_convention` (now
+  `calendar_id`/`business_day_convention`), `StructuredCredit::with_payment_calendar`/
+  `with_payment_business_day_convention` (now `with_calendar`/
+  `with_business_day_convention`), `AssetBackedFacility.payment_calendar_id`
+  (now `calendar_id`); Python `payment_calendar_id` keyword and getter (now
+  `calendar_id`); Rust/Python/JSON.
+- `RevolvingCredit.commitment_date` (now `issue_date`, field, builder setter and
+  Python getter/builder); Rust/Python/JSON.
+- `CashflowScheduleBuildSpec.issue` (now `issue_date`);
+  `InflationLinkedBondParams.issue` and the `issue` parameter of `Bond::fixed`,
+  `Bond::with_convention`, `Bond::floating`, `Bond::floating_with_convention`
+  and `Bond::zero_coupon` (now `issue_date`; Python `Bond` factory keyword `issue` now
+  `issue_date`; WASM `issue` parameter now `issueDate`); Rust/Python/WASM/JSON.
+- `CashFlowMeta.maturity_date` (now `maturity`; Python `CashFlowMeta` keyword and
+  getter follow); Rust/Python/JSON.
+- Every instrument and cashflow-spec `*_calendar_id` field that was `String` or
+  `Option<String>` (legs, TermLoan, RevolvingCredit, StructuredCredit,
+  AssetBackedFacility, CDSTranche, CommodityForward, InflationCapFloor,
+  IRFuture, XccySwap, FX spot/forward/swap/NDF/variance swap, VarianceSwap, Bond
+  ex-coupon, cashflows `ScheduleParams`/`FloatingRateSpec`/`ExCouponRule`) is
+  now `CalendarId` / `Option<CalendarId>`; field names and wire format are
+  unchanged; Rust only.
+
+#### Removed
+
+- `Deposit.settlement_days` (formerly `spot_lag_days`). `start_date` is now
+  always the accrual start (spot) date; callers holding a trade date compute
+  the spot date before building. `Deposit::from_conventions` now sets
+  `start_date` to `trade_date` plus the index's `market_settlement_days`
+  business days on its market calendar, and `Deposit::example` starts on its
+  spot date 2024-01-03. PVs are unchanged. Rust, JSON (the key is rejected).
+
 ### Coupon, strike and inflation terms (2026-09-24)
 
 A margin over a floating or CMS index is `spread_bp` / `cms_spread_bp` (basis

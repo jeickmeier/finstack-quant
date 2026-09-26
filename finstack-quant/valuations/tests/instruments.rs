@@ -16,6 +16,8 @@ mod common;
 mod coupon_strike_inflation_wire_keys;
 #[path = "instruments/credit_wire_keys.rs"]
 mod credit_wire_keys;
+#[path = "instruments/dates_calendars_wire_keys.rs"]
+mod dates_calendars_wire_keys;
 #[path = "instruments/exotic_payoff_wire_keys.rs"]
 mod exotic_payoff_wire_keys;
 #[path = "instruments/listed_future_wire_keys.rs"]

@@ -45,7 +45,7 @@ fn test_pricing_recovery_consistency() {
         .id("TEST-RCF".into())
         .commitment_amount(commitment)
         .drawn_amount(drawn)
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.07 }) // 7% Coupon
         .day_count(DayCount::Act365F)
@@ -118,7 +118,7 @@ fn test_floating_rcf_declares_forward_dependency() {
         .id("RCF-FIXED".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -134,7 +134,7 @@ fn test_floating_rcf_declares_forward_dependency() {
         .id("RCF-FLOAT".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -191,7 +191,7 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
         .id("RCF-DV01-FWD".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -281,7 +281,7 @@ fn test_upfront_fee_excluded_after_commitment() {
         .id("RCF-UPFRONT-ASOF".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(0.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment)
+        .issue_date(commitment)
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)

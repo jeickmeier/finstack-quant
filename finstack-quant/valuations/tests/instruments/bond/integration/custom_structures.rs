@@ -43,7 +43,7 @@ fn test_pik_bond() {
 
                 business_day_convention: BusinessDayConvention::Following,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 
@@ -76,7 +76,7 @@ fn test_step_up_bond() {
         frequency: Tenor::semi_annual(),
         day_count: DayCount::Act365F,
         business_day_convention: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
+        calendar_id: "weekends_only".into(),
         stub: StubKind::None,
         end_of_month: false,
         payment_lag_days: 0,

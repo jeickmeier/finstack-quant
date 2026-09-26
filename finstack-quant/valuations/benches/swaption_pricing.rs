@@ -36,8 +36,8 @@ fn create_swaption(expiry_months: i64, swap_tenor_years: i32) -> Swaption {
         notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         strike: Decimal::try_from(0.04).expect("valid literal"), // 4% strike
         expiry,
-        swap_start,
-        swap_end,
+        underlying_start_date: swap_start,
+        underlying_maturity: swap_end,
         side: PayReceive::Pay,
         fixed_frequency: Some(Tenor::semi_annual()),
         float_frequency: Some(Tenor::quarterly()),

@@ -766,7 +766,7 @@ fn test_payment_schedule_imm_vs_non_imm() {
 
     let mut imm_tranche = sample_tranche();
     imm_tranche.roll_rule = crate::cashflow::builder::specs::RollRule::CdsImm;
-    imm_tranche.effective_date =
+    imm_tranche.start_date =
         Some(Date::from_calendar_date(2025, Month::March, 20).expect("cds date"));
     imm_tranche.maturity = Date::from_calendar_date(2030, Month::March, 20).expect("cds date");
     let imm_dates = model
@@ -798,7 +798,7 @@ fn test_payment_schedule_imm_vs_non_imm() {
 
     let mut non_imm_tranche = sample_tranche();
     non_imm_tranche.roll_rule = crate::cashflow::builder::specs::RollRule::None;
-    non_imm_tranche.effective_date =
+    non_imm_tranche.start_date =
         Some(Date::from_calendar_date(2025, Month::January, 15).expect("valid date"));
     non_imm_tranche.maturity =
         Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
@@ -1603,7 +1603,7 @@ fn test_settlement_date_calculation() {
     // CDX index should use T+1 business days
     let mut cdx_tranche = sample_tranche();
     cdx_tranche.index_name = "CDX.NA.IG.42".to_string();
-    cdx_tranche.effective_date = None;
+    cdx_tranche.start_date = None;
     cdx_tranche.calendar_id = None; // No calendar, weekend-only logic
     let cdx_settle = model.calculate_settlement_date(&cdx_tranche, &market_ctx, as_of);
     assert!(cdx_settle.is_ok());
@@ -1618,7 +1618,7 @@ fn test_settlement_date_calculation() {
     // From Wed Jan 1: Thu Jan 2 (+1), Fri Jan 3 (+2), Mon Jan 6 (+3, skipping weekend)
     let mut bespoke_tranche = sample_tranche();
     bespoke_tranche.index_name = "BESPOKE".to_string();
-    bespoke_tranche.effective_date = None;
+    bespoke_tranche.start_date = None;
     bespoke_tranche.calendar_id = None;
     let bespoke_settle = model.calculate_settlement_date(&bespoke_tranche, &market_ctx, as_of);
     assert!(bespoke_settle.is_ok());
@@ -1640,7 +1640,7 @@ fn test_settlement_date_skips_weekends() {
 
     let mut tranche = sample_tranche();
     tranche.index_name = "CDX.NA.IG.42".to_string();
-    tranche.effective_date = None;
+    tranche.start_date = None;
     tranche.calendar_id = None; // No calendar, weekend-only logic
 
     let settle = model
@@ -1664,7 +1664,7 @@ fn test_settlement_date_weekday() {
 
     let mut tranche = sample_tranche();
     tranche.index_name = "CDX.NA.IG.42".to_string();
-    tranche.effective_date = None;
+    tranche.start_date = None;
     tranche.calendar_id = None;
 
     let settle = model
@@ -1688,7 +1688,7 @@ fn test_accrued_premium_calculation() {
 
     // At inception, accrued should be minimal
     let inception = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    tranche.effective_date = Some(inception);
+    tranche.start_date = Some(inception);
     let accrued_at_inception = model.calculate_accrued_premium(&tranche, &market_ctx, inception);
     assert!(accrued_at_inception.is_ok());
 
@@ -2557,9 +2557,9 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
         .get_credit_index("CDX.NA.IG.42")
         .expect("test index data");
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let effective_date = Date::from_calendar_date(2024, Month::December, 20).expect("date");
+    let start_date = Date::from_calendar_date(2024, Month::December, 20).expect("date");
     let mut tranche = sample_tranche();
-    tranche.effective_date = Some(effective_date);
+    tranche.start_date = Some(start_date);
     tranche.roll_rule = crate::cashflow::builder::specs::RollRule::None;
     tranche.coupon_bp = 0.0;
 

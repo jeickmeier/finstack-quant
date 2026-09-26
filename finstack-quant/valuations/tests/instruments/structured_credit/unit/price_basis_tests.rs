@@ -88,7 +88,7 @@ fn fixture(seasoned: bool) -> (StructuredCredit, Date) {
         maturity,
         "USD-OIS",
     )
-    .with_payment_calendar("nyse");
+    .with_calendar("nyse");
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
     deal.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.4, 12);
@@ -218,7 +218,7 @@ fn par_quarterly_note_yields_its_coupon() {
     // Unadjusted payment dates keep every 30/360 coupon period at exactly a
     // quarter; business-day rolls would move the yield by a few tenths of a
     // basis point.
-    deal.payment_business_day_convention =
+    deal.business_day_convention =
         Some(finstack_quant_core::dates::BusinessDayConvention::Unadjusted);
     deal.instrument_pricing_overrides
         .market_quotes

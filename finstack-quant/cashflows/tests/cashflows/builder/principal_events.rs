@@ -782,7 +782,7 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
 
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 
@@ -894,7 +894,7 @@ fn order_independence_fixed_spec() -> FixedCouponSpec {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
@@ -929,7 +929,7 @@ fn order_independence_float_spec() -> FloatingCouponSpec {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
@@ -1011,7 +1011,7 @@ fn full_horizon_coupon_programs_are_order_independent() {
 
             business_day_convention: BusinessDayConvention::Following,
 
-            calendar_id: "weekends_only".to_string(),
+            calendar_id: "weekends_only".into(),
 
             stub: StubKind::None,
 

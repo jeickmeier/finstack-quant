@@ -194,6 +194,7 @@ DIRECT_CONSUMER_FORBIDDEN = (
             r"swap_convention|swap_day_count|floating_index_id|price_curve_id|funding_curve_id|fixing_index_id|rate_index_id|floating_tenor|reference_tenor|"
             r"underlying_equity_id|spot_rate_override|forward_rate_override|price_quote|fx_rate_id|fx_vol_id|underlying_quantity|settlement_discount_curve_id|equity_vol_surface_id|"
             r"cms_spread|cms_fixing_dates|cms_payment_dates|cms_accrual_fractions|cms_day_count|equity_strike|lag_override|interpolation_override|margin_bp|base_index|coupon_dates|index_floor|"
+            r"accrual_start_date|underlying_effective_date|cds_maturity|swap_start|swap_end|bermudan_schedule|lockout_periods|commitment_date|payment_business_day_convention|"
             r"[A-Za-z][A-Za-z0-9_]*_(?:ccy|bps))"
             r'(?:"|\\")\s*:'
         ),

@@ -113,8 +113,8 @@ fn test_swaption_cash_annuity_zero_forward_and_invalid_frequency() {
     let expected = swaption
         .get_fixed_day_count()
         .year_fraction(
-            swaption.get_swap_start(),
-            swaption.get_swap_end(),
+            swaption.get_underlying_start_date(),
+            swaption.get_underlying_maturity(),
             DayCountContext::default(),
         )
         .unwrap();
@@ -245,8 +245,8 @@ fn test_bermudan_swaption_schedule_and_conversion() {
 
     let euro = swaption.to_european().unwrap();
     assert_eq!(euro.expiry, first_ex);
-    assert_eq!(euro.get_swap_start(), first_ex);
-    assert_eq!(euro.get_swap_end(), swap_end);
+    assert_eq!(euro.get_underlying_start_date(), first_ex);
+    assert_eq!(euro.get_underlying_maturity(), swap_end);
     assert_eq!(euro.vol_model, VolatilityModel::Black);
 
     let market = create_flat_market(as_of, 0.03, 0.2);

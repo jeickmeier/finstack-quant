@@ -130,11 +130,11 @@ impl ConvertibleBondValuator {
 
         if let Some(ref call_put) = bond.call_put {
             for call in &call_put.calls {
-                if call.end_date >= base_date && call.start_date <= bond.maturity {
+                if call.end >= base_date && call.start <= bond.maturity {
                     let floor_price = bond.notional.amount() * (call.price_pct_of_par / 100.0);
                     let start_step = map_date_to_step(
                         base_date,
-                        call.start_date.max(base_date),
+                        call.start.max(base_date),
                         bond.maturity,
                         steps,
                         DayCount::Act365F,
@@ -144,7 +144,7 @@ impl ConvertibleBondValuator {
                     // Exercise period: map all steps from start to end
                     let end_step = map_date_to_step(
                         base_date,
-                        call.end_date.min(bond.maturity),
+                        call.end.min(bond.maturity),
                         bond.maturity,
                         steps,
                         DayCount::Act365F,
@@ -198,11 +198,11 @@ impl ConvertibleBondValuator {
             }
 
             for put in &call_put.puts {
-                if put.end_date >= base_date && put.start_date <= bond.maturity {
+                if put.end >= base_date && put.start <= bond.maturity {
                     let put_price = bond.notional.amount() * (put.price_pct_of_par / 100.0);
                     let start_step = map_date_to_step(
                         base_date,
-                        put.start_date.max(base_date),
+                        put.start.max(base_date),
                         bond.maturity,
                         steps,
                         DayCount::Act365F,
@@ -211,7 +211,7 @@ impl ConvertibleBondValuator {
 
                     let end_step = map_date_to_step(
                         base_date,
-                        put.end_date.min(bond.maturity),
+                        put.end.min(bond.maturity),
                         bond.maturity,
                         steps,
                         DayCount::Act365F,

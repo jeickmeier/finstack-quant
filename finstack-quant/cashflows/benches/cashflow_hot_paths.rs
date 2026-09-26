@@ -100,7 +100,7 @@ fn make_fixed_schedule(base: Date, years: i32, frequency: Tenor) -> CashFlowSche
 
                 business_day_convention: BusinessDayConvention::ModifiedFollowing,
 
-                calendar_id: "weekends_only".to_string(),
+                calendar_id: "weekends_only".into(),
 
                 stub: StubKind::None,
 
@@ -325,7 +325,7 @@ fn bench_build_fixed_schedule(c: &mut Criterion) {
 
                             business_day_convention: BusinessDayConvention::ModifiedFollowing,
 
-                            calendar_id: "weekends_only".to_string(),
+                            calendar_id: "weekends_only".into(),
 
                             stub: StubKind::None,
 
@@ -602,7 +602,7 @@ fn bench_accrued_variants(c: &mut Criterion) {
         let cfg = AccrualConfig {
             ex_coupon: Some(ExCouponRule {
                 days_before_coupon: 7,
-                calendar_id: Some("usny".to_string()),
+                calendar_id: Some("usny".into()),
             }),
             ..Default::default()
         };

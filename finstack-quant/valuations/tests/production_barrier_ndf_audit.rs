@@ -147,7 +147,7 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
         );
     let mut note = RangeAccrual::example();
     note.terms.observation_dates = vec![expiry];
-    note.terms.accrual_start_date = as_of;
+    note.terms.start_date = as_of;
     note.terms.day_count = DayCount::Act365F;
     note.terms.lower_bound = 80.0;
     note.terms.upper_bound = 120.0;

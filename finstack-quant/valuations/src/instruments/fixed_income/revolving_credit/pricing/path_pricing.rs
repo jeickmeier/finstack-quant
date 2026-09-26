@@ -84,7 +84,7 @@ impl RevolvingCreditPricer {
                 &path_data.time_points,
                 &cashflow_dates,
                 facility.recovery_rate,
-                facility.commitment_date,
+                facility.issue_date,
                 super::super::MC_CLOCK_DAY_COUNT,
             )?
         } else if let Some(ref hazard_id) = facility.credit_curve_id {
@@ -116,7 +116,7 @@ impl RevolvingCreditPricer {
                 &path_data.time_points,
                 &[as_of],
                 facility.recovery_rate,
-                facility.commitment_date,
+                facility.issue_date,
                 super::super::MC_CLOCK_DAY_COUNT,
             )?[0]
         } else if let Some(ref hazard_id) = facility.credit_curve_id {
@@ -151,14 +151,14 @@ impl RevolvingCreditPricer {
         // Signed so pre-commitment valuation dates do not error; only the
         // pathwise branch consumes this.
         let t_asof_path = super::super::MC_CLOCK_DAY_COUNT.signed_year_fraction(
-            facility.commitment_date,
+            facility.issue_date,
             as_of,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
         let df_asof_to = |date: Date| -> Result<f64> {
             if let Some(p) = pathwise_rates {
                 let t = super::super::MC_CLOCK_DAY_COUNT.signed_year_fraction(
-                    facility.commitment_date,
+                    facility.issue_date,
                     date,
                     finstack_quant_core::dates::DayCountContext::default(),
                 )?;
@@ -220,7 +220,7 @@ impl RevolvingCreditPricer {
                         &path_data.time_points,
                         &future_grid,
                         facility.recovery_rate,
-                        facility.commitment_date,
+                        facility.issue_date,
                         super::super::MC_CLOCK_DAY_COUNT,
                     )?
                 } else if let Some(ref hazard_id) = facility.credit_curve_id {
@@ -278,7 +278,7 @@ impl RevolvingCreditPricer {
         // Add upfront fee if applicable
         total_pv += compute_upfront_fee_pv(
             facility.upfront_fee_amount(),
-            facility.commitment_date,
+            facility.issue_date,
             as_of,
             disc_curve.as_ref(),
         )?;
@@ -341,7 +341,7 @@ impl RevolvingCreditPricer {
             &path_data.time_points,
             dates,
             facility.recovery_rate,
-            facility.commitment_date,
+            facility.issue_date,
             super::super::MC_CLOCK_DAY_COUNT,
         )?;
 
@@ -400,7 +400,7 @@ impl RevolvingCreditPricer {
         time_points: &[f64],
         cashflow_dates: &[Date],
         recovery_rate: f64,
-        commitment_date: Date,
+        issue_date: Date,
         day_count: DayCount,
     ) -> Result<Vec<f64>> {
         use finstack_quant_core::dates::DayCountContext;
@@ -427,8 +427,7 @@ impl RevolvingCreditPricer {
         // Now interpolate survival for each cashflow date
         let mut survival_probs = Vec::with_capacity(cashflow_dates.len());
         for &cf_date in cashflow_dates {
-            let t_cf =
-                day_count.year_fraction(commitment_date, cf_date, DayCountContext::default())?;
+            let t_cf = day_count.year_fraction(issue_date, cf_date, DayCountContext::default())?;
 
             let hazard_at_cf = if let Some(idx) = time_points.iter().position(|&t| t >= t_cf) {
                 if idx == 0
@@ -507,7 +506,7 @@ impl RevolvingCreditPricer {
                 .map(|&date| {
                     let util = Self::interpolate_utilization_at_date(
                         date,
-                        facility.commitment_date,
+                        facility.issue_date,
                         super::super::MC_CLOCK_DAY_COUNT,
                         &path_data.time_points,
                         &path_data.utilization_path,
@@ -578,7 +577,7 @@ impl RevolvingCreditPricer {
     /// Linearly interpolate utilization from the MC path at a given calendar date.
     fn interpolate_utilization_at_date(
         date: Date,
-        commitment_date: Date,
+        issue_date: Date,
         day_count: DayCount,
         time_points: &[f64],
         utilization_path: &[f64],
@@ -595,7 +594,7 @@ impl RevolvingCreditPricer {
             return Ok(0.0);
         }
         let t = day_count.year_fraction(
-            commitment_date,
+            issue_date,
             date,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;

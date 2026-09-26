@@ -32,14 +32,14 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
 #[test]
 fn test_revolving_credit_basic_pricing() {
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     let facility = RevolvingCredit::builder()
         .id("RC-001".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -83,14 +83,14 @@ fn test_revolving_credit_basic_pricing() {
 #[test]
 fn test_revolving_credit_with_draws_and_repayments() {
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     let facility = RevolvingCredit::builder()
         .id("RC-002".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.04 })
         .day_count(DayCount::Act360)
@@ -131,14 +131,14 @@ fn test_revolving_credit_with_draws_and_repayments() {
 #[test]
 fn test_revolving_credit_utilization_metrics() {
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     let facility = RevolvingCredit::builder()
         .id("RC-003".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(6_000_000.0, Currency::USD).expect("valid money fixture")) // 60% utilization
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -189,14 +189,14 @@ fn test_revolving_credit_utilization_metrics() {
 #[test]
 fn test_revolving_credit_standard_metrics() {
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2027 - 01 - 01); // 2 years
 
     let facility = RevolvingCredit::builder()
         .id("RC-004".into())
         .commitment_amount(Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
@@ -290,7 +290,7 @@ fn test_revolving_credit_cs01_z_spread_fallback_without_credit_curve() {
         .id("RC-ZS-001".into())
         .commitment_amount(Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(15_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(val_date)
+        .issue_date(val_date)
         .maturity(date!(2030 - 01 - 01)) // 5y
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
@@ -345,7 +345,7 @@ fn test_revolving_credit_cs01_stochastic_without_credit_curve_errors() {
         .id("RC-ZS-STOCH".into())
         .commitment_amount(Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(val_date)
+        .issue_date(val_date)
         .maturity(date!(2028 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
@@ -393,14 +393,14 @@ fn test_revolving_credit_cs01_stochastic_without_credit_curve_errors() {
 #[test]
 fn test_revolving_credit_bucketed_dv01() {
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2028 - 01 - 01); // 3 years
 
     let facility = RevolvingCredit::builder()
         .id("RC-005".into())
         .commitment_amount(Money::new(20_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
@@ -443,7 +443,7 @@ fn test_revolving_credit_helpers() {
         .id("RC-006".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(7_500_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(val_date)
+        .issue_date(val_date)
         .maturity(date!(2026 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -469,7 +469,7 @@ fn test_term_forward_with_floor() {
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2025 - 07 - 01);
 
     // Build forward curve with very low rates that will be affected by floor
@@ -504,7 +504,7 @@ fn test_term_forward_with_floor() {
         .id("RC-FLOOR".into())
         .commitment_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -540,7 +540,7 @@ fn test_term_forward_with_floor() {
         .id("RC-NO-FLOOR".into())
         .commitment_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
@@ -584,7 +584,7 @@ fn test_term_forward_with_floor() {
 
 #[test]
 fn test_overdraw_validation() {
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2026 - 01 - 01);
 
     // Create a facility with a draw that would exceed commitment
@@ -592,7 +592,7 @@ fn test_overdraw_validation() {
         .id("RC-OVERDRAW".into())
         .commitment_amount(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(500_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
@@ -624,7 +624,7 @@ fn test_deterministic_with_credit_risk() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
 
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2030 - 01 - 01); // 5 year term
 
     // Create facility WITH hazard curve
@@ -632,7 +632,7 @@ fn test_deterministic_with_credit_risk() {
         .id("RC-RISKY".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture")) // 30% utilization
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act365F)
@@ -650,7 +650,7 @@ fn test_deterministic_with_credit_risk() {
         .id("RC-RISK-FREE".into())
         .commitment_amount(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
         .drawn_amount(Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"))
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act365F)
@@ -721,7 +721,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
     };
 
     let val_date = date!(2025 - 01 - 01);
-    let commitment_date = date!(2025 - 01 - 01);
+    let issue_date = date!(2025 - 01 - 01);
     let maturity_date = date!(2030 - 01 - 01); // 5 year term
     let commitment_amount = Money::new(10_000_000.0, Currency::USD).expect("valid money fixture");
     let drawn_amount = Money::new(3_000_000.0, Currency::USD).expect("valid money fixture"); // 30% utilization
@@ -732,7 +732,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .id("RC-DET".into())
         .commitment_amount(commitment_amount)
         .drawn_amount(drawn_amount)
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 }) // 5.5% fixed
         .day_count(DayCount::Act365F)
@@ -776,7 +776,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .id("RC-STOCH".into())
         .commitment_amount(commitment_amount)
         .drawn_amount(drawn_amount)
-        .commitment_date(commitment_date)
+        .issue_date(issue_date)
         .maturity(maturity_date)
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act365F)

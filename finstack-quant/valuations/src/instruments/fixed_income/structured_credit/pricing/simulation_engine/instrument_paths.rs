@@ -505,7 +505,7 @@ mod tests {
         .expect("tranches");
         let mut deal =
             StructuredCredit::new_clo("POOL-PATH", pool, tranches, AS_OF, maturity, "USD-OIS")
-                .with_payment_calendar("nyse");
+                .with_calendar("nyse");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         deal
@@ -609,8 +609,8 @@ mod tests {
             CashflowSpec::fixed(0.08, Tenor::semi_annual(), DayCount::Thirty360).expect("coupon");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
-                start_date: date!(2026 - 01 - 15),
-                end_date: date!(2034 - 01 - 15),
+                start: date!(2026 - 01 - 15),
+                end: date!(2034 - 01 - 15),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],
@@ -649,8 +649,8 @@ mod tests {
         bond.call_put = Some(CallPutSchedule {
             calls: Vec::new(),
             puts: vec![CallPut {
-                start_date: date!(2026 - 01 - 15),
-                end_date: date!(2034 - 01 - 15),
+                start: date!(2026 - 01 - 15),
+                end: date!(2034 - 01 - 15),
                 price_pct_of_par: 100.0,
                 make_whole: None,
             }],

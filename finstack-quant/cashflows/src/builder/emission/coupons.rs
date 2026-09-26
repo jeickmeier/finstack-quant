@@ -301,7 +301,7 @@ pub(crate) fn emit_fixed_coupons_on(
                 let accrual = CashFlowAccrual {
                     coupon_period,
                     end_is_termination_date: is_termination_date,
-                    calendar_id: Some(spec.schedule.calendar_id.clone()),
+                    calendar_id: Some(spec.schedule.calendar_id.to_string()),
                     start: accrual_start,
                     end: accrual_end,
                     day_count: spec.schedule.day_count,
@@ -702,7 +702,7 @@ pub(crate) fn emit_float_coupons_on(
                 let accrual = CashFlowAccrual {
                     coupon_period,
                     end_is_termination_date: is_termination_date,
-                    calendar_id: Some(spec.schedule.calendar_id.clone()),
+                    calendar_id: Some(spec.schedule.calendar_id.to_string()),
                     start: accrual_start,
                     end: accrual_end,
                     day_count: spec.schedule.day_count,

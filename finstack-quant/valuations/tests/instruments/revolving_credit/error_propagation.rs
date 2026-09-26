@@ -39,7 +39,7 @@ fn unknown_pricing_model_override_is_an_error() {
         .id("RC-MODEL".into())
         .commitment_amount(usd(10_000_000.0))
         .drawn_amount(usd(5_000_000.0))
-        .commitment_date(as_of)
+        .issue_date(as_of)
         .maturity(date!(2027 - 01 - 01))
         .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)

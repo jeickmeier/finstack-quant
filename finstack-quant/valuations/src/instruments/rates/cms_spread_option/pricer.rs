@@ -81,12 +81,12 @@ impl CmsSpreadOptionPricer {
 
         // Seasoned options (expiry already past) have zero time to expiry;
         // the year fraction is only defined for `as_of <= expiry`.
-        let time_to_expiry = if inst.expiry_date <= as_of {
+        let time_to_expiry = if inst.expiry <= as_of {
             0.0
         } else {
             // Option expiry is calendar time: ACT/365F, not the accrual day count.
             DayCount::Act365F
-                .year_fraction(as_of, inst.expiry_date, DayCountContext::default())?
+                .year_fraction(as_of, inst.expiry, DayCountContext::default())?
                 .max(0.0)
         };
 
@@ -144,12 +144,12 @@ impl CmsSpreadOptionPricer {
         // never re-project from the live curve, which books phantom P&L. The
         // rate is known, so there is no convexity adjustment and the payoff
         // collapses to intrinsic on the observed rates.
-        if inst.expiry_date < as_of {
+        if inst.expiry < as_of {
             let observed = crate::instruments::rates::hw1f::fixings::historical_cms_fixing(
                 market,
                 &inst.forward_curve_id,
                 tenor_years,
-                inst.expiry_date,
+                inst.expiry,
             )?;
             return Ok(CmsSpreadLeg {
                 tenor_years,
@@ -167,15 +167,12 @@ impl CmsSpreadOptionPricer {
                 tenor
             ))
         })?;
-        let swap_end = inst.expiry_date.add_months(tenor_months as i32);
+        let swap_end = inst.expiry.add_months(tenor_months as i32);
         // Project the CMS forward swap rate on the instrument's resolved swap
         // conventions (explicit fields > index_id > currency > USD).
-        let (forward_rate, _) = inst.reference_swap().forward_rate_and_annuity(
-            market,
-            as_of,
-            inst.expiry_date,
-            swap_end,
-        )?;
+        let (forward_rate, _) =
+            inst.reference_swap()
+                .forward_rate_and_annuity(market, as_of, inst.expiry, swap_end)?;
         if forward_rate <= 0.0 || !forward_rate.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CmsSpreadOption forward CMS rate must be positive and finite, got {}",
@@ -509,7 +506,7 @@ mod tests {
         let payment = date(2025, 3, 1);
 
         let mut inst = CmsSpreadOption::example();
-        inst.expiry_date = expiry;
+        inst.expiry = expiry;
         inst.payment_date = payment;
         inst.strike = rust_decimal::Decimal::ZERO;
         inst.option_type = CmsSpreadOptionType::Call;

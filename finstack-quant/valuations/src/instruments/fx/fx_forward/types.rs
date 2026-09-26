@@ -98,11 +98,11 @@ pub struct FxForward {
     /// Optional base currency calendar for business day adjustment.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_calendar_id: Option<String>,
+    pub base_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Optional quote currency calendar for business day adjustment.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quote_calendar_id: Option<String>,
+    pub quote_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -190,8 +190,8 @@ impl TryFrom<FxForwardUnchecked> for FxForward {
             domestic_discount_curve_id: value.domestic_discount_curve_id,
             foreign_discount_curve_id: value.foreign_discount_curve_id,
             quoted_spot: value.quoted_spot,
-            base_calendar_id: value.base_calendar_id,
-            quote_calendar_id: value.quote_calendar_id,
+            base_calendar_id: value.base_calendar_id.map(Into::into),
+            quote_calendar_id: value.quote_calendar_id.map(Into::into),
             instrument_pricing_overrides: value.instrument_pricing_overrides,
             metric_pricing_overrides: value.metric_pricing_overrides,
             scenario_pricing_overrides: value.scenario_pricing_overrides,
@@ -360,8 +360,8 @@ impl FxForward {
             .notional(notional)
             .domestic_discount_curve_id(domestic_discount_curve_id.into())
             .foreign_discount_curve_id(foreign_discount_curve_id.into())
-            .base_calendar_id_opt(base_calendar_id)
-            .quote_calendar_id_opt(quote_calendar_id)
+            .base_calendar_id_opt(base_calendar_id.map(Into::into))
+            .quote_calendar_id_opt(quote_calendar_id.map(Into::into))
             .attributes(Attributes::new())
             .build()
     }

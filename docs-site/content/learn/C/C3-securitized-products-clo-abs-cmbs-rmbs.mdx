@@ -141,7 +141,7 @@ for kind in ["clo","abs","cmbs","rmbs"]:
     tr=TrancheStructure.from_json(json.dumps(spec["tranches"]))
     native_deal=getattr(StructuredCredit,"new_"+kind)("C3-"+kind,p,tr,AS_OF,date(2030,1,15),"USD-OIS")
     payload=json.loads(native_deal.to_json());s=payload["instrument"]["spec"]
-    s.update(payment_calendar_id="weekends_only",payment_business_day_convention="following")
+    s.update(calendar_id="weekends_only",business_day_convention="following")
     s["pool"]["deal_type"]=kind
     validate_instrument_json(json.dumps(payload));presets[kind]=payload
     preset_rows.append({"deal_type":kind,"CPR_parameter":s["prepayment_spec"]["cpr"],
@@ -162,7 +162,7 @@ fee_deal["instrument"]["spec"]["fees"]={"trustee_fee":{"amount":"50000","currenc
     "senior_mgmt_fee_bp":40.,"subordinated_mgmt_fee_bp":20.,"servicing_fee_bp":0.,
     "master_servicer_fee_bp":None,"special_servicer_fee_bp":None}
 reinvest=deepcopy(fee_deal);reinvest["instrument"]["spec"]["reinvestment_end_date"]="2027-01-15"
-reinvest["instrument"]["spec"]["pool"]["reinvestment_period"]={"end_date":"2027-01-15","is_active":True,
+reinvest["instrument"]["spec"]["pool"]["reinvestment_period"]={"end":"2027-01-15","is_active":True,
     "criteria":{"max_price_pct":100.,"min_yield":0.,"maintain_credit_quality":True,"maintain_wal":True,"apply_eligibility_criteria":True}}
 for payload in [fee_deal,reinvest]:
     payload["instrument"]["spec"]["prepayment_spec"]={"cpr":.15,"curve":None}

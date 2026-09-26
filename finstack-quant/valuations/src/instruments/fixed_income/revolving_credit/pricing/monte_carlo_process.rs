@@ -249,7 +249,7 @@ pub struct RevolvingCreditProcessParams {
     /// Must be symmetric, positive definite, with ones on diagonal
     pub correlation: Option<[[f64; 3]; 3]>,
     /// Time offset applied to MC time when mapping to market curve time axis
-    /// (e.g., base_date→commitment_date), so market-t = offset + path-t
+    /// (e.g., base_date→issue_date), so market-t = offset + path-t
     pub time_offset: f64,
 }
 

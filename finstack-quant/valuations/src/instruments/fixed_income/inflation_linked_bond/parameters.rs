@@ -16,7 +16,7 @@ pub struct InflationLinkedBondParams {
     /// Real coupon rate
     pub real_coupon: Decimal,
     /// Issue date
-    pub issue: Date,
+    pub issue_date: Date,
     /// Maturity date
     pub maturity: Date,
     /// Base index value at issue
@@ -36,7 +36,7 @@ impl InflationLinkedBondParams {
     pub fn new(
         notional: Money,
         real_coupon: f64,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         base_cpi: f64,
         frequency: Tenor,
@@ -45,7 +45,7 @@ impl InflationLinkedBondParams {
         Ok(Self {
             notional,
             real_coupon: finstack_quant_core::decimal::f64_to_decimal(real_coupon)?,
-            issue,
+            issue_date,
             maturity,
             base_cpi,
             frequency,
@@ -61,14 +61,14 @@ impl InflationLinkedBondParams {
     pub fn tips(
         notional: Money,
         real_coupon: f64,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         base_cpi: f64,
     ) -> finstack_quant_core::Result<Self> {
         Self::new(
             notional,
             real_coupon,
-            issue,
+            issue_date,
             maturity,
             base_cpi,
             Tenor::semi_annual(),
@@ -84,14 +84,14 @@ impl InflationLinkedBondParams {
     pub fn uk_linker(
         notional: Money,
         real_coupon: f64,
-        issue: Date,
+        issue_date: Date,
         maturity: Date,
         base_cpi: f64,
     ) -> finstack_quant_core::Result<Self> {
         Self::new(
             notional,
             real_coupon,
-            issue,
+            issue_date,
             maturity,
             base_cpi,
             Tenor::semi_annual(),

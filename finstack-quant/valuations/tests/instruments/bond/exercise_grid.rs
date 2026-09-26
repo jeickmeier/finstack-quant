@@ -67,8 +67,8 @@ fn bond(id: &str, coupon: f64, maturity: Date) -> Bond {
 
 fn right(start: Date, end: Date, price: f64) -> CallPut {
     CallPut {
-        start_date: start,
-        end_date: end,
+        start,
+        end,
         price_pct_of_par: price,
         make_whole: None,
     }
