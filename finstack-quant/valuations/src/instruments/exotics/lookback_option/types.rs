@@ -46,8 +46,8 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{Monitoring, OptionType};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
 /// Lookback option type.
@@ -139,8 +139,10 @@ pub struct LookbackOption {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expiry_fixing: Option<f64>,
-    /// Notional amount
-    pub notional: Money,
+    /// Number of underlying units the option is written on; PV and Greeks scale linearly with it.
+    pub quantity: f64,
+    /// Currency of the strike, premium and present value.
+    pub currency: Currency,
     /// Day count convention
     pub day_count: finstack_quant_core::dates::DayCount,
     /// Discount curve ID for present value calculations
@@ -205,7 +207,8 @@ impl LookbackOption {
             .lookback_type(LookbackType::FixedStrike)
             .expiry(date!(2024 - 12 - 20))
             .expiry_fixing_opt(None)
-            .notional(Money::from((100_000_i64, Currency::USD)))
+            .quantity(100_000.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())

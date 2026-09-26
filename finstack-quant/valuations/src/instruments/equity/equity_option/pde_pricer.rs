@@ -82,14 +82,14 @@ impl EquityOptionPdePricer {
         let q = inputs.q;
         let sigma = inputs.sigma;
         let t = inputs.t_vol;
-        let ccy = inst.notional.currency();
+        let ccy = inst.currency;
 
         if t <= 0.0 {
             let intrinsic = match inst.option_type {
                 OptionType::Call => (spot - inst.strike).max(0.0),
                 OptionType::Put => (inst.strike - spot).max(0.0),
             };
-            return Money::new(intrinsic * inst.notional.amount(), ccy).map_err(|error| {
+            return Money::new(intrinsic * inst.quantity, ccy).map_err(|error| {
                 crate::pricer::PricingError::from_core(
                     error,
                     crate::pricer::PricingErrorContext::from_instrument(inst)
@@ -178,7 +178,7 @@ impl EquityOptionPdePricer {
         })?;
         let price = solution.interpolate(spot.ln());
 
-        Money::new(price * inst.notional.amount(), ccy).map_err(|error| {
+        Money::new(price * inst.quantity, ccy).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,
                 crate::pricer::PricingErrorContext::from_instrument(inst)

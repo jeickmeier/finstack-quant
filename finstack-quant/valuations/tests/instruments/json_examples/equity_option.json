@@ -2,6 +2,7 @@
   "instrument": {
     "spec": {
       "attributes": {},
+      "currency": "USD",
       "day_count": "act_365f",
       "discount_curve_id": "USD-OIS",
       "discrete_dividends": [],
@@ -9,11 +10,8 @@
       "exercise_style": "european",
       "expiry": "2024-06-21",
       "id": "SPX-CALL-4500",
-      "notional": {
-        "amount": "100",
-        "currency": "USD"
-      },
       "option_type": "call",
+      "quantity": 100.0,
       "settlement": "cash",
       "spot_id": "EQUITY-SPOT",
       "strike": 4500.0,

@@ -74,7 +74,7 @@ impl EquityOptionHestonMcPricer {
 
         let inputs = collect_inputs_extended(inst, market, as_of)?;
         let (spot, r, q, _sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
-        let ccy = inst.notional.currency();
+        let ccy = inst.currency;
 
         if t <= 0.0 {
             let intrinsic = match inst.option_type {
@@ -85,7 +85,7 @@ impl EquityOptionHestonMcPricer {
                     (inst.strike - spot).max(0.0)
                 }
             };
-            return Ok((Money::new(intrinsic * inst.notional.amount(), ccy)?, 0.0));
+            return Ok((Money::new(intrinsic * inst.quantity, ccy)?, 0.0));
         }
 
         // Heston parameters: **Audit P3b** — use the strict resolver so a
@@ -136,7 +136,7 @@ impl EquityOptionHestonMcPricer {
 
         let result = match inst.option_type {
             crate::instruments::common_impl::parameters::OptionType::Call => {
-                let payoff = EuropeanCall::new(inst.strike, inst.notional.amount(), maturity_step);
+                let payoff = EuropeanCall::new(inst.strike, inst.quantity, maturity_step);
                 engine.price(
                     &rng,
                     &process,
@@ -148,7 +148,7 @@ impl EquityOptionHestonMcPricer {
                 )?
             }
             crate::instruments::common_impl::parameters::OptionType::Put => {
-                let payoff = EuropeanPut::new(inst.strike, inst.notional.amount(), maturity_step);
+                let payoff = EuropeanPut::new(inst.strike, inst.quantity, maturity_step);
                 engine.price(
                     &rng,
                     &process,
@@ -280,7 +280,8 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::from((100_i64, Currency::USD)))
+            .quantity(100.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))

@@ -18,9 +18,9 @@
                 "discrete_dividends": [],
                 "div_yield_id": null,
                 "id": "COMPOSITE-LONG",
-                "price_id": null,
-                "price_quote": 100.0,
-                "shares": 1.0,
+                "quantity": 1.0,
+                "quoted_spot": 100.0,
+                "spot_id": null,
                 "ticker": "LONG"
               },
               "type": "equity"
@@ -37,9 +37,9 @@
                 "discrete_dividends": [],
                 "div_yield_id": null,
                 "id": "COMPOSITE-SHORT",
-                "price_id": null,
-                "price_quote": 90.0,
-                "shares": 1.0,
+                "quantity": 1.0,
+                "quoted_spot": 90.0,
+                "spot_id": null,
                 "ticker": "SHORT"
               },
               "type": "equity"

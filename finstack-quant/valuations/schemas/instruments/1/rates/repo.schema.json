@@ -116,8 +116,8 @@
           "type": "string"
         },
         "market_value_id": {
-          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")"
         },
         "quantity": {
           "description": "Quantity/face value of collateral",

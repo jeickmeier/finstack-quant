@@ -39,10 +39,10 @@ fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve
 }
 
 #[test]
-fn test_equity_pricer_with_price_quote() {
+fn test_equity_pricer_with_quoted_spot() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(100.0)
-        .with_price(150.0);
+        .with_quantity(100.0)
+        .with_quoted_spot(150.0);
 
     let market = MarketContext::new();
     let pricer = EquityPricer;
@@ -61,7 +61,9 @@ fn test_equity_pricer_with_price_quote() {
 
 #[test]
 fn test_equity_pricer_from_market_data() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_shares(50.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD)
+        .with_quantity(50.0)
+        .with_spot_id("AAPL");
 
     let market = MarketContext::new().insert_price(
         "AAPL",
@@ -82,8 +84,8 @@ fn test_equity_pricer_from_market_data() {
 #[test]
 fn test_equity_pricer_with_custom_price_id() {
     let equity = Equity::new("EQUITY1", "AAPL", Currency::USD)
-        .with_shares(25.0)
-        .with_price_id("CUSTOM_PRICE_ID");
+        .with_quantity(25.0)
+        .with_spot_id("CUSTOM_PRICE_ID");
 
     let market = MarketContext::new().insert_price(
         "CUSTOM_PRICE_ID",
@@ -113,7 +115,7 @@ fn test_equity_dividend_yield_default() {
 
 #[test]
 fn test_equity_dividend_yield_from_market() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_dividend_yield_id("AAPL-DIVYIELD");
     let market = MarketContext::new().insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.025)); // 2.5% dividend yield
 
     let pricer = EquityPricer;
@@ -136,7 +138,9 @@ fn test_equity_dividend_yield_with_custom_id() {
 
 #[test]
 fn test_equity_forward_price() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price(100.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD)
+        .with_quoted_spot(100.0)
+        .with_dividend_yield_id("AAPL-DIVYIELD");
 
     // Add discount curve (5% interest rate)
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -159,8 +163,8 @@ fn test_equity_forward_price() {
 #[test]
 fn test_equity_forward_value() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_price(100.0)
-        .with_shares(10.0);
+        .with_quoted_spot(100.0)
+        .with_quantity(10.0);
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.04, base_date, "USD");
@@ -188,8 +192,8 @@ fn test_simple_equity_pricer_key() {
 #[test]
 fn test_simple_equity_pricer_price_dyn() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(100.0)
-        .with_price(150.0);
+        .with_quantity(100.0)
+        .with_quoted_spot(150.0);
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.05, base_date, "USD");
@@ -240,20 +244,20 @@ fn test_simple_equity_pricer_type_mismatch() {
 #[test]
 fn test_equity_effective_shares_default() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD);
-    assert_eq!(equity.effective_shares(), 1.0);
+    assert_eq!(equity.effective_quantity(), 1.0);
 }
 
 #[test]
 fn test_equity_effective_shares_explicit() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_shares(50.0);
-    assert_eq!(equity.effective_shares(), 50.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quantity(50.0);
+    assert_eq!(equity.effective_quantity(), 50.0);
 }
 
 #[test]
 fn test_equity_pricer_zero_shares() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(0.0)
-        .with_price(150.0);
+        .with_quantity(0.0)
+        .with_quoted_spot(150.0);
 
     let market = MarketContext::new();
     let pricer = EquityPricer;
@@ -267,8 +271,8 @@ fn test_equity_pricer_zero_shares() {
 fn test_equity_pricer_negative_shares() {
     // Short position
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(-10.0)
-        .with_price(150.0);
+        .with_quantity(-10.0)
+        .with_quoted_spot(150.0);
 
     let market = MarketContext::new();
     let pricer = EquityPricer;
@@ -282,8 +286,8 @@ fn test_equity_pricer_negative_shares() {
 fn test_equity_pricer_different_currencies() {
     // EUR equity
     let equity = Equity::new("SAP", "SAP", Currency::EUR)
-        .with_shares(20.0)
-        .with_price(120.0);
+        .with_quantity(20.0)
+        .with_quoted_spot(120.0);
 
     let market = MarketContext::new();
     let pricer = EquityPricer;
@@ -296,7 +300,7 @@ fn test_equity_pricer_different_currencies() {
 
 #[test]
 fn test_equity_forward_price_zero_rates() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price(100.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quoted_spot(100.0);
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.0, base_date, "USD");
@@ -313,7 +317,9 @@ fn test_equity_forward_price_zero_rates() {
 
 #[test]
 fn test_equity_forward_price_high_dividend() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price(100.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD)
+        .with_quoted_spot(100.0)
+        .with_dividend_yield_id("AAPL-DIVYIELD");
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.05, base_date, "USD");
@@ -338,7 +344,7 @@ fn test_equity_forward_price_high_dividend() {
 #[test]
 fn test_equity_forward_price_with_discrete_dividend() {
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
-    let mut equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price(100.0);
+    let mut equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quoted_spot(100.0);
     equity.discrete_dividends = vec![(
         Date::from_calendar_date(2024, time::Month::April, 1).unwrap(),
         2.50,

@@ -118,16 +118,14 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
             return Ok(crate::results::ValuationResult::stamped(
                 equity_option.id(),
                 as_of,
-                Money::new(
-                    intrinsic * equity_option.notional.amount(),
-                    equity_option.notional.currency(),
-                )
-                .map_err(|error| {
-                    crate::pricer::PricingError::from_core(
-                        error,
-                        crate::pricer::PricingErrorContext::from_instrument(equity_option),
-                    )
-                })?,
+                Money::new(intrinsic * equity_option.quantity, equity_option.currency).map_err(
+                    |error| {
+                        crate::pricer::PricingError::from_core(
+                            error,
+                            crate::pricer::PricingErrorContext::from_instrument(equity_option),
+                        )
+                    },
+                )?,
             ));
         }
 
@@ -148,16 +146,14 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
         }
         .map_err(|error| crate::pricer::PricingError::from_core(error, err_ctx))?;
 
-        let pv = Money::new(
-            price * equity_option.notional.amount(),
-            equity_option.notional.currency(),
-        )
-        .map_err(|error| {
-            crate::pricer::PricingError::from_core(
-                error,
-                crate::pricer::PricingErrorContext::from_instrument(equity_option),
-            )
-        })?;
+        let pv = Money::new(price * equity_option.quantity, equity_option.currency).map_err(
+            |error| {
+                crate::pricer::PricingError::from_core(
+                    error,
+                    crate::pricer::PricingErrorContext::from_instrument(equity_option),
+                )
+            },
+        )?;
         Ok(crate::results::ValuationResult::stamped(
             equity_option.id(),
             as_of,
@@ -225,7 +221,8 @@ mod tests {
             .option_type(option_type)
             .exercise_style(exercise_style)
             .expiry(expiry)
-            .notional(Money::from((100_i64, Currency::USD)))
+            .quantity(100.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -350,7 +347,7 @@ mod tests {
             .expect("European escrowed-dividend price")
             .amount();
 
-        assert!(american_pv >= 50.0 * american.notional.amount());
+        assert!(american_pv >= 50.0 * american.quantity);
         assert!(
             american_pv > european_pv,
             "large near-term dividend should create an early-exercise premium"
@@ -470,7 +467,7 @@ mod tests {
             opt.metric_pricing_overrides.theta_days_per_year(),
         )
         .rho_r
-            * opt.notional.amount()
+            * opt.quantity
             / 100.0; // `BsGreeks::rho_r` is per 1%; compare per 1bp.
         assert!(
             (analytic - naive).abs() / denom > 1e-3,
@@ -548,7 +545,7 @@ mod tests {
             american.metric_pricing_overrides.theta_days_per_year(),
         )
         .gamma
-            * american.notional.amount();
+            * american.quantity;
 
         assert!(
             analytic > 0.0 && tree_greeks.gamma > 0.0,
@@ -599,9 +596,9 @@ mod tests {
             finstack_quant_models::trees::binomial_tree::BinomialTree::leisen_reimer(51)
                 .price_european(&params)
                 .expect("European lattice")
-                * european.notional.amount();
+                * european.quantity;
         assert!(american_pv.amount() >= tree_european);
-        assert!((tree_european - european_pv.amount()).abs() < 0.01 * european.notional.amount());
+        assert!((tree_european - european_pv.amount()).abs() < 0.01 * european.quantity);
     }
 
     #[test]
@@ -657,7 +654,7 @@ mod tests {
             365.0,
         )
         .theta
-            * option.notional.amount();
+            * option.quantity;
 
         assert!((theta - expected).abs() < 1e-12);
     }

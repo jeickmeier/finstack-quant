@@ -31,7 +31,7 @@ use time::macros::date;
 /// PV = notional × (F_market - F_contract) × DF_domestic(T)
 /// ```
 /// where:
-/// - S = spot FX rate (from FxMatrix or spot_rate_override)
+/// - S = spot FX rate (from FxMatrix or quoted_spot)
 /// - DF_foreign(T) = discount factor in base currency to maturity
 /// - DF_domestic(T) = discount factor in quote currency to maturity
 /// - F_contract = contract_rate (if provided, else F_market for at-market forward)
@@ -94,7 +94,7 @@ pub struct FxForward {
     /// Optional spot rate override (quote per base). If None, source from FxMatrix.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub spot_rate_override: Option<f64>,
+    pub quoted_spot: Option<f64>,
     /// Optional base currency calendar for business day adjustment.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -156,7 +156,7 @@ struct FxForwardUnchecked {
     foreign_discount_curve_id: CurveId,
     /// Optional spot rate override (quote per base). If None, source from FxMatrix.
     #[serde(default)]
-    spot_rate_override: Option<f64>,
+    quoted_spot: Option<f64>,
     /// Optional base currency calendar for business day adjustment.
     #[serde(default)]
     base_calendar_id: Option<String>,
@@ -189,7 +189,7 @@ impl TryFrom<FxForwardUnchecked> for FxForward {
             contract_rate: value.contract_rate,
             domestic_discount_curve_id: value.domestic_discount_curve_id,
             foreign_discount_curve_id: value.foreign_discount_curve_id,
-            spot_rate_override: value.spot_rate_override,
+            quoted_spot: value.quoted_spot,
             base_calendar_id: value.base_calendar_id,
             quote_calendar_id: value.quote_calendar_id,
             instrument_pricing_overrides: value.instrument_pricing_overrides,
@@ -211,7 +211,7 @@ impl FxForward {
     /// - `base_currency` equals `quote_currency` (must be different currencies)
     /// - `notional.currency()` does not match `base_currency`
     /// - `contract_rate` is provided but is not positive
-    /// - `spot_rate_override` is provided but is not positive
+    /// - `quoted_spot` is provided but is not positive
     pub fn validate(&self) -> Result<()> {
         validation::validate_distinct_currencies(
             self.base_currency,
@@ -241,15 +241,12 @@ impl FxForward {
         }
 
         // Spot rate override must be positive if provided
-        if let Some(rate) = self.spot_rate_override {
+        if let Some(rate) = self.quoted_spot {
             validation::require_with(rate > 0.0, || {
-                format!(
-                    "FX forward spot_rate_override must be positive, got {}",
-                    rate
-                )
+                format!("FX forward quoted_spot must be positive, got {}", rate)
             })?;
             validation::require_with(rate.is_finite(), || {
-                "FX forward spot_rate_override must be finite".to_string()
+                "FX forward quoted_spot must be finite".to_string()
             })?;
         }
 
@@ -526,7 +523,7 @@ impl FxForward {
                 quote_currency: self.quote_currency,
                 domestic_discount_curve_id: &self.domestic_discount_curve_id,
                 foreign_discount_curve_id: &self.foreign_discount_curve_id,
-                spot_rate_override: self.spot_rate_override,
+                quoted_spot: self.quoted_spot,
                 context: "FxForward",
             },
         )
@@ -606,7 +603,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
                 quote_currency: self.quote_currency,
                 domestic_discount_curve_id: &self.domestic_discount_curve_id,
                 foreign_discount_curve_id: &self.foreign_discount_curve_id,
-                spot_rate_override: self.spot_rate_override,
+                quoted_spot: self.quoted_spot,
                 context: "FxForward",
             },
         )?;
@@ -629,10 +626,10 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
     ) -> Option<crate::results::ValuationDetails> {
         // Project invariant: FX-policy visibility per layer. Record whether
         // the spot was a direct quote or triangulated through the matrix
-        // pivot. `spot_rate_override` short-circuits the matrix lookup, so
+        // pivot. `quoted_spot` short-circuits the matrix lookup, so
         // there is no triangulation to report in that case.
         use finstack_quant_core::money::fx::FxQuery;
-        let fx_triangulated = if self.spot_rate_override.is_some() {
+        let fx_triangulated = if self.quoted_spot.is_some() {
             None
         } else {
             market
@@ -761,7 +758,7 @@ mod tests {
             contract_rate: None,
             domestic_discount_curve_id: CurveId::new("EUR-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
-            spot_rate_override: None,
+            quoted_spot: None,
             base_calendar_id: None,
             quote_calendar_id: None,
             instrument_pricing_overrides: Default::default(),
@@ -789,7 +786,7 @@ mod tests {
             contract_rate: None,
             domestic_discount_curve_id: CurveId::new("USD-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
-            spot_rate_override: None,
+            quoted_spot: None,
             base_calendar_id: None,
             quote_calendar_id: None,
             instrument_pricing_overrides: Default::default(),
@@ -817,7 +814,7 @@ mod tests {
             contract_rate: Some(-1.10), // Negative rate - invalid
             domestic_discount_curve_id: CurveId::new("USD-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
-            spot_rate_override: None,
+            quoted_spot: None,
             base_calendar_id: None,
             quote_calendar_id: None,
             instrument_pricing_overrides: Default::default(),
@@ -845,7 +842,7 @@ mod tests {
             contract_rate: Some(1.10),
             domestic_discount_curve_id: CurveId::new("USD-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
-            spot_rate_override: Some(-1.10), // Negative rate - invalid
+            quoted_spot: Some(-1.10), // Negative rate - invalid
             base_calendar_id: None,
             quote_calendar_id: None,
             instrument_pricing_overrides: Default::default(),
@@ -859,7 +856,7 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("spot_rate_override must be positive"));
+            .contains("quoted_spot must be positive"));
     }
 
     #[test]
@@ -885,7 +882,7 @@ mod tests {
             .expect("valid forward points");
 
         assert_eq!(forward.contract_rate, Some(1.105));
-        assert_eq!(forward.spot_rate_override, None);
+        assert_eq!(forward.quoted_spot, None);
 
         let pv_at_trade_spot = forward
             .base_value(&test_market(as_of), as_of)

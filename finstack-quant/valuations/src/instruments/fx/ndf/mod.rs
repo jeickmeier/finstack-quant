@@ -48,7 +48,7 @@
 //! ## Pre-Fixing (before fixing date)
 //!
 //! Forward rate is projected using both currency curves unless an explicit
-//! `forward_rate_override` is supplied in the contract's quote convention.
+//! `quoted_forward` is supplied in the contract's quote convention.
 //!
 //! ## Post-Fixing (after fixing date, before settlement)
 //!

@@ -44,10 +44,7 @@ impl LookbackOptionMcPricer {
         if as_of >= inst.expiry {
             let payoff =
                 expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
-            return finstack_quant_core::money::Money::new(
-                payoff * inst.notional.amount(),
-                inst.notional.currency(),
-            );
+            return finstack_quant_core::money::Money::new(payoff * inst.quantity, inst.currency);
         }
 
         let t = inst
@@ -56,10 +53,7 @@ impl LookbackOptionMcPricer {
         if t <= 0.0 {
             let payoff =
                 expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
-            return finstack_quant_core::money::Money::new(
-                payoff * inst.notional.amount(),
-                inst.notional.currency(),
-            );
+            return finstack_quant_core::money::Money::new(payoff * inst.quantity, inst.currency);
         }
 
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
@@ -141,7 +135,7 @@ impl LookbackOptionMcPricer {
         // maturity (at time T·(N-1)/N) and exclude the last spot from the tracked extremum.
         let maturity_step = num_steps;
 
-        let currency = inst.notional.currency();
+        let currency = inst.currency;
 
         // Derive deterministic seed from instrument ID and scenario
 
@@ -166,7 +160,7 @@ impl LookbackOptionMcPricer {
                 // Seed initial minimum from observed_min if seasoned
                 let initial_min = inst.observed_min.unwrap_or(f64::INFINITY);
                 let payoff = FloatingStrikeLookbackCall::with_initial_min(
-                    inst.notional.amount(),
+                    inst.quantity,
                     maturity_step,
                     initial_min,
                 )
@@ -185,7 +179,7 @@ impl LookbackOptionMcPricer {
                 // Seed initial maximum from observed_max if seasoned
                 let initial_max = inst.observed_max.unwrap_or(f64::NEG_INFINITY);
                 let payoff = FloatingStrikeLookbackPut::with_initial_max(
-                    inst.notional.amount(),
+                    inst.quantity,
                     maturity_step,
                     initial_max,
                 )
@@ -211,7 +205,7 @@ impl LookbackOptionMcPricer {
                 let payoff = Lookback::with_initial_extremum(
                     LookbackDirection::Call,
                     *strike,
-                    inst.notional.amount(),
+                    inst.quantity,
                     maturity_step,
                     initial_max,
                 )
@@ -237,7 +231,7 @@ impl LookbackOptionMcPricer {
                 let payoff = Lookback::with_initial_extremum(
                     LookbackDirection::Put,
                     *strike,
-                    inst.notional.amount(),
+                    inst.quantity,
                     maturity_step,
                     initial_min,
                 )
@@ -460,11 +454,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 lookback.id(),
                 as_of,
-                Money::new(
-                    payoff * lookback.notional.amount(),
-                    lookback.notional.currency(),
-                )
-                .map_err(|error| {
+                Money::new(payoff * lookback.quantity, lookback.currency).map_err(|error| {
                     crate::pricer::PricingError::from_core(
                         error,
                         crate::pricer::PricingErrorContext::from_instrument(lookback),
@@ -491,11 +481,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 lookback.id(),
                 as_of,
-                Money::new(
-                    payoff * lookback.notional.amount(),
-                    lookback.notional.currency(),
-                )
-                .map_err(|error| {
+                Money::new(payoff * lookback.quantity, lookback.currency).map_err(|error| {
                     crate::pricer::PricingError::from_core(
                         error,
                         crate::pricer::PricingErrorContext::from_instrument(lookback),
@@ -563,7 +549,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             },
         };
 
-        let currency = lookback.notional.currency();
+        let currency = lookback.currency;
         // Closed-form leaves signal out-of-domain input with a NaN sentinel;
         // convert to an error before `Money::new` panics on non-finite.
         let price = finstack_quant_models::closed_form::checked_closed_form_value(
@@ -573,7 +559,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
-        let pv = Money::new(price * lookback.notional.amount(), currency).map_err(|error| {
+        let pv = Money::new(price * lookback.quantity, currency).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,
                 crate::pricer::PricingErrorContext::from_instrument(lookback),
@@ -640,7 +626,8 @@ mod tests {
             .option_type(OptionType::Call)
             .lookback_type(LookbackType::FixedStrike)
             .expiry(expiry)
-            .notional(Money::from((1_i64, Currency::USD)))
+            .quantity(1.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -660,7 +647,8 @@ mod tests {
             .option_type(OptionType::Put)
             .lookback_type(LookbackType::FixedStrike)
             .expiry(expiry)
-            .notional(Money::from((1_i64, Currency::USD)))
+            .quantity(1.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -680,7 +668,8 @@ mod tests {
             .option_type(OptionType::Call)
             .lookback_type(LookbackType::FloatingStrike)
             .expiry(expiry)
-            .notional(Money::from((1_i64, Currency::USD)))
+            .quantity(1.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -700,7 +689,8 @@ mod tests {
             .option_type(OptionType::Put)
             .lookback_type(LookbackType::FloatingStrike)
             .expiry(expiry)
-            .notional(Money::from((1_i64, Currency::USD)))
+            .quantity(1.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -852,7 +842,8 @@ mod tests {
             .option_type(OptionType::Put)
             .lookback_type(LookbackType::FixedStrike)
             .expiry(date(2025, 1, 1))
-            .notional(Money::from((1_i64, Currency::USD)))
+            .quantity(1.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())

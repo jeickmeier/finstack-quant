@@ -217,7 +217,8 @@ fn test_zero_volatility_option_limits() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -260,7 +261,8 @@ fn test_zero_volatility_option_limits() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -305,19 +307,20 @@ fn test_zero_volatility_option_limits() {
 }
 
 #[test]
-fn test_zero_notional_is_rejected() {
+fn test_zero_quantity_is_rejected() {
     // EquityOption's canonical invariant rejects zero economic exposure.
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
 
     let option = EquityOption {
-        id: "ZERO_NOTIONAL".into(),
+        id: "ZERO_QUANTITY".into(),
         underlying_ticker: "AAPL".to_string(),
         strike: 100.0,
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
+        quantity: 0.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -336,8 +339,8 @@ fn test_zero_notional_is_rejected() {
     let market = create_option_market(as_of, 100.0, 0.25, 0.05);
     let err = option
         .value(&market, as_of)
-        .expect_err("zero-notional equity option must fail validation");
-    assert!(err.to_string().contains("notional must be non-zero"));
+        .expect_err("zero-quantity equity option must fail validation");
+    assert!(err.to_string().contains("EquityOption.quantity must be non-zero"));
 }
 
 #[test]
@@ -355,7 +358,8 @@ fn test_deep_otm_option_greeks() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -410,7 +414,8 @@ fn test_deep_itm_put_greeks() {
         option_type: OptionType::Put,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -464,7 +469,8 @@ fn test_deep_otm_put_greeks() {
         option_type: OptionType::Put,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -533,7 +539,8 @@ fn test_atm_option_gamma_peak() {
             option_type: OptionType::Call,
             exercise_style: ExerciseStyle::European,
             expiry,
-            notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+            quantity: 100.0,
+            currency: Currency::USD,
             day_count: DayCount::Act365F,
             settlement: SettlementType::Cash,
             exercise: None,
@@ -597,7 +604,8 @@ fn test_extreme_volatility_handling() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -655,7 +663,8 @@ fn test_very_short_dated_option() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -735,7 +744,8 @@ fn test_very_low_interest_rate_greeks() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,
@@ -820,7 +830,8 @@ fn test_vol_smile_greeks() {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,

@@ -30,11 +30,11 @@
               "all_in_cap_bp": null,
               "all_in_floor_bp": null,
               "fixing_calendar_id": "weekends_only",
+              "forward_curve_id": "USD-SOFR-3M",
               "gearing": "1",
               "gearing_includes_spread": true,
               "index_cap_bp": null,
               "index_floor_bp": null,
-              "forward_curve_id": "USD-SOFR-3M",
               "reset_frequency": {
                 "count": 3,
                 "unit": "months"

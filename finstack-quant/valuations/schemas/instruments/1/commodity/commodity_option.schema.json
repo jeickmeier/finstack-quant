@@ -156,18 +156,22 @@
           "description": "Settlement type (physical or cash).\n\nDefaults to cash settlement when omitted in serialized payloads."
         },
         "spot_id": {
-          "description": "Optional spot price ID (for spot-based pricing and American options).",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot price ID (for spot-based pricing and American options)."
         },
         "strike": {
           "$ref": "#/$defs/PositiveF64Wire",
           "description": "Strike price per unit."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -182,7 +186,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "strike",
@@ -297,7 +301,7 @@
           "quantity": 1000.0,
           "settlement": "cash",
           "strike": 75.0,
-          "ticker": "CL",
+          "underlying_ticker": "CL",
           "unit": "BBL",
           "vol_surface_id": "WTI-VOL"
         },

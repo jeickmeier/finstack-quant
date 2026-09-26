@@ -222,7 +222,7 @@ mod tests {
             .into_iter()
             .map(|(id, currency)| {
                 let mut equity = Equity::new(id, id, currency);
-                equity.price_quote = Some(100.0);
+                equity.quoted_spot = Some(100.0);
                 serde_json::json!({
                     "id": id,
                     "instrument": InstrumentEnvelope::new(InstrumentJson::Equity(equity)),

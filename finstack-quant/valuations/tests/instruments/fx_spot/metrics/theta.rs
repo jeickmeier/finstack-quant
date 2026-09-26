@@ -50,7 +50,7 @@ fn test_theta_zero_notional() {
     let fx = sample_eurusd()
         .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate")
         .with_settlement_date(d(2025, 1, 17));
     let market = market_full();
@@ -67,7 +67,7 @@ fn test_theta_calculation_completes() {
         sample_gbpusd()
             .with_notional(Money::new(2_000_000.0, Currency::GBP).expect("valid money fixture"))
             .unwrap()
-            .with_rate(1.40)
+            .with_quoted_spot(1.40)
             .expect("test rate")
             .with_settlement_date(d(2025, 3, 15)),
     ];

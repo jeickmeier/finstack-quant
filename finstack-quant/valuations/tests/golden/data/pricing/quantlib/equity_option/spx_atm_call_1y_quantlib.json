@@ -16,15 +16,13 @@
             "quantlib"
           ]
         },
+        "currency": "USD",
         "discount_curve_id": "USD-OIS",
         "div_yield_id": "SPX-DIVYIELD",
         "expiry": "2027-04-30",
         "id": "SPX-ATM-CALL-1Y-QUANTLIB",
-        "notional": {
-          "amount": "100.0",
-          "currency": "USD"
-        },
         "option_type": "call",
+        "quantity": 100.0,
         "spot_id": "SPX-SPOT",
         "strike": 100.0,
         "underlying_ticker": "SPX",

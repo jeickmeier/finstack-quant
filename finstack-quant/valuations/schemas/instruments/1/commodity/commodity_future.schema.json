@@ -37,14 +37,14 @@
           "$ref": "#/$defs/ListedFutureTerms",
           "description": "Standard listed position and lifecycle terms."
         },
-        "underlying": {
+        "underlying_ticker": {
           "description": "Exchange symbol or underlying label.",
           "type": "string"
         }
       },
       "required": [
         "id",
-        "underlying",
+        "underlying_ticker",
         "terms",
         "forward_curve_id",
         "fixing"
@@ -308,7 +308,7 @@
             },
             "settlement_date": "2027-01-04"
           },
-          "underlying": "TSI-62-FE"
+          "underlying_ticker": "TSI-62-FE"
         },
         "type": "commodity_future"
       },

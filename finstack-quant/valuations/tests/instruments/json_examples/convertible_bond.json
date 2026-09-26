@@ -13,6 +13,7 @@
       },
       "credit_curve_id": "USD-CREDIT-BBB",
       "discount_curve_id": "USD-IG",
+      "div_yield_id": null,
       "fixed_coupon": {
         "business_day_convention": "following",
         "calendar_id": "weekends_only",
@@ -36,7 +37,8 @@
         "currency": "USD"
       },
       "recovery_rate": 0.0,
-      "underlying_equity_id": "TECH"
+      "spot_id": "TECH",
+      "vol_surface_id": "TECH-VOL"
     },
     "type": "convertible_bond"
   },

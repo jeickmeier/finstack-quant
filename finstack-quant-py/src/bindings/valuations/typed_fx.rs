@@ -710,7 +710,7 @@ end_of_month=False)"
     /// ----------
     /// market : MarketContext | str
     ///     Market carrying both discount curves and the FX matrix (or an
-    ///     explicit ``spot_rate_override`` on the instrument).
+    ///     explicit ``quoted_spot`` on the instrument).
     /// as_of : datetime.date | str
     ///     Valuation date.
     ///
@@ -783,8 +783,8 @@ end_of_month=False)"
 
     /// Explicit spot override (quote per base), or ``None`` to use the FX matrix.
     #[getter]
-    fn spot_rate_override(&self) -> Option<f64> {
-        self.inner.spot_rate_override
+    fn quoted_spot(&self) -> Option<f64> {
+        self.inner.quoted_spot
     }
 
     /// Base-currency holiday calendar identifier, if any.
@@ -1063,15 +1063,12 @@ impl PyFxForwardBuilder {
     /// FxForwardBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn spot_rate_override<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: f64,
-    ) -> PyResult<PyRefMut<'py, Self>> {
+    fn quoted_spot<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         fx_forward_set!(
             slf,
-            spot_rate_override,
+            quoted_spot,
             float_repr(value),
-            |b: FxForwardBuilderInner| b.spot_rate_override(value)
+            |b: FxForwardBuilderInner| b.quoted_spot(value)
         )
     }
 

@@ -867,7 +867,7 @@ mod tests {
             "base_currency": "EUR",
             "quote_currency": "USD",
             "settlement_date": "2025-01-17",
-            "spot_rate": 1.20,
+            "quoted_spot": 1.20,
             "notional": {"amount": "1000000", "currency": "EUR"},
             "attributes": {},
         })

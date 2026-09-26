@@ -6,7 +6,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Error;
 
 use crate::cashflow::builder::specs::{FixedCouponSpec, FloatingCouponSpec};
@@ -140,9 +140,17 @@ pub struct ConvertibleBond {
     pub credit_curve_id: Option<CurveId>,
     /// Conversion terms for equity conversion.
     pub conversion: ConversionSpec,
-    /// Optional underlying equity identifier (ticker or instrument id).
+    /// Market-scalar id (`MarketContext::get_price`) of the underlying share
+    /// price, as a price in the bond's currency or a unitless level.
+    pub spot_id: PriceId,
+    /// Equity volatility id: a volatility surface read at the conversion strike
+    /// and maturity, or a unitless scalar holding a flat volatility.
+    pub vol_surface_id: CurveId,
+    /// Optional unitless continuous dividend-yield scalar id (decimal,
+    /// 0.02 = 2%). `None` means a zero dividend yield; a configured id must
+    /// resolve.
     #[builder(optional)]
-    pub underlying_equity_id: Option<String>,
+    pub div_yield_id: Option<PriceId>,
     /// Optional call/put schedule (issuer/holder redemption before maturity).
     #[builder(optional)]
     pub call_put: Option<CallPutSchedule>,
@@ -627,17 +635,11 @@ impl ConvertibleBond {
             )));
         }
 
-        let underlying = self
-            .underlying_equity_id
-            .as_deref()
-            .map(str::trim)
-            .filter(|id| !id.is_empty())
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "convertible bond requires a non-empty underlying_equity_id".to_string(),
-                )
-            })?;
-        let _ = underlying;
+        if self.spot_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "convertible bond requires a non-empty spot_id".to_string(),
+            ));
+        }
 
         if self.fixed_coupon.is_some() && self.floating_coupon.is_some() {
             return Err(finstack_quant_core::Error::Validation(
@@ -794,7 +796,8 @@ impl ConvertibleBond {
                 dividend_adjustment: DividendAdjustment::None,
                 dilution_events: Vec::new(),
             })
-            .underlying_equity_id_opt(Some("TECH".to_string()))
+            .spot_id(PriceId::new("TECH"))
+            .vol_surface_id(CurveId::new("TECH-VOL"))
             .call_put_opt(None)
             .fixed_coupon_opt(Some(FixedCouponSpec {
                 coupon_type: CouponType::Cash,
@@ -872,7 +875,8 @@ impl ConvertibleBond {
                 dividend_adjustment: DividendAdjustment::None,
                 dilution_events: Vec::new(),
             })
-            .underlying_equity_id_opt(Some("INDU".to_string()))
+            .spot_id(PriceId::new("INDU"))
+            .vol_surface_id(CurveId::new("INDU-VOL"))
             .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides {
                 market_quotes: crate::instruments::MarketQuoteOverrides {
                     implied_volatility: Some(0.01),
@@ -931,7 +935,7 @@ impl ConvertibleBond {
     ///
     /// # Arguments
     ///
-    /// * `curves` - Market context containing `underlying_equity_id` as the
+    /// * `curves` - Market context containing `spot_id` as the
     ///   current share price in the bond's currency. Mandatory-variable terms
     ///   determine share delivery from the lower and upper conversion prices.
     pub fn parity(
@@ -939,11 +943,7 @@ impl ConvertibleBond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        let underlying_id = self.underlying_equity_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::internal("convertible parity requires underlying_equity_id")
-        })?;
-
-        let spot_price = curves.get_price(underlying_id)?;
+        let spot_price = curves.get_price(&self.spot_id)?;
         let spot = match spot_price {
             finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
@@ -967,13 +967,7 @@ impl ConvertibleBond {
         bond_price: f64,
     ) -> finstack_quant_core::Result<f64> {
         crate::instruments::common_impl::traits::Instrument::validate_for_pricing(self)?;
-        let underlying_id = self.underlying_equity_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::internal(
-                "convertible conversion premium requires underlying_equity_id",
-            )
-        })?;
-
-        let spot_price = curves.get_price(underlying_id)?;
+        let spot_price = curves.get_price(&self.spot_id)?;
         let spot = match spot_price {
             finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
@@ -1096,7 +1090,6 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         use crate::instruments::common_impl::dependencies::VolatilityDependency;
-        use finstack_quant_core::types::PriceId;
 
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
@@ -1116,27 +1109,22 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
                 }
             }
         }
-        if let Some(underlying_id) = &self.underlying_equity_id {
-            deps.add_market_scalar_id(underlying_id.as_str());
-            let price_id = PriceId::new(underlying_id);
-            let reference_strike = self
-                .effective_conversion_ratio()
-                .filter(|ratio| *ratio > 0.0)
-                .map(|ratio| self.notional.amount() / ratio);
-            for dividend_yield_id in super::market_inputs::dividend_yield_candidate_ids(self)? {
-                deps.add_market_scalar_id(dividend_yield_id);
-            }
-            for vol_surface_id in super::market_inputs::volatility_candidate_ids(self)? {
-                // Convertible volatility may be supplied either as a unitless
-                // MarketScalar or as a full surface under the same candidate ID.
-                deps.add_market_scalar_id(vol_surface_id.clone());
-                deps.add_volatility_dependency(VolatilityDependency::new(
-                    vol_surface_id,
-                    Some(price_id.clone()),
-                    reference_strike,
-                ));
-            }
+        deps.add_market_scalar_id(&self.spot_id);
+        if let Some(div_yield_id) = &self.div_yield_id {
+            deps.add_market_scalar_id(div_yield_id);
         }
+        let reference_strike = self
+            .effective_conversion_ratio()
+            .filter(|ratio| *ratio > 0.0)
+            .map(|ratio| self.notional.amount() / ratio);
+        // Convertible volatility may be supplied either as a unitless
+        // MarketScalar or as a full surface under `vol_surface_id`.
+        deps.add_market_scalar_id(&self.vol_surface_id);
+        deps.add_volatility_dependency(VolatilityDependency::new(
+            self.vol_surface_id.clone(),
+            Some(self.spot_id.clone()),
+            reference_strike,
+        ));
         Ok(deps)
     }
 
@@ -1226,37 +1214,22 @@ mod tests {
     use crate::instruments::common_impl::traits::Instrument;
 
     #[test]
-    fn market_dependencies_cover_convertible_equity_input_fallbacks() {
+    fn market_dependencies_use_typed_equity_ids_only() {
         let mut bond = ConvertibleBond::example().expect("example");
+        // Retired `attributes.meta` market keys are ordinary tags now.
         bond.attributes
             .meta
             .insert("vol_surface_id".to_string(), "TECH-CUSTOM-VOL".to_string());
-
-        let dividend_ids = super::super::market_inputs::dividend_yield_candidate_ids(&bond)
-            .expect("dividend candidates");
-        let volatility_ids = super::super::market_inputs::volatility_candidate_ids(&bond)
-            .expect("volatility candidates");
         let deps =
             crate::instruments::Instrument::market_dependencies(&bond).expect("dependencies");
 
-        assert!(deps
-            .market_scalar_ids
-            .contains(bond.underlying_equity_id.as_ref().expect("underlying")));
-        assert!(dividend_ids
-            .iter()
-            .all(|id| deps.market_scalar_ids.contains(id)));
-        assert!(volatility_ids
-            .iter()
-            .all(|id| deps.market_scalar_ids.contains(id)));
+        assert_eq!(deps.market_scalar_ids, vec!["TECH", "TECH-VOL"]);
         assert_eq!(
             deps.volatility_dependencies
                 .iter()
                 .map(|dependency| dependency.vol_surface_id.as_str())
                 .collect::<Vec<_>>(),
-            volatility_ids
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>()
+            vec!["TECH-VOL"]
         );
     }
 

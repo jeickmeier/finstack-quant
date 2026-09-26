@@ -94,7 +94,8 @@ fn create_barrier_option() -> BarrierOption {
         barrier_type: BarrierType::DownAndOut,
         expiry: as_of() + time::Duration::days(365),
         observed_barrier_breached: None,
-        notional: Money::new(100.0, Currency::USD).expect("valid money fixture"),
+        quantity: 100.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         monitoring: finstack_quant_valuations::instruments::Monitoring::Continuous,
         discount_curve_id: CurveId::new("USD_DISC"),
@@ -125,7 +126,8 @@ fn create_asian_option() -> AsianOption {
         .averaging_method(finstack_quant_valuations::instruments::AveragingMethod::Arithmetic)
         .expiry(as_of() + time::Duration::days(365))
         .fixing_dates(fixing_dates)
-        .notional(Money::new(100.0, Currency::USD).expect("valid money fixture"))
+        .quantity(100.0)
+        .currency(Currency::USD)
         .day_count(DayCount::Act365F)
         .discount_curve_id(CurveId::new("USD_DISC"))
         .spot_id("SPX".into())

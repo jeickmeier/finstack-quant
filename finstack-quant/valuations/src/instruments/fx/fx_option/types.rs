@@ -493,7 +493,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxOption {
         // FX policy stamp: record whether the spot was a direct quote or
         // triangulated through the FX matrix pivot. FxOption always
         // resolves its spot via the matrix (`FxSpotSource::Matrix`), so
-        // there is no `fx_rate_id` short-circuit to consider.
+        // there is no `fx_spot_id` short-circuit to consider.
         use finstack_quant_core::money::fx::FxQuery;
         let fx_triangulated = market
             .fx()

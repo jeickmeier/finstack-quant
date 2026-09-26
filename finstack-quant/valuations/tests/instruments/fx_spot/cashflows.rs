@@ -126,7 +126,7 @@ fn test_settlement_lag_custom() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate")
         .with_settlement_date(d(2025, 1, 16)); // T+1
 
@@ -180,7 +180,7 @@ fn test_settlement_zero_notional() {
     let fx = sample_eurusd()
         .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate")
         .with_settlement_date(d(2025, 1, 17));
     let market = MarketContext::new();
@@ -260,7 +260,7 @@ fn test_settlement_lag_negative() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate")
         .with_settlement_date(d(2025, 1, 15)); // Past date
 
@@ -278,7 +278,7 @@ fn test_calendar_aware_settlement_lag() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate")
         .with_base_calendar_id("target2")
         .with_quote_calendar_id("usny")

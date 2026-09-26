@@ -54,7 +54,7 @@ fn test_ndf_pricing_pre_fixing_at_market() {
         .contract_rate(7.25) // At market
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
-        .forward_rate_override_opt(Some(7.25))
+        .quoted_forward_opt(Some(7.25))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -84,7 +84,7 @@ fn fixing_remains_projectable_on_the_fixing_date() {
         .contract_rate(7.25)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
-        .forward_rate_override_opt(Some(7.25))
+        .quoted_forward_opt(Some(7.25))
         .attributes(Attributes::new())
         .build()
         .expect("ndf");
@@ -179,7 +179,7 @@ fn test_ndf_pricing_expired() {
         .contract_rate(7.25)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
-        .forward_rate_override_opt(Some(7.25))
+        .quoted_forward_opt(Some(7.25))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -203,7 +203,7 @@ fn test_ndf_registry_pricer() {
         .maturity(maturity)
         .notional(Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"))
         .contract_rate(7.25)
-        .forward_rate_override_opt(Some(7.25))
+        .quoted_forward_opt(Some(7.25))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
         .attributes(Attributes::new())
@@ -260,7 +260,7 @@ fn test_ndf_pre_fixing_requires_forward_input() {
         .value(&market, as_of)
         .expect_err("pre-fixing NDF should require foreign curve or forward override");
     assert!(
-        err.to_string().contains("forward_rate_override"),
+        err.to_string().contains("quoted_forward"),
         "error should mention explicit forward input: {}",
         err
     );

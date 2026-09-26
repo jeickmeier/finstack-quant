@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
 
 pub use crate::instruments::common_impl::parameters::PayReceive;
@@ -45,7 +45,7 @@ pub struct FxVarianceSwap {
     pub quote_currency: Currency,
     /// Optional spot identifier used to look up historical series.
     #[builder(optional)]
-    pub spot_id: Option<String>,
+    pub spot_id: Option<PriceId>,
     /// Variance notional (in quote currency units)
     pub notional: Money,
     /// Strike variance (annualized)
@@ -204,7 +204,7 @@ impl FxVarianceSwap {
             .id(InstrumentId::new("FXVAR-EURUSD-1Y"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .spot_id("EURUSD".to_string())
+            .spot_id(PriceId::new("EURUSD"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(
@@ -269,7 +269,7 @@ impl FxVarianceSwap {
 
     pub(crate) fn series_id(&self) -> String {
         if let Some(id) = &self.spot_id {
-            id.clone()
+            id.to_string()
         } else {
             format!("{}{}", self.base_currency, self.quote_currency)
         }
@@ -392,10 +392,7 @@ impl InstrumentTrait for FxVarianceSwap {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.domestic_discount_curve_id.clone());
         deps.add_discount_curve(self.foreign_discount_curve_id.clone());
-        let underlying_id = self
-            .spot_id
-            .as_deref()
-            .map(finstack_quant_core::types::PriceId::new);
+        let underlying_id = self.spot_id.clone();
         if let Some(spot_id) = self.spot_id.as_deref() {
             deps.add_market_scalar_id(spot_id);
         }

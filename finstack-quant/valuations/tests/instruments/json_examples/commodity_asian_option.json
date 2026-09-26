@@ -22,7 +22,7 @@
       "past_fixings": [],
       "quantity": 1000.0,
       "strike": 75.0,
-      "ticker": "CL",
+      "underlying_ticker": "CL",
       "unit": "BBL",
       "vol_surface_id": "CL-VOL"
     },

@@ -6,7 +6,7 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::{realized_variance, RealizedVarMethod};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::equity::variance_swap::{PayReceive, VarianceSwap};
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
@@ -388,6 +388,9 @@ fn ohlc_swap(method: RealizedVarMethod) -> VarianceSwap {
     VarianceSwap::builder()
         .id(InstrumentId::new(format!("VAR-OHLC-{method:?}")))
         .underlying_ticker(UNDERLYING_ID.to_string())
+        .spot_id(PriceId::new(UNDERLYING_ID))
+        .vol_surface_id(CurveId::new(UNDERLYING_ID))
+        .div_yield_id_opt(Some(PriceId::new(format!("{}-DIVYIELD", UNDERLYING_ID))))
         .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD).expect("valid money fixture"))
         .strike_variance(DEFAULT_STRIKE_VAR)
         .start_date(start)
@@ -459,6 +462,9 @@ fn test_ohlc_missing_series_id_returns_error() {
     let bad_swap = VarianceSwap::builder()
         .id(InstrumentId::new("VAR-BAD-OHLC"))
         .underlying_ticker(UNDERLYING_ID.to_string())
+        .spot_id(PriceId::new(UNDERLYING_ID))
+        .vol_surface_id(CurveId::new(UNDERLYING_ID))
+        .div_yield_id_opt(Some(PriceId::new(format!("{}-DIVYIELD", UNDERLYING_ID))))
         .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD).expect("valid money fixture"))
         .strike_variance(DEFAULT_STRIKE_VAR)
         .start_date(start)

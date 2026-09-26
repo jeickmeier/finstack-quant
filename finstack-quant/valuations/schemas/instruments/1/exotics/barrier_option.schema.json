@@ -17,6 +17,10 @@
           "$ref": "#/$defs/BarrierType",
           "description": "Barrier type (up/down, in/out)"
         },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency of the strike, premium and present value."
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day count convention"
@@ -67,10 +71,6 @@
           },
           "description": "Contractual monitoring: continuous or an explicit, strictly increasing\nset of observation dates no later than expiry. Discrete pricing does not\ninterpolate hits between those dates."
         },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount"
-        },
         "observed_barrier_breached": {
           "description": "Observed barrier state for expired options.\n\nHistorical barrier monitoring must be supplied explicitly for expired\noptions because terminal spot alone does not reveal whether the barrier\nwas breached intralife and then reversed.",
           "type": [
@@ -81,6 +81,11 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "rebate": {
           "anyOf": [
@@ -128,7 +133,8 @@
         "option_type",
         "barrier_type",
         "expiry",
-        "notional",
+        "quantity",
+        "currency",
         "day_count",
         "discount_curve_id",
         "spot_id",
@@ -267,6 +273,7 @@
           "attributes": {},
           "barrier": 5000.0,
           "barrier_type": "up_and_out",
+          "currency": "USD",
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
           "div_yield_id": "SPX-DIV",
@@ -275,11 +282,8 @@
           "monitoring": {
             "type": "continuous"
           },
-          "notional": {
-            "amount": "100000",
-            "currency": "USD"
-          },
           "option_type": "call",
+          "quantity": 100000.0,
           "rebate": {
             "amount": "50",
             "currency": "USD"

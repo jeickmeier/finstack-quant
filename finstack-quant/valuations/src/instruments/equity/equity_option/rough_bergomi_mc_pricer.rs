@@ -33,9 +33,9 @@ use finstack_quant_core::money::Money;
 ///
 /// | Scalar Key | Description |
 /// |---|---|
-/// | `RBERGOMI_ETA` | Vol-of-vol scaling |
-/// | `RBERGOMI_HURST` | Hurst exponent |
-/// | `RBERGOMI_RHO` | Spot-vol correlation |
+/// | `ROUGH_BERGOMI_ETA` | Vol-of-vol scaling |
+/// | `ROUGH_BERGOMI_HURST` | Hurst exponent |
+/// | `ROUGH_BERGOMI_RHO` | Spot-vol correlation |
 ///
 /// The forward variance curve ξ₀(t) is built from the ATM-forward implied
 /// vol term structure of the option's vol surface (total-variance
@@ -84,15 +84,15 @@ pub(crate) struct RoughBergomiScalars {
 
 impl RoughBergomiScalars {
     /// Read rough-Bergomi scalars from the market, erroring when any
-    /// `RBERGOMI_*` scalar is missing or is not unitless. No numerical
+    /// `ROUGH_BERGOMI_*` scalar is missing or is not unitless. No numerical
     /// validation is done here; downstream constructors
     /// (`RoughBergomiParams::new`, `HurstExponent::new`) enforce invariants.
     pub(crate) fn from_market_strict(market: &MarketContext) -> finstack_quant_core::Result<Self> {
         use crate::instruments::common_impl::helpers::get_unitless_scalar_strict;
         Ok(Self {
-            eta: get_unitless_scalar_strict(market, "RBERGOMI_ETA", "rough Bergomi")?,
-            hurst: get_unitless_scalar_strict(market, "RBERGOMI_HURST", "rough Bergomi")?,
-            rho: get_unitless_scalar_strict(market, "RBERGOMI_RHO", "rough Bergomi")?,
+            eta: get_unitless_scalar_strict(market, "ROUGH_BERGOMI_ETA", "rough Bergomi")?,
+            hurst: get_unitless_scalar_strict(market, "ROUGH_BERGOMI_HURST", "rough Bergomi")?,
+            rho: get_unitless_scalar_strict(market, "ROUGH_BERGOMI_RHO", "rough Bergomi")?,
         })
     }
 }
@@ -332,16 +332,14 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             return Ok(crate::results::ValuationResult::stamped(
                 equity_option.id(),
                 as_of,
-                Money::new(
-                    intrinsic * equity_option.notional.amount(),
-                    equity_option.notional.currency(),
-                )
-                .map_err(|error| {
-                    crate::pricer::PricingError::from_core(
-                        error,
-                        crate::pricer::PricingErrorContext::from_instrument(equity_option),
-                    )
-                })?,
+                Money::new(intrinsic * equity_option.quantity, equity_option.currency).map_err(
+                    |error| {
+                        crate::pricer::PricingError::from_core(
+                            error,
+                            crate::pricer::PricingErrorContext::from_instrument(equity_option),
+                        )
+                    },
+                )?,
             ));
         }
 
@@ -388,7 +386,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             )
             .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
-        let ccy = equity_option.notional.currency();
+        let ccy = equity_option.currency;
         let initial_state = [spot];
 
         // Derive deterministic seed from instrument id
@@ -419,7 +417,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             OptionType::Call => {
                 let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall::new(
                     equity_option.strike,
-                    equity_option.notional.amount(),
+                    equity_option.quantity,
                     self.num_steps,
                 );
                 simulate_rbergomi(
@@ -439,7 +437,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             OptionType::Put => {
                 let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanPut::new(
                     equity_option.strike,
-                    equity_option.notional.amount(),
+                    equity_option.quantity,
                     self.num_steps,
                 );
                 simulate_rbergomi(

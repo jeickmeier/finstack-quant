@@ -574,7 +574,9 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 4. Equities
     for i in 0..positions_per_common {
         let equity_id = format!("EQUITY_{}", i);
-        let equity = Equity::new(equity_id.clone(), "AAPL", Currency::USD);
+        let equity = Equity::new(equity_id.clone(), "AAPL", Currency::USD)
+            .with_spot_id("AAPL")
+            .with_dividend_yield_id("AAPL-DIVYIELD");
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(
@@ -594,12 +596,15 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     for i in 0..positions_per_common {
         let option_id = format!("OPTION_{}", i);
         let contract_size = 100.0;
-        let option_notional =
-            Money::new(contract_size, Currency::USD).expect("valid money fixture");
-        let option_params =
-            EquityOptionParams::new(150.0, maturity_2y(), OptionType::Call, option_notional)
-                .with_exercise_style(ExerciseStyle::European)
-                .with_settlement(SettlementType::Cash);
+        let option_params = EquityOptionParams::new(
+            150.0,
+            maturity_2y(),
+            OptionType::Call,
+            contract_size,
+            Currency::USD,
+        )
+        .with_exercise_style(ExerciseStyle::European)
+        .with_settlement(SettlementType::Cash);
         let underlying_params = EquityUnderlyingParams::new("AAPL", "EQUITY-SPOT", Currency::USD)
             .with_dividend_yield("EQUITY-DIVYIELD")
             .with_contract_size(contract_size);
@@ -713,7 +718,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             collateral_type: CollateralType::General,
             instrument_id: format!("BOND_{}", i),
             quantity: 1_000_000.0,
-            market_value_id: format!("BOND_{}_PRICE", i),
+            market_value_id: format!("BOND_{}_PRICE", i).into(),
         };
         let repo = Repo::term(
             repo_id.clone(),
@@ -855,6 +860,9 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let var_swap = VarianceSwap::builder()
             .id(var_swap_id.clone().into())
             .underlying_ticker("AAPL".to_string())
+            .spot_id("AAPL".into())
+            .vol_surface_id("EQUITY-VOL".into())
+            .div_yield_id_opt(Some("AAPL-DIVYIELD".into()))
             .notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
             .strike_variance(0.0625)
             .start_date(base)
@@ -1094,7 +1102,9 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             discount_curve_id: "USD-OIS".into(),
             credit_curve_id: None,
             conversion: conversion_spec,
-            underlying_equity_id: Some("AAPL".to_string()),
+            spot_id: "AAPL".into(),
+            vol_surface_id: "AAPL-VOL".into(),
+            div_yield_id: Some("AAPL-DIVYIELD".into()),
             call_put: None,
             soft_call_trigger: None,
             settlement_days: None,

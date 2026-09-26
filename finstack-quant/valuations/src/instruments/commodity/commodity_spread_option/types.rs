@@ -62,7 +62,7 @@ use finstack_quant_core::Result;
 ///     .option_type(OptionType::Call)
 ///     .expiry(date!(2025-06-15))
 ///     .strike(10.0)           // $10/bbl crack spread strike
-///     .notional(1000.0)
+///     .quantity(1000.0)
 ///     .leg1_forward_curve_id(CurveId::new("RBOB-FORWARD"))
 ///     .leg2_forward_curve_id(CurveId::new("WTI-FORWARD"))
 ///     .leg1_vol_surface_id(CurveId::new("RBOB-VOL"))
@@ -107,7 +107,7 @@ pub struct CommoditySpreadOption {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::PositiveF64Wire")
     )]
-    pub notional: f64,
+    pub quantity: f64,
     /// Forward/price curve ID for leg 1 (the "long" commodity).
     pub leg1_forward_curve_id: CurveId,
     /// Forward/price curve ID for leg 2 (the "short" commodity).
@@ -168,7 +168,7 @@ pub struct CommoditySpreadOption {
 impl CommoditySpreadOption {
     /// Create a representative WTI-RBOB crack spread call option example.
     ///
-    /// $5 strike, 10,000 bbl notional, 0.85 correlation, European-style.
+    /// $5 strike, 10,000 bbl quantity, 0.85 correlation, European-style.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
             .id(InstrumentId::new("WTI-RBOB-CRACK-SPREAD"))
@@ -176,7 +176,7 @@ impl CommoditySpreadOption {
             .option_type(OptionType::Call)
             .expiry(time::macros::date!(2025 - 09 - 15))
             .strike(5.0)
-            .notional(10_000.0)
+            .quantity(10_000.0)
             .leg1_forward_curve_id(CurveId::new("RBOB-FORWARD"))
             .leg2_forward_curve_id(CurveId::new("WTI-FORWARD"))
             .leg1_vol_surface_id(CurveId::new("RBOB-VOL"))
@@ -221,10 +221,10 @@ impl CommoditySpreadOption {
                 self.strike
             )));
         }
-        if !self.notional.is_finite() || self.notional <= 0.0 {
+        if !self.quantity.is_finite() || self.quantity <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "CommoditySpreadOption notional must be finite and positive, got {}",
-                self.notional
+                "CommoditySpreadOption quantity must be finite and positive, got {}",
+                self.quantity
             )));
         }
         Ok(())

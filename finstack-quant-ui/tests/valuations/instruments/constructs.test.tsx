@@ -100,7 +100,7 @@ it("adds and edits a native tuple array and distinguishes nullable omission", as
       fields={{
         allow: [
           "instrument.spec.discrete_dividends",
-          "instrument.spec.price_quote",
+          "instrument.spec.quoted_spot",
         ],
       }}
     />,
@@ -124,25 +124,25 @@ it("adds and edits a native tuple array and distinguishes nullable omission", as
   expect(first.instrument.spec.discrete_dividends).toEqual([
     ["2025-06-01", 1.23456789],
   ]);
-  expect(first.instrument.spec.price_quote).toBe(123.456789);
+  expect(first.instrument.spec.quoted_spot).toBe(123.456789);
   await user.click(screen.getByRole("button", { name: "Price quote options" }));
   await user.click(
     await screen.findByRole("button", { name: "Clear price quote" }),
   );
   const cleared = await apply(submit);
-  expect(cleared.instrument.spec.price_quote).toBeNull();
+  expect(cleared.instrument.spec.quoted_spot).toBeNull();
   await user.click(screen.getByRole("button", { name: "Omit price quote" }));
   await apply(submit);
   expect(
     JSON.parse(validate.mock.calls.at(-1)![0]).instrument.spec,
-  ).not.toHaveProperty("price_quote");
+  ).not.toHaveProperty("quoted_spot");
   await user.click(
     screen.getByRole("button", {
       name: "Set price quote to null",
     }),
   );
   const nulled = await apply(submit);
-  expect(nulled.instrument.spec.price_quote).toBeNull();
+  expect(nulled.instrument.spec.quoted_spot).toBeNull();
 });
 it("inserts a nullable object and edits a recursive union inside its tuple through native validation", async () => {
   const user = userEvent.setup(),

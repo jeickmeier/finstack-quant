@@ -80,9 +80,9 @@ impl BarrierOptionHestonMcPricer {
         let spot = match spot_scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
             finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
-                if m.currency() != inst.notional.currency() {
+                if m.currency() != inst.currency {
                     return Err(finstack_quant_core::Error::CurrencyMismatch {
-                        expected: inst.notional.currency(),
+                        expected: inst.currency,
                         actual: m.currency(),
                     });
                 }
@@ -124,8 +124,8 @@ impl BarrierOptionHestonMcPricer {
             inst.barrier,
             inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
-            inst.rebate.map(|m| m.amount() / inst.notional.amount()),
-            inst.notional.amount(),
+            inst.rebate.map(|m| m.amount() / inst.quantity),
+            inst.quantity,
             maturity_step,
             sigma,
             &time_grid,
@@ -165,7 +165,7 @@ impl BarrierOptionHestonMcPricer {
             &discretization,
             &initial_state,
             &payoff,
-            inst.notional.currency(),
+            inst.currency,
             discount_factor,
         )?;
 

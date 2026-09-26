@@ -75,7 +75,7 @@ mod tests {
         FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
             .with_notional(Money::from((5_000_000_i64, Currency::EUR)))
             .expect("should succeed")
-            .with_rate(1.24)
+            .with_quoted_spot(1.24)
             .expect("should succeed")
     }
 

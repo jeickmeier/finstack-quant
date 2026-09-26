@@ -358,7 +358,7 @@ class TestConvertibleBond:
         assert bond.effective_conversion_ratio == 25.0
         assert isinstance(bond.conversion, ConversionSpec)
         assert bond.conversion.policy == "voluntary"
-        assert bond.underlying_equity_id == "TECH"
+        assert bond.spot_id == "TECH"
         assert bond.credit_curve_id == "USD-CREDIT-BBB"
         assert bond.call_put is None
         assert bond.fixed_coupon is not None
@@ -382,7 +382,8 @@ class TestConvertibleBond:
                 .maturity("2029-01-15")
                 .discount_curve_id("USD-OIS")
                 .conversion(conversion)
-                .underlying_equity_id("ACME")
+                .spot_id("ACME")
+                .vol_surface_id("ACME-VOL")
                 .build()
             )
 
@@ -405,7 +406,8 @@ class TestConvertibleBond:
             .issue_date("2024-01-15")
             .maturity("2029-01-15")
             .discount_curve_id("USD-OIS")
-            .underlying_equity_id("ACME-EQ")
+            .spot_id("ACME-EQ")
+            .vol_surface_id("ACME-EQ-VOL")
             .conversion(ConversionSpec(price=50.0))
             .call_put(sched)
             .soft_call_trigger({"threshold_pct": 130.0, "observation_days": 30, "required_days_above": 20})
@@ -437,8 +439,8 @@ class TestEquityOption:
         result = option.price(market, "2024-01-15")
         assert result.price > 0.0
         greeks = option.greeks(market, "2024-01-15")
-        # Greeks are notional-scaled; per-unit delta lies in (0, 1) for a call.
-        assert 0.0 < greeks["delta"] / option.notional.amount < 1.0
+        # Greeks are quantity-scaled; per-unit delta lies in (0, 1) for a call.
+        assert 0.0 < greeks["delta"] / option.quantity < 1.0
         assert option.delta(market, "2024-01-15") == pytest.approx(greeks["delta"])
         implied = option.implied_vol(market, "2024-01-15", result.price)
         assert implied == pytest.approx(0.2, abs=2e-3)
@@ -455,7 +457,8 @@ class TestEquityOption:
             .exercise_style(style)
             .expiry("2024-06-21")
             .day_count("act_360")
-            .notional(Money(100.0, USD))
+            .quantity(100.0)
+            .currency("USD")
             .discount_curve_id("USD-OIS")
             .spot_id("EQUITY-SPOT")
             .vol_surface_id("EQUITY-VOL")
@@ -473,14 +476,15 @@ class TestEquityOption:
             option.implied_vol(market, "2024-06-21", price)
 
     def test_european_call_defaults_match_rust(self) -> None:
-        option = EquityOption.european_call("AAPL-C", "AAPL", 200.0, "2025-06-20", 100.0)
+        option = EquityOption.european_call("AAPL-C", "AAPL", 200.0, "2025-06-20", 100.0, "USD")
         assert option.option_type == "call"
         assert option.exercise_style == "european"
         assert option.spot_id == "EQUITY-SPOT"
         assert option.vol_surface_id == "EQUITY-VOL"
-        assert option.notional.currency.code == "USD"
+        assert option.quantity == 100.0
+        assert option.currency == "USD"
         custom = EquityOption.european_call(
-            "AAPL-C2", "AAPL", 200.0, "2025-06-20", Money(100.0, USD), spot_id="AAPL", div_yield_id=None
+            "AAPL-C2", "AAPL", 200.0, "2025-06-20", 100.0, USD, spot_id="AAPL", div_yield_id=None
         )
         assert custom.spot_id == "AAPL"
         assert custom.div_yield_id is None
@@ -495,7 +499,8 @@ class TestEquityOption:
             .option_type("call")
             .expiry("2025-06-20")
             .day_count("act_360")
-            .notional(Money(100.0, USD))
+            .quantity(100.0)
+            .currency("USD")
             .discount_curve_id("USD-OIS")
             .spot_id("AAPL")
             .vol_surface_id("AAPL-VOL")
@@ -513,7 +518,7 @@ class TestFxForward:
         assert fwd.quote_currency == USD
         assert fwd.contract_rate == 1.12
         assert fwd.maturity == datetime.date(2025, 6, 15)
-        assert fwd.spot_rate_override is None
+        assert fwd.quoted_spot is None
         market = _fx_market()
         result = fwd.price(market, "2025-01-15")
         assert math.isfinite(result.price)
@@ -568,7 +573,7 @@ class TestFxOption:
         result = opt.price(market, "2025-01-15")
         assert result.price > 0.0
         greeks = opt.greeks(market, "2025-01-15")
-        # Greeks are notional-scaled; per-unit delta lies in (0, 1) for a call.
+        # Greeks are quantity-scaled; per-unit delta lies in (0, 1) for a call.
         assert 0.0 < greeks["delta"] / opt.notional.amount < 1.0
         assert opt.implied_vol(market, "2025-01-15", result.price) == pytest.approx(0.1, abs=2e-3)
 

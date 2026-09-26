@@ -81,8 +81,8 @@ fn test_equity_price_id_uses_restored_scalar_price() {
     use finstack_quant_attribution::{MarketRestoreFlags, MarketSnapshot};
 
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_price_id("AAPL-SPOT")
-        .with_shares(1.0);
+        .with_spot_id("AAPL-SPOT")
+        .with_quantity(1.0);
 
     let market_t0 = MarketContext::new()
         .insert(
@@ -146,8 +146,8 @@ fn test_taylor_equity_spot_move_lands_in_market_scalars_pnl() {
     let as_of_t0 = date!(2024 - 01 - 01);
     let as_of_t1 = date!(2024 - 01 - 02);
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_price_id("AAPL-SPOT")
-        .with_shares(1.0);
+        .with_spot_id("AAPL-SPOT")
+        .with_quantity(1.0);
     let instrument: Arc<dyn Instrument> = Arc::new(equity);
 
     let discount = || {

@@ -109,8 +109,8 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Start date of the swap."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -121,7 +121,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "quantity",
@@ -210,7 +210,7 @@
           "quantity": 10000.0,
           "side": "pay",
           "start_date": "2025-01-01",
-          "ticker": "NG",
+          "underlying_ticker": "NG",
           "unit": "MMBTU"
         },
         "type": "commodity_swap"

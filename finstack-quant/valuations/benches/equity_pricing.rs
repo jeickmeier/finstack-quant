@@ -133,7 +133,10 @@ fn create_equity_market() -> MarketContext {
 }
 
 fn sample_equity() -> Equity {
-    Equity::new("SPX-EQ", "SPX", Currency::USD).with_shares(100.0)
+    Equity::new("SPX-EQ", "SPX", Currency::USD)
+        .with_quantity(100.0)
+        .with_spot_id("SPX")
+        .with_dividend_yield_id("SPX-DIVYIELD")
 }
 
 fn equity_trs(tenor_years: i32) -> EquityTotalReturnSwap {
@@ -201,6 +204,9 @@ fn variance_swap(months: i64) -> VarianceSwap {
     VarianceSwap::builder()
         .id(InstrumentId::new(format!("VAR-{months}M")))
         .underlying_ticker("SPX".to_string())
+        .spot_id("SPX".into())
+        .vol_surface_id("SPX".into())
+        .div_yield_id_opt(Some("SPX-DIVYIELD".into()))
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .strike_variance(0.04)
         .start_date(start)

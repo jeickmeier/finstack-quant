@@ -73,7 +73,7 @@ pub struct FxValuationDetails {
     /// rather than a direct quote. Mirrors
     /// [`FxRateResult.triangulated`](finstack_quant_core::money::fx::FxRateResult).
     /// `None` when the instrument resolved spot from an explicit market
-    /// scalar (`fx_rate_id`) rather than the matrix.
+    /// scalar (`fx_spot_id`) rather than the matrix.
     pub fx_triangulated: Option<bool>,
 }
 

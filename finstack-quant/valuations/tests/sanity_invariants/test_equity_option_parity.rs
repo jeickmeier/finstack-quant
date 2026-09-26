@@ -10,12 +10,12 @@
 //! 3. Delta: call Δ ≈ 0.636, put Δ ≈ -0.329
 //! 4. Gamma: call gamma = put gamma
 
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::{currency::Currency, money::Money};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::{Attributes, Instrument, SettlementType};
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
@@ -81,7 +81,8 @@ fn create_option(expiry: Date, option_type: OptionType) -> EquityOption {
         option_type,
         exercise_style: ExerciseStyle::European,
         expiry,
-        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+        quantity: 1.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,

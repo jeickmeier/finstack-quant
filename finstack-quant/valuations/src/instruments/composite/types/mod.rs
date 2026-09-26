@@ -42,8 +42,8 @@ mod tests {
             id,
             InstrumentJson::Equity(
                 crate::instruments::Equity::new(id, id, Currency::USD)
-                    .with_shares(shares)
-                    .with_price(price),
+                    .with_quantity(shares)
+                    .with_quoted_spot(price),
             ),
             weight,
         )
@@ -75,8 +75,8 @@ mod tests {
                     "EUR-LEG",
                     InstrumentJson::Equity(
                         crate::instruments::Equity::new("EUR-LEG", "EUR-LEG", Currency::EUR)
-                            .with_shares(1.0)
-                            .with_price(100.0),
+                            .with_quantity(1.0)
+                            .with_quoted_spot(100.0),
                     ),
                     1.0,
                 ),
@@ -122,8 +122,8 @@ mod tests {
                 "A",
                 InstrumentJson::Equity(
                     crate::instruments::Equity::new("A", "A", Currency::USD)
-                        .with_shares(1.0)
-                        .with_price(1.0),
+                        .with_quantity(1.0)
+                        .with_quoted_spot(1.0),
                 ),
                 -1.0,
             ),
@@ -131,8 +131,8 @@ mod tests {
                 "B",
                 InstrumentJson::Equity(
                     crate::instruments::Equity::new("B", "B", Currency::USD)
-                        .with_shares(1.0)
-                        .with_price(1.0),
+                        .with_quantity(1.0)
+                        .with_quoted_spot(1.0),
                 ),
                 1.0,
             ),
@@ -140,8 +140,8 @@ mod tests {
                 "C",
                 InstrumentJson::Equity(
                     crate::instruments::Equity::new("C", "C", Currency::USD)
-                        .with_shares(1.0)
-                        .with_price(1.0),
+                        .with_quantity(1.0)
+                        .with_quoted_spot(1.0),
                 ),
                 -3.0,
             ),
@@ -204,12 +204,16 @@ mod tests {
         let legs = vec![
             CompositeLegSpec::new(
                 "A",
-                InstrumentJson::Equity(crate::instruments::Equity::new("A", "A", Currency::USD)),
+                InstrumentJson::Equity(
+                    crate::instruments::Equity::new("A", "A", Currency::USD).with_spot_id("A"),
+                ),
                 1.0,
             ),
             CompositeLegSpec::new(
                 "B",
-                InstrumentJson::Equity(crate::instruments::Equity::new("B", "B", Currency::USD)),
+                InstrumentJson::Equity(
+                    crate::instruments::Equity::new("B", "B", Currency::USD).with_spot_id("B"),
+                ),
                 -1.0,
             ),
         ];
@@ -286,7 +290,7 @@ mod tests {
         let InstrumentJson::Equity(equity) = changed_spec.legs[0].instrument.as_mut() else {
             return Err(Error::Internal("expected equity example leg".to_string()));
         };
-        equity.price_quote = Some(101.0);
+        equity.quoted_spot = Some(101.0);
         let current = changed_spec
             .initialize_fixed(date!(2025 - 01 - 02))?
             .instrument;

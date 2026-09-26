@@ -453,7 +453,10 @@ fn test_commodity_forward_serialization() {
     let parsed: CommodityForward = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(forward.id.as_str(), parsed.id.as_str());
-    assert_eq!(forward.underlying.ticker, parsed.underlying.ticker);
+    assert_eq!(
+        forward.underlying.underlying_ticker,
+        parsed.underlying.underlying_ticker
+    );
     assert_eq!(forward.quantity, parsed.quantity);
     assert_eq!(forward.underlying.currency, parsed.underlying.currency);
     assert_eq!(forward.position, parsed.position);

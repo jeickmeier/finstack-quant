@@ -224,8 +224,8 @@ pub fn eur_fx_markets(shift_bp: f64) -> BondMarkets {
 pub fn sample_equity() -> Arc<dyn Instrument> {
     Arc::new(
         Equity::new("AAPL", "AAPL", Currency::USD)
-            .with_price_id("AAPL-SPOT")
-            .with_shares(100.0),
+            .with_spot_id("AAPL-SPOT")
+            .with_quantity(100.0),
     )
 }
 

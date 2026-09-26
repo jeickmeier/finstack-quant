@@ -40,8 +40,8 @@ pub struct QuantoOption {
     pub expiry: Date,
     /// Strike-equivalent domestic reference notional.
     ///
-    /// When `underlying_quantity` and `payoff_fx_rate` are supplied, this must
-    /// equal `underlying_quantity * payoff_fx_rate * equity_strike.amount()`.
+    /// When `quantity` and `payoff_fx_rate` are supplied, this must
+    /// equal `quantity * payoff_fx_rate * equity_strike.amount()`.
     pub notional: Money,
     /// Number of underlying units covered by the option payoff.
     ///
@@ -49,7 +49,7 @@ pub struct QuantoOption {
     /// This quantity converts the per-unit price into contract-level exposure.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default)]
-    pub underlying_quantity: Option<f64>,
+    pub quantity: Option<f64>,
     /// Fixed payoff FX conversion rate from base-currency payoff into quote currency.
     ///
     /// Example: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD
@@ -84,14 +84,14 @@ pub struct QuantoOption {
     /// lookup, so an inverted quote (JPY-per-USD) silently mislocates the
     /// smile. `validate()` rejects ids whose embedded pair name contradicts
     /// this direction.
-    pub fx_rate_id: Option<String>,
+    pub fx_spot_id: Option<PriceId>,
     /// Optional FX volatility surface ID.
     ///
     /// Must be calibrated in the same **quote-per-base** direction as
-    /// `fx_rate_id` so absolute-strike lookups at the CIRP forward land on
+    /// `fx_spot_id` so absolute-strike lookups at the CIRP forward land on
     /// the correct smile. `validate()` rejects ids whose embedded pair name
     /// contradicts this direction.
-    pub fx_vol_id: Option<CurveId>,
+    pub fx_vol_surface_id: Option<CurveId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -140,7 +140,7 @@ struct QuantoOptionUnchecked {
     notional: Money,
     /// Number of underlying units covered by the option payoff.
     #[serde(default)]
-    underlying_quantity: Option<f64>,
+    quantity: Option<f64>,
     /// Fixed payoff FX conversion rate from base-currency payoff into quote currency.
     #[serde(default)]
     payoff_fx_rate: Option<f64>,
@@ -165,10 +165,10 @@ struct QuantoOptionUnchecked {
     div_yield_id: Option<PriceId>,
     /// Optional FX rate identifier.
     #[serde(default)]
-    fx_rate_id: Option<String>,
+    fx_spot_id: Option<PriceId>,
     /// Optional FX volatility surface ID.
     #[serde(default)]
-    fx_vol_id: Option<CurveId>,
+    fx_vol_surface_id: Option<CurveId>,
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
@@ -193,7 +193,7 @@ impl TryFrom<QuantoOptionUnchecked> for QuantoOption {
             option_type: value.option_type,
             expiry: value.expiry,
             notional: value.notional,
-            underlying_quantity: value.underlying_quantity,
+            quantity: value.quantity,
             payoff_fx_rate: value.payoff_fx_rate,
             base_currency: value.base_currency,
             quote_currency: value.quote_currency,
@@ -204,8 +204,8 @@ impl TryFrom<QuantoOptionUnchecked> for QuantoOption {
             spot_id: value.spot_id,
             vol_surface_id: value.vol_surface_id,
             div_yield_id: value.div_yield_id,
-            fx_rate_id: value.fx_rate_id,
-            fx_vol_id: value.fx_vol_id,
+            fx_spot_id: value.fx_spot_id,
+            fx_vol_surface_id: value.fx_vol_surface_id,
             instrument_pricing_overrides: value.instrument_pricing_overrides,
             metric_pricing_overrides: value.metric_pricing_overrides,
             scenario_pricing_overrides: value.scenario_pricing_overrides,
@@ -230,7 +230,7 @@ impl QuantoOption {
             .option_type(crate::instruments::OptionType::Call)
             .expiry(crate::instruments::common_impl::example_constants::FAR_EXPIRY)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
-            .underlying_quantity_opt(Some(4_000.0))
+            .quantity_opt(Some(4_000.0))
             .payoff_fx_rate_opt(Some(1.0 / 140.0))
             .base_currency(Currency::JPY)
             .quote_currency(Currency::USD)
@@ -241,8 +241,8 @@ impl QuantoOption {
             .spot_id("NKY-SPOT".into())
             .vol_surface_id(CurveId::new("NKY-VOL"))
             .div_yield_id_opt(Some(PriceId::new("NKY-DIV")))
-            .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
-            .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
+            .fx_spot_id_opt(Some(PriceId::new("JPYUSD-SPOT")))
+            .fx_vol_surface_id_opt(Some(CurveId::new("JPYUSD-VOL")))
             .attributes(Attributes::new())
             .build()
             .expect("Example QuantoOption construction should not fail")
@@ -287,11 +287,11 @@ impl QuantoOption {
                 self.notional.amount()
             )));
         }
-        match (self.underlying_quantity, self.payoff_fx_rate) {
+        match (self.quantity, self.payoff_fx_rate) {
             (Some(quantity), Some(fx_rate)) => {
                 if !quantity.is_finite() || quantity <= 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "QuantoOption underlying_quantity must be positive and finite; got {}",
+                        "QuantoOption quantity must be positive and finite; got {}",
                         quantity
                     )));
                 }
@@ -305,7 +305,7 @@ impl QuantoOption {
                 let tolerance = 1e-8 * expected.abs().max(self.notional.amount().abs()).max(1.0);
                 if (self.notional.amount() - expected).abs() > tolerance {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "QuantoOption notional ({}) must match underlying_quantity * payoff_fx_rate * equity_strike ({})",
+                        "QuantoOption notional ({}) must match quantity * payoff_fx_rate * equity_strike ({})",
                         self.notional.amount(),
                         expected
                     )));
@@ -314,15 +314,15 @@ impl QuantoOption {
             (None, None) => {}
             _ => {
                 return Err(finstack_quant_core::Error::Validation(
-                    "QuantoOption requires both underlying_quantity and payoff_fx_rate when either is supplied".to_string(),
+                    "QuantoOption requires both quantity and payoff_fx_rate when either is supplied".to_string(),
                 ));
             }
         }
-        if let Some(fx_rate_id) = &self.fx_rate_id {
-            self.validate_fx_id_direction(fx_rate_id, "fx_rate_id")?;
+        if let Some(fx_spot_id) = &self.fx_spot_id {
+            self.validate_fx_id_direction(fx_spot_id, "fx_spot_id")?;
         }
-        if let Some(fx_vol_id) = &self.fx_vol_id {
-            self.validate_fx_id_direction(fx_vol_id.as_str(), "fx_vol_id")?;
+        if let Some(fx_vol_surface_id) = &self.fx_vol_surface_id {
+            self.validate_fx_id_direction(fx_vol_surface_id.as_str(), "fx_vol_surface_id")?;
         }
         Ok(())
     }
@@ -645,11 +645,11 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
         if let Some(dividend_yield) = &self.div_yield_id {
             deps.add_market_scalar_id(dividend_yield.as_str());
         }
-        let fx_underlying_id = self.fx_rate_id.as_deref().map(|id| {
+        let fx_underlying_id = self.fx_spot_id.as_deref().map(|id| {
             deps.add_market_scalar_id(id);
             finstack_quant_core::types::PriceId::new(id)
         });
-        if let Some(fx_volatility) = &self.fx_vol_id {
+        if let Some(fx_volatility) = &self.fx_vol_surface_id {
             deps.add_volatility_dependency(
                 crate::instruments::common_impl::dependencies::VolatilityDependency::new(
                     fx_volatility.clone(),
@@ -688,9 +688,9 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> Option<crate::results::ValuationDetails> {
-        // Quanto FX policy stamp. `fx_rate_id` short-circuits the matrix,
+        // Quanto FX policy stamp. `fx_spot_id` short-circuits the matrix,
         // so triangulation is unknown / not applicable in that case.
-        let fx_triangulated = if self.fx_rate_id.is_some() {
+        let fx_triangulated = if self.fx_spot_id.is_some() {
             None
         } else {
             use finstack_quant_core::money::fx::FxQuery;
@@ -726,7 +726,7 @@ mod tests {
         assert_eq!(option.id.as_str(), "QUANTO-NKY-USD-CALL");
         assert_eq!(option.quote_currency, Currency::USD);
         assert_eq!(option.base_currency, Currency::JPY);
-        assert_eq!(option.underlying_quantity, Some(4_000.0));
+        assert_eq!(option.quantity, Some(4_000.0));
         assert!(option.payoff_fx_rate.is_some());
         assert!(option.correlation < 0.0); // Negative correlation in example
     }
@@ -760,12 +760,12 @@ mod tests {
         );
         let mut expected_spots = vec![option.spot_id.as_str().to_string()];
         expected_spots.extend(option.div_yield_id.iter().map(|id| id.as_str().to_string()));
-        expected_spots.push(option.fx_rate_id.clone().expect("FX rate id"));
+        expected_spots.push(option.fx_spot_id.clone().expect("FX spot id").to_string());
         assert_eq!(deps.market_scalar_ids, expected_spots);
         assert!(deps.series_ids.is_empty());
         assert_eq!(deps.volatility_dependencies.len(), 2);
         assert_eq!(
-            deps.volatility_dependencies[0].underlying_id.as_ref(),
+            deps.volatility_dependencies[0].spot_id.as_ref(),
             Some(&option.spot_id)
         );
         assert_eq!(
@@ -774,10 +774,10 @@ mod tests {
         );
         assert_eq!(
             deps.volatility_dependencies[1]
-                .underlying_id
+                .spot_id
                 .as_ref()
                 .map(|id| id.as_str()),
-            option.fx_rate_id.as_deref()
+            option.fx_spot_id.as_deref()
         );
         assert_eq!(deps.fx_pairs[0].base, option.base_currency);
         assert_eq!(deps.fx_pairs[0].quote, option.quote_currency);

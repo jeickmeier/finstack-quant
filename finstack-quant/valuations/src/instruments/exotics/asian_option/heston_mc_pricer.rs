@@ -81,10 +81,7 @@ impl AsianOptionHestonMcPricer {
                 crate::instruments::OptionType::Call => (average - inst.strike).max(0.0),
                 crate::instruments::OptionType::Put => (inst.strike - average).max(0.0),
             };
-            return Ok((
-                Money::new(intrinsic * inst.notional.amount(), inst.notional.currency())?,
-                0.0,
-            ));
+            return Ok((Money::new(intrinsic * inst.quantity, inst.currency)?, 0.0));
         }
 
         let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
@@ -158,14 +155,14 @@ impl AsianOptionHestonMcPricer {
         // Initial state: [spot, v0]
         let initial_state = [spot, v0];
 
-        let ccy = inst.notional.currency();
+        let ccy = inst.currency;
 
         let (pv, mc_stderr) = match inst.option_type {
             crate::instruments::OptionType::Call => {
                 let payoff = if hist_count > 0 {
                     AsianCall::with_history(
                         inst.strike,
-                        inst.notional.amount(),
+                        inst.quantity,
                         averaging,
                         fixing_steps,
                         hist_sum,
@@ -173,7 +170,7 @@ impl AsianOptionHestonMcPricer {
                         hist_count,
                     )
                 } else {
-                    AsianCall::new(inst.strike, inst.notional.amount(), averaging, fixing_steps)
+                    AsianCall::new(inst.strike, inst.quantity, averaging, fixing_steps)
                 }?;
                 let result = engine.price(
                     &rng,
@@ -190,7 +187,7 @@ impl AsianOptionHestonMcPricer {
                 let payoff = if hist_count > 0 {
                     AsianPut::with_history(
                         inst.strike,
-                        inst.notional.amount(),
+                        inst.quantity,
                         averaging,
                         fixing_steps,
                         hist_sum,
@@ -198,7 +195,7 @@ impl AsianOptionHestonMcPricer {
                         hist_count,
                     )
                 } else {
-                    AsianPut::new(inst.strike, inst.notional.amount(), averaging, fixing_steps)
+                    AsianPut::new(inst.strike, inst.quantity, averaging, fixing_steps)
                 }?;
                 let result = engine.price(
                     &rng,

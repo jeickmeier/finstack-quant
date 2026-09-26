@@ -41,7 +41,7 @@ def test_total_trade_rebate_and_paid_at_hit_state(expired: bool) -> None:
     spec = instrument["instrument"]["spec"]
     spec.update(div_yield_id=None, strike=100.0, observed_barrier_breached=True, monitoring={"type": "continuous"})
     spec["barrier"] = 120.0
-    spec["notional"]["amount"] = "1000"
+    spec["quantity"] = 1000.0
     spec["rebate"]["amount"] = "25"
     spec["rebate_timing"] = "at_hit" if expired else "at_expiry"
     spec["expiry_fixing"] = 100.0

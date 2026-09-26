@@ -70,7 +70,7 @@ fn test_inverse_rate_zero_notional_errors() {
     let fx = sample_eurusd()
         .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate");
     let mut ctx = create_context(fx, test_date());
 
@@ -116,7 +116,7 @@ fn test_inverse_rate_large_rate() {
     let fx = sample_usdjpy()
         .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
         .unwrap()
-        .with_rate(110.0)
+        .with_quoted_spot(110.0)
         .expect("test rate");
     let mut ctx = create_context(fx, test_date());
 

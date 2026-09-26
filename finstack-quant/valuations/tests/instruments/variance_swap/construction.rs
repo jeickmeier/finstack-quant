@@ -4,7 +4,7 @@ use super::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::equity::variance_swap::{
     PayReceive, RealizedVarMethod, VarianceSwap,
 };
@@ -19,6 +19,9 @@ fn test_builder_creates_valid_swap_with_all_required_fields() {
     let swap = VarianceSwap::builder()
         .id(InstrumentId::new("VAR-TEST-001"))
         .underlying_ticker(UNDERLYING_ID.to_string())
+        .spot_id(PriceId::new(UNDERLYING_ID))
+        .vol_surface_id(CurveId::new(UNDERLYING_ID))
+        .div_yield_id_opt(Some(PriceId::new(format!("{}-DIVYIELD", UNDERLYING_ID))))
         .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD).expect("valid money fixture"))
         .strike_variance(DEFAULT_STRIKE_VAR)
         .start_date(start)

@@ -337,7 +337,7 @@ pub struct Ndf {
     /// Quote convention for contract_rate and observed_fixing.
     pub quote_convention: NdfQuoteConvention,
     /// Optional foreign (base) currency discount curve ID.
-    /// Required for pre-fixing forward estimation unless `forward_rate_override`
+    /// Required for pre-fixing forward estimation unless `quoted_forward`
     /// is supplied.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -358,14 +358,14 @@ pub struct Ndf {
     /// Interpretation depends on `quote_convention`.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub spot_rate_override: Option<f64>,
+    pub quoted_spot: Option<f64>,
     /// Explicit pre-fixing forward rate in `quote_convention` units.
     ///
     /// Use this for NDF market quotes or basis-adjusted forwards when a base
     /// currency discount curve is unavailable.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub forward_rate_override: Option<f64>,
+    pub quoted_forward: Option<f64>,
     /// Optional base currency calendar.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -443,10 +443,10 @@ struct NdfUnchecked {
     fixing_source_enum: Option<NdfFixingSource>,
     /// Optional spot rate override for forward rate calculation.
     #[serde(default)]
-    spot_rate_override: Option<f64>,
+    quoted_spot: Option<f64>,
     /// Explicit pre-fixing forward rate in `quote_convention` units.
     #[serde(default)]
-    forward_rate_override: Option<f64>,
+    quoted_forward: Option<f64>,
     /// Optional base currency calendar.
     #[serde(default)]
     base_calendar_id: Option<String>,
@@ -483,8 +483,8 @@ impl TryFrom<NdfUnchecked> for Ndf {
             foreign_discount_curve_id: value.foreign_discount_curve_id,
             observed_fixing: value.observed_fixing,
             fixing_source_enum: value.fixing_source_enum,
-            spot_rate_override: value.spot_rate_override,
-            forward_rate_override: value.forward_rate_override,
+            quoted_spot: value.quoted_spot,
+            quoted_forward: value.quoted_forward,
             base_calendar_id: value.base_calendar_id,
             quote_calendar_id: value.quote_calendar_id,
             instrument_pricing_overrides: value.instrument_pricing_overrides,
@@ -519,7 +519,7 @@ impl Ndf {
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .forward_rate_override_opt(Some(7.25))
+            .quoted_forward_opt(Some(7.25))
             .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))
             .attributes(
                 Attributes::new()
@@ -611,11 +611,11 @@ impl Ndf {
         if let Some(rate) = self.observed_fixing {
             Self::validate_rate("observed_fixing", rate)?;
         }
-        if let Some(rate) = self.spot_rate_override {
-            Self::validate_rate("spot_rate_override", rate)?;
+        if let Some(rate) = self.quoted_spot {
+            Self::validate_rate("quoted_spot", rate)?;
         }
-        if let Some(rate) = self.forward_rate_override {
-            Self::validate_rate("forward_rate_override", rate)?;
+        if let Some(rate) = self.quoted_forward {
+            Self::validate_rate("quoted_forward", rate)?;
         }
         self.validate_fixing_source()?;
         Ok(())
@@ -800,8 +800,8 @@ impl Ndf {
     fn estimate_forward_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         use finstack_quant_core::money::fx::FxQuery;
 
-        if let Some(rate) = self.forward_rate_override {
-            Self::validate_rate("forward_rate_override", rate)?;
+        if let Some(rate) = self.quoted_forward {
+            Self::validate_rate("quoted_forward", rate)?;
             return Ok(rate);
         }
 
@@ -823,7 +823,7 @@ impl Ndf {
         };
 
         // Try to get spot rate in the appropriate convention
-        let spot = if let Some(rate) = self.spot_rate_override {
+        let spot = if let Some(rate) = self.quoted_spot {
             rate
         } else if let Some(fx) = market.fx() {
             match (**fx).rate(FxQuery::new(from_currency, to_currency, as_of)) {
@@ -836,7 +836,7 @@ impl Ndf {
             }
         } else {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "NDF {} requires FxMatrix or spot_rate_override to estimate a forward rate",
+                "NDF {} requires FxMatrix or quoted_spot to estimate a forward rate",
                 self.id
             )));
         };
@@ -862,7 +862,7 @@ impl Ndf {
         }
 
         Err(finstack_quant_core::Error::Validation(format!(
-            "NDF {} requires foreign_discount_curve_id or forward_rate_override for pre-fixing forward estimation",
+            "NDF {} requires foreign_discount_curve_id or quoted_forward for pre-fixing forward estimation",
             self.id
         )))
     }
@@ -1402,7 +1402,7 @@ mod tests {
             .maturity(Date::from_calendar_date(2024, Month::April, 15).expect("valid date"))
             .notional(Money::from((10_000_000_i64, Currency::CNY)))
             .contract_rate(7.25)
-            .forward_rate_override_opt(Some(7.25))
+            .quoted_forward_opt(Some(7.25))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
             .build()

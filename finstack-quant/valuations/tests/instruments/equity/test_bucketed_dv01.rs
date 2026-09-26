@@ -49,8 +49,8 @@ fn sum_bucketed_dv01(result: &finstack_quant_valuations::results::ValuationResul
 fn test_equity_bucketed_dv01_computed() {
     let as_of = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(100.0)
-        .with_price(150.0);
+        .with_quantity(100.0)
+        .with_quoted_spot(150.0);
 
     let usd_curve = build_flat_curve(0.05, as_of, "USD");
     let market = MarketContext::new().insert(usd_curve).insert_price(
@@ -92,7 +92,9 @@ fn test_equity_bucketed_dv01_computed() {
 #[test]
 fn test_equity_bucketed_dv01_with_market_price() {
     let as_of = Date::from_calendar_date(2024, Month::January, 1).unwrap();
-    let equity = Equity::new("MSFT", "MSFT", Currency::USD).with_shares(200.0);
+    let equity = Equity::new("MSFT", "MSFT", Currency::USD)
+        .with_quantity(200.0)
+        .with_spot_id("MSFT");
 
     let usd_curve = build_flat_curve(0.03, as_of, "USD");
     let market = MarketContext::new().insert(usd_curve).insert_price(

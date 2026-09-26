@@ -9,7 +9,7 @@ use crate::bindings::extract::extract_market;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py};
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DilutionEvent, DividendAdjustment,
@@ -437,7 +437,7 @@ fn call_put_from_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<CallPu
 /// --------
 /// >>> from finstack_quant.valuations.instruments import ConvertibleBond
 /// >>> cb = ConvertibleBond.example()
-/// >>> (cb.id, cb.conversion_ratio, cb.underlying_equity_id)
+/// >>> (cb.id, cb.conversion_ratio, cb.spot_id)
 /// ('CB-TECH-5Y', 25.0, 'TECH')
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
@@ -538,11 +538,9 @@ impl PyConvertibleBond {
     /// Raises
     /// ------
     /// KeyError
-    ///     If the underlying price is missing from ``market``.
+    ///     If the ``spot_id`` price is missing from ``market``.
     /// ValueError
     ///     If conversion terms or the nonnegative finite equity price are invalid.
-    /// RuntimeError
-    ///     If the bond has no ``underlying_equity_id``.
     #[pyo3(text_signature = "($self, market)")]
     fn parity(&self, py: Python<'_>, market: &Bound<'_, PyAny>) -> PyResult<f64> {
         let market = extract_market(py, market)?;
@@ -569,11 +567,9 @@ impl PyConvertibleBond {
     /// Raises
     /// ------
     /// KeyError
-    ///     If the underlying price is missing from ``market``.
+    ///     If the ``spot_id`` price is missing from ``market``.
     /// ValueError
     ///     If conversion value is nonpositive/non-finite or bond price is negative/non-finite.
-    /// RuntimeError
-    ///     If the bond has no ``underlying_equity_id``.
     #[pyo3(text_signature = "($self, market, bond_price)")]
     fn conversion_premium(
         &self,
@@ -683,10 +679,22 @@ impl PyConvertibleBond {
         self.inner.effective_conversion_ratio()
     }
 
-    /// Underlying equity identifier, or ``None``.
+    /// Market-scalar id of the underlying share price.
     #[getter]
-    fn underlying_equity_id(&self) -> Option<String> {
-        self.inner.underlying_equity_id.clone()
+    fn spot_id(&self) -> String {
+        self.inner.spot_id.to_string()
+    }
+
+    /// Equity volatility id: a surface, or a unitless flat-vol scalar.
+    #[getter]
+    fn vol_surface_id(&self) -> String {
+        self.inner.vol_surface_id.to_string()
+    }
+
+    /// Unitless continuous dividend-yield scalar id, or ``None`` (zero yield).
+    #[getter]
+    fn div_yield_id(&self) -> Option<String> {
+        self.inner.div_yield_id.as_ref().map(|id| id.to_string())
     }
 
     /// Call/put schedule, or ``None``.
@@ -750,13 +758,13 @@ impl PyConvertibleBond {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "ConvertibleBond(id={:?}, notional={}, issue_date={}, maturity={}, conversion_ratio={}, underlying_equity_id={})",
+            "ConvertibleBond(id={:?}, notional={}, issue_date={}, maturity={}, conversion_ratio={}, spot_id={:?})",
             self.inner.id.as_str(),
             money_repr(self.inner.notional),
             date_repr(self.inner.issue_date),
             date_repr(self.inner.maturity),
             opt_repr(self.inner.conversion_ratio().map(float_repr)),
-            opt_repr(self.inner.underlying_equity_id.as_ref().map(|s| format!("{s:?}"))),
+            self.inner.spot_id.as_str(),
         )
     }
 }
@@ -969,27 +977,75 @@ impl PyConvertibleBondBuilder {
             .conversion(conversion))
     }
 
-    /// Set the underlying equity identifier.
+    /// Set the market-scalar id of the underlying share price.
     ///
     /// Parameters
     /// ----------
     /// value : str
-    ///     Underlying equity identifier (ticker or instrument id).
+    ///     ``MarketContext`` price id holding the share price in the bond's
+    ///     currency (or a unitless level). Required.
     ///
     /// Returns
     /// -------
     /// ConvertibleBondBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn underlying_equity_id<'py>(
+    fn spot_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
+        cb_set!(
+            slf,
+            spot_id,
+            format!("{value:?}"),
+            |b: ConvertibleBondBuilderInner| b.spot_id(PriceId::new(value))
+        )
+    }
+
+    /// Set the equity volatility id.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : str
+    ///     Volatility surface id (read at the conversion strike and maturity),
+    ///     or the id of a unitless scalar holding a flat volatility. Required.
+    ///
+    /// Returns
+    /// -------
+    /// ConvertibleBondBuilder
+    ///     ``self``, for chaining.
+    #[pyo3(text_signature = "($self, value)")]
+    fn vol_surface_id<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         cb_set!(
             slf,
-            underlying_equity_id,
+            vol_surface_id,
             format!("{value:?}"),
-            |b: ConvertibleBondBuilderInner| b.underlying_equity_id(value.to_string())
+            |b: ConvertibleBondBuilderInner| b.vol_surface_id(CurveId::new(value))
+        )
+    }
+
+    /// Set the continuous dividend-yield scalar id.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : str
+    ///     Id of a unitless decimal dividend yield (``0.02`` = 2%). When never
+    ///     set, the dividend yield is zero; a set id must exist in the market.
+    ///
+    /// Returns
+    /// -------
+    /// ConvertibleBondBuilder
+    ///     ``self``, for chaining.
+    #[pyo3(text_signature = "($self, value)")]
+    fn div_yield_id<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        cb_set!(
+            slf,
+            div_yield_id,
+            format!("{value:?}"),
+            |b: ConvertibleBondBuilderInner| b.div_yield_id(PriceId::new(value))
         )
     }
 

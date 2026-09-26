@@ -233,7 +233,6 @@ mod mc_invariants {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::exotics::asian_option::{
         AsianOption, AveragingMethod,
     };
@@ -286,7 +285,8 @@ mod mc_invariants {
             strike: 100.0,
             option_type: OptionType::Call,
             expiry,
-            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            quantity: 1.0,
+            currency: Currency::USD,
             averaging_method: AveragingMethod::Arithmetic,
             fixing_dates: vec![date!(2024 - 07 - 01), date!(2025 - 01 - 01)],
             day_count: DayCount::Act365F,
@@ -336,7 +336,8 @@ mod mc_invariants {
             strike: 100.0,
             option_type: OptionType::Call,
             expiry,
-            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            quantity: 1.0,
+            currency: Currency::USD,
             averaging_method: AveragingMethod::Arithmetic,
             fixing_dates: vec![date!(2024 - 07 - 01), date!(2025 - 01 - 01)],
             day_count: DayCount::Act365F,

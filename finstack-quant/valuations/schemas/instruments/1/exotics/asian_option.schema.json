@@ -12,6 +12,10 @@
           "$ref": "#/$defs/AveragingMethod",
           "description": "Averaging method (arithmetic or geometric)"
         },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency of the strike, premium and present value."
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day count convention"
@@ -54,10 +58,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount"
-        },
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
@@ -80,6 +80,11 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -111,7 +116,8 @@
         "averaging_method",
         "expiry",
         "fixing_dates",
-        "notional",
+        "quantity",
+        "currency",
         "day_count",
         "discount_curve_id",
         "spot_id",
@@ -183,6 +189,7 @@
         "spec": {
           "attributes": {},
           "averaging_method": "arithmetic",
+          "currency": "USD",
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
           "div_yield_id": "SPX-DIV",
@@ -196,12 +203,9 @@
             "2024-06-30"
           ],
           "id": "ASIAN-SPX-ARITH-6M",
-          "notional": {
-            "amount": "100000",
-            "currency": "USD"
-          },
           "option_type": "call",
           "past_fixings": [],
+          "quantity": 100000.0,
           "spot_id": "SPX-SPOT",
           "strike": 4500.0,
           "underlying_ticker": "SPX",

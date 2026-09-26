@@ -14,7 +14,7 @@ fn test_basic_construction() {
     assert_eq!(fx.base_currency, Currency::EUR);
     assert_eq!(fx.quote_currency, Currency::USD);
     assert!(fx.settlement_date.is_none());
-    assert!(fx.spot_rate.is_none());
+    assert!(fx.quoted_spot.is_none());
     assert_eq!(
         fx.notional,
         Money::new(1.0, Currency::EUR).expect("valid money fixture")
@@ -28,9 +28,9 @@ fn test_basic_construction() {
 
 #[test]
 fn test_construction_with_rate() {
-    let fx = sample_eurusd().with_rate(1.18).expect("test rate");
+    let fx = sample_eurusd().with_quoted_spot(1.18).expect("test rate");
 
-    assert_eq!(fx.spot_rate, Some(1.18));
+    assert_eq!(fx.quoted_spot, Some(1.18));
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn test_construction_full_builder() {
     let fx = FxSpot::new(InstrumentId::new("GBPUSD"), Currency::GBP, Currency::USD)
         .with_notional(Money::new(5_000_000.0, Currency::GBP).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.32)
+        .with_quoted_spot(1.32)
         .expect("test rate")
         .with_settlement_date(d(2025, 1, 17))
         .with_business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -89,7 +89,7 @@ fn test_construction_full_builder() {
     assert_eq!(fx.base_currency, Currency::GBP);
     assert_eq!(fx.quote_currency, Currency::USD);
     assert_eq!(fx.notional.amount(), 5_000_000.0);
-    assert_eq!(fx.spot_rate, Some(1.32));
+    assert_eq!(fx.quoted_spot, Some(1.32));
     assert_eq!(fx.settlement_date, Some(d(2025, 1, 17)));
     assert_eq!(
         fx.business_day_convention,
@@ -177,7 +177,7 @@ fn test_clone_preserves_all_fields() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.18)
+        .with_quoted_spot(1.18)
         .expect("test rate")
         .with_settlement_date(d(2025, 1, 17));
 
@@ -187,13 +187,13 @@ fn test_clone_preserves_all_fields() {
     assert_eq!(cloned.base_currency, fx.base_currency);
     assert_eq!(cloned.quote_currency, fx.quote_currency);
     assert_eq!(cloned.notional, fx.notional);
-    assert_eq!(cloned.spot_rate, fx.spot_rate);
+    assert_eq!(cloned.quoted_spot, fx.quoted_spot);
     assert_eq!(cloned.settlement_date, fx.settlement_date);
 }
 
 #[test]
 fn test_debug_representation() {
-    let fx = sample_eurusd().with_rate(1.20);
+    let fx = sample_eurusd().with_quoted_spot(1.20);
     let debug_str = format!("{:?}", fx);
 
     assert!(debug_str.contains("FxSpot"));

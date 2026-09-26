@@ -151,7 +151,7 @@ from finstack_quant.core.money import Money
 s=convert["instrument"]["spec"]
 rebuilt=(ConvertibleBond.builder().id("C5-REBUILT").notional(Money(1_000_000.,"USD"))
     .issue_date(AS_OF).maturity(date(2030,1,15)).discount_curve_id("USD-OIS").credit_curve_id("CONVERT-RISKY")
-    .conversion(ConversionSpec(ratio=10_000.)).underlying_equity_id("CONVERT")
+    .conversion(ConversionSpec(ratio=10_000.)).spot_id("CONVERT").vol_surface_id("CONVERT-VOL").div_yield_id("CONVERT-DIVYIELD")
     .fixed_coupon(s["fixed_coupon"]).recovery_rate(0.).build())
 validate_instrument_json(rebuilt.to_json())
 greeks=price_instrument(rebuilt.to_json(),credit_market,AS_OF,model="tree",metrics=["delta","conversion01","dividend01"])

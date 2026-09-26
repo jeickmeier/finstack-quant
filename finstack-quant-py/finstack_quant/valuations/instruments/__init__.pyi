@@ -10957,7 +10957,7 @@ class ConvertibleBond:
     --------
     >>> from finstack_quant.valuations.instruments import ConvertibleBond
     >>> cb = ConvertibleBond.example()
-    >>> (cb.id, cb.conversion_ratio, cb.underlying_equity_id)
+    >>> (cb.id, cb.conversion_ratio, cb.spot_id)
     ('CB-TECH-5Y', 25.0, 'TECH')
     """
 
@@ -11263,12 +11263,10 @@ class ConvertibleBond:
         Raises
         ------
         KeyError
-            If the underlying price is missing from ``market``.
+            If the ``spot_id`` price is missing from ``market``.
         ValueError
             If conversion terms are invalid or the equity price is negative
             or non-finite.
-        RuntimeError
-            If the bond has no ``underlying_equity_id``.
         """
         ...
     def conversion_premium(self, market: MarketContext | str, bond_price: float) -> float:
@@ -11293,12 +11291,10 @@ class ConvertibleBond:
         Raises
         ------
         KeyError
-            If the underlying price is missing from ``market``.
+            If the ``spot_id`` price is missing from ``market``.
         ValueError
             If conversion value is nonpositive or ``bond_price`` is negative
             or non-finite.
-        RuntimeError
-            If the bond has no ``underlying_equity_id``.
         """
         ...
     def greeks(
@@ -11460,14 +11456,45 @@ class ConvertibleBond:
         """
         ...
     @property
-    def underlying_equity_id(self) -> str | None:
+    def spot_id(self) -> str:
         """
-        Underlying equity identifier.
+        Market-scalar id of the underlying share price.
+
+        Returns
+        -------
+        str
+            The ``MarketContext`` price id read for the equity spot.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def vol_surface_id(self) -> str:
+        """
+        Equity volatility id: a volatility surface, or a unitless scalar
+        holding a flat volatility.
+
+        Returns
+        -------
+        str
+            The volatility id.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def div_yield_id(self) -> str | None:
+        """
+        Unitless continuous dividend-yield scalar id.
 
         Returns
         -------
         str | None
-            The id, or ``None``.
+            The id, or ``None`` for a zero dividend yield.
 
         Notes
         -----
@@ -11617,7 +11644,8 @@ class ConvertibleBondBuilder:
     ...     .maturity("2029-01-15")
     ...     .discount_curve_id("USD-OIS")
     ...     .conversion(ConversionSpec(ratio=20.0, anti_dilution="full_ratchet"))
-    ...     .underlying_equity_id("ACME")
+    ...     .spot_id("ACME")
+    ...     .vol_surface_id("ACME-VOL")
     ...     .build()
     ... )
     >>> bond.conversion_ratio
@@ -11766,14 +11794,57 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not match the ``ConversionSpec`` shape.
         """
         ...
-    def underlying_equity_id(self, value: str) -> ConvertibleBondBuilder:
+    def spot_id(self, value: str) -> ConvertibleBondBuilder:
         """
-        Set the underlying equity identifier.
+        Set the market-scalar id of the underlying share price (required).
 
         Parameters
         ----------
         value : str
-            Underlying equity identifier (ticker or instrument id).
+            ``MarketContext`` price id holding the share price in the bond's
+            currency, or a unitless level.
+
+        Returns
+        -------
+        ConvertibleBondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()``.
+        """
+        ...
+    def vol_surface_id(self, value: str) -> ConvertibleBondBuilder:
+        """
+        Set the equity volatility id (required).
+
+        Parameters
+        ----------
+        value : str
+            Volatility surface id read at the conversion strike and maturity,
+            or the id of a unitless scalar holding a flat volatility.
+
+        Returns
+        -------
+        ConvertibleBondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()``.
+        """
+        ...
+    def div_yield_id(self, value: str) -> ConvertibleBondBuilder:
+        """
+        Set the continuous dividend-yield scalar id.
+
+        Parameters
+        ----------
+        value : str
+            Id of a unitless decimal dividend yield (``0.02`` = 2%). When never
+            set the dividend yield is zero; a set id must exist in the market.
 
         Returns
         -------
@@ -12411,7 +12482,7 @@ class FxForward:
         ----------
         market : MarketContext | str
             Market carrying both discount curves and the FX matrix (or an
-            explicit ``spot_rate_override`` on the instrument).
+            explicit ``quoted_spot`` on the instrument).
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date.
 
@@ -12534,7 +12605,7 @@ class FxForward:
         """
         ...
     @property
-    def spot_rate_override(self) -> float | None:
+    def quoted_spot(self) -> float | None:
         """
         Explicit spot override (quote per base).
 
@@ -12800,7 +12871,7 @@ class FxForwardBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def spot_rate_override(self, value: float) -> FxForwardBuilder:
+    def quoted_spot(self, value: float) -> FxForwardBuilder:
         """
         Set an explicit spot rate override (quote per base).
 
@@ -14109,7 +14180,8 @@ class EquityOption:
     Vanilla equity option (typed wrapper for the canonical Rust
     ``EquityOption``). European options price with Black–Scholes–Merton
     (``"black76"`` on the forward); American and Bermudan styles use the tree
-    pricer. ``notional`` scales the per-share value; discrete dividends and a
+    pricer. ``quantity`` (underlying units) scales the per-share value and
+    ``currency`` is the premium/PV currency; discrete dividends and a
     continuous ``div_yield_id`` are both supported.
 
     Construct via :meth:`EquityOption.builder`,
@@ -14363,7 +14435,7 @@ class EquityOption:
     def example() -> EquityOption:
         """
         Canonical SPX 4500 European call expiring 2024-06-21 (mirrors Rust
-        ``EquityOption::example``): USD 100 notional, curve ``USD-OIS``, spot
+        ``EquityOption::example``): 100 units in USD, curve ``USD-OIS``, spot
         ``EQUITY-SPOT``, surface ``EQUITY-VOL``, dividend yield ``EQUITY-DIVYIELD``.
 
         Returns
@@ -14389,7 +14461,8 @@ class EquityOption:
         ticker: str,
         strike: float,
         expiry: datetime.date | datetime.datetime | pd.Timestamp | str,
-        notional: Money | float,
+        quantity: float,
+        currency: Currency | str,
         *,
         discount_curve_id: str = "USD-OIS",
         spot_id: str = "EQUITY-SPOT",
@@ -14413,8 +14486,10 @@ class EquityOption:
             Strike price; must be finite and positive.
         expiry : datetime.date | datetime.datetime | pd.Timestamp | str
             Expiry date.
-        notional : Money | float
-            Notional for valuation scaling; a bare float is USD.
+        quantity : float
+            Number of underlying units; PV and Greeks scale linearly with it.
+        currency : Currency | str
+            Currency of the strike, premium and present value (e.g. ``"USD"``).
         discount_curve_id : str, default "USD-OIS"
             Discount curve identifier.
         spot_id : str, default "EQUITY-SPOT"
@@ -14432,13 +14507,13 @@ class EquityOption:
         Raises
         ------
         ValueError
-            If ``strike`` is not positive, the notional is zero, or ``expiry``
-            cannot be interpreted.
+            If ``strike`` is not positive, ``quantity`` is zero, ``currency``
+            is not a recognized code, or ``expiry`` cannot be interpreted.
 
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import EquityOption
-        >>> opt = EquityOption.european_call("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, spot_id="AAPL")
+        >>> opt = EquityOption.european_call("AAPL-C-200", "AAPL", 200.0, "2025-06-20", 100.0, "USD", spot_id="AAPL")
         >>> (opt.option_type, opt.settlement, opt.spot_id)
         ('call', 'cash', 'AAPL')
         """
@@ -14463,7 +14538,7 @@ class EquityOption:
             Valuation date strictly before expiry and observed exercise.
         target_price : float
             Observed option premium: finite non-negative total trade PV in the
-            notional currency, including the contract multiplier.
+            option currency, including the contract multiplier.
 
         Returns
         -------
@@ -14473,7 +14548,7 @@ class EquityOption:
         Raises
         ------
         ValueError
-            If PV or notional is invalid, the option has expired or exercised,
+            If PV or ``quantity`` is invalid, the option has expired or exercised,
             or the target is indistinguishable from the deterministic price.
         KeyError
             If required market data is missing from ``market``.
@@ -14749,14 +14824,29 @@ class EquityOption:
         """
         ...
     @property
-    def notional(self) -> Money:
+    def quantity(self) -> float:
         """
-        Notional for valuation scaling.
+        Number of underlying units; PV and Greeks scale linearly with it.
 
         Returns
         -------
-        Money
-            Currency-tagged notional.
+        float
+            Underlying unit count (contract size).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def currency(self) -> str:
+        """
+        Currency of the strike, premium and present value.
+
+        Returns
+        -------
+        str
+            ISO-4217 currency code, e.g. ``"USD"``.
 
         Notes
         -----
@@ -14921,14 +15011,12 @@ class EquityOptionBuilder:
 
     Builders are consumed by ``build()``; create a new builder per
     instrument. Required fields: ``id``, ``underlying_ticker``, ``strike``,
-    ``option_type``, ``expiry``, ``notional``, ``discount_curve_id``,
+    ``option_type``, ``expiry``, ``quantity``, ``currency``, ``discount_curve_id``,
     ``spot_id``, ``vol_surface_id`` (``exercise_style`` defaults to
     ``"european"``, ``day_count`` to ACT/365F, ``settlement`` to ``"cash"``).
 
     Examples
     --------
-    >>> from finstack_quant.core.currency import Currency
-    >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import EquityOption
     >>> option = (
     ...     EquityOption
@@ -14938,7 +15026,8 @@ class EquityOptionBuilder:
     ...     .strike(200.0)
     ...     .option_type("call")
     ...     .expiry("2025-06-20")
-    ...     .notional(Money(100.0, Currency("USD")))
+    ...     .quantity(100.0)
+    ...     .currency("USD")
     ...     .discount_curve_id("USD-OIS")
     ...     .spot_id("AAPL")
     ...     .vol_surface_id("AAPL-VOL")
@@ -15140,14 +15229,14 @@ class EquityOptionBuilder:
             If the builder was already consumed by ``build()`` or a date cannot be interpreted.
         """
         ...
-    def notional(self, value: Money) -> EquityOptionBuilder:
+    def quantity(self, value: float) -> EquityOptionBuilder:
         """
-        Set the notional amount for valuation scaling.
+        Set the number of underlying units the option is written on.
 
         Parameters
         ----------
-        value : Money
-            Notional amount for valuation scaling.
+        value : float
+            Number of underlying units; PV and Greeks scale linearly with it.
 
         Returns
         -------
@@ -15158,6 +15247,29 @@ class EquityOptionBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()``.
+        """
+        ...
+    def currency(self, value: Currency | str) -> EquityOptionBuilder:
+        """
+        Set the currency of the strike, premium and present value.
+
+        Parameters
+        ----------
+        value : Currency | str
+            ISO-4217 currency code (e.g. ``"USD"``) or ``Currency``.
+
+        Returns
+        -------
+        EquityOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` is
+            not a recognized currency code.
+        TypeError
+            If ``value`` is neither a ``Currency`` nor a string.
         """
         ...
     def discount_curve_id(self, value: str) -> EquityOptionBuilder:
@@ -15309,7 +15421,7 @@ class EquityOptionBuilder:
     def __repr__(self) -> str:
         """
         Python-style rendering of the fields set so far, e.g.
-        ``EquityOptionBuilder(id='X', notional=Money(1000000.0, 'USD'))``.
+        ``EquityOptionBuilder(id='X', quantity=100.0, currency="USD")``.
 
         Returns
         -------

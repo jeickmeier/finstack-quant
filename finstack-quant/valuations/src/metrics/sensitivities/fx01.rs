@@ -38,15 +38,15 @@ fn bumped_instrument_quote(
 ) -> Option<Box<dyn Instrument>> {
     let mut bumped = instrument.clone_box();
     if let Some(forward) = bumped.as_any_mut().downcast_mut::<FxForward>() {
-        *forward.spot_rate_override.as_mut()? *= 1.0 + relative;
+        *forward.quoted_spot.as_mut()? *= 1.0 + relative;
     } else if let Some(spot) = bumped.as_any_mut().downcast_mut::<FxSpot>() {
-        *spot.spot_rate.as_mut()? *= 1.0 + relative;
+        *spot.quoted_spot.as_mut()? *= 1.0 + relative;
     } else if let Some(ndf) = bumped.as_any_mut().downcast_mut::<Ndf>() {
         if ndf.observed_fixing.is_none() {
-            let quote = if ndf.forward_rate_override.is_some() {
-                ndf.forward_rate_override.as_mut()?
+            let quote = if ndf.quoted_forward.is_some() {
+                ndf.quoted_forward.as_mut()?
             } else {
-                ndf.spot_rate_override.as_mut()?
+                ndf.quoted_spot.as_mut()?
             };
             match ndf.quote_convention {
                 NdfQuoteConvention::SettlementPerBase => *quote *= 1.0 + relative,

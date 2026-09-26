@@ -178,14 +178,18 @@
           ]
         },
         "spot_id": {
-          "description": "Optional spot price ID (for delta calculations).",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot price ID (for delta calculations)."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -196,7 +200,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "quantity",
@@ -294,7 +298,7 @@
           "position": "long",
           "quantity": 1000.0,
           "settlement": "cash",
-          "ticker": "CL",
+          "underlying_ticker": "CL",
           "unit": "BBL"
         },
         "type": "commodity_forward"

@@ -20,8 +20,8 @@ fn composite_with_legs(count: usize) -> CompositeInstrument {
                 id.clone(),
                 InstrumentJson::Equity(
                     Equity::new(id.clone(), id, Currency::USD)
-                        .with_shares(1.0)
-                        .with_price(price),
+                        .with_quantity(1.0)
+                        .with_quoted_spot(price),
                 ),
                 if index % 2 == 0 { 1.0 } else { -1.0 },
             )

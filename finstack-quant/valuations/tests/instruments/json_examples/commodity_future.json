@@ -25,7 +25,7 @@
         },
         "settlement_date": "2027-01-04"
       },
-      "underlying": "TSI-62-FE"
+      "underlying_ticker": "TSI-62-FE"
     },
     "type": "commodity_future"
   },

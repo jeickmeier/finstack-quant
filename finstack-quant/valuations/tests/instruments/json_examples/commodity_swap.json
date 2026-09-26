@@ -25,7 +25,7 @@
       "quantity": 10000.0,
       "side": "pay",
       "start_date": "2025-01-01",
-      "ticker": "NG",
+      "underlying_ticker": "NG",
       "unit": "MMBTU"
     },
     "type": "commodity_swap"

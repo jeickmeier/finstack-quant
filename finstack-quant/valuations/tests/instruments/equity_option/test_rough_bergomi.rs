@@ -12,8 +12,6 @@
 //! self-referential fixture.
 
 use super::helpers::*;
-use finstack_quant_core::currency::Currency;
-use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::black_scholes_spot_call;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::pricer::{standard_pricer_registry, ModelKey};
@@ -21,7 +19,7 @@ use time::macros::date;
 
 /// Build an ATM market with rBergomi scalar parameters injected.
 ///
-/// `RBERGOMI_ETA` / `RBERGOMI_HURST` / `RBERGOMI_RHO` are unitless market
+/// `ROUGH_BERGOMI_ETA` / `ROUGH_BERGOMI_HURST` / `ROUGH_BERGOMI_RHO` are unitless market
 /// scalars read by the pricer; the rest is a flat-vol Black-Scholes market.
 fn rbergomi_market(
     as_of: finstack_quant_core::dates::Date,
@@ -34,9 +32,9 @@ fn rbergomi_market(
 ) -> finstack_quant_core::market_data::context::MarketContext {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     build_standard_market(as_of, spot, vol, rate, 0.0)
-        .insert_price("RBERGOMI_ETA", MarketScalar::Unitless(eta))
-        .insert_price("RBERGOMI_HURST", MarketScalar::Unitless(hurst))
-        .insert_price("RBERGOMI_RHO", MarketScalar::Unitless(rho))
+        .insert_price("ROUGH_BERGOMI_ETA", MarketScalar::Unitless(eta))
+        .insert_price("ROUGH_BERGOMI_HURST", MarketScalar::Unitless(hurst))
+        .insert_price("ROUGH_BERGOMI_RHO", MarketScalar::Unitless(rho))
 }
 
 /// Price an ATM call through the rBergomi MC pricer with a capped path count.
@@ -373,7 +371,7 @@ fn rbergomi_missing_scalars_error() {
     );
     let msg = result.unwrap_err().to_string();
     assert!(
-        msg.contains("RBERGOMI_ETA"),
+        msg.contains("ROUGH_BERGOMI_ETA"),
         "error should name the missing scalar, got: {msg}"
     );
 }
@@ -437,11 +435,11 @@ fn rbergomi_price_scales_with_notional() {
     let market = rbergomi_market(as_of, spot, 0.20, 0.0, 1.4, 0.1, -0.85);
 
     let mut call_100 = create_call(as_of, expiry, strike);
-    call_100.notional = Money::new(100.0, Currency::USD).expect("valid money fixture");
+    call_100.quantity = 100.0;
     call_100.instrument_pricing_overrides.model_config.mc_paths = Some(30_000);
 
     let mut call_300 = create_call(as_of, expiry, strike);
-    call_300.notional = Money::new(300.0, Currency::USD).expect("valid money fixture");
+    call_300.quantity = 300.0;
     call_300.instrument_pricing_overrides.model_config.mc_paths = Some(30_000);
 
     let registry = standard_pricer_registry();

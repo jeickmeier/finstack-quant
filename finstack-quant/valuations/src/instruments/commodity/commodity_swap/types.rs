@@ -701,7 +701,7 @@ mod tests {
             .expect("should build");
 
         assert_eq!(swap.id.as_str(), "TEST-SWAP");
-        assert_eq!(swap.underlying.ticker, "CL");
+        assert_eq!(swap.underlying.underlying_ticker, "CL");
         assert_eq!(swap.quantity, 1000.0);
         assert_eq!(swap.fixed_price.to_f64().expect("decimal to f64"), 70.0);
         assert_eq!(swap.side, PayReceive::Pay);
@@ -736,7 +736,7 @@ mod tests {
         let swap = CommoditySwap::example();
         assert_eq!(swap.id.as_str(), "NG-SWAP-2025");
         assert_eq!(swap.underlying.commodity_type, "Energy");
-        assert_eq!(swap.underlying.ticker, "NG");
+        assert_eq!(swap.underlying.underlying_ticker, "NG");
         assert!(swap.attributes.has_tag("energy"));
     }
 
@@ -947,7 +947,10 @@ mod tests {
         let deserialized: CommoditySwap = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(swap.id.as_str(), deserialized.id.as_str());
-        assert_eq!(swap.underlying.ticker, deserialized.underlying.ticker);
+        assert_eq!(
+            swap.underlying.underlying_ticker,
+            deserialized.underlying.underlying_ticker
+        );
         assert_eq!(swap.fixed_price, deserialized.fixed_price);
     }
 

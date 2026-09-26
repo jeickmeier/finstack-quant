@@ -77,7 +77,7 @@ pub fn eurusd_with_notional(notional: f64, rate: f64) -> FxSpot {
     sample_eurusd()
         .with_notional(Money::new(notional, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(rate)
+        .with_quoted_spot(rate)
         .unwrap()
 }
 

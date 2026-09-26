@@ -32,7 +32,7 @@ impl MetricCalculator for SpeedCalculator {
 
         let current_spot = crate::instruments::common_impl::helpers::scalar_price_amount(
             context.curves.get_price(&option.spot_id)?,
-            option.notional.currency(),
+            option.currency,
         )?;
 
         let bump_pct = super::spot_bump_decimal(context, option, current_spot)?;

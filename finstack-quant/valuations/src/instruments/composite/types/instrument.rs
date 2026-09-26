@@ -171,11 +171,11 @@ impl CompositeInstrument {
     /// Returns an error if the generated example fails validation.
     pub fn example() -> Result<Self> {
         let long = crate::instruments::Equity::new("COMPOSITE-LONG", "LONG", Currency::USD)
-            .with_shares(1.0)
-            .with_price(100.0);
+            .with_quantity(1.0)
+            .with_quoted_spot(100.0);
         let short = crate::instruments::Equity::new("COMPOSITE-SHORT", "SHORT", Currency::USD)
-            .with_shares(1.0)
-            .with_price(90.0);
+            .with_quantity(1.0)
+            .with_quoted_spot(90.0);
         let spec = CompositeSpec::new(
             "COMPOSITE-EXAMPLE",
             Currency::USD,

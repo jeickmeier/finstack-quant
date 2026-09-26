@@ -36,9 +36,9 @@ fn test_equity_new_defaults() {
     assert_eq!(equity.id.as_str(), "AAPL");
     assert_eq!(equity.ticker, "AAPL");
     assert_eq!(equity.currency, Currency::USD);
-    assert_eq!(equity.shares, None);
-    assert_eq!(equity.price_quote, None);
-    assert_eq!(equity.price_id, None);
+    assert_eq!(equity.quantity, None);
+    assert_eq!(equity.quoted_spot, None);
+    assert_eq!(equity.spot_id, None);
     assert_eq!(equity.div_yield_id, None);
     assert_eq!(equity.discount_curve_id.as_str(), "USD");
 }
@@ -61,24 +61,24 @@ fn test_equity_new_with_different_currencies() {
 
 #[test]
 fn test_equity_with_shares() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_shares(100.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quantity(100.0);
 
-    assert_eq!(equity.shares, Some(100.0));
+    assert_eq!(equity.quantity, Some(100.0));
 }
 
 #[test]
 fn test_equity_with_price() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price(150.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quoted_spot(150.0);
 
-    assert_eq!(equity.price_quote, Some(150.0));
+    assert_eq!(equity.quoted_spot, Some(150.0));
 }
 
 #[test]
 fn test_equity_with_price_id() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price_id("CUSTOM_PRICE");
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_spot_id("CUSTOM_PRICE");
 
     assert_eq!(
-        equity.price_id,
+        equity.spot_id,
         Some(finstack_quant_core::types::PriceId::new("CUSTOM_PRICE"))
     );
 }
@@ -96,15 +96,15 @@ fn test_equity_with_dividend_yield_id() {
 #[test]
 fn test_equity_builder_chaining() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(100.0)
-        .with_price(150.0)
-        .with_price_id("CUSTOM_PRICE")
+        .with_quantity(100.0)
+        .with_quoted_spot(150.0)
+        .with_spot_id("CUSTOM_PRICE")
         .with_dividend_yield_id("CUSTOM_DIV");
 
-    assert_eq!(equity.shares, Some(100.0));
-    assert_eq!(equity.price_quote, Some(150.0));
+    assert_eq!(equity.quantity, Some(100.0));
+    assert_eq!(equity.quoted_spot, Some(150.0));
     assert_eq!(
-        equity.price_id,
+        equity.spot_id,
         Some(finstack_quant_core::types::PriceId::new("CUSTOM_PRICE"))
     );
     assert_eq!(
@@ -116,18 +116,18 @@ fn test_equity_builder_chaining() {
 #[test]
 fn test_equity_effective_shares_none() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD);
-    assert_eq!(equity.effective_shares(), 1.0);
+    assert_eq!(equity.effective_quantity(), 1.0);
 }
 
 #[test]
 fn test_equity_effective_shares_set() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_shares(50.0);
-    assert_eq!(equity.effective_shares(), 50.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quantity(50.0);
+    assert_eq!(equity.effective_quantity(), 50.0);
 }
 
 #[test]
 fn test_equity_price_per_share_with_quote() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price(175.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quoted_spot(175.0);
 
     let market = MarketContext::new();
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -138,8 +138,8 @@ fn test_equity_price_per_share_with_quote() {
 }
 
 #[test]
-fn test_equity_price_per_share_from_ticker() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD);
+fn test_equity_price_per_share_from_spot_id() {
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_spot_id("AAPL");
 
     let market = MarketContext::new().insert_price(
         "AAPL",
@@ -152,36 +152,8 @@ fn test_equity_price_per_share_from_ticker() {
 }
 
 #[test]
-fn test_equity_price_per_share_from_id() {
-    let equity = Equity::new("EQUITY_001", "AAPL", Currency::USD);
-
-    let market = MarketContext::new().insert_price(
-        "EQUITY_001",
-        MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
-    );
-
-    let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
-    let price = equity.price_per_share(&market, as_of).unwrap();
-    assert_eq!(price.amount(), 185.0);
-}
-
-#[test]
-fn test_equity_price_per_share_from_ticker_spot() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD);
-
-    let market = MarketContext::new().insert_price(
-        "AAPL-SPOT",
-        MarketScalar::Price(Money::new(195.0, Currency::USD).expect("valid money fixture")),
-    );
-
-    let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
-    let price = equity.price_per_share(&market, as_of).unwrap();
-    assert_eq!(price.amount(), 195.0);
-}
-
-#[test]
 fn test_equity_price_per_share_unitless() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_spot_id("AAPL");
 
     // Unitless scalar is treated as amount in equity currency
     let market = MarketContext::new().insert_price("AAPL", MarketScalar::Unitless(210.0));
@@ -202,13 +174,14 @@ fn test_equity_dividend_yield_default() {
 }
 
 #[test]
-fn test_equity_dividend_yield_from_ticker() {
+fn test_equity_dividend_yield_ignores_ticker_suffix() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD);
 
+    // No `div_yield_id` means a zero yield; `{ticker}-DIVYIELD` is not read.
     let market = MarketContext::new().insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     let div_yield = equity.dividend_yield(&market).unwrap();
-    assert_eq!(div_yield, 0.02);
+    assert_eq!(div_yield, 0.0);
 }
 
 #[test]
@@ -219,17 +192,6 @@ fn test_equity_dividend_yield_from_custom_id() {
 
     let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.035);
-}
-
-#[test]
-fn test_equity_dividend_yield_from_id() {
-    let equity = Equity::new("EQUITY_001", "AAPL", Currency::USD);
-
-    let market =
-        MarketContext::new().insert_price("EQUITY_001-DIVYIELD", MarketScalar::Unitless(0.025));
-
-    let div_yield = equity.dividend_yield(&market).unwrap();
-    assert_eq!(div_yield, 0.025);
 }
 
 #[test]
@@ -264,15 +226,15 @@ fn test_equity_discount_curve_id() {
 #[test]
 fn test_equity_clone() {
     let equity1 = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(100.0)
-        .with_price(150.0);
+        .with_quantity(100.0)
+        .with_quoted_spot(150.0);
 
     let equity2 = equity1.clone();
 
     assert_eq!(equity1.id, equity2.id);
     assert_eq!(equity1.ticker, equity2.ticker);
-    assert_eq!(equity1.shares, equity2.shares);
-    assert_eq!(equity1.price_quote, equity2.price_quote);
+    assert_eq!(equity1.quantity, equity2.quantity);
+    assert_eq!(equity1.quoted_spot, equity2.quoted_spot);
 }
 
 #[test]
@@ -297,7 +259,7 @@ fn test_equity_with_attributes() {
 #[test]
 fn test_equity_price_resolution_priority() {
     // Price quote should override market data
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price(100.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quoted_spot(100.0);
 
     let market = MarketContext::new().insert_price(
         "AAPL",
@@ -314,7 +276,7 @@ fn test_equity_price_resolution_priority() {
 #[test]
 fn test_equity_custom_price_id_priority() {
     // Custom price_id should override ticker-based lookup
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price_id("CUSTOM_PRICE");
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_spot_id("CUSTOM_PRICE");
 
     let market = MarketContext::new()
         .insert_price(
@@ -336,7 +298,7 @@ fn test_equity_custom_price_id_priority() {
 #[test]
 fn test_equity_fx_conversion() {
     // EUR equity priced in EUR
-    let equity = Equity::new("SAP", "SAP", Currency::EUR);
+    let equity = Equity::new("SAP", "SAP", Currency::EUR).with_spot_id("SAP");
 
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let eur_curve = build_flat_curve(0.03, base_date, "EUR-OIS");
@@ -364,34 +326,34 @@ fn test_equity_price_missing() {
 
 #[test]
 fn test_equity_zero_shares() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_shares(0.0);
-    assert_eq!(equity.effective_shares(), 0.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quantity(0.0);
+    assert_eq!(equity.effective_quantity(), 0.0);
 }
 
 #[test]
 fn test_equity_negative_shares() {
     // Short position
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_shares(-50.0);
-    assert_eq!(equity.effective_shares(), -50.0);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quantity(-50.0);
+    assert_eq!(equity.effective_quantity(), -50.0);
 }
 
 #[test]
 fn test_equity_fractional_shares() {
-    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_shares(12.5);
-    assert_eq!(equity.effective_shares(), 12.5);
+    let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_quantity(12.5);
+    assert_eq!(equity.effective_quantity(), 12.5);
 }
 
 #[test]
 fn test_equity_serde_roundtrip() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-        .with_shares(100.0)
-        .with_price(150.0);
+        .with_quantity(100.0)
+        .with_quoted_spot(150.0);
 
     let json = serde_json::to_string(&equity).unwrap();
     let deserialized: Equity = serde_json::from_str(&json).unwrap();
 
     assert_eq!(equity.id, deserialized.id);
     assert_eq!(equity.ticker, deserialized.ticker);
-    assert_eq!(equity.shares, deserialized.shares);
-    assert_eq!(equity.price_quote, deserialized.price_quote);
+    assert_eq!(equity.quantity, deserialized.quantity);
+    assert_eq!(equity.quoted_spot, deserialized.quoted_spot);
 }

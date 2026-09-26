@@ -69,15 +69,19 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Discount curve ID (foreign currency)."
         },
-        "fx_rate_id": {
+        "fx_spot_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional FX rate identifier.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional FX rate identifier."
         },
-        "fx_vol_id": {
+        "fx_vol_surface_id": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
@@ -122,6 +126,15 @@
             "null"
           ]
         },
+        "quantity": {
+          "default": null,
+          "description": "Number of underlying units covered by the option payoff.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Quote currency (payment/settlement currency)."
@@ -134,15 +147,6 @@
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Equity spot price identifier."
-        },
-        "underlying_quantity": {
-          "default": null,
-          "description": "Number of underlying units covered by the option payoff.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "underlying_ticker": {
           "description": "Underlying equity ticker symbol.",
@@ -210,8 +214,8 @@
           },
           "expiry": "2030-06-21",
           "foreign_discount_curve_id": "JPY-OIS",
-          "fx_rate_id": "JPYUSD-SPOT",
-          "fx_vol_id": "JPYUSD-VOL",
+          "fx_spot_id": "JPYUSD-SPOT",
+          "fx_vol_surface_id": "JPYUSD-VOL",
           "id": "QUANTO-NKY-USD-CALL",
           "notional": {
             "amount": "1000000",
@@ -219,9 +223,9 @@
           },
           "option_type": "call",
           "payoff_fx_rate": 0.007142857142857143,
+          "quantity": 4000.0,
           "quote_currency": "USD",
           "spot_id": "NKY-SPOT",
-          "underlying_quantity": 4000.0,
           "underlying_ticker": "NKY",
           "vol_surface_id": "NKY-VOL"
         },

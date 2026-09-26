@@ -237,7 +237,7 @@ def _definition_terms(definition: dict[str, Any]) -> list[list[tuple[str, str]]]
             [
                 ("Vol Surface", spec.get("vol_surface_id", "")),
                 ("Discount Curve", spec.get("discount_curve_id", "")),
-                ("Notional", _money_str(spec.get("notional"))),
+                ("Quantity", f"{float(spec.get('quantity', 0)):,.0f} {spec.get('currency', '')}"),
             ],
         ]
     # generic: flatten scalar spec fields into up to three columns

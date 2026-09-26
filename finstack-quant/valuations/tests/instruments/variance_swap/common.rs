@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::scalars::{
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_valuations::instruments::equity::variance_swap::{
     PayReceive, RealizedVarMethod, VarianceSwap,
 };
@@ -34,6 +34,9 @@ pub fn sample_swap(side: PayReceive) -> VarianceSwap {
     VarianceSwap::builder()
         .id(InstrumentId::new(format!("VAR-{side:?}")))
         .underlying_ticker(UNDERLYING_ID.to_string())
+        .spot_id(PriceId::new(UNDERLYING_ID))
+        .vol_surface_id(CurveId::new(UNDERLYING_ID))
+        .div_yield_id_opt(Some(PriceId::new(format!("{}-DIVYIELD", UNDERLYING_ID))))
         .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD).expect("valid money fixture"))
         .strike_variance(DEFAULT_STRIKE_VAR)
         .start_date(start)

@@ -39,7 +39,7 @@ fn test_fx_forward_builder_with_optional_fields() {
         .maturity(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
         .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .contract_rate_opt(Some(1.12))
-        .spot_rate_override_opt(Some(1.10))
+        .quoted_spot_opt(Some(1.10))
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .base_calendar_id_opt(Some("EUR".to_string()))
@@ -49,7 +49,7 @@ fn test_fx_forward_builder_with_optional_fields() {
         .expect("should build");
 
     assert_eq!(forward.contract_rate, Some(1.12));
-    assert_eq!(forward.spot_rate_override, Some(1.10));
+    assert_eq!(forward.quoted_spot, Some(1.10));
     assert_eq!(forward.base_calendar_id, Some("EUR".to_string()));
     assert_eq!(forward.quote_calendar_id, Some("USD".to_string()));
     assert!(forward.attributes.has_tag("test"));
@@ -168,7 +168,7 @@ fn test_fx_forward_with_forward_points_builder() {
         .with_forward_points(1.10, 0.0100)
         .expect("valid forward points"); // 100 pips
 
-    assert_eq!(forward.spot_rate_override, None);
+    assert_eq!(forward.quoted_spot, None);
     assert!((forward.contract_rate.unwrap() - 1.11).abs() < 1e-10);
 }
 
@@ -188,7 +188,7 @@ fn test_fx_forward_with_forward_pips() {
         .with_forward_pips(1.10, 50.0)
         .expect("valid forward pips");
 
-    assert_eq!(forward.spot_rate_override, None);
+    assert_eq!(forward.quoted_spot, None);
     assert!((forward.contract_rate.unwrap() - 1.1050).abs() < 1e-10);
 }
 
@@ -208,7 +208,7 @@ fn test_fx_forward_with_forward_pips_jpy_pair() {
         .with_forward_pips(150.00, 50.0)
         .expect("valid JPY pips");
 
-    assert_eq!(forward.spot_rate_override, None);
+    assert_eq!(forward.quoted_spot, None);
     assert!((forward.contract_rate.unwrap() - 150.50).abs() < 1e-10);
 }
 

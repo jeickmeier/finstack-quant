@@ -44,7 +44,7 @@
 //! // CCY1 (base) is the currency being priced; CCY2 (quote) is the pricing currency.
 //! let mut eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
 //! // How many units of `quote` per 1 unit of `base`
-//! eur_usd.spot_rate = Some(1.10);
+//! eur_usd.quoted_spot = Some(1.10);
 //! ```
 //!
 //! Example:
@@ -54,7 +54,7 @@
 //! use finstack_quant_valuations::instruments::FxSpot;
 //!
 //! let eur_usd = FxSpot::new(InstrumentId::from("EURUSD"), Currency::EUR, Currency::USD);
-//! // If spot_rate = 1.10, this means: 1 EUR = 1.10 USD
+//! // If quoted_spot = 1.10, this means: 1 EUR = 1.10 USD
 //! ```
 
 use crate::cashflow::traits::CashflowProvider;
@@ -76,7 +76,7 @@ use finstack_quant_core::Result;
 ///
 /// The rate is interpreted as: **1 unit of base = rate units of quote**
 ///
-/// For example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:
+/// For example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:
 /// - 1 EUR = 1.10 USD
 /// - This is the "EUR/USD" rate
 ///
@@ -120,9 +120,9 @@ pub struct FxSpot {
     /// USD↔CAD and USD↔TRY, T+2 otherwise.
     #[builder(optional)]
     pub settlement_days: Option<u32>,
-    /// Optional spot rate (if not provided, will look up from market data)
+    /// Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
     #[builder(optional)]
-    pub spot_rate: Option<f64>,
+    pub quoted_spot: Option<f64>,
     /// Optional quote-currency discount curve for PV-ing the settlement
     /// cashflow. When absent the settlement amount is reported undiscounted
     /// (a 1–2 day effect for standard spot lags).
@@ -196,8 +196,8 @@ struct FxSpotUnchecked {
     ///
     /// `None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.
     settlement_days: Option<u32>,
-    /// Optional spot rate (if not provided, will look up from market data)
-    spot_rate: Option<f64>,
+    /// Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
+    quoted_spot: Option<f64>,
     /// Optional quote-currency discount curve for PV-ing the settlement
     /// cashflow. When absent the settlement amount is reported undiscounted
     /// (a 1–2 day effect for standard spot lags).
@@ -244,7 +244,7 @@ impl TryFrom<FxSpotUnchecked> for FxSpot {
             quote_currency: value.quote_currency,
             settlement_date: value.settlement_date,
             settlement_days: value.settlement_days,
-            spot_rate: value.spot_rate,
+            quoted_spot: value.quoted_spot,
             discount_curve_id: value.discount_curve_id,
             notional: value.notional,
             instrument_pricing_overrides: value.instrument_pricing_overrides,
@@ -271,7 +271,7 @@ impl FxSpot {
             quote_currency,
             settlement_date: None,
             settlement_days: None,
-            spot_rate: None,
+            quoted_spot: None,
             discount_curve_id: None,
             notional: Money::from((1_i64, base_currency)),
             instrument_pricing_overrides: Default::default(),
@@ -380,10 +380,10 @@ impl FxSpot {
     /// use finstack_quant_valuations::instruments::FxSpot;
     ///
     /// let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-    ///     .with_rate(1.10)
+    ///     .with_quoted_spot(1.10)
     ///     .expect("valid rate");
     /// ```
-    pub fn with_rate(mut self, rate: f64) -> finstack_quant_core::Result<Self> {
+    pub fn with_quoted_spot(mut self, rate: f64) -> finstack_quant_core::Result<Self> {
         if !rate.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FX spot rate must be finite (got {}). NaN and Infinity are not valid rates.",
@@ -402,7 +402,7 @@ impl FxSpot {
                     .to_string(),
             ));
         }
-        self.spot_rate = Some(rate);
+        self.quoted_spot = Some(rate);
         Ok(self)
     }
 
@@ -490,9 +490,9 @@ impl FxSpot {
                 actual: self.notional.currency(),
             });
         }
-        // The builder and serde paths must enforce the same `spot_rate`
-        // invariants as `with_rate`: finite and strictly positive.
-        if let Some(rate) = self.spot_rate {
+        // The builder and serde paths must enforce the same `quoted_spot`
+        // invariants as `with_quoted_spot`: finite and strictly positive.
+        if let Some(rate) = self.quoted_spot {
             if !rate.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "FX spot rate must be finite (got {rate}). \
@@ -515,7 +515,7 @@ impl FxSpot {
         Ok(
             Self::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
                 .with_notional(Money::from((1_000_000_i64, Currency::EUR)))?
-                .with_rate(1.10)?
+                .with_quoted_spot(1.10)?
                 .with_settlement_days(2),
         )
     }
@@ -650,8 +650,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
         }
 
         let flows = {
-            // Future settlement - use explicit spot_rate if provided, otherwise query FX matrix
-            let rate = if let Some(rate) = self.spot_rate {
+            // Future settlement - use explicit quoted_spot if provided, otherwise query FX matrix
+            let rate = if let Some(rate) = self.quoted_spot {
                 rate
             } else {
                 // Try market context FX matrix
@@ -711,7 +711,7 @@ mod tests {
     #[test]
     fn test_fx_spot_with_explicit_rate() {
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_rate(1.10)
+            .with_quoted_spot(1.10)
             .expect("valid rate");
 
         let market = MarketContext::new();
@@ -768,7 +768,7 @@ mod tests {
         let settle_date = date(2025, Month::January, 10);
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
             .with_settlement_date(settle_date)
-            .with_rate(1.10)
+            .with_quoted_spot(1.10)
             .expect("valid rate");
 
         let market = MarketContext::new();
@@ -792,7 +792,7 @@ mod tests {
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
             .with_notional(Money::from((1_000_000_i64, Currency::EUR)))
             .expect("valid notional")
-            .with_rate(1.10)
+            .with_quoted_spot(1.10)
             .expect("valid rate");
 
         let market = MarketContext::new();
@@ -805,8 +805,8 @@ mod tests {
 
     #[test]
     fn test_fx_spot_rejects_negative_rate() {
-        let result =
-            FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD).with_rate(-1.10);
+        let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
+            .with_quoted_spot(-1.10);
         assert!(result.is_err(), "Should reject negative rate");
 
         let err = result.unwrap_err();
@@ -820,7 +820,7 @@ mod tests {
     #[test]
     fn test_fx_spot_rejects_nan_rate() {
         let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_rate(f64::NAN);
+            .with_quoted_spot(f64::NAN);
         assert!(result.is_err(), "Should reject NaN rate");
 
         let err = result.unwrap_err();
@@ -835,14 +835,14 @@ mod tests {
     #[test]
     fn test_fx_spot_rejects_infinity_rate() {
         let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_rate(f64::INFINITY);
+            .with_quoted_spot(f64::INFINITY);
         assert!(result.is_err(), "Should reject Infinity rate");
     }
 
     #[test]
     fn test_fx_spot_rejects_zero_rate() {
-        let result =
-            FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD).with_rate(0.0);
+        let result = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
+            .with_quoted_spot(0.0);
         assert!(result.is_err(), "Should reject zero rate");
 
         let err = result.unwrap_err();
@@ -951,13 +951,13 @@ mod tests {
     }
 
     #[test]
-    fn builder_and_serde_reject_invalid_spot_rate() {
+    fn builder_and_serde_reject_invalid_quoted_spot() {
         // Builder path: validation runs through validate_economics.
         let result = FxSpot::builder()
             .id(InstrumentId::new("EURUSD"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .spot_rate_opt(Some(-1.10))
+            .quoted_spot_opt(Some(-1.10))
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .attributes(Attributes::new())
             .build();
@@ -967,7 +967,7 @@ mod tests {
             .id(InstrumentId::new("EURUSD"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
-            .spot_rate_opt(Some(0.0))
+            .quoted_spot_opt(Some(0.0))
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .attributes(Attributes::new())
             .build();
@@ -980,7 +980,7 @@ mod tests {
             "quote_currency": "USD",
             "settlement_date": null,
             "settlement_days": null,
-            "spot_rate": -1.10,
+            "quoted_spot": -1.10,
             "notional": {"amount": "1000000", "currency": "EUR"},
             "base_calendar_id": null,
             "quote_calendar_id": null,
@@ -1005,7 +1005,7 @@ mod tests {
         let market = MarketContext::new().insert(curve);
 
         let undiscounted = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_rate(1.10)
+            .with_quoted_spot(1.10)
             .expect("valid rate")
             .with_settlement_date(settle);
         let mut discounted = undiscounted.clone();
@@ -1037,7 +1037,7 @@ mod tests {
         let as_of = date(2025, Month::January, 15);
         let market = MarketContext::new();
         let spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
-            .with_rate(1.10)
+            .with_quoted_spot(1.10)
             .expect("valid rate");
 
         let schedule = spot
@@ -1061,7 +1061,7 @@ mod tests {
             Currency::EUR,
             Currency::USD,
         )
-        .with_rate(1.10)
+        .with_quoted_spot(1.10)
         .expect("valid rate")
         .with_settlement_date(settlement);
 

@@ -23,8 +23,8 @@
         },
         "expiry": "2027-04-30",
         "foreign_discount_curve_id": "JPY-OIS",
-        "fx_rate_id": "JPYUSD-SPOT",
-        "fx_vol_id": "JPYUSD-VOL-QL",
+        "fx_spot_id": "JPYUSD-SPOT",
+        "fx_vol_surface_id": "JPYUSD-VOL-QL",
         "id": "NKY-USD-QUANTO-CALL-1Y-QUANTLIB",
         "notional": {
           "amount": "1000",
@@ -32,9 +32,9 @@
         },
         "option_type": "call",
         "payoff_fx_rate": 0.01,
+        "quantity": 1000.0,
         "quote_currency": "USD",
         "spot_id": "NKY-SPOT",
-        "underlying_quantity": 1000.0,
         "underlying_ticker": "NKY",
         "vol_surface_id": "NKY-VOL-QL"
       },

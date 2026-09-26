@@ -1,7 +1,7 @@
 //! Equity pricer engine.
 //!
 //! Provides deterministic PV for `Equity` instruments. The PV is
-//! `price_per_share * effective_shares` in the instrument's quote currency.
+//! `price_per_share * effective_quantity` in the instrument's quote currency.
 //!
 //! All arithmetic uses the core `Money` type to respect rounding policy and
 //! currency safety requirements.
@@ -21,12 +21,10 @@ impl EquityPricer {
     /// Resolve price per share for the equity.
     ///
     /// Priority:
-    /// 1) `inst.price_quote` when set.
-    /// 2) Authoritative `inst.price_id` when set; missing data is an error.
-    /// 3) Without an explicit ID, attribute hints, ticker, instrument ID,
-    ///    `{ticker}-SPOT`, and finally `EQUITY-SPOT`.
-    ///    `Price` values are FX-converted to `inst.currency`; `Unitless`
-    ///    values are interpreted in `inst.currency`.
+    /// 1) `inst.quoted_spot` when set.
+    /// 2) Otherwise the `inst.spot_id` scalar; a missing id or missing data is
+    ///    an error. `Price` values are FX-converted to `inst.currency`;
+    ///    `Unitless` values are interpreted in `inst.currency`.
     pub fn price_per_share(
         &self,
         inst: &Equity,
@@ -44,13 +42,12 @@ impl EquityPricer {
     /// - `as_of`: valuation date (unused currently)
     pub fn pv(&self, inst: &Equity, curves: &MarketContext, as_of: Date) -> Result<Money> {
         let px = self.price_per_share(inst, curves, as_of)?;
-        Money::new(px.amount() * inst.effective_shares(), inst.currency)
+        Money::new(px.amount() * inst.effective_quantity(), inst.currency)
     }
 
     /// Resolve dividend yield (annualized, decimal) for the equity.
     ///
-    /// Attempts to read from market context using the key format
-    /// "{ticker}-DIVYIELD". When not present, defaults to 0.0.
+    /// Reads the unitless `div_yield_id` scalar; an unset id means 0.0.
     pub fn dividend_yield(&self, inst: &Equity, curves: &MarketContext) -> Result<f64> {
         inst.dividend_yield(curves)
     }
@@ -80,7 +77,10 @@ impl EquityPricer {
         t: f64,
     ) -> Result<Money> {
         let per_share = self.forward_price_per_share(inst, curves, as_of, t)?;
-        Money::new(per_share.amount() * inst.effective_shares(), inst.currency)
+        Money::new(
+            per_share.amount() * inst.effective_quantity(),
+            inst.currency,
+        )
     }
 }
 
@@ -96,7 +96,7 @@ mod tests {
     use time::Month;
 
     fn create_test_equity() -> Equity {
-        Equity::new("AAPL", "Apple Inc.", Currency::USD).with_price(150.0)
+        Equity::new("AAPL", "Apple Inc.", Currency::USD).with_quoted_spot(150.0)
     }
 
     fn create_test_market_context() -> MarketContext {
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_equity_pricing_with_different_currencies() {
-        let eur_equity = Equity::new("SAP", "SAP SE", Currency::EUR).with_price(120.0);
+        let eur_equity = Equity::new("SAP", "SAP SE", Currency::EUR).with_quoted_spot(120.0);
 
         let market = MarketContext::new(); // No discount curve for EUR
         let as_of =

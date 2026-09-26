@@ -61,8 +61,8 @@ fn collect_quanto_inputs(
 
     // The quanto drift adjustment uses ATM-forward FX vol, so absolute-strike
     // surfaces must be queried at the CIRP forward rather than moneyness 1.0.
-    let sigma_fx = if let Some(fx_vol_id) = &inst.fx_vol_id {
-        let fx_vol_surface = curves.get_surface(fx_vol_id.as_str())?;
+    let sigma_fx = if let Some(fx_vol_surface_id) = &inst.fx_vol_surface_id {
+        let fx_vol_surface = curves.get_surface(fx_vol_surface_id.as_str())?;
         let fx_spot = resolve_quanto_fx_spot(inst, curves, as_of);
         match fx_spot {
             Some(s_fx) if s_fx.is_finite() && s_fx > 0.0 => {
@@ -80,7 +80,7 @@ fn collect_quanto_inputs(
             }
             _ => {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "QuantoOption '{}': FX spot is required to select ATM-forward FX volatility; configure fx_rate_id or populate the FX matrix",
+                    "QuantoOption '{}': FX spot is required to select ATM-forward FX volatility; configure fx_spot_id or populate the FX matrix",
                     inst.id
                 )));
             }
@@ -88,7 +88,7 @@ fn collect_quanto_inputs(
     } else {
         return Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {
-                id: "fx_vol_id".to_string(),
+                id: "fx_vol_surface_id".to_string(),
             },
         ));
     };
@@ -97,12 +97,12 @@ fn collect_quanto_inputs(
 }
 
 /// Resolve the FX spot for the quanto's base/quote pair, preferring an
-/// explicit scalar id (`fx_rate_id`) over the market `FxMatrix`. Returns
+/// explicit scalar id (`fx_spot_id`) over the market `FxMatrix`. Returns
 /// `None` when neither source is available, letting the caller decide
 /// whether to fall back to a moneyness-1.0 lookup.
 fn resolve_quanto_fx_spot(inst: &QuantoOption, curves: &MarketContext, as_of: Date) -> Option<f64> {
     use finstack_quant_core::money::fx::FxQuery;
-    if let Some(fx_id) = &inst.fx_rate_id {
+    if let Some(fx_id) = &inst.fx_spot_id {
         if let Ok(scalar) = curves.get_price(fx_id) {
             return Some(crate::metrics::scalar_numeric_value(scalar));
         }
@@ -118,11 +118,11 @@ fn payoff_scale(inst: &QuantoOption) -> finstack_quant_core::Result<f64> {
     // instrument fields directly (e.g. `Correlation01Calculator`) validate
     // the bumped field locally. Re-running the full validation on every
     // pricing call cost ~3-4x for vanna/volga which call `value()` 4x.
-    match (inst.underlying_quantity, inst.payoff_fx_rate) {
+    match (inst.quantity, inst.payoff_fx_rate) {
         (Some(quantity), Some(fx_rate)) => Ok(quantity * fx_rate),
         (None, None) => Ok(inst.notional.amount() / inst.equity_strike.amount()),
         _ => Err(finstack_quant_core::Error::Validation(
-            "QuantoOption requires both underlying_quantity and payoff_fx_rate when either is supplied"
+            "QuantoOption requires both quantity and payoff_fx_rate when either is supplied"
                 .to_string(),
         )),
     }
@@ -359,8 +359,8 @@ mod tests {
             .spot_id("NKY-SPOT".into())
             .vol_surface_id(CurveId::new("NKY-VOL"))
             .div_yield_id_opt(None)
-            .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
-            .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
+            .fx_spot_id_opt(Some("JPYUSD-SPOT".into()))
+            .fx_vol_surface_id_opt(Some(CurveId::new("JPYUSD-VOL")))
             .attributes(Attributes::new())
             .build()
             .expect("quanto");
@@ -460,7 +460,7 @@ mod tests {
             .spot_id("NKY-SPOT".into())
             .vol_surface_id(CurveId::new("NKY-VOL"))
             .div_yield_id_opt(None)
-            .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
+            .fx_vol_surface_id_opt(Some(CurveId::new("JPYUSD-VOL")))
             .attributes(Attributes::new())
             .build()
             .expect("quanto");
@@ -535,7 +535,7 @@ mod tests {
             .build()
             .expect("equity vol");
 
-        // Explicit FX spot via the optional `fx_rate_id` scalar — no FX
+        // Explicit FX spot via the optional `fx_spot_id` scalar — no FX
         // matrix needed. This is the standard production path.
         let market = MarketContext::new()
             .insert(usd)
@@ -564,8 +564,8 @@ mod tests {
             .spot_id("AAPL-SPOT".into())
             .vol_surface_id(CurveId::new("AAPL-VOL"))
             .div_yield_id_opt(None)
-            .fx_rate_id_opt(Some("EURUSD-SPOT".to_string()))
-            .fx_vol_id_opt(Some(CurveId::new("EURUSD-VOL")))
+            .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
+            .fx_vol_surface_id_opt(Some(CurveId::new("EURUSD-VOL")))
             .attributes(Attributes::new())
             .build()
             .expect("quanto");

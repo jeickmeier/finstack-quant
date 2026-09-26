@@ -43,9 +43,9 @@ pub(crate) fn collect_barrier_inputs(
     let spot = match curves.get_price(&inst.spot_id)? {
         finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
         finstack_quant_core::market_data::scalars::MarketScalar::Price(value) => {
-            if value.currency() != inst.notional.currency() {
+            if value.currency() != inst.currency {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: inst.notional.currency(),
+                    expected: inst.currency,
                     actual: value.currency(),
                 });
             }
@@ -93,7 +93,7 @@ pub(crate) fn known_knock_out_value(
             .get_discount(inst.discount_curve_id.as_str())?
             .df_between_dates(as_of, inst.expiry)?;
     }
-    Money::new(value, inst.notional.currency()).map(Some)
+    Money::new(value, inst.currency).map(Some)
 }
 
 /// Whether the instrument's rebate should be paid at the hit time.
@@ -175,7 +175,7 @@ impl BarrierOptionMcPricer {
                     PricingErrorContext::default(),
                 )
             })?;
-            return Money::new(unit * inst.notional.amount(), inst.notional.currency());
+            return Money::new(unit * inst.quantity, inst.currency);
         }
 
         let gbm_params = GbmParams::new(r, q, sigma)?;
@@ -196,8 +196,8 @@ impl BarrierOptionMcPricer {
             inst.barrier,
             inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
-            inst.rebate.map(|m| m.amount() / inst.notional.amount()),
-            inst.notional.amount(),
+            inst.rebate.map(|m| m.amount() / inst.quantity),
+            inst.quantity,
             maturity_step,
             sigma,
             &time_grid,
@@ -230,7 +230,7 @@ impl BarrierOptionMcPricer {
             spot,
             time_grid,
             &payoff,
-            inst.notional.currency(),
+            inst.currency,
             discount_factor,
         )?;
 
@@ -306,8 +306,8 @@ pub(crate) fn price_expired_barrier(
         )));
     };
 
-    let ccy = inst.notional.currency();
-    let notional = inst.notional.amount();
+    let ccy = inst.currency;
+    let quantity = inst.quantity;
     let is_knock_out = inst.barrier_type.is_knock_out();
 
     let barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
@@ -318,8 +318,8 @@ pub(crate) fn price_expired_barrier(
     })?;
 
     let intrinsic = match inst.option_type {
-        crate::instruments::OptionType::Call => (spot - inst.strike).max(0.0) * notional,
-        crate::instruments::OptionType::Put => (inst.strike - spot).max(0.0) * notional,
+        crate::instruments::OptionType::Call => (spot - inst.strike).max(0.0) * quantity,
+        crate::instruments::OptionType::Put => (inst.strike - spot).max(0.0) * quantity,
     };
     let rebate = inst.rebate.map(|m| m.amount()).unwrap_or(0.0);
 
@@ -440,16 +440,13 @@ impl Pricer for BarrierOptionAnalyticalPricer {
                     PricingErrorContext::default(),
                 )
             })?;
-            let pv = Money::new(
-                unit * barrier_opt.notional.amount(),
-                barrier_opt.notional.currency(),
-            )
-            .map_err(|error| {
-                crate::pricer::PricingError::from_core(
-                    error,
-                    crate::pricer::PricingErrorContext::from_instrument(barrier_opt),
-                )
-            })?;
+            let pv =
+                Money::new(unit * barrier_opt.quantity, barrier_opt.currency).map_err(|error| {
+                    crate::pricer::PricingError::from_core(
+                        error,
+                        crate::pricer::PricingErrorContext::from_instrument(barrier_opt),
+                    )
+                })?;
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
         }
 
@@ -487,14 +484,14 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         // The closed-form leaves return NaN sentinels for out-of-domain input;
         // convert that to an error before `Money::new` panics on non-finite.
         let price = finstack_quant_models::closed_form::checked_closed_form_value(
-            price * barrier_opt.notional.amount() + rebate_val,
+            price * barrier_opt.quantity + rebate_val,
             "barrier closed-form price",
         )
         .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        let pv = Money::new(price, barrier_opt.notional.currency()).map_err(|error| {
+        let pv = Money::new(price, barrier_opt.currency).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,
                 crate::pricer::PricingErrorContext::from_instrument(barrier_opt),
@@ -567,7 +564,8 @@ mod tests {
             expiry,
             observed_barrier_breached: None,
             expiry_fixing: None,
-            notional: Money::from((1_i64, Currency::USD)),
+            quantity: 1.0,
+            currency: Currency::USD,
             day_count: DayCount::Act365F,
             monitoring: crate::instruments::Monitoring::Continuous,
             discount_curve_id: "USD_DISC".into(),
@@ -1043,7 +1041,8 @@ mod tests {
             barrier_type: BarrierType::UpAndOut,
             expiry,
             observed_barrier_breached: None,
-            notional: Money::from((1_i64, Currency::USD)),
+            quantity: 1.0,
+            currency: Currency::USD,
             day_count: DayCount::Act365F,
             monitoring: crate::instruments::Monitoring::Continuous,
             discount_curve_id: "USD_DISC".into(),

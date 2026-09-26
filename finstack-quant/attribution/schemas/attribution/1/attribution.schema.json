@@ -786,6 +786,10 @@
           "$ref": "#/$defs/AveragingMethod",
           "description": "Averaging method (arithmetic or geometric)"
         },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Currency of the strike, premium and present value."
+        },
         "day_count": {
           "$ref": "#/$defs/DayCount",
           "description": "Day count convention"
@@ -828,10 +832,6 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/Money",
-          "description": "Notional amount"
-        },
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
@@ -854,6 +854,11 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -885,7 +890,8 @@
         "averaging_method",
         "expiry",
         "fixing_dates",
-        "notional",
+        "quantity",
+        "currency",
         "day_count",
         "discount_curve_id",
         "spot_id",
@@ -2511,6 +2517,10 @@
           "$ref": "#/$defs/BarrierType",
           "description": "Barrier type (up/down, in/out)"
         },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Currency of the strike, premium and present value."
+        },
         "day_count": {
           "$ref": "#/$defs/DayCount",
           "description": "Day count convention"
@@ -2561,10 +2571,6 @@
           },
           "description": "Contractual monitoring: continuous or an explicit, strictly increasing\nset of observation dates no later than expiry. Discrete pricing does not\ninterpolate hits between those dates."
         },
-        "notional": {
-          "$ref": "#/$defs/Money",
-          "description": "Notional amount"
-        },
         "observed_barrier_breached": {
           "description": "Observed barrier state for expired options.\n\nHistorical barrier monitoring must be supplied explicitly for expired\noptions because terminal spot alone does not reveal whether the barrier\nwas breached intralife and then reversed.",
           "type": [
@@ -2575,6 +2581,11 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "rebate": {
           "anyOf": [
@@ -2622,7 +2633,8 @@
         "option_type",
         "barrier_type",
         "expiry",
-        "notional",
+        "quantity",
+        "currency",
         "day_count",
         "discount_curve_id",
         "spot_id",
@@ -6579,8 +6591,8 @@
           "type": "string"
         },
         "market_value_id": {
-          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")",
-          "type": "string"
+          "$ref": "#/$defs/Id",
+          "description": "Market value identifier in MarketContext (e.g., \"BOND_ABC_PRICE\")"
         },
         "quantity": {
           "description": "Quantity/face value of collateral",
@@ -6768,8 +6780,8 @@
           "$ref": "#/$defs/PositiveF64Wire",
           "description": "Strike price per unit."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -6784,7 +6796,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "strike",
@@ -6977,14 +6989,18 @@
           ]
         },
         "spot_id": {
-          "description": "Optional spot price ID (for delta calculations).",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot price ID (for delta calculations)."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -6995,7 +7011,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "quantity",
@@ -7042,14 +7058,14 @@
           "$ref": "#/$defs/ListedFutureTerms",
           "description": "Standard listed position and lifecycle terms."
         },
-        "underlying": {
+        "underlying_ticker": {
           "description": "Exchange symbol or underlying label.",
           "type": "string"
         }
       },
       "required": [
         "id",
-        "underlying",
+        "underlying_ticker",
         "terms",
         "forward_curve_id",
         "fixing"
@@ -7276,18 +7292,22 @@
           "description": "Settlement type (physical or cash).\n\nDefaults to cash settlement when omitted in serialized payloads."
         },
         "spot_id": {
-          "description": "Optional spot price ID (for spot-based pricing and American options).",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot price ID (for spot-based pricing and American options)."
         },
         "strike": {
           "$ref": "#/$defs/PositiveF64Wire",
           "description": "Strike price per unit."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -7302,7 +7322,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "strike",
@@ -7318,7 +7338,7 @@
     },
     "CommoditySpreadOption": {
       "additionalProperties": false,
-      "description": "Commodity spread option: option on the price difference between two commodities.\n\nPays max(S1 - S2 - K, 0) for calls, max(K - (S1 - S2), 0) for puts.\n\n# Kirk's Approximation\n\nThe spread option is priced using Kirk's approximation, which maps the\ntwo-asset problem into a single-asset Black-76 framework:\n\n1. Forward prices F1, F2 from respective price curves\n2. Adjusted strike: K_adj = F2 + K\n3. Kirk's volatility:\n   sigma_kirk = sqrt(sigma1^2 - 2*rho*sigma1*sigma2*F2/(F2+K) + (sigma2*F2/(F2+K))^2)\n4. Price via Black-76 on F1 vs K_adj with sigma_kirk\n\nFor puts, put-call parity is used: P = C - DF * (F1 - F2 - K)\n\n# Correlation\n\nThe `correlation` parameter captures the co-movement between the two\ncommodity prices. Higher correlation reduces the effective spread volatility\nand hence the option price. The correlation must be in [-1, 1].\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::commodity::CommoditySpreadOption;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::macros::date;\n\nlet spread_opt = CommoditySpreadOption::builder()\n    .id(InstrumentId::new(\"WTI-RBOB-CRACK-SPREAD\"))\n    .currency(finstack_quant_core::currency::Currency::USD)\n    .option_type(OptionType::Call)\n    .expiry(date!(2025-06-15))\n    .strike(10.0)           // $10/bbl crack spread strike\n    .notional(1000.0)\n    .leg1_forward_curve_id(CurveId::new(\"RBOB-FORWARD\"))\n    .leg2_forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .leg1_vol_surface_id(CurveId::new(\"RBOB-VOL\"))\n    .leg2_vol_surface_id(CurveId::new(\"WTI-VOL\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .correlation(0.85)\n    .build()\n    .expect(\"Valid spread option\");\n```",
+      "description": "Commodity spread option: option on the price difference between two commodities.\n\nPays max(S1 - S2 - K, 0) for calls, max(K - (S1 - S2), 0) for puts.\n\n# Kirk's Approximation\n\nThe spread option is priced using Kirk's approximation, which maps the\ntwo-asset problem into a single-asset Black-76 framework:\n\n1. Forward prices F1, F2 from respective price curves\n2. Adjusted strike: K_adj = F2 + K\n3. Kirk's volatility:\n   sigma_kirk = sqrt(sigma1^2 - 2*rho*sigma1*sigma2*F2/(F2+K) + (sigma2*F2/(F2+K))^2)\n4. Price via Black-76 on F1 vs K_adj with sigma_kirk\n\nFor puts, put-call parity is used: P = C - DF * (F1 - F2 - K)\n\n# Correlation\n\nThe `correlation` parameter captures the co-movement between the two\ncommodity prices. Higher correlation reduces the effective spread volatility\nand hence the option price. The correlation must be in [-1, 1].\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::commodity::CommoditySpreadOption;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::macros::date;\n\nlet spread_opt = CommoditySpreadOption::builder()\n    .id(InstrumentId::new(\"WTI-RBOB-CRACK-SPREAD\"))\n    .currency(finstack_quant_core::currency::Currency::USD)\n    .option_type(OptionType::Call)\n    .expiry(date!(2025-06-15))\n    .strike(10.0)           // $10/bbl crack spread strike\n    .quantity(1000.0)\n    .leg1_forward_curve_id(CurveId::new(\"RBOB-FORWARD\"))\n    .leg2_forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .leg1_vol_surface_id(CurveId::new(\"RBOB-VOL\"))\n    .leg2_vol_surface_id(CurveId::new(\"WTI-VOL\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .correlation(0.85)\n    .build()\n    .expect(\"Valid spread option\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -7374,13 +7394,13 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Notional quantity (number of units)."
-        },
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put on the spread S1 - S2)."
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Notional quantity (number of units)."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -7398,7 +7418,7 @@
         "option_type",
         "expiry",
         "strike",
-        "notional",
+        "quantity",
         "leg1_forward_curve_id",
         "leg2_forward_curve_id",
         "leg1_vol_surface_id",
@@ -7517,8 +7537,8 @@
           "$ref": "#/$defs/DateWire",
           "description": "Start date of the swap."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -7529,7 +7549,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "quantity",
@@ -7544,7 +7564,7 @@
     },
     "CommoditySwaption": {
       "additionalProperties": false,
-      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .swap_start(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .notional(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
+      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .swap_start(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -7608,13 +7628,13 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Notional quantity per period."
-        },
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call = right to enter pay-fixed swap, put = right to enter receive-fixed swap)."
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Notional quantity per period."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -7632,8 +7652,8 @@
           "$ref": "#/$defs/DateWire",
           "description": "Underlying swap start date."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -7648,7 +7668,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "option_type",
@@ -7657,7 +7677,7 @@
         "swap_end",
         "swap_frequency",
         "fixed_price",
-        "notional",
+        "quantity",
         "forward_curve_id",
         "discount_curve_id",
         "vol_surface_id"
@@ -8141,6 +8161,17 @@
           "$ref": "#/$defs/Id",
           "description": "Discount curve identifier for the debt component (risk-free or funding)."
         },
+        "div_yield_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield; a configured id must\nresolve."
+        },
         "fixed_coupon": {
           "anyOf": [
             {
@@ -8219,12 +8250,13 @@
           ],
           "description": "Optional soft-call trigger condition.\n\nWhen set, the issuer can only exercise call provisions if the underlying\nstock price satisfies the trigger condition (e.g., above 130% of conversion\nprice for 20 of 30 trading days).\n\n**Modeling scope**: a single trigger gates the ENTIRE callable life —\nevery window in [`Self::call_put`] is subject to it. A soft-call period\nfollowed by an unconditional hard-call period is not representable\n(omit the trigger to model an unconditional call). In the tree the\ntrigger is evaluated on the instantaneous node spot with a\nBroadie-Glasserman-Kou-style barrier adjustment approximating the\nk-of-n-days observation window; the realized path is not tracked."
         },
-        "underlying_equity_id": {
-          "description": "Optional underlying equity identifier (ticker or instrument id).",
-          "type": [
-            "string",
-            "null"
-          ]
+        "spot_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Market-scalar id (`MarketContext::get_price`) of the underlying share\nprice, as a price in the bond's currency or a unitless level."
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Equity volatility id: a volatility surface read at the conversion strike\nand maturity, or a unitless scalar holding a flat volatility."
         }
       },
       "required": [
@@ -8234,6 +8266,8 @@
         "maturity",
         "discount_curve_id",
         "conversion",
+        "spot_id",
+        "vol_surface_id",
         "attributes"
       ],
       "type": "object"
@@ -12357,7 +12391,7 @@
               "type": "null"
             }
           ],
-          "description": "Explicit scalar identifier used to resolve the dividend yield."
+          "description": "Market-scalar id of the unitless continuous dividend yield (decimal,\n0.02 = 2%). `None` means a zero dividend yield."
         },
         "id": {
           "$ref": "#/$defs/Id",
@@ -12371,19 +12405,16 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "price_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Id"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Explicit scalar identifier used to resolve the spot price."
+        "quantity": {
+          "description": "Optional number of shares held (defaults to 1 if not specified).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
-        "price_quote": {
-          "description": "Optional price quote (if not provided, will look up from market data)",
+        "quoted_spot": {
+          "description": "Optional quoted spot price per share in `currency`. When set it wins\nover the `spot_id` market lookup.",
           "format": "double",
           "type": [
             "number",
@@ -12394,13 +12425,16 @@
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "description": "Scenario-only pricing adjustments."
         },
-        "shares": {
-          "description": "Optional number of shares (defaults to 1 if not specified)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "spot_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Market-scalar id (`MarketContext::get_price`) of the spot price per\nshare. Required unless `quoted_spot` is set; no id is ever derived from\nthe ticker or instrument id."
         },
         "ticker": {
           "description": "Ticker symbol (e.g., \"AAPL\", \"MSFT\")",
@@ -12482,7 +12516,7 @@
         },
         "discount_curve_id": {
           "$ref": "#/$defs/Id",
-          "description": "Underlying-currency discount curve used for equity carry."
+          "description": "Settlement-currency discount curve. Without `quanto` the settlement and\nunderlying currencies match, so this curve also carries the equity."
         },
         "discrete_dividends": {
           "description": "Optional discrete dividends `(ex_date, amount)` in index points.",
@@ -12528,13 +12562,13 @@
         "quanto": {
           "anyOf": [
             {
-              "$ref": "#/$defs/EquityFutureQuantoSpec"
+              "$ref": "#/$defs/QuantoSpec"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Required quanto adjustment when settlement and underlying currencies differ."
+          "description": "Required quanto adjustment when settlement and underlying currencies\ndiffer. `quanto.asset_discount_curve_id` is the underlying-currency\ncarry curve and `quanto.asset_currency` must equal `underlying_currency`."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -12555,6 +12589,17 @@
         "underlying_ticker": {
           "description": "Equity or index ticker.",
           "type": "string"
+        },
+        "vol_surface_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Equity volatility surface (decimal vol per square-root year). Required\nwith `quanto`, where it drives the quanto drift."
         }
       },
       "required": [
@@ -12603,41 +12648,6 @@
       ],
       "type": "object"
     },
-    "EquityFutureQuantoSpec": {
-      "additionalProperties": false,
-      "description": "Market inputs for a fixed-currency quanto equity future.",
-      "properties": {
-        "correlation": {
-          "description": "Correlation between equity returns and the settlement-per-underlying FX rate.",
-          "format": "double",
-          "type": "number"
-        },
-        "equity_vol_surface_id": {
-          "$ref": "#/$defs/Id",
-          "description": "Equity volatility surface in decimal volatility per square-root year."
-        },
-        "fx_spot_id": {
-          "$ref": "#/$defs/Id",
-          "description": "FX spot scalar in settlement currency per underlying currency."
-        },
-        "fx_vol_surface_id": {
-          "$ref": "#/$defs/Id",
-          "description": "FX volatility surface for settlement currency per underlying currency."
-        },
-        "settlement_discount_curve_id": {
-          "$ref": "#/$defs/Id",
-          "description": "Settlement-currency discount curve used to form the ATM FX forward."
-        }
-      },
-      "required": [
-        "settlement_discount_curve_id",
-        "equity_vol_surface_id",
-        "fx_vol_surface_id",
-        "fx_spot_id",
-        "correlation"
-      ],
-      "type": "object"
-    },
     "EquityOption": {
       "additionalProperties": false,
       "description": "Equity option instrument",
@@ -12645,6 +12655,10 @@
         "attributes": {
           "$ref": "#/$defs/Attributes",
           "description": "Attributes for scenario selection and grouping"
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Currency of the strike, premium and present value."
         },
         "day_count": {
           "$ref": "#/$defs/DayCount",
@@ -12727,13 +12741,14 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/Money",
-          "description": "Notional amount for valuation scaling."
-        },
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -12768,7 +12783,8 @@
         "strike",
         "option_type",
         "expiry",
-        "notional",
+        "quantity",
+        "currency",
         "discount_curve_id",
         "spot_id",
         "vol_surface_id",
@@ -15755,7 +15771,7 @@
     },
     "FxForward": {
       "additionalProperties": false,
-      "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or spot_rate_override)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
+      "description": "FX forward (outright forward) instrument.\n\nRepresents a commitment to exchange one currency for another at a specified\nfuture date at a predetermined rate. The position is long base currency\n(foreign) and short quote currency (domestic).\n\n# Pricing\n\nForward value is calculated using covered interest rate parity:\n```text\nF_market = S × DF_foreign(T) / DF_domestic(T)\nPV = notional × (F_market - F_contract) × DF_domestic(T)\n```\nwhere:\n- S = spot FX rate (from FxMatrix or quoted_spot)\n- DF_foreign(T) = discount factor in base currency to maturity\n- DF_domestic(T) = discount factor in quote currency to maturity\n- F_contract = contract_rate (if provided, else F_market for at-market forward)\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::fx_forward::FxForward;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet forward = FxForward::builder()\n    .id(InstrumentId::new(\"EURUSD-FWD-6M\"))\n    .base_currency(Currency::EUR)\n    .quote_currency(Currency::USD)\n    .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .notional(Money::from((1_000_000_i64, Currency::EUR)))\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .foreign_discount_curve_id(CurveId::new(\"EUR-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -15826,12 +15842,7 @@
           "$ref": "#/$defs/Currency",
           "description": "Quote currency (domestic currency, denominator of the pair, PV currency)."
         },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/ScenarioPricingOverrides",
-          "default": {},
-          "description": "Scenario-only pricing adjustments."
-        },
-        "spot_rate_override": {
+        "quoted_spot": {
           "default": null,
           "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
           "format": "double",
@@ -15839,6 +15850,11 @@
             "number",
             "null"
           ]
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/ScenarioPricingOverrides",
+          "default": {},
+          "description": "Scenario-only pricing adjustments."
         }
       },
       "required": [
@@ -15886,17 +15902,17 @@
           "$ref": "#/$defs/MetricPricingOverrides",
           "description": "Metric-time pricing configuration."
         },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/ScenarioPricingOverrides",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "spot_rate_override": {
+        "quoted_spot": {
           "description": "Optional spot override in quote currency per base currency.",
           "format": "double",
           "type": [
             "number",
             "null"
           ]
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/ScenarioPricingOverrides",
+          "description": "Scenario-only pricing adjustments."
         },
         "terms": {
           "$ref": "#/$defs/ListedFutureTerms",
@@ -16123,7 +16139,7 @@
     },
     "FxSpot": {
       "additionalProperties": false,
-      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
+      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/Attributes",
@@ -16188,6 +16204,14 @@
           "$ref": "#/$defs/Currency",
           "description": "Quote currency (the currency used for pricing)"
         },
+        "quoted_spot": {
+          "description": "Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "default": {},
@@ -16211,14 +16235,6 @@
           "minimum": 0,
           "type": [
             "integer",
-            "null"
-          ]
-        },
-        "spot_rate": {
-          "description": "Optional spot rate (if not provided, will look up from market data)",
-          "format": "double",
-          "type": [
-            "number",
             "null"
           ]
         }
@@ -16575,11 +16591,15 @@
           "description": "Pay/receive variance"
         },
         "spot_id": {
-          "description": "Optional spot identifier used to look up historical series.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot identifier used to look up historical series."
         },
         "start_date": {
           "$ref": "#/$defs/DateWire",
@@ -16995,22 +17015,30 @@
           "description": "Base currency of the index"
         },
         "duration_id": {
-          "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Market scalar identifier for signed index duration in years. Required when\nrequesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity."
         },
         "index_id": {
           "$ref": "#/$defs/Id",
           "description": "Index identifier (e.g., \"CDX.IG\", \"HY.BOND.INDEX\")"
         },
         "yield_id": {
-          "description": "Optional yield curve/scalar identifier for carry calculation",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional yield curve/scalar identifier for carry calculation"
         }
       },
       "required": [
@@ -20123,6 +20151,10 @@
           "$ref": "#/$defs/Attributes",
           "description": "Attributes for scenario selection and grouping"
         },
+        "currency": {
+          "$ref": "#/$defs/Currency",
+          "description": "Currency of the strike, premium and present value."
+        },
         "day_count": {
           "$ref": "#/$defs/DayCount",
           "description": "Day count convention"
@@ -20177,10 +20209,6 @@
           },
           "description": "Contractual monitoring of the path extremum.\n\n`continuous` (default) prices with the Goldman-Sosin-Gatto closed form.\n`discrete` observes the extremum only on the strictly increasing\n`observation_dates` (no later than expiry) and prices by Monte Carlo."
         },
-        "notional": {
-          "$ref": "#/$defs/Money",
-          "description": "Notional amount"
-        },
         "observed_max": {
           "description": "Observed maximum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Put / Fixed Call once seasoned).",
           "format": "double",
@@ -20200,6 +20228,11 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
@@ -20232,7 +20265,8 @@
         "option_type",
         "lookback_type",
         "expiry",
-        "notional",
+        "quantity",
+        "currency",
         "day_count",
         "discount_curve_id",
         "spot_id",
@@ -21802,15 +21836,6 @@
           "default": null,
           "description": "Optional foreign (base) currency discount curve ID."
         },
-        "forward_rate_override": {
-          "default": null,
-          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "id": {
           "$ref": "#/$defs/Id",
           "description": "Unique instrument identifier."
@@ -21856,6 +21881,24 @@
           "$ref": "#/$defs/NdfQuoteConvention",
           "description": "Quote convention for contract_rate and observed_fixing."
         },
+        "quoted_forward": {
+          "default": null,
+          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_spot": {
+          "default": null,
+          "description": "Optional spot rate override for forward rate calculation.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/ScenarioPricingOverrides",
           "default": {},
@@ -21864,15 +21907,6 @@
         "settlement_currency": {
           "$ref": "#/$defs/Currency",
           "description": "Settlement currency (freely convertible, typically USD, denominator and PV currency)."
-        },
-        "spot_rate_override": {
-          "default": null,
-          "description": "Optional spot rate override for forward rate calculation.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         }
       },
       "required": [
@@ -24253,15 +24287,19 @@
           "$ref": "#/$defs/Id",
           "description": "Discount curve ID (foreign currency)."
         },
-        "fx_rate_id": {
+        "fx_spot_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": null,
-          "description": "Optional FX rate identifier.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "Optional FX rate identifier."
         },
-        "fx_vol_id": {
+        "fx_vol_surface_id": {
           "anyOf": [
             {
               "$ref": "#/$defs/Id"
@@ -24306,6 +24344,15 @@
             "null"
           ]
         },
+        "quantity": {
+          "default": null,
+          "description": "Number of underlying units covered by the option payoff.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "quote_currency": {
           "$ref": "#/$defs/Currency",
           "description": "Quote currency (payment/settlement currency)."
@@ -24318,15 +24365,6 @@
         "spot_id": {
           "$ref": "#/$defs/Id",
           "description": "Equity spot price identifier."
-        },
-        "underlying_quantity": {
-          "default": null,
-          "description": "Number of underlying units covered by the option payoff.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "underlying_ticker": {
           "description": "Underlying equity ticker symbol.",
@@ -30124,7 +30162,7 @@
         },
         "close_series_id": {
           "default": null,
-          "description": "Series ID for close prices. Defaults to `underlying_ticker` when absent.",
+          "description": "Series ID for close prices. Defaults to `spot_id` when absent.",
           "type": [
             "string",
             "null"
@@ -30138,9 +30176,21 @@
           "$ref": "#/$defs/Id",
           "description": "Discount curve identifier"
         },
+        "div_yield_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield."
+        },
         "high_series_id": {
           "default": null,
-          "description": "Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent.",
+          "description": "Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).",
           "type": [
             "string",
             "null"
@@ -30156,7 +30206,7 @@
         },
         "low_series_id": {
           "default": null,
-          "description": "Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent.",
+          "description": "Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).",
           "type": [
             "string",
             "null"
@@ -30194,7 +30244,7 @@
         },
         "open_series_id": {
           "default": null,
-          "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).\nDefaults to `underlying_ticker` when absent.",
+          "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).",
           "type": [
             "string",
             "null"
@@ -30229,6 +30279,10 @@
           "$ref": "#/$defs/PayReceive",
           "description": "Pay/receive variance"
         },
+        "spot_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Market-scalar id (`MarketContext::get_price`) of the underlying spot\nlevel. It is also the default close-price series id."
+        },
         "start_date": {
           "$ref": "#/$defs/DateWire",
           "description": "Start date of observation period"
@@ -30245,13 +30299,19 @@
           "type": "number"
         },
         "underlying_ticker": {
-          "description": "Underlying identifier (equity/index)",
+          "description": "Underlying symbol (equity/index). A label only; market data is read\nthrough `spot_id`, `vol_surface_id` and `div_yield_id`.",
           "type": "string"
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Volatility surface used to replicate the unobserved variance."
         }
       },
       "required": [
         "id",
         "underlying_ticker",
+        "spot_id",
+        "vol_surface_id",
         "notional",
         "strike_variance",
         "start_date",

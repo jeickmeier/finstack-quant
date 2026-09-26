@@ -88,8 +88,8 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let instrument: Arc<dyn Instrument> = Arc::new(
 //!     Equity::new("AAPL", "AAPL", Currency::USD)
-//!         .with_price_id("AAPL-SPOT")
-//!         .with_shares(100.0),
+//!         .with_spot_id("AAPL-SPOT")
+//!         .with_quantity(100.0),
 //! );
 //! let market_t0 = MarketContext::new().insert_price(
 //!     "AAPL-SPOT",

@@ -79,7 +79,8 @@ fn build_option() -> EquityOption {
         option_type: OptionType::Call,
         exercise_style: ExerciseStyle::European,
         expiry: date!(2026 - 01 - 01), // 1Y to expiry from as_of
-        notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+        quantity: 1_000_000.0,
+        currency: Currency::USD,
         day_count: DayCount::Act365F,
         settlement: SettlementType::Cash,
         exercise: None,

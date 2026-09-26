@@ -137,8 +137,8 @@ impl FxPair {
 pub struct VolatilityDependency {
     /// Volatility surface identifier.
     pub vol_surface_id: CurveId,
-    /// Optional underlying price identifier paired with the surface.
-    pub underlying_id: Option<PriceId>,
+    /// Optional market-scalar id of the underlying spot paired with the surface.
+    pub spot_id: Option<PriceId>,
     /// Optional contractual strike used by local volatility diagnostics.
     pub reference_strike: Option<f64>,
 }
@@ -147,12 +147,12 @@ impl VolatilityDependency {
     /// Create a volatility dependency descriptor.
     pub fn new(
         vol_surface_id: impl Into<CurveId>,
-        underlying_id: Option<PriceId>,
+        spot_id: Option<PriceId>,
         reference_strike: Option<f64>,
     ) -> Self {
         Self {
             vol_surface_id: vol_surface_id.into(),
-            underlying_id,
+            spot_id,
             reference_strike,
         }
     }
@@ -161,7 +161,7 @@ impl VolatilityDependency {
 impl PartialEq for VolatilityDependency {
     fn eq(&self, other: &Self) -> bool {
         self.vol_surface_id == other.vol_surface_id
-            && self.underlying_id == other.underlying_id
+            && self.spot_id == other.spot_id
             && self.reference_strike.map(f64::to_bits) == other.reference_strike.map(f64::to_bits)
     }
 }
@@ -248,8 +248,13 @@ impl MarketDependencies {
     }
 
     /// Add an identifier resolved through `MarketContext::get_price`.
-    pub fn add_market_scalar_id(&mut self, id: impl Into<String>) {
-        push_unique_string(&mut self.market_scalar_ids, id.into());
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Market-scalar key (a `PriceId` or plain string); duplicates are
+    ///   ignored while preserving insertion order.
+    pub fn add_market_scalar_id(&mut self, id: impl AsRef<str>) {
+        push_unique_string(&mut self.market_scalar_ids, id.as_ref().to_string());
     }
 
     /// Add a typed volatility dependency.

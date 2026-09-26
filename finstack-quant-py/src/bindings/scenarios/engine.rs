@@ -175,8 +175,8 @@ impl PyApplicationReport {
                     T::VolSurface { vol_surface_id } => {
                         ("vol_surface", vol_surface_id.as_str().to_string(), None)
                     }
-                    T::EquityPrice { price_id } => {
-                        ("equity_price", price_id.as_str().to_string(), None)
+                    T::EquityPrice { spot_id } => {
+                        ("equity_price", spot_id.as_str().to_string(), None)
                     }
                     T::Fx { base, quote } => ("fx", format!("{base}/{quote}"), None),
                 };

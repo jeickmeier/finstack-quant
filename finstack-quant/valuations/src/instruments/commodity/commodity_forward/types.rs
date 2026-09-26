@@ -14,7 +14,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
 
 /// Settlement type for commodity contracts.
@@ -95,7 +95,7 @@ pub use crate::instruments::common_impl::parameters::SettlementType;
 pub struct CommodityForward {
     /// Unique instrument identifier.
     pub id: InstrumentId,
-    /// Commodity underlying parameters (commodity_type, ticker, unit, currency).
+    /// Commodity underlying parameters (commodity_type, underlying_ticker, unit, currency).
     #[serde(flatten)]
     pub underlying: CommodityUnderlyingParams,
     /// Contract quantity in units.
@@ -164,7 +164,7 @@ pub struct CommodityForward {
     /// Optional spot price ID (for delta calculations).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub spot_id: Option<String>,
+    pub spot_id: Option<PriceId>,
     /// Discount curve ID.
     pub discount_curve_id: CurveId,
     /// Optional exchange identifier (e.g., "NYMEX", "ICE").
@@ -560,7 +560,7 @@ mod tests {
             .expect("should build");
 
         assert_eq!(forward.id.as_str(), "TEST-FWD");
-        assert_eq!(forward.underlying.ticker, "CL");
+        assert_eq!(forward.underlying.underlying_ticker, "CL");
         assert_eq!(forward.quantity, 1000.0);
         assert_eq!(forward.underlying.currency, Currency::USD);
         assert_eq!(forward.position, Position::Long);
@@ -587,7 +587,7 @@ mod tests {
         let forward = CommodityForward::example();
         assert_eq!(forward.id.as_str(), "WTI-FWD-2025M03");
         assert_eq!(forward.underlying.commodity_type, "Energy");
-        assert_eq!(forward.underlying.ticker, "CL");
+        assert_eq!(forward.underlying.underlying_ticker, "CL");
         assert_eq!(forward.position, Position::Long);
         assert!(forward.attributes.has_tag("energy"));
     }
@@ -923,7 +923,10 @@ mod tests {
         let deserialized: CommodityForward = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(forward.id.as_str(), deserialized.id.as_str());
-        assert_eq!(forward.underlying.ticker, deserialized.underlying.ticker);
+        assert_eq!(
+            forward.underlying.underlying_ticker,
+            deserialized.underlying.underlying_ticker
+        );
         assert_eq!(forward.quantity, deserialized.quantity);
         assert_eq!(forward.position, deserialized.position);
     }

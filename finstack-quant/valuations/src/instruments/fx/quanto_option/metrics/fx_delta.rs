@@ -29,15 +29,15 @@ impl MetricCalculator for FxDeltaCalculator {
             return Ok(0.0);
         }
 
-        let fx_rate_id = option.fx_rate_id.as_ref().ok_or_else(|| {
+        let fx_spot_id = option.fx_spot_id.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "QuantoOption {}: fx_rate_id is required to compute FX Delta",
+                "QuantoOption {}: fx_spot_id is required to compute FX Delta",
                 option.id
             ))
         })?;
 
-        let market_up = bump_scalar_price(context.curves.as_ref(), fx_rate_id, spot_bump)?;
-        let market_down = bump_scalar_price(context.curves.as_ref(), fx_rate_id, -spot_bump)?;
+        let market_up = bump_scalar_price(context.curves.as_ref(), fx_spot_id, spot_bump)?;
+        let market_down = bump_scalar_price(context.curves.as_ref(), fx_spot_id, -spot_bump)?;
         let pv_up = option.value(&market_up, as_of)?.amount();
         let pv_down = option.value(&market_down, as_of)?.amount();
 

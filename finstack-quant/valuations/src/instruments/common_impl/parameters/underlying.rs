@@ -137,8 +137,8 @@ impl EquityUnderlyingParams {
 pub struct CommodityUnderlyingParams {
     /// Commodity type (e.g., "Energy", "Metal", "Agricultural")
     pub commodity_type: String,
-    /// Ticker/identifier for market data lookup (e.g., "CL", "GC", "NG")
-    pub ticker: String,
+    /// Commodity symbol label (e.g., "CL", "GC", "NG"); never a market-data key.
+    pub underlying_ticker: String,
     /// Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
     pub unit: String,
     /// Base currency for pricing
@@ -147,15 +147,22 @@ pub struct CommodityUnderlyingParams {
 
 impl CommodityUnderlyingParams {
     /// Create commodity underlying parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `commodity_type` - Commodity class label (e.g. "Energy", "Metal").
+    /// * `underlying_ticker` - Commodity symbol label (e.g. "CL"); not a market-data key.
+    /// * `unit` - Unit of measurement for one quantity unit (e.g. "BBL", "MMBTU").
+    /// * `currency` - Pricing currency of the commodity.
     pub fn new(
         commodity_type: impl Into<String>,
-        ticker: impl Into<String>,
+        underlying_ticker: impl Into<String>,
         unit: impl Into<String>,
         currency: Currency,
     ) -> Self {
         Self {
             commodity_type: commodity_type.into(),
-            ticker: ticker.into(),
+            underlying_ticker: underlying_ticker.into(),
             unit: unit.into(),
             currency,
         }
@@ -169,7 +176,7 @@ impl CommodityUnderlyingParams {
     pub(crate) fn validate(&self, context: &str) -> finstack_quant_core::Result<()> {
         for (field, value) in [
             ("commodity_type", self.commodity_type.as_str()),
-            ("ticker", self.ticker.as_str()),
+            ("underlying_ticker", self.underlying_ticker.as_str()),
             ("unit", self.unit.as_str()),
         ] {
             if value.trim().is_empty() {
@@ -192,10 +199,10 @@ pub struct IndexUnderlyingParams {
     /// Base currency of the index
     pub base_currency: Currency,
     /// Optional yield curve/scalar identifier for carry calculation
-    pub yield_id: Option<String>,
+    pub yield_id: Option<PriceId>,
     /// Market scalar identifier for signed index duration in years. Required when
     /// requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
-    pub duration_id: Option<String>,
+    pub duration_id: Option<PriceId>,
 }
 
 impl IndexUnderlyingParams {
@@ -209,14 +216,24 @@ impl IndexUnderlyingParams {
         }
     }
 
-    /// Set yield identifier for carry calculation
-    pub fn with_yield(mut self, yield_id: impl Into<String>) -> Self {
+    /// Set the market-scalar id of the index yield used for carry.
+    ///
+    /// # Arguments
+    ///
+    /// * `yield_id` - `MarketContext::get_price` id of a unitless decimal
+    ///   yield scalar (0.05 = 5% per annum).
+    pub fn with_yield(mut self, yield_id: impl Into<PriceId>) -> Self {
         self.yield_id = Some(yield_id.into());
         self
     }
 
-    /// Set duration identifier for risk calculations
-    pub fn with_duration(mut self, duration_id: impl Into<String>) -> Self {
+    /// Set the market-scalar id of the index duration used for risk.
+    ///
+    /// # Arguments
+    ///
+    /// * `duration_id` - `MarketContext::get_price` id of a unitless, finite
+    ///   signed index duration in years.
+    pub fn with_duration(mut self, duration_id: impl Into<PriceId>) -> Self {
         self.duration_id = Some(duration_id.into());
         self
     }

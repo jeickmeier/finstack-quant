@@ -9,9 +9,7 @@
 
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::convertible::{
-    market_inputs::resolve_dividend_yield_market_value_id, ConvertibleBond,
-};
+use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{
     replace_scalar_value, scalar_numeric_value, scaled_central_diff_by_width, MetricCalculator,
     MetricContext,
@@ -26,10 +24,8 @@ impl MetricCalculator for DividendRiskCalculator {
         let convertible: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
 
-        let Some(div_yield_id) =
-            resolve_dividend_yield_market_value_id(&context.curves, convertible)?
-        else {
-            return Ok(0.0); // No dividend yield available, risk is zero
+        let Some(div_yield_id) = convertible.div_yield_id.clone() else {
+            return Ok(0.0); // No dividend yield configured, risk is zero
         };
 
         let current_scalar = context.curves.get_price(&div_yield_id)?;

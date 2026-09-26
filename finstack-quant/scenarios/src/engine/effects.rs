@@ -8,7 +8,7 @@ use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
 use finstack_quant_core::market_data::bumps::MarketBump;
-use finstack_quant_core::types::CurveId;
+use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::HashSet;
 
 /// Dispatch one operation to its adapter and produce effects.
@@ -146,7 +146,7 @@ fn generate_effects(
 fn market_target_for_id(op: &OperationSpec, id: &CurveId) -> Option<ScenarioMarketTarget> {
     match op {
         OperationSpec::EquityPricePct { .. } => Some(ScenarioMarketTarget::EquityPrice {
-            price_id: id.clone(),
+            spot_id: PriceId::new(id.as_str()),
         }),
         OperationSpec::CurveParallelBp { curve_kind, .. }
         | OperationSpec::CurveNodeBp { curve_kind, .. } => Some(ScenarioMarketTarget::Curve {

@@ -170,10 +170,7 @@ pub(crate) fn get_historical_prices(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Vec<f64>> {
-    let close_id = inst
-        .close_series_id
-        .as_deref()
-        .unwrap_or(&inst.underlying_ticker);
+    let close_id = inst.close_series_id();
     let past_dates: Vec<Date> = observation_dates(inst)?
         .into_iter()
         .filter(|&d| d <= as_of)
@@ -195,7 +192,7 @@ pub(crate) fn get_historical_prices(
             close_id
         )));
     }
-    if let Ok(scalar) = context.get_price(&inst.underlying_ticker) {
+    if let Ok(scalar) = context.get_price(&inst.spot_id) {
         let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
             scalar,
             inst.notional.currency(),
@@ -219,10 +216,7 @@ pub(crate) fn get_historical_ohlc(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<OhlcVecs> {
-    let default_close = inst
-        .close_series_id
-        .as_deref()
-        .unwrap_or(&inst.underlying_ticker);
+    let default_close = inst.close_series_id();
 
     let method_label = inst.realized_var_method.label();
     let inst_id = inst.id.as_str().to_owned();
@@ -392,71 +386,54 @@ fn spot_variance_to_date(
         .day_count
         .year_fraction(as_of, target_date, Default::default())?;
 
-    for sid in inst.volatility_candidate_ids() {
-        if let Ok(surface) = context.get_surface(&sid) {
-            let disc = context.get_discount(&inst.discount_curve_id)?;
-            let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
-                context.get_price(&inst.underlying_ticker)?,
-                inst.notional.currency(),
-            )?;
-            // Date-based zero rate over [as_of, target_date]: avoids the
-            // axis bias of `disc.zero(t)` when curve base != as_of.
-            let df_mat =
-                crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                    disc.as_ref(),
-                    as_of,
-                    target_date,
-                )?;
-            let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
-                df_mat,
-                t,
-                "variance-swap replication rate",
-            )?;
-            let dividend_yield_id = inst.dividend_yield_scalar_id();
-            let q = match context.get_price(&dividend_yield_id) {
-                Ok(finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v)) => *v,
-                Ok(finstack_quant_core::market_data::scalars::MarketScalar::Price(_)) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "variance-swap dividend yield '{}-DIVYIELD' must be unitless",
-                        inst.underlying_ticker
-                    )));
-                }
-                Err(error) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "variance-swap dividend yield '{}' is required for surface replication: {}",
-                        dividend_yield_id, error
-                    )));
-                }
-            };
-            let fwd = spot / df_mat * (-q * t).exp();
-            let strikes = surface.strikes();
-            if t > 0.0 {
-                let vol_fn = |t_exp: f64, k: f64| {
-                    finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t_exp, k)
-                };
-                let bs_fn = |k: f64, v: f64, opt: OptionType| -> f64 {
-                    bs_price_unchecked(spot, k, r, q, v, t, opt)
-                };
-                if let Some(variance) =
-                    carr_madan_forward_variance(strikes, fwd, r, t, vol_fn, bs_fn)
-                {
-                    return Ok(variance);
-                }
+    let surface = context.get_surface(inst.vol_surface_id.as_str())?;
+    let disc = context.get_discount(&inst.discount_curve_id)?;
+    let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
+        context.get_price(&inst.spot_id)?,
+        inst.notional.currency(),
+    )?;
+    // Date-based zero rate over [as_of, target_date]: avoids the
+    // axis bias of `disc.zero(t)` when curve base != as_of.
+    let df_mat = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+        disc.as_ref(),
+        as_of,
+        target_date,
+    )?;
+    let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
+        df_mat,
+        t,
+        "variance-swap replication rate",
+    )?;
+    let q = match &inst.div_yield_id {
+        None => 0.0,
+        Some(div_yield_id) => match context.get_price(div_yield_id)? {
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "VarianceSwap '{}' div_yield_id '{}' must be a unitless scalar",
+                    inst.id, div_yield_id
+                )));
             }
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "variance-swap surface '{sid}' cannot support Carr-Madan replication; \
-                 provide a wider OTM strike grid or an explicit implied-volatility override"
-            )));
+        },
+    };
+    let fwd = spot / df_mat * (-q * t).exp();
+    let strikes = surface.strikes();
+    if t > 0.0 {
+        let vol_fn = |t_exp: f64, k: f64| {
+            finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t_exp, k)
+        };
+        let bs_fn = |k: f64, v: f64, opt: OptionType| -> f64 {
+            bs_price_unchecked(spot, k, r, q, v, t, opt)
+        };
+        if let Some(variance) = carr_madan_forward_variance(strikes, fwd, r, t, vol_fn, bs_fn) {
+            return Ok(variance);
         }
     }
-    Err(finstack_quant_core::InputError::NotFound {
-        id: format!(
-            "variance-swap volatility surface for '{}'; provide a replication-quality \
-             surface or an explicit implied-volatility override",
-            inst.underlying_ticker
-        ),
-    }
-    .into())
+    Err(finstack_quant_core::Error::Validation(format!(
+        "variance-swap surface '{}' cannot support Carr-Madan replication; \
+         provide a wider OTM strike grid or an explicit implied-volatility override",
+        inst.vol_surface_id
+    )))
 }
 
 #[cfg(test)]
@@ -477,7 +454,7 @@ mod tests {
             .build()
             .expect("curve");
         let strikes = [50.0, 75.0, 90.0, 100.0, 110.0, 125.0, 150.0];
-        let mut surface = VolSurface::builder("SPX")
+        let mut surface = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
             .strikes(&strikes);
         for _ in 0..4 {
@@ -536,6 +513,11 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-FLAT"))
             .underlying_ticker("SPX".to_string())
+            .spot_id(finstack_quant_core::types::PriceId::new("SPX"))
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(finstack_quant_core::types::PriceId::new(
+                "SPX-DIVYIELD",
+            )))
             .notional(Money::from((
                 1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,
@@ -558,7 +540,7 @@ mod tests {
 
         let vol = 0.20_f64;
         let strikes: Vec<f64> = (4..=60).map(|i| 5.0 * i as f64).collect(); // 20..300
-        let mut builder = VolSurface::builder("SPX")
+        let mut builder = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
             .strikes(&strikes);
         for _ in 0..4 {
@@ -608,6 +590,11 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-FWDSTART"))
             .underlying_ticker("SPX".to_string())
+            .spot_id(finstack_quant_core::types::PriceId::new("SPX"))
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(finstack_quant_core::types::PriceId::new(
+                "SPX-DIVYIELD",
+            )))
             .notional(Money::from((
                 1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,
@@ -633,7 +620,7 @@ mod tests {
         // arbitrage, but a strongly downward-sloping forward vol.
         let strikes: Vec<f64> = (4..=60).map(|i| 5.0 * i as f64).collect(); // 20..300
         let vol_rows = [0.30_f64, 0.30, 0.25];
-        let mut builder = VolSurface::builder("SPX")
+        let mut builder = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.51, 1.0])
             .strikes(&strikes);
         for v in vol_rows {
@@ -707,7 +694,7 @@ mod tests {
 
         let err = remaining_forward_variance(&swap, &market, as_of)
             .expect_err("missing volatility must not manufacture a zero mark");
-        assert!(err.to_string().contains("volatility"));
+        assert!(err.to_string().contains("SPX-VOL"), "{err}");
     }
 
     /// Regression: when the swap has accrued past observations but no
@@ -752,6 +739,11 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-SEASONED"))
             .underlying_ticker("SPX".to_string())
+            .spot_id(finstack_quant_core::types::PriceId::new("SPX"))
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(finstack_quant_core::types::PriceId::new(
+                "SPX-DIVYIELD",
+            )))
             .notional(Money::from((
                 1_000_000_i64,
                 finstack_quant_core::currency::Currency::USD,

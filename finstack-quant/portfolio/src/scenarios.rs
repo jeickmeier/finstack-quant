@@ -81,8 +81,8 @@ fn selective_invalidation(
             ScenarioMarketTarget::VolSurface { vol_surface_id, .. } => {
                 MarketFactorKey::vol_surface(vol_surface_id.as_str())
             }
-            ScenarioMarketTarget::EquityPrice { price_id } => {
-                MarketFactorKey::spot(price_id.as_str())
+            ScenarioMarketTarget::EquityPrice { spot_id } => {
+                MarketFactorKey::spot(spot_id.as_str())
             }
             // A direct FX quote can feed triangulated crosses used inside an
             // instrument's native PV, while volatility-index and base-correlation

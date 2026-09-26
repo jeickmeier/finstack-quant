@@ -45,7 +45,8 @@
 //!     "SPX",
 //!     4500.0,
 //!     date!(2025 - 07 - 15),
-//!     Money::from((100_i64, Currency::USD)),
+//!     100.0,
+//!     Currency::USD,
 //!     market_data,
 //! )
 //! .expect("valid option");
@@ -119,7 +120,7 @@ pub mod vol_index_future_option;
 pub use autocallable::{Autocallable, FinalPayoffType};
 pub use cliquet_option::CliquetOption;
 pub use dcf_equity::{DiscountedCashFlow, TerminalValueSpec};
-pub use equity_future::{EquityFuture, EquityFutureQuantoSpec};
+pub use equity_future::EquityFuture;
 pub use equity_future_option::EquityFutureOption;
 pub use equity_option::{EquityOption, EquityOptionExercise, EquityOptionMarketData};
 pub use equity_total_return_future::EquityTotalReturnFuture;

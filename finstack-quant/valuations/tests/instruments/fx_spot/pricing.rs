@@ -18,7 +18,7 @@ fn test_npv_with_explicit_rate() {
 
 #[test]
 fn test_npv_with_default_notional() {
-    let fx = sample_eurusd().with_rate(1.18).expect("test rate");
+    let fx = sample_eurusd().with_quoted_spot(1.18).expect("test rate");
     let market = MarketContext::new();
     let pv = fx.value(&market, test_date()).unwrap();
 
@@ -109,7 +109,7 @@ fn test_zero_notional() {
     let fx = sample_eurusd()
         .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate");
     let market = MarketContext::new();
     let pv = fx.value(&market, test_date()).unwrap();
@@ -223,7 +223,7 @@ fn test_multiple_currencies_independence() {
     let gbpusd = sample_gbpusd()
         .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.40)
+        .with_quoted_spot(1.40)
         .expect("test rate");
 
     let market = MarketContext::new();

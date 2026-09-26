@@ -3,6 +3,7 @@
     "spec": {
       "attributes": {},
       "averaging_method": "arithmetic",
+      "currency": "USD",
       "day_count": "act_365f",
       "discount_curve_id": "USD-OIS",
       "div_yield_id": "SPX-DIV",
@@ -16,12 +17,9 @@
         "2024-06-30"
       ],
       "id": "ASIAN-SPX-ARITH-6M",
-      "notional": {
-        "amount": "100000",
-        "currency": "USD"
-      },
       "option_type": "call",
       "past_fixings": [],
+      "quantity": 100000.0,
       "spot_id": "SPX-SPOT",
       "strike": 4500.0,
       "underlying_ticker": "SPX",

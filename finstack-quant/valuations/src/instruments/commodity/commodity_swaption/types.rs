@@ -63,7 +63,7 @@ use finstack_quant_core::Result;
 ///     .swap_end(Date::from_calendar_date(2026, Month::June, 30).unwrap())
 ///     .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
 ///     .fixed_price(3.50)
-///     .notional(10000.0)
+///     .quantity(10000.0)
 ///     .forward_curve_id(CurveId::new("NG-FORWARD"))
 ///     .discount_curve_id(CurveId::new("USD-OIS"))
 ///     .vol_surface_id(CurveId::new("NG-VOL"))
@@ -82,7 +82,7 @@ use finstack_quant_core::Result;
 pub struct CommoditySwaption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
-    /// Commodity underlying parameters (commodity_type, ticker, unit, currency).
+    /// Commodity underlying parameters (commodity_type, underlying_ticker, unit, currency).
     #[serde(flatten)]
     pub underlying: CommodityUnderlyingParams,
     /// Option type (call = right to enter pay-fixed swap, put = right to enter receive-fixed swap).
@@ -129,7 +129,7 @@ pub struct CommoditySwaption {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::PositiveF64Wire")
     )]
-    pub notional: f64,
+    pub quantity: f64,
     /// Forward/futures curve ID for commodity price interpolation.
     pub forward_curve_id: CurveId,
     /// Discount curve ID for present value.
@@ -196,10 +196,10 @@ impl CommoditySwaption {
             self.swap_end,
             "CommoditySwaption swap_start/swap_end",
         )?;
-        // notional > 0
+        // quantity > 0
         crate::instruments::common_impl::validation::validate_f64_positive(
-            self.notional,
-            "CommoditySwaption notional",
+            self.quantity,
+            "CommoditySwaption quantity",
         )?;
         // This instrument is dispatched to unshifted Black-76, whose logarithm
         // requires a strictly positive strike.
@@ -235,7 +235,7 @@ impl CommoditySwaption {
             )
             .swap_frequency(Tenor::monthly())
             .fixed_price(3.50)
-            .notional(10000.0)
+            .quantity(10000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("NG-VOL"))
@@ -374,7 +374,7 @@ impl CommoditySwaption {
     /// The annuity is the sum of discount factors to each payment date — the
     /// PV of receiving 1 unit per period. The underlying `CommoditySwap` pays
     /// `quantity × price` per period with no year-fraction accrual, and
-    /// `notional` is a per-period quantity, so the annuity must not carry a
+    /// `quantity` is a per-period quantity, so the annuity must not carry a
     /// `τ_i` factor (the IR-swaption `Σ DF·τ` convention
     /// understated a monthly-settling swaption ~12×).
     pub fn annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
@@ -527,7 +527,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
                 OptionType::Put => (self.fixed_price - inputs.forward).max(0.0),
             };
             return Money::new(
-                intrinsic * inputs.annuity * self.notional,
+                intrinsic * inputs.annuity * self.quantity,
                 self.underlying.currency,
             );
         }
@@ -542,7 +542,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
             self.option_type,
         );
 
-        Money::new(unit_price * self.notional, self.underlying.currency)
+        Money::new(unit_price * self.quantity, self.underlying.currency)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
@@ -588,7 +588,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
                     }
                 }
             };
-            return Ok(Some(intrinsic * inputs.annuity * self.notional));
+            return Ok(Some(intrinsic * inputs.annuity * self.quantity));
         }
 
         if inputs.sigma <= 0.0 {
@@ -607,7 +607,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             OptionType::Call => inputs.annuity * nd1,
             OptionType::Put => inputs.annuity * (nd1 - 1.0),
         };
-        Ok(Some(delta_unit * self.notional))
+        Ok(Some(delta_unit * self.quantity))
     }
 
     fn option_gamma(
@@ -691,7 +691,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         );
         // Vega = annuity * F * N'(d1) * sqrt(T) * 0.01 (per vol point)
         let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1) * inputs.time.sqrt();
-        Ok(Some(vega_abs * 0.01 * self.notional))
+        Ok(Some(vega_abs * 0.01 * self.quantity))
     }
 }
 
@@ -746,7 +746,7 @@ mod tests {
             .swap_end(Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"))
             .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(3.50)
-            .notional(10_000.0)
+            .quantity(10_000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("NG-VOL"))
@@ -812,19 +812,19 @@ mod tests {
 
     #[test]
     fn validation_rejects_zero_notional() {
-        let result = base_swaption_builder().notional(0.0).build();
+        let result = base_swaption_builder().quantity(0.0).build();
         assert!(
             result.is_err(),
-            "CommoditySwaption must reject zero notional"
+            "CommoditySwaption must reject zero quantity"
         );
     }
 
     #[test]
     fn validation_rejects_negative_notional() {
-        let result = base_swaption_builder().notional(-1000.0).build();
+        let result = base_swaption_builder().quantity(-1000.0).build();
         assert!(
             result.is_err(),
-            "CommoditySwaption must reject negative notional"
+            "CommoditySwaption must reject negative quantity"
         );
     }
 
@@ -866,7 +866,7 @@ mod tests {
     fn test_commodity_swaption_example() {
         let swaption = CommoditySwaption::example();
         assert_eq!(swaption.id.as_str(), "NG-SWAPTION-2025");
-        assert_eq!(swaption.underlying.ticker, "NG");
+        assert_eq!(swaption.underlying.underlying_ticker, "NG");
     }
 
     #[test]
@@ -896,7 +896,10 @@ mod tests {
         let json = serde_json::to_string(&swaption).expect("serialize");
         let deserialized: CommoditySwaption = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(swaption.id.as_str(), deserialized.id.as_str());
-        assert_eq!(swaption.underlying.ticker, deserialized.underlying.ticker);
+        assert_eq!(
+            swaption.underlying.underlying_ticker,
+            deserialized.underlying.underlying_ticker
+        );
         assert_eq!(swaption.fixed_price, deserialized.fixed_price);
     }
 
@@ -956,7 +959,7 @@ mod tests {
             .swap_end(Date::from_calendar_date(2026, Month::July, 1).expect("valid date"))
             .swap_frequency(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(4.0)
-            .notional(10000.0)
+            .quantity(10000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("NG-VOL"))
@@ -1083,7 +1086,7 @@ mod tests {
             .swap_end(swap_end)
             .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(strike)
-            .notional(10_000.0)
+            .quantity(10_000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("NG-VOL"))
@@ -1191,7 +1194,7 @@ mod tests {
             .swap_end(date(2026, 6, 30))
             .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
             .fixed_price(fixed_price)
-            .notional(10000.0)
+            .quantity(10000.0)
             .forward_curve_id(CurveId::new("NG-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("NG-VOL"))
@@ -1267,9 +1270,9 @@ mod tests {
             .value(&market, as_of)
             .expect("pricing should succeed");
 
-        // Compute intrinsic ~ annuity * (F - K) * notional
+        // Compute intrinsic ~ annuity * (F - K) * quantity
         let annuity = swaption.annuity(&market, as_of).expect("annuity");
-        let intrinsic = (fwd - 2.00) * annuity * swaption.notional;
+        let intrinsic = (fwd - 2.00) * annuity * swaption.quantity;
 
         assert!(
             pv.amount() >= intrinsic * 0.95,
@@ -1281,7 +1284,7 @@ mod tests {
 
     #[test]
     fn test_put_call_parity() {
-        // Put-call parity: C - P = annuity * (F - K) * notional
+        // Put-call parity: C - P = annuity * (F - K) * quantity
         let as_of = date(2025, 1, 2);
         let fwd = 3.50;
         let strike = 3.30;
@@ -1301,7 +1304,7 @@ mod tests {
 
         let annuity = call.annuity(&market, as_of).expect("annuity");
         let forward = call.forward_swap_rate(&market, as_of).expect("forward");
-        let parity_rhs = annuity * (forward - strike) * call.notional;
+        let parity_rhs = annuity * (forward - strike) * call.quantity;
 
         let diff = (call_pv - put_pv) - parity_rhs;
         assert!(
@@ -1334,7 +1337,7 @@ mod tests {
 
         let annuity = swaption.annuity(&market, as_of).expect("annuity");
         let forward = swaption.forward_swap_rate(&market, as_of).expect("forward");
-        let expected_intrinsic = (forward - strike).max(0.0) * annuity * swaption.notional;
+        let expected_intrinsic = (forward - strike).max(0.0) * annuity * swaption.quantity;
 
         assert!(
             (pv.amount() - expected_intrinsic).abs() < 0.01,
@@ -1372,7 +1375,7 @@ mod tests {
     /// The swaption annuity must be consistent with its own underlying.
     /// A `CommoditySwap` pays `quantity × price` per period with no
     /// year-fraction accrual, so a zero-vol ITM call swaption on a flat
-    /// forward curve must equal `notional × (F − K) × Σ DF_i` — computed here
+    /// forward curve must equal `quantity × (F − K) × Σ DF_i` — computed here
     /// independently from the discount curve. The pre-fix `Σ DF·τ` annuity
     /// understated a monthly-settling swaption ~12×.
     #[test]
@@ -1403,7 +1406,7 @@ mod tests {
             .iter()
             .map(|&d| day_count.df_between_dates(as_of, d).expect("df"))
             .sum();
-        let expected = swaption.notional * (fwd - strike) * sum_df;
+        let expected = swaption.quantity * (fwd - strike) * sum_df;
 
         let rel = (pv - expected).abs() / expected;
         assert!(

@@ -10,7 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use finstack_quant_core::Result;
 use finstack_quant_models::trees::binomial_tree::BinomialTree;
 
@@ -104,7 +104,7 @@ pub enum CommodityPricingModel {
 pub struct CommodityOption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
-    /// Commodity underlying parameters (commodity_type, ticker, unit, currency).
+    /// Commodity underlying parameters (commodity_type, underlying_ticker, unit, currency).
     #[serde(flatten)]
     pub underlying: CommodityUnderlyingParams,
     /// Strike price per unit.
@@ -176,7 +176,7 @@ pub struct CommodityOption {
     /// Optional spot price ID (for spot-based pricing and American options).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub spot_id: Option<String>,
+    pub spot_id: Option<PriceId>,
     /// Optional quoted forward price (overrides curve lookup).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -953,7 +953,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         enum ForwardDriver {
             QuotedForward(f64),
             PriceCurve,
-            SpotScalar(String),
+            SpotScalar(PriceId),
         }
 
         let driver = if let Some(fwd) = self.quoted_forward {
@@ -1052,7 +1052,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         enum ForwardDriver {
             QuotedForward(f64),
             PriceCurve,
-            SpotScalar(String),
+            SpotScalar(PriceId),
         }
 
         let driver = if let Some(fwd) = self.quoted_forward {
@@ -1222,7 +1222,7 @@ mod tests {
     #[test]
     fn canonical_dependencies_preserve_surface_pairing_and_strike() {
         let mut option = CommodityOption::example();
-        option.spot_id = Some("WTI-SPOT".to_string());
+        option.spot_id = Some("WTI-SPOT".into());
 
         let deps = option.market_dependencies().expect("dependencies");
         assert_eq!(
@@ -1238,7 +1238,7 @@ mod tests {
         let volatility = &deps.volatility_dependencies[0];
         assert_eq!(volatility.vol_surface_id, option.vol_surface_id);
         assert_eq!(
-            volatility.underlying_id.as_ref().map(|id| id.as_str()),
+            volatility.spot_id.as_ref().map(|id| id.as_str()),
             Some("WTI-SPOT")
         );
         assert_eq!(volatility.reference_strike, Some(option.strike));

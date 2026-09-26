@@ -1380,7 +1380,7 @@ mod tests {
         let fx_spot = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
             .with_notional(Money::from((1_000_000_i64, Currency::EUR)))
             .expect("FxSpot notional should be valid")
-            .with_rate(1.10)
+            .with_quoted_spot(1.10)
             .expect("FxSpot rate should be valid")
             .with_settlement_date(
                 Date::from_calendar_date(2024, Month::January, 15).expect("Valid test date"),

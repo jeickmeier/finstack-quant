@@ -24,11 +24,11 @@ pub(crate) struct SharesCalculator;
 impl MetricCalculator for SharesCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let equity: &Equity = context.instrument_as()?;
-        Ok(equity.effective_shares())
+        Ok(equity.effective_quantity())
     }
 }
 
-/// Computes the dividend yield using `{ticker}-DIVYIELD` if present, or 0.0.
+/// Computes the dividend yield from `div_yield_id`, or 0.0 when it is unset.
 pub(crate) struct DividendYieldCalculator;
 
 impl MetricCalculator for DividendYieldCalculator {
@@ -68,7 +68,7 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let equity: &Equity = context.instrument_as()?;
-        let delta = equity.shares.unwrap_or(1.0);
+        let delta = equity.quantity.unwrap_or(1.0);
 
         context.computed.insert(
             MetricId::composite(&MetricId::Delta, &[equity.ticker.as_str()]),

@@ -266,7 +266,7 @@ fn test_fx_forward_with_spot_override() {
         .maturity(maturity)
         .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .contract_rate_opt(Some(1.12))
-        .spot_rate_override_opt(Some(1.12)) // Override spot to match contract
+        .quoted_spot_opt(Some(1.12)) // Override spot to match contract
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .attributes(Attributes::new())
@@ -308,7 +308,7 @@ fn test_fx_forward_with_forward_points() {
         .with_forward_points(spot, forward_points)
         .expect("valid forward points");
 
-    assert_eq!(forward.spot_rate_override, None);
+    assert_eq!(forward.quoted_spot, None);
     assert!((forward.contract_rate.unwrap() - 1.105).abs() < 1e-10);
 
     let npv = forward.value(&market, as_of).expect("should price");
@@ -335,7 +335,7 @@ fn test_fx_forward_with_forward_pips() {
         .with_forward_pips(1.10, 50.0)
         .expect("valid forward pips");
 
-    assert_eq!(forward.spot_rate_override, None);
+    assert_eq!(forward.quoted_spot, None);
     assert!((forward.contract_rate.unwrap() - 1.105).abs() < 1e-10);
 
     let npv = forward.value(&market, as_of).expect("should price");

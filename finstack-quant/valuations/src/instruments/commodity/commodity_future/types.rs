@@ -65,7 +65,7 @@ pub struct CommodityFuture {
     /// Unique instrument identifier.
     pub id: InstrumentId,
     /// Exchange symbol or underlying label.
-    pub underlying: String,
+    pub underlying_ticker: String,
     /// Standard listed position and lifecycle terms.
     pub terms: ListedFutureTerms,
     /// Commodity forward `PriceCurve` used for projected observations.
@@ -103,9 +103,9 @@ impl CommodityFuture {
     /// Validate settlement dates, fixings, and listed terms.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.terms.validate()?;
-        if self.underlying.trim().is_empty() {
+        if self.underlying_ticker.trim().is_empty() {
             return Err(finstack_quant_core::Error::Validation(
-                "CommodityFuture underlying must not be empty".to_string(),
+                "CommodityFuture underlying_ticker must not be empty".to_string(),
             ));
         }
         match &self.fixing {
@@ -180,7 +180,7 @@ impl CommodityFuture {
 
         Self::builder()
             .id(InstrumentId::new("SGX-IRON-ORE-DEC26"))
-            .underlying("TSI-62-FE".to_string())
+            .underlying_ticker("TSI-62-FE".to_string())
             .terms(ListedFutureTerms::new(
                 10.0,
                 100.0,
@@ -371,7 +371,7 @@ mod tests {
     fn average_future(past_fixings: Vec<(Date, f64)>) -> CommodityFuture {
         CommodityFuture::builder()
             .id(InstrumentId::new("AVG"))
-            .underlying("INDEX".to_string())
+            .underlying_ticker("INDEX".to_string())
             .terms(
                 ListedFutureTerms::new(
                     2.0,

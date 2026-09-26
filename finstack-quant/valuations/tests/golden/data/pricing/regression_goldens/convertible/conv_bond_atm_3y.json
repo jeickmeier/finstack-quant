@@ -573,7 +573,6 @@
           "anti_dilution": "none",
           "dividend_adjustment": "none"
         },
-        "underlying_equity_id": "ACME",
         "fixed_coupon": {
           "rate": "0.02",
           "frequency": {
@@ -589,12 +588,13 @@
           "tags": [
             "golden"
           ],
-          "meta": {
-            "vol_surface_id": "ACME-VOL"
-          }
+          "meta": {}
         },
         "id": "CONV-BOND-ATM-3Y-GOLDEN",
-        "issue_date": "2026-04-30"
+        "issue_date": "2026-04-30",
+        "spot_id": "ACME",
+        "vol_surface_id": "ACME-VOL",
+        "div_yield_id": "ACME-DIVYIELD"
       }
     }
   },

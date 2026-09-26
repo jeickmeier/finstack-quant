@@ -3,6 +3,7 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{Monitoring, OptionType};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -76,8 +77,10 @@ pub struct BarrierOption {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_barrier_breached: Option<bool>,
-    /// Notional amount
-    pub notional: Money,
+    /// Number of underlying units the option is written on; PV and Greeks scale linearly with it.
+    pub quantity: f64,
+    /// Currency of the strike, premium and present value.
+    pub currency: Currency,
     /// Day count convention
     pub day_count: finstack_quant_core::dates::DayCount,
     /// Contractual monitoring: continuous or an explicit, strictly increasing
@@ -138,7 +141,8 @@ impl BarrierOption {
             .expiry(date!(2024 - 12 - 20))
             .expiry_fixing_opt(None)
             .observed_barrier_breached_opt(None)
-            .notional(Money::from((100_000_i64, Currency::USD)))
+            .quantity(100_000.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .monitoring(Monitoring::Continuous)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -203,12 +207,12 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
         // sentinel); rejecting them here surfaces a `Validation` error at the
         // instrument boundary instead of panicking inside `Money::new`.
         validation::validate_f64_positive(self.strike, "BarrierOption strike")?;
-        validation::validate_money_gt(self.notional, 0.0, "BarrierOption notional")?;
+        validation::validate_f64_positive(self.quantity, "BarrierOption quantity")?;
         validation::validate_f64_positive(self.barrier, "BarrierOption barrier")?;
         if let Some(rebate) = self.rebate {
-            if rebate.currency() != self.notional.currency() {
+            if rebate.currency() != self.currency {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: self.notional.currency(),
+                    expected: self.currency,
                     actual: rebate.currency(),
                 });
             }

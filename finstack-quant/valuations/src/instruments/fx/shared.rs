@@ -34,7 +34,7 @@ pub(crate) struct FxForwardRateRequest<'a> {
     /// Base-currency discount curve.
     pub(crate) foreign_discount_curve_id: &'a CurveId,
     /// Optional quote-per-base spot override.
-    pub(crate) spot_rate_override: Option<f64>,
+    pub(crate) quoted_spot: Option<f64>,
     /// Label included in validation errors.
     pub(crate) context: &'a str,
 }
@@ -84,7 +84,7 @@ pub(crate) fn collect_fx_forward_inputs(
             request.context, request.maturity
         )));
     }
-    let spot = if let Some(spot) = request.spot_rate_override {
+    let spot = if let Some(spot) = request.quoted_spot {
         spot
     } else {
         let matrix = request.market.fx().ok_or_else(|| {

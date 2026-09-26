@@ -12,6 +12,7 @@
             "quantlib"
           ]
         },
+        "currency": "USD",
         "day_count": "act_365f",
         "discount_curve_id": "USD-OIS",
         "div_yield_id": "SPX-DIVYIELD",
@@ -21,13 +22,10 @@
         "monitoring": {
           "type": "continuous"
         },
-        "notional": {
-          "amount": "1",
-          "currency": "USD"
-        },
         "observed_max": null,
         "observed_min": 100.0,
         "option_type": "call",
+        "quantity": 1.0,
         "spot_id": "SPX-SPOT",
         "strike": null,
         "underlying_ticker": "SPX",

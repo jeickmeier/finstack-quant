@@ -13,6 +13,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and grouping"
         },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency of the strike, premium and present value."
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day count convention"
@@ -67,10 +71,6 @@
           },
           "description": "Contractual monitoring of the path extremum.\n\n`continuous` (default) prices with the Goldman-Sosin-Gatto closed form.\n`discrete` observes the extremum only on the strictly increasing\n`observation_dates` (no later than expiry) and prices by Monte Carlo."
         },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount"
-        },
         "observed_max": {
           "description": "Observed maximum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Put / Fixed Call once seasoned).",
           "format": "double",
@@ -90,6 +90,11 @@
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -122,7 +127,8 @@
         "option_type",
         "lookback_type",
         "expiry",
-        "notional",
+        "quantity",
+        "currency",
         "day_count",
         "discount_curve_id",
         "spot_id",
@@ -229,6 +235,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "currency": "USD",
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
           "div_yield_id": "SPX-DIV",
@@ -238,13 +245,10 @@
           "monitoring": {
             "type": "continuous"
           },
-          "notional": {
-            "amount": "100000",
-            "currency": "USD"
-          },
           "observed_max": null,
           "observed_min": null,
           "option_type": "call",
+          "quantity": 100000.0,
           "spot_id": "SPX-SPOT",
           "strike": 4500.0,
           "underlying_ticker": "SPX",

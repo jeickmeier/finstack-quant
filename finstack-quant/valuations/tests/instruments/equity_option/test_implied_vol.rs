@@ -63,16 +63,8 @@ fn test_implied_vol_recovers_surface_vol() {
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.02);
 
     // Use analytical Black-Scholes price as external reference
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.02,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.02, vol, as_of, expiry, call.quantity);
 
     // Set market price in attributes
     call.instrument_pricing_overrides
@@ -116,16 +108,8 @@ fn test_implied_vol_atm_option() {
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -161,16 +145,8 @@ fn test_implied_vol_itm_option() {
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -206,16 +182,8 @@ fn test_implied_vol_otm_option() {
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -251,16 +219,8 @@ fn test_implied_vol_short_dated() {
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -296,16 +256,8 @@ fn test_implied_vol_long_dated() {
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -341,16 +293,8 @@ fn test_implied_vol_high_volatility() {
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -387,16 +331,8 @@ fn test_implied_vol_low_volatility() {
     let mut call = create_call(as_of, expiry, strike);
     let market = build_standard_market(as_of, spot, vol, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -437,16 +373,8 @@ fn test_implied_vol_rejects_expired() {
     );
     let market = build_standard_market(as_of, spot, 0.25, 0.05, 0.0);
 
-    let market_price = analytical_call_price(
-        spot,
-        strike,
-        0.05,
-        0.0,
-        vol,
-        as_of,
-        expiry,
-        call.notional.amount(),
-    );
+    let market_price =
+        analytical_call_price(spot, strike, 0.05, 0.0, vol, as_of, expiry, call.quantity);
     call.instrument_pricing_overrides
         .market_quotes
         .quoted_premium = Some(market_price);
@@ -515,7 +443,7 @@ fn test_implied_vol_with_dividends() {
         vol,
         as_of,
         expiry,
-        call.notional.amount(),
+        call.quantity,
     );
     call.instrument_pricing_overrides
         .market_quotes

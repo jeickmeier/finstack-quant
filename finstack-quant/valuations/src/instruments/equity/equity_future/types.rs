@@ -3,69 +3,13 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::VolatilityDependency;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
+use crate::instruments::common_impl::parameters::QuantoSpec;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
-
-/// Market inputs for a fixed-currency quanto equity future.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct EquityFutureQuantoSpec {
-    /// Settlement-currency discount curve used to form the ATM FX forward.
-    pub settlement_discount_curve_id: CurveId,
-    /// Equity volatility surface in decimal volatility per square-root year.
-    pub equity_vol_surface_id: CurveId,
-    /// FX volatility surface for settlement currency per underlying currency.
-    pub fx_vol_surface_id: CurveId,
-    /// FX spot scalar in settlement currency per underlying currency.
-    pub fx_spot_id: PriceId,
-    /// Correlation between equity returns and the settlement-per-underlying FX rate.
-    pub correlation: f64,
-}
-
-impl EquityFutureQuantoSpec {
-    /// Construct validated quanto market inputs.
-    ///
-    /// # Arguments
-    ///
-    /// * `settlement_discount_curve_id` - Discount curve for the variation-margin currency.
-    /// * `equity_vol_surface_id` - Equity volatility surface identifier.
-    /// * `fx_vol_surface_id` - FX volatility surface identifier.
-    /// * `fx_spot_id` - Spot scalar for settlement currency per underlying currency.
-    /// * `correlation` - Finite equity/FX return correlation in `[-1, 1]`.
-    pub fn new(
-        settlement_discount_curve_id: impl Into<CurveId>,
-        equity_vol_surface_id: impl Into<CurveId>,
-        fx_vol_surface_id: impl Into<CurveId>,
-        fx_spot_id: impl Into<PriceId>,
-        correlation: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        let spec = Self {
-            settlement_discount_curve_id: settlement_discount_curve_id.into(),
-            equity_vol_surface_id: equity_vol_surface_id.into(),
-            fx_vol_surface_id: fx_vol_surface_id.into(),
-            fx_spot_id: fx_spot_id.into(),
-            correlation,
-        };
-        spec.validate()?;
-        Ok(spec)
-    }
-
-    /// Validate the quanto correlation.
-    pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        if !self.correlation.is_finite() || !(-1.0..=1.0).contains(&self.correlation) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "EquityFuture quanto correlation must be finite and in [-1, 1], got {}",
-                self.correlation
-            )));
-        }
-        Ok(())
-    }
-}
 
 /// Exchange-listed future on an equity, equity index, or fixed-currency quanto index.
 #[derive(
@@ -87,7 +31,8 @@ pub struct EquityFuture {
     pub underlying_currency: Currency,
     /// Standard listed position and lifecycle terms.
     pub terms: ListedFutureTerms,
-    /// Underlying-currency discount curve used for equity carry.
+    /// Settlement-currency discount curve. Without `quanto` the settlement and
+    /// underlying currencies match, so this curve also carries the equity.
     pub discount_curve_id: CurveId,
     /// Current equity or index level.
     pub spot_id: PriceId,
@@ -104,10 +49,17 @@ pub struct EquityFuture {
         schemars(with = "Vec<(finstack_quant_core::wire::DateWire, f64)>")
     )]
     pub discrete_dividends: Vec<(Date, f64)>,
-    /// Required quanto adjustment when settlement and underlying currencies differ.
+    /// Equity volatility surface (decimal vol per square-root year). Required
+    /// with `quanto`, where it drives the quanto drift.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quanto: Option<EquityFutureQuantoSpec>,
+    pub vol_surface_id: Option<CurveId>,
+    /// Required quanto adjustment when settlement and underlying currencies
+    /// differ. `quanto.asset_discount_curve_id` is the underlying-currency
+    /// carry curve and `quanto.asset_currency` must equal `underlying_currency`.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quanto: Option<QuantoSpec>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -159,17 +111,37 @@ impl EquityFuture {
                 ));
             }
         } else {
-            self.quanto
-                .as_ref()
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "EquityFuture requires quanto inputs when underlying and settlement currencies differ"
-                            .to_string(),
-                    )
-                })?
-                .validate()?;
+            let quanto = self.quanto.as_ref().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "EquityFuture requires quanto inputs when underlying and settlement currencies differ"
+                        .to_string(),
+                )
+            })?;
+            quanto.validate()?;
+            if quanto.asset_currency != self.underlying_currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "EquityFuture quanto.asset_currency ({}) must equal underlying_currency ({})",
+                    quanto.asset_currency, self.underlying_currency
+                )));
+            }
+            if self.vol_surface_id.is_none() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "EquityFuture quanto requires vol_surface_id for the equity volatility"
+                        .to_string(),
+                ));
+            }
         }
         Ok(())
+    }
+
+    /// Underlying-currency curve used for equity carry: the quanto asset
+    /// curve when present, otherwise `discount_curve_id`.
+    fn carry_curve_id(&self) -> &CurveId {
+        self.quanto
+            .as_ref()
+            .map_or(&self.discount_curve_id, |quanto| {
+                &quanto.asset_discount_curve_id
+            })
     }
 
     /// Create a canonical Eurex EURO STOXX 50 quanto future example.
@@ -190,15 +162,16 @@ impl EquityFuture {
                 date!(2026 - 12 - 21),
                 Position::Long,
             )?)
-            .discount_curve_id(CurveId::new("EUR-OIS"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id(PriceId::new("SX5E-SPOT"))
             .div_yield_id_opt(Some(PriceId::new("SX5E-DIV")))
-            .quanto_opt(Some(EquityFutureQuantoSpec::new(
-                "USD-OIS",
-                "SX5E-VOL",
-                "EURUSD-VOL",
-                "EURUSD-SPOT",
+            .vol_surface_id_opt(Some(CurveId::new("SX5E-VOL")))
+            .quanto_opt(Some(QuantoSpec::new(
                 -0.25,
+                "EURUSD-VOL",
+                Currency::EUR,
+                "EUR-OIS",
+                "EURUSD-SPOT",
             )?))
             .attributes(Attributes::new())
             .build()
@@ -248,7 +221,7 @@ impl EquityFuture {
     ) -> finstack_quant_core::Result<(f64, f64, f64)> {
         self.validate()?;
         let spot = self.spot(market)?;
-        let discount = market.get_discount(&self.discount_curve_id)?;
+        let discount = market.get_discount(self.carry_curve_id())?;
         let df = discount.df_between_dates(as_of, self.terms.settlement_date)?;
         if !df.is_finite() || df <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
@@ -293,7 +266,12 @@ impl EquityFuture {
         let Some(quanto) = &self.quanto else {
             return Ok(domestic_forward);
         };
-        let equity_surface = market.get_surface(&quanto.equity_vol_surface_id)?;
+        let vol_surface_id = self.vol_surface_id.as_ref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "EquityFuture quanto requires vol_surface_id".to_string(),
+            )
+        })?;
+        let equity_surface = market.get_surface(vol_surface_id)?;
         let equity_vol = finstack_quant_models::volatility::get_surface_vol_clamped(
             &equity_surface,
             t,
@@ -314,10 +292,10 @@ impl EquityFuture {
                 "EquityFuture quanto FX spot must be finite and positive".to_string(),
             ));
         }
-        let underlying_discount = market.get_discount(&self.discount_curve_id)?;
+        let underlying_discount = market.get_discount(&quanto.asset_discount_curve_id)?;
         let underlying_df =
             underlying_discount.df_between_dates(as_of, self.terms.settlement_date)?;
-        let settlement_discount = market.get_discount(&quanto.settlement_discount_curve_id)?;
+        let settlement_discount = market.get_discount(&self.discount_curve_id)?;
         let settlement_df =
             settlement_discount.df_between_dates(as_of, self.terms.settlement_date)?;
         if !settlement_df.is_finite() || settlement_df <= 0.0 {
@@ -423,14 +401,16 @@ impl crate::instruments::Instrument for EquityFuture {
         if let Some(id) = &self.div_yield_id {
             dependencies.add_market_scalar_id(id.as_str());
         }
-        if let Some(quanto) = &self.quanto {
-            dependencies.add_discount_curve(quanto.settlement_discount_curve_id.clone());
-            dependencies.add_market_scalar_id(quanto.fx_spot_id.as_str());
+        if let Some(vol_surface_id) = &self.vol_surface_id {
             dependencies.add_volatility_dependency(VolatilityDependency::new(
-                quanto.equity_vol_surface_id.clone(),
+                vol_surface_id.clone(),
                 Some(self.spot_id.clone()),
                 None,
             ));
+        }
+        if let Some(quanto) = &self.quanto {
+            dependencies.add_discount_curve(quanto.asset_discount_curve_id.clone());
+            dependencies.add_market_scalar_id(quanto.fx_spot_id.as_str());
             dependencies.add_volatility_dependency(VolatilityDependency::new(
                 quanto.fx_vol_surface_id.clone(),
                 Some(quanto.fx_spot_id.clone()),
@@ -561,18 +541,13 @@ mod tests {
                 )
                 .expect("terms"),
             )
-            .discount_curve_id(CurveId::new("EUR-OIS"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id(PriceId::new("SX5E-SPOT"))
             .div_yield_id(PriceId::new("SX5E-DIV"))
+            .vol_surface_id(CurveId::new("SX5E-VOL"))
             .quanto(
-                EquityFutureQuantoSpec::new(
-                    "USD-OIS",
-                    "SX5E-VOL",
-                    "EURUSD-VOL",
-                    "EURUSD-SPOT",
-                    0.5,
-                )
-                .expect("quanto"),
+                QuantoSpec::new(0.5, "EURUSD-VOL", Currency::EUR, "EUR-OIS", "EURUSD-SPOT")
+                    .expect("quanto"),
             )
             .attributes(Attributes::new())
             .build()

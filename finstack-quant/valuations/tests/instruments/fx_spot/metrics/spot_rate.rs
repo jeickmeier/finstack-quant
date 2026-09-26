@@ -46,7 +46,7 @@ fn test_spot_rate_derived_from_pv() {
 
 #[test]
 fn test_spot_rate_default_notional() {
-    let fx = sample_eurusd().with_rate(1.18).expect("test rate");
+    let fx = sample_eurusd().with_quoted_spot(1.18).expect("test rate");
     let mut ctx = create_context(fx, test_date());
 
     let rate = calculate_metric(&mut ctx, MetricId::SpotRate).unwrap();
@@ -58,7 +58,7 @@ fn test_spot_rate_zero_notional_errors() {
     let fx = sample_eurusd()
         .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate");
     let mut ctx = create_context(fx, test_date());
 
@@ -95,7 +95,7 @@ fn test_spot_rate_various_currencies() {
     let gbp_fx = sample_gbpusd()
         .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.40)
+        .with_quoted_spot(1.40)
         .expect("test rate");
     let mut gbp_ctx = create_context(gbp_fx, test_date());
     approx_eq(
@@ -109,7 +109,7 @@ fn test_spot_rate_various_currencies() {
     let jpy_fx = sample_usdjpy()
         .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
         .unwrap()
-        .with_rate(110.0)
+        .with_quoted_spot(110.0)
         .expect("test rate");
     let mut jpy_ctx = create_context(jpy_fx, test_date());
     approx_eq(

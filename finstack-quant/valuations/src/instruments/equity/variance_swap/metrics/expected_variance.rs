@@ -67,6 +67,11 @@ mod tests {
         let mut swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-EV"))
             .underlying_ticker("SPX".to_string())
+            .spot_id(finstack_quant_core::types::PriceId::new("SPX"))
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(finstack_quant_core::types::PriceId::new(
+                "SPX-DIVYIELD",
+            )))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04)
             .start_date(start)

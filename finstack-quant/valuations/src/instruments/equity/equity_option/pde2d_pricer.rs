@@ -89,14 +89,14 @@ impl EquityOptionHestonPdePricer {
         let r = inputs.r;
         let q = inputs.q;
         let t = inputs.t_vol;
-        let ccy = inst.notional.currency();
+        let ccy = inst.currency;
 
         if t <= 0.0 {
             let intrinsic = match inst.option_type {
                 OptionType::Call => (spot - inst.strike).max(0.0),
                 OptionType::Put => (inst.strike - spot).max(0.0),
             };
-            return Money::new(intrinsic * inst.notional.amount(), ccy).map_err(|error| {
+            return Money::new(intrinsic * inst.quantity, ccy).map_err(|error| {
                 crate::pricer::PricingError::from_core(
                     error,
                     crate::pricer::PricingErrorContext::from_instrument(inst)
@@ -166,7 +166,7 @@ impl EquityOptionHestonPdePricer {
         })?;
         let price = solution.interpolate(spot.ln(), v0);
 
-        Money::new(price * inst.notional.amount(), ccy).map_err(|error| {
+        Money::new(price * inst.quantity, ccy).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,
                 crate::pricer::PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
@@ -246,7 +246,8 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::from((100_i64, Currency::USD)))
+            .quantity(100.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))

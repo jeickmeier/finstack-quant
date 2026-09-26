@@ -159,10 +159,8 @@
         "strike": 4500.0,
         "option_type": "call",
         "expiry": "2026-05-29",
-        "notional": {
-          "amount": "100",
-          "currency": "USD"
-        },
+        "quantity": 100.0,
+        "currency": "USD",
         "discount_curve_id": "USD-OIS",
         "spot_id": "SPX-SPOT",
         "vol_surface_id": "SPX-VOL",

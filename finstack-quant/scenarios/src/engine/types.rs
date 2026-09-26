@@ -3,7 +3,7 @@
 use crate::spec::{CurveKind, HazardBumpMode, RateBindingSpec};
 use crate::warning::Warning;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::types::CurveId;
+use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements::FinancialModelSpec;
 use finstack_quant_valuations::instruments::{Instrument, InstrumentEnvelope};
@@ -108,8 +108,8 @@ pub enum ScenarioMarketTarget {
     },
     /// An equity or other scalar price entry.
     EquityPrice {
-        /// Concrete scalar-price identifier.
-        price_id: CurveId,
+        /// Concrete `MarketContext::get_price` scalar identifier.
+        spot_id: PriceId,
     },
     /// A directed FX pair.
     Fx {
@@ -375,5 +375,27 @@ impl ApplicationEnvelope {
             time_roll: self.time_roll,
         };
         (self.market, self.model, self.instruments, report)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    // schema-rejection-test: equity_price target `price_id`
+    fn equity_price_target_uses_typed_spot_id() {
+        let target = ScenarioMarketTarget::EquityPrice {
+            spot_id: PriceId::new("AAPL-SPOT"),
+        };
+        let json = serde_json::to_value(&target).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({"kind": "equity_price", "spot_id": "AAPL-SPOT"})
+        );
+        let retired = serde_json::json!({"kind": "equity_price", "price_id": "AAPL-SPOT"});
+        let err = serde_json::from_value::<ScenarioMarketTarget>(retired)
+            .expect_err("retired price_id must be rejected");
+        assert!(err.to_string().contains("price_id"), "{err}");
     }
 }

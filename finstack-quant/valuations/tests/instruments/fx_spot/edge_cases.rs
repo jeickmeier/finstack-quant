@@ -16,7 +16,7 @@ fn test_same_currency_pair() {
     let fx = FxSpot::new(InstrumentId::new("USDUSD"), Currency::USD, Currency::USD)
         .with_notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
         .expect("notional should be accepted before pair validation")
-        .with_rate(1.0)
+        .with_quoted_spot(1.0)
         .expect("rate should be accepted before pair validation");
     let err = fx
         .value(&MarketContext::new(), test_date())
@@ -71,7 +71,7 @@ fn test_negative_notional() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
         .with_notional(Money::new(-1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate");
 
     let market = MarketContext::new();
@@ -251,7 +251,7 @@ fn test_extreme_settlement_lag() {
     let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
         .with_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate")
         .with_settlement_date(far_future);
 
@@ -277,7 +277,7 @@ fn test_default_notional_with_various_rates() {
     let market = MarketContext::new();
 
     for rate in [0.1, 1.0, 10.0, 100.0, 1000.0] {
-        let fx = sample_eurusd().with_rate(rate).expect("test rate");
+        let fx = sample_eurusd().with_quoted_spot(rate).expect("test rate");
         let pv = fx.value(&market, test_date()).unwrap();
 
         approx_eq(pv.amount(), rate, EPSILON, &format!("Rate {}", rate));

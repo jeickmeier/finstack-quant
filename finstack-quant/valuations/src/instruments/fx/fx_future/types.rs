@@ -50,7 +50,7 @@ pub struct FxFuture {
     /// Optional spot override in quote currency per base currency.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub spot_rate_override: Option<f64>,
+    pub quoted_spot: Option<f64>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -91,7 +91,7 @@ impl FxFuture {
             ("entry_price", Some(self.terms.entry_price)),
             ("quoted_price", self.terms.quoted_price),
             ("settlement_price", self.terms.settlement_price),
-            ("spot_rate_override", self.spot_rate_override),
+            ("quoted_spot", self.quoted_spot),
         ] {
             if value.is_some_and(|rate| !rate.is_finite() || rate <= 0.0) {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -154,7 +154,7 @@ impl FxFuture {
             quote_currency: self.quote_currency(),
             domestic_discount_curve_id: &self.domestic_discount_curve_id,
             foreign_discount_curve_id: &self.foreign_discount_curve_id,
-            spot_rate_override: self.spot_rate_override,
+            quoted_spot: self.quoted_spot,
             context: "FxFuture",
         })
     }
@@ -275,7 +275,7 @@ mod tests {
             )
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
-            .spot_rate_override(1.10)
+            .quoted_spot(1.10)
             .attributes(Attributes::new())
             .build()
             .expect("future");

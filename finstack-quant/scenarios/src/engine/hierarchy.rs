@@ -6,7 +6,7 @@ use crate::warning::Warning;
 use finstack_quant_core::market_data::hierarchy::{
     HierarchyNode, HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter,
 };
-use finstack_quant_core::types::CurveId;
+use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::{HashMap, HashSet};
 
 struct HierarchyExpansion {
@@ -25,7 +25,7 @@ enum HierarchyExpansionKey {
         vol_surface_id: CurveId,
     },
     EquityPrice {
-        price_id: CurveId,
+        spot_id: PriceId,
     },
     BaseCorrelation {
         surface_id: CurveId,
@@ -296,7 +296,7 @@ pub(super) fn expand_hierarchy_operations<'a>(
                 let exps = expand_matches(matches, |curve_id| {
                     (
                         HierarchyExpansionKey::EquityPrice {
-                            price_id: curve_id.clone(),
+                            spot_id: PriceId::new(curve_id.as_str()),
                         },
                         OperationSpec::EquityPricePct {
                             ids: vec![curve_id.as_str().to_string()],

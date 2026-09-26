@@ -25,7 +25,7 @@ pub(crate) fn compute_pv(
     if let Some(value) = resolve_lifecycle_value(inst, curves, as_of)? {
         return Ok(value);
     }
-    let ccy = inst.notional.currency();
+    let ccy = inst.currency;
     let unit_price = match inst.exercise_style {
         ExerciseStyle::European => {
             let (spot, r, q, sigma, t) = collect_inputs(inst, curves, as_of)?;
@@ -87,7 +87,7 @@ pub(crate) fn compute_pv(
         unit_price,
         "equity option unit price",
     )?;
-    Money::new(unit_price * inst.notional.amount(), ccy)
+    Money::new(unit_price * inst.quantity, ccy)
 }
 /// Cash greeks for an equity option (scaled by contract size; vega per 1% vol,
 /// rho per 1bp).
@@ -149,7 +149,7 @@ pub(crate) fn compute_greeks(
                     OptionType::Call => 1.0,
                     OptionType::Put => -1.0,
                 };
-                direction * carry * inst.notional.amount()
+                direction * carry * inst.quantity
             }
             _ => 0.0,
         };
@@ -186,7 +186,7 @@ pub(crate) fn compute_greeks(
                 }
             }
         };
-        let scale = inst.notional.amount();
+        let scale = inst.quantity;
         return Ok(EquityOptionGreeks {
             delta: delta_unit * scale,
             ..Default::default()
@@ -229,7 +229,7 @@ pub(crate) fn compute_greeks(
                 }
             };
 
-            let scale = inst.notional.amount();
+            let scale = inst.quantity;
             Ok(EquityOptionGreeks {
                 delta: greeks_unit.delta * scale,
                 gamma: greeks_unit.gamma * scale,
@@ -255,7 +255,7 @@ pub(crate) fn compute_greeks(
             };
             tree_finite_difference_greeks(
                 &params,
-                inst.notional.amount(),
+                inst.quantity,
                 inst.metric_pricing_overrides.theta_days_per_year(),
                 price_fn,
             )
@@ -303,7 +303,7 @@ pub(crate) fn compute_greeks(
             };
             tree_finite_difference_greeks(
                 &params,
-                inst.notional.amount(),
+                inst.quantity,
                 inst.metric_pricing_overrides.theta_days_per_year(),
                 price_fn,
             )

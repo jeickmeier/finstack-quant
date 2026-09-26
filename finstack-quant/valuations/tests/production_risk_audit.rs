@@ -51,9 +51,9 @@ fn fx01_follows_active_spot_and_forward_overrides() {
     forward.maturity = maturity;
     forward.notional = Money::from((100_i64, Currency::EUR));
     forward.contract_rate = Some(1.0);
-    forward.spot_rate_override = Some(1.1);
+    forward.quoted_spot = Some(1.1);
     let mut spot = FxSpot::new("SPOT".into(), Currency::EUR, Currency::USD)
-        .with_rate(1.1)
+        .with_quoted_spot(1.1)
         .expect("spot")
         .with_settlement_date(maturity);
     spot.notional = Money::from((100_i64, Currency::EUR));
@@ -68,7 +68,7 @@ fn fx01_follows_active_spot_and_forward_overrides() {
         .quote_convention(NdfQuoteConvention::SettlementPerBase)
         .domestic_discount_curve_id("USD-OIS".into())
         .foreign_discount_curve_id_opt(Some("EUR-OIS".into()))
-        .forward_rate_override_opt(Some(1.1))
+        .quoted_forward_opt(Some(1.1))
         .build()
         .expect("NDF");
     for instrument in [&forward as &dyn Instrument, &spot, &ndf] {

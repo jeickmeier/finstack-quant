@@ -232,7 +232,9 @@ fn test_time_mapping_with_quarterly_coupons() {
         settlement_days: None,
         recovery_rate: None,
         conversion: conversion_spec,
-        underlying_equity_id: Some("AAPL".to_string()),
+        spot_id: "AAPL".into(),
+        vol_surface_id: "AAPL-VOL".into(),
+        div_yield_id: Some("AAPL-DIVYIELD".into()),
         call_put: None,
         soft_call_trigger: None,
         fixed_coupon: Some(fixed_coupon),
@@ -491,7 +493,7 @@ fn test_very_high_conversion_ratio() {
 #[test]
 fn test_missing_underlying_equity() {
     let mut bond = create_standard_convertible();
-    bond.underlying_equity_id = None; // Missing equity ID
+    bond.spot_id = "".into(); // Empty spot id
 
     let market = create_market_context();
 
@@ -502,10 +504,7 @@ fn test_missing_underlying_equity() {
         ConvertibleTreeType::Binomial,
         dates::base_date(),
     );
-    assert!(
-        result.is_err(),
-        "Should fail with missing underlying equity ID"
-    );
+    assert!(result.is_err(), "Should fail with an empty spot_id");
 }
 
 #[test]

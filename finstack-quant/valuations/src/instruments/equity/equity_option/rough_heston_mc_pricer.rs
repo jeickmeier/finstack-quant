@@ -140,16 +140,14 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
             return Ok(crate::results::ValuationResult::stamped(
                 equity_option.id(),
                 as_of,
-                Money::new(
-                    intrinsic * equity_option.notional.amount(),
-                    equity_option.notional.currency(),
-                )
-                .map_err(|error| {
-                    crate::pricer::PricingError::from_core(
-                        error,
-                        crate::pricer::PricingErrorContext::from_instrument(equity_option),
-                    )
-                })?,
+                Money::new(intrinsic * equity_option.quantity, equity_option.currency).map_err(
+                    |error| {
+                        crate::pricer::PricingError::from_core(
+                            error,
+                            crate::pricer::PricingErrorContext::from_instrument(equity_option),
+                        )
+                    },
+                )?,
             ));
         }
 
@@ -219,7 +217,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
                 .parallel(false),
         );
 
-        let ccy = equity_option.notional.currency();
+        let ccy = equity_option.currency;
         let discount_factor = (-r * t).exp();
         let initial_state = [spot, s.v0];
         let rng = finstack_quant_models::monte_carlo::rng::philox::PhiloxRng::new(seed_val);
@@ -228,7 +226,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
             OptionType::Call => {
                 let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall::new(
                     equity_option.strike,
-                    equity_option.notional.amount(),
+                    equity_option.quantity,
                     self.num_steps,
                 );
                 engine
@@ -246,7 +244,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
             OptionType::Put => {
                 let payoff = finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanPut::new(
                     equity_option.strike,
-                    equity_option.notional.amount(),
+                    equity_option.quantity,
                     self.num_steps,
                 );
                 engine
@@ -321,7 +319,8 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::from((100_i64, Currency::USD)))
+            .quantity(100.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new("USD-OIS"))

@@ -43,7 +43,7 @@ pub(crate) fn resolve_lifecycle_value(
     if as_of < exercise.date {
         return Ok(None);
     }
-    let currency = inst.notional.currency();
+    let currency = inst.currency;
     if !exercise.exercised || as_of > exercise.settlement_date {
         return Ok(Some(Money::from((0_i64, currency))));
     }
@@ -100,10 +100,7 @@ pub(crate) fn resolve_lifecycle_value(
         }
     };
 
-    Ok(Some(Money::new(
-        unit_value * inst.notional.amount(),
-        currency,
-    )?))
+    Ok(Some(Money::new(unit_value * inst.quantity, currency)?))
 }
 
 /// Collected market inputs for equity option pricing.
@@ -236,7 +233,7 @@ pub(crate) fn collect_inputs_extended(
 
     let raw_spot = crate::instruments::common_impl::helpers::scalar_price_amount(
         curves.get_price(&inst.spot_id)?,
-        inst.notional.currency(),
+        inst.currency,
     )?;
 
     // Check for discrete dividends — if present, adjust spot and zero out q
@@ -313,7 +310,7 @@ pub(crate) fn early_exercise_market_params(
     } else {
         crate::instruments::common_impl::helpers::scalar_price_amount(
             curves.get_price(&inst.spot_id)?,
-            inst.notional.currency(),
+            inst.currency,
         )?
     };
     let params = OptionMarketParams {

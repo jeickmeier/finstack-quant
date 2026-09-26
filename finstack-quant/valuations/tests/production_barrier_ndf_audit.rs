@@ -85,7 +85,7 @@ fn barrier() -> BarrierOption {
     option.day_count = DayCount::Act365F;
     option.div_yield_id = None;
     option.monitoring = finstack_quant_valuations::instruments::Monitoring::Continuous;
-    option.notional = Money::from((1_000_i64, Currency::USD));
+    option.quantity = 1_000.0;
     option.rebate = Some(Money::from((25_i64, Currency::USD)));
     option
 }
@@ -98,7 +98,7 @@ fn production_barrier_ndf_known_expiry_rebate_is_total_trade_money() {
     option.observed_barrier_breached = Some(true);
     option.rebate_timing = PayoutTiming::AtExpiry;
     for scale in [1.0, 1_000.0] {
-        option.notional = Money::new(scale, Currency::USD).expect("notional");
+        option.quantity = scale;
         assert!(
             (option.value(&market, as_of).expect("known rebate").amount() - 25.0).abs() < 1e-10
         );
@@ -293,7 +293,7 @@ fn production_barrier_ndf_discrete_gbm_and_heston_do_not_observe_between_dates()
         );
     let mut option = barrier();
     option.option_type = OptionType::Put;
-    option.notional = Money::new(1.0, Currency::USD).expect("notional");
+    option.quantity = 1.0;
     option.barrier = 90.0;
     option.rebate = Some(Money::new(2.5, Currency::USD).expect("rebate"));
     option.rebate_timing = PayoutTiming::AtHit;

@@ -2,6 +2,74 @@
 
 ## [Unreleased]
 
+### Underlying identity, spot ids and size (2026-09-24)
+
+The underlying spot is a typed `spot_id: PriceId`; no market id is read from
+`attributes.meta` or derived from a ticker or instrument id (`-SPOT`, `-VOL`,
+`_VOL`, `-DIVYIELD`, global `EQUITY-SPOT`/`EQUITY-DIVYIELD`). `underlying_ticker`
+is a label only. Instrument-local quotes are `quoted_spot`/`quoted_forward`,
+quanto inputs use the shared `QuantoSpec`, and a count of underlying units is
+`quantity`. Every `MarketContext::get_price` key is typed `PriceId` (the wire
+stays a string).
+
+#### Changed (BREAKING)
+
+- `ConvertibleBond.underlying_equity_id` (now `spot_id: PriceId`, required),
+  plus new required `vol_surface_id` (a surface, or a unitless flat-vol scalar)
+  and optional `div_yield_id`; the `attributes.meta` `vol_surface_id`/`div_yield_id`
+  keys and the `{id}-VOL`/`{id}-DIVYIELD` fallbacks are gone. A configured
+  `div_yield_id` must resolve (no silent q = 0). Python getters/builder
+  `underlying_equity_id` (now `spot_id`, `vol_surface_id`, `div_yield_id`);
+  Rust/Python/JSON.
+- `VarianceSwap` gains required `spot_id: PriceId` and `vol_surface_id: CurveId`
+  and optional `div_yield_id` (unset means a zero yield); the close series
+  defaults to `spot_id`. The `{ticker}`/`{ticker}_VOL`/`{ticker}-DIVYIELD`
+  lookups are gone; Rust/JSON.
+- `Equity.price_id` (now `spot_id`), `Equity.price_quote` (now `quoted_spot`),
+  `Equity.shares` (now `quantity`); builders `with_price_id`/`with_price`/`with_shares`
+  (now `with_spot_id`/`with_quoted_spot`/`with_quantity`), `effective_shares()`
+  (now `effective_quantity()`). Without `quoted_spot` a `spot_id` is required: the
+  meta keys and ticker/id/`-SPOT`/`EQUITY-SPOT` candidates, and the
+  `-DIVYIELD`/`EQUITY-DIVYIELD` dividend candidates, are removed; Rust/JSON.
+- `EquityOption.notional`, `AsianOption.notional`, `BarrierOption.notional` and
+  `LookbackOption.notional` (a `Money` unit count; now `quantity: f64` plus a
+  separate `currency: Currency`). `EquityOptionParams.notional` and the
+  `EquityOptionParams::new`/`european_call`/`european_put` and
+  `EquityOption::european_call`/`european_call_with_market_data` `notional: Money`
+  argument (now `quantity: f64, currency: Currency`). Python
+  `EquityOption.notional` getter, `EquityOptionBuilder.notional` and the
+  `EquityOption.european_call(..., notional, ...)` argument (now `quantity` and
+  `currency`). PV is unchanged; Rust/Python/JSON.
+- `FxForward.spot_rate_override`, `FxFuture.spot_rate_override`, `Ndf.spot_rate_override`
+  and `FxSpot.spot_rate` (now `quoted_spot`); `Ndf.forward_rate_override` (now
+  `quoted_forward`); `FxSpot::with_rate` (now `with_quoted_spot`); Python
+  `FxForward.spot_rate_override` getter/builder (now `quoted_spot`); Rust/Python/JSON.
+- `QuantoOption.fx_rate_id` (now `fx_spot_id: Option<PriceId>`), `QuantoOption.fx_vol_id`
+  (now `fx_vol_surface_id`), `QuantoOption.underlying_quantity` (now `quantity`);
+  Rust/JSON.
+- `EquityFutureQuantoSpec` deleted; `EquityFuture.quanto` is the shared
+  `QuantoSpec` (`asset_currency`, `asset_discount_curve_id`, `correlation`,
+  `fx_vol_surface_id`, `fx_spot_id`). `EquityFuture.discount_curve_id` is now the
+  settlement (payoff) curve, the carry curve is `quanto.asset_discount_curve_id`
+  (was `discount_curve_id`), `quanto.settlement_discount_curve_id` is gone, and
+  `quanto.equity_vol_surface_id` moves to `EquityFuture.vol_surface_id`;
+  `quanto.asset_currency` must equal `underlying_currency`; Rust/JSON.
+- Commodity flattened `ticker` (now `underlying_ticker`) on CommodityForward,
+  CommodityOption, CommodityAsianOption, CommoditySwap and CommoditySwaption
+  (`CommodityUnderlyingParams.ticker`); `CommodityFuture.underlying` (now
+  `underlying_ticker`); Rust/JSON.
+- `CommoditySpreadOption.notional` and `CommoditySwaption.notional` (unit counts,
+  now `quantity`); Rust/JSON.
+- `CommodityForward.spot_id`, `CommodityOption.spot_id`, `FxVarianceSwap.spot_id`,
+  `IndexUnderlyingParams.yield_id`/`duration_id` (FI TRS) and
+  `CollateralSpec.market_value_id` are typed `PriceId` (wire unchanged); Rust.
+- `VolatilityDependency.underlying_id` (now `spot_id`); Rust/JSON.
+- Scenario market target `equity_price.price_id: CurveId` (now `spot_id: PriceId`);
+  Rust/JSON.
+- Rough-Bergomi market scalars `RBERGOMI_ETA`/`RBERGOMI_HURST`/`RBERGOMI_RHO`
+  (now `ROUGH_BERGOMI_ETA`/`ROUGH_BERGOMI_HURST`/`ROUGH_BERGOMI_RHO`).
+- `MarketDependencies::add_market_scalar_id` takes `impl AsRef<str>`; Rust.
+
 ### Rates projection and index ids (2026-09-24)
 
 A rates projection curve and a commodity price curve are `forward_curve_id`,

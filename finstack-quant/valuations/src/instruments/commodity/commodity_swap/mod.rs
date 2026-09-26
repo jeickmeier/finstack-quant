@@ -24,7 +24,7 @@
 //!
 //! // Create a natural gas swap
 //! let swap = CommoditySwap::example();
-//! assert_eq!(swap.underlying.ticker, "NG");
+//! assert_eq!(swap.underlying.underlying_ticker, "NG");
 //! ```
 
 mod types;

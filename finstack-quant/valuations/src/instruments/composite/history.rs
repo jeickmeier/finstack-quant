@@ -310,20 +310,16 @@ mod tests {
         let legs = vec![
             CompositeLegSpec::new(
                 "A",
-                crate::instruments::InstrumentJson::Equity(crate::instruments::Equity::new(
-                    "A",
-                    "A",
-                    Currency::USD,
-                )),
+                crate::instruments::InstrumentJson::Equity(
+                    crate::instruments::Equity::new("A", "A", Currency::USD).with_spot_id("A"),
+                ),
                 1.0,
             ),
             CompositeLegSpec::new(
                 "B",
-                crate::instruments::InstrumentJson::Equity(crate::instruments::Equity::new(
-                    "B",
-                    "B",
-                    Currency::USD,
-                )),
+                crate::instruments::InstrumentJson::Equity(
+                    crate::instruments::Equity::new("B", "B", Currency::USD).with_spot_id("B"),
+                ),
                 -1.0,
             ),
         ];

@@ -3,8 +3,8 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
 pub use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
@@ -86,8 +86,10 @@ pub struct AsianOption {
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub fixing_dates: Vec<Date>,
-    /// Notional amount
-    pub notional: Money,
+    /// Number of underlying units the option is written on; PV and Greeks scale linearly with it.
+    pub quantity: f64,
+    /// Currency of the strike, premium and present value.
+    pub currency: Currency,
     /// Day count convention
     pub day_count: finstack_quant_core::dates::DayCount,
     /// Discount curve ID for present value calculations
@@ -146,8 +148,7 @@ impl AsianOption {
             ));
         }
         validation::validate_f64_positive(self.strike, "AsianOption strike")?;
-        validation::validate_money_finite(self.notional, "AsianOption notional")?;
-        validation::validate_money_gt(self.notional, 0.0, "AsianOption notional")?;
+        validation::validate_f64_positive(self.quantity, "AsianOption quantity")?;
         if self.fixing_dates.is_empty() {
             return Err(finstack_quant_core::Error::Validation(
                 "AsianOption requires at least one fixing date".to_string(),
@@ -212,7 +213,8 @@ impl AsianOption {
             .averaging_method(AveragingMethod::Arithmetic)
             .expiry(date!(2024 - 06 - 30))
             .fixing_dates(fixing_dates)
-            .notional(Money::from((100_000_i64, Currency::USD)))
+            .quantity(100_000.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .spot_id("SPX-SPOT".into())
@@ -454,10 +456,10 @@ mod tests {
         use crate::instruments::common_impl::traits::Instrument;
 
         let mut option = AsianOption::example().expect("example");
-        option.notional = Money::from((0_i64, option.notional.currency()));
+        option.quantity = 0.0;
         assert!(option.validate_for_pricing().is_err());
 
-        option.notional = Money::from((100_000_i64, option.notional.currency()));
+        option.quantity = 100_000.0;
         option.fixing_dates.swap(0, 1);
         assert!(option.validate_for_pricing().is_err());
 

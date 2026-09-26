@@ -9,7 +9,7 @@
 //!
 //! # Note
 //!
-//! Errors if `fx_vol_id` is not set on the instrument.
+//! Errors if `fx_vol_surface_id` is not set on the instrument.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::quanto_option::QuantoOption;
@@ -38,18 +38,18 @@ impl MetricCalculator for FxVegaCalculator {
         }
 
         // Require an FX vol surface id - silent zero hides config errors.
-        let fx_vol_id = option.fx_vol_id.as_ref().ok_or_else(|| {
+        let fx_vol_surface_id = option.fx_vol_surface_id.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "QuantoOption {}: fx_vol_id is required to compute FX Vega",
+                "QuantoOption {}: fx_vol_surface_id is required to compute FX Vega",
                 option.id
             ))
         })?;
 
         // Absolute bump in vol units (e.g. 20% -> 21%); central difference for O(h^2).
         let curves_up =
-            bump_surface_vol_absolute(context.curves.as_ref(), fx_vol_id.as_str(), bump)?;
+            bump_surface_vol_absolute(context.curves.as_ref(), fx_vol_surface_id.as_str(), bump)?;
         let curves_down =
-            bump_surface_vol_absolute(context.curves.as_ref(), fx_vol_id.as_str(), -bump)?;
+            bump_surface_vol_absolute(context.curves.as_ref(), fx_vol_surface_id.as_str(), -bump)?;
 
         let pv_up = option.value(&curves_up, as_of)?.amount();
         let pv_down = option.value(&curves_down, as_of)?.amount();

@@ -62,15 +62,6 @@
           "default": null,
           "description": "Optional foreign (base) currency discount curve ID."
         },
-        "forward_rate_override": {
-          "default": null,
-          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
@@ -116,6 +107,24 @@
           "$ref": "#/$defs/NdfQuoteConvention",
           "description": "Quote convention for contract_rate and observed_fixing."
         },
+        "quoted_forward": {
+          "default": null,
+          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_spot": {
+          "default": null,
+          "description": "Optional spot rate override for forward rate calculation.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
           "default": {},
@@ -124,15 +133,6 @@
         "settlement_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Settlement currency (freely convertible, typically USD, denominator and PV currency)."
-        },
-        "spot_rate_override": {
-          "default": null,
-          "description": "Optional spot rate override for forward rate calculation.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         }
       },
       "required": [
@@ -258,7 +258,6 @@
           "domestic_discount_curve_id": "USD-OIS",
           "fixing_date": "2025-03-13",
           "fixing_source_enum": "PBOC",
-          "forward_rate_override": 7.25,
           "id": "USDCNY-NDF-3M",
           "maturity": "2025-03-15",
           "notional": {
@@ -266,6 +265,7 @@
             "currency": "CNY"
           },
           "quote_convention": "base_per_settlement",
+          "quoted_forward": 7.25,
           "settlement_currency": "USD"
         },
         "type": "ndf"

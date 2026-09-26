@@ -7,7 +7,7 @@ use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
+use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId, PriceId};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_margin::RepoMarginSpec;
 use rust_decimal::Decimal;
@@ -91,7 +91,7 @@ pub struct CollateralSpec {
     /// Quantity/face value of collateral
     pub quantity: f64,
     /// Market value identifier in MarketContext (e.g., "BOND_ABC_PRICE")
-    pub market_value_id: String,
+    pub market_value_id: PriceId,
 }
 
 impl CollateralSpec {
@@ -99,7 +99,7 @@ impl CollateralSpec {
     pub fn new(
         instrument_id: impl Into<String>,
         quantity: f64,
-        market_value_id: impl Into<String>,
+        market_value_id: impl Into<PriceId>,
     ) -> Self {
         Self {
             collateral_type: CollateralType::default(),
@@ -114,7 +114,7 @@ impl CollateralSpec {
         security_id: impl Into<String>,
         instrument_id: impl Into<String>,
         quantity: f64,
-        market_value_id: impl Into<String>,
+        market_value_id: impl Into<PriceId>,
         rate_adjustment_bp: Option<f64>,
     ) -> Self {
         Self {
@@ -623,7 +623,7 @@ impl Instrument for Repo {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_market_scalar_id(&self.collateral.market_value_id);
+        deps.add_market_scalar_id(self.collateral.market_value_id.as_str());
         Ok(deps)
     }
 

@@ -32,7 +32,7 @@
 //!
 //! // Create a WTI crude oil forward
 //! let forward = CommodityForward::example();
-//! assert_eq!(forward.underlying.ticker, "CL");
+//! assert_eq!(forward.underlying.underlying_ticker, "CL");
 //! ```
 
 mod types;

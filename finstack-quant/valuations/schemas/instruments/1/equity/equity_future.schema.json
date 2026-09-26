@@ -1,5 +1,12 @@
 {
   "$defs": {
+    "CorrelationWire": {
+      "description": "Finite correlation coefficient in the closed interval `[-1, 1]`.",
+      "format": "double",
+      "maximum": 1.0,
+      "minimum": -1.0,
+      "type": "number"
+    },
     "EquityFuture": {
       "additionalProperties": false,
       "description": "Exchange-listed future on an equity, equity index, or fixed-currency quanto index.",
@@ -11,7 +18,7 @@
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Underlying-currency discount curve used for equity carry."
+          "description": "Settlement-currency discount curve. Without `quanto` the settlement and\nunderlying currencies match, so this curve also carries the equity."
         },
         "discrete_dividends": {
           "description": "Optional discrete dividends `(ex_date, amount)` in index points.",
@@ -57,13 +64,13 @@
         "quanto": {
           "anyOf": [
             {
-              "$ref": "#/$defs/EquityFutureQuantoSpec"
+              "$ref": "#/$defs/QuantoSpec"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Required quanto adjustment when settlement and underlying currencies differ."
+          "description": "Required quanto adjustment when settlement and underlying currencies\ndiffer. `quanto.asset_discount_curve_id` is the underlying-currency\ncarry curve and `quanto.asset_currency` must equal `underlying_currency`."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -84,6 +91,17 @@
         "underlying_ticker": {
           "description": "Equity or index ticker.",
           "type": "string"
+        },
+        "vol_surface_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Equity volatility surface (decimal vol per square-root year). Required\nwith `quanto`, where it drives the quanto drift."
         }
       },
       "required": [
@@ -93,41 +111,6 @@
         "terms",
         "discount_curve_id",
         "spot_id"
-      ],
-      "type": "object"
-    },
-    "EquityFutureQuantoSpec": {
-      "additionalProperties": false,
-      "description": "Market inputs for a fixed-currency quanto equity future.",
-      "properties": {
-        "correlation": {
-          "description": "Correlation between equity returns and the settlement-per-underlying FX rate.",
-          "format": "double",
-          "type": "number"
-        },
-        "equity_vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Equity volatility surface in decimal volatility per square-root year."
-        },
-        "fx_spot_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "FX spot scalar in settlement currency per underlying currency."
-        },
-        "fx_vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "FX volatility surface for settlement currency per underlying currency."
-        },
-        "settlement_discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Settlement-currency discount curve used to form the ATM FX forward."
-        }
-      },
-      "required": [
-        "settlement_discount_curve_id",
-        "equity_vol_surface_id",
-        "fx_vol_surface_id",
-        "fx_spot_id",
-        "correlation"
       ],
       "type": "object"
     },
@@ -265,6 +248,40 @@
         }
       ]
     },
+    "QuantoSpec": {
+      "additionalProperties": false,
+      "description": "Quanto adjustment parameters for instruments where payoff currency differs from\nunderlying currency.",
+      "properties": {
+        "asset_currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency in which the underlying asset is quoted and financed."
+        },
+        "asset_discount_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve for financing the underlying in its asset currency."
+        },
+        "correlation": {
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Correlation between the asset price and payoff-currency units per asset-currency unit.\nMust be in [-1, 1]."
+        },
+        "fx_spot_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Required positive FX spot scalar in payoff-currency units per asset-currency unit.\nA monetary scalar must use the payoff currency. The FX surface is queried\nat the forward FX rate implied by the asset and payoff discount curves."
+        },
+        "fx_vol_surface_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "FX volatility surface ID (required for quanto vol lookup)."
+        }
+      },
+      "required": [
+        "asset_currency",
+        "asset_discount_curve_id",
+        "correlation",
+        "fx_vol_surface_id",
+        "fx_spot_id"
+      ],
+      "type": "object"
+    },
     "equity_future": {
       "additionalProperties": false,
       "properties": {
@@ -292,15 +309,15 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "discount_curve_id": "EUR-OIS",
+          "discount_curve_id": "USD-OIS",
           "div_yield_id": "SX5E-DIV",
           "id": "EUREX-FESQ-DEC26",
           "quanto": {
+            "asset_currency": "EUR",
+            "asset_discount_curve_id": "EUR-OIS",
             "correlation": -0.25,
-            "equity_vol_surface_id": "SX5E-VOL",
             "fx_spot_id": "EURUSD-SPOT",
-            "fx_vol_surface_id": "EURUSD-VOL",
-            "settlement_discount_curve_id": "USD-OIS"
+            "fx_vol_surface_id": "EURUSD-VOL"
           },
           "spot_id": "SX5E-SPOT",
           "terms": {
@@ -316,7 +333,8 @@
             "settlement_date": "2026-12-21"
           },
           "underlying_currency": "EUR",
-          "underlying_ticker": "SX5E"
+          "underlying_ticker": "SX5E",
+          "vol_surface_id": "SX5E-VOL"
         },
         "type": "equity_future"
       },

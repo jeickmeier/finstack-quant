@@ -1329,7 +1329,8 @@ mod tests {
                             "A",
                             "A",
                             Currency::USD,
-                        ),
+                        )
+                        .with_spot_id("A"),
                     ),
                     1.0,
                 ),
@@ -1340,7 +1341,8 @@ mod tests {
                             "B",
                             "B",
                             Currency::USD,
-                        ),
+                        )
+                        .with_spot_id("B"),
                     ),
                     -1.0,
                 ),

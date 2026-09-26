@@ -1,8 +1,8 @@
 //! Equity option specific parameters.
 
 use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, PriceId};
 
 /// Equity option specific parameters.
@@ -20,8 +20,10 @@ pub struct EquityOptionParams {
     pub exercise_style: ExerciseStyle,
     /// Settlement type (Cash/Physical)
     pub settlement: SettlementType,
-    /// Notional amount for valuation scaling.
-    pub notional: Money,
+    /// Number of underlying units the option is written on; PV and Greeks scale linearly with it.
+    pub quantity: f64,
+    /// Currency of the strike, premium and present value.
+    pub currency: Currency,
 }
 
 /// Explicit market data identifiers for pricing an equity option.
@@ -39,25 +41,54 @@ pub struct EquityOptionMarketData {
 
 impl EquityOptionParams {
     /// Create new equity option parameters
-    pub fn new(strike: f64, expiry: Date, option_type: OptionType, notional: Money) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `strike` - Strike price in `currency` per underlying unit
+    /// * `expiry` - Option expiry date
+    /// * `option_type` - Call or put
+    /// * `quantity` - Number of underlying units; PV scales linearly with it
+    /// * `currency` - Currency of the strike, premium and present value
+    pub fn new(
+        strike: f64,
+        expiry: Date,
+        option_type: OptionType,
+        quantity: f64,
+        currency: Currency,
+    ) -> Self {
         Self {
             strike,
             expiry,
             option_type,
             exercise_style: ExerciseStyle::European,
             settlement: SettlementType::Physical,
-            notional,
+            quantity,
+            currency,
         }
     }
 
     /// Create European call option parameters
-    pub fn european_call(strike: f64, expiry: Date, notional: Money) -> Self {
-        Self::new(strike, expiry, OptionType::Call, notional)
+    ///
+    /// # Arguments
+    ///
+    /// * `strike` - Strike price in `currency` per underlying unit
+    /// * `expiry` - Option expiry date
+    /// * `quantity` - Number of underlying units; PV scales linearly with it
+    /// * `currency` - Currency of the strike, premium and present value
+    pub fn european_call(strike: f64, expiry: Date, quantity: f64, currency: Currency) -> Self {
+        Self::new(strike, expiry, OptionType::Call, quantity, currency)
     }
 
     /// Create European put option parameters
-    pub fn european_put(strike: f64, expiry: Date, notional: Money) -> Self {
-        Self::new(strike, expiry, OptionType::Put, notional)
+    ///
+    /// # Arguments
+    ///
+    /// * `strike` - Strike price in `currency` per underlying unit
+    /// * `expiry` - Option expiry date
+    /// * `quantity` - Number of underlying units; PV scales linearly with it
+    /// * `currency` - Currency of the strike, premium and present value
+    pub fn european_put(strike: f64, expiry: Date, quantity: f64, currency: Currency) -> Self {
+        Self::new(strike, expiry, OptionType::Put, quantity, currency)
     }
 
     /// Set exercise style

@@ -46,7 +46,8 @@ function pdeFixture() {
   Object.assign(f.instrument.instrument.spec, {
     strike: 100,
     barrier: 120,
-    notional: { amount: '1', currency: 'USD' },
+    quantity: 1,
+    currency: 'USD',
     rebate: null,
     div_yield_id: null,
     expiry: '2026-01-02',
@@ -78,7 +79,7 @@ test('PDE total rebates follow continuous closed forms and payment timing', () =
     [10, Math.exp(-0.5)],
   ];
   const s = f.instrument.instrument.spec;
-  s.notional.amount = '1000';
+  s.quantity = 1000;
   s.rebate = { amount: '25000', currency: 'USD' };
   s.monitoring = { type: 'continuous' };
   for (const barrierType of ['up_and_out', 'down_and_in']) {
@@ -146,7 +147,7 @@ test('known expiry rebate is a total trade amount', () => {
   s.div_yield_id = null;
   s.strike = 100;
   s.barrier = 120;
-  s.notional.amount = '1000';
+  s.quantity = 1000;
   s.rebate.amount = '25';
   s.rebate_timing = 'at_expiry';
   s.observed_barrier_breached = true;

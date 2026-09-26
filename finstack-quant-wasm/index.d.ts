@@ -6464,7 +6464,7 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
  *   base_currency: "EUR",
  *   quote_currency: "USD",
  *   settlement: "2025-01-17",
- *   spot_rate: 1.1,
+ *   quoted_spot: 1.1,
  *   notional: { amount: "1000000", currency: "EUR" },
  *   attributes: {},
  * });
@@ -6499,7 +6499,7 @@ export interface FxInstrumentConstructor<T extends FxInstrument> {
  *   base_currency: "EUR",
  *   quote_currency: "USD",
  *   settlement: "2025-01-17",
- *   spot_rate: 1.1,
+ *   quoted_spot: 1.1,
  *   notional: { amount: "1000000", currency: "EUR" },
  *   attributes: {},
  * });

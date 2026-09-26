@@ -45,7 +45,7 @@ fn test_quote_amount_equals_npv() {
 
 #[test]
 fn test_quote_amount_default_notional() {
-    let fx = sample_eurusd().with_rate(1.18).expect("test rate");
+    let fx = sample_eurusd().with_quoted_spot(1.18).expect("test rate");
     let market = MarketContext::new();
     let result = fx
         .price_with_metrics(
@@ -97,7 +97,7 @@ fn test_quote_amount_various_currencies() {
     let gbp_fx = sample_gbpusd()
         .with_notional(Money::new(500_000.0, Currency::GBP).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.40)
+        .with_quoted_spot(1.40)
         .expect("test rate");
     let gbp_result = gbp_fx
         .price_with_metrics(
@@ -118,7 +118,7 @@ fn test_quote_amount_various_currencies() {
     let jpy_fx = sample_usdjpy()
         .with_notional(Money::new(100_000.0, Currency::USD).expect("valid money fixture"))
         .unwrap()
-        .with_rate(110.0)
+        .with_quoted_spot(110.0)
         .expect("test rate");
     let jpy_result = jpy_fx
         .price_with_metrics(
@@ -141,7 +141,7 @@ fn test_quote_amount_zero_notional() {
     let fx = sample_eurusd()
         .with_notional(Money::new(0.0, Currency::EUR).expect("valid money fixture"))
         .unwrap()
-        .with_rate(1.20)
+        .with_quoted_spot(1.20)
         .expect("test rate");
     let market = MarketContext::new();
     let result = fx
@@ -229,7 +229,7 @@ fn test_quote_amount_conversion_relationship() {
         .unwrap();
 
     let quote_amt = result.value.amount();
-    let spot_rate = fx.spot_rate.unwrap();
+    let spot_rate = fx.quoted_spot.unwrap();
 
     // Base amount is the notional
     let base_amt = fx.notional.amount();

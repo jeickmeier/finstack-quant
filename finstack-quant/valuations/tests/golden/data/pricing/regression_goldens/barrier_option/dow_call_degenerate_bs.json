@@ -139,12 +139,12 @@
         "option_type": "call",
         "barrier_type": "down_and_out",
         "expiry": "2027-04-30",
-        "notional": {
-          "amount": "1",
-          "currency": "USD"
-        },
+        "quantity": 1.0,
+        "currency": "USD",
         "day_count": "act_365f",
-        "monitoring": {"type": "continuous"},
+        "monitoring": {
+          "type": "continuous"
+        },
         "discount_curve_id": "USD-OIS",
         "spot_id": "SPX-SPOT",
         "vol_surface_id": "SPX-VOL",

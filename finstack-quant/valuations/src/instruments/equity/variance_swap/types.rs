@@ -91,8 +91,19 @@ pub enum EquityPriceSeriesPolicy {
 pub struct VarianceSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
-    /// Underlying identifier (equity/index)
+    /// Underlying symbol (equity/index). A label only; market data is read
+    /// through `spot_id`, `vol_surface_id` and `div_yield_id`.
     pub underlying_ticker: String,
+    /// Market-scalar id (`MarketContext::get_price`) of the underlying spot
+    /// level. It is also the default close-price series id.
+    pub spot_id: PriceId,
+    /// Volatility surface used to replicate the unobserved variance.
+    pub vol_surface_id: CurveId,
+    /// Optional unitless continuous dividend-yield scalar id (decimal,
+    /// 0.02 = 2%). `None` means a zero dividend yield.
+    #[serde(default)]
+    #[builder(optional)]
+    pub div_yield_id: Option<PriceId>,
     /// Variance notional (in variance units)
     pub notional: Money,
     /// Strike variance (annualized)
@@ -153,21 +164,18 @@ pub struct VarianceSwap {
     /// levels or contracts whose calculation agent retains raw observations.
     pub price_series_policy: EquityPriceSeriesPolicy,
     /// Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-    /// Defaults to `underlying_ticker` when absent.
     #[serde(default)]
     #[builder(optional)]
     pub open_series_id: Option<String>,
     /// Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-    /// Defaults to `underlying_ticker` when absent.
     #[serde(default)]
     #[builder(optional)]
     pub high_series_id: Option<String>,
     /// Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
-    /// Defaults to `underlying_ticker` when absent.
     #[serde(default)]
     #[builder(optional)]
     pub low_series_id: Option<String>,
-    /// Series ID for close prices. Defaults to `underlying_ticker` when absent.
+    /// Series ID for close prices. Defaults to `spot_id` when absent.
     #[serde(default)]
     #[builder(optional)]
     pub close_series_id: Option<String>,
@@ -329,15 +337,11 @@ impl VarianceSwap {
         variance_notional * 2.0 * strike_vol * 0.01
     }
 
-    pub(crate) fn volatility_candidate_ids(&self) -> [String; 2] {
-        [
-            self.underlying_ticker.clone(),
-            format!("{}_VOL", self.underlying_ticker),
-        ]
-    }
-
-    pub(crate) fn dividend_yield_scalar_id(&self) -> String {
-        format!("{}-DIVYIELD", self.underlying_ticker)
+    /// Close-price series id: `close_series_id`, else `spot_id`.
+    pub(crate) fn close_series_id(&self) -> &str {
+        self.close_series_id
+            .as_deref()
+            .unwrap_or(self.spot_id.as_str())
     }
 
     /// Create a canonical example equity variance swap (SPX, 1Y).
@@ -346,6 +350,9 @@ impl VarianceSwap {
         VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-1Y"))
             .underlying_ticker("SPX".to_string())
+            .spot_id(PriceId::new("SPX"))
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(PriceId::new("SPX-DIVYIELD")))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .strike_variance(0.04) // 20% vol squared
             .start_date(date!(2024 - 01 - 01))
@@ -555,18 +562,17 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        let underlying_id = PriceId::new(self.underlying_ticker.as_str());
-        deps.add_market_scalar_id(self.underlying_ticker.as_str());
-        deps.add_market_scalar_id(self.dividend_yield_scalar_id());
-        for vol_surface_id in self.volatility_candidate_ids() {
-            deps.add_volatility_dependency(
-                crate::instruments::common_impl::dependencies::VolatilityDependency::new(
-                    vol_surface_id,
-                    Some(underlying_id.clone()),
-                    None,
-                ),
-            );
+        deps.add_market_scalar_id(&self.spot_id);
+        if let Some(div_yield_id) = &self.div_yield_id {
+            deps.add_market_scalar_id(div_yield_id);
         }
+        deps.add_volatility_dependency(
+            crate::instruments::common_impl::dependencies::VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                Some(self.spot_id.clone()),
+                None,
+            ),
+        );
         if self.realized_var_method.requires_ohlc() {
             for series_id in [
                 self.open_series_id.as_deref(),
@@ -579,10 +585,8 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
             {
                 deps.add_series_id(series_id);
             }
-        } else if let Some(close_id) = self.close_series_id.as_deref() {
-            deps.add_series_id(close_id);
         } else {
-            deps.add_series_id(self.underlying_ticker.as_str());
+            deps.add_series_id(self.close_series_id());
         }
         Ok(deps)
     }
@@ -623,28 +627,20 @@ mod dependency_tests {
         let deps =
             crate::instruments::Instrument::market_dependencies(&swap).expect("dependencies");
 
-        assert_eq!(
-            deps.market_scalar_ids,
-            vec![
-                swap.underlying_ticker.clone(),
-                swap.dividend_yield_scalar_id(),
-            ]
-        );
+        // Every market id comes from a typed field; nothing is derived from
+        // `underlying_ticker`.
+        assert_eq!(deps.market_scalar_ids, vec!["SPX", "SPX-DIVYIELD"]);
         assert_eq!(
             deps.volatility_dependencies
                 .iter()
                 .map(|dependency| dependency.vol_surface_id.as_str())
                 .collect::<Vec<_>>(),
-            swap.volatility_candidate_ids()
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>()
+            vec!["SPX-VOL"]
         );
         assert!(deps.volatility_dependencies.iter().all(|dependency| {
-            dependency.underlying_id.as_ref().map(|id| id.as_str())
-                == Some(swap.underlying_ticker.as_str())
+            dependency.spot_id.as_ref().map(|id| id.as_str()) == Some("SPX")
                 && dependency.reference_strike.is_none()
         }));
-        assert_eq!(deps.series_ids, vec![swap.underlying_ticker]);
+        assert_eq!(deps.series_ids, vec!["SPX"]);
     }
 }

@@ -11,8 +11,7 @@ use finstack_quant_core::{Error, Result};
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::{GreekBumps, Instrument};
 use crate::instruments::fixed_income::convertible::{
-    market_inputs::{resolve_dividend_yield, volatility_candidate_ids},
-    ConversionEvent, ConversionPolicy, ConvertibleBond,
+    market_inputs::resolve_dividend_yield, ConversionEvent, ConversionPolicy, ConvertibleBond,
 };
 use crate::metrics::bump_discount_curve_parallel;
 use finstack_quant_models::TreeGreeks;
@@ -142,13 +141,8 @@ fn extract_equity_state(
     ctx: &MarketContext,
     as_of: Date,
 ) -> Result<EquityState> {
-    let underlying_id = bond
-        .underlying_equity_id
-        .as_deref()
-        .ok_or_else(|| Error::internal("convertible pricing requires underlying equity spot"))?;
-
     // Get spot price, preserving the original scalar variant for type-safe bumping
-    let spot_scalar = ctx.get_price(underlying_id)?.clone();
+    let spot_scalar = ctx.get_price(&bond.spot_id)?.clone();
     let spot = match &spot_scalar {
         MarketScalar::Price(money) => {
             if money.currency() != bond.notional.currency() {
@@ -208,18 +202,13 @@ fn extract_equity_state(
             Error::Validation("convertible volatility requires a valid conversion ratio".into())
         })?;
         let strike = bond.notional.amount() / ratio;
-        resolve_volatility(
-            ctx,
-            &volatility_candidate_ids(bond)?,
-            time_to_maturity,
-            strike,
-        )?
+        resolve_volatility(ctx, bond.vol_surface_id.as_str(), time_to_maturity, strike)?
     };
 
     let dividend_yield = resolve_dividend_yield(ctx, bond)?;
 
     let resolved_ids = ResolvedIds {
-        spot_id: underlying_id.into(),
+        spot_id: bond.spot_id.clone(),
     };
 
     Ok(EquityState {
@@ -234,54 +223,31 @@ fn extract_equity_state(
 }
 
 /// Resolve the equity volatility at the contractual conversion strike.
+///
+/// `vol_surface_id` names either a volatility surface (read at the conversion
+/// strike and maturity) or a unitless scalar holding a flat volatility.
 fn resolve_volatility(
     ctx: &MarketContext,
-    candidate_ids: &[String],
+    vol_surface_id: &str,
     time_to_maturity: f64,
     strike: f64,
 ) -> Result<f64> {
-    let mut first_missing: Option<String> = None;
-
-    for id in candidate_ids {
-        match ctx.get_price(id) {
-            Ok(MarketScalar::Unitless(vol)) => {
-                return Ok(*vol);
-            }
-            Ok(_) => {}
-            Err(err) => {
-                if matches!(err, Error::Input(InputError::NotFound { .. })) {
-                    if first_missing.is_none() {
-                        first_missing = Some(id.clone());
-                    }
-                } else {
-                    return Err(err);
-                }
-            }
+    match ctx.get_price(vol_surface_id) {
+        Ok(MarketScalar::Unitless(vol)) => return Ok(*vol),
+        Ok(MarketScalar::Price(_)) => {
+            return Err(Error::Validation(format!(
+                "ConvertibleBond vol_surface_id '{vol_surface_id}' scalar must be unitless"
+            )));
         }
-
-        match ctx.get_surface(id) {
-            Ok(surface) => {
-                let vol = finstack_quant_models::volatility::get_surface_vol_clamped(
-                    &surface,
-                    time_to_maturity,
-                    strike,
-                );
-                return Ok(vol);
-            }
-            Err(err) => {
-                if matches!(err, Error::Input(InputError::NotFound { .. })) {
-                    if first_missing.is_none() {
-                        first_missing = Some(id.clone());
-                    }
-                    continue;
-                }
-                return Err(err);
-            }
-        }
+        Err(Error::Input(InputError::NotFound { .. })) => {}
+        Err(err) => return Err(err),
     }
-
-    let missing_id = first_missing.unwrap_or_else(|| "volatility".to_string());
-    Err(Error::from(InputError::NotFound { id: missing_id }))
+    let surface = ctx.get_surface(vol_surface_id)?;
+    Ok(finstack_quant_models::volatility::get_surface_vol_clamped(
+        &surface,
+        time_to_maturity,
+        strike,
+    ))
 }
 
 /// Aggregated data required for tree pricing

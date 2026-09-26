@@ -916,7 +916,7 @@ mod tests {
         assert_eq!(deps.volatility_dependencies.len(), 1);
         let dependency = &deps.volatility_dependencies[0];
         assert_eq!(dependency.vol_surface_id, vol_surface_id);
-        assert_eq!(dependency.underlying_id, None);
+        assert_eq!(dependency.spot_id, None);
         assert_eq!(dependency.reference_strike, None);
     }
 

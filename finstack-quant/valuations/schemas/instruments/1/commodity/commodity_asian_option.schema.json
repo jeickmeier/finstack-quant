@@ -107,8 +107,8 @@
           "$ref": "#/$defs/PositiveF64Wire",
           "description": "Strike price per unit."
         },
-        "ticker": {
-          "description": "Ticker/identifier for market data lookup (e.g., \"CL\", \"GC\", \"NG\")",
+        "underlying_ticker": {
+          "description": "Commodity symbol label (e.g., \"CL\", \"GC\", \"NG\"); never a market-data key.",
           "type": "string"
         },
         "unit": {
@@ -123,7 +123,7 @@
       "required": [
         "id",
         "commodity_type",
-        "ticker",
+        "underlying_ticker",
         "unit",
         "currency",
         "strike",
@@ -211,7 +211,7 @@
           "past_fixings": [],
           "quantity": 1000.0,
           "strike": 75.0,
-          "ticker": "CL",
+          "underlying_ticker": "CL",
           "unit": "BBL",
           "vol_surface_id": "CL-VOL"
         },

@@ -537,10 +537,8 @@
         "strike": 175.0,
         "option_type": "call",
         "expiry": "2027-05-08",
-        "notional": {
-          "amount": "100",
-          "currency": "USD"
-        },
+        "quantity": 100.0,
+        "currency": "USD",
         "discount_curve_id": "USD-OIS",
         "spot_id": "AAPL-SPOT",
         "vol_surface_id": "AAPL-EQUITY-SVI-VOL",

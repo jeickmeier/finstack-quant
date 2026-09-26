@@ -8,6 +8,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and grouping"
         },
+        "currency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency of the strike, premium and present value."
+        },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "default": "act_365f",
@@ -89,13 +93,14 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount for valuation scaling."
-        },
         "option_type": {
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)"
+        },
+        "quantity": {
+          "description": "Number of underlying units the option is written on; PV and Greeks scale linearly with it.",
+          "format": "double",
+          "type": "number"
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -130,7 +135,8 @@
         "strike",
         "option_type",
         "expiry",
-        "notional",
+        "quantity",
+        "currency",
         "discount_curve_id",
         "spot_id",
         "vol_surface_id",
@@ -250,6 +256,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "currency": "USD",
           "day_count": "act_365f",
           "discount_curve_id": "USD-OIS",
           "discrete_dividends": [],
@@ -257,11 +264,8 @@
           "exercise_style": "european",
           "expiry": "2024-06-21",
           "id": "SPX-CALL-4500",
-          "notional": {
-            "amount": "100",
-            "currency": "USD"
-          },
           "option_type": "call",
+          "quantity": 100.0,
           "settlement": "cash",
           "spot_id": "EQUITY-SPOT",
           "strike": 4500.0,

@@ -77,7 +77,8 @@ fn asian_option(mc_paths: usize) -> AsianOption {
         strike: 100.0,
         option_type: OptionType::Call,
         expiry,
-        notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+        quantity: 1.0,
+        currency: Currency::USD,
         averaging_method: AveragingMethod::Arithmetic,
         fixing_dates: vec![
             Date::from_calendar_date(2025, Month::July, 1).unwrap(),
@@ -104,7 +105,8 @@ fn lookback_option(mc_paths: usize) -> LookbackOption {
         .option_type(OptionType::Call)
         .lookback_type(LookbackType::FixedStrike)
         .expiry(expiry)
-        .notional(Money::new(1.0, Currency::USD).expect("valid money fixture"))
+        .quantity(1.0)
+        .currency(Currency::USD)
         .day_count(DayCount::Act365F)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .spot_id("SPOT".into())
@@ -277,7 +279,7 @@ fn bench_barrier_monitoring(c: &mut Criterion) {
     option.strike = 100.0;
     option.barrier = 120.0;
     option.barrier_type = BarrierType::UpAndOut;
-    option.notional = Money::from((1_000_i64, Currency::USD));
+    option.quantity = 1_000.0;
     option.rebate = Some(Money::from((25_i64, Currency::USD)));
     option.rebate_timing = PayoutTiming::AtHit;
     option.spot_id = "SPOT".into();

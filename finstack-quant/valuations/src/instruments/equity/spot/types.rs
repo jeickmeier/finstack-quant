@@ -40,13 +40,17 @@ pub struct Equity {
     pub ticker: String,
     /// Currency in which the equity is quoted
     pub currency: Currency,
-    /// Optional number of shares (defaults to 1 if not specified)
-    pub shares: Option<f64>,
-    /// Optional price quote (if not provided, will look up from market data)
-    pub price_quote: Option<f64>,
-    /// Explicit scalar identifier used to resolve the spot price.
-    pub price_id: Option<PriceId>,
-    /// Explicit scalar identifier used to resolve the dividend yield.
+    /// Optional number of shares held (defaults to 1 if not specified).
+    pub quantity: Option<f64>,
+    /// Optional quoted spot price per share in `currency`. When set it wins
+    /// over the `spot_id` market lookup.
+    pub quoted_spot: Option<f64>,
+    /// Market-scalar id (`MarketContext::get_price`) of the spot price per
+    /// share. Required unless `quoted_spot` is set; no id is ever derived from
+    /// the ticker or instrument id.
+    pub spot_id: Option<PriceId>,
+    /// Market-scalar id of the unitless continuous dividend yield (decimal,
+    /// 0.02 = 2%). `None` means a zero dividend yield.
     pub div_yield_id: Option<PriceId>,
     /// Optional discrete cash dividends `(ex_date, amount)` for single-name forwards.
     #[serde(default)]
@@ -93,19 +97,19 @@ impl Equity {
                 "Equity requires a non-empty ticker".to_string(),
             ));
         }
-        if let Some(shares) = self.shares {
-            validation::validate_f64_finite(shares, "Equity shares")?;
+        if let Some(quantity) = self.quantity {
+            validation::validate_f64_finite(quantity, "Equity quantity")?;
         }
-        if let Some(price) = self.price_quote {
-            validation::validate_f64_non_negative(price, "Equity price_quote")?;
+        if let Some(price) = self.quoted_spot {
+            validation::validate_f64_non_negative(price, "Equity quoted_spot")?;
         }
         if self
-            .price_id
+            .spot_id
             .as_ref()
             .is_some_and(|id| id.as_str().trim().is_empty())
         {
             return Err(finstack_quant_core::Error::Validation(
-                "Equity price_id must not be empty when supplied".to_string(),
+                "Equity spot_id must not be empty when supplied".to_string(),
             ));
         }
         for (date, amount) in &self.discrete_dividends {
@@ -125,8 +129,8 @@ impl Equity {
     /// Returns a 100-share position in AAPL with realistic market data IDs.
     pub fn example() -> Self {
         Self::new("EQUITY-AAPL", "AAPL", Currency::USD)
-            .with_shares(100.0)
-            .with_price_id("AAPL-SPOT")
+            .with_quantity(100.0)
+            .with_spot_id("AAPL-SPOT")
             .with_dividend_yield_id("AAPL-DIV")
     }
 
@@ -138,9 +142,9 @@ impl Equity {
             id: InstrumentId::new(id.into()),
             ticker: ticker.into(),
             currency,
-            shares: None,
-            price_quote: None,
-            price_id: None,
+            quantity: None,
+            quoted_spot: None,
+            spot_id: None,
             div_yield_id: None,
             discrete_dividends: Vec::new(),
             discount_curve_id,
@@ -151,21 +155,33 @@ impl Equity {
         }
     }
 
-    /// Set the number of shares
-    pub fn with_shares(mut self, shares: f64) -> Self {
-        self.shares = Some(shares);
+    /// Set the number of shares held.
+    ///
+    /// # Arguments
+    ///
+    /// * `quantity` - Share count (finite; negative for a short position).
+    pub fn with_quantity(mut self, quantity: f64) -> Self {
+        self.quantity = Some(quantity);
         self
     }
 
-    /// Set a price quote
-    pub fn with_price(mut self, price: f64) -> Self {
-        self.price_quote = Some(price);
+    /// Set a quoted spot price that replaces the `spot_id` market lookup.
+    ///
+    /// # Arguments
+    ///
+    /// * `price` - Spot price per share in the equity's `currency` (non-negative).
+    pub fn with_quoted_spot(mut self, price: f64) -> Self {
+        self.quoted_spot = Some(price);
         self
     }
 
-    /// Override the scalar identifier used to resolve the spot price.
-    pub fn with_price_id(mut self, price_id: impl Into<PriceId>) -> Self {
-        self.price_id = Some(price_id.into());
+    /// Set the market-scalar id used to resolve the spot price.
+    ///
+    /// # Arguments
+    ///
+    /// * `spot_id` - `MarketContext::get_price` id of the spot price per share.
+    pub fn with_spot_id(mut self, spot_id: impl Into<PriceId>) -> Self {
+        self.spot_id = Some(spot_id.into());
         self
     }
 
@@ -179,54 +195,6 @@ impl Equity {
     pub fn with_discrete_dividends(mut self, dividends: Vec<(Date, f64)>) -> Self {
         self.discrete_dividends = dividends;
         self
-    }
-
-    pub(crate) fn price_id_candidates(&self) -> Vec<String> {
-        let mut ids: Vec<String> = Vec::new();
-        let mut push = |candidate: Option<&str>| {
-            if let Some(value) = candidate {
-                if !value.is_empty() && !ids.iter().any(|existing| existing == value) {
-                    ids.push(value.to_string());
-                }
-            }
-        };
-
-        push(self.price_id.as_ref().map(|id| id.as_str()));
-        push(self.attributes.get_meta("price_id"));
-        push(self.attributes.get_meta("spot_id"));
-        push(self.attributes.get_meta("market_price_id"));
-        push(Some(self.ticker.as_str()));
-        push(Some(self.id.as_str()));
-        let ticker_spot = format!("{}-SPOT", self.ticker);
-        push(Some(ticker_spot.as_str()));
-        let id_spot = format!("{}-SPOT", self.id.as_str());
-        push(Some(id_spot.as_str()));
-        push(Some("EQUITY-SPOT"));
-
-        ids
-    }
-
-    pub(crate) fn dividend_yield_id_candidates(&self) -> Vec<String> {
-        let mut ids: Vec<String> = Vec::new();
-        let mut push = |candidate: Option<&str>| {
-            if let Some(value) = candidate {
-                if !value.is_empty() && !ids.iter().any(|existing| existing == value) {
-                    ids.push(value.to_string());
-                }
-            }
-        };
-
-        push(self.div_yield_id.as_ref().map(|id| id.as_str()));
-        push(self.attributes.get_meta("div_yield_id"));
-        push(self.attributes.get_meta("dividend_yield_key"));
-        push(self.attributes.get_meta("div_yield_id"));
-        let ticker_div = format!("{}-DIVYIELD", self.ticker);
-        push(Some(ticker_div.as_str()));
-        let id_div = format!("{}-DIVYIELD", self.id.as_str());
-        push(Some(id_div.as_str()));
-        push(Some("EQUITY-DIVYIELD"));
-
-        ids
     }
 
     fn money_from_scalar(
@@ -291,45 +259,37 @@ impl Equity {
         )
     }
 
-    /// Get the effective number of shares (defaults to 1)
-    pub fn effective_shares(&self) -> f64 {
-        self.shares.unwrap_or(1.0)
+    /// Get the effective number of shares held (defaults to 1).
+    pub fn effective_quantity(&self) -> f64 {
+        self.quantity.unwrap_or(1.0)
     }
 
     /// Resolve price per share for the equity.
     ///
-    /// A direct `price_quote` has highest priority. When `price_id` is set,
-    /// that identifier is authoritative: missing or invalid data returns an
-    /// error and never falls through to a different underlying. Candidate
-    /// lookup is used only when no explicit identifier was configured.
+    /// A direct `quoted_spot` has highest priority; otherwise the `spot_id`
+    /// scalar is read. Missing or invalid data returns an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `curves` - Market context holding the `spot_id` scalar (and the FX
+    ///   matrix when the scalar is a price in another currency).
+    /// * `as_of` - Valuation date used for any FX conversion.
     pub fn price_per_share(
         &self,
         curves: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
         self.validate()?;
-        if let Some(px) = self.price_quote {
+        if let Some(px) = self.quoted_spot {
             return Money::new(px, self.currency);
         }
-        if let Some(price_id) = &self.price_id {
-            return self.money_from_scalar(curves.get_price(price_id)?, curves, as_of);
-        }
-
-        let candidates = self.price_id_candidates();
-        for key in &candidates {
-            match curves.get_price(key) {
-                Ok(scalar) => return self.money_from_scalar(scalar, curves, as_of),
-                Err(finstack_quant_core::Error::Input(
-                    finstack_quant_core::InputError::NotFound { .. },
-                )) => continue,
-                Err(error) => return Err(error),
-            }
-        }
-
-        Err(finstack_quant_core::InputError::NotFound {
-            id: format!("equity price (candidates: {})", candidates.join(", ")),
-        }
-        .into())
+        let spot_id = self.spot_id.as_ref().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "Equity '{}' requires either quoted_spot or spot_id",
+                self.id
+            ))
+        })?;
+        self.money_from_scalar(curves.get_price(spot_id)?, curves, as_of)
     }
 
     /// Resolve dividend yield (annualized, decimal) for the equity
@@ -348,25 +308,6 @@ impl Equity {
                     self.id, explicit_id
                 ))),
             };
-        }
-        let candidates = self.dividend_yield_id_candidates();
-        for key in &candidates {
-            match curves.get_price(key) {
-                Ok(MarketScalar::Unitless(v)) if v.is_finite() => return Ok(*v),
-                Ok(MarketScalar::Unitless(v)) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Equity '{}' dividend yield '{}' must be finite, got {v}",
-                        self.id, key
-                    )));
-                }
-                Ok(MarketScalar::Price(_)) => continue,
-                Err(err) => match err {
-                    finstack_quant_core::Error::Input(
-                        finstack_quant_core::InputError::NotFound { .. },
-                    ) => continue,
-                    _ => return Err(err),
-                },
-            }
         }
         Ok(0.0)
     }
@@ -437,7 +378,10 @@ impl Equity {
         t: f64,
     ) -> finstack_quant_core::Result<Money> {
         let per_share = self.forward_price_per_share(curves, as_of, t)?;
-        Money::new(per_share.amount() * self.effective_shares(), self.currency)
+        Money::new(
+            per_share.amount() * self.effective_quantity(),
+            self.currency,
+        )
     }
 }
 
@@ -451,19 +395,11 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        if let Some(price_id) = &self.price_id {
-            deps.add_market_scalar_id(price_id.as_str());
-        } else {
-            for spot_id in self.price_id_candidates() {
-                deps.add_market_scalar_id(spot_id);
-            }
+        if let Some(spot_id) = &self.spot_id {
+            deps.add_market_scalar_id(spot_id);
         }
         if let Some(dividend_yield_id) = &self.div_yield_id {
-            deps.add_market_scalar_id(dividend_yield_id.as_str());
-        } else {
-            for dividend_yield_id in self.dividend_yield_id_candidates() {
-                deps.add_market_scalar_id(dividend_yield_id);
-            }
+            deps.add_market_scalar_id(dividend_yield_id);
         }
         Ok(deps)
     }
@@ -476,7 +412,7 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
         let spot_px = self.price_per_share(market, as_of)?;
 
         finstack_quant_core::money::Money::new(
-            spot_px.amount() * self.effective_shares(),
+            spot_px.amount() * self.effective_quantity(),
             self.currency,
         )
     }
@@ -492,8 +428,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
         // Equity notional is shares * price (market value)
         // If price not quoted, return None to avoid incorrect estimation
-        self.price_quote
-            .map(|p| Money::new(self.effective_shares() * p, self.currency))
+        self.quoted_spot
+            .map(|p| Money::new(self.effective_quantity() * p, self.currency))
             .transpose()
     }
 
@@ -525,14 +461,14 @@ mod tests {
     #[test]
     fn test_equity_creation() {
         let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-            .with_shares(100.0)
-            .with_price(150.0);
+            .with_quantity(100.0)
+            .with_quoted_spot(150.0);
 
         assert_eq!(equity.id.as_str(), "AAPL");
         assert_eq!(equity.ticker, "AAPL");
         assert_eq!(equity.currency, Currency::USD);
-        assert_eq!(equity.effective_shares(), 100.0);
-        assert_eq!(equity.price_quote, Some(150.0));
+        assert_eq!(equity.effective_quantity(), 100.0);
+        assert_eq!(equity.quoted_spot, Some(150.0));
     }
 
     #[test]
@@ -549,7 +485,7 @@ mod tests {
 
     #[test]
     fn missing_explicit_price_id_does_not_use_global_fallback() {
-        let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_price_id("AAPL-PRIMARY");
+        let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_spot_id("AAPL-PRIMARY");
         let market = MarketContext::new().insert_price(
             "EQUITY-SPOT",
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(999.0),
@@ -565,14 +501,14 @@ mod tests {
     #[test]
     fn test_equity_default_shares() {
         let equity = Equity::new("MSFT", "MSFT", Currency::USD);
-        assert_eq!(equity.effective_shares(), 1.0);
+        assert_eq!(equity.effective_quantity(), 1.0);
     }
 
     #[test]
     fn test_equity_valuation() {
         let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-            .with_shares(100.0)
-            .with_price(150.0);
+            .with_quantity(100.0)
+            .with_quoted_spot(150.0);
 
         let curves = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -598,8 +534,8 @@ mod tests {
     #[test]
     fn test_equity_metrics() {
         let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-            .with_shares(50.0)
-            .with_price(200.0);
+            .with_quantity(50.0)
+            .with_quoted_spot(200.0);
 
         let curves = MarketContext::new();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");

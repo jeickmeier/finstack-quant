@@ -231,7 +231,7 @@ impl BarrierOptionPdePricer {
         let q = bs_inputs.q;
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
-        let ccy = inst.notional.currency();
+        let ccy = inst.currency;
 
         let r = bs_inputs.r_eff();
 
@@ -245,7 +245,7 @@ impl BarrierOptionPdePricer {
                 t,
                 inst.option_type,
             );
-            return Money::new(unit * inst.notional.amount(), ccy).map_err(|error| {
+            return Money::new(unit * inst.quantity, ccy).map_err(|error| {
                 crate::pricer::PricingError::from_core(
                     error,
                     crate::pricer::PricingErrorContext::from_instrument(inst),
@@ -300,8 +300,7 @@ impl BarrierOptionPdePricer {
             is_call,
             barrier_is_upper,
             rebate: if is_knock_out {
-                inst.rebate
-                    .map_or(0.0, |m| m.amount() / inst.notional.amount())
+                inst.rebate.map_or(0.0, |m| m.amount() / inst.quantity)
             } else {
                 0.0
             },
@@ -374,10 +373,7 @@ impl BarrierOptionPdePricer {
             }
             // A knock-in rebate is paid only when monitoring finishes without
             // a hit. Price the discounted survival indicator on the same grid.
-            ko_inputs.terminal_cash = Some(
-                inst.rebate
-                    .map_or(0.0, |m| m.amount() / inst.notional.amount()),
-            );
+            ko_inputs.terminal_cash = Some(inst.rebate.map_or(0.0, |m| m.amount() / inst.quantity));
             let survival_rebate = if inst.rebate.is_some() {
                 self.price_knock_out(&ko_grid, &ko_inputs)?
             } else {
@@ -386,7 +382,7 @@ impl BarrierOptionPdePricer {
             parity.max(0.0) + survival_rebate
         };
 
-        Money::new(unit_price * inst.notional.amount(), ccy).map_err(|error| {
+        Money::new(unit_price * inst.quantity, ccy).map_err(|error| {
             crate::pricer::PricingError::from_core(
                 error,
                 crate::pricer::PricingErrorContext::from_instrument(inst),
@@ -721,7 +717,8 @@ mod tests {
             barrier_type,
             expiry,
             observed_barrier_breached: None,
-            notional: Money::from((1_i64, Currency::USD)),
+            quantity: 1.0,
+            currency: Currency::USD,
             day_count: DayCount::Act365F,
             monitoring: crate::instruments::Monitoring::Continuous,
             discount_curve_id: "USD_DISC".into(),
@@ -973,7 +970,7 @@ mod tests {
                 let level = if barrier_type.is_up() { 120.0 } else { 80.0 };
                 let mut option =
                     barrier_option(barrier_type, OptionType::Call, expiry, 100.0, level);
-                option.notional = Money::new(1_000.0, Currency::USD).expect("notional");
+                option.quantity = 1_000.0;
                 option.rebate = Some(Money::new(25_000.0, Currency::USD).expect("rebate"));
                 option.rebate_timing = timing;
                 let analytical = option.value(&mkt, as_of).expect("analytical").amount();

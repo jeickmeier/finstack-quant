@@ -175,7 +175,8 @@ mod gbm_barrier {
             barrier_type: BarrierType::DownAndOut,
             expiry,
             observed_barrier_breached: None,
-            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            quantity: 1.0,
+            currency: Currency::USD,
             day_count: DayCount::Act365F,
             // false: no extra Gobet-Miri barrier shift. Both pricers still apply
             // the same Brownian-bridge hit correction inside the shared payoff;
@@ -597,7 +598,8 @@ mod asian_geometric {
             averaging_method: AveragingMethod::Geometric,
             expiry,
             fixing_dates,
-            notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            quantity: 1.0,
+            currency: Currency::USD,
             day_count: DayCount::Act365F,
             discount_curve_id: "USD-OIS".into(),
             spot_id: "SPX".into(),

@@ -192,9 +192,9 @@ d1=(math.log(72/75)+.5*.30**2*t)/(.30*math.sqrt(t));d2=d1-.30*math.sqrt(t)
 listed_manual=1000*market.get_discount("USD-OIS").df(t)*(72*normal.cdf(d1)-75*normal.cdf(d2))
 
 swaption=instrument_envelope({"type":"commodity_swaption","spec":{
-    "id":"NG-SWAPTION","commodity_type":"Energy","ticker":"NG","unit":"MMBTU","currency":"USD",
+    "id":"NG-SWAPTION","commodity_type":"Energy","underlying_ticker":"NG","unit":"MMBTU","currency":"USD",
     "option_type":"call","expiry":"2025-06-16","swap_start":"2025-06-16","swap_end":"2025-12-16",
-    "swap_frequency":{"count":3,"unit":"months"},"fixed_price":3.2,"notional":10000.,
+    "swap_frequency":{"count":3,"unit":"months"},"fixed_price":3.2,"quantity":10000.,
     "forward_curve_id":"NG-FORWARD","discount_curve_id":"USD-OIS","vol_surface_id":"NG-VOL",
     "calendar_id":"weekends_only","business_day_convention":"modified_following","day_count":"act_365f","attributes":{}}})
 sloped_value=price_instrument(json.dumps(swaption),market,AS_OF,model="black76").value.amount

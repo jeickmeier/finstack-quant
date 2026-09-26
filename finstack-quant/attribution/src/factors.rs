@@ -298,7 +298,7 @@ impl MarketSnapshot {
             .volatility_dependencies
             .iter()
             .filter(|dependency| {
-                dependency.underlying_id.as_ref().is_none_or(|underlying| {
+                dependency.spot_id.as_ref().is_none_or(|underlying| {
                     underlying.as_str() != dependency.vol_surface_id.as_str()
                 })
             })

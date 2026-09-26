@@ -128,11 +128,15 @@
           "description": "Pay/receive variance"
         },
         "spot_id": {
-          "description": "Optional spot identifier used to look up historical series.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional spot identifier used to look up historical series."
         },
         "start_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

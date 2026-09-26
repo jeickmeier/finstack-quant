@@ -25,7 +25,7 @@
 //! use finstack_quant_core::currency::Currency;
 //!
 //! let swaption = CommoditySwaption::example();
-//! assert_eq!(swaption.underlying.ticker, "NG");
+//! assert_eq!(swaption.underlying.underlying_ticker, "NG");
 //! ```
 
 /// Metrics submodule for commodity swaption risk measures.

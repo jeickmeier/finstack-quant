@@ -2014,6 +2014,17 @@
           "$ref": "#/$defs/Id",
           "description": "Discount curve identifier for the debt component (risk-free or funding)."
         },
+        "div_yield_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional unitless continuous dividend-yield scalar id (decimal,\n0.02 = 2%). `None` means a zero dividend yield; a configured id must\nresolve."
+        },
         "fixed_coupon": {
           "anyOf": [
             {
@@ -2092,12 +2103,13 @@
           ],
           "description": "Optional soft-call trigger condition.\n\nWhen set, the issuer can only exercise call provisions if the underlying\nstock price satisfies the trigger condition (e.g., above 130% of conversion\nprice for 20 of 30 trading days).\n\n**Modeling scope**: a single trigger gates the ENTIRE callable life —\nevery window in [`Self::call_put`] is subject to it. A soft-call period\nfollowed by an unconditional hard-call period is not representable\n(omit the trigger to model an unconditional call). In the tree the\ntrigger is evaluated on the instantaneous node spot with a\nBroadie-Glasserman-Kou-style barrier adjustment approximating the\nk-of-n-days observation window; the realized path is not tracked."
         },
-        "underlying_equity_id": {
-          "description": "Optional underlying equity identifier (ticker or instrument id).",
-          "type": [
-            "string",
-            "null"
-          ]
+        "spot_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Market-scalar id (`MarketContext::get_price`) of the underlying share\nprice, as a price in the bond's currency or a unitless level."
+        },
+        "vol_surface_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Equity volatility id: a volatility surface read at the conversion strike\nand maturity, or a unitless scalar holding a flat volatility."
         }
       },
       "required": [
@@ -2107,6 +2119,8 @@
         "maturity",
         "discount_curve_id",
         "conversion",
+        "spot_id",
+        "vol_surface_id",
         "attributes"
       ],
       "type": "object"

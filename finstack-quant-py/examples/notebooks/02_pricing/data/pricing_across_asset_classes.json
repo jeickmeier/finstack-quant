@@ -14,8 +14,8 @@
       "position": "long",
       "quantity": 1000.0,
       "settlement": "cash",
-      "ticker": "CL",
-      "unit": "BBL"
+      "unit": "BBL",
+      "underlying_ticker": "CL"
     },
     "type": "commodity_forward"
   }

@@ -49,7 +49,9 @@
           "currency": "USD"
         },
         "recovery_rate": null,
-        "underlying_equity_id": "AAPL"
+        "spot_id": "AAPL",
+        "vol_surface_id": "AAPL-VOL",
+        "div_yield_id": "AAPL-DIVYIELD"
       },
       "type": "convertible_bond"
     },

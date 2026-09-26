@@ -68,7 +68,6 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use time::macros::date;
 
@@ -157,8 +156,10 @@ pub struct EquityOption {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
-    /// Notional amount for valuation scaling.
-    pub notional: Money,
+    /// Number of underlying units the option is written on; PV and Greeks scale linearly with it.
+    pub quantity: f64,
+    /// Currency of the strike, premium and present value.
+    pub currency: Currency,
     /// Model year fraction for volatility, dividend carry and exercise times; defaults to ACT/365F. Discount factors retain the curve's own date convention.
     #[serde(default = "crate::serde_defaults::day_count_act365f")]
     #[builder(default = finstack_quant_core::dates::DayCount::Act365F)]
@@ -282,7 +283,8 @@ impl EquityOption {
             .option_type(option_params.option_type)
             .exercise_style(option_params.exercise_style)
             .expiry(option_params.expiry)
-            .notional(option_params.notional)
+            .quantity(option_params.quantity)
+            .currency(option_params.currency)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .settlement(option_params.settlement)
             .discount_curve_id(market_data.discount_curve_id)
@@ -295,16 +297,16 @@ impl EquityOption {
 
     /// Validate structural and lifecycle invariants.
     ///
-    /// Checks strike/notional validity and, when an exercise observation is
+    /// Checks strike/quantity validity and, when an exercise observation is
     /// present, verifies its date, spot, settlement date, and exercise-style
     /// compatibility.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         validation::validate_f64_finite(self.strike, "equity option strike")?;
         validation::validate_f64_positive(self.strike, "equity option strike")?;
-        validation::validate_money_finite(self.notional, "equity option notional")?;
-        if self.notional.amount().abs() < f64::EPSILON {
+        validation::validate_f64_finite(self.quantity, "equity option quantity")?;
+        if self.quantity.abs() < f64::EPSILON {
             return Err(finstack_quant_core::Error::Validation(
-                "Equity option notional must be non-zero".into(),
+                "EquityOption.quantity must be non-zero".into(),
             ));
         }
         for (_, amount) in &self.discrete_dividends {
@@ -374,7 +376,8 @@ impl EquityOption {
             "SPX",
             4500.0,
             date!(2024 - 06 - 21),
-            Money::from((100_i64, Currency::USD)),
+            100.0,
+            Currency::USD,
             market_data,
         )
     }
@@ -391,20 +394,23 @@ impl EquityOption {
     /// * `ticker` - Underlying equity identifier used to look up spot, vol, and dividend market data.
     /// * `strike` - Option strike in the surface's quote units (absolute or relative)
     /// * `expiry` - Option expiry date or year-fraction used to locate the volatility point
-    /// * `notional` - Trade notional amount in the instrument currency's major units
+    /// * `quantity` - Number of underlying units; PV scales linearly with it
+    /// * `currency` - Currency of the strike, premium and present value
     pub fn european_call(
         id: impl Into<String>,
         ticker: impl Into<String>,
         strike: f64,
         expiry: Date,
-        notional: Money,
+        quantity: f64,
+        currency: Currency,
     ) -> finstack_quant_core::Result<Self> {
         Self::european_call_with_market_data(
             id,
             ticker,
             strike,
             expiry,
-            notional,
+            quantity,
+            currency,
             EquityOptionMarketData::new("USD-OIS", "EQUITY-SPOT", "EQUITY-VOL")
                 .with_dividend_yield("EQUITY-DIVYIELD"),
         )
@@ -415,15 +421,26 @@ impl EquityOption {
     /// Use this constructor when you want the concise API of [`Self::european_call`]
     /// without hard-coding the discount curve, spot id, volatility surface, or
     /// dividend-yield source.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Trade identifier stored on the option
+    /// * `ticker` - Underlying equity label (not used for market lookups)
+    /// * `strike` - Option strike in `currency` per underlying unit
+    /// * `expiry` - Option expiry date
+    /// * `quantity` - Number of underlying units; PV scales linearly with it
+    /// * `currency` - Currency of the strike, premium and present value
+    /// * `market_data` - Discount curve, spot, vol surface and dividend-yield ids
     pub fn european_call_with_market_data(
         id: impl Into<String>,
         ticker: impl Into<String>,
         strike: f64,
         expiry: Date,
-        notional: Money,
+        quantity: f64,
+        currency: Currency,
         market_data: EquityOptionMarketData,
     ) -> finstack_quant_core::Result<Self> {
-        let option_params = EquityOptionParams::european_call(strike, expiry, notional)
+        let option_params = EquityOptionParams::european_call(strike, expiry, quantity, currency)
             .with_settlement(SettlementType::Cash);
         Self::build_vanilla_with_market_data(id, ticker, option_params, market_data)
     }
@@ -443,7 +460,8 @@ impl EquityOption {
             option_type: option_params.option_type,
             exercise_style: option_params.exercise_style,
             expiry: option_params.expiry,
-            notional: option_params.notional,
+            quantity: option_params.quantity,
+            currency: option_params.currency,
             day_count: finstack_quant_core::dates::DayCount::Act365F,
             settlement: option_params.settlement,
             exercise: None,
@@ -542,7 +560,7 @@ impl EquityOption {
     /// * `target_price` - Observed option premium: finite non-negative total trade PV in the notional currency, including the contract multiplier.
     ///
     /// # Errors
-    /// Returns a validation error for non-positive notional, settled exercise, invalid prices or an unidentifiable deterministic limit; propagates market, pricing and convergence errors.
+    /// Returns a validation error for non-positive quantity, settled exercise, invalid prices or an unidentifiable deterministic limit; propagates market, pricing and convergence errors.
     pub fn implied_vol(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -550,14 +568,14 @@ impl EquityOption {
         target_price: f64,
     ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_core::{math::solver::BrentSolver, Error};
-        let notional = self.notional.amount();
+        let quantity = self.quantity;
         if !target_price.is_finite()
             || target_price < 0.0
-            || !notional.is_finite()
-            || notional <= 0.0
+            || !quantity.is_finite()
+            || quantity <= 0.0
         {
             return Err(Error::Validation(
-                "equity implied vol requires finite non-negative PV and positive notional".into(),
+                "equity implied vol requires finite non-negative PV and positive quantity".into(),
             ));
         }
         if as_of >= self.expiry || self.exercise.is_some_and(|exercise| as_of >= exercise.date) {
@@ -569,9 +587,9 @@ impl EquityOption {
             let mut trial = self.clone();
             trial.instrument_pricing_overrides =
                 trial.instrument_pricing_overrides.with_implied_vol(sigma);
-            super::pricing::compute_pv(&trial, curves, as_of).map(|pv| pv.amount() / notional)
+            super::pricing::compute_pv(&trial, curves, as_of).map(|pv| pv.amount() / quantity)
         };
-        let target = target_price / notional;
+        let target = target_price / quantity;
         let lower = 1e-8;
         let low = price(lower)?;
         let tolerance = 1e-10 * target.abs().max(1.0);
@@ -655,7 +673,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
         // Vol bump: ±`vol_bump_decimal` (absolute, parallel surface bump).
         let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
             market.get_price(&self.spot_id)?,
-            self.notional.currency(),
+            self.currency,
         )?;
         let spot_bump_abs = spot * bumps.spot_bump_decimal;
         if spot_bump_abs <= 0.0 {
@@ -897,7 +915,7 @@ mod tests {
         assert_eq!(deps.volatility_dependencies.len(), 1);
         let volatility = &deps.volatility_dependencies[0];
         assert_eq!(volatility.vol_surface_id, option.vol_surface_id);
-        assert_eq!(volatility.underlying_id.as_ref(), Some(&option.spot_id));
+        assert_eq!(volatility.spot_id.as_ref(), Some(&option.spot_id));
         assert_eq!(volatility.reference_strike, Some(option.strike));
         assert!(deps.series_ids.is_empty());
     }
@@ -934,7 +952,8 @@ mod tests {
             .option_type(OptionType::Call)
             .exercise_style(ExerciseStyle::European)
             .expiry(expiry)
-            .notional(Money::from((100_i64, Currency::USD)))
+            .quantity(100.0)
+            .currency(Currency::USD)
             .day_count(DayCount::Act365F)
             .settlement(SettlementType::Cash)
             .discount_curve_id(CurveId::new(DISC_ID))
@@ -955,7 +974,8 @@ mod tests {
             .strike(0.0)
             .option_type(option.option_type)
             .expiry(option.expiry)
-            .notional(option.notional)
+            .quantity(option.quantity)
+            .currency(option.currency)
             .discount_curve_id(option.discount_curve_id)
             .spot_id(option.spot_id)
             .vol_surface_id(option.vol_surface_id)
@@ -989,13 +1009,13 @@ mod tests {
         let put = option_support::equity_option_european_put("SPX-PUT", "SPX", 90.0, expiry, 50.0)
             .unwrap();
         assert_eq!(put.option_type, OptionType::Put);
-        assert_eq!(put.notional.amount(), 50.0);
+        assert_eq!(put.quantity, 50.0);
 
         let american =
             option_support::equity_option_american_call("SPX-AMER", "SPX", 105.0, expiry, 75.0)
                 .unwrap();
         assert_eq!(american.exercise_style, ExerciseStyle::American);
-        assert_eq!(american.notional.amount(), 75.0);
+        assert_eq!(american.quantity, 75.0);
     }
 
     #[test]
@@ -1010,7 +1030,8 @@ mod tests {
             "SPX",
             100.0,
             expiry,
-            Money::from((100_i64, Currency::USD)),
+            100.0,
+            Currency::USD,
             market_data,
         )
         .expect("custom market-data constructor should succeed");
@@ -1021,7 +1042,8 @@ mod tests {
         assert_eq!(option.option_type, OptionType::Call);
         assert_eq!(option.exercise_style, ExerciseStyle::European);
         assert_eq!(option.expiry, expiry);
-        assert_eq!(option.notional, Money::from((100_i64, Currency::USD)));
+        assert_eq!(option.quantity, 100.0);
+        assert_eq!(option.currency, Currency::USD);
         assert_eq!(option.discount_curve_id, CurveId::new(DISC_ID));
         assert_eq!(option.spot_id.as_str(), SPOT_ID);
         assert_eq!(option.vol_surface_id, CurveId::new(VOL_ID));
@@ -1051,11 +1073,7 @@ mod tests {
         let expected_unit =
             bs_price_unchecked(spot, option.strike, r, q, sigma, t, option.option_type);
         // Slightly wider tolerance due to MonotoneConvex interpolation (vs Linear)
-        approx_eq(
-            price.amount(),
-            expected_unit * option.notional.amount(),
-            5e-3,
-        );
+        approx_eq(price.amount(), expected_unit * option.quantity, 5e-3);
 
         let greeks = option
             .greeks(&curves, as_of)
@@ -1209,7 +1227,7 @@ mod tests {
         for price in [-1.0, f64::NAN, f64::INFINITY] {
             assert!(option.implied_vol(&curves, as_of, price).is_err());
         }
-        option.notional = Money::from((0_i64, Currency::USD));
+        option.quantity = 0.0;
         assert!(option.implied_vol(&curves, as_of, 10.0).is_err());
     }
 
@@ -1242,7 +1260,7 @@ mod tests {
             0.45,
             t,
             override_option.option_type,
-        ) * override_option.notional.amount();
+        ) * override_option.quantity;
         // Slightly wider tolerance due to MonotoneConvex interpolation (vs Linear)
         approx_eq(override_price.amount(), expected, 5e-3);
     }
@@ -1252,7 +1270,7 @@ mod tests {
         let expiry = date(2025, 1, 3);
         let as_of = expiry;
         let mut option = base_option(expiry);
-        option.notional = Money::from((50_i64, Currency::USD));
+        option.quantity = 50.0;
         option.exercise = Some(EquityOptionExercise::new(expiry, 120.0, expiry, true));
         let curves = build_market_context(as_of, 120.0, 0.25, 0.01, 0.0);
 
@@ -1350,7 +1368,7 @@ mod tests {
         let greeks = option
             .greeks(&curves, as_of)
             .expect("Greeks should succeed with mixed day counts");
-        assert!(greeks.delta > 0.0 && greeks.delta < option.notional.amount());
+        assert!(greeks.delta > 0.0 && greeks.delta < option.quantity);
         assert!(greeks.gamma > 0.0);
         assert!(greeks.vega > 0.0);
 
@@ -1364,7 +1382,7 @@ mod tests {
             inputs.sigma,
             inputs.t_vol,
             option.option_type,
-        ) * option.notional.amount();
+        ) * option.quantity;
 
         // Slightly wider tolerance due to MonotoneConvex interpolation (vs Linear)
         // Same tolerance as other tests in this file

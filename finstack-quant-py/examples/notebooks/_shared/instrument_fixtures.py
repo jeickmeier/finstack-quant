@@ -587,9 +587,9 @@ def spot_equity(idx: int) -> tuple[str, dict]:
             "id": iid,
             "ticker": "AAPL",
             "currency": "USD",
-            "shares": 100.0,
-            "price_quote": None,
-            "price_id": "AAPL-SPOT",
+            "quantity": 100.0,
+            "quoted_spot": None,
+            "spot_id": "AAPL-SPOT",
             "div_yield_id": "AAPL-DIV",
             "discount_curve_id": "USD-OIS",
             "attributes": {"tags": ["equity"], "meta": {}},
@@ -607,6 +607,8 @@ def variance_swap(idx: int) -> tuple[str, dict]:
         "spec": {
             "id": iid,
             "underlying_ticker": "SPX",
+            "spot_id": "SPX",
+            "vol_surface_id": "SPX-VOL",
             "notional": {"amount": "100000", "currency": "USD"},
             "strike_variance": strike_var,
             "start_date": AS_OF_STR,
@@ -667,7 +669,8 @@ def convertible_bond(idx: int) -> tuple[str, dict]:
                 "anti_dilution": "none",
                 "dividend_adjustment": "none",
             },
-            "underlying_equity_id": "TECH",
+            "spot_id": "TECH",
+            "vol_surface_id": "TECH-VOL",
             "fixed_coupon": {
                 "coupon_type": "cash",
                 "rate": str(coupon),
@@ -815,7 +818,7 @@ def instrument_description(instrument_spec: dict) -> str:
     if itype == "convertible_bond":
         tenor = int(s["maturity"][:4]) - ref_year
         cpn = float(s["fixed_coupon"]["rate"]) * 100
-        return f"CB {s['underlying_equity_id']} {tenor}Y {cpn:.1f}%"
+        return f"CB {s['spot_id']} {tenor}Y {cpn:.1f}%"
 
     return itype
 

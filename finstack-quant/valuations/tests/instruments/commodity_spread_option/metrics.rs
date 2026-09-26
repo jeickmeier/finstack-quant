@@ -42,7 +42,7 @@ fn spread_call() -> (CommoditySpreadOption, MarketContext, Date) {
         .option_type(OptionType::Call)
         .expiry(expiry)
         .strike(5.0)
-        .notional(1.0)
+        .quantity(1.0)
         .leg1_forward_curve_id(CurveId::new("LEG1-FWD"))
         .leg2_forward_curve_id(CurveId::new("LEG2-FWD"))
         .leg1_vol_surface_id(CurveId::new("LEG1-VOL"))

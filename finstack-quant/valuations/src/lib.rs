@@ -76,8 +76,8 @@
 //!
 //! # fn main() -> finstack_quant_core::Result<()> {
 //! let equity = Equity::new("AAPL", "AAPL", Currency::USD)
-//!     .with_shares(50.0)
-//!     .with_price(200.0);
+//!     .with_quantity(50.0)
+//!     .with_quoted_spot(200.0);
 //! let result = equity.price_with_metrics(
 //!     &MarketContext::new(),
 //!     create_date(2026, Month::January, 2)?,

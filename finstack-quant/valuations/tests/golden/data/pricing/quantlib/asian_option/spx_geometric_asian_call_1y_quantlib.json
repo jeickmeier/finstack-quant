@@ -13,6 +13,7 @@
           ]
         },
         "averaging_method": "geometric",
+        "currency": "USD",
         "day_count": "act_365f",
         "discount_curve_id": "USD-OIS",
         "div_yield_id": "SPX-DIVYIELD",
@@ -24,12 +25,9 @@
           "2027-04-30"
         ],
         "id": "SPX-GEOMETRIC-ASIAN-CALL-1Y-QUANTLIB",
-        "notional": {
-          "amount": "1",
-          "currency": "USD"
-        },
         "option_type": "call",
         "past_fixings": [],
+        "quantity": 1.0,
         "spot_id": "SPX-SPOT",
         "strike": 100.0,
         "underlying_ticker": "SPX",

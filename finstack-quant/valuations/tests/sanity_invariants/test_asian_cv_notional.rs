@@ -75,7 +75,8 @@ mod cv_notional_tests {
             option_type,
             expiry,
             averaging_method: AveragingMethod::Arithmetic,
-            notional: Money::new(notional, Currency::USD).expect("valid money fixture"),
+            quantity: notional,
+            currency: Currency::USD,
             fixing_dates: vec![
                 date(2025, Month::April, 1),
                 date(2025, Month::July, 1),

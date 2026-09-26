@@ -1342,7 +1342,7 @@
             "null"
           ]
         },
-        "underlying_id": {
+        "spot_id": {
           "anyOf": [
             {
               "$ref": "#/$defs/Id"
@@ -1351,7 +1351,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional underlying price identifier paired with the surface."
+          "description": "Optional market-scalar id of the underlying spot paired with the surface."
         },
         "vol_surface_id": {
           "$ref": "#/$defs/Id",

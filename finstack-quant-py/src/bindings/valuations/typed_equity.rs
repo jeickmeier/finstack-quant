@@ -4,7 +4,6 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
@@ -13,8 +12,8 @@ use finstack_quant_valuations::instruments::equity::equity_option::EquityOptionM
 use finstack_quant_valuations::instruments::InstrumentJson;
 
 use super::convert::{
-    attributes_from_py, bool_repr, builder_repr, date_repr, day_count_from_py, enum_to_py_string,
-    float_repr, money_from_py, money_repr, money_to_py,
+    attributes_from_py, bool_repr, builder_repr, currency_from_py, date_repr, day_count_from_py,
+    enum_to_py_string, float_repr,
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
 use super::typed_fx::{
@@ -29,8 +28,8 @@ type EquityOptionBuilderInner =
 ///
 /// European options price with Black–Scholes–Merton (``"black76"`` on the
 /// forward); American and Bermudan styles use the tree pricer. The
-/// ``notional`` scales the per-share value (contract size in currency
-/// units); discrete dividends and a continuous ``div_yield_id`` are both
+/// ``quantity`` is the number of underlying units (contract size) the per-share
+/// value scales by, and ``currency`` is the premium/PV currency; discrete dividends and a continuous ``div_yield_id`` are both
 /// supported.
 ///
 /// Build with ``EquityOption.builder()`` or ``EquityOption.european_call(...)``;
@@ -79,7 +78,7 @@ instrument_pricing_methods!(PyEquityOption);
 impl PyEquityOption {
     /// Canonical example: SPX 4500 European call expiring 2024-06-21.
     ///
-    /// Mirrors Rust ``EquityOption::example()``: USD 100 notional, curve
+    /// Mirrors Rust ``EquityOption::example()``: 100 units in USD, curve
     /// ``USD-OIS``, spot ``EQUITY-SPOT``, surface ``EQUITY-VOL``, dividend
     /// yield ``EQUITY-DIVYIELD``.
     ///
@@ -118,8 +117,10 @@ impl PyEquityOption {
     ///     Strike price; must be finite and positive.
     /// expiry : datetime.date | str
     ///     Expiry date.
-    /// notional : Money | float
-    ///     Notional for valuation scaling; a bare float is USD.
+    /// quantity : float
+    ///     Number of underlying units; PV and Greeks scale linearly with it.
+    /// currency : Currency | str
+    ///     Currency of the strike, premium and present value (``"USD"``).
     /// discount_curve_id : str
     ///     Discount curve identifier.
     /// spot_id : str
@@ -137,13 +138,13 @@ impl PyEquityOption {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``strike`` is not positive or the notional is zero.
+    ///     If ``strike`` is not positive or ``quantity`` is zero, or ``currency`` is not a recognized code.
     #[staticmethod]
-    #[pyo3(signature = (id, ticker, strike, expiry, notional, *, discount_curve_id="USD-OIS",
+    #[pyo3(signature = (id, ticker, strike, expiry, quantity, currency, *, discount_curve_id="USD-OIS",
                         spot_id="EQUITY-SPOT", vol_surface_id="EQUITY-VOL",
                         div_yield_id="EQUITY-DIVYIELD"))]
     #[pyo3(
-        text_signature = "(id, ticker, strike, expiry, notional, *, discount_curve_id='USD-OIS', \
+        text_signature = "(id, ticker, strike, expiry, quantity, currency, *, discount_curve_id='USD-OIS', \
 spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIELD')"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
@@ -153,7 +154,8 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         ticker: &str,
         strike: f64,
         expiry: &Bound<'_, PyAny>,
-        notional: &Bound<'_, PyAny>,
+        quantity: f64,
+        currency: &Bound<'_, PyAny>,
         discount_curve_id: &str,
         spot_id: &str,
         vol_surface_id: &str,
@@ -170,7 +172,8 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
                 ticker,
                 strike,
                 extract_date(expiry)?,
-                money_from_py(notional, Some("USD"), "notional")?,
+                quantity,
+                currency_from_py(currency, "currency")?,
                 market_data,
             )
             .map_err(core_to_py)?;
@@ -190,7 +193,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     ///     Valuation date strictly before expiry and observed exercise.
     /// target_price : float
     ///     Observed option premium: finite non-negative total trade PV in the
-    ///     notional currency, including the contract multiplier.
+    ///     option currency, including the contract multiplier.
     ///
     /// Returns
     /// -------
@@ -200,7 +203,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     /// Raises
     /// ------
     /// ValueError
-    ///     If PV or notional is invalid, exercise has occurred, or volatility is unidentifiable.
+    ///     If PV or ``quantity`` is invalid, exercise has occurred, or volatility is unidentifiable.
     /// KeyError
     ///     If required market data is missing from ``market``.
     /// RuntimeError
@@ -392,10 +395,16 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         date_to_py(py, self.inner.expiry)
     }
 
-    /// Notional for valuation scaling.
+    /// Number of underlying units; PV and Greeks scale linearly with it.
     #[getter]
-    fn notional(&self) -> PyMoney {
-        money_to_py(self.inner.notional)
+    fn quantity(&self) -> f64 {
+        self.inner.quantity
+    }
+
+    /// Currency of the strike, premium and present value (ISO-4217 code).
+    #[getter]
+    fn currency(&self) -> String {
+        self.inner.currency.to_string()
     }
 
     /// Day count for the time-to-expiry year fraction (serde name).
@@ -471,14 +480,15 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "EquityOption(id={:?}, underlying_ticker={:?}, option_type={:?}, strike={}, expiry={}, exercise_style={:?}, notional={})",
+            "EquityOption(id={:?}, underlying_ticker={:?}, option_type={:?}, strike={}, expiry={}, exercise_style={:?}, quantity={}, currency={})",
             self.inner.id.as_str(),
             self.inner.underlying_ticker,
             enum_to_py_string(&self.inner.option_type).unwrap_or_default(),
             float_repr(self.inner.strike),
             date_repr(self.inner.expiry),
             enum_to_py_string(&self.inner.exercise_style).unwrap_or_default(),
-            money_repr(self.inner.notional),
+            float_repr(self.inner.quantity),
+            self.inner.currency,
         )
     }
 }
@@ -760,28 +770,54 @@ impl PyEquityOptionBuilder {
             .exercise(exercise))
     }
 
-    /// Set the notional amount for valuation scaling.
+    /// Set the number of underlying units the option is written on.
     ///
     /// Parameters
     /// ----------
-    /// value : Money
-    ///     Notional amount for valuation scaling.
+    /// value : float
+    ///     Number of underlying units; PV and Greeks scale linearly with it.
     ///
     /// Returns
     /// -------
     /// EquityOptionBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn notional<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyMoney>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let money = value.inner;
+    fn quantity<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
         eq_set!(
             slf,
-            notional,
-            money_repr(money),
-            |b: EquityOptionBuilderInner| b.notional(money)
+            quantity,
+            float_repr(value),
+            |b: EquityOptionBuilderInner| b.quantity(value)
+        )
+    }
+
+    /// Set the currency of the strike, premium and present value.
+    ///
+    /// Parameters
+    /// ----------
+    /// value : Currency | str
+    ///     ISO-4217 currency code (e.g. ``"USD"``) or ``Currency``.
+    ///
+    /// Returns
+    /// -------
+    /// EquityOptionBuilder
+    ///     ``self``, for chaining.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``value`` is not a recognized currency code.
+    #[pyo3(text_signature = "($self, value)")]
+    fn currency<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let ccy = currency_from_py(value, "currency")?;
+        eq_set!(
+            slf,
+            currency,
+            format!("{:?}", ccy.to_string()),
+            |b: EquityOptionBuilderInner| b.currency(ccy)
         )
     }
 
@@ -998,7 +1034,7 @@ impl PyEquityOptionBuilder {
     /// ValueError
     ///     If the builder was already consumed, a required field is missing,
     ///     or the completed option fails validation (non-positive strike,
-    ///     zero notional, unsorted dividends, inconsistent exercise state).
+    ///     zero quantity, unsorted dividends, inconsistent exercise state).
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyEquityOption> {
         let b = take_builder(&mut slf.inner)?;

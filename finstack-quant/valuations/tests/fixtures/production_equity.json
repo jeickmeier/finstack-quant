@@ -12,10 +12,8 @@
         "option_type": "put",
         "exercise_style": "american",
         "expiry": "2026-01-01",
-        "notional": {
-          "amount": "1",
-          "currency": "USD"
-        },
+        "quantity": 1.0,
+        "currency": "USD",
         "day_count": "act_365f",
         "settlement": "cash",
         "discount_curve_id": "DISC",
