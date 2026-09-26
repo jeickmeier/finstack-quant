@@ -49,7 +49,7 @@ fn create_test_pool() -> AssetPool {
             balance: Money::new(30_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: None,
-            index_id: None,
+            forward_curve_id: None,
             index_floor: None,
             maturity: maturity_date(),
             credit_quality: Some(CreditRating::BB),
@@ -373,7 +373,7 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
         TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
-            index_id: finstack_quant_core::types::CurveId::new("SOFR-3M".to_string()),
+            forward_curve_id: finstack_quant_core::types::CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
             gearing: rust_decimal::Decimal::ONE,
             gearing_includes_spread: true,

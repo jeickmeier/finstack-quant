@@ -1520,8 +1520,8 @@ mod haircut_tests {
     fn coverage_economics_floating_cure_uses_denominator_market_rate() {
         let pool = rated_pool();
         let as_of = Date::from_calendar_date(2025, Month::April, 1).expect("date");
-        let index_id = CurveId::new("USD-3M");
-        let forward = ForwardCurve::builder(index_id.clone(), 0.25)
+        let forward_curve_id = CurveId::new("USD-3M");
+        let forward = ForwardCurve::builder(forward_curve_id.clone(), 0.25)
             .base_date(as_of)
             .day_count(DayCount::Act360)
             .knots([(0.0, 0.04), (1.0, 0.04)])
@@ -1531,7 +1531,7 @@ mod haircut_tests {
             .expect("fixing series");
         let market = MarketContext::new().insert(forward).insert_series(fixing);
         let floating_coupon = TrancheCoupon::Floating(FloatingRateSpec {
-            index_id,
+            forward_curve_id,
             spread_bp: Decimal::from(100),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,

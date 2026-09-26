@@ -869,7 +869,7 @@ impl PyFixedCouponSpec {
 ///
 /// Parameters
 /// ----------
-/// index_id : str
+/// forward_curve_id : str
 ///     Forward curve identifier (e.g. ``"USD-SOFR"``).
 /// spread_bp : Decimal, float or str
 ///     Spread over the index in basis points.
@@ -900,7 +900,7 @@ impl PyFixedCouponSpec {
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows.builder import FloatingRateSpec
-/// >>> FloatingRateSpec.sofr(50).index_id
+/// >>> FloatingRateSpec.sofr(50).forward_curve_id
 /// 'USD-SOFR'
 #[pyclass(
     name = "FloatingRateSpec",
@@ -921,12 +921,12 @@ impl PyFloatingRateSpec {
     /// Construct a floating-rate spec; see the class docstring for parameters.
     #[new]
     #[pyo3(
-        signature = (index_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=true, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, overnight_compounding=None, overnight_basis=None, fallback=None),
-        text_signature = "(index_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, overnight_compounding=None, overnight_basis=None, fallback=None)"
+        signature = (forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=true, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, overnight_compounding=None, overnight_basis=None, fallback=None),
+        text_signature = "(forward_curve_id, spread_bp, reset_frequency, gearing=None, gearing_includes_spread=True, index_floor_bp=None, all_in_floor_bp=None, all_in_cap_bp=None, index_cap_bp=None, overnight_index_constraints=None, index_tenor=None, reset_lag_days=2, fixing_calendar_id=None, overnight_compounding=None, overnight_basis=None, fallback=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
-        index_id: &str,
+        forward_curve_id: &str,
         spread_bp: &Bound<'_, PyAny>,
         reset_frequency: &Bound<'_, PyAny>,
         gearing: Option<&Bound<'_, PyAny>>,
@@ -945,7 +945,7 @@ impl PyFloatingRateSpec {
     ) -> PyResult<Self> {
         Ok(Self {
             inner: FloatingRateSpec {
-                index_id: finstack_quant_core::types::CurveId::from(index_id),
+                forward_curve_id: finstack_quant_core::types::CurveId::from(forward_curve_id),
                 spread_bp: decimal_from_any(spread_bp)?,
                 gearing: gearing.map_or(Ok(Decimal::ONE), decimal_from_any)?,
                 gearing_includes_spread,
@@ -1013,8 +1013,8 @@ impl PyFloatingRateSpec {
 
     /// Forward curve identifier.
     #[getter]
-    fn index_id(&self) -> String {
-        self.inner.index_id.to_string()
+    fn forward_curve_id(&self) -> String {
+        self.inner.forward_curve_id.to_string()
     }
 
     /// Spread over the index in basis points, as ``decimal.Decimal``.
@@ -1146,7 +1146,7 @@ impl PyFloatingRateSpec {
 /// --------
 /// >>> from finstack_quant.cashflows.builder import FloatingCouponSpec, FloatingRateSpec, ScheduleParams
 /// >>> spec = FloatingCouponSpec(FloatingRateSpec.sofr(50), ScheduleParams.usd_sofr_swap())
-/// >>> spec.rate_spec.index_id
+/// >>> spec.rate_spec.forward_curve_id
 /// 'USD-SOFR'
 #[pyclass(
     name = "FloatingCouponSpec",

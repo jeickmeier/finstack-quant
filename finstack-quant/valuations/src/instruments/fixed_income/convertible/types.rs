@@ -1104,9 +1104,9 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
             deps.add_credit_curve(credit_curve_id.clone());
         }
         if let Some(floating_coupon) = &self.floating_coupon {
-            deps.add_forward_curve(floating_coupon.rate_spec.index_id.clone());
+            deps.add_forward_curve(floating_coupon.rate_spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                floating_coupon.rate_spec.index_id.as_str(),
+                floating_coupon.rate_spec.forward_curve_id.as_str(),
             ));
         }
         if let Some(call_put) = &self.call_put {
@@ -1271,7 +1271,7 @@ mod tests {
             unreachable!("floating example must have a floating coupon")
         };
         let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
-            floating_coupon.rate_spec.index_id.as_str(),
+            floating_coupon.rate_spec.forward_curve_id.as_str(),
         );
         bond.fixed_coupon = None;
         bond.floating_coupon = Some(floating_coupon);

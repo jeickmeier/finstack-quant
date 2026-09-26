@@ -169,7 +169,7 @@ impl CmsSpreadOptionPricer {
         })?;
         let swap_end = inst.expiry_date.add_months(tenor_months as i32);
         // Project the CMS forward swap rate on the instrument's resolved swap
-        // conventions (explicit fields > swap_convention > currency > USD).
+        // conventions (explicit fields > index_id > currency > USD).
         let (forward_rate, _) = inst.reference_swap().forward_rate_and_annuity(
             market,
             as_of,

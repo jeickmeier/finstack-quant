@@ -699,7 +699,7 @@ impl BasisSwap {
             .principal_exchange(PrincipalExchange::None)
             .floating_cf(FloatingCouponSpec {
                 rate_spec: FloatingRateSpec {
-                    index_id: leg.forward_curve_id.clone(),
+                    forward_curve_id: leg.forward_curve_id.clone(),
                     spread_bp: leg.spread_bp,
                     gearing: Decimal::ONE,
                     gearing_includes_spread: true,

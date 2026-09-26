@@ -142,7 +142,7 @@ from finstack_quant.core.money import Money
 
 from _shared.analyst_book import build_market
 overnight_market = build_market('foundations')
-floating_rate = FloatingRateSpec(index_id='USD-SOFR', spread_bp=Decimal('0'), reset_frequency='1W',
+floating_rate = FloatingRateSpec(forward_curve_id='USD-SOFR', spread_bp=Decimal('0'), reset_frequency='1W',
     reset_lag_days=0, fixing_calendar_id='weekends_only', overnight_basis=DayCount.ACT_360,
     overnight_compounding=OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS)
 schedule = (CashFlowSchedule.builder().principal(Money(1_000_000.0, 'USD'), date(2025, 1, 6), date(2025, 1, 13))

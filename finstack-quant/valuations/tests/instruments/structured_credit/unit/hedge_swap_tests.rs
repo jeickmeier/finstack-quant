@@ -49,7 +49,7 @@ fn market(forward: f64) -> MarketContext {
 fn floating(spread_bp: f64) -> FloatingRateSpec {
     let dec = |value: f64| rust_decimal::Decimal::try_from(value).expect("decimal");
     FloatingRateSpec {
-        index_id: CurveId::new(INDEX),
+        forward_curve_id: CurveId::new(INDEX),
         spread_bp: dec(spread_bp),
         gearing: dec(1.0),
         gearing_includes_spread: true,

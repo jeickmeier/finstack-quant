@@ -257,7 +257,7 @@ fn ir_future() -> InterestRateFuture {
         discount_curve_id: CurveId::new("USD-OIS"),
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
         rate_averaging: RateAveragingMethod::Term,
-        fixing_index_id: None,
+        index_id: None,
         fixing_calendar_id: None,
         vol_surface_id: None,
         instrument_pricing_overrides: Default::default(),

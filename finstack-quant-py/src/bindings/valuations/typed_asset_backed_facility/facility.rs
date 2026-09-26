@@ -443,8 +443,11 @@ impl PyAssetBackedFacility {
 
     /// Floating index curve identifier, or ``None`` for a fixed all-in rate.
     #[getter]
-    fn index_id(&self) -> Option<String> {
-        self.inner.index_id.as_ref().map(|id| id.to_string())
+    fn forward_curve_id(&self) -> Option<String> {
+        self.inner
+            .forward_curve_id
+            .as_ref()
+            .map(|id| id.to_string())
     }
 
     /// Margin over the index (or the all-in fixed rate) in basis points.
@@ -1063,10 +1066,13 @@ impl PyAssetBackedFacilityBuilder {
     /// ValueError
     ///     If this builder was already consumed by ``build``.
     #[pyo3(text_signature = "($self, value)")]
-    fn index_id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
+    fn forward_curve_id<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
         let converted = CurveId::new(value.to_string());
         let b = take_facility(&mut slf)?;
-        slf.inner = Some(b.index_id(converted));
+        slf.inner = Some(b.forward_curve_id(converted));
         Ok(slf)
     }
 

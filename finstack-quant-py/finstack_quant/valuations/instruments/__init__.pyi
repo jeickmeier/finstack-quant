@@ -332,7 +332,7 @@ class Bond:
     def floating(
         id: str,
         notional: Money | float,
-        index_id: str,
+        forward_curve_id: str,
         margin_bp: float | Bps,
         issue: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
@@ -357,7 +357,7 @@ class Bond:
             Unique instrument identifier.
         notional : Money | float
             Principal amount; a bare number is tagged with ``currency``.
-        index_id : str
+        forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
         margin_bp : float | Bps
             Spread over the index in whole basis points (fractions are rounded).
@@ -413,7 +413,7 @@ class Bond:
     def floating_with_convention(
         id: str,
         notional: Money | float,
-        index_id: str,
+        forward_curve_id: str,
         margin_bp: float | Bps,
         issue: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
@@ -437,7 +437,7 @@ class Bond:
             Unique instrument identifier.
         notional : Money | float
             Principal amount; a bare number is tagged with ``currency``.
-        index_id : str
+        forward_curve_id : str
             Forward curve identifier (e.g. ``"EUR-EURIBOR-3M"``).
         margin_bp : float | Bps
             Spread over the index in whole basis points (fractions are rounded).
@@ -953,9 +953,9 @@ class Bond:
         """
         ...
     @property
-    def funding_curve_id(self) -> str | None:
+    def repo_curve_id(self) -> str | None:
         """
-        Funding curve identifier.
+        Repo (financing) discount curve identifier.
 
         Returns
         -------
@@ -1370,14 +1370,14 @@ class BondBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def funding_curve_id(self, value: str) -> BondBuilder:
+    def repo_curve_id(self, value: str) -> BondBuilder:
         """
-        Set the funding curve identifier.
+        Set the repo (financing) discount curve identifier.
 
         Parameters
         ----------
         value : str
-            Funding curve identifier.
+            Repo (financing) discount curve identifier.
 
         Returns
         -------
@@ -3370,7 +3370,7 @@ class TermLoanBuilder:
             A bare decimal (``0.06`` = 6%) or ``Rate`` sets a fixed rate (mirrors
             Rust ``RateSpec::fixed_rate``; rounded to whole basis points). A
             ``dict`` / JSON ``str`` is the Rust ``RateSpec`` in serde form, e.g.
-            ``{"floating": {"index_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
+            ``{"floating": {"forward_curve_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
 
         Returns
         -------
@@ -15381,7 +15381,7 @@ class RepLine:
         *,
         asset_type: dict[str, Any],
         spread_bp: float | Bps | None = None,
-        index_id: str | None = None,
+        forward_curve_id: str | None = None,
         index_floor: float | None = None,
         cpr: float | None = None,
         cdr: float | None = None,
@@ -15413,7 +15413,7 @@ class RepLine:
         spread_bp : float | Bps, optional
             Weighted average spread over the reference index, in basis
             points (e.g. ``150.0`` = 150bp), for floating-rate lines.
-        index_id : str, optional
+        forward_curve_id : str, optional
             Reference index identifier, if floating.
         index_floor : float, optional
             Floor on the floating index as an annual decimal, applied before
@@ -15653,7 +15653,7 @@ class RepLine:
         ...
 
     @property
-    def index_id(self) -> str | None:
+    def forward_curve_id(self) -> str | None:
         """
         Reference index identifier, or ``None``.
 
@@ -16087,7 +16087,7 @@ class AssetPool:
             yield below which a surviving asset is skipped), optional
             ``amortizing_tranches`` (note ids paid down inside the window) and
             optional ``assumptions`` (``spread_bp``, ``price_pct``,
-            ``maturity_months``, ``index_id``, ``coupon_floor``) describing the
+            ``maturity_months``, ``forward_curve_id``, ``coupon_floor``) describing the
             replacement collateral; omitted assumptions clone the surviving
             pool pro rata.
 
@@ -17802,7 +17802,7 @@ class PoolAsset:
         *,
         day_count: DayCount | None = None,
         spread_bp: float | None = None,
-        index_id: str | None = None,
+        forward_curve_id: str | None = None,
         index_floor: float | None = None,
         credit_quality: str | None = None,
         industry: str | None = None,
@@ -17844,14 +17844,14 @@ class PoolAsset:
             Current principal balance in the pool currency.
         rate : float
             Annual coupon as a decimal (``0.08`` = 8%). For floating rows the
-            engine adds ``spread_bp`` to the ``index_id`` projection.
+            engine adds ``spread_bp`` to the ``forward_curve_id`` projection.
         maturity : datetime.date
             Contractual maturity (balloon date for commercial mortgages).
         day_count : DayCount, optional
             Accrual convention; Act/360 when omitted.
         spread_bp : float, optional
-            Floating spread over ``index_id`` in basis points.
-        index_id : str, optional
+            Floating spread over ``forward_curve_id`` in basis points.
+        forward_curve_id : str, optional
             Forward-curve identifier of the floating index; ``None`` for a
             fixed-rate row.
         index_floor : float, optional
@@ -17985,7 +17985,7 @@ class PoolAsset:
 
     @staticmethod
     def floating_rate_loan(
-        id: str, balance: Money, index_id: str, spread_bp: float, maturity: datetime.date, day_count: DayCount
+        id: str, balance: Money, forward_curve_id: str, spread_bp: float, maturity: datetime.date, day_count: DayCount
     ) -> PoolAsset:
         """
         Floating-rate first-lien loan row (mirrors Rust ``PoolAsset::floating_rate_loan``).
@@ -17996,7 +17996,7 @@ class PoolAsset:
             Stable asset identifier.
         balance : Money
             Current principal balance.
-        index_id : str
+        forward_curve_id : str
             Forward-curve identifier of the floating index (e.g. ``"USD-SOFR-3M"``).
         spread_bp : float
             Spread over the index in basis points.
@@ -18030,7 +18030,7 @@ class PoolAsset:
         ...     datetime.date(2030, 1, 1),
         ...     DayCount.ACT_360,
         ... )
-        >>> loan.index_id, loan.spread_bp
+        >>> loan.forward_curve_id, loan.spread_bp
         ('USD-SOFR-3M', 350.0)
         """
         ...
@@ -18207,7 +18207,7 @@ class PoolAsset:
         ...
 
     @property
-    def index_id(self) -> str | None:
+    def forward_curve_id(self) -> str | None:
         """
         Floating index curve identifier.
 
@@ -25349,7 +25349,7 @@ class AssetBackedFacility:
         """
         ...
     @property
-    def index_id(self) -> str | None:
+    def forward_curve_id(self) -> str | None:
         """
         Floating index curve identifier, or ``None`` for a fixed all-in rate.
 
@@ -25878,7 +25878,7 @@ class AssetBackedFacilityBuilder:
             If ``value`` is neither ``Money`` nor a number.
         """
         ...
-    def index_id(self, value: str) -> AssetBackedFacilityBuilder:
+    def forward_curve_id(self, value: str) -> AssetBackedFacilityBuilder:
         """
         Set the floating index; omit for a fixed all-in rate.
 

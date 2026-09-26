@@ -267,7 +267,7 @@ fn test_ytm_current_period_coupon_uses_fixing() {
             .issue_date(issue)
             .maturity(date!(2026 - 01 - 01))
             .rate(RateSpec::Floating(FloatingRateSpec {
-                index_id: CurveId::from("USD-SOFR-3M"),
+                forward_curve_id: CurveId::from("USD-SOFR-3M"),
                 spread_bp: Decimal::from(300),
                 gearing: Decimal::ONE,
                 gearing_includes_spread: true,

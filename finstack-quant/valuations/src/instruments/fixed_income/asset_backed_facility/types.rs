@@ -123,7 +123,7 @@ pub struct AssetBackedFacility {
     /// `margin_bp` the all-in fixed rate.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub index_id: Option<CurveId>,
+    pub forward_curve_id: Option<CurveId>,
     /// Margin over the index (or the all-in fixed rate) in basis points.
     pub margin_bp: f64,
     /// Fee on the undrawn commitment in basis points per annum.

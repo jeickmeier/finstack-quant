@@ -169,7 +169,7 @@ fn canonical_floating_coupon(spread_bp: &str) -> serde_json::Value {
     let mut spec = canonical_schedule_params();
     spec["coupon_type"] = json!("cash");
     spec["rate_spec"] = json!({
-        "index_id": "TEST-INDEX",
+        "forward_curve_id": "TEST-INDEX",
         "spread_bp": spread_bp,
         "reset_frequency": {"count": 3, "unit": "months"},
         "reset_lag_days": 0,
@@ -624,7 +624,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
             "spec": {
               "coupon_type": "cash",
               "rate_spec": {
-                "index_id": "USD-SOFR-3M",
+                "forward_curve_id": "USD-SOFR-3M",
                 "spread_bp": "100",
                 "reset_frequency": {"count": 3, "unit": "months"},
                 "reset_lag_days": 0

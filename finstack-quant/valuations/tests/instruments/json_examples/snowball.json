@@ -16,12 +16,12 @@
       "day_count": "act_360",
       "discount_curve_id": "USD-OIS",
       "fixed_rate": 0.05,
-      "floating_index_id": "USD-SOFR-6M",
-      "floating_tenor": {
+      "forward_curve_id": "USD-SOFR-6M",
+      "id": "SNOWBALL-USD-3Y",
+      "index_tenor": {
         "count": 6,
         "unit": "months"
       },
-      "id": "SNOWBALL-USD-3Y",
       "initial_coupon": 0.03,
       "leverage": 1.0,
       "notional": {

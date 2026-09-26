@@ -174,7 +174,7 @@ fn linear_amortization_spans_fixed_to_float_cadences() {
     let quarterly_float = FloatingCouponSpec {
         coupon_type: CouponType::Cash,
         rate_spec: FloatingRateSpec {
-            index_id: "USD-SOFR-3M".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: Decimal::try_from(200.0).expect("valid"),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,
@@ -262,7 +262,7 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
     let floating = FloatingCouponSpec {
         coupon_type: CouponType::Cash,
         rate_spec: FloatingRateSpec {
-            index_id: "USD-SOFR-3M".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: Decimal::try_from(0.0).expect("valid"),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,
@@ -531,7 +531,7 @@ fn negative_rate_fixed_coupons_are_emitted() {
 #[test]
 fn floating_rate_spec_rejects_unknown_fields() {
     let json = r#"{
-        "index_id": "USD-SOFR-3M",
+        "forward_curve_id": "USD-SOFR-3M",
         "spred_bp": "200",
         "reset_frequency": {"count": 3, "unit": "months"},
         "day_count": "act_360",
@@ -551,7 +551,7 @@ fn floating_rate_spec_rejects_unknown_fields() {
 #[test]
 fn floating_rate_spec_rejects_floor_bp_alias() {
     let json = r#"{
-        "index_id": "USD-SOFR-3M",
+        "forward_curve_id": "USD-SOFR-3M",
         "spread_bp": "200",
         "floor_bp": "0",
         "reset_frequency": {"count": 3, "unit": "months"}
@@ -1407,7 +1407,7 @@ fn lagged_redemption_matches_final_coupon_on_weekend_maturity() {
     let float = FloatingCouponSpec {
         coupon_type: CouponType::Cash,
         rate_spec: FloatingRateSpec {
-            index_id: "USD-SOFR".into(),
+            forward_curve_id: "USD-SOFR".into(),
             spread_bp: Decimal::try_from(0.0).expect("valid"),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,

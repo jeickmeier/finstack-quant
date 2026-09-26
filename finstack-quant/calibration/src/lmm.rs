@@ -232,7 +232,7 @@ pub fn calibrate_bermudan_lmm_base_vol(
         ))
     })?;
 
-    let fallback_expiry = swaption.get_day_count().year_fraction(
+    let fallback_expiry = swaption.get_fixed_day_count().year_fraction(
         as_of,
         swaption.get_swap_start(),
         DayCountContext::default(),
@@ -241,7 +241,7 @@ pub fn calibrate_bermudan_lmm_base_vol(
         .first_exercise()
         .map(|date| {
             swaption
-                .get_day_count()
+                .get_fixed_day_count()
                 .year_fraction(as_of, date, DayCountContext::default())
         })
         .transpose()?

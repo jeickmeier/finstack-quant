@@ -1,7 +1,7 @@
 //! Inflation reference observations and market-convention production regressions.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{calendar_by_id, DayCount, Tenor};
+use finstack_quant_core::dates::{calendar_by_id, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationInterpolation, InflationLag,
@@ -203,22 +203,6 @@ fn m23_repo_conveniences_reject_currencies_without_explicit_defaults() {
         .calendar_id_opt(Some("gblo".into()))
         .build();
     assert!(repo.is_ok(), "{repo:?}");
-}
-
-#[test]
-fn m22_ois_conveniences_match_the_canonical_registry() {
-    use finstack_quant_valuations::instruments::IRSConvention;
-    for (convention, expected) in [
-        (IRSConvention::UsdSofr, DayCount::Act360),
-        (IRSConvention::EurEstr, DayCount::Act360),
-        (IRSConvention::JpyTonar, DayCount::Act365F),
-    ] {
-        assert_eq!(convention.fixed_day_count().expect("registry"), expected);
-        assert_eq!(
-            convention.fixed_frequency().expect("registry"),
-            Tenor::annual()
-        );
-    }
 }
 
 #[test]

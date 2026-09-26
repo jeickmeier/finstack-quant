@@ -621,10 +621,12 @@ impl CompiledCashFlowPlan {
             self.float_schedules
                 .iter()
                 .map(|schedule| {
-                    let index_id = schedule.spec.rate_spec.index_id.as_str();
+                    let forward_curve_id = schedule.spec.rate_spec.forward_curve_id.as_str();
                     (
-                        mkt.get_forward(index_id).ok(),
-                        mkt.get_series(fixing_series_id(index_id)).ok().cloned(),
+                        mkt.get_forward(forward_curve_id).ok(),
+                        mkt.get_series(fixing_series_id(forward_curve_id))
+                            .ok()
+                            .cloned(),
                     )
                 })
                 .unzip()
@@ -652,7 +654,7 @@ impl CompiledCashFlowPlan {
                 && (spec_years - curve_years).abs() / curve_years > 0.1
             {
                 tracing::warn!(
-                    index_id = %schedule.spec.rate_spec.index_id,
+                    forward_curve_id = %schedule.spec.rate_spec.forward_curve_id,
                     spec_index_tenor_years = spec_years,
                     curve_tenor_years = curve_years,
                     "floating leg index_tenor disagrees with the resolved forward curve's \

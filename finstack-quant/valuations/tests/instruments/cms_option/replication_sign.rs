@@ -79,11 +79,11 @@ fn single_curve_cms(
         option_type,
         notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
-        swap_convention: None,
+        index_id: None,
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
         // Same day count for both legs so forward rate equals OIS rate exactly.
-        swap_day_count: Some(DayCount::Act365F),
+        swap_fixed_day_count: Some(DayCount::Act365F),
         swap_float_day_count: Some(DayCount::Act365F),
         // Both legs use the same "USD-FLAT" curve so the single-curve path is taken.
         discount_curve_id: CurveId::new("USD-FLAT"),

@@ -384,7 +384,7 @@ pub(crate) fn generate_cashflows(
             let base_spec = FloatingCouponSpec {
                 coupon_type: loan.coupon_type,
                 rate_spec: FloatingRateSpec {
-                    index_id: spec.index_id.clone(),
+                    forward_curve_id: spec.forward_curve_id.clone(),
                     spread_bp: spec.spread_bp,
                     gearing: spec.gearing,
                     gearing_includes_spread: spec.gearing_includes_spread,

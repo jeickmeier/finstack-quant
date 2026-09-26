@@ -556,7 +556,7 @@
         "maturity": "2031-04-30",
         "rate": {
           "floating": {
-            "index_id": "USD-SOFR-3M",
+            "forward_curve_id": "USD-SOFR-3M",
             "spread_bp": "375",
             "gearing": "1",
             "gearing_includes_spread": true,

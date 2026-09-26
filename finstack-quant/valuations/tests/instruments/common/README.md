@@ -17,7 +17,7 @@ submodule reaches it as `crate::common::...`.
 | `mod.rs` | Module wiring; re-exports `parity` and `#[macro_use]`s `assert_parity!` |
 | `test_helpers.rs` | Curve/market/`Money` builders, tolerance tiers, assertion helpers, reference Black-Scholes formulas |
 | `parity.rs` | `ParityConfig` / `compare_values` / `assert_parity!` for documented reference comparisons |
-| `parameters/test_conventions.rs` | `BondConvention` and `IRSConvention` lookup and `FromStr` behavior |
+| `parameters/test_conventions.rs` | `BondConvention` lookup and `FromStr` behavior |
 | `pricer/registry.rs` | `InstrumentType`, `ModelKey`, `PricerKey`, `PricingError`, and `PricerRegistry` lookup/batch coverage |
 | `test_discountable.rs` | `finstack_quant_core::cashflow::Discountable` NPV contract against a mock flat curve |
 | `test_rates_credit_tree.rs` | Two-factor rates+credit binomial tree: closed-form parity, correlation monotonicity, curve-reproducing calibration |

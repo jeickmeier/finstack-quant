@@ -132,7 +132,7 @@ fn window() -> ReinvestmentPeriod {
             spread_bp: 400.0,
             price_pct: 100.0,
             maturity_months: 60,
-            index_id: None,
+            forward_curve_id: None,
             coupon_floor: None,
         }),
     }

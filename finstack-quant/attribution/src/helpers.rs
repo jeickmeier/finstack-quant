@@ -418,7 +418,7 @@ fn reprice_funding_cost(
     currency: Currency,
     warnings: &mut Vec<String>,
 ) -> Option<Money> {
-    let curve_id = instrument.funding_curve_id()?;
+    let curve_id = instrument.repo_curve_id()?;
     if as_of_t1 <= as_of_t0 {
         return Some(Money::from((0_i64, currency)));
     }
@@ -834,7 +834,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.funding_curve_id = Some(CurveId::new("USD-REPO"));
+        bond.repo_curve_id = Some(CurveId::new("USD-REPO"));
 
         let ois = DiscountCurve::builder("USD-OIS")
             .base_date(as_of_t0)

@@ -128,13 +128,13 @@ pub struct InterestRateFuture {
     pub forward_curve_id: CurveId,
     /// Rate settlement method defined by the exchange contract.
     pub rate_averaging: RateAveragingMethod,
-    /// Optional fixing-index identifier.
+    /// Optional rate-index identity keying the historical fixing series.
     ///
     /// When omitted, historical fixings use `forward_curve_id`. Fixing series
     /// are looked up strictly as `FIXING:{id}` without alias fallback.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fixing_index_id: Option<IndexId>,
+    pub index_id: Option<IndexId>,
     /// Optional overnight fixing calendar identifier.
     ///
     /// Required only when the contract currency has no registered standard
@@ -289,12 +289,12 @@ impl InterestRateFuture {
             )));
         }
         if self
-            .fixing_index_id
+            .index_id
             .as_ref()
             .is_some_and(|id| id.as_str().trim().is_empty())
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} fixing_index_id cannot be empty"
+                "{context} index_id cannot be empty"
             )));
         }
         if self
@@ -389,8 +389,8 @@ impl InterestRateFuture {
         Rate::from_percent(100.0 - self.terms.entry_price)
     }
 
-    fn fixing_index_id(&self) -> &str {
-        self.fixing_index_id
+    fn resolved_index_id(&self) -> &str {
+        self.index_id
             .as_ref()
             .map_or(self.forward_curve_id.as_str(), IndexId::as_str)
     }
@@ -432,7 +432,7 @@ impl InterestRateFuture {
 
         let (fixing_date, period_start, period_end) = self.resolve_dates()?;
         let fwd = context.get_forward(&self.forward_curve_id)?;
-        let fixing_id = self.fixing_index_id();
+        let fixing_id = self.resolved_index_id();
         let fixings_required = match self.rate_averaging {
             RateAveragingMethod::Term => fixing_date < as_of,
             RateAveragingMethod::ArithmeticAverage | RateAveragingMethod::CompoundedOvernight => {
@@ -1012,7 +1012,7 @@ mod tests {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR"))
             .rate_averaging(RateAveragingMethod::ArithmeticAverage)
-            .fixing_index_id_opt(Some(IndexId::new("USD-SOFR")))
+            .index_id_opt(Some(IndexId::new("USD-SOFR")))
             .attributes(Attributes::new())
             .build()
             .expect("future");

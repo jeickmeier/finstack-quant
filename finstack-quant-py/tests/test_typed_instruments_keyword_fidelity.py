@@ -294,7 +294,7 @@ def test_rep_line_accepts_keyword_arguments() -> None:
         day_count=DayCount.ACT_360,
         asset_type={"type": "first_lien_loan"},
         spread_bp=None,
-        index_id=None,
+        forward_curve_id=None,
         cpr=0.10,
         cdr=0.02,
         recovery_rate=0.45,

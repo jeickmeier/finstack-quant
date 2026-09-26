@@ -205,7 +205,7 @@ def _floating_bond_spec(*, credit_curve_id: str | None) -> dict[str, Any]:
                 "cashflow_spec": {
                     "floating": {
                         "rate_spec": {
-                            "index_id": "USD-SOFR-3M",
+                            "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "100",
                             "gearing": "1",
                             "gearing_includes_spread": True,

@@ -49,7 +49,7 @@ use rust_decimal::Decimal;
 ///     .underlying(CommodityUnderlyingParams::new("Energy", "NG", "MMBTU", Currency::USD))
 ///     .quantity(10000.0)
 ///     .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal"))
-///     .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+///     .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
 ///     .side(PayReceive::Pay)
 ///     .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
 ///     .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())
@@ -90,8 +90,8 @@ pub struct CommoditySwap {
         schemars(with = "finstack_quant_core::wire::DecimalWire")
     )]
     pub fixed_price: Decimal,
-    /// Floating index ID for price lookups.
-    pub floating_index_id: CurveId,
+    /// Commodity forward `PriceCurve` that projects the floating-leg price observations.
+    pub forward_curve_id: CurveId,
     /// Direction of the swap: Pay means paying the fixed price leg,
     /// Receive means receiving the fixed price leg.
     #[serde(default = "default_pay_receive")]
@@ -230,7 +230,7 @@ impl CommoditySwap {
             ))
             .quantity(10000.0)
             .fixed_price(Decimal::try_from(3.50).expect("valid decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(
                 Date::from_calendar_date(2025, time::Month::January, 1)
@@ -276,14 +276,14 @@ impl CommoditySwap {
 
     /// Calculate the present value of the floating leg.
     ///
-    /// Projects floating prices from the `PriceCurve` referenced by `floating_index_id`,
+    /// Projects floating prices from the `PriceCurve` referenced by `forward_curve_id`,
     /// with optional index lag and period averaging.
     pub fn floating_leg_pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let schedule = self.payment_schedule(as_of)?;
 
         // Try to get PriceCurve for floating index
-        let price_curve = market.get_price_curve(self.floating_index_id.as_str())?;
+        let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
 
         let mut pv = 0.0;
         let mut prev_period_end = self.start_date;
@@ -530,7 +530,7 @@ impl CommoditySwap {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Vec<(Date, Money)>> {
-        let price_curve = market.get_price_curve(self.floating_index_id.as_str())?;
+        let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
         let mut prev_period_end = self.start_date;
         let mut flows = Vec::new();
         let schedule = self.payment_schedule(as_of)?;
@@ -574,7 +574,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_forward_curve(self.floating_index_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
         Ok(deps)
     }
 
@@ -687,7 +687,7 @@ mod tests {
             ))
             .quantity(1000.0)
             .fixed_price(rust_decimal::Decimal::try_from(70.0).expect("valid decimal"))
-            .floating_index_id(CurveId::new("CL-AVG"))
+            .forward_curve_id(CurveId::new("CL-AVG"))
             .side(PayReceive::Pay)
             .start_date(Date::from_calendar_date(2025, Month::January, 1).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
@@ -756,7 +756,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal")) // Same as spot
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
@@ -794,7 +794,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.55).expect("valid decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
@@ -816,7 +816,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.55).expect("valid decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Receive) // Receiving fixed
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
@@ -855,7 +855,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
@@ -987,7 +987,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
@@ -1040,7 +1040,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::December, 31).expect("date"))
@@ -1087,7 +1087,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
@@ -1209,7 +1209,7 @@ mod tests {
             ))
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal"))
-            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
             .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
@@ -1258,7 +1258,7 @@ mod tests {
         );
         assert_eq!(
             deps.curves.forward_curves.as_slice(),
-            &[swap.floating_index_id]
+            &[swap.forward_curve_id]
         );
     }
 }

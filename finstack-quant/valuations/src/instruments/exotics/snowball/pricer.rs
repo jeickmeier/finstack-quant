@@ -236,7 +236,7 @@ impl SnowballDiscountingPricer {
         }
 
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-        let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+        let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
         // The discounting pricer projects rates from the forward curve, so the
         // term-forward coefficients (and the `r0` seasoned-fixing argument) are
         // unused here; default HW params and `r0 = 0.0` suffice. Only the
@@ -306,7 +306,7 @@ impl Pricer for SnowballDiscountingPricer {
                     .model(ModelKey::Discounting)
                     .curve_ids([
                         snowball.discount_curve_id.as_str().to_string(),
-                        snowball.floating_index_id.as_str().to_string(),
+                        snowball.forward_curve_id.as_str().to_string(),
                     ]),
             )
         })?;
@@ -424,7 +424,7 @@ impl SnowballHw1fMcPricer {
             )));
         }
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-        let _forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+        let _forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
         let hw_params = self.effective_hw_params(inst, market)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
         // short rate sampled at each coupon's in-advance fixing date into that
@@ -547,7 +547,7 @@ impl Pricer for SnowballHw1fMcPricer {
                     .model(ModelKey::MonteCarloHullWhite1F)
                     .curve_ids([
                         snowball.discount_curve_id.as_str().to_string(),
-                        snowball.floating_index_id.as_str().to_string(),
+                        snowball.forward_curve_id.as_str().to_string(),
                     ]),
             )
         })?;
@@ -625,10 +625,10 @@ fn coupon_events(
     _r0: f64,
 ) -> Result<Vec<CouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-    let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+    let forward_curve = market.get_forward(inst.forward_curve_id.as_ref())?;
     crate::instruments::rates::hw1f::forward_swap_rate::validate_term_curve_tenor(
         forward_curve.as_ref(),
-        inst.floating_tenor,
+        inst.index_tenor,
         inst.id.as_str(),
     )?;
     let mut events = Vec::new();
@@ -658,13 +658,13 @@ fn coupon_events(
             let fixing_time =
                 inst.day_count
                     .year_fraction(as_of, start, DayCountContext::default())?;
-            let coeffs = term_forward.period_coeffs(fixing_time, inst.floating_tenor.to_years());
+            let coeffs = term_forward.period_coeffs(fixing_time, inst.index_tenor.to_years());
             let discount_time = discount_curve.day_count().signed_year_fraction(
                 discount_curve.base_date(),
                 start,
                 DayCountContext::default(),
             )?;
-            let tenor = inst.floating_tenor.to_years();
+            let tenor = inst.index_tenor.to_years();
             let discount_forward =
                 (discount_curve.df(discount_time) / discount_curve.df(discount_time + tenor) - 1.0)
                     / tenor;
@@ -780,8 +780,8 @@ mod tests {
                 date(2026, Month::January, 1),
                 date(2026, Month::July, 1),
             ],
-            floating_index_id: CurveId::new("USD-SOFR-6M"),
-            floating_tenor: Tenor::semi_annual(),
+            forward_curve_id: CurveId::new("USD-SOFR-6M"),
+            index_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             call_provision: None,
@@ -1196,20 +1196,20 @@ mod tests {
             .contains_key(&MetricId::custom("mc_num_paths")));
     }
 
-    /// Regression: the pricer must read `floating_tenor` when reconstructing the
-    /// HW1F term forward. If `floating_tenor` is ignored (bug), changing it from
+    /// Regression: the pricer must read `index_tenor` when reconstructing the
+    /// HW1F term forward. If `index_tenor` is ignored (bug), changing it from
     /// 3M to 6M on semi-annual coupon periods leaves the PV unchanged because the
     /// pricer always uses the coupon accrual fraction (= 0.5 yr) as the bond
     /// tenor. On a sloped curve the 3M and 6M simple forwards differ, so the two
-    /// instruments MUST price differently once `floating_tenor` is respected.
+    /// instruments MUST price differently once `index_tenor` is respected.
     #[test]
-    fn floating_tenor_affects_pv_on_sloped_curve() {
+    fn index_tenor_affects_pv_on_sloped_curve() {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.02, 0.03);
 
         // Semi-annual coupon periods, 3M floating index.
         let inst_3m = Snowball {
-            floating_tenor: Tenor::quarterly(),
+            index_tenor: Tenor::quarterly(),
             ..test_snowball()
         };
         let err = deterministic_mc_pricer(32)

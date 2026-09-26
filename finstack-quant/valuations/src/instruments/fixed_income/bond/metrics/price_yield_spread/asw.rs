@@ -452,7 +452,7 @@ impl MetricCalculator for AssetSwapParCalculator {
                         bond,
                         &context.curves,
                         context.as_of,
-                        spec.rate_spec.index_id.as_str(),
+                        spec.rate_spec.forward_curve_id.as_str(),
                         spec.rate_spec.spread_bp.to_f64().unwrap_or_default(),
                         None,
                     );
@@ -594,7 +594,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                         bond,
                         &context.curves,
                         context.as_of,
-                        spec.rate_spec.index_id.as_str(),
+                        spec.rate_spec.forward_curve_id.as_str(),
                         spec.rate_spec.spread_bp.to_f64().unwrap_or_default(),
                         Some(dirty_currency),
                         None,

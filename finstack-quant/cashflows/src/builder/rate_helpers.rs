@@ -350,7 +350,7 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 ///   observation is a realized historical fixing that the curve cannot
 ///   supply; this function projects only. The emission layer resolves
 ///   seasoned resets from a `MarketContext` `ScalarTimeSeries` with id
-///   `FIXING:{index_id}` *before* calling this function, and routes this
+///   `FIXING:{forward_curve_id}` *before* calling this function, and routes this
 ///   error through the spec's
 ///   [`crate::builder::specs::FloatingRateFallback`] policy when no series
 ///   is provided. A reset exactly on the curve base date (T+0) is projected
@@ -413,7 +413,7 @@ pub fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result<f64> {
     let fwd_base = fwd.base_date();
 
     // Strictly-past resets are realized fixings; the curve must not clamp them
-    // to today's short end. Emission resolves `FIXING:{index_id}` first.
+    // to today's short end. Emission resolves `FIXING:{forward_curve_id}` first.
     if reset_date < fwd_base {
         return Err(finstack_quant_core::Error::Validation(format!(
             "floating-rate observation date {} is before the '{}' curve base date {}; the \
@@ -447,11 +447,11 @@ mod tests {
 
     fn project_floating_rate_from_market(
         reset_date: Date,
-        index_id: &str,
+        forward_curve_id: &str,
         params: &FloatingRateParams,
         market: &MarketContext,
     ) -> Result<f64> {
-        let fwd = market.get_forward(index_id)?;
+        let fwd = market.get_forward(forward_curve_id)?;
         project_floating_rate(reset_date, fwd.as_ref(), params)
     }
 
@@ -836,7 +836,7 @@ mod tests {
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
-            index_id: "USD-SOFR-3M".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: dec!(200.0),
             gearing: dec!(1.5),
             gearing_includes_spread: false,
@@ -874,7 +874,7 @@ mod tests {
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
-            index_id: "USD-SOFR-3M".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: dec!(100.0),
             gearing: dec!(1.0),
             gearing_includes_spread: true,
@@ -908,7 +908,7 @@ mod tests {
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
-            index_id: "USD-SOFR-3M".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: dec!(100.0),
             gearing: dec!(1.0),
             gearing_includes_spread: true,

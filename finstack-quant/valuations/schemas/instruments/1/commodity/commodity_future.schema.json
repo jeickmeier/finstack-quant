@@ -13,6 +13,10 @@
           "$ref": "#/$defs/CommodityFutureFixing",
           "description": "Final-settlement price fixing rule (single observation or average)."
         },
+        "forward_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Commodity forward `PriceCurve` used for projected observations."
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
@@ -24,10 +28,6 @@
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
-        },
-        "price_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Price-curve identifier used for projected observations."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -46,7 +46,7 @@
         "id",
         "underlying",
         "terms",
-        "price_curve_id",
+        "forward_curve_id",
         "fixing"
       ],
       "type": "object"
@@ -294,8 +294,8 @@
             "past_fixings": [],
             "type": "arithmetic_average"
           },
+          "forward_curve_id": "IRON-ORE-FORWARD",
           "id": "SGX-IRON-ORE-DEC26",
-          "price_curve_id": "IRON-ORE-FORWARD",
           "terms": {
             "contracts": 10.0,
             "currency": "USD",

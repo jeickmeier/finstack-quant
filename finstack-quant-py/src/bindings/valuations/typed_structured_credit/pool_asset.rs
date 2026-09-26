@@ -98,14 +98,14 @@ impl PyPoolAsset {
     ///     Current principal balance in the pool currency.
     /// rate : float
     ///     Annual coupon as a decimal (``0.08`` = 8%). For floating rows the
-    ///     engine adds ``spread_bp`` to the ``index_id`` projection.
+    ///     engine adds ``spread_bp`` to the ``forward_curve_id`` projection.
     /// maturity : datetime.date
     ///     Contractual maturity (balloon date for commercial mortgages).
     /// day_count : DayCount, optional
     ///     Accrual convention; Act/360 when omitted.
     /// spread_bp : float, optional
-    ///     Floating spread over ``index_id`` in basis points.
-    /// index_id : str, optional
+    ///     Floating spread over ``forward_curve_id`` in basis points.
+    /// forward_curve_id : str, optional
     ///     Forward-curve identifier of the floating index; ``None`` for a
     ///     fixed-rate row.
     /// index_floor : float, optional
@@ -192,7 +192,7 @@ impl PyPoolAsset {
     ///     or ``credit_quality`` is not a known rating.
     #[new]
     #[pyo3(signature = (
-        id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, index_id=None,
+        id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, forward_curve_id=None,
         index_floor=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=false,
         recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None,
         origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None,
@@ -201,7 +201,7 @@ impl PyPoolAsset {
         prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None
     ))]
     #[pyo3(
-        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, index_id=None, index_floor=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
+        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, forward_curve_id=None, index_floor=None, credit_quality=None, industry=None, obligor_id=None, is_defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
     )]
     // PyO3 binding: one keyword per public Rust field.
     #[allow(clippy::too_many_arguments)]
@@ -214,7 +214,7 @@ impl PyPoolAsset {
         maturity: &Bound<'_, PyAny>,
         day_count: Option<PyRef<'_, PyDayCount>>,
         spread_bp: Option<f64>,
-        index_id: Option<String>,
+        forward_curve_id: Option<String>,
         index_floor: Option<f64>,
         credit_quality: Option<&str>,
         industry: Option<String>,
@@ -257,7 +257,7 @@ impl PyPoolAsset {
             balance: balance.inner,
             rate,
             spread_bp,
-            index_id,
+            forward_curve_id,
             index_floor,
             maturity: extract_date(maturity)?,
             credit_quality,
@@ -353,7 +353,7 @@ impl PyPoolAsset {
     ///     Stable asset identifier.
     /// balance : Money
     ///     Current principal balance.
-    /// index_id : str
+    /// forward_curve_id : str
     ///     Forward-curve identifier of the floating index (e.g.
     ///     ``"USD-SOFR-3M"``).
     /// spread_bp : float
@@ -381,14 +381,14 @@ impl PyPoolAsset {
     /// >>> from finstack_quant.core.money import Money
     /// >>> from finstack_quant.valuations.instruments import PoolAsset
     /// >>> loan = PoolAsset.floating_rate_loan("L1", Money(1_000_000.0, Currency("USD")), "USD-SOFR-3M", 350.0, datetime.date(2030, 1, 1), DayCount.ACT_360)
-    /// >>> loan.index_id, loan.spread_bp
+    /// >>> loan.forward_curve_id, loan.spread_bp
     /// ('USD-SOFR-3M', 350.0)
     #[staticmethod]
-    #[pyo3(text_signature = "(id, balance, index_id, spread_bp, maturity, day_count)")]
+    #[pyo3(text_signature = "(id, balance, forward_curve_id, spread_bp, maturity, day_count)")]
     fn floating_rate_loan(
         id: &str,
         balance: PyRef<'_, PyMoney>,
-        index_id: &str,
+        forward_curve_id: &str,
         spread_bp: f64,
         maturity: &Bound<'_, PyAny>,
         day_count: PyRef<'_, PyDayCount>,
@@ -397,7 +397,7 @@ impl PyPoolAsset {
             inner: PoolAsset::floating_rate_loan(
                 id,
                 balance.inner,
-                index_id,
+                forward_curve_id,
                 spread_bp,
                 extract_date(maturity)?,
                 day_count.inner,
@@ -437,8 +437,8 @@ impl PyPoolAsset {
 
     /// Floating index curve identifier, or ``None``.
     #[getter]
-    fn index_id(&self) -> Option<String> {
-        self.inner.index_id.clone()
+    fn forward_curve_id(&self) -> Option<String> {
+        self.inner.forward_curve_id.clone()
     }
 
     /// Floor on the floating index (annual decimal) applied before the

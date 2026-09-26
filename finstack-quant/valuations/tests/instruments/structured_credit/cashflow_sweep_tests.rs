@@ -58,7 +58,7 @@ fn create_pool() -> AssetPool {
             balance: Money::new(25_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: Some(400.0),
-            index_id: Some("SOFR-3M".to_string()),
+            forward_curve_id: Some("SOFR-3M".to_string()),
             index_floor: None,
             maturity: maturity(),
             credit_quality: Some(CreditRating::BB),

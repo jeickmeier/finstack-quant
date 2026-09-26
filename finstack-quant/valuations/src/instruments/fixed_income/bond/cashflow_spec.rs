@@ -48,9 +48,9 @@ use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{Bps, CurveId, Rate};
 use rust_decimal::Decimal;
 
-fn rate_index_defaults(index_id: &CurveId) -> Option<RateIndexConventions> {
+fn rate_index_defaults(forward_curve_id: &CurveId) -> Option<RateIndexConventions> {
     let registry = ConventionRegistry::try_global().ok()?;
-    let id = IndexId::new(index_id.as_str());
+    let id = IndexId::new(forward_curve_id.as_str());
     registry.require_rate_index(&id).ok().cloned()
 }
 
@@ -218,7 +218,7 @@ impl CashflowSpec {
     ///
     /// # Arguments
     ///
-    /// * `index_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
+    /// * `forward_curve_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
     /// * `margin_bp` - Spread over index in basis points (e.g., 200.0 for 200bps)
     /// * `frequency` - Payment frequency (e.g., `Tenor::quarterly()`)
     /// * `day_count` - Day count convention (e.g., `DayCount::Act360`)
@@ -277,26 +277,26 @@ impl CashflowSpec {
     /// - For full control (floors/caps/gearing), construct `FloatingCouponSpec` directly
     ///   and wrap in `CashflowSpec::Floating(...)`.
     pub fn floating(
-        index_id: CurveId,
+        forward_curve_id: CurveId,
         margin_bp: f64,
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
-        let reset_lag = rate_index_defaults(&index_id)
+        let reset_lag = rate_index_defaults(&forward_curve_id)
             .map(|conv| conv.default_reset_lag_days)
             .unwrap_or(2);
-        Self::floating_with_reset_lag(index_id, margin_bp, frequency, day_count, reset_lag)
+        Self::floating_with_reset_lag(forward_curve_id, margin_bp, frequency, day_count, reset_lag)
     }
 
     /// Create a floating-rate specification using a typed margin in basis points.
     pub fn floating_bp(
-        index_id: CurveId,
+        forward_curve_id: CurveId,
         margin_bp: Bps,
         frequency: Tenor,
         day_count: DayCount,
     ) -> Self {
         let spread_bp = Decimal::from(margin_bp.as_bp());
-        let defaults = rate_index_defaults(&index_id);
+        let defaults = rate_index_defaults(&forward_curve_id);
         let reset_lag_days = defaults
             .as_ref()
             .map(|conv| conv.default_reset_lag_days)
@@ -306,7 +306,7 @@ impl CashflowSpec {
             .unwrap_or_else(|| "weekends_only".to_string());
         Self::Floating(FloatingCouponSpec {
             rate_spec: FloatingRateSpec {
-                index_id,
+                forward_curve_id,
                 spread_bp,
                 gearing: Decimal::ONE,
                 gearing_includes_spread: true,
@@ -342,7 +342,7 @@ impl CashflowSpec {
     ///
     /// # Arguments
     ///
-    /// * `index_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
+    /// * `forward_curve_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
     /// * `margin_bp` - Spread over index in basis points (e.g., 200.0 for 200bps)
     /// * `frequency` - Payment frequency (e.g., `Tenor::quarterly()`)
     /// * `day_count` - Day count convention (e.g., `DayCount::Act360`)
@@ -402,7 +402,7 @@ impl CashflowSpec {
     /// Returns a validation error if `margin_bp` is not finite or not
     /// representable as a `Decimal`.
     pub fn floating_with_reset_lag(
-        index_id: CurveId,
+        forward_curve_id: CurveId,
         margin_bp: f64,
         frequency: Tenor,
         day_count: DayCount,
@@ -410,12 +410,12 @@ impl CashflowSpec {
     ) -> finstack_quant_core::Result<Self> {
         let spread_bp =
             decimal_from_finite_f64(margin_bp, "CashflowSpec::floating_with_reset_lag margin_bp")?;
-        let calendar_id = rate_index_defaults(&index_id)
+        let calendar_id = rate_index_defaults(&forward_curve_id)
             .map(|conv| conv.market_calendar_id)
             .unwrap_or_else(|| "weekends_only".to_string());
         Ok(Self::Floating(FloatingCouponSpec {
             rate_spec: FloatingRateSpec {
-                index_id,
+                forward_curve_id,
                 spread_bp,
                 gearing: Decimal::ONE,
                 gearing_includes_spread: true,

@@ -1110,7 +1110,7 @@ mod tests {
             ))
             .quantity(10_000.0)
             .fixed_price(rust_decimal::Decimal::try_from(strike).expect("decimal"))
-            .floating_index_id(CurveId::new("NG-FORWARD"))
+            .forward_curve_id(CurveId::new("NG-FORWARD"))
             .side(crate::instruments::PayReceive::Pay)
             .start_date(swap_start)
             .maturity(swap_end)

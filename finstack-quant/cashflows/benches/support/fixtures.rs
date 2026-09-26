@@ -177,7 +177,7 @@ pub fn build_adjusted(
 pub fn term_float_spec(frequency: Tenor) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
-            index_id: INDEX_ID.into(),
+            forward_curve_id: INDEX_ID.into(),
             spread_bp: dec!(200.0),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,
@@ -205,7 +205,7 @@ pub fn overnight_float_spec(
 ) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
-            index_id: INDEX_ID.into(),
+            forward_curve_id: INDEX_ID.into(),
             spread_bp: dec!(200.0),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,

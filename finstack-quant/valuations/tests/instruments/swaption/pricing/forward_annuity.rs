@@ -123,7 +123,7 @@ fn test_year_fraction_act360() {
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
 
     let yf = swaption
-        .get_day_count()
+        .get_fixed_day_count()
         .year_fraction(as_of, expiry, DayCountContext::default())
         .unwrap();
 
@@ -260,7 +260,7 @@ fn test_zero_coupon_cash_annuity_matches_tenor_times_maturity_df() {
         .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon);
 
     let tenor = swaption
-        .get_day_count()
+        .get_fixed_day_count()
         .year_fraction(swap_start, swap_end, DayCountContext::default())
         .unwrap();
     let expected = tenor * disc.df_between_dates(as_of, swap_end).unwrap();

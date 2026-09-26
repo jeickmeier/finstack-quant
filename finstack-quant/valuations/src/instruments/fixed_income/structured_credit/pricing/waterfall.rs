@@ -1613,7 +1613,7 @@ mod coverage_position_tests {
             balance: usd(balance),
             rate: 0.08,
             spread_bp: Some(400.0),
-            index_id: None,
+            forward_curve_id: None,
             index_floor: None,
             maturity: maturity(),
             credit_quality: Some(CreditRating::BB),

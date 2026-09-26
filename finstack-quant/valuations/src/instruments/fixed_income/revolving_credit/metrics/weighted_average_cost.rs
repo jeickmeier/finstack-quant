@@ -37,7 +37,7 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
             crate::instruments::fixed_income::revolving_credit::types::BaseRateSpec::Floating(
                 spec,
             ) => {
-                let fwd = context.curves.get_forward(spec.index_id.as_str())?;
+                let fwd = context.curves.get_forward(spec.forward_curve_id.as_str())?;
                 let index_rate = average_forward_rate(&fwd, facility, context.as_of)?;
                 let mut params =
                     finstack_quant_cashflows::builder::FloatingRateParams::try_from(spec)?;

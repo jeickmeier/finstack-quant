@@ -57,7 +57,7 @@ impl ZSpreadCs01 for RevolvingCredit {
                     BaseRateSpec::Floating(spec) => {
                         finstack_quant_core::market_data::fixings::get_fixing_series(
                             curves,
-                            spec.index_id.as_ref(),
+                            spec.forward_curve_id.as_ref(),
                         )
                         .ok()
                     }

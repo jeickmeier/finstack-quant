@@ -4,6 +4,7 @@ use finstack_quant_cashflows::builder::AmortizationSpec;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Month, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IndexId;
 use finstack_quant_portfolio::{
     flatten_dependencies, Entity, InstrumentArtifact, MaterializedPosition, PortfolioHeader,
     PortfolioMaterializationEnvelope, PositionId, PositionUnit,
@@ -11,7 +12,7 @@ use finstack_quant_portfolio::{
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CashflowSpec};
 use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
 use finstack_quant_valuations::instruments::{
-    IRSConvention, Instrument, InstrumentEnvelope, InstrumentJson, MarketDependencies, PayReceive,
+    Instrument, InstrumentEnvelope, InstrumentJson, MarketDependencies, PayReceive,
 };
 use indexmap::IndexMap;
 use time::macros::date;
@@ -234,7 +235,7 @@ fn schedule_rich_swap(index: usize) -> CmsSwap {
         },
         Money::new(2_000_000.0 + index as f64, Currency::USD).expect("valid money fixture"),
         DayCount::Act360,
-        IRSConvention::UsdSofr,
+        IndexId::new("USD-SOFR-OIS"),
         if index % 4 == 1 {
             PayReceive::Pay
         } else {

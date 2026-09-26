@@ -394,7 +394,7 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
             "balance": {"amount": "20000000", "currency": "USD"},
             "rate": 0.08,
             "spread_bp": None,
-            "index_id": None,
+            "forward_curve_id": None,
             "maturity": maturity.isoformat(),
             "credit_quality": None,
             "industry": industry,
@@ -737,7 +737,7 @@ def commodity_inputs() -> dict[str, dict[str, Any]]:
         "spec": {
             "id": "WTI-FUTURE",
             "attributes": {},
-            "price_curve_id": "WTI-FORWARD",
+            "forward_curve_id": "WTI-FORWARD",
             "underlying": "CL",
             "fixing": {"type": "single", "observation_date": "2025-09-15", "realized_price": None},
             "terms": {
@@ -762,7 +762,7 @@ def commodity_inputs() -> dict[str, dict[str, Any]]:
             "currency": "USD",
             "discount_curve_id": "USD-OIS",
             "fixed_price": "3.2",
-            "floating_index_id": "NG-FORWARD",
+            "forward_curve_id": "NG-FORWARD",
             "frequency": {"count": 1, "unit": "months"},
             "maturity": "2025-12-15",
             "quantity": 10000.0,

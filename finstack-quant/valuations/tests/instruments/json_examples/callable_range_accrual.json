@@ -19,6 +19,12 @@
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
         "div_yield_id": null,
+        "forward_curve_id": "USD-OIS",
+        "index_id": "SOFR",
+        "index_tenor": {
+          "count": 3,
+          "unit": "months"
+        },
         "lower_bound": 0.04,
         "notional": {
           "amount": "1000000",
@@ -40,12 +46,6 @@
         ],
         "past_observations_in_range": null,
         "payment_date": null,
-        "projection_curve_id": "USD-OIS",
-        "rate_index_id": "SOFR",
-        "reference_tenor": {
-          "count": 3,
-          "unit": "months"
-        },
         "spot_id": "SOFR-RATE",
         "total_past_observations": null,
         "underlying_ticker": "SOFR",

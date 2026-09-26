@@ -248,7 +248,7 @@ fn purchase_replacement_collateral(
         return Ok(Money::from((0_i64, state.base_currency)));
     }
     let spread = assumptions.spread_bp / 10_000.0;
-    let coupon = match &assumptions.index_id {
+    let coupon = match &assumptions.forward_curve_id {
         Some(index) => collateral_asset_rate_for_period(
             market.get_forward(index)?.as_ref(),
             market,
@@ -277,7 +277,7 @@ fn purchase_replacement_collateral(
         .filter(|id| id.starts_with("REINVEST-"))
         .count();
     let id = format!("REINVEST-{}", purchases + 1);
-    let mut asset = match &assumptions.index_id {
+    let mut asset = match &assumptions.forward_curve_id {
         Some(index) => PoolAsset::floating_rate_loan(
             id,
             par,

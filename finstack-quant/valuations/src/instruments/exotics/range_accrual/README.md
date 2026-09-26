@@ -79,7 +79,7 @@ Both paths discount the payment-date cashflow back to `as_of`, apply
 mid-life valuations. When every observation is in the past, both fall through to
 the known-value computation.
 
-**Rate-linked notes are not priced here.** If `rate_index_id` is set, both the
+**Rate-linked notes are not priced here.** If `index_id` is set, both the
 static-replication and the GBM Monte Carlo pricer return a validation error
 rather than treating a rate as an equity spot.
 
@@ -193,7 +193,7 @@ pricing; normal or displaced surface quotes produce a validation error.
 - `payment_date` (when set) is on or after the final observation date;
 - the accrual factor from `accrual_start_date` to the final observation is
   finite and positive;
-- `rate_index_id`, `projection_curve_id` and `reference_tenor` are supplied
+- `index_id`, `forward_curve_id` and `index_tenor` are supplied
   together (all three or none).
 
 ## Metrics
@@ -213,7 +213,7 @@ finite-difference:
 ## Market dependencies
 
 Declared by `Instrument::market_dependencies`: the discount curve, the
-projection curve when `projection_curve_id` is set, the `spot_id` scalar, the
+projection curve when `forward_curve_id` is set, the `spot_id` scalar, the
 volatility surface at both `lower_bound` and `upper_bound` strikes, and the
 dividend-yield scalar when `div_yield_id` is set.
 
@@ -233,7 +233,7 @@ A related standalone helper for the callable variant is exposed as
 
 - GBM dynamics only: no stochastic volatility, no jumps.
 - Discrete observation only; no continuous-monitoring adjustment.
-- Rate-linked range accruals (`rate_index_id` set) are rejected by both
+- Rate-linked range accruals (`index_id` set) are rejected by both
   registered pricers.
 - Quanto handling uses correlation and vol inputs; there is no full
   multi-currency simulation.

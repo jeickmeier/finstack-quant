@@ -2701,9 +2701,9 @@ class FloatingCouponSpec:
     ...     FloatingRateSpec,
     ...     ScheduleParams,
     ... )
-    >>> rate_spec = FloatingRateSpec(index_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M")
+    >>> rate_spec = FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M")
     >>> spec = FloatingCouponSpec(rate_spec, ScheduleParams.usd_sofr_swap())
-    >>> spec.rate_spec.index_id
+    >>> spec.rate_spec.forward_curve_id
     'USD-SOFR-3M'
     """
 
@@ -2924,14 +2924,14 @@ class FloatingRateSpec:
     --------
     >>> from decimal import Decimal
     >>> from finstack_quant.cashflows.builder import FloatingRateSpec
-    >>> spec = FloatingRateSpec(index_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M")
-    >>> spec.index_id
+    >>> spec = FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M")
+    >>> spec.forward_curve_id
     'USD-SOFR-3M'
     """
 
     def __init__(
         self,
-        index_id: str,
+        forward_curve_id: str,
         spread_bp: Decimal | float,
         reset_frequency: Tenor | str,
         gearing: Decimal | float | None = None,
@@ -2953,7 +2953,7 @@ class FloatingRateSpec:
 
         Parameters
         ----------
-        index_id : str
+        forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
         spread_bp : decimal.Decimal | float
             Spread/margin over the index in basis points.
@@ -3008,7 +3008,7 @@ class FloatingRateSpec:
         ...
 
     @property
-    def index_id(self) -> str:
+    def forward_curve_id(self) -> str:
         """
         Forward curve identifier.
 
@@ -3288,7 +3288,7 @@ class FloatingRateSpec:
         Returns
         -------
         FloatingRateSpec
-            Spec with ``index_id`` ``"USD-SOFR"``, unit gearing, no floors or caps
+            Spec with ``forward_curve_id`` ``"USD-SOFR"``, unit gearing, no floors or caps
             and ``FloatingRateFallback.ERROR``.
 
         Raises
@@ -3299,7 +3299,7 @@ class FloatingRateSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import FloatingRateSpec
-        >>> FloatingRateSpec.sofr(50).index_id
+        >>> FloatingRateSpec.sofr(50).forward_curve_id
         'USD-SOFR'
         """
         ...
@@ -3317,7 +3317,7 @@ class FloatingRateSpec:
         Returns
         -------
         FloatingRateSpec
-            Spec with ``index_id`` ``"GBP-SONIA"``, unit gearing, no floors or caps
+            Spec with ``forward_curve_id`` ``"GBP-SONIA"``, unit gearing, no floors or caps
             and ``FloatingRateFallback.ERROR``.
 
         Raises
@@ -3328,7 +3328,7 @@ class FloatingRateSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import FloatingRateSpec
-        >>> FloatingRateSpec.sonia(50).index_id
+        >>> FloatingRateSpec.sonia(50).forward_curve_id
         'GBP-SONIA'
         """
         ...
@@ -3346,7 +3346,7 @@ class FloatingRateSpec:
         Returns
         -------
         FloatingRateSpec
-            Spec with ``index_id`` ``"EUR-EURIBOR-3M"``, unit gearing, no floors or caps
+            Spec with ``forward_curve_id`` ``"EUR-EURIBOR-3M"``, unit gearing, no floors or caps
             and ``FloatingRateFallback.ERROR``.
 
         Raises
@@ -3357,7 +3357,7 @@ class FloatingRateSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import FloatingRateSpec
-        >>> FloatingRateSpec.euribor_3m(50).index_id
+        >>> FloatingRateSpec.euribor_3m(50).forward_curve_id
         'EUR-EURIBOR-3M'
         """
         ...

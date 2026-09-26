@@ -35,7 +35,7 @@
         "settlement_days": 1,
         "ex_coupon_days": 0,
         "ex_coupon_calendar_id": "usny",
-        "funding_curve_id": "USD-REPO"
+        "repo_curve_id": "USD-REPO"
       }
     }
   },

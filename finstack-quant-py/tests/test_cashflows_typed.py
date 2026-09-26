@@ -190,14 +190,14 @@ class TestBuilderSpecs:
         from finstack_quant.cashflows.builder import FloatingRateSpec
 
         spec = FloatingRateSpec(
-            index_id="USD-SOFR-3M",
+            forward_curve_id="USD-SOFR-3M",
             spread_bp=Decimal("200"),
             reset_frequency="3M",
             index_floor_bp=Decimal("0"),
         )
         spec.validate()
         bad = FloatingRateSpec(
-            index_id="USD-SOFR-3M",
+            forward_curve_id="USD-SOFR-3M",
             spread_bp=Decimal("200"),
             reset_frequency="3M",
             index_floor_bp=Decimal("100"),
@@ -333,7 +333,7 @@ class TestBuilderSpecs:
             .floating_cf(
                 FloatingCouponSpec(
                     rate_spec=FloatingRateSpec(
-                        index_id="USD-SOFR-3M",
+                        forward_curve_id="USD-SOFR-3M",
                         spread_bp=Decimal("150"),
                         reset_frequency="3M",
                     ),
@@ -352,7 +352,7 @@ class TestBuilderSpecs:
                     "kind": "floating",
                     "spec": {
                         "rate_spec": {
-                            "index_id": "USD-SOFR-3M",
+                            "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "150",
                             "reset_frequency": {"count": 3, "unit": "months"},
                         },
@@ -410,7 +410,7 @@ class TestBuilderSpecs:
             if overnight_index_constraints is not None:
                 kwargs["overnight_index_constraints"] = overnight_index_constraints
             rate_spec = FloatingRateSpec(
-                index_id="USD-SOFR-3M",
+                forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("0"),
                 reset_frequency="3M",
                 index_floor_bp=Decimal("300"),
@@ -443,7 +443,7 @@ class TestBuilderSpecs:
                     "kind": "floating",
                     "spec": {
                         "rate_spec": {
-                            "index_id": "USD-SOFR-3M",
+                            "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "0",
                             "reset_frequency": {"count": 3, "unit": "months"},
                             "index_floor_bp": "300",
@@ -500,7 +500,7 @@ class TestBuilderSpecs:
             .floating_cf(
                 FloatingCouponSpec(
                     rate_spec=FloatingRateSpec(
-                        index_id="USD-SOFR-3M",
+                        forward_curve_id="USD-SOFR-3M",
                         spread_bp=Decimal("150"),
                         reset_frequency="3M",
                     ),
@@ -520,7 +520,7 @@ class TestBuilderSpecs:
                     "kind": "floating",
                     "spec": {
                         "rate_spec": {
-                            "index_id": "USD-SOFR-3M",
+                            "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "150",
                             "reset_frequency": {"count": 3, "unit": "months"},
                         },
@@ -635,7 +635,7 @@ class TestCashFlowBuilder:
         )
 
         spec = FloatingCouponSpec(
-            rate_spec=FloatingRateSpec(index_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M"),
+            rate_spec=FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency="3M"),
             schedule=ScheduleParams.quarterly_act360(),
         )
         builder = (
@@ -670,7 +670,7 @@ class TestCashFlowBuilder:
         )
         market = MarketContext().insert(curve)
         spec = FloatingCouponSpec(
-            rate_spec=FloatingRateSpec(index_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency="3M"),
+            rate_spec=FloatingRateSpec(forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency="3M"),
             schedule=ScheduleParams.quarterly_act360(),
         )
         schedule = (
@@ -699,7 +699,7 @@ class TestCashFlowBuilder:
 
         floating = FloatingCouponSpec(
             rate_spec=FloatingRateSpec(
-                index_id="USD-SOFR-3M",
+                forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
                 reset_frequency="3M",
                 fallback=FloatingRateFallback.SPREAD_ONLY,
@@ -735,7 +735,7 @@ class TestCashFlowBuilder:
 
         spec = FloatingCouponSpec(
             rate_spec=FloatingRateSpec(
-                index_id="USD-SOFR-3M",
+                forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
                 reset_frequency="3M",
                 fallback=FloatingRateFallback.SPREAD_ONLY,
@@ -1272,11 +1272,11 @@ class TestTypedTwinsAndWire:
         from finstack_quant.core.dates import DayCount
 
         sofr = FloatingRateSpec.sofr(50)
-        assert sofr.index_id == "USD-SOFR"
+        assert sofr.forward_curve_id == "USD-SOFR"
         assert sofr.overnight_compounding == OvernightCompoundingMethod.COMPOUNDED_IN_ARREARS
         assert sofr.overnight_basis == DayCount.ACT_360
         assert sofr.reset_lag_days == 0
-        assert FloatingRateSpec.sonia(10).index_id == "GBP-SONIA"
+        assert FloatingRateSpec.sonia(10).forward_curve_id == "GBP-SONIA"
         assert FloatingRateSpec.euribor_3m(10).index_tenor is not None
         assert sofr.fallback is not None
         assert sofr.gearing_includes_spread is True

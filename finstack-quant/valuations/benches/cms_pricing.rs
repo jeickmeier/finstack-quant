@@ -21,12 +21,13 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::rates::cms_option::replication_pricer::CmsReplicationPricer;
 use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
 use finstack_quant_valuations::instruments::rates::cms_swap::{CmsSwap, FundingLegSpec};
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::{IRSConvention, PayReceive};
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{InstrumentPricingOverrides, OptionType};
 use finstack_quant_valuations::pricer::Pricer;
 use rust_decimal::Decimal;
@@ -109,10 +110,10 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: f64) -> CmsOption {
         payment_dates,
         accrual_fractions,
         cms_tenor,
-        swap_convention: None,
+        index_id: None,
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
-        swap_day_count: Some(DayCount::Thirty360),
+        swap_fixed_day_count: Some(DayCount::Thirty360),
         swap_float_day_count: Some(DayCount::Act360),
         day_count: DayCount::Act360,
         discount_curve_id: CurveId::new("USD-OIS"),
@@ -199,7 +200,7 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
         },
         Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         DayCount::Act360,
-        IRSConvention::UsdSofr,
+        IndexId::new("USD-SOFR-OIS"),
         PayReceive::Receive,
         "USD-OIS",
         "USD-LIBOR-3M",

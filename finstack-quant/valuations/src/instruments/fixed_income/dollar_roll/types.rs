@@ -137,8 +137,9 @@ pub struct DollarRoll {
     pub discount_curve_id: CurveId,
     /// Optional repo/financing curve identifier (carry-only).
     ///
-    /// Forward curve used by roll specialness to calculate the simple
-    /// financing rate over the front/back settlement interval on ACT/360.
+    /// Discount curve used by roll specialness to calculate the simple
+    /// financing rate `(DF(front)/DF(back) − 1)/τ` over the front/back
+    /// settlement interval, with `τ` on ACT/360.
     /// The implied financing rate itself is determined by prices and carry.
     /// See the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]
     /// module). Does **not** affect
@@ -391,7 +392,7 @@ impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let Some(repo_curve_id) = &self.repo_curve_id {
-            deps.add_forward_curve(repo_curve_id.clone());
+            deps.add_discount_curve(repo_curve_id.clone());
         }
         Ok(deps)
     }

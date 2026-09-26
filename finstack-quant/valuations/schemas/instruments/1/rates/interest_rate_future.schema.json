@@ -80,7 +80,15 @@
           ],
           "description": "Underlying rate fixing date.\n\nDefaults to `terms.last_trading_date` when omitted."
         },
-        "fixing_index_id": {
+        "forward_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Forward curve identifier"
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique identifier"
+        },
+        "index_id": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
@@ -89,15 +97,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional fixing-index identifier.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
-        },
-        "forward_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve identifier"
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique identifier"
+          "description": "Optional rate-index identity keying the historical fixing series.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",

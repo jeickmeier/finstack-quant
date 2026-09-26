@@ -143,9 +143,9 @@ impl TrancheCoupon {
     ) -> finstack_quant_core::Result<f64> {
         let as_of = match self {
             TrancheCoupon::Fixed { .. } => date,
-            TrancheCoupon::Floating(spec) => {
-                context.get_forward(spec.index_id.as_str())?.base_date()
-            }
+            TrancheCoupon::Floating(spec) => context
+                .get_forward(spec.forward_curve_id.as_str())?
+                .base_date(),
         };
         self.try_rate_for_period(date, as_of, context)
     }
@@ -160,7 +160,7 @@ impl TrancheCoupon {
         match self {
             TrancheCoupon::Fixed { rate } => Ok(*rate),
             TrancheCoupon::Floating(spec) => {
-                let fwd = context.get_forward(spec.index_id.as_str())?;
+                let fwd = context.get_forward(spec.forward_curve_id.as_str())?;
                 let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
                 let calendar_id = spec
                     .fixing_calendar_id
@@ -187,12 +187,12 @@ impl TrancheCoupon {
                     }
                     let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
                         context,
-                        spec.index_id.as_str(),
+                        spec.forward_curve_id.as_str(),
                     )?;
                     let raw =
                         finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                             Some(fixings),
-                            spec.index_id.as_str(),
+                            spec.forward_curve_id.as_str(),
                             reset_date,
                             as_of,
                         )?;
@@ -1165,7 +1165,7 @@ mod tests {
             .balance(Money::from((900_000_000_i64, Currency::USD)))
             .coupon(TrancheCoupon::Floating(
                 crate::cashflow::builder::FloatingRateSpec {
-                    index_id: CurveId::new("SOFR-3M".to_string()),
+                    forward_curve_id: CurveId::new("SOFR-3M".to_string()),
                     spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),
                     gearing: rust_decimal::Decimal::ONE,
                     gearing_includes_spread: true,

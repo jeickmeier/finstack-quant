@@ -59,7 +59,7 @@ fn floating_cashflow_spec_json() -> String {
             "kind": "floating",
             "spec": {
               "rate_spec": {
-                "index_id": "USD-SOFR-3M",
+                "forward_curve_id": "USD-SOFR-3M",
                 "spread_bp": "150.0",
                 "gearing": "1.0",
                 "gearing_includes_spread": true,
@@ -134,7 +134,7 @@ fn canonical_schedule_params_json() -> serde_json::Value {
 fn canonical_floating_coupon_json() -> serde_json::Value {
     serde_json::json!({
         "rate_spec": {
-            "index_id": "TEST-INDEX",
+            "forward_curve_id": "TEST-INDEX",
             "spread_bp": "150",
             "reset_frequency": {"count": 3, "unit": "months"},
             "reset_lag_days": 0,

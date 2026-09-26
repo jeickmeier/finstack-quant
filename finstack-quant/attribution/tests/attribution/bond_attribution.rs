@@ -206,7 +206,7 @@ fn test_parallel_bond_attribution_isolates_funding_when_repo_curve_present() {
         "USD-OIS",
     )
     .unwrap();
-    bond.funding_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-REPO"));
+    bond.repo_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-REPO"));
 
     let market_t0 = MarketContext::new()
         .insert(flat_curve("USD-OIS", as_of_t0, 0.05))
@@ -273,7 +273,7 @@ fn test_metrics_based_bond_attribution_populates_carry_decomposition() {
     // Attach a funding (repo) curve so funding_cost is NON-zero: with
     // funding_cost = 0 both a `− funding` and a `+ funding` partition
     // identity pass, hiding a sign error in the test.
-    bond.funding_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-REPO"));
+    bond.repo_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-REPO"));
 
     let market_t0 = MarketContext::new()
         .insert(flat_curve("USD-OIS", as_of_t0, 0.05))

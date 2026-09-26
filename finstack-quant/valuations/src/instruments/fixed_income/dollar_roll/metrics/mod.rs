@@ -41,23 +41,12 @@ impl MetricCalculator for RollSpecialnessCalculator {
             back,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
-        let repo_rate = if let Some(id) = &roll.repo_curve_id {
-            let curve = context.curves.get_forward(id)?;
-            let t1 = curve.day_count().year_fraction(
-                curve.base_date(),
-                front,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?;
-            let t2 = curve.day_count().year_fraction(
-                curve.base_date(),
-                back,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?;
-            curve.rate_between(t1, t2)? * (t2 - t1) / accrual
-        } else {
-            let curve = context.curves.get_discount(&roll.discount_curve_id)?;
-            (1.0 / curve.df_between_dates(front, back)? - 1.0) / accrual
-        };
+        let repo_curve_id = roll
+            .repo_curve_id
+            .as_ref()
+            .unwrap_or(&roll.discount_curve_id);
+        let curve = context.curves.get_discount(repo_curve_id)?;
+        let repo_rate = (1.0 / curve.df_between_dates(front, back)? - 1.0) / accrual;
         super::carry::roll_specialness(roll, repo_rate)
     }
 }
@@ -89,15 +78,19 @@ mod production_mortgage_audit {
     use super::*;
     use finstack_quant_core::{
         currency::Currency,
-        market_data::{
-            context::MarketContext,
-            term_structures::{DiscountCurve, ForwardCurve},
-        },
+        market_data::{context::MarketContext, term_structures::DiscountCurve},
         money::Money,
     };
     use std::sync::Arc;
     use time::macros::date;
 
+    /// The repo curve is a discount curve: the reference financing rate is the
+    /// simple ACT/360 rate implied by its discount factors over the roll
+    /// interval. On a curve with continuously compounded zero rate `r` and an
+    /// ACT/360 clock, DF(front)/DF(back) = exp(r·τ) with τ the ACT/360 accrual,
+    /// so the repo rate is (exp(r·τ) − 1)/τ. The only error left is the
+    /// log-linear interpolation round-off (~1e-16 relative), so 1e-9 bp is a
+    /// tight bound on specialness.
     #[test]
     fn specialness_resolves_the_supplied_repo_curve() {
         let as_of = date!(2026 - 03 - 01);
@@ -117,12 +110,13 @@ mod production_mortgage_audit {
                     .expect("curve"),
             )
             .insert(
-                ForwardCurve::builder("REPO", 31.0 / 360.0)
+                DiscountCurve::builder("REPO")
                     .base_date(as_of)
                     .day_count(finstack_quant_core::dates::DayCount::Act360)
-                    .knots([(0.0, 0.0375), (5.0, 0.0375)])
+                    .knots([(0.0, 1.0), (5.0, (-0.0375_f64 * 5.0).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
                     .build()
-                    .expect("forward"),
+                    .expect("repo curve"),
             );
         let mut context = MetricContext::new(
             Arc::new(roll),
@@ -134,9 +128,11 @@ mod production_mortgage_audit {
         let actual = RollSpecialnessCalculator
             .calculate(&mut context)
             .expect("specialness");
-        let expected = (0.0375 - carry.implied_rate) * 10000.0;
+        let tau = 31.0 / 360.0;
+        let repo_rate = ((0.0375_f64 * tau).exp() - 1.0) / tau;
+        let expected = (repo_rate - carry.implied_rate) * 10000.0;
         assert!(
-            (actual - expected).abs() < 1e-7,
+            (actual - expected).abs() < 1e-9,
             "{actual} versus {expected}"
         );
     }

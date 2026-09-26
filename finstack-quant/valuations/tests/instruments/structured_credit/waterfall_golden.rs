@@ -62,7 +62,7 @@ fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
             balance: Money::new(asset_balance, currency).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: Some(400.0),
-            index_id: Some("SOFR-3M".into()),
+            forward_curve_id: Some("SOFR-3M".into()),
             index_floor: None,
             maturity: Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
             credit_quality: Some(CreditRating::BB),

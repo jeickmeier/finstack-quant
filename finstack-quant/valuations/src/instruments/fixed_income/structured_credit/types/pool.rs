@@ -39,8 +39,8 @@ pub struct PoolAsset {
     /// Weighted-average-spread calculations use this field rather than the
     /// all-in coupon because the index component is not a credit spread.
     pub spread_bp: Option<f64>,
-    /// Reference index identifier for floating-rate assets, such as SOFR-3M.
-    pub index_id: Option<String>,
+    /// Rates forward-curve identifier for floating-rate assets, such as SOFR-3M.
+    pub forward_curve_id: Option<String>,
     /// Floor on the floating index (annual decimal, e.g. `0.01` = 1%)
     /// applied before `spread_bp` is added, matching
     /// `FloatingRateSpec::index_floor_bp`; `None` for no floor. Ignored on
@@ -187,7 +187,7 @@ impl PoolAsset {
                 crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => {
                     Err(finstack_quant_core::Error::Validation(format!(
                         "PoolAsset::from_bond cannot faithfully flatten floating-rate bond '{}' into the simplified pool asset schema: reset lag/frequency, fixing calendars, gearing, floors/caps, and overnight conventions would be lost; construct an explicit PoolAsset with supported pool-rate terms instead",
-                        spec.rate_spec.index_id
+                        spec.rate_spec.forward_curve_id
                     )))
                 }
                 crate::instruments::fixed_income::bond::CashflowSpec::Amortizing {
@@ -202,14 +202,14 @@ impl PoolAsset {
             }
         }
 
-        let (rate, spread_bp, index_id, day_count) = economics(&bond.cashflow_spec)?;
+        let (rate, spread_bp, forward_curve_id, day_count) = economics(&bond.cashflow_spec)?;
         Ok(Self {
             id: bond.id.to_owned(),
             asset_type: AssetType::HighYieldBond {},
             balance: bond.notional,
             rate,
             spread_bp,
-            index_id,
+            forward_curve_id,
             maturity: bond.maturity,
             index_floor: None,
             credit_quality: None,
@@ -251,7 +251,7 @@ impl PoolAsset {
     /// # Arguments
     /// * `id` - Unique asset identifier
     /// * `balance` - Current outstanding balance
-    /// * `index_id` - Reference rate (e.g., "SOFR-3M", "LIBOR-3M")
+    /// * `forward_curve_id` - Reference rate (e.g., "SOFR-3M", "LIBOR-3M")
     /// * `spread_bp` - Spread over index in basis points
     /// * `maturity` - Maturity date
     /// * `day_count` - Day count convention
@@ -281,7 +281,7 @@ impl PoolAsset {
     pub fn floating_rate_loan(
         id: impl Into<InstrumentId>,
         balance: Money,
-        index_id: impl Into<String>,
+        forward_curve_id: impl Into<String>,
         spread_bp: f64,
         maturity: Date,
         day_count: DayCount,
@@ -292,7 +292,7 @@ impl PoolAsset {
             balance,
             rate: spread_bp / BASIS_POINTS_DIVISOR, // Initialize with spread only
             spread_bp: Some(spread_bp),
-            index_id: Some(index_id.into()),
+            forward_curve_id: Some(forward_curve_id.into()),
             maturity,
             index_floor: None,
             credit_quality: None,
@@ -338,7 +338,7 @@ impl PoolAsset {
             balance,
             rate,
             spread_bp: None, // Fixed rate - no separate spread
-            index_id: None,
+            forward_curve_id: None,
             maturity,
             index_floor: None,
             credit_quality: None,
@@ -460,7 +460,7 @@ pub struct ReinvestmentPeriod {
 /// Terms of the collateral bought with reinvested principal.
 ///
 /// Each purchase creates a bullet first-lien row maturing `maturity_months`
-/// after the purchase date, accruing ACT/360 at `index_id` plus `spread_bp`
+/// after the purchase date, accruing ACT/360 at `forward_curve_id` plus `spread_bp`
 /// (or at `spread_bp` as a fixed coupon when no index is given), bought at
 /// `price_pct` percent of par. A discount price builds par.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -468,7 +468,7 @@ pub struct ReinvestmentPeriod {
 #[serde(deny_unknown_fields)]
 pub struct ReinvestmentAssumptions {
     /// Spread over the index in basis points (the whole coupon in basis
-    /// points when `index_id` is `None`).
+    /// points when `forward_curve_id` is `None`).
     pub spread_bp: f64,
     /// Purchase price as percent of par (`99.0` buys `100/99` of par per unit
     /// of cash); must not exceed `ReinvestmentCriteria::max_price_pct`.
@@ -477,7 +477,7 @@ pub struct ReinvestmentAssumptions {
     pub maturity_months: u32,
     /// Floating-rate index id (a forward curve in the market context), or
     /// `None` for a fixed coupon.
-    pub index_id: Option<String>,
+    pub forward_curve_id: Option<String>,
     /// Minimum all-in annual coupon as a decimal (a floor on the resolved
     /// index plus spread), if any.
     pub coupon_floor: Option<f64>,
@@ -643,8 +643,8 @@ pub struct RepLine {
     pub rate: f64,
     /// Weighted average spread (for floating rate)
     pub spread_bp: Option<f64>,
-    /// Reference index (if floating)
-    pub index_id: Option<String>,
+    /// Rates forward-curve identifier (if floating)
+    pub forward_curve_id: Option<String>,
     /// Floor on the floating index (annual decimal) applied before
     /// `spread_bp`; `None` for no floor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -704,7 +704,7 @@ impl RepLine {
             balance,
             rate,
             spread_bp: None,
-            index_id: None,
+            forward_curve_id: None,
             index_floor: None,
             maturity,
             seasoning_months: 0,
@@ -829,7 +829,7 @@ impl AssetPool {
                     balance: line.balance,
                     rate: line.rate,
                     spread_bp: line.spread_bp,
-                    index_id: line.index_id,
+                    forward_curve_id: line.forward_curve_id,
                     index_floor: line.index_floor,
                     maturity: line.maturity,
                     credit_quality: None,
@@ -1116,7 +1116,7 @@ impl AssetPool {
     /// Indenture WAC: the balance-weighted all-in coupon (`rate`) over the
     /// performing (non-defaulted, positive-balance) fixed-rate collateral,
     /// asset rows and rep lines alike. A row is floating-rate, and so left
-    /// out, when it carries both an `index_id` and a `spread_bp`; its spread
+    /// out, when it carries both an `forward_curve_id` and a `spread_bp`; its spread
     /// is reported by [`Self::weighted_avg_spread_bp`] instead. This is the
     /// same population as the simulated `PeriodDiagnostics::wac`.
     ///
@@ -1125,14 +1125,17 @@ impl AssetPool {
     /// The WAC as a decimal (`0.08` = 8%), or `0.0` when no performing
     /// fixed-rate balance remains.
     pub fn wac(&self) -> f64 {
-        let is_fixed = |index_id: &Option<String>, spread_bp: Option<f64>| {
-            index_id.is_none() || spread_bp.is_none()
+        let is_fixed = |forward_curve_id: &Option<String>, spread_bp: Option<f64>| {
+            forward_curve_id.is_none() || spread_bp.is_none()
         };
         let mut weighted = 0.0;
         let mut included = 0.0;
         for asset in &self.assets {
             let balance = asset.balance.amount();
-            if asset.is_defaulted || balance <= 0.0 || !is_fixed(&asset.index_id, asset.spread_bp) {
+            if asset.is_defaulted
+                || balance <= 0.0
+                || !is_fixed(&asset.forward_curve_id, asset.spread_bp)
+            {
                 continue;
             }
             weighted += asset.rate * balance;
@@ -1140,7 +1143,7 @@ impl AssetPool {
         }
         for line in self.rep_lines.iter().flatten() {
             let balance = line.balance.amount();
-            if balance <= 0.0 || !is_fixed(&line.index_id, line.spread_bp) {
+            if balance <= 0.0 || !is_fixed(&line.forward_curve_id, line.spread_bp) {
                 continue;
             }
             weighted += line.rate * balance;

@@ -360,7 +360,7 @@ def test_bond_constructors_and_examples() -> None:
         currency="USD",
     )
     assert frn.has_floating_coupons
-    assert frn.cashflow_spec["floating"]["rate_spec"]["index_id"] == "USD-SOFR-3M"
+    assert frn.cashflow_spec["floating"]["rate_spec"]["forward_curve_id"] == "USD-SOFR-3M"
     frn_eur = Bond.floating_with_convention(
         "FRN-EUR",
         1000.0,

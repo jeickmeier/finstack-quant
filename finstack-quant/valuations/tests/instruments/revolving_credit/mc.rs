@@ -459,7 +459,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
     // Helper to build a floating rate spec with optional index cap
     let make_float_spec = |all_in_cap_bp: Option<Decimal>| -> FloatingRateSpec {
         FloatingRateSpec {
-            index_id: "USD-SOFR-3M".into(),
+            forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: Decimal::try_from(100.0).expect("valid"), // 100 bp spread
             gearing: Decimal::try_from(1.0).expect("valid"),
             gearing_includes_spread: true,
@@ -571,7 +571,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
     let val_date = date!(2025 - 01 - 02);
     let maturity_date = date!(2026 - 01 - 02);
     let float_spec = FloatingRateSpec {
-        index_id: "USD-SOFR-OIS".into(),
+        forward_curve_id: "USD-SOFR-OIS".into(),
         spread_bp: Decimal::ZERO,
         gearing: Decimal::ONE,
         gearing_includes_spread: true,

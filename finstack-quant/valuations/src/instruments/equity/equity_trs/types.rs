@@ -638,7 +638,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
             .principal(self.notional, self.schedule.start, self.schedule.end)
             .floating_cf(crate::cashflow::builder::FloatingCouponSpec {
                 rate_spec: crate::cashflow::builder::FloatingRateSpec {
-                    index_id: self.financing.forward_curve_id.clone(),
+                    forward_curve_id: self.financing.forward_curve_id.clone(),
                     spread_bp: self.financing.spread_bp,
                     gearing: Decimal::ONE,
                     gearing_includes_spread: true,

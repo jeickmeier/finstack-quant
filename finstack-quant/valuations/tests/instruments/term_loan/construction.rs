@@ -52,7 +52,7 @@ fn test_builder_floating_rate_loan() {
         .issue_date(date!(2025 - 01 - 01))
         .maturity(date!(2028 - 01 - 01))
         .rate(RateSpec::Floating(FloatingRateSpec {
-            index_id: CurveId::from("USD-SOFR"),
+            forward_curve_id: CurveId::from("USD-SOFR"),
             spread_bp: rust_decimal::Decimal::try_from(250.0).expect("valid"), // +250 bp
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
             gearing_includes_spread: true,

@@ -24,7 +24,7 @@ fn loan_debt_service(
 ) -> finstack_quant_core::Result<f64> {
     // A floating coupon is the index projected from the curve at `as_of`
     // (floored) plus the spread; a fixed coupon is the stored rate.
-    let coupon = match asset.index_id.as_deref() {
+    let coupon = match asset.forward_curve_id.as_deref() {
         Some(index) => {
             let curve = market.get_forward(index)?;
             // Project the next reset: the accrual starting one reset lag after

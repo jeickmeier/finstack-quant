@@ -68,8 +68,8 @@ pub struct CommodityFuture {
     pub underlying: String,
     /// Standard listed position and lifecycle terms.
     pub terms: ListedFutureTerms,
-    /// Price-curve identifier used for projected observations.
-    pub price_curve_id: CurveId,
+    /// Commodity forward `PriceCurve` used for projected observations.
+    pub forward_curve_id: CurveId,
     /// Final-settlement price fixing rule (single observation or average).
     pub fixing: CommodityFutureFixing,
     /// Instrument-owned pricing inputs.
@@ -190,7 +190,7 @@ impl CommodityFuture {
                 date!(2027 - 01 - 04),
                 Position::Long,
             )?)
-            .price_curve_id(CurveId::new("IRON-ORE-FORWARD"))
+            .forward_curve_id(CurveId::new("IRON-ORE-FORWARD"))
             .fixing(CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates: vec![
                     date!(2026 - 12 - 29),
@@ -229,7 +229,7 @@ impl CommodityFuture {
                     })
                 } else {
                     market
-                        .get_price_curve(self.price_curve_id.as_str())?
+                        .get_price_curve(self.forward_curve_id.as_str())?
                         .price_on_date(*observation_date)
                 }
             }
@@ -238,7 +238,7 @@ impl CommodityFuture {
                 past_fixings,
             } => {
                 let curve = if fixing_dates.iter().any(|date| *date >= as_of) {
-                    Some(market.get_price_curve(self.price_curve_id.as_str())?)
+                    Some(market.get_price_curve(self.forward_curve_id.as_str())?)
                 } else {
                     None
                 };
@@ -332,7 +332,7 @@ impl crate::instruments::Instrument for CommodityFuture {
         &self,
     ) -> finstack_quant_core::Result<crate::instruments::MarketDependencies> {
         let mut dependencies = crate::instruments::MarketDependencies::new();
-        dependencies.add_forward_curve(self.price_curve_id.clone());
+        dependencies.add_forward_curve(self.forward_curve_id.clone());
         Ok(dependencies)
     }
 
@@ -384,7 +384,7 @@ mod tests {
                 )
                 .expect("valid terms"),
             )
-            .price_curve_id(CurveId::new("INDEX-FWD"))
+            .forward_curve_id(CurveId::new("INDEX-FWD"))
             .fixing(CommodityFutureFixing::ArithmeticAverage {
                 fixing_dates: vec![
                     date!(2026 - 01 - 02),

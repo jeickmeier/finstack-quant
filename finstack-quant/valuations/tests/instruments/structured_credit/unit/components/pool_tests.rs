@@ -44,8 +44,8 @@ fn test_pool_asset_floating_rate_loan_creation() {
     assert_eq!(asset.id.as_str(), "LOAN001");
     assert_eq!(asset.balance.amount(), 10_000_000.0);
     assert_eq!(asset.spread_bp(), 450.0);
-    assert!(asset.index_id.is_some());
-    assert_eq!(asset.index_id.as_ref().unwrap(), "SOFR-3M");
+    assert!(asset.forward_curve_id.is_some());
+    assert_eq!(asset.forward_curve_id.as_ref().unwrap(), "SOFR-3M");
     assert!(!asset.is_defaulted);
 }
 
@@ -65,7 +65,7 @@ fn test_pool_asset_fixed_rate_bond_creation() {
     assert_eq!(asset.balance.amount(), 5_000_000.0);
     assert_eq!(asset.rate, 0.07);
     assert!(asset.spread_bp.is_none()); // Fixed rate has no separate spread
-    assert!(asset.index_id.is_none());
+    assert!(asset.forward_curve_id.is_none());
 }
 
 #[test]
@@ -799,7 +799,7 @@ fn test_pool_asset_type_classification() {
         balance: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
         rate: 0.07,
         spread_bp: Some(450.0),
-        index_id: Some("SOFR-3M".to_string()),
+        forward_curve_id: Some("SOFR-3M".to_string()),
         index_floor: None,
         maturity: maturity_date(),
         credit_quality: Some(CreditRating::BB),

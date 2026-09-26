@@ -145,7 +145,7 @@
           "2026-04-02"
         ],
         "strike": "0.025",
-        "swap_convention": "usd_sofr",
+        "index_id": "USD-SOFR-OIS",
         "swap_float_day_count": "act_360",
         "vol_surface_id": "USD-CMS10Y-VOL",
         "swap_fixed_frequency": {

@@ -640,7 +640,7 @@ use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
 
 fn sofr_plus(spread_bp: i64) -> BaseRateSpec {
     BaseRateSpec::Floating(FloatingRateSpec {
-        index_id: "USD-SOFR-3M".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::from(spread_bp),
         gearing: rust_decimal::Decimal::ONE,
         gearing_includes_spread: true,

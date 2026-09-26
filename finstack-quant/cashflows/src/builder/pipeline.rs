@@ -44,7 +44,7 @@ pub(super) struct DateProcessor<'a> {
     ctx: &'a BuildContext<'a>,
     amort_setup: &'a AmortizationSetup,
     resolved_curves: &'a [Option<Arc<ForwardCurve>>],
-    /// Per-float-schedule historical fixing series (`FIXING:{index_id}`),
+    /// Per-float-schedule historical fixing series (`FIXING:{forward_curve_id}`),
     /// aligned with `resolved_curves`; used for seasoned coupons whose
     /// observation dates precede the curve base date.
     resolved_fixings: &'a [Option<ScalarTimeSeries>],

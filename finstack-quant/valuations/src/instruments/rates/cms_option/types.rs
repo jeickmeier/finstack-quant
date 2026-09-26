@@ -1,12 +1,12 @@
 //! CMS option instrument definition.
 
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
 use crate::instruments::OptionType;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
@@ -57,14 +57,14 @@ pub struct CmsOption {
     /// Day count convention for the option accrual
     pub day_count: DayCount,
 
-    /// IRS convention for the underlying swap (e.g., `UsdSofr`).
+    /// Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
     ///
     /// When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
-    /// `swap_day_count`, and `swap_float_day_count`. Individual fields still
+    /// `swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still
     /// override the convention when explicitly set.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swap_convention: Option<IRSConvention>,
+    pub index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying swap (overrides convention if set)
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -76,7 +76,7 @@ pub struct CmsOption {
     /// Day count convention of the underlying swap fixed leg (overrides convention if set)
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swap_day_count: Option<DayCount>,
+    pub swap_fixed_day_count: Option<DayCount>,
     /// Optional day count convention of the underlying swap floating leg
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -121,10 +121,10 @@ impl CmsOption {
         CmsReferenceSwap {
             label: "CMS option",
             currency: self.notional.currency(),
-            swap_convention: self.swap_convention,
+            index_id: self.index_id.as_ref(),
             swap_fixed_frequency: self.swap_fixed_frequency,
             swap_float_frequency: self.swap_float_frequency,
-            swap_day_count: self.swap_day_count,
+            swap_fixed_day_count: self.swap_fixed_day_count,
             swap_float_day_count: self.swap_float_day_count,
             discount_curve_id: &self.discount_curve_id,
             forward_curve_id: &self.forward_curve_id,
@@ -182,7 +182,7 @@ impl CmsOption {
             .option_type(crate::instruments::OptionType::Call)
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
-            .swap_convention_opt(Some(IRSConvention::UsdSofr))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .swap_float_day_count_opt(Some(DayCount::Act360))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-LIBOR-3M"))

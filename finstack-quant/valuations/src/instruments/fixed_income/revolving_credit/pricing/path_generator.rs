@@ -132,7 +132,7 @@ pub fn generate_three_factor_paths(
         BaseRateSpec::Fixed { rate } => (InterestRateSpec::Fixed { rate: *rate }, None, 0.0),
         BaseRateSpec::Floating(spec) => {
             let overnight = crate::instruments::common_impl::pricing::overnight_conventions::resolved_overnight_compounding(
-                spec.index_id.as_str(),
+                spec.forward_curve_id.as_str(),
                 spec.overnight_compounding.as_ref(),
             )?;
             if overnight.is_some()
@@ -196,7 +196,7 @@ pub fn generate_three_factor_paths(
                 }
                 None => {
                     // Use deterministic forward curve
-                    let fwd = market.get_forward(spec.index_id.as_str())?;
+                    let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
                     let times = fwd.knots().to_vec();
                     let rates = fwd.forwards().to_vec();
                     let curve_offset = fwd.day_count().signed_year_fraction(

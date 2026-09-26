@@ -445,7 +445,7 @@
               },
               "rate": 0.035,
               "spread_bp": 350.0,
-              "index_id": "SOFR-3M",
+              "forward_curve_id": "SOFR-3M",
               "maturity": "2030-01-01",
               "credit_quality": "BB",
               "industry": "Technology",
@@ -469,7 +469,7 @@
               },
               "rate": 0.055,
               "spread_bp": null,
-              "index_id": null,
+              "forward_curve_id": null,
               "maturity": "2029-07-01",
               "credit_quality": "A",
               "industry": "Healthcare",
@@ -597,7 +597,7 @@
               },
               "coupon": {
                 "floating": {
-                  "index_id": "SOFR-3M",
+                  "forward_curve_id": "SOFR-3M",
                   "spread_bp": "150.0",
                   "gearing": "1.0",
                   "gearing_includes_spread": true,

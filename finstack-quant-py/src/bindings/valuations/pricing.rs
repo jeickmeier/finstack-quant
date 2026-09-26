@@ -550,7 +550,7 @@ pub(crate) fn market_history_json(
 ///     ``bucketed_dv01`` include the same rate-dependent prepayments as
 ///     ``duration_mod``. FI TRS ``duration_dv01`` requires ``duration_id`` and
 ///     its finite signed duration scalar in years. Roll specialness is in
-///     basis points against ``repo_curve_id`` (a forward curve), or the
+///     basis points against ``repo_curve_id`` (a discount curve), or the
 ///     discount curve when absent; implied financing is an ACT/360 decimal.
 /// metric_pricing_overrides : MetricPricingOverrides | dict | str | None
 ///     Metric-time overrides merged into

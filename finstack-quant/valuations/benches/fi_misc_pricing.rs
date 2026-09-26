@@ -78,7 +78,7 @@ fn revolving_credit_floating(maturity: Date) -> RevolvingCredit {
         .maturity(maturity)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
-                index_id: "USD-SOFR-3M".into(),
+                forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: Decimal::try_from(100.0).unwrap(),
                 gearing: Decimal::try_from(1.0).unwrap(),
                 gearing_includes_spread: true,
@@ -186,7 +186,7 @@ fn bench_term_loan_discount_margin(c: &mut Criterion) {
     let market = revolving_credit_market(as_of);
     let mut loan = term_loan(Date::from_calendar_date(2030, Month::January, 1).unwrap());
     loan.rate = RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
-        index_id: "USD-SOFR-3M".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: Decimal::from(350),
         gearing: Decimal::ONE,
         gearing_includes_spread: true,

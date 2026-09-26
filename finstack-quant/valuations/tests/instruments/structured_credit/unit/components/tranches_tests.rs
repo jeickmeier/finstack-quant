@@ -130,7 +130,7 @@ fn test_tranche_floating_coupon() {
         TrancheSeniority::Senior,
         Money::new(90_000_000.0, Currency::USD).expect("valid money fixture"),
         TrancheCoupon::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
-            index_id: CurveId::new("SOFR-3M".to_string()),
+            forward_curve_id: CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
             gearing_includes_spread: true,

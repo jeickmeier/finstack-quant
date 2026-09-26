@@ -774,13 +774,13 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
-    /// Funding curve ID for this instrument.
+    /// Repo (financing) discount curve ID for this instrument.
     ///
     /// Returns the funding or repo curve used to finance the position for
     /// carry cost calculations.
     ///
     /// Default implementation returns `None`.
-    fn funding_curve_id(&self) -> Option<CurveId> {
+    fn repo_curve_id(&self) -> Option<CurveId> {
         None
     }
 

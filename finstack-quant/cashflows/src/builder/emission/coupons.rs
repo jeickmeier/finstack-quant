@@ -64,7 +64,7 @@ pub fn emit_inflation_coupons(
 /// when no historical fixing series is available.
 ///
 /// Historical fixings are supported via a [`ScalarTimeSeries`] stored in the
-/// `MarketContext` under the canonical id `FIXING:{index_id}` (see
+/// `MarketContext` under the canonical id `FIXING:{forward_curve_id}` (see
 /// [`finstack_quant_core::market_data::fixings`]). This error is raised only when
 /// no such series was provided; the emission layer routes it through the
 /// spec's [`crate::builder::specs::FloatingRateFallback`] policy.
@@ -90,7 +90,7 @@ fn pre_base_observation_error(obs_date: Date, fwd: &ForwardCurve) -> finstack_qu
 /// carry the same `(rate, days)` weighting in the compounding product.
 ///
 /// - `obs_date < curve base`: realized fixing, resolved exactly from the
-///   `FIXING:{index_id}` series. Weekend/holiday carry is represented by the
+///   `FIXING:{forward_curve_id}` series. Weekend/holiday carry is represented by the
 ///   observation day weight, so a missing business-day publication is an
 ///   error rather than permission to reuse an arbitrarily old rate. Errors via
 ///   [`pre_base_observation_error`] when no series is provided; both errors
@@ -106,12 +106,14 @@ fn observed_overnight_rate(
     fwd: &ForwardCurve,
     fwd_day_count_basis: f64,
     fixings: Option<&ScalarTimeSeries>,
-    index_id: &str,
+    forward_curve_id: &str,
 ) -> finstack_quant_core::Result<f64> {
     let fwd_base = fwd.base_date();
     if obs_date < fwd_base {
         return match fixings {
-            Some(series) => require_fixing_value_exact(Some(series), index_id, obs_date, fwd_base),
+            Some(series) => {
+                require_fixing_value_exact(Some(series), forward_curve_id, obs_date, fwd_base)
+            }
             None => Err(pre_base_observation_error(obs_date, fwd)),
         };
     }
@@ -177,7 +179,7 @@ fn resolve_floating_rate_fallback(
 }
 
 fn rate_when_curve_missing(
-    index_id: &str,
+    forward_curve_id: &str,
     reset_date: Date,
     spread_bp: f64,
     fallback: &ResolvedFloatingRateFallback,
@@ -187,7 +189,7 @@ fn rate_when_curve_missing(
     let error = finstack_quant_core::Error::Input(InputError::NotFound {
         id: format!(
             "forward curve '{}' not found for reset date {}{}",
-            index_id, reset_date, context_suffix
+            forward_curve_id, reset_date, context_suffix
         ),
     });
     resolve_floating_rate_fallback(error, reset_date, spread_bp, fallback, params)
@@ -341,12 +343,12 @@ pub(crate) fn emit_fixed_coupons_on(
 ///
 /// Both slices are aligned index-for-index with the builder's float
 /// schedules; entries are `None` when the `MarketContext` lacks the
-/// corresponding curve or `FIXING:{index_id}` series.
+/// corresponding curve or `FIXING:{forward_curve_id}` series.
 #[derive(Clone, Copy)]
 pub(crate) struct ResolvedFloatMarket<'a> {
     /// Forward curves, one per float schedule.
     pub(crate) curves: &'a [Option<std::sync::Arc<ForwardCurve>>],
-    /// Historical fixing series (`FIXING:{index_id}`), one per float schedule.
+    /// Historical fixing series (`FIXING:{forward_curve_id}`), one per float schedule.
     pub(crate) fixings: &'a [Option<ScalarTimeSeries>],
 }
 
@@ -358,7 +360,7 @@ pub(crate) struct ResolvedFloatMarket<'a> {
 /// Cash and PIK flows are appended directly into the provided `out_flows` buffer.
 ///
 /// Seasoned coupons (observation dates before the curve base) resolve realized
-/// index fixings from `market.fixings` — the per-schedule `FIXING:{index_id}`
+/// index fixings from `market.fixings` — the per-schedule `FIXING:{forward_curve_id}`
 /// series aligned with `market.curves` (LOCF for overnight observations,
 /// exact-date for term resets). Without a series, pre-base observations route
 /// through the spec's [`crate::builder::specs::FloatingRateFallback`] policy.
@@ -478,7 +480,7 @@ pub(crate) fn emit_float_coupons_on(
                     if observations.observations().is_empty() {
                         return Err(finstack_quant_core::Error::Validation(format!(
                         "overnight accrual period [{accrual_start}, {accrual_end}) for index '{}' contains no business-day fixings",
-                        spec.rate_spec.index_id
+                        spec.rate_spec.forward_curve_id
                     )));
                     }
                     FloatingRateObservation::Overnight {
@@ -525,7 +527,7 @@ pub(crate) fn emit_float_coupons_on(
                     observation,
                 )?;
 
-                let series_id = format!("FIXING:{}", spec.rate_spec.index_id);
+                let series_id = format!("FIXING:{}", spec.rate_spec.forward_curve_id);
                 // Record required observations even if the coupon's configured
                 // fallback masks an unavailable projection. A roll cannot use
                 // a spread-only fallback as an observed index fixing.
@@ -562,7 +564,7 @@ pub(crate) fn emit_float_coupons_on(
                         };
                         if let Some(fwd) = resolved_curve.as_deref() {
                             let fixings = resolved_fixing.as_ref();
-                            let index_id = spec.rate_spec.index_id.as_str();
+                            let forward_curve_id = spec.rate_spec.forward_curve_id.as_str();
                             let mut state = compiled.replay_state();
                             compiled.capture_notional(&mut state, base_out_f64)?;
                             let mut cumulative =
@@ -574,7 +576,7 @@ pub(crate) fn emit_float_coupons_on(
                                             fwd,
                                             *day_count_basis,
                                             fixings,
-                                            index_id,
+                                            forward_curve_id,
                                         )?;
                                         projected_fixings.push(crate::fixings::ProjectedFixing {
                                             series_id: series_id.clone(),
@@ -634,7 +636,7 @@ pub(crate) fn emit_float_coupons_on(
                             }
                         } else {
                             let index_rate = fallback_index_rate(rate_when_curve_missing(
-                                spec.rate_spec.index_id.as_str(),
+                                spec.rate_spec.forward_curve_id.as_str(),
                                 reset_date,
                                 spread_bp,
                                 &runtime_spec.fallback,
@@ -654,7 +656,7 @@ pub(crate) fn emit_float_coupons_on(
                                 if reset_date < fwd.base_date() || same_day_fixing_exists {
                                     require_fixing_value_exact(
                                         resolved_fixing.as_ref(),
-                                        spec.rate_spec.index_id.as_str(),
+                                        spec.rate_spec.forward_curve_id.as_str(),
                                         reset_date,
                                         fwd.base_date(),
                                     )
@@ -680,7 +682,7 @@ pub(crate) fn emit_float_coupons_on(
                             }
                         } else {
                             fallback_index_rate(rate_when_curve_missing(
-                                spec.rate_spec.index_id.as_str(),
+                                spec.rate_spec.forward_curve_id.as_str(),
                                 reset_date,
                                 spread_bp,
                                 &runtime_spec.fallback,

@@ -180,7 +180,7 @@ def borrower_data() -> dict[str, Any]:
             "holding_fraction": 0.01,
             "issue_date": "2025-01-15",
             "maturity": "2030-01-15",
-            "index_id": "USD-SOFR-3M",
+            "forward_curve_id": "USD-SOFR-3M",
             "model_sofr": 0.05,
             "spread_bp": 250.0,
             "amortization_per_quarter_of_original": 0.025,

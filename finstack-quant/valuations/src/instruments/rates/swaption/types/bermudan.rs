@@ -298,7 +298,7 @@ impl BermudanSwaption {
     }
 
     /// Fixed-leg accrual convention.
-    pub fn get_day_count(&self) -> DayCount {
+    pub fn get_fixed_day_count(&self) -> DayCount {
         self.underlying_fixed_leg.day_count
     }
 

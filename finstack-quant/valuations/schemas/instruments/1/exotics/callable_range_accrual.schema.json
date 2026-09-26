@@ -169,6 +169,39 @@
           ],
           "description": "Optional dividend-yield scalar ID"
         },
+        "forward_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rates forward curve that projects the observed index of a rate-linked range accrual."
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual."
+        },
+        "index_tenor": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual tenor of the observed rate index."
+        },
         "lower_bound": {
           "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
           "format": "double",
@@ -206,17 +239,6 @@
           "default": null,
           "description": "Optional payment date (defaults to last observation date)"
         },
-        "projection_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Projection curve for a rate-linked range accrual."
-        },
         "quanto": {
           "anyOf": [
             {
@@ -227,28 +249,6 @@
             }
           ],
           "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
-        },
-        "rate_index_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Explicit rate index for rate-linked range accruals."
-        },
-        "reference_tenor": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Contractual tenor of the observed reference rate."
         },
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -336,6 +336,12 @@
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "div_yield_id": null,
+            "forward_curve_id": "USD-OIS",
+            "index_id": "SOFR",
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "lower_bound": 0.04,
             "notional": {
               "amount": "1000000",
@@ -357,12 +363,6 @@
             ],
             "past_observations_in_range": null,
             "payment_date": null,
-            "projection_curve_id": "USD-OIS",
-            "rate_index_id": "SOFR",
-            "reference_tenor": {
-              "count": 3,
-              "unit": "months"
-            },
             "spot_id": "SOFR-RATE",
             "total_past_observations": null,
             "underlying_ticker": "SOFR",

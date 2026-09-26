@@ -593,7 +593,7 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
                 _date(row["maturity"]),
                 day_count=DayCount.parse(row["day_count"]),
                 spread_bp=row.get("spread_bp"),
-                index_id=row.get("index_id"),
+                forward_curve_id=row.get("forward_curve_id"),
                 credit_quality=row.get("credit_quality"),
                 industry=row.get("industry"),
                 obligor_id=row.get("obligor_id"),

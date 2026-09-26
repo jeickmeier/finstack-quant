@@ -72,10 +72,10 @@ pub struct Bond {
     /// Optional credit curve identifier (default intensity). When present,
     /// credit-rate pricing is enabled.
     pub credit_curve_id: Option<CurveId>,
-    /// Optional funding/repo curve for carry cost computation.
+    /// Optional repo (financing) discount curve for carry cost computation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default)]
-    pub funding_curve_id: Option<CurveId>,
+    pub repo_curve_id: Option<CurveId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[serde(
@@ -148,7 +148,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             discount_curve_id: CurveId,
             credit_curve_id: Option<CurveId>,
             #[serde(default)]
-            funding_curve_id: Option<CurveId>,
+            repo_curve_id: Option<CurveId>,
             #[serde(default)]
             instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
             #[serde(default)]
@@ -207,7 +207,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             cashflow_spec: helper.cashflow_spec,
             discount_curve_id: helper.discount_curve_id,
             credit_curve_id: helper.credit_curve_id,
-            funding_curve_id: helper.funding_curve_id,
+            repo_curve_id: helper.repo_curve_id,
             instrument_pricing_overrides: helper.instrument_pricing_overrides,
             metric_pricing_overrides: helper.metric_pricing_overrides,
             scenario_pricing_overrides: helper.scenario_pricing_overrides,

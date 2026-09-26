@@ -79,10 +79,10 @@ pub(super) fn build_overnight_coupon(
         )?,
         index_cap_bp: decimal_option_to_f64(spec.rate_spec.index_cap_bp, "overnight index cap")?,
     };
-    let index_id = spec.rate_spec.index_id.as_str();
-    let fixing_id = fixing_series_id(index_id);
+    let forward_curve_id = spec.rate_spec.forward_curve_id.as_str();
+    let fixing_id = fixing_series_id(forward_curve_id);
     let fixings = market.get_series(&fixing_id).ok();
-    let forward = market.get_forward(index_id).ok();
+    let forward = market.get_forward(forward_curve_id).ok();
     let horizon = *times.last().ok_or_else(|| {
         Error::internal("bond hazard LSMC overnight replay has an empty tree grid")
     })?;
@@ -102,7 +102,8 @@ pub(super) fn build_overnight_coupon(
             let published_same_day = observation_date == as_of
                 && fixings.is_some_and(|series| series.value_on_exact(observation_date).is_ok());
             let source = if observation_date < as_of || published_same_day {
-                match require_fixing_value_exact(fixings, index_id, observation_date, as_of) {
+                match require_fixing_value_exact(fixings, forward_curve_id, observation_date, as_of)
+                {
                     Ok(rate) => OvernightRateSource::Fixed(rate),
                     Err(error) => OvernightRateSource::Fixed(fallback_index_rate(
                         &spec.rate_spec.fallback,
@@ -114,7 +115,7 @@ pub(super) fn build_overnight_coupon(
                     OvernightRateSource::Fixed(fallback_index_rate(
                         &spec.rate_spec.fallback,
                         Error::Validation(format!(
-                            "overnight observation {observation_date} for index '{index_id}' precedes forward-curve base {}",
+                            "overnight observation {observation_date} for index '{forward_curve_id}' precedes forward-curve base {}",
                             forward.base_date()
                         )),
                     )?)
@@ -163,7 +164,7 @@ pub(super) fn build_overnight_coupon(
                 OvernightRateSource::Fixed(fallback_index_rate(
                     &spec.rate_spec.fallback,
                     Error::Validation(format!(
-                        "forward curve '{index_id}' is required for stochastic overnight observation {observation_date}"
+                        "forward curve '{forward_curve_id}' is required for stochastic overnight observation {observation_date}"
                     )),
                 )?)
             };

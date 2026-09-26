@@ -140,7 +140,7 @@ fn commodity_swap_contract(label: &str, end: Date) -> CommoditySwap {
         .underlying(wti_underlying())
         .quantity(10_000.0)
         .fixed_price(Decimal::try_from(75.0).expect("fixed price"))
-        .floating_index_id(CurveId::new("WTI-FWD"))
+        .forward_curve_id(CurveId::new("WTI-FWD"))
         .side(PayReceive::Pay)
         .start_date(start)
         .maturity(end)

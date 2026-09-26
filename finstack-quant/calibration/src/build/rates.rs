@@ -490,7 +490,7 @@ fn build_future(
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
         .forward_curve_id(CurveId::new(ctx.require_curve_id("forward")?.to_string()))
         .rate_averaging(fut_conv.rate_averaging)
-        .fixing_index_id_opt(Some(fut_conv.index_id.clone()))
+        .index_id_opt(Some(fut_conv.index_id.clone()))
         .fixing_calendar_id_opt(Some(fut_conv.calendar_id.clone()))
         .attributes(Default::default())
         .build()?;

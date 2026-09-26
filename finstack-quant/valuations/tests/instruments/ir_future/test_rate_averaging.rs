@@ -46,7 +46,7 @@ fn overnight_future(
         .discount_curve_id("UNUSED-DISCOUNT".into())
         .forward_curve_id(curve_id.into())
         .rate_averaging(rate_averaging)
-        .fixing_index_id(curve_id.into())
+        .index_id(curve_id.into())
         .attributes(Default::default())
         .build()
         .expect("overnight future")

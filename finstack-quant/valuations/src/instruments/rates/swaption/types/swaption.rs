@@ -225,7 +225,7 @@ impl Swaption {
     }
 
     /// Fixed-leg accrual convention.
-    pub fn get_day_count(&self) -> DayCount {
+    pub fn get_fixed_day_count(&self) -> DayCount {
         self.underlying_fixed_leg.day_count
     }
 
@@ -861,7 +861,7 @@ impl Swaption {
     /// 365-day year).
     pub fn cash_annuity_par_yield(&self, forward_rate: f64) -> Result<f64> {
         let tenor_years = year_fraction(
-            self.get_day_count(),
+            self.get_fixed_day_count(),
             self.get_swap_start(),
             self.get_swap_end(),
         )?;
@@ -890,7 +890,7 @@ impl Swaption {
         use crate::instruments::common_impl::pricing::time::relative_df_discounting;
 
         let tenor = year_fraction(
-            self.get_day_count(),
+            self.get_fixed_day_count(),
             self.get_swap_start(),
             self.get_swap_end(),
         )?;

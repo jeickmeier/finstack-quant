@@ -16,12 +16,12 @@
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
 /// CMS (Constant Maturity Swap) swap instrument.
@@ -88,10 +88,10 @@ pub struct CmsSwap {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cms_floor: Option<f64>,
 
-    /// IRS convention for the underlying swap (e.g., `UsdSofr`).
+    /// Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swap_convention: Option<IRSConvention>,
+    pub index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying swap (overrides convention).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -103,7 +103,7 @@ pub struct CmsSwap {
     /// Day count of the underlying swap fixed leg (overrides convention).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swap_day_count: Option<DayCount>,
+    pub swap_fixed_day_count: Option<DayCount>,
     /// Day count of the underlying swap floating leg (overrides convention).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -208,10 +208,10 @@ impl CmsSwap {
         CmsReferenceSwap {
             label: "CMS swap",
             currency: self.notional.currency(),
-            swap_convention: self.swap_convention,
+            index_id: self.index_id.as_ref(),
             swap_fixed_frequency: self.swap_fixed_frequency,
             swap_float_frequency: self.swap_float_frequency,
-            swap_day_count: self.swap_day_count,
+            swap_fixed_day_count: self.swap_fixed_day_count,
             swap_float_day_count: self.swap_float_day_count,
             discount_curve_id: &self.discount_curve_id,
             forward_curve_id: &self.forward_curve_id,
@@ -258,7 +258,7 @@ impl CmsSwap {
     /// Create a CMS swap from schedule parameters.
     ///
     /// Generates fixing/payment dates for both legs from start, end, and
-    /// frequency. Calendar and reset lag come from `swap_convention`.
+    /// frequency. Calendar and reset lag come from the `index_id` rate-index convention.
     ///
     /// # Arguments
     ///
@@ -273,8 +273,8 @@ impl CmsSwap {
     ///   start, maturity, and CMS frequency.
     /// * `notional` - Trade notional amount in the instrument currency's major units
     /// * `cms_day_count` - Day-count convention for CMS-leg accrual fractions.
-    /// * `swap_convention` - IRS convention supplying the calendar and reset lag used to
-    ///   build both schedules.
+    /// * `index_id` - Rate-index convention-registry key (e.g. `USD-SOFR-OIS`) supplying the
+    ///   calendar and reset lag used to build both schedules; stored as the reference-swap index.
     /// * `side` - Trade side (buy/sell or pay/receive) controlling sign conventions
     /// * `discount_curve_id` - Identifier of the discount curve used for present-value calculations.
     /// * `forward_curve_id` - Identifier of the forward curve used to project floating rates.
@@ -290,7 +290,7 @@ impl CmsSwap {
         funding_leg: FundingLegSpec,
         notional: Money,
         cms_day_count: DayCount,
-        swap_convention: IRSConvention,
+        index_id: IndexId,
         side: crate::instruments::common_impl::parameters::legs::PayReceive,
         discount_curve_id: impl Into<CurveId>,
         forward_curve_id: impl Into<CurveId>,
@@ -299,7 +299,8 @@ impl CmsSwap {
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
 
-        let reference_conventions = swap_convention.conventions()?;
+        let reference_conventions = crate::market::conventions::ConventionRegistry::try_global()?
+            .require_rate_index(&index_id)?;
         let calendar_id = &reference_conventions.market_calendar_id;
         let reset_lag_days = reference_conventions.market_settlement_days;
 
@@ -402,7 +403,7 @@ impl CmsSwap {
             .cms_accrual_fractions(cms_accrual_fractions)
             .cms_day_count(cms_day_count)
             .cms_spread(cms_spread)
-            .swap_convention_opt(Some(swap_convention))
+            .index_id_opt(Some(index_id))
             .funding_leg(funding_leg)
             .discount_curve_id(discount_curve_id.into())
             .forward_curve_id(forward_curve_id.into())
@@ -441,7 +442,7 @@ impl CmsSwap {
             .cms_accrual_fractions(accrual_fractions.clone())
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(IRSConvention::UsdSofr))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .swap_float_day_count_opt(Some(DayCount::Act360))
             .funding_leg(FundingLeg::Fixed {
                 rate: 0.03,
@@ -942,9 +943,7 @@ mod tests {
             .cms_accrual_fractions(vec![0.25])
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(
-                crate::instruments::common_impl::parameters::IRSConvention::UsdSofr,
-            ))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             // Zero fixed rate so pv_funding = 0 and base_value == pv_cms
             .funding_leg(FundingLeg::Fixed {
                 rate: 0.0,
@@ -1109,9 +1108,7 @@ mod tests {
             .cms_accrual_fractions(vec![0.25])
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(
-                crate::instruments::common_impl::parameters::IRSConvention::UsdSofr,
-            ))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: 0.0,
                 payment_dates: vec![pay],

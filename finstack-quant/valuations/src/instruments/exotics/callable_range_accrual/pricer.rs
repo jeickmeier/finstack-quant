@@ -481,17 +481,17 @@ fn build_schedule(
     let final_payment_discount_factor =
         relative_df_discount_curve(discount_curve.as_ref(), as_of, final_payment_date)?;
 
-    let reference_tenor = range
-        .reference_tenor
+    let index_tenor = range
+        .index_tenor
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation(
-                "CallableRangeAccrual requires reference_tenor".to_string(),
+                "CallableRangeAccrual requires index_tenor".to_string(),
             )
         })?
         .to_years();
-    if !reference_tenor.is_finite() || reference_tenor <= 0.0 {
+    if !index_tenor.is_finite() || index_tenor <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "CallableRangeAccrual '{}' reference_tenor must be positive",
+            "CallableRangeAccrual '{}' index_tenor must be positive",
             inst.id
         )));
     }
@@ -527,8 +527,8 @@ fn build_schedule(
             .year_fraction(as_of, date, DayCountContext::default())?;
         if t > 0.0 {
             if event.is_observation {
-                // Term reference rate over [t, t + reference_tenor].
-                event.forward_coeffs = term_forward.period_coeffs(t, reference_tenor);
+                // Term reference rate over [t, t + index_tenor].
+                event.forward_coeffs = term_forward.period_coeffs(t, index_tenor);
             }
             if date == final_payment_date {
                 final_payment_event_idx = Some(events.len());
@@ -637,9 +637,9 @@ mod tests {
                 .day_count(DayCount::Act365F)
                 .discount_curve_id(CurveId::new("USD-OIS"))
                 .accrual_start_date(date(2025, Month::January, 1))
-                .rate_index_id_opt(Some("SOFR".into()))
-                .projection_curve_id_opt(Some(CurveId::new("USD-OIS")))
-                .reference_tenor_opt(Some(
+                .index_id_opt(Some("SOFR".into()))
+                .forward_curve_id_opt(Some(CurveId::new("USD-OIS")))
+                .index_tenor_opt(Some(
                     finstack_quant_core::dates::Tenor::new(
                         6,
                         finstack_quant_core::dates::TenorUnit::Months,

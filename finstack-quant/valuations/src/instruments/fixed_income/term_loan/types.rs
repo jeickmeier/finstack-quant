@@ -86,7 +86,7 @@ fn default_settlement_days() -> u32 {
 /// use rust_decimal_macros::dec;
 ///
 /// let floating = RateSpec::Floating(FloatingRateSpec {
-///     index_id: CurveId::new("USD-SOFR-3M"),
+///     forward_curve_id: CurveId::new("USD-SOFR-3M"),
 ///     spread_bp: dec!(300),     // +300 bp spread
 ///     gearing: dec!(1),
 ///     gearing_includes_spread: true,
@@ -338,9 +338,9 @@ impl TermLoan {
         }
         if let RateSpec::Floating(rate) = &self.rate {
             rate.validate()?;
-            if rate.index_id.as_str().trim().is_empty() {
+            if rate.forward_curve_id.as_str().trim().is_empty() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "{context} floating-rate index_id cannot be empty"
+                    "{context} floating-rate forward_curve_id cannot be empty"
                 )));
             }
         }
@@ -718,7 +718,7 @@ impl TermLoan {
         use time::macros::date;
 
         let floating_rate = FloatingRateSpec {
-            index_id: CurveId::new("USD-SOFR-3M"),
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::new(400, 0),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,
@@ -902,9 +902,9 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
             deps.add_credit_curve(credit_curve_id.clone());
         }
         if let RateSpec::Floating(spec) = &self.rate {
-            deps.add_forward_curve(spec.index_id.clone());
+            deps.add_forward_curve(spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                spec.index_id.as_str(),
+                spec.forward_curve_id.as_str(),
             ));
         }
         Ok(deps)
@@ -1073,8 +1073,9 @@ mod tests {
         let RateSpec::Floating(spec) = &loan.rate else {
             unreachable!("floating example must use a floating rate");
         };
-        let expected =
-            finstack_quant_core::market_data::fixings::fixing_series_id(spec.index_id.as_str());
+        let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
+            spec.forward_curve_id.as_str(),
+        );
 
         let deps =
             crate::instruments::Instrument::market_dependencies(&loan).expect("dependencies");

@@ -112,7 +112,7 @@ fn b14_overnight_principal_events_preserve_cumulative_rate_clock() {
         .expect("spec")
         .remove("rate");
     v["coupon_program"][0]["spec"]["rate_spec"] = json!({
-        "index_id":"RFR", "spread_bp":"0", "reset_frequency":{"count":3,"unit":"months"},
+        "forward_curve_id":"RFR", "spread_bp":"0", "reset_frequency":{"count":3,"unit":"months"},
         "reset_lag_days":0, "overnight_compounding":"compounded_in_arrears"
     });
     v["principal_events"] = json!([{
@@ -369,7 +369,7 @@ fn terminal_window_payment_lag_redeems_final_pik() {
             coupon.insert(
                 "rate_spec".into(),
                 json!({
-                    "index_id":"TEST-3M", "spread_bp":"0", "gearing":"1",
+                    "forward_curve_id":"TEST-3M", "spread_bp":"0", "gearing":"1",
                     "reset_frequency":{"count":3,"unit":"months"},
                     "reset_lag_days":0, "fallback":{"fixed_rate":"0.1"}
                 }),

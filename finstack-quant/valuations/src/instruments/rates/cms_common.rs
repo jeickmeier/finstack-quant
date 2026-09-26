@@ -10,7 +10,6 @@
 //! [`CmsSpreadOption`]: crate::instruments::rates::cms_spread_option::CmsSpreadOption
 //! [`CmsReferenceSwap`]: crate::instruments::rates::cms_common::CmsReferenceSwap
 
-use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::rates::hw1f::forward_swap_rate::{
     calculate_forward_swap_rate, ForwardSwapRateInputs,
 };
@@ -19,30 +18,30 @@ use finstack_quant_core::dates::{
     calendar_by_id, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::types::CurveId;
+use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_core::Result;
 
 /// Reference swap of a CMS fixing, with its leg conventions resolved.
 ///
 /// Resolution order for every leg field is explicit override >
-/// `swap_convention` > currency market convention. The default USD CMS reference uses the
+/// `index_id` > currency market convention. The default USD CMS reference uses the
 /// registered USD-LIBOR-3M convention (semi-annual 30/360 fixed versus
-/// quarterly ACT/360 floating), distinct from
-/// [`IRSConvention::UsdSofr`] (annual/annual OIS).
+/// quarterly ACT/360 floating), distinct from the `USD-SOFR-OIS` index
+/// (annual/annual OIS).
 #[derive(Debug, Clone, Copy)]
 pub struct CmsReferenceSwap<'a> {
     /// Instrument label used in error messages (e.g. `CMS option 'ID'`).
     pub label: &'a str,
     /// Notional currency, selecting the market convention when no override is given.
     pub currency: Currency,
-    /// Explicit reference-swap convention override.
-    pub swap_convention: Option<IRSConvention>,
+    /// Rate-index convention-registry key of the reference swap (e.g. `USD-SOFR-OIS`).
+    pub index_id: Option<&'a IndexId>,
     /// Explicit fixed-leg payment frequency override.
     pub swap_fixed_frequency: Option<Tenor>,
     /// Explicit floating-leg payment frequency override.
     pub swap_float_frequency: Option<Tenor>,
     /// Explicit fixed-leg accrual day count override.
-    pub swap_day_count: Option<DayCount>,
+    pub swap_fixed_day_count: Option<DayCount>,
     /// Explicit floating-leg accrual day count override.
     pub swap_float_day_count: Option<DayCount>,
     /// Discount curve used for the reference-swap annuity.
@@ -55,11 +54,10 @@ impl CmsReferenceSwap<'_> {
     fn market_convention(
         &self,
     ) -> Result<&'static crate::market::conventions::RateIndexConventions> {
-        if let Some(convention) = self.swap_convention {
-            return convention.conventions();
-        }
         use crate::market::conventions::ConventionRegistry;
-        use finstack_quant_core::types::IndexId;
+        if let Some(index_id) = self.index_id {
+            return ConventionRegistry::try_global()?.require_rate_index(index_id);
+        }
         let id = match self.currency {
             Currency::USD => "USD-LIBOR-3M",
             Currency::EUR => "EUR-ESTR-OIS",
@@ -105,7 +103,7 @@ impl CmsReferenceSwap<'_> {
     ///
     /// Returns an error for unsupported currencies or invalid registry entries.
     pub fn resolved_fixed_day_count(&self) -> Result<DayCount> {
-        match self.swap_day_count {
+        match self.swap_fixed_day_count {
             Some(value) => Ok(value),
             None => Ok(self.market_convention()?.default_fixed_leg_day_count),
         }
@@ -277,23 +275,42 @@ mod tests {
         assert!((a - expected).abs() < 1e-12);
     }
 
+    fn registry_index(id: &str) -> &'static crate::market::conventions::RateIndexConventions {
+        crate::market::conventions::ConventionRegistry::try_global()
+            .expect("registry")
+            .require_rate_index(&IndexId::new(id))
+            .expect("registered index")
+    }
+
     #[test]
     fn resolution_prefers_explicit_then_convention_then_currency() {
         let disc = CurveId::new("EUR-OIS");
         let base = CmsReferenceSwap {
             label: "test",
             currency: Currency::EUR,
-            swap_convention: None,
+            index_id: None,
             swap_fixed_frequency: None,
             swap_float_frequency: None,
-            swap_day_count: None,
+            swap_fixed_day_count: None,
             swap_float_day_count: None,
             discount_curve_id: &disc,
             forward_curve_id: &disc,
         };
         assert_eq!(
             base.resolved_fixed_frequency().expect("registry"),
-            IRSConvention::EurEstr.fixed_frequency().expect("registry")
+            registry_index("EUR-ESTR-OIS").default_fixed_leg_frequency
+        );
+        // An explicit registry index selects conventions the currency default
+        // cannot reach (CHF had no CMS reference swap before `index_id`).
+        let saron = IndexId::new("CHF-SARON-OIS");
+        let chf = CmsReferenceSwap {
+            currency: Currency::CHF,
+            index_id: Some(&saron),
+            ..base
+        };
+        assert_eq!(
+            chf.resolved_fixed_day_count().expect("registry"),
+            registry_index("CHF-SARON-OIS").default_fixed_leg_day_count
         );
         let explicit = CmsReferenceSwap {
             swap_fixed_frequency: Some(Tenor::quarterly()),

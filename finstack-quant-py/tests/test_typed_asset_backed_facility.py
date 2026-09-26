@@ -79,7 +79,7 @@ def test_builder_exposes_every_field_and_rejects_an_overdrawn_line() -> None:
     assert facility.commitment.amount == 80_000_000.0
     assert facility.drawn.amount == 60_000_000.0
     assert facility.undrawn.amount == 20_000_000.0
-    assert facility.index_id is None
+    assert facility.forward_curve_id is None
     assert facility.margin_bp == 600.0
     assert facility.unused_fee_bp == 50.0
     assert facility.closing_date == CLOSE

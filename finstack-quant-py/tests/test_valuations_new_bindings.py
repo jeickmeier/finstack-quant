@@ -101,7 +101,7 @@ def _revolving_credit_json(*, gearing: str | None = None, credit_curve: bool = F
                 if gearing is None
                 else {
                     "floating": {
-                        "index_id": "USD-SOFR-3M",
+                        "forward_curve_id": "USD-SOFR-3M",
                         "spread_bp": "250",
                         "gearing": gearing,
                         "gearing_includes_spread": True,

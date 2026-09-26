@@ -66,17 +66,17 @@ impl CallableRangeAccrual {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.range_accrual.validate()?;
         self.call_provision.validate()?;
-        if self.range_accrual.rate_index_id.is_none() {
+        if self.range_accrual.index_id.is_none() {
             return Err(finstack_quant_core::Error::Validation(
-                "CallableRangeAccrual requires explicit rate_index_id, projection_curve_id, and reference_tenor; asset-style spot/dividend inputs cannot be priced with Hull-White"
+                "CallableRangeAccrual requires explicit index_id, forward_curve_id, and index_tenor; asset-style spot/dividend inputs cannot be priced with Hull-White"
                     .to_string(),
             ));
         }
-        if self.range_accrual.projection_curve_id.as_ref()
+        if self.range_accrual.forward_curve_id.as_ref()
             != Some(&self.range_accrual.discount_curve_id)
         {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "CallableRangeAccrual '{}' HW1F implementation is currently single-curve; projection_curve_id must equal discount_curve_id until basis-adjusted projection is implemented",
+                "CallableRangeAccrual '{}' HW1F implementation is currently single-curve; forward_curve_id must equal discount_curve_id until basis-adjusted projection is implemented",
                 self.id
             )));
         }
@@ -123,9 +123,9 @@ impl CallableRangeAccrual {
                 .notional(Money::from((1_000_000_i64, Currency::USD)))
                 .day_count(DayCount::Act360)
                 .accrual_start_date(date!(2025 - 12 - 31))
-                .rate_index_id(finstack_quant_core::types::IndexId::new("SOFR"))
-                .projection_curve_id(CurveId::new("USD-OIS"))
-                .reference_tenor(finstack_quant_core::dates::Tenor::quarterly())
+                .index_id(finstack_quant_core::types::IndexId::new("SOFR"))
+                .forward_curve_id(CurveId::new("USD-OIS"))
+                .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
                 .discount_curve_id(CurveId::new("USD-OIS"))
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))

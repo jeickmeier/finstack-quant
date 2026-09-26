@@ -306,7 +306,7 @@ impl OvernightIndexConstraintApplication {
 /// # Rate Calculation
 ///
 /// The all-in rate is computed as:
-/// 1. Look up forward rate from `index_id` curve for the accrual period
+/// 1. Look up forward rate from `forward_curve_id` curve for the accrual period
 /// 2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread
 /// 3. Add `spread_bp` to get base rate
 /// 4. Multiply by `gearing` (typically 1.0)
@@ -329,7 +329,7 @@ impl OvernightIndexConstraintApplication {
 /// # Seasoned Instruments (Historical Fixings)
 ///
 /// Historical fixings **are supported** via the `MarketContext`: store a
-/// `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
+/// `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
 /// `finstack_quant_core::market_data::fixings`) containing realized index
 /// observations. Observation dates strictly before the forward curve base
 /// date then resolve from that series instead of the curve:
@@ -363,7 +363,7 @@ impl OvernightIndexConstraintApplication {
 ///
 /// // 3M SOFR + 200bps with 0% floor
 /// let spec = FloatingRateSpec {
-///     index_id: "USD-SOFR-3M".into(),
+///     forward_curve_id: "USD-SOFR-3M".into(),
 ///     spread_bp: dec!(200.0),
 ///     gearing: dec!(1.0),
 ///     gearing_includes_spread: true,
@@ -386,7 +386,7 @@ impl OvernightIndexConstraintApplication {
 #[serde(deny_unknown_fields)]
 pub struct FloatingRateSpec {
     /// Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
-    pub index_id: CurveId,
+    pub forward_curve_id: CurveId,
 
     /// Spread/margin over index in basis points. Uses Decimal for exact representation.
     #[serde(with = "finstack_quant_core::wire::decimal")]
@@ -581,7 +581,7 @@ fn default_gearing_includes_spread() -> bool {
 impl FloatingRateSpec {
     /// Shared preset skeleton: unit gearing, no floors/caps, `Error` fallback.
     fn preset(
-        index_id: &str,
+        forward_curve_id: &str,
         spread_bp: Decimal,
         reset_frequency: Tenor,
         index_tenor: Option<Tenor>,
@@ -589,7 +589,7 @@ impl FloatingRateSpec {
         fixing_calendar_id: &str,
     ) -> Self {
         Self {
-            index_id: CurveId::from(index_id),
+            forward_curve_id: CurveId::from(forward_curve_id),
             spread_bp,
             gearing: default_gearing(),
             gearing_includes_spread: true,
@@ -627,7 +627,7 @@ impl FloatingRateSpec {
     /// use rust_decimal_macros::dec;
     ///
     /// let spec = FloatingRateSpec::sofr(dec!(50));
-    /// assert_eq!(spec.index_id.as_str(), "USD-SOFR");
+    /// assert_eq!(spec.forward_curve_id.as_str(), "USD-SOFR");
     /// assert_eq!(spec.overnight_compounding, Some(OvernightCompoundingMethod::CompoundedInArrears));
     /// assert!(spec.validate().is_ok());
     /// ```
@@ -663,7 +663,7 @@ impl FloatingRateSpec {
     /// use rust_decimal_macros::dec;
     ///
     /// let spec = FloatingRateSpec::sonia(dec!(25));
-    /// assert_eq!(spec.index_id.as_str(), "GBP-SONIA");
+    /// assert_eq!(spec.forward_curve_id.as_str(), "GBP-SONIA");
     /// assert_eq!(spec.overnight_basis, Some(DayCount::Act365F));
     /// ```
     pub fn sonia(spread_bp: Decimal) -> Self {
@@ -693,7 +693,7 @@ impl FloatingRateSpec {
     /// use rust_decimal_macros::dec;
     ///
     /// let spec = FloatingRateSpec::euribor_3m(dec!(100));
-    /// assert_eq!(spec.index_id.as_str(), "EUR-EURIBOR-3M");
+    /// assert_eq!(spec.forward_curve_id.as_str(), "EUR-EURIBOR-3M");
     /// assert_eq!(spec.index_tenor, Some(Tenor::quarterly()));
     /// assert_eq!(spec.reset_lag_days, 2);
     /// ```

@@ -14,7 +14,7 @@
           "gearing": "1",
           "gearing_includes_spread": true,
           "index_cap_bp": null,
-          "index_id": "USD-SOFR-3M",
+          "forward_curve_id": "USD-SOFR-3M",
           "reset_frequency": {
             "count": 3,
             "unit": "months"

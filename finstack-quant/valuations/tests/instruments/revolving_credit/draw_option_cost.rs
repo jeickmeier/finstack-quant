@@ -53,7 +53,7 @@ pub(crate) fn widening_hazard_curve() -> HazardCurve {
 
 pub(crate) fn floating_spec() -> FloatingRateSpec {
     FloatingRateSpec {
-        index_id: "USD-SOFR-3M".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::from(MARGIN_BP),
         gearing: rust_decimal::Decimal::ONE,
         gearing_includes_spread: true,

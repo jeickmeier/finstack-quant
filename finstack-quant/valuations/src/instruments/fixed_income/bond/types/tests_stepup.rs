@@ -233,14 +233,14 @@ fn test_bond_serde_roundtrip_preserves_funding_curve_id() {
         .as_object_mut()
         .expect("Bond should serialize to an object");
     obj.insert(
-        "funding_curve_id".to_string(),
+        "repo_curve_id".to_string(),
         serde_json::Value::String("USD-REPO".to_string()),
     );
 
     let restored: Bond = serde_json::from_value(value).expect("deserialize");
     assert_eq!(
         restored
-            .funding_curve_id
+            .repo_curve_id
             .as_ref()
             .expect("funding curve should deserialize")
             .as_str(),
@@ -248,7 +248,7 @@ fn test_bond_serde_roundtrip_preserves_funding_curve_id() {
     );
     assert_eq!(
         restored
-            .funding_curve_id()
+            .repo_curve_id()
             .expect("bond should expose funding curve through Instrument")
             .as_str(),
         "USD-REPO"

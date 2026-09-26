@@ -135,7 +135,7 @@ impl PoolState {
         self.liquidation.push(asset.liquidation);
         self.rate_floors.push(rate_floor);
         self.index_floors.push(asset.index_floor);
-        let curve_index = asset.index_id.as_ref().map(|id| {
+        let curve_index = asset.forward_curve_id.as_ref().map(|id| {
             self.unique_curves
                 .iter()
                 .position(|curve| curve == id)
@@ -183,7 +183,7 @@ impl PoolState {
             });
             rates.push(asset.rate);
             spread_bp.push(asset.spread_bp);
-            index_ids.push(asset.index_id.clone());
+            index_ids.push(asset.forward_curve_id.clone());
             maturities.push(asset.maturity);
             day_counts.push(asset.day_count);
             is_defaulted.push(asset.is_defaulted);

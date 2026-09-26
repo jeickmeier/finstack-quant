@@ -5276,7 +5276,7 @@ export interface BondConstructor {
    * Create a floating-rate bond (FRN) linked to a forward index. Mirrors Rust `Bond::floating`. Settlement, calendar, and business-day convention come from the notional currency: USD UsCorporate (T+1, usny), EUR EurCorporate (T+2, target2), GBP UkGilt (T+1), JPY Jgb (T+2). Unmapped currencies throw.
    * @param id - Unique instrument identifier.
    * @param notional - Principal amount of the bond.
-   * @param indexId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
+   * @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
    * @param marginBp - Spread over the index in whole basis points (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp margins, which preserves the exact decimal spread).
    * @param issue - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
    * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
@@ -5289,7 +5289,7 @@ export interface BondConstructor {
   floating(
     id: string,
     notional: Money,
-    indexId: string,
+    forwardCurveId: string,
     marginBp: Bps,
     issue: string,
     maturity: string,
@@ -5797,7 +5797,7 @@ export interface ValuationInstrumentsNamespace {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit for the instrument-native model.
-   * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a forward curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.
+   * @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a valuation-only result. Mortgage OAS and CMO Z-spread consume clean prices per 100 current face and include settlement accrued interest. MBS DV01, bucketed DV01 and duration share rate-dependent prepayment assumptions. FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years. Roll specialness is in basis points versus `repo_curve_id` (a discount curve), or the discount curve when omitted; implied financing is an ACT/360 decimal.
    * @param metricPricingOverrides - Optional JSON metric-pricing overrides merged into the envelope before validation. Omit, `null`, or `undefined` to use the envelope as-is.
    * @param marketHistory - Optional serialized market-history JSON required by historical risk metrics such as historical VaR.
    * @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`, `value`, `measures`, `meta`, …).

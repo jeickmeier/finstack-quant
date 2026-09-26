@@ -101,7 +101,7 @@ impl BermudanSwaptionLmmPricer {
 
         let tenors: Vec<f64> = tenor_dates
             .iter()
-            .map(|&date| year_fraction(swaption.get_day_count(), as_of, date))
+            .map(|&date| year_fraction(swaption.get_fixed_day_count(), as_of, date))
             .collect::<finstack_quant_core::Result<Vec<_>>>()
             .map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -308,7 +308,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
 
         let exercise_times = swaption
             .bermudan_schedule
-            .exercise_times(as_of, swaption.get_day_count())
+            .exercise_times(as_of, swaption.get_fixed_day_count())
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),

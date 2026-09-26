@@ -123,7 +123,7 @@ test('cashflows facade builds fixed-to-float and preserves Rust window errors', 
   };
   const floating = {
     rate_spec: {
-      index_id: 'TEST-INDEX',
+      forward_curve_id: 'TEST-INDEX',
       spread_bp: '150',
       reset_frequency: { count: 3, unit: 'months' },
       reset_lag_days: 0,

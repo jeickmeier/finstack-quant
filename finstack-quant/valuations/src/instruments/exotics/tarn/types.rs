@@ -57,10 +57,10 @@ pub struct Tarn {
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub coupon_dates: Vec<Date>,
-    /// Floating rate tenor (e.g., "3M", "6M").
-    pub floating_tenor: Tenor,
-    /// Floating rate index identifier.
-    pub floating_index_id: CurveId,
+    /// Contractual tenor of the observed floating index (e.g. 3M, 6M); must match the forward curve tenor.
+    pub index_tenor: Tenor,
+    /// Rates forward curve that projects the floating index (also the fixing-series key).
+    pub forward_curve_id: CurveId,
     /// Discount curve ID for PV calculations.
     pub discount_curve_id: CurveId,
     /// Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
@@ -159,8 +159,8 @@ impl Tarn {
             target_coupon: 0.15,
             notional: Money::from((1_000_000_i64, Currency::USD)),
             coupon_dates,
-            floating_tenor: Tenor::semi_annual(),
-            floating_index_id: CurveId::new("USD-SOFR-6M"),
+            index_tenor: Tenor::semi_annual(),
+            forward_curve_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act360,
@@ -190,7 +190,7 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_forward_curve(self.floating_index_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(vol_surface_id) = &self.vol_surface_id {
             deps.add_volatility_dependency(
                 crate::instruments::common_impl::dependencies::VolatilityDependency::new(
@@ -250,8 +250,8 @@ mod tests {
             target_coupon: 0.10,
             notional: Money::from((100_000_i64, Currency::USD)),
             coupon_dates: vec![Date::from_calendar_date(2026, Month::June, 30).expect("valid")],
-            floating_tenor: Tenor::semi_annual(),
-            floating_index_id: CurveId::new("USD-SOFR-6M"),
+            index_tenor: Tenor::semi_annual(),
+            forward_curve_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act360,

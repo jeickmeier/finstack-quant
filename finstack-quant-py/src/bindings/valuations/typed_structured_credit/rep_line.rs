@@ -45,7 +45,7 @@ impl PyRepLine {
     /// spread_bp : float | Bps, optional
     ///     Weighted average spread over the reference index, in basis
     ///     points (e.g. ``150.0`` = 150bp), for floating-rate lines.
-    /// index_id : str, optional
+    /// forward_curve_id : str, optional
     ///     Reference index identifier, if floating.
     /// index_floor : float, optional
     ///     Floor on the floating index as an annual decimal, applied before
@@ -97,12 +97,12 @@ impl PyRepLine {
     /// True
     #[new]
     #[pyo3(signature = (id, balance, rate, maturity, seasoning_months, day_count, *, asset_type,
-                        spread_bp = None, index_id = None, index_floor = None, cpr = None,
+                        spread_bp = None, forward_curve_id = None, index_floor = None, cpr = None,
                         cdr = None, recovery_rate = None, contractual_payment = None,
                         amortization_term_months = None, io_months = None))]
     #[pyo3(
         text_signature = "(id, balance, rate, maturity, seasoning_months, day_count, *, asset_type, \
-spread_bp=None, index_id=None, index_floor=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
+spread_bp=None, forward_curve_id=None, index_floor=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -115,7 +115,7 @@ spread_bp=None, index_id=None, index_floor=None, cpr=None, cdr=None, recovery_ra
         day_count: PyRef<'_, PyDayCount>,
         asset_type: &Bound<'_, PyAny>,
         spread_bp: Option<&Bound<'_, PyAny>>,
-        index_id: Option<String>,
+        forward_curve_id: Option<String>,
         index_floor: Option<f64>,
         cpr: Option<f64>,
         cdr: Option<f64>,
@@ -139,7 +139,7 @@ spread_bp=None, index_id=None, index_floor=None, cpr=None, cdr=None, recovery_ra
             crate::bindings::module_utils::py_to_serde(py, asset_type, "asset_type")?,
         );
         inner.spread_bp = spread_bp;
-        inner.index_id = index_id;
+        inner.forward_curve_id = forward_curve_id;
         inner.index_floor = index_floor;
         inner.seasoning_months = seasoning_months;
         if let Some(cpr) = cpr {
@@ -226,8 +226,8 @@ spread_bp=None, index_id=None, index_floor=None, cpr=None, cdr=None, recovery_ra
 
     /// Reference index identifier, or ``None``.
     #[getter]
-    fn index_id(&self) -> Option<String> {
-        self.inner.index_id.clone()
+    fn forward_curve_id(&self) -> Option<String> {
+        self.inner.forward_curve_id.clone()
     }
 
     /// Floor on the floating index (annual decimal) applied before the

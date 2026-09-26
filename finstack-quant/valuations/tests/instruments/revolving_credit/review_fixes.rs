@@ -40,7 +40,7 @@ fn usd(amount: f64) -> Money {
 
 fn term_spec(reset: Tenor) -> FloatingRateSpec {
     FloatingRateSpec {
-        index_id: "USD-SOFR-3M".into(),
+        forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::ZERO,
         gearing: rust_decimal::Decimal::ONE,
         gearing_includes_spread: true,

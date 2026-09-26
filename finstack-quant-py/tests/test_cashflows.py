@@ -88,7 +88,7 @@ def _floating_cashflow_spec() -> str:
                 "kind": "floating",
                 "spec": {
                     "rate_spec": {
-                        "index_id": "USD-SOFR-3M",
+                        "forward_curve_id": "USD-SOFR-3M",
                         "spread_bp": "150.0",
                         "gearing": "1.0",
                         "gearing_includes_spread": True,
@@ -192,7 +192,7 @@ def test_cashflows_builds_step_up_with_payment_program() -> None:
 
 def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
     floating = json.loads(_floating_cashflow_spec())["coupon_program"][0]["spec"]
-    floating["rate_spec"]["index_id"] = "TEST-INDEX"
+    floating["rate_spec"]["forward_curve_id"] = "TEST-INDEX"
     floating["rate_spec"]["fallback"] = "spread_only"
     schedule = {
         key: floating[key]

@@ -137,13 +137,13 @@ fn instrument_collateral_round_trips_and_materializes() {
     // Fixed bond: contractual coupon, no spread, notional balance.
     let fix = row("B-FIX");
     assert!((fix.rate - 0.0425).abs() < 1e-12);
-    assert!(fix.spread_bp.is_none() && fix.index_id.is_none());
+    assert!(fix.spread_bp.is_none() && fix.forward_curve_id.is_none());
     assert_eq!(fix.balance, usd(1_000_000.0));
     assert!(matches!(fix.asset_type, AssetType::HighYieldBond { .. }));
 
     // Floating bond: spread and index recorded for projection.
     let frn = row("B-FRN");
-    assert!(frn.spread_bp.is_some() && frn.index_id.is_some());
+    assert!(frn.spread_bp.is_some() && frn.forward_curve_id.is_some());
 
     // Step-up bond reports its initial coupon.
     assert!((row("B-STEPUP").rate - 0.03).abs() < 1e-12);

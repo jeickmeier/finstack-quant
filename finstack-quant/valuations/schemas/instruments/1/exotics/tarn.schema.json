@@ -38,17 +38,17 @@
           "format": "double",
           "type": "number"
         },
-        "floating_index_id": {
+        "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Floating rate index identifier."
-        },
-        "floating_tenor": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Floating rate tenor (e.g., \"3M\", \"6M\")."
+          "description": "Rates forward curve that projects the floating index (also the fixing-series key)."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
+        },
+        "index_tenor": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Contractual tenor of the observed floating index (e.g. 3M, 6M); must match the forward curve tenor."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -90,8 +90,8 @@
         "target_coupon",
         "notional",
         "coupon_dates",
-        "floating_tenor",
-        "floating_index_id",
+        "index_tenor",
+        "forward_curve_id",
         "discount_curve_id",
         "day_count",
         "attributes"
@@ -141,12 +141,12 @@
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
           "fixed_rate": 0.06,
-          "floating_index_id": "USD-SOFR-6M",
-          "floating_tenor": {
+          "forward_curve_id": "USD-SOFR-6M",
+          "id": "TARN-USD-5Y",
+          "index_tenor": {
             "count": 6,
             "unit": "months"
           },
-          "id": "TARN-USD-5Y",
           "notional": {
             "amount": "1000000",
             "currency": "USD"

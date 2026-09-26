@@ -348,7 +348,7 @@ impl PyAssetPool {
     ///     yield below which a surviving asset is skipped), optional
     ///     ``amortizing_tranches`` (note ids paid down inside the window) and
     ///     optional ``assumptions`` (``spread_bp``, ``price_pct``,
-    ///     ``maturity_months``, ``index_id``, ``coupon_floor``) describing the
+    ///     ``maturity_months``, ``forward_curve_id``, ``coupon_floor``) describing the
     ///     replacement collateral; omitted assumptions clone the surviving
     ///     pool pro rata.
     ///

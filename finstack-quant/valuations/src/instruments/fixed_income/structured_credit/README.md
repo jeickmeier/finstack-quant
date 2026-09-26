@@ -18,7 +18,7 @@ There is **no `prelude` module** — import the names you need directly.
 |------|---------|
 | `StructuredCredit` | The instrument. `new_abs`/`new_clo`/`new_cmbs`/`new_rmbs` apply deal-type defaults; `builder()` for full control; `example()` for a canonical deal. |
 | `DealType`, `AssetType`, `TrancheSeniority` | `DealType::{Clo, Cbo, Abs, Rmbs, Cmbs, Auto, Card}` and pool/tranche taxonomy. Only `Abs`, `Clo`, `Cmbs` and `Rmbs` have `new_*` constructors and registry profiles. |
-| `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats` | Collateral pool and its aggregates. Floating rows (`index_id` + `spread_bp`) may carry `index_floor`, an annual-decimal floor on the index applied before the spread. |
+| `AssetPool`, `PoolAsset`, `RepLine`, `PoolStats`, `calculate_pool_stats` | Collateral pool and its aggregates. Floating rows (`forward_curve_id` + `spread_bp`) may carry `index_floor`, an annual-decimal floor on the index applied before the spread. |
 | `Tranche`, `TrancheBuilder`, `TrancheStructure`, `TrancheCoupon` | Capital structure. |
 | `Waterfall`, `WaterfallBuilder`, `WaterfallTier`, `Recipient`, `RecipientType`, `PaymentType`, `PaymentCalculation`, `AllocationMode` | Waterfall construction. |
 | `WaterfallRules`, `AfcSpec`, `StepDownSpec`, `StepDownTrigger`, `ShiftingInterestSpec`, `ShiftMode` | Declarative rules layered onto the base waterfall per period (`pricing/resolve.rs`). |
@@ -903,7 +903,7 @@ their paydown is recycled. Principal that cannot be invested stays in the princi
 account until eligible placement or the end of the revolving period. Without
 `assumptions`, replacements preserve the surviving collateral profile pro rata,
 including credit-quality weights, maturities, and level payments. With
-`ReinvestmentAssumptions { spread_bp, price_pct, maturity_months, index_id,
+`ReinvestmentAssumptions { spread_bp, price_pct, maturity_months, forward_curve_id,
 coupon_floor }`, each period's purchases are booked as a synthetic `REINVEST-{n}`
 first-lien bullet row (ACT/360, maturity capped at legal final) at the stated
 terms, so the replacement spread, price and tenor drive WAS, par build and

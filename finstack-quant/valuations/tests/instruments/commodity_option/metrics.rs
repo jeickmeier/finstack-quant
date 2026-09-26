@@ -208,9 +208,9 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
     let bump_size = forward_price * bump_pct;
 
     // Reference gamma: bump PriceCurve up/down and use central FD
-    let price_curve_id = CurveId::new("CL-FWD");
+    let forward_curve_id = CurveId::new("CL-FWD");
     let bump_up = MarketBump::Curve {
-        id: price_curve_id.clone(),
+        id: forward_curve_id.clone(),
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
             mode: BumpMode::Additive,
@@ -219,7 +219,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
         },
     };
     let bump_down = MarketBump::Curve {
-        id: price_curve_id,
+        id: forward_curve_id,
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
             mode: BumpMode::Additive,

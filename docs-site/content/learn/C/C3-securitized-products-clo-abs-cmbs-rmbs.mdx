@@ -132,7 +132,7 @@ from finstack_quant.cashflows.builder import PrepaymentModelSpec
 rated=deepcopy(deal)
 for asset,rating,spread in zip(rated["instrument"]["spec"]["pool"]["assets"],
                               ["BB","BB-","B+","B","B-"],[325.,350.,400.,450.,500.]):
-    asset.update(credit_quality=rating,spread_bp=spread,index_id="USD-SOFR-3M")
+    asset.update(credit_quality=rating,spread_bp=spread,forward_curve_id="USD-SOFR-3M")
 pool_metrics=price_instrument(json.dumps(rated),market,AS_OF,metrics=["clo_warf","clo_was","wal"])
 print(pd.Series(pool_metrics.metrics))
 preset_rows=[];presets={}

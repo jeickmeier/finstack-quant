@@ -161,11 +161,11 @@ fn ytm_accretion_factor(context: &MetricContext, ytm: f64, rolled_date: Date) ->
 }
 
 fn compute_funding_cost(context: &MetricContext, rolled_date: Date) -> Result<f64> {
-    let Some(funding_curve_id) = context.instrument.funding_curve_id() else {
+    let Some(repo_curve_id) = context.instrument.repo_curve_id() else {
         return Ok(0.0);
     };
 
-    let funding_curve = context.curves.get_discount(funding_curve_id.as_str())?;
+    let funding_curve = context.curves.get_discount(repo_curve_id.as_str())?;
     let annual_rate = funding_curve.zero_rate_on_date(rolled_date, Compounding::Continuous)?;
     let day_count = context.day_count.ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
@@ -496,7 +496,7 @@ mod tests {
     fn test_funding_cost_uses_bond_day_count_fraction() {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = zero_coupon_bond();
-        bond.funding_curve_id = Some(CurveId::new("USD-REPO"));
+        bond.repo_curve_id = Some(CurveId::new("USD-REPO"));
         let market = MarketContext::new()
             .insert(flat_discount_curve("USD-OIS", 0.05, as_of))
             .insert(flat_discount_curve("USD-REPO", 0.02, as_of));
@@ -535,7 +535,7 @@ mod tests {
     fn test_funding_cost_requires_explicit_day_count() {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = zero_coupon_bond();
-        bond.funding_curve_id = Some(CurveId::new("USD-REPO"));
+        bond.repo_curve_id = Some(CurveId::new("USD-REPO"));
         let market = MarketContext::new()
             .insert(flat_discount_curve("USD-OIS", 0.05, as_of))
             .insert(flat_discount_curve("USD-REPO", 0.02, as_of));

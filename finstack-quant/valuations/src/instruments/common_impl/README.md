@@ -43,7 +43,7 @@ numeric-serde helpers that keep instrument invariants uniform.
 | `legs.rs` | `PayReceive`, `ParRateMethod`, `FixedLegSpec`, `FloatLegSpec`, `BasisSwapLeg`, `PremiumLegSpec`, `ProtectionLegSpec`, `FinancingLegSpec`, `FinancingRateCompounding`, `TotalReturnLegSpec` |
 | `underlying.rs` | `FxUnderlyingParams`, `EquityUnderlyingParams`, `CommodityUnderlyingParams`, `IndexUnderlyingParams` |
 | `market.rs` | `OptionType`, `ExerciseStyle`, `SettlementType`, `CreditParams` |
-| `conventions.rs` | `BondConvention`, `IRSConvention`, `CommodityConvention` |
+| `conventions.rs` | `BondConvention`, `CommodityConvention` |
 | `contract.rs` | `ScheduleSpec` |
 | `quanto.rs` | `QuantoSpec` (validated correlation in `[-1, 1]`) |
 | `trs_common.rs` | `TrsSide`, `TrsScheduleSpec` — shared by equity and fixed-income TRS |
@@ -82,7 +82,7 @@ Everything below is re-exported by `instruments/mod.rs`; the module paths under
   `FinancingRateCompounding`, `TotalReturnLegSpec`, `PayReceive`,
   `ParRateMethod`, `OptionType`, `ExerciseStyle`, `SettlementType`,
   `CreditParams`, `OptionMarketParams`, `ScheduleSpec`,
-  `BondConvention`, `IRSConvention`, and the four `*UnderlyingParams`).
+  `BondConvention` and the four `*UnderlyingParams`).
 - `instruments::pricing` — glob of `common_impl::pricing`'s public items.
 - `instruments::cashflow_export` — `instrument_cashflows_json`,
   `InstrumentCashflowEnvelope`, `CashflowRow`.
@@ -147,7 +147,7 @@ Optional hooks with defaults worth knowing about:
 | `as_marginable()` | `None` | The type implements `finstack_quant_margin::Marginable` (impls live in `../marginable.rs`) |
 | `model_params_snapshot()` / `with_model_params()` | `ModelParamsSnapshot::None` (the variant, not `Option::None`) / clone-or-error | Attribution must revalue the instrument with isolated model parameters |
 | `scenario_spread_shock_supported()` | `false` | The pricer consumes `scenario_spread_shock_bp` exactly, with no silent no-op |
-| `fx_exposure()`, `expiry()`, `effective_start_date()`, `dividend_schedule_id()`, `funding_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |
+| `fx_exposure()`, `expiry()`, `effective_start_date()`, `dividend_schedule_id()`, `repo_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |
 
 `Instrument` sits behind `Arc<dyn Instrument>` across portfolio, scenario and
 binding code, so it is a stability surface. New optional capabilities go in

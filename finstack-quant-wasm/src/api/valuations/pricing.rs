@@ -270,7 +270,7 @@ pub fn bond_from_cashflows_json(
 /// per 100 current face and include settlement accrued interest. MBS DV01,
 /// bucketed DV01 and duration share rate-dependent prepayment assumptions.
 /// FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years.
-/// Roll specialness is in basis points versus `repo_curve_id` (a forward curve),
+/// Roll specialness is in basis points versus `repo_curve_id` (a discount curve),
 /// or the discount curve when omitted; implied financing is an ACT/360 decimal.
 /// @param metric_pricing_overrides - Optional JSON metric-pricing overrides merged into
 /// the envelope before validation. Omit, `null`, or `undefined` to use the
@@ -713,8 +713,8 @@ mod tests {
                 Date::from_calendar_date(2026, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::July, 1).expect("date"),
             ],
-            floating_tenor: Tenor::semi_annual(),
-            floating_index_id: CurveId::new("USD-SOFR-6M"),
+            index_tenor: Tenor::semi_annual(),
+            forward_curve_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act365F,
@@ -759,8 +759,8 @@ mod tests {
                 Date::from_calendar_date(2026, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::July, 1).expect("date"),
             ],
-            floating_index_id: CurveId::new("USD-SOFR-6M"),
-            floating_tenor: Tenor::semi_annual(),
+            forward_curve_id: CurveId::new("USD-SOFR-6M"),
+            index_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             call_provision: None,
@@ -799,8 +799,8 @@ mod tests {
                 Date::from_calendar_date(2026, Month::January, 1).expect("date"),
                 Date::from_calendar_date(2026, Month::July, 1).expect("date"),
             ],
-            floating_index_id: CurveId::new("USD-SOFR-6M"),
-            floating_tenor: Tenor::semi_annual(),
+            forward_curve_id: CurveId::new("USD-SOFR-6M"),
+            index_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             call_provision: None,
@@ -850,9 +850,9 @@ mod tests {
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .accrual_start_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
-            .rate_index_id_opt(Some("SOFR".into()))
-            .projection_curve_id_opt(Some(CurveId::new("USD-OIS")))
-            .reference_tenor_opt(Some(
+            .index_id_opt(Some("SOFR".into()))
+            .forward_curve_id_opt(Some(CurveId::new("USD-OIS")))
+            .index_tenor_opt(Some(
                 finstack_quant_core::dates::Tenor::new(
                     6,
                     finstack_quant_core::dates::TenorUnit::Months,
@@ -910,10 +910,10 @@ mod tests {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             correlation: 0.5,
             day_count: DayCount::Act365F,
-            swap_convention: None,
+            index_id: None,
             swap_fixed_frequency: None,
             swap_float_frequency: None,
-            swap_day_count: None,
+            swap_fixed_day_count: None,
             swap_float_day_count: None,
             instrument_pricing_overrides: InstrumentPricingOverrides::default(),
             metric_pricing_overrides: Default::default(),

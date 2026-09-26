@@ -114,8 +114,8 @@ impl AssetBackedFacility {
         let residual = self.collateral.total_balance()?.checked_sub(self.drawn)?;
         let repayment_date = self.repayment_date();
 
-        let coupon = match &self.index_id {
-            Some(index_id) => {
+        let coupon = match &self.forward_curve_id {
+            Some(forward_curve_id) => {
                 let dec = |value: f64| {
                     rust_decimal::Decimal::try_from(value).map_err(|_| {
                         finstack_quant_core::Error::Validation(format!(
@@ -124,7 +124,7 @@ impl AssetBackedFacility {
                     })
                 };
                 TrancheCoupon::Floating(FloatingRateSpec {
-                    index_id: index_id.clone(),
+                    forward_curve_id: forward_curve_id.clone(),
                     spread_bp: dec(self.margin_bp)?,
                     gearing: dec(1.0)?,
                     gearing_includes_spread: true,
@@ -404,7 +404,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let projection = self.project(context, as_of)?;
         let mut flows: Vec<CashFlow> = Vec::new();
-        let interest_kind = if self.index_id.is_some() {
+        let interest_kind = if self.forward_curve_id.is_some() {
             CFKind::FloatReset
         } else {
             CFKind::Fixed
@@ -489,18 +489,18 @@ impl Instrument for AssetBackedFacility {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        if let Some(index_id) = &self.index_id {
-            deps.add_forward_curve(index_id.clone());
-            deps.add_series_id(fixing_series_id(index_id.as_str()));
+        if let Some(forward_curve_id) = &self.forward_curve_id {
+            deps.add_forward_curve(forward_curve_id.clone());
+            deps.add_series_id(fixing_series_id(forward_curve_id.as_str()));
         }
         let pool = self.collateral.normalized(self.closing_date)?;
-        for index_id in pool
+        for forward_curve_id in pool
             .assets
             .iter()
-            .filter_map(|asset| asset.index_id.as_deref())
+            .filter_map(|asset| asset.forward_curve_id.as_deref())
         {
-            deps.add_forward_curve(index_id);
-            deps.add_series_id(fixing_series_id(index_id));
+            deps.add_forward_curve(forward_curve_id);
+            deps.add_series_id(fixing_series_id(forward_curve_id));
         }
         Ok(deps)
     }

@@ -300,7 +300,7 @@ impl Bond {
     ///
     /// * `id` - Unique identifier for the bond
     /// * `notional` - Principal amount of the bond
-    /// * `index_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
+    /// * `forward_curve_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
     /// * `margin_bp` - Spread over index in typed basis points (e.g., `Bps::new(200)`)
     /// * `issue` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
@@ -345,7 +345,7 @@ impl Bond {
     pub fn floating(
         id: impl Into<InstrumentId>,
         notional: Money,
-        index_id: impl Into<CurveId>,
+        forward_curve_id: impl Into<CurveId>,
         margin_bp: impl Into<Bps>,
         issue: Date,
         maturity: Date,
@@ -370,7 +370,7 @@ impl Bond {
         Self::floating_with_convention(
             id,
             notional,
-            index_id,
+            forward_curve_id,
             margin_bp,
             issue,
             maturity,
@@ -390,7 +390,7 @@ impl Bond {
     ///
     /// * `id` - Unique identifier for the bond
     /// * `notional` - Principal amount of the bond
-    /// * `index_id` - Forward curve identifier (e.g., `USD-SOFR-3M`)
+    /// * `forward_curve_id` - Forward curve identifier (e.g., `USD-SOFR-3M`)
     /// * `margin_bp` - Spread over the index in typed basis points
     /// * `issue` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
@@ -430,7 +430,7 @@ impl Bond {
     pub fn floating_with_convention(
         id: impl Into<InstrumentId>,
         notional: Money,
-        index_id: impl Into<CurveId>,
+        forward_curve_id: impl Into<CurveId>,
         margin_bp: impl Into<Bps>,
         issue: Date,
         maturity: Date,
@@ -441,7 +441,7 @@ impl Bond {
     ) -> finstack_quant_core::Result<Self> {
         let margin_bp = margin_bp.into();
         let mut cashflow_spec =
-            CashflowSpec::floating_bp(index_id.into(), margin_bp, frequency, day_count);
+            CashflowSpec::floating_bp(forward_curve_id.into(), margin_bp, frequency, day_count);
         if let CashflowSpec::Floating(spec) = &mut cashflow_spec {
             spec.schedule.business_day_convention = convention.business_day_convention();
             spec.schedule.calendar_id = convention
@@ -889,7 +889,7 @@ impl Bond {
 
         let cashflow_spec = CashflowSpec::Floating(FloatingCouponSpec {
             rate_spec: FloatingRateSpec {
-                index_id: CurveId::new("USD-SOFR-3M"),
+                forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: Decimal::new(150, 0),
                 gearing: Decimal::ONE,
                 gearing_includes_spread: true,

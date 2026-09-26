@@ -11,8 +11,8 @@
         "past_fixings": [],
         "type": "arithmetic_average"
       },
+      "forward_curve_id": "IRON-ORE-FORWARD",
       "id": "SGX-IRON-ORE-DEC26",
-      "price_curve_id": "IRON-ORE-FORWARD",
       "terms": {
         "contracts": 10.0,
         "currency": "USD",

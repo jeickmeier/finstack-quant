@@ -3,7 +3,6 @@
 use crate::instruments::common_impl::pricing::time::{
     rate_between_on_dates, relative_df_discount_curve,
 };
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -11,35 +10,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
-
-use crate::instruments::IRSConvention;
-
-/// Resolve the reference-swap convention from an explicit override or the
-/// notional currency.
-///
-/// # Arguments
-///
-/// * `explicit` - Optional contractual swap convention override; when `Some`,
-///   it takes precedence over the currency-derived default.
-/// * `currency` - Notional currency used to select USD, EUR, GBP, or JPY
-///   market-standard convention when no override is supplied.
-pub fn resolve_reference_swap_convention(
-    explicit: Option<IRSConvention>,
-    currency: Currency,
-) -> Result<IRSConvention> {
-    if let Some(convention) = explicit {
-        return Ok(convention);
-    }
-    match currency {
-        Currency::USD => Ok(IRSConvention::UsdSofr),
-        Currency::EUR => Ok(IRSConvention::EurEstr),
-        Currency::GBP => Ok(IRSConvention::GbpSonia),
-        Currency::JPY => Ok(IRSConvention::JpyTonar),
-        _ => Err(finstack_quant_core::Error::Validation(format!(
-            "CMS reference swap requires an explicit IRS convention for currency {currency}"
-        ))),
-    }
-}
 
 /// Validate that a term-index curve represents the instrument's contractual
 /// reset tenor.
@@ -51,7 +21,7 @@ pub(crate) fn validate_term_curve_tenor(
     let expected = tenor.to_years();
     if (curve.tenor() - expected).abs() > 1e-8 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "{instrument} floating tenor {expected} does not match forward curve '{}' tenor {}",
+            "{instrument} index_tenor {expected} does not match forward curve '{}' tenor {}",
             curve.id(),
             curve.tenor()
         )));

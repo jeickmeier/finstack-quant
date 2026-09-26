@@ -33,7 +33,7 @@ fn _generate_deterministic_cashflows_with_curves_replaced(
         BaseRateSpec::Floating(spec) => {
             finstack_quant_core::market_data::fixings::get_fixing_series(
                 market,
-                spec.index_id.as_str(),
+                spec.forward_curve_id.as_str(),
             )
             .ok()
         }
@@ -201,7 +201,7 @@ fn test_floating_vs_margin_only() {
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
-                index_id: "USD-SOFR-3M".into(),
+                forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(100.0).expect("valid"), // 100 bp margin
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
                 gearing_includes_spread: true,
@@ -292,7 +292,7 @@ fn test_reset_frequency_mismatch() {
         .maturity(end)
         .base_rate_spec(BaseRateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
-                index_id: "USD-SOFR-1M".into(),
+                forward_curve_id: "USD-SOFR-1M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"), // No margin to isolate reset effect
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
                 gearing_includes_spread: true,

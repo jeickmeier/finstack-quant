@@ -549,7 +549,7 @@ impl PyBond {
     ///     Unique instrument identifier.
     /// notional : Money | float
     ///     Principal amount; a bare number needs ``currency``.
-    /// index_id : str
+    /// forward_curve_id : str
     ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
     /// margin_bp : float | Bps
     ///     Spread over the index in whole basis points (fractions are
@@ -593,16 +593,16 @@ impl PyBond {
     /// >>> frn.has_floating_coupons
     /// True
     #[staticmethod]
-    #[pyo3(signature = (id, notional, index_id, margin_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, index_id, margin_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
     fn floating(
         id: &str,
         notional: &Bound<'_, PyAny>,
-        index_id: &str,
+        forward_curve_id: &str,
         margin_bp: &Bound<'_, PyAny>,
         issue: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
@@ -614,7 +614,7 @@ impl PyBond {
         let inner = finstack_quant_valuations::instruments::Bond::floating(
             id,
             money_from_py(notional, currency, "notional")?,
-            index_id,
+            forward_curve_id,
             bps_value_from_py(margin_bp, "margin_bp")?,
             extract_date(issue)?,
             extract_date(maturity)?,
@@ -636,7 +636,7 @@ impl PyBond {
     ///     Unique instrument identifier.
     /// notional : Money | float
     ///     Principal amount; a bare number needs ``currency``.
-    /// index_id : str
+    /// forward_curve_id : str
     ///     Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
     /// margin_bp : float | Bps
     ///     Spread over the index in whole basis points (fractions are
@@ -681,16 +681,16 @@ impl PyBond {
     /// >>> frn.settlement_days
     /// 2
     #[staticmethod]
-    #[pyo3(signature = (id, notional, index_id, margin_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
+    #[pyo3(signature = (id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency = None))]
     #[pyo3(
-        text_signature = "(id, notional, index_id, margin_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency=None)"
+        text_signature = "(id, notional, forward_curve_id, margin_bp, issue, maturity, frequency, day_count, convention, discount_curve_id, *, currency=None)"
     )]
     // PyO3 binding: the argument list mirrors the Python keyword-argument API.
     #[allow(clippy::too_many_arguments)]
     fn floating_with_convention(
         id: &str,
         notional: &Bound<'_, PyAny>,
-        index_id: &str,
+        forward_curve_id: &str,
         margin_bp: &Bound<'_, PyAny>,
         issue: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
@@ -703,7 +703,7 @@ impl PyBond {
         let inner = finstack_quant_valuations::instruments::Bond::floating_with_convention(
             id,
             money_from_py(notional, currency, "notional")?,
-            index_id,
+            forward_curve_id,
             bps_value_from_py(margin_bp, "margin_bp")?,
             extract_date(issue)?,
             extract_date(maturity)?,
@@ -1144,13 +1144,10 @@ impl PyBond {
         self.inner.credit_curve_id.as_ref().map(ToString::to_string)
     }
 
-    /// Funding curve identifier, or ``None``.
+    /// Repo (financing) discount curve identifier, or ``None``.
     #[getter]
-    fn funding_curve_id(&self) -> Option<String> {
-        self.inner
-            .funding_curve_id
-            .as_ref()
-            .map(ToString::to_string)
+    fn repo_curve_id(&self) -> Option<String> {
+        self.inner.repo_curve_id.as_ref().map(ToString::to_string)
     }
 
     /// Call/put schedule in serde form (``{"calls": [...], "puts": [...]}``), or ``None``.
@@ -1495,25 +1492,25 @@ impl PyBondBuilder {
         Ok(slf)
     }
 
-    /// Set the funding curve identifier.
+    /// Set the repo (financing) discount curve identifier.
     ///
     /// Parameters
     /// ----------
     /// value : str
-    ///     Funding curve identifier.
+    ///     Repo (financing) discount curve identifier.
     ///
     /// Returns
     /// -------
     /// BondBuilder
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
-    fn funding_curve_id<'py>(
+    fn repo_curve_id<'py>(
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let b = take_bond(&mut slf)?;
-        slf.inner = Some(b.funding_curve_id(CurveId::new(value.to_string())));
-        slf.fields.push(("funding_curve_id", format!("{value:?}")));
+        slf.inner = Some(b.repo_curve_id(CurveId::new(value.to_string())));
+        slf.fields.push(("repo_curve_id", format!("{value:?}")));
         Ok(slf)
     }
 
@@ -2348,7 +2345,7 @@ impl PyTermLoanBuilder {
     ///     A bare decimal (``0.06`` = 6%) or ``Rate`` sets a fixed rate
     ///     (mirrors Rust ``RateSpec::fixed_rate``; rounded to whole basis
     ///     points). A ``dict``/JSON ``str`` is the Rust ``RateSpec`` in serde
-    ///     form, e.g. ``{"floating": {"index_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
+    ///     form, e.g. ``{"floating": {"forward_curve_id": "USD-SOFR-3M", "spread_bp": 400, ...}}``.
     ///
     /// Returns
     /// -------

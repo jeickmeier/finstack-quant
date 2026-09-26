@@ -25,7 +25,7 @@ pub(crate) struct DeltaCalculator;
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let swap: &CommoditySwap = context.instrument_as()?;
-        let curve_id = CurveId::new(swap.floating_index_id.as_str());
+        let curve_id = CurveId::new(swap.forward_curve_id.as_str());
         let bump = |value| MarketBump::Curve {
             id: curve_id.clone(),
             spec: BumpSpec {

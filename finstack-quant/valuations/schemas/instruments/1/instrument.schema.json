@@ -956,15 +956,7 @@
           ],
           "description": "Transaction fees paid through the synthetic deal's waterfall ahead of\nthe facility's interest (trustee, servicing, ...); `None` for none."
         },
-        "frequency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Payment frequency of interest, fees and the borrowing-base test."
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Stable facility identifier."
-        },
-        "index_id": {
+        "forward_curve_id": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
@@ -974,6 +966,14 @@
             }
           ],
           "description": "Forward-curve identifier of the floating index; `None` makes\n`margin_bp` the all-in fixed rate."
+        },
+        "frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Payment frequency of interest, fees and the borrowing-base test."
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Stable facility identifier."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -2834,17 +2834,6 @@
           "minimum": 0,
           "type": "integer"
         },
-        "funding_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional funding/repo curve for carry cost computation."
-        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique identifier for the bond."
@@ -2868,6 +2857,17 @@
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Principal amount of the bond."
+        },
+        "repo_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional repo (financing) discount curve for carry cost computation."
         },
         "return_floor": {
           "anyOf": [
@@ -5088,6 +5088,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier"
         },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set."
+        },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
@@ -5119,18 +5130,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
           "description": "Strike (fixed rate for CMS option)"
         },
-        "swap_convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/IRSConvention"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "IRS convention for the underlying swap (e.g., `UsdSofr`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set."
-        },
-        "swap_day_count": {
+        "swap_fixed_day_count": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
@@ -5227,6 +5227,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
         },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
+        },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
@@ -5272,18 +5283,7 @@
           "format": "double",
           "type": "number"
         },
-        "swap_convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/IRSConvention"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "IRS convention for the underlying CMS swaps (e.g. `EurEstr`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
-        },
-        "swap_day_count": {
+        "swap_fixed_day_count": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
@@ -5440,6 +5440,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
         },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`)."
+        },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
           "description": "Instrument-owned pricing inputs."
@@ -5460,18 +5471,7 @@
           "$ref": "#/$defs/PayReceive",
           "description": "Pay direction: `Pay` means pay CMS leg, receive funding leg."
         },
-        "swap_convention": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/IRSConvention"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "IRS convention for the underlying swap (e.g., `UsdSofr`)."
-        },
-        "swap_day_count": {
+        "swap_fixed_day_count": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
@@ -6091,6 +6091,10 @@
           "$ref": "#/$defs/CommodityFutureFixing",
           "description": "Final-settlement price fixing rule (single observation or average)."
         },
+        "forward_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Commodity forward `PriceCurve` used for projected observations."
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
@@ -6102,10 +6106,6 @@
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
-        },
-        "price_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Price-curve identifier used for projected observations."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -6124,7 +6124,7 @@
         "id",
         "underlying",
         "terms",
-        "price_curve_id",
+        "forward_curve_id",
         "fixing"
       ],
       "type": "object"
@@ -6483,7 +6483,7 @@
     },
     "CommoditySwap": {
       "additionalProperties": false,
-      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(rust_decimal::Decimal::try_from(3.50).expect(\"valid decimal\"))\n    .floating_index_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
+      "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::PayReceive;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(rust_decimal::Decimal::try_from(3.50).expect(\"valid decimal\"))\n    .forward_curve_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6522,9 +6522,9 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
           "description": "Fixed price per unit."
         },
-        "floating_index_id": {
+        "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Floating index ID for price lookups."
+          "description": "Commodity forward `PriceCurve` that projects the floating-leg price observations."
         },
         "frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -6607,7 +6607,7 @@
         "currency",
         "quantity",
         "fixed_price",
-        "floating_index_id",
+        "forward_curve_id",
         "start_date",
         "maturity",
         "frequency",
@@ -9020,7 +9020,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional repo/financing curve identifier (carry-only).\n\nForward curve used by roll specialness to calculate the simple\nfinancing rate over the front/back settlement interval on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
+          "description": "Optional repo/financing curve identifier (carry-only).\n\nDiscount curve used by roll specialness to calculate the simple\nfinancing rate `(DF(front)/DF(back) − 1)/τ` over the front/back\nsettlement interval, with `τ` on ACT/360.\nThe implied financing rate itself is determined by prices and carry.\nSee the carry calculations (see [`crate::instruments::fixed_income::dollar_roll::carry`]\nmodule). Does **not** affect\nthe mark-to-market PV, which always discounts both legs at\n`discount_curve_id`.\n\nWhen `None`, the discount curve rate is used as the reference\nfinancing rate for carry analytics."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -10863,7 +10863,7 @@
     },
     "FloatingRateSpec": {
       "additionalProperties": false,
-      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
       "properties": {
         "all_in_cap_bp": {
           "anyOf": [
@@ -10901,6 +10901,10 @@
             "null"
           ]
         },
+        "forward_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
+        },
         "gearing": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
           "default": "1",
@@ -10934,10 +10938,6 @@
           ],
           "default": null,
           "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%."
-        },
-        "index_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
         },
         "index_tenor": {
           "anyOf": [
@@ -10992,7 +10992,7 @@
         }
       },
       "required": [
-        "index_id",
+        "forward_curve_id",
         "spread_bp",
         "reset_frequency"
       ],
@@ -12921,36 +12921,6 @@
         "irr"
       ],
       "type": "object"
-    },
-    "IRSConvention": {
-      "description": "Standard interest rate swap conventions by region.\n\n# Market Standards Reference (Post-IBOR Transition)\n\n| Convention | Index | Fixed DC | Float DC | Fixed Freq | Float Freq | Reset Lag |\n|------------|-------|----------|----------|------------|------------|-----------|\n| USD OIS | SOFR | 30/360 | ACT/360 | Semi-annual | Annual | T-2 |\n| EUR OIS | ESTR | 30/360 | ACT/360 | Annual | Annual | T-2 |\n| EUR IBOR | EURIBOR | 30/360 | ACT/360 | Annual | Semi-annual | T-2 |\n| GBP OIS | SONIA | ACT/365F | ACT/365F | Annual | Annual | T-0 |\n| JPY OIS | TONAR | ACT/365F | ACT/365F | Semi-annual | Annual | T-2 |\n\n# OIS Compounding\n\nNote: OIS swaps (SOFR, ESTR, SONIA, TONAR) use **daily compounded** rates\nwith observation shift (typically 2 days lookback). The float frequency\nindicates the payment/reset frequency, not the compounding frequency.\nSee compounding method guidance below for details.\n\n# Sources\n\n- ISDA 2021 IBOR Fallbacks Protocol\n- Bloomberg SWDF function\n- QuantLib OvernightIndexedSwap conventions",
-      "oneOf": [
-        {
-          "const": "usd_sofr",
-          "description": "USD SOFR OIS: Annual fixed, annual float, ACT/360\n\nStandard post-LIBOR USD swap convention using SOFR compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "eur_estr",
-          "description": "EUR ESTR OIS: Annual fixed, annual float, ACT/360\n\nStandard EUR OIS convention using ESTR compounded in arrears.\nFor EURIBOR swaps, use [`EurEuribor`](Self::EurEuribor).",
-          "type": "string"
-        },
-        {
-          "const": "eur_euribor",
-          "description": "EUR EURIBOR: Annual fixed, semi-annual float, ACT/360\n\nLegacy EUR swap convention using EURIBOR 6M as the floating index.\nThis is a term rate (not compounded daily).",
-          "type": "string"
-        },
-        {
-          "const": "gbp_sonia",
-          "description": "GBP SONIA OIS: Annual fixed, annual float, ACT/365F\n\nStandard GBP swap convention using SONIA compounded in arrears.",
-          "type": "string"
-        },
-        {
-          "const": "jpy_tonar",
-          "description": "JPY TONAR OIS: Annual fixed, annual float, ACT/365F\n\nStandard JPY swap convention using TONAR compounded in arrears.",
-          "type": "string"
-        }
-      ]
     },
     "ImMethodology": {
       "description": "Initial margin calculation methodology.\n\nDifferent methodologies are used depending on regulatory requirements,\nproduct type, and whether trades are cleared or bilateral.\n\n# BCBS-IOSCO Standards\n\nFor bilateral (uncleared) OTC derivatives, either SIMM or the regulatory\nschedule approach may be used. SIMM is the industry standard for large\ndealers due to its risk-sensitivity.",
@@ -15113,7 +15083,15 @@
           ],
           "description": "Underlying rate fixing date.\n\nDefaults to `terms.last_trading_date` when omitted."
         },
-        "fixing_index_id": {
+        "forward_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Forward curve identifier"
+        },
+        "id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique identifier"
+        },
+        "index_id": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
@@ -15122,15 +15100,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional fixing-index identifier.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
-        },
-        "forward_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Forward curve identifier"
-        },
-        "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique identifier"
+          "description": "Optional rate-index identity keying the historical fixing series.\n\nWhen omitted, historical fixings use `forward_curve_id`. Fixing series\nare looked up strictly as `FIXING:{id}` without alias fallback."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -17565,6 +17535,13 @@
             "null"
           ]
         },
+        "forward_curve_id": {
+          "description": "Rates forward-curve identifier for floating-rate assets, such as SOFR-3M.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Stable identifier used to match the asset to diagnostics and scenarios."
@@ -17574,13 +17551,6 @@
           "format": "double",
           "type": [
             "number",
-            "null"
-          ]
-        },
-        "index_id": {
-          "description": "Reference index identifier for floating-rate assets, such as SOFR-3M.",
-          "type": [
-            "string",
             "null"
           ]
         },
@@ -18518,7 +18488,7 @@
     },
     "RangeAccrual": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`index_id`, `forward_curve_id`,\n`index_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
       "properties": {
         "accrual_start_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -18557,9 +18527,42 @@
           ],
           "description": "Optional dividend-yield scalar ID"
         },
+        "forward_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rates forward curve that projects the observed index of a rate-linked range accrual."
+        },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier"
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual."
+        },
+        "index_tenor": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual tenor of the observed rate index."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -18606,17 +18609,6 @@
           "default": null,
           "description": "Optional payment date (defaults to last observation date)"
         },
-        "projection_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Projection curve for a rate-linked range accrual."
-        },
         "quanto": {
           "anyOf": [
             {
@@ -18627,28 +18619,6 @@
             }
           ],
           "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
-        },
-        "rate_index_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Explicit rate index for rate-linked range accruals."
-        },
-        "reference_tenor": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Contractual tenor of the observed reference rate."
         },
         "scenario_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
@@ -18735,6 +18705,39 @@
           ],
           "description": "Optional dividend-yield scalar ID"
         },
+        "forward_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rates forward curve that projects the observed index of a rate-linked range accrual."
+        },
+        "index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual."
+        },
+        "index_tenor": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual tenor of the observed rate index."
+        },
         "lower_bound": {
           "description": "Lower bound of accrual range (interpretation depends on bounds_type)",
           "format": "double",
@@ -18772,17 +18775,6 @@
           "default": null,
           "description": "Optional payment date (defaults to last observation date)"
         },
-        "projection_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Projection curve for a rate-linked range accrual."
-        },
         "quanto": {
           "anyOf": [
             {
@@ -18793,28 +18785,6 @@
             }
           ],
           "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
-        },
-        "rate_index_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Explicit rate index for rate-linked range accruals."
-        },
-        "reference_tenor": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Contractual tenor of the observed reference rate."
         },
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -18904,7 +18874,7 @@
       ]
     },
     "RateSpec": {
-      "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    index_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bp spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: Default::default(),\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
+      "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    forward_curve_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bp spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: Default::default(),\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -19607,7 +19577,7 @@
     },
     "ReinvestmentAssumptions": {
       "additionalProperties": false,
-      "description": "Terms of the collateral bought with reinvested principal.\n\nEach purchase creates a bullet first-lien row maturing `maturity_months`\nafter the purchase date, accruing ACT/360 at `index_id` plus `spread_bp`\n(or at `spread_bp` as a fixed coupon when no index is given), bought at\n`price_pct` percent of par. A discount price builds par.",
+      "description": "Terms of the collateral bought with reinvested principal.\n\nEach purchase creates a bullet first-lien row maturing `maturity_months`\nafter the purchase date, accruing ACT/360 at `forward_curve_id` plus `spread_bp`\n(or at `spread_bp` as a fixed coupon when no index is given), bought at\n`price_pct` percent of par. A discount price builds par.",
       "properties": {
         "coupon_floor": {
           "description": "Minimum all-in annual coupon as a decimal (a floor on the resolved\nindex plus spread), if any.",
@@ -19617,7 +19587,7 @@
             "null"
           ]
         },
-        "index_id": {
+        "forward_curve_id": {
           "description": "Floating-rate index id (a forward curve in the market context), or\n`None` for a fixed coupon.",
           "type": [
             "string",
@@ -19636,7 +19606,7 @@
           "type": "number"
         },
         "spread_bp": {
-          "description": "Spread over the index in basis points (the whole coupon in basis\npoints when `index_id` is `None`).",
+          "description": "Spread over the index in basis points (the whole coupon in basis\npoints when `forward_curve_id` is `None`).",
           "format": "double",
           "type": "number"
         }
@@ -19765,6 +19735,13 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
           "description": "Day count convention"
         },
+        "forward_curve_id": {
+          "description": "Rates forward-curve identifier (if floating)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "id": {
           "description": "Unique identifier for the rep line",
           "type": "string"
@@ -19774,13 +19751,6 @@
           "format": "double",
           "type": [
             "number",
-            "null"
-          ]
-        },
-        "index_id": {
-          "description": "Reference index (if floating)",
-          "type": [
-            "string",
             "null"
           ]
         },
@@ -20923,17 +20893,17 @@
           "format": "double",
           "type": "number"
         },
-        "floating_index_id": {
+        "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Floating rate index identifier."
-        },
-        "floating_tenor": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Floating rate tenor."
+          "description": "Rates forward curve that projects the floating index (also the fixing-series key)."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
+        },
+        "index_tenor": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Contractual tenor of the observed floating index (must match the forward curve tenor)."
         },
         "initial_coupon": {
           "description": "Initial coupon for snowball (c_0); ignored for inverse floater.",
@@ -20986,8 +20956,8 @@
         "coupon_floor",
         "notional",
         "coupon_dates",
-        "floating_index_id",
-        "floating_tenor",
+        "forward_curve_id",
+        "index_tenor",
         "discount_curve_id",
         "day_count",
         "attributes"
@@ -22166,17 +22136,17 @@
           "format": "double",
           "type": "number"
         },
-        "floating_index_id": {
+        "forward_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Floating rate index identifier."
-        },
-        "floating_tenor": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Floating rate tenor (e.g., \"3M\", \"6M\")."
+          "description": "Rates forward curve that projects the floating index (also the fixing-series key)."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier."
+        },
+        "index_tenor": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Contractual tenor of the observed floating index (e.g. 3M, 6M); must match the forward curve tenor."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -22218,8 +22188,8 @@
         "target_coupon",
         "notional",
         "coupon_dates",
-        "floating_tenor",
-        "floating_index_id",
+        "index_tenor",
+        "forward_curve_id",
         "discount_curve_id",
         "day_count",
         "attributes"
@@ -24212,11 +24182,11 @@
               "all_in_cap_bp": null,
               "all_in_floor_bp": null,
               "fixing_calendar_id": null,
+              "forward_curve_id": "USD-SOFR-3M",
               "gearing": "1",
               "gearing_includes_spread": true,
               "index_cap_bp": null,
               "index_floor_bp": "0",
-              "index_id": "USD-SOFR-3M",
               "reset_frequency": {
                 "count": 3,
                 "unit": "months"
@@ -25050,12 +25020,12 @@
             "type": "fixed"
           },
           "id": "CMSSWAP-10Y-USD",
+          "index_id": "USD-SOFR-OIS",
           "notional": {
             "amount": "10000000",
             "currency": "USD"
           },
           "side": "pay",
-          "swap_convention": "usd_sofr",
           "swap_float_day_count": "act_360",
           "vol_surface_id": "USD-CMS10Y-VOL"
         },
@@ -25084,6 +25054,7 @@
           ],
           "forward_curve_id": "USD-LIBOR-3M",
           "id": "CMSOPT-10Y-USD",
+          "index_id": "USD-SOFR-OIS",
           "notional": {
             "amount": "10000000",
             "currency": "USD"
@@ -25096,7 +25067,6 @@
             "2026-03-20"
           ],
           "strike": "0.025",
-          "swap_convention": "usd_sofr",
           "swap_float_day_count": "act_360",
           "vol_surface_id": "USD-CMS10Y-VOL"
         },
@@ -25933,7 +25903,7 @@
           "currency": "USD",
           "discount_curve_id": "USD-OIS",
           "fixed_price": "3.5",
-          "floating_index_id": "NG-SPOT-AVG",
+          "forward_curve_id": "NG-SPOT-AVG",
           "frequency": {
             "count": 1,
             "unit": "months"
@@ -26015,8 +25985,8 @@
             "past_fixings": [],
             "type": "arithmetic_average"
           },
+          "forward_curve_id": "IRON-ORE-FORWARD",
           "id": "SGX-IRON-ORE-DEC26",
-          "price_curve_id": "IRON-ORE-FORWARD",
           "terms": {
             "contracts": 10.0,
             "currency": "USD",
@@ -26386,12 +26356,12 @@
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
           "fixed_rate": 0.06,
-          "floating_index_id": "USD-SOFR-6M",
-          "floating_tenor": {
+          "forward_curve_id": "USD-SOFR-6M",
+          "id": "TARN-USD-5Y",
+          "index_tenor": {
             "count": 6,
             "unit": "months"
           },
-          "id": "TARN-USD-5Y",
           "notional": {
             "amount": "1000000",
             "currency": "USD"
@@ -26421,12 +26391,12 @@
           "day_count": "act_360",
           "discount_curve_id": "USD-OIS",
           "fixed_rate": 0.05,
-          "floating_index_id": "USD-SOFR-6M",
-          "floating_tenor": {
+          "forward_curve_id": "USD-SOFR-6M",
+          "id": "SNOWBALL-USD-3Y",
+          "index_tenor": {
             "count": 6,
             "unit": "months"
           },
-          "id": "SNOWBALL-USD-3Y",
           "initial_coupon": 0.03,
           "leverage": 1.0,
           "notional": {
@@ -26450,6 +26420,7 @@
           "expiry_date": "2027-03-29",
           "forward_curve_id": "USD-SOFR-3M",
           "id": "CMS-SPREAD-10Y2Y",
+          "index_id": "USD-SOFR-OIS",
           "long_cms_tenor": {
             "count": 10,
             "unit": "years"
@@ -26466,8 +26437,7 @@
             "unit": "years"
           },
           "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
-          "strike": 0.005,
-          "swap_convention": "usd_sofr"
+          "strike": 0.005
         },
         "type": "cms_spread_option"
       },
@@ -26797,6 +26767,12 @@
             "day_count": "act_360",
             "discount_curve_id": "USD-OIS",
             "div_yield_id": null,
+            "forward_curve_id": "USD-OIS",
+            "index_id": "SOFR",
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "lower_bound": 0.04,
             "notional": {
               "amount": "1000000",
@@ -26818,12 +26794,6 @@
             ],
             "past_observations_in_range": null,
             "payment_date": null,
-            "projection_curve_id": "USD-OIS",
-            "rate_index_id": "SOFR",
-            "reference_tenor": {
-              "count": 3,
-              "unit": "months"
-            },
             "spot_id": "SOFR-RATE",
             "total_past_observations": null,
             "underlying_ticker": "SOFR",
@@ -26920,8 +26890,8 @@
                 "credit_quality": null,
                 "day_count": "act_360",
                 "default_date": null,
+                "forward_curve_id": null,
                 "id": "COLLATERAL-1",
-                "index_id": null,
                 "industry": null,
                 "is_defaulted": false,
                 "maturity": "2034-01-01",
@@ -27060,8 +27030,8 @@
                 "credit_quality": null,
                 "day_count": "act_360",
                 "default_date": null,
+                "forward_curve_id": null,
                 "id": "COLLATERAL-1",
-                "index_id": null,
                 "industry": null,
                 "is_defaulted": false,
                 "maturity": "2034-01-01",

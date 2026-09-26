@@ -196,7 +196,7 @@ impl RangeAccrualMcPricer {
             return Ok(Money::from((0_i64, inst.terms.notional.currency())));
         }
         inst.validate()?;
-        if inst.terms.rate_index_id.is_some() {
+        if inst.terms.index_id.is_some() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Rate-linked RangeAccrual '{}' cannot use the equity GBM Monte Carlo pricer",
                 inst.id
@@ -404,7 +404,7 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    if inst.terms.rate_index_id.is_some() {
+    if inst.terms.index_id.is_some() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Rate-linked RangeAccrual '{}' cannot use equity static replication",
             inst.id
@@ -818,10 +818,10 @@ mod tests {
     fn default_registry_and_direct_paths_share_static_kernel() {
         let as_of = date(2024, 1, 1);
         let mut rate_linked = RangeAccrual::example();
-        rate_linked.terms.rate_index_id = Some(finstack_quant_core::types::IndexId::new("SOFR"));
-        rate_linked.terms.projection_curve_id =
+        rate_linked.terms.index_id = Some(finstack_quant_core::types::IndexId::new("SOFR"));
+        rate_linked.terms.forward_curve_id =
             Some(finstack_quant_core::types::CurveId::new("SOFR-3M"));
-        rate_linked.terms.reference_tenor = Some(
+        rate_linked.terms.index_tenor = Some(
             finstack_quant_core::dates::Tenor::new(
                 3,
                 finstack_quant_core::dates::TenorUnit::Months,

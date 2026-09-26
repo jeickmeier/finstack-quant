@@ -59,7 +59,7 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             balance: Money::new(balance_each, Currency::USD).expect("valid money fixture"),
             rate: 0.08,
             spread_bp: None,
-            index_id: None,
+            forward_curve_id: None,
             index_floor: None,
             maturity: maturity_5y(),
             credit_quality: Some(CreditRating::BB),
@@ -740,7 +740,7 @@ mod excess_spread_tests {
 
     fn floating_senior_spec() -> FloatingRateSpec {
         FloatingRateSpec {
-            index_id: CurveId::new("SOFR-3M"),
+            forward_curve_id: CurveId::new("SOFR-3M"),
             spread_bp: rust_decimal_macros::dec!(100),
             gearing: rust_decimal_macros::dec!(1),
             gearing_includes_spread: true,
@@ -1259,7 +1259,7 @@ mod shifting_interest_tests {
             balance: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             rate: 0.06,
             spread_bp: None,
-            index_id: None,
+            forward_curve_id: None,
             index_floor: None,
             maturity: maturity(),
             credit_quality: None,

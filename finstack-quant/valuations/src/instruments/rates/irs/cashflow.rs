@@ -408,7 +408,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
         .principal_exchange(PrincipalExchange::None)
         .floating_cf(FloatingCouponSpec {
             rate_spec: FloatingRateSpec {
-                index_id: float.forward_curve_id.to_owned(),
+                forward_curve_id: float.forward_curve_id.to_owned(),
                 spread_bp: float.spread_bp,
                 gearing: Decimal::ONE,
                 gearing_includes_spread: true,

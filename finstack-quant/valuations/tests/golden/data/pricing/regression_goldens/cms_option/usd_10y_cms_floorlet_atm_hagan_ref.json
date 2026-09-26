@@ -270,7 +270,7 @@
           "count": 3,
           "unit": "months"
         },
-        "swap_day_count": "act_365f",
+        "swap_fixed_day_count": "act_365f",
         "swap_float_day_count": "act_365f",
         "discount_curve_id": "USD-FLAT-4PCT",
         "forward_curve_id": "USD-FLAT-4PCT",

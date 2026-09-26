@@ -101,7 +101,7 @@ Notes that bite:
   `frequency` (not `payment_frequency`).
 - `BaseRateSpec::Floating` is a **tuple variant** wrapping the canonical
   `finstack_quant_cashflows::builder::FloatingRateSpec` — not a struct variant
-  with `index_id` / `margin_bp` fields.
+  with `forward_curve_id` / `margin_bp` fields.
 - `RevolvingCreditFees::flat` returns `Result` (non-finite bp are rejected).
 - `recovery_rate` is required and must be a finite decimal in `[0, 1]`.
 - Schedule conventions are typed fields: `business_day_convention` (default

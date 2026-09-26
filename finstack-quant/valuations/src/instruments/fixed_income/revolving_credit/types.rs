@@ -244,7 +244,7 @@ impl RevolvingCredit {
         let start = date!(2024 - 01 - 01);
         let end = date!(2027 - 01 - 01);
         let base_rate = BaseRateSpec::Floating(FloatingRateSpec {
-            index_id: CurveId::new("USD-SOFR-3M"),
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::from(250),
             gearing: Decimal::ONE,
             gearing_includes_spread: true,
@@ -1257,9 +1257,9 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
             deps.add_credit_curve(credit_curve_id.clone());
         }
         if let BaseRateSpec::Floating(spec) = &self.base_rate_spec {
-            deps.add_forward_curve(spec.index_id.clone());
+            deps.add_forward_curve(spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                spec.index_id.as_str(),
+                spec.forward_curve_id.as_str(),
             ));
         }
         Ok(deps)
@@ -1334,7 +1334,7 @@ impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
             BaseRateSpec::Floating(spec) => {
                 finstack_quant_core::market_data::fixings::get_fixing_series(
                     curves,
-                    spec.index_id.as_ref(),
+                    spec.forward_curve_id.as_ref(),
                 )
                 .ok()
             }
@@ -1399,8 +1399,9 @@ mod dependency_tests {
         let BaseRateSpec::Floating(spec) = &facility.base_rate_spec else {
             unreachable!("example must use a floating base rate");
         };
-        let expected =
-            finstack_quant_core::market_data::fixings::fixing_series_id(spec.index_id.as_str());
+        let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
+            spec.forward_curve_id.as_str(),
+        );
 
         let deps =
             crate::instruments::Instrument::market_dependencies(&facility).expect("dependencies");

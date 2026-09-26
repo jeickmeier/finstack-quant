@@ -18,7 +18,7 @@ pub mod underlying;
 pub mod volatility;
 
 pub use contract::ScheduleSpec;
-pub use conventions::{BondConvention, CommodityConvention, IRSConvention};
+pub use conventions::{BondConvention, CommodityConvention};
 pub use finstack_quant_models::types::OptionMarketParams;
 pub use legs::{
     BasisSwapLeg, FinancingLegSpec, FinancingRateCompounding, FixedLegSpec, FloatLegSpec,

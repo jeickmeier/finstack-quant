@@ -43,12 +43,12 @@
         "type": "fixed"
       },
       "id": "CMSSWAP-10Y-USD",
+      "index_id": "USD-SOFR-OIS",
       "notional": {
         "amount": "10000000",
         "currency": "USD"
       },
       "side": "pay",
-      "swap_convention": "usd_sofr",
       "swap_float_day_count": "act_360",
       "vol_surface_id": "USD-CMS10Y-VOL"
     },

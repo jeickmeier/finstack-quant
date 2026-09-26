@@ -77,7 +77,7 @@ impl JsBond {
     /// UkGilt (T+1), JPY Jgb (T+2). Unmapped currencies throw.
     /// @param id - Unique instrument identifier.
     /// @param notional - Principal amount of the bond.
-    /// @param indexId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
+    /// @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
     /// @param marginBp - Spread over the index in whole basis points
     /// (`Bps` rejects fractional values; use `Bond.fromJson` for sub-bp
     /// margins, which preserves the exact decimal spread).
@@ -93,7 +93,7 @@ impl JsBond {
     pub fn floating(
         id: &str,
         notional: &JsMoney,
-        index_id: &str,
+        forward_curve_id: &str,
         margin_bp: &JsBps,
         issue: &str,
         maturity: &str,
@@ -104,7 +104,7 @@ impl JsBond {
         let inner = finstack_quant_valuations::instruments::Bond::floating(
             id,
             notional.inner,
-            index_id,
+            forward_curve_id,
             margin_bp.inner,
             parse_iso_date(issue)?,
             parse_iso_date(maturity)?,

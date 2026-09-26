@@ -294,11 +294,11 @@ impl<'a> CashflowEngine<'a> {
         let fwd_curve = match &self.facility.base_rate_spec {
             BaseRateSpec::Floating(spec) => {
                 if let Some(market) = self.market {
-                    Some(market.get_forward(&spec.index_id)?)
+                    Some(market.get_forward(&spec.forward_curve_id)?)
                 } else {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "Market context required for floating rate facility (index: {})",
-                        spec.index_id
+                        spec.forward_curve_id
                     )));
                 }
             }
@@ -491,12 +491,12 @@ impl<'a> CashflowEngine<'a> {
                             let fixing_rate =
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,
-                                    spec.index_id.as_ref(),
+                                    spec.forward_curve_id.as_ref(),
                                     fixing_date,
                                     self.as_of,
                                 )?;
                             projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
-                                series_id: format!("FIXING:{}", spec.index_id),
+                                series_id: format!("FIXING:{}", spec.forward_curve_id),
                                 date: fixing_date,
                                 value: Some(fixing_rate),
                             });
@@ -516,7 +516,7 @@ impl<'a> CashflowEngine<'a> {
                                     fwd.as_ref(),
                                 )?;
                             projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
-                                series_id: format!("FIXING:{}", spec.index_id),
+                                series_id: format!("FIXING:{}", spec.forward_curve_id),
                                 date: fixing_date,
                                 value: Some(index_rate),
                             });
@@ -813,13 +813,14 @@ impl<'a> CashflowEngine<'a> {
             BaseRateSpec::Floating(spec) => {
                 let overnight = super::utils::resolved_overnight_compounding(spec)?.is_some();
                 match self.market {
-                    Some(market) if overnight => {
-                        (Some(market.get_forward(spec.index_id.as_str())?), None)
-                    }
+                    Some(market) if overnight => (
+                        Some(market.get_forward(spec.forward_curve_id.as_str())?),
+                        None,
+                    ),
                     Some(market) if path.stochastic_rates => (
                         None,
                         Some((
-                            market.get_forward(spec.index_id.as_str())?,
+                            market.get_forward(spec.forward_curve_id.as_str())?,
                             market.get_discount(self.facility.discount_curve_id.as_str())?,
                         )),
                     ),
@@ -827,7 +828,7 @@ impl<'a> CashflowEngine<'a> {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "Market context required to project the '{}' index over a \
                              stochastic short-rate path",
-                            spec.index_id
+                            spec.forward_curve_id
                         )));
                     }
                     Some(_) | None => (None, None),
@@ -997,7 +998,7 @@ impl<'a> CashflowEngine<'a> {
                             let base_rate = if fixing_date < self.as_of {
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,
-                                    spec.index_id.as_ref(),
+                                    spec.forward_curve_id.as_ref(),
                                     fixing_date,
                                     self.as_of,
                                 )?

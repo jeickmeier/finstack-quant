@@ -1,12 +1,12 @@
 //! CMS Spread Option instrument definition.
 
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
 /// Call or put on a CMS spread.
@@ -107,12 +107,12 @@ pub struct CmsSpreadOption {
     // market swap conventions through to `resolve_leg`; when unset they
     // default to the USD market standard (semi-annual 30/360 fixed,
     // quarterly Act/360 float), so existing USD instruments are unaffected.
-    /// IRS convention for the underlying CMS swaps (e.g. `EurEstr`).
+    /// Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).
     ///
     /// When set, provides default values for the fixed/float frequency and
     /// day count. Individual fields still override the convention when set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swap_convention: Option<IRSConvention>,
+    pub index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying CMS swaps (overrides convention).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_frequency: Option<Tenor>,
@@ -121,7 +121,7 @@ pub struct CmsSpreadOption {
     pub swap_float_frequency: Option<Tenor>,
     /// Fixed leg day count of the underlying CMS swaps (overrides convention).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swap_day_count: Option<DayCount>,
+    pub swap_fixed_day_count: Option<DayCount>,
     /// Floating leg day count of the underlying CMS swaps (overrides convention).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_float_day_count: Option<DayCount>,
@@ -193,10 +193,10 @@ impl CmsSpreadOption {
         CmsReferenceSwap {
             label: "CMS spread option",
             currency: self.notional.currency(),
-            swap_convention: self.swap_convention,
+            index_id: self.index_id.as_ref(),
             swap_fixed_frequency: self.swap_fixed_frequency,
             swap_float_frequency: self.swap_float_frequency,
-            swap_day_count: self.swap_day_count,
+            swap_fixed_day_count: self.swap_fixed_day_count,
             swap_float_day_count: self.swap_float_day_count,
             discount_curve_id: &self.discount_curve_id,
             forward_curve_id: &self.forward_curve_id,
@@ -226,10 +226,10 @@ impl CmsSpreadOption {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             correlation: 0.85,
             day_count: DayCount::Act360,
-            swap_convention: Some(IRSConvention::UsdSofr),
+            index_id: Some(IndexId::new("USD-SOFR-OIS")),
             swap_fixed_frequency: None,
             swap_float_frequency: None,
-            swap_day_count: None,
+            swap_fixed_day_count: None,
             swap_float_day_count: None,
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -499,14 +499,14 @@ mod tests {
     /// `DayCount::Thirty360` / `Tenor::quarterly()` / `DayCount::Act360`. A
     /// `EurEstr` CMS spread has an *annual* fixed leg, so its forward swap
     /// rate is projected on a different annuity. This test verifies the
-    /// resolved conventions pick up the instrument's `swap_convention`.
+    /// resolved conventions pick up the instrument's `index_id`.
     #[test]
-    fn swap_conventions_resolve_from_convention_field() {
+    fn swap_conventions_resolve_from_index_id() {
         use finstack_quant_core::dates::{DayCount, Tenor, TenorUnit};
 
         // Default (no convention set) -> USD market standard.
         let mut opt = CmsSpreadOption::example();
-        opt.swap_convention = None;
+        opt.index_id = None;
         assert_eq!(
             opt.reference_swap()
                 .resolved_fixed_frequency()
@@ -533,7 +533,7 @@ mod tests {
         );
 
         // EUR convention -> annual fixed leg (the case the hard-coded path got wrong).
-        opt.swap_convention = Some(IRSConvention::EurEstr);
+        opt.index_id = Some(IndexId::new("EUR-ESTR-OIS"));
         assert_eq!(
             opt.reference_swap()
                 .resolved_fixed_frequency()
@@ -567,10 +567,10 @@ mod tests {
         usd.payment_date = date(2026, Month::January, 5);
         usd.strike = 0.0;
         usd.correlation = 0.50;
-        usd.swap_convention = Some(IRSConvention::UsdSofr);
+        usd.index_id = Some(IndexId::new("USD-SOFR-OIS"));
 
         let mut eur = usd.clone();
-        eur.swap_convention = Some(IRSConvention::EurEstr);
+        eur.index_id = Some(IndexId::new("EUR-ESTR-OIS"));
 
         let usd_value = price_amount(&usd, &market, as_of);
         let eur_value = price_amount(&eur, &market, as_of);

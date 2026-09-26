@@ -78,10 +78,10 @@ pub struct Snowball {
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub coupon_dates: Vec<Date>,
-    /// Floating rate index identifier.
-    pub floating_index_id: CurveId,
-    /// Floating rate tenor.
-    pub floating_tenor: Tenor,
+    /// Rates forward curve that projects the floating index (also the fixing-series key).
+    pub forward_curve_id: CurveId,
+    /// Contractual tenor of the observed floating index (must match the forward curve tenor).
+    pub index_tenor: Tenor,
     /// Discount curve ID.
     pub discount_curve_id: CurveId,
     /// Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
@@ -203,8 +203,8 @@ impl Snowball {
             coupon_cap: None,
             notional: Money::from((1_000_000_i64, Currency::USD)),
             coupon_dates,
-            floating_index_id: CurveId::new("USD-SOFR-6M"),
-            floating_tenor: Tenor::semi_annual(),
+            forward_curve_id: CurveId::new("USD-SOFR-6M"),
+            index_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             call_provision: None,
@@ -239,8 +239,8 @@ impl Snowball {
             coupon_cap: Some(0.10),
             notional: Money::from((500_000_i64, Currency::USD)),
             coupon_dates,
-            floating_index_id: CurveId::new("USD-SOFR-3M"),
-            floating_tenor: Tenor::quarterly(),
+            forward_curve_id: CurveId::new("USD-SOFR-3M"),
+            index_tenor: Tenor::quarterly(),
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             call_provision: None,
@@ -311,7 +311,7 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        deps.add_forward_curve(self.floating_index_id.clone());
+        deps.add_forward_curve(self.forward_curve_id.clone());
         if let Some(vol_surface_id) = &self.vol_surface_id {
             deps.add_volatility_dependency(
                 crate::instruments::common_impl::dependencies::VolatilityDependency::new(

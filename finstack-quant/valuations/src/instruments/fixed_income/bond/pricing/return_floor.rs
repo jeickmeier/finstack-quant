@@ -826,7 +826,7 @@ mod tests {
             .build()
             .expect("flat discount curve for FRN smoke test");
 
-        // Build a flat 4.5% forward curve named "USD-SOFR-3M" (the bond's index_id).
+        // Build a flat 4.5% forward curve named "USD-SOFR-3M" (the bond's forward_curve_id).
         // Tenor 0.25 = quarterly (3M SOFR), matching the FloatingRateSpec in example_floating.
         let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
             .base_date(as_of - time::Duration::days(10))

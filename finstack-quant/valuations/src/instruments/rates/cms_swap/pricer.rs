@@ -614,10 +614,10 @@ mod tests {
     }
 
     use super::*;
-    use crate::instruments::common_impl::parameters::IRSConvention;
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::types::IndexId;
     use finstack_quant_core::types::{CurveId, InstrumentId};
 
     fn floating_leg_swap() -> CmsSwap {
@@ -634,7 +634,7 @@ mod tests {
             .cms_accrual_fractions(vec![0.25])
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(IRSConvention::UsdSofr))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Floating {
                 spread: 0.0,
                 payment_dates: vec![first_pay, second_pay],
@@ -741,7 +741,7 @@ mod tests {
             .cms_accrual_fractions(vec![0.25])
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(IRSConvention::UsdSofr))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: 0.0,
                 payment_dates: vec![pay],
@@ -850,7 +850,7 @@ mod tests {
             .cms_accrual_fractions(vec![0.25])
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(IRSConvention::UsdSofr))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: 0.0,
                 payment_dates: vec![pay],
@@ -927,7 +927,7 @@ mod tests {
             .cms_accrual_fractions(vec![0.25])
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(IRSConvention::UsdSofr))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: 0.0,
                 payment_dates: vec![pay],
@@ -1012,7 +1012,7 @@ mod tests {
             .cms_accrual_fractions(vec![0.25])
             .cms_day_count(DayCount::Act365F)
             .cms_spread(0.0)
-            .swap_convention_opt(Some(IRSConvention::UsdSofr))
+            .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: 0.0,
                 payment_dates: vec![payment],

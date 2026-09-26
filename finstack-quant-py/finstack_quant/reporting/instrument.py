@@ -185,7 +185,7 @@ def _definition_terms(definition: dict[str, Any]) -> list[list[tuple[str, str]]]
             frequency = fixed.get("frequency", {})
             day_count = fixed.get("day_count", "")
         else:
-            coupon = f"{floating.get('index_id', 'float')} + {floating.get('spread_bp', 0)}bp"
+            coupon = f"{floating.get('forward_curve_id', 'float')} + {floating.get('spread_bp', 0)}bp"
             frequency = floating.get("reset_frequency", {})
             day_count = floating.get("day_count", "")
         return [

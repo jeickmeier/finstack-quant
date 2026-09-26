@@ -309,7 +309,7 @@ fn production_structured_metrics_discount_margin_uses_dirty_settlement_target() 
     let settlement = date!(2024 - 05 - 15);
     deal.quote_settlement_date = Some(settlement);
     deal.tranches.tranches[0].coupon = TrancheCoupon::Floating(FloatingRateSpec {
-        index_id: CurveId::new("SOFR-3M"),
+        forward_curve_id: CurveId::new("SOFR-3M"),
         spread_bp: dec!(100),
         gearing: dec!(1),
         gearing_includes_spread: true,

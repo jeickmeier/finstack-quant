@@ -535,7 +535,7 @@ def test_structured_credit_representative_collateral_preserves_pv() -> None:
             "balance": asset["balance"],
             "rate": asset["rate"],
             "spread_bp": asset["spread_bp"],
-            "index_id": asset["index_id"],
+            "forward_curve_id": asset["forward_curve_id"],
             "maturity": asset["maturity"],
             "seasoning_months": 0,
             "day_count": asset["day_count"],

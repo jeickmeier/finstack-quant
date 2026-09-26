@@ -2,6 +2,59 @@
 
 ## [Unreleased]
 
+### Rates projection and index ids (2026-09-24)
+
+A rates projection curve and a commodity price curve are `forward_curve_id`,
+the rate-index identity is `index_id: IndexId` (the convention-registry key),
+the observed index tenor is `index_tenor`, the financing curve is
+`repo_curve_id` (always a discount curve), and the CMS reference-swap fixed-leg
+day count is `swap_fixed_day_count`.
+
+#### Changed (BREAKING)
+
+- `FloatingRateSpec.index_id` (now `forward_curve_id`) on every host (Bond FRN,
+  ConvertibleBond, TermLoan, RevolvingCredit, StructuredCredit, AssetBackedFacility
+  collateral), including the `FloatingRateSpec(...)` Python keyword/property;
+  Rust/Python/WASM/JSON.
+- `AssetBackedFacility.index_id`, `PoolAsset.index_id`, `RepLine.index_id` and
+  `ReinvestmentAssumptions.index_id` (now `forward_curve_id`); Rust/Python/JSON.
+- `Bond::floating`/`Bond.floating(...)` and `PoolAsset.floating_rate_loan(...)`
+  parameter `index_id` (now `forward_curve_id`; WASM `indexId` now `forwardCurveId`).
+- `Snowball.floating_index_id`, `Tarn.floating_index_id`, `CommoditySwap.floating_index_id`,
+  `CommodityFuture.price_curve_id` and `RangeAccrual.projection_curve_id` (now
+  `forward_curve_id`); Rust/JSON.
+- `Snowball.floating_tenor`, `Tarn.floating_tenor` and `RangeAccrual.reference_tenor`
+  (now `index_tenor`); Rust/JSON.
+- `RangeAccrual.rate_index_id` and `InterestRateFuture.fixing_index_id` (now
+  `index_id`; the IR future still falls back to `forward_curve_id` for its fixing
+  series); Rust/JSON.
+- `CmsSwap`/`CmsOption`/`CmsSpreadOption.swap_convention: Option<IRSConvention>`
+  (now `index_id: Option<IndexId>`, any registered rate index such as
+  `"USD-SOFR-OIS"`, `"CHF-SARON-OIS"`); `CmsSwap::from_schedule` takes an
+  `IndexId`; Rust/JSON.
+- `CmsSwap`/`CmsOption`/`CmsSpreadOption.swap_day_count` (now
+  `swap_fixed_day_count`); Rust/JSON.
+- `Bond.funding_curve_id` and `Instrument::funding_curve_id()` (now
+  `repo_curve_id`); Rust/Python/JSON.
+- `Swaption::get_day_count()` / `BermudanSwaption::get_day_count()` (now
+  `get_fixed_day_count()`); Rust.
+- `BondConvention::default_disc_curve()` (now `discount_curve_id()`); Rust.
+- `DollarRoll.repo_curve_id` resolves a discount curve (was a forward curve).
+
+#### Removed
+
+- `IRSConvention` and the unused `resolve_reference_swap_convention`; select
+  the reference-swap convention with the registry `index_id`.
+
+#### Numbers change
+
+- DollarRoll `roll_specialness`: the reference repo rate is now
+  `(DF(front)/DF(back) − 1)/τ` from the `repo_curve_id` discount curve (τ on
+  ACT/360), the same formula already used when no repo curve is set. A market
+  that registered `repo_curve_id` as a forward curve must register it as a
+  discount curve. Reference: closed form `(exp(r·τ) − 1)/τ` on a flat
+  continuously compounded curve (`specialness_resolves_the_supplied_repo_curve`).
+
 ### Exotic payoff terms (2026-09-24)
 
 Barrier and fixing levels are bare quotes in the underlying's price units; a

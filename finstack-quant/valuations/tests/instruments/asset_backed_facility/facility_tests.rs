@@ -56,7 +56,7 @@ fn collateral() -> AssetPool {
             d(2032, 1, 1),
             DayCount::Act360,
         );
-        loan.index_id = None;
+        loan.forward_curve_id = None;
         loan.spread_bp = None;
         loan.rate = 0.08;
         loan.obligor_id = Some(format!("OBL-{i}"));
@@ -712,7 +712,7 @@ fn floating_facility_interest_is_tagged_float_reset() {
 
     let fixed = facility(60_000_000.0, 100_000_000.0);
     let mut floating = fixed.clone();
-    floating.index_id = Some(CurveId::new("USD-SOFR-3M".to_string()));
+    floating.forward_curve_id = Some(CurveId::new("USD-SOFR-3M".to_string()));
     floating.margin_bp = 250.0;
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
         .base_date(close())

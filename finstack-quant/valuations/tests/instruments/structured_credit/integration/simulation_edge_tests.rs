@@ -40,7 +40,7 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: b
         balance: Money::new(balance, Currency::USD).expect("valid money fixture"),
         rate,
         spread_bp: None,
-        index_id: None,
+        forward_curve_id: None,
         index_floor: None,
         maturity,
         credit_quality: Some(CreditRating::BB),

@@ -85,7 +85,7 @@ def floating_bond(idx: int) -> tuple[str, dict]:
                     "payment_lag_days": 0,
                     "end_of_month": False,
                     "rate_spec": {
-                        "index_id": "USD-SOFR-3M",
+                        "forward_curve_id": "USD-SOFR-3M",
                         "spread_bp": str(spread),
                         "gearing": "1",
                         "gearing_includes_spread": True,
@@ -124,7 +124,7 @@ def term_loan(idx: int) -> tuple[str, dict]:
             "discount_curve_id": "USD-OIS",
             "rate": {
                 "floating": {
-                    "index_id": "USD-SOFR-3M",
+                    "forward_curve_id": "USD-SOFR-3M",
                     "spread_bp": str(spread),
                     "gearing": "1",
                     "gearing_includes_spread": True,
@@ -170,7 +170,7 @@ def revolver(idx: int) -> tuple[str, dict]:
             "recovery_rate": 0.70,
             "base_rate_spec": {
                 "floating": {
-                    "index_id": "USD-SOFR-3M",
+                    "forward_curve_id": "USD-SOFR-3M",
                     "spread_bp": str(spread),
                     "gearing": "1",
                     "gearing_includes_spread": True,
@@ -330,7 +330,7 @@ def _pool_assets(iid: str, n: int = 5) -> list[dict]:
             "balance": {"amount": "2000000", "currency": "USD"},
             "rate": 0.055 + 0.005 * (j % 3),
             "spread_bp": 300.0 + 50.0 * (j % 4),
-            "index_id": None,
+            "forward_curve_id": None,
             "maturity": f"{2029 + (j % 3)}-01-01",
             "credit_quality": "BB",
             "industry": "Technology",

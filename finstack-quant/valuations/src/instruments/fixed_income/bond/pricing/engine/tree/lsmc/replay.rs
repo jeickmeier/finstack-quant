@@ -595,7 +595,7 @@ impl ReplayTemplate {
                     overnight_observation,
                 )
             } else {
-                let forward = market.get_forward(&spec.rate_spec.index_id).ok();
+                let forward = market.get_forward(&spec.rate_spec.forward_curve_id).ok();
                 let tenor_years = forward.as_ref().map_or_else(
                     || {
                         spec.rate_spec
@@ -605,7 +605,7 @@ impl ReplayTemplate {
                     },
                     |curve| curve.tenor(),
                 );
-                let fixing_id = fixing_series_id(spec.rate_spec.index_id.as_str());
+                let fixing_id = fixing_series_id(spec.rate_spec.forward_curve_id.as_str());
                 let published_same_day = reset == as_of
                     && market
                         .get_series(&fixing_id)

@@ -67,8 +67,8 @@ impl std::str::FromStr for BoundsType {
 ///
 /// # Rate-Linked Underlyings: Pricing Routing
 ///
-/// The rate-linked fields (`rate_index_id`, `projection_curve_id`,
-/// `reference_tenor`) describe the contract but are **not priceable by the
+/// The rate-linked fields (`index_id`, `forward_curve_id`,
+/// `index_tenor`) describe the contract but are **not priceable by the
 /// standalone `RangeAccrual` pricers**, which support equity/FX (GBM)
 /// underlyings only and return a validation error when these fields are set.
 /// Price rate-linked range accrual notes through
@@ -163,18 +163,18 @@ pub struct RangeAccrualTerms {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub accrual_start_date: Date,
-    /// Explicit rate index for rate-linked range accruals.
+    /// Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rate_index_id: Option<IndexId>,
-    /// Projection curve for a rate-linked range accrual.
+    pub index_id: Option<IndexId>,
+    /// Rates forward curve that projects the observed index of a rate-linked range accrual.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub projection_curve_id: Option<CurveId>,
-    /// Contractual tenor of the observed reference rate.
+    pub forward_curve_id: Option<CurveId>,
+    /// Contractual tenor of the observed rate index.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reference_tenor: Option<finstack_quant_core::dates::Tenor>,
+    pub index_tenor: Option<finstack_quant_core::dates::Tenor>,
     /// Discount curve ID for present value calculations
     pub discount_curve_id: CurveId,
     /// Spot price identifier
@@ -429,11 +429,11 @@ impl RangeAccrualTerms {
         validation::require_with(accrual_factor.is_finite() && accrual_factor > 0.0, || {
             format!("RangeAccrual accrual factor must be finite and positive, got {accrual_factor}")
         })?;
-        let rate_field_count = usize::from(self.rate_index_id.is_some())
-            + usize::from(self.projection_curve_id.is_some())
-            + usize::from(self.reference_tenor.is_some());
+        let rate_field_count = usize::from(self.index_id.is_some())
+            + usize::from(self.forward_curve_id.is_some())
+            + usize::from(self.index_tenor.is_some());
         validation::require_with(rate_field_count == 0 || rate_field_count == 3, || {
-            "RangeAccrual rate_index_id, projection_curve_id, and reference_tenor must be supplied together"
+            "RangeAccrual index_id, forward_curve_id, and index_tenor must be supplied together"
                 .to_string()
         })?;
 
@@ -457,7 +457,7 @@ impl RangeAccrualTerms {
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
-        if let Some(projection_curve) = &self.projection_curve_id {
+        if let Some(projection_curve) = &self.forward_curve_id {
             deps.add_forward_curve(projection_curve.clone());
         }
         deps.add_market_scalar_id(self.spot_id.as_str());
@@ -608,7 +608,7 @@ mod audit_regression_tests {
     #[test]
     fn rate_contract_fields_are_all_or_none() {
         let mut range = RangeAccrual::example().terms;
-        range.rate_index_id = Some(IndexId::new("SOFR"));
+        range.index_id = Some(IndexId::new("SOFR"));
         let err = range.validate().expect_err("partial rate spec must fail");
         assert!(err.to_string().contains("must be supplied together"));
     }

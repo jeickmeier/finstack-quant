@@ -698,7 +698,7 @@ mod margin_stepup_period_semantics {
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2026 - 01 - 01))
             .rate(RateSpec::Floating(FloatingRateSpec {
-                index_id: CurveId::from("USD-SOFR"),
+                forward_curve_id: CurveId::from("USD-SOFR"),
                 spread_bp: Decimal::from(200),
                 gearing: Decimal::from(1),
                 gearing_includes_spread: true,

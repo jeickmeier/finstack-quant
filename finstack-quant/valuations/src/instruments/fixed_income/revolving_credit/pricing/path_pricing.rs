@@ -40,7 +40,7 @@ pub(super) fn resolve_fixings<'a>(
         BaseRateSpec::Floating(spec) => {
             finstack_quant_core::market_data::fixings::get_fixing_series(
                 market,
-                spec.index_id.as_ref(),
+                spec.forward_curve_id.as_ref(),
             )
             .ok()
         }

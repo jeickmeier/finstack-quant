@@ -63,18 +63,18 @@ impl Instrument for StructuredCredit {
         deps.add_discount_curve(self.discount_curve_id.clone());
 
         let pool = self.pool.normalized(self.closing_date)?;
-        for index_id in pool
+        for forward_curve_id in pool
             .assets
             .iter()
-            .filter_map(|asset| asset.index_id.as_deref())
+            .filter_map(|asset| asset.forward_curve_id.as_deref())
         {
-            deps.add_forward_curve(index_id);
-            deps.add_series_id(fixing_series_id(index_id));
+            deps.add_forward_curve(forward_curve_id);
+            deps.add_series_id(fixing_series_id(forward_curve_id));
         }
         for tranche in &self.tranches.tranches {
             if let TrancheCoupon::Floating(spec) = &tranche.coupon {
-                deps.add_forward_curve(spec.index_id.clone());
-                deps.add_series_id(fixing_series_id(spec.index_id.as_str()));
+                deps.add_forward_curve(spec.forward_curve_id.clone());
+                deps.add_series_id(fixing_series_id(spec.forward_curve_id.as_str()));
             }
         }
         Ok(deps)

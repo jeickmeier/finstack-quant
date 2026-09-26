@@ -111,7 +111,7 @@ fn test_swaption_cash_annuity_zero_forward_and_invalid_frequency() {
     swaption.settlement = SwaptionSettlement::Cash;
 
     let expected = swaption
-        .get_day_count()
+        .get_fixed_day_count()
         .year_fraction(
             swaption.get_swap_start(),
             swaption.get_swap_end(),
@@ -131,7 +131,7 @@ fn test_resolve_volatility_priority_and_greek_inputs_expired() {
     let market = create_flat_market(as_of, 0.03, 0.2);
     let forward = swaption.forward_swap_rate(&market, as_of).unwrap();
     let t = swaption
-        .get_day_count()
+        .get_fixed_day_count()
         .year_fraction(as_of, swaption.expiry, DayCountContext::default())
         .unwrap();
 

@@ -56,17 +56,17 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         }
         match &self.cashflow_spec {
             CashflowSpec::Floating(spec) => {
-                deps.add_forward_curve(spec.rate_spec.index_id.clone());
+                deps.add_forward_curve(spec.rate_spec.forward_curve_id.clone());
                 deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                    spec.rate_spec.index_id.as_str(),
+                    spec.rate_spec.forward_curve_id.as_str(),
                 ));
             }
             CashflowSpec::Amortizing { base, .. } => {
                 if let CashflowSpec::Floating(spec) = base.as_ref() {
-                    deps.add_forward_curve(spec.rate_spec.index_id.clone());
+                    deps.add_forward_curve(spec.rate_spec.forward_curve_id.clone());
                     deps.add_series_id(
                         finstack_quant_core::market_data::fixings::fixing_series_id(
-                            spec.rate_spec.index_id.as_str(),
+                            spec.rate_spec.forward_curve_id.as_str(),
                         ),
                     );
                 }
@@ -151,8 +151,8 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         Some(self.issue_date)
     }
 
-    fn funding_curve_id(&self) -> Option<CurveId> {
-        self.funding_curve_id.clone()
+    fn repo_curve_id(&self) -> Option<CurveId> {
+        self.repo_curve_id.clone()
     }
 
     fn metrics_equivalent(&self) -> Box<dyn crate::instruments::common_impl::traits::Instrument> {
@@ -367,7 +367,7 @@ mod dependency_tests {
             unreachable!("floating example must have a floating coupon");
         };
         let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
-            spec.rate_spec.index_id.as_str(),
+            spec.rate_spec.forward_curve_id.as_str(),
         );
 
         let deps =
