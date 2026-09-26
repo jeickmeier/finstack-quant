@@ -2,10 +2,7 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "barrier": {
-        "amount": "5000",
-        "currency": "USD"
-      },
+      "barrier": 5000.0,
       "barrier_type": "up_and_out",
       "day_count": "act_365f",
       "discount_curve_id": "USD-OIS",

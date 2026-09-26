@@ -12,8 +12,8 @@
       },
       "quote_calendar_id": null,
       "quote_currency": "USD",
-      "settlement": null,
-      "settlement_lag_days": 2,
+      "settlement_date": null,
+      "settlement_days": 2,
       "spot_rate": 1.1
     },
     "type": "fx_spot"

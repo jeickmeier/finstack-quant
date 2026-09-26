@@ -4107,17 +4107,17 @@ export interface Money11 {
  */
 export interface TranchePricingResult {
   /**
-   * Attachment point (percentage)
+   * Attachment point in percent of the capital structure (0 = first loss).
    */
-  attachment: number;
+  attach_pct: number;
   /**
    * Credit duration (price sensitivity to credit spread)
    */
   credit_duration: number;
   /**
-   * Detachment point (percentage)
+   * Detachment point in percent of the capital structure (100 = most senior).
    */
-  detachment: number;
+  detach_pct: number;
   draw_option_cost: Money12;
   expected_loss: Money13;
   expected_shortfall: Money14;

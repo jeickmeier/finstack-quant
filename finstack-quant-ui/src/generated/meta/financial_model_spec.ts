@@ -657,7 +657,7 @@ export default [
   {
     "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/credit_curve_id",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConvertibleBond/properties/credit_curve_id",
-    "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread).\n\n**Convention**: this curve must represent ZERO-RECOVERY (pure hazard)\nrisky discounting, i.e. `risky_df = rf_df * survival_probability`. The\npricer converts it to recovery-adjusted discounting via the blend\n`risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a\nmarket recovery-adjusted spread curve here double-counts `(1 - R)` and\noverstates the credit discount."
+    "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
   },
   {
     "path": "#/$defs/d_174ce9631272c7d7f4f7/properties/credit_curve_id/anyOf/0",
@@ -870,21 +870,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/quoted_z_spread",
     "description": "Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1aae7d4b687142dd110c/properties/upfront_payment",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/upfront_payment",
-    "description": "PV adjustment at valuation date (primarily credit-instrument upfront quotes).\n\nThis is an **already-discounted** adjustment to the net present value.\nIt is added directly to the NPV without further discounting.\n\n# Sign Convention\n\nFor CDS, CDS index, and CDS tranche instruments, a positive amount is\npaid by the protection buyer: it decreases buyer NPV and increases\nseller NPV. Other instrument families may treat the amount as an\nexplicitly signed PV adjustment and document that convention locally.\n\n# Relationship to CDS Dated Upfront\n\nFor CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:\n- **`upfront_payment`**: PV adjustment at `as_of`, added directly\n- **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date\n\nBoth can be set simultaneously without double-counting."
-  },
-  {
-    "path": "#/$defs/d_1aae7d4b687142dd110c/properties/upfront_payment/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/upfront_payment/anyOf/0",
-    "ref": "#/$defs/Money",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
-  },
-  {
-    "path": "#/$defs/d_1aae7d4b687142dd110c/properties/upfront_payment/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarketQuoteOverrides/properties/upfront_payment/anyOf/1"
   },
   {
     "path": "#/$defs/d_1b4d5042646bf8d5c9cb",
@@ -5100,10 +5085,10 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OvernightCouponConvention/properties/payment_calendar_id/anyOf/1"
   },
   {
-    "path": "#/$defs/d_7d1a98f209076e58ed77/properties/payment_delay_days",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OvernightCouponConvention/properties/payment_delay_days",
+    "path": "#/$defs/d_7d1a98f209076e58ed77/properties/payment_lag_days",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OvernightCouponConvention/properties/payment_lag_days",
     "default": 0,
-    "description": "Payment delay in business days after the accrual end date.",
+    "description": "Payment lag in business days after the accrual end date.",
     "format": "int32",
     "maximum": 31,
     "minimum": 0

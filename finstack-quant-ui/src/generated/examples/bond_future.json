@@ -3,7 +3,6 @@
     "spec": {
       "attributes": {},
       "contract_specs": {
-        "contract_size": 100000.0,
         "repo_day_count": "act_360",
         "standard_coupon": 0.06,
         "standard_maturity_years": 10.0
@@ -19,17 +18,21 @@
           "conversion_factor": 0.7915
         }
       ],
-      "delivery_end": "2025-09-30",
       "delivery_start": "2025-09-22",
       "discount_curve_id": "USD-TREASURY",
-      "expiry": "2025-09-19",
       "id": "TYU5",
-      "notional": {
-        "amount": "1000000",
-        "currency": "USD"
-      },
-      "position": "long",
-      "quoted_price": 112.25
+      "terms": {
+        "contracts": 10.0,
+        "currency": "USD",
+        "entry_price": 112.25,
+        "last_trading_date": "2025-09-19",
+        "multiplier": 1000.0,
+        "position": "long",
+        "settlement": {
+          "type": "cash"
+        },
+        "settlement_date": "2025-09-30"
+      }
     },
     "type": "bond_future"
   },

@@ -521,14 +521,6 @@ export interface D_91Fef53F78D7C50653A0 {
   maturity: Date2;
   metric_pricing_overrides?: MetricPricingOverrides;
   original_face: Money1;
-  /**
-   * Optional custom stated payment delay in days (overrides the agency
-   * rule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`
-   * months after the accrual month, rolled Following on the `usny`
-   * calendar (55 → 25th of the next month, 75 → 15th two months later).
-   * Must be at least 1.
-   */
-  payment_lag_days?: number | null;
   pool_id: Id2;
   /**
    * Pool type (generic or specified).
@@ -542,6 +534,14 @@ export interface D_91Fef53F78D7C50653A0 {
    * Defaults to `0.0` when omitted.
    */
   servicing_fee_bp?: number;
+  /**
+   * Optional custom stated payment delay in days (overrides the agency
+   * rule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`
+   * months after the accrual month, rolled Following on the `usny`
+   * calendar (55 → 25th of the next month, 75 → 15th two months later).
+   * Must be at least 1.
+   */
+  stated_delay_days?: number | null;
   /**
    * Weighted average coupon (gross rate on underlying mortgages).
    */
@@ -823,218 +823,6 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-  /**
-   * PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-   *
-   * This is an **already-discounted** adjustment to the net present value.
-   * It is added directly to the NPV without further discounting.
-   *
-   * # Sign Convention
-   *
-   * For CDS, CDS index, and CDS tranche instruments, a positive amount is
-   * paid by the protection buyer: it decreases buyer NPV and increases
-   * seller NPV. Other instrument families may treat the amount as an
-   * explicitly signed PV adjustment and document that convention locally.
-   *
-   * # Relationship to CDS Dated Upfront
-   *
-   * For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-   * - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-   * - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-   *
-   * Both can be set simultaneously without double-counting.
-   */
-  upfront_payment?: D_1A6C2Ccee66D90A3A469 | null;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface D_1A6C2Ccee66D90A3A469 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Model selection and tree pricing parameters.

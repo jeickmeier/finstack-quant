@@ -3,11 +3,11 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-      "sha256": "dd5272a4bf6a734538c79382af8996744741f91816d6955b5be0ccec4594dc1e"
+      "sha256": "9e823021d62508a1a5a2c90875de07f48010fcece6ae3e99b45d73a3c0e55978"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "5e9532fbb7a2e62fa2f06ef05bbe5abbbb17062bf24a62f30df8dd6fbd472787"
+      "sha256": "31a3ffa768aa16be90066351f8f009b9b192ac3d13513f416bb6cf368733db61"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/equity_option.json",

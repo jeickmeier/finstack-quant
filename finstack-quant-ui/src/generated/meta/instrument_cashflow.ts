@@ -1281,6 +1281,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
+    "path": "#/properties/credit_curve_id",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/credit_curve_id",
+    "description": "Hazard curve ID (`credit_curve_id`) used (omitted for `discounting` model)."
+  },
+  {
+    "path": "#/properties/credit_curve_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/credit_curve_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/properties/credit_curve_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/credit_curve_id/anyOf/1"
+  },
+  {
     "path": "#/properties/currency",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/currency",
     "description": "Reporting currency used for row PVs and `total_pv`.",
@@ -1304,21 +1319,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/flows/items",
     "ref": "#/$defs/CashflowRow",
     "resolvedRef": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow"
-  },
-  {
-    "path": "#/properties/hazard_curve_id",
-    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/hazard_curve_id",
-    "description": "Hazard curve ID used (omitted for `discounting` model)."
-  },
-  {
-    "path": "#/properties/hazard_curve_id/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/hazard_curve_id/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/properties/hazard_curve_id/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/properties/hazard_curve_id/anyOf/1"
   },
   {
     "path": "#/properties/instrument_id",

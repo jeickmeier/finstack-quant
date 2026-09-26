@@ -160,6 +160,10 @@ export type D_826Db27Dbb673D9F5F86 =
       | {
           convention: D_149952Dfbecf32B456Eb1;
           /**
+           * Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).
+           */
+          coupon_bp: number;
+          /**
            * Reference entity name.
            */
           entity: string;
@@ -181,10 +185,6 @@ export type D_826Db27Dbb673D9F5F86 =
            * Recovery rate assumption.
            */
           recovery_rate: number;
-          /**
-           * Running spread in basis points (25.0, 100.0, 500.0 or 1000.0).
-           */
-          running_spread_bp: number;
           type: "cds_upfront";
           /**
            * Upfront payment percentage of notional (e.g. 0.01 for 1%).
@@ -203,6 +203,10 @@ export type D_826Db27Dbb673D9F5F86 =
       attachment: number;
       convention: D_149952Dfbecf32B456Eb2;
       /**
+       * Contractual running coupon of the tranche, in basis points.
+       */
+      coupon_bp: number;
+      /**
        * Detachment point (decimal, e.g. 0.07).
        */
       detachment: number;
@@ -216,10 +220,6 @@ export type D_826Db27Dbb673D9F5F86 =
       index: string;
       kind: "cds_tranche_quote";
       maturity: Date2;
-      /**
-       * Running spread (bp).
-       */
-      running_spread_bp: number;
       /**
        * CDS index series number.
        */
@@ -2426,13 +2426,16 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       notional?: number;
       /**
+       * Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
+       * standard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the
+       * default) for a schedule generated from the convention frequency and
+       * stub. `imm` is rejected.
+       */
+      roll_rule?: "none" | "imm" | "cds_imm";
+      /**
        * Series number of the credit index.
        */
       series: number;
-      /**
-       * Whether to use IMM dates for coupon schedules.
-       */
-      use_imm_dates?: boolean;
     }
   | {
       /**

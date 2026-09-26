@@ -692,11 +692,11 @@ export interface DCb133E56Ebd239Cdb4Ee {
  *
  * # Pricing
  *
- * ## Pre-Fixing (fixing_rate = None)
+ * ## Pre-Fixing (observed_fixing = None)
  * Forward rate uses the explicit override or covered interest rate parity
  * with both currency curves.
  *
- * ## Post-Fixing (fixing_rate = Some)
+ * ## Post-Fixing (observed_fixing = Some)
  * Uses the observed fixing rate for settlement calculation.
  *
  * The settlement formula depends on `quote_convention`:
@@ -751,10 +751,6 @@ export interface D_6737E7813812De86Cf9B {
   domestic_discount_curve_id: Id;
   fixing_date: Date;
   /**
-   * Observed fixing rate. Interpretation depends on `quote_convention`.
-   */
-  fixing_rate?: number | null;
-  /**
    * Official fixing source/benchmark enum for type-safe specification.
    */
   fixing_source_enum?: D_1F0Bf95E27D8096E424E | null;
@@ -772,11 +768,15 @@ export interface D_6737E7813812De86Cf9B {
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
   /**
+   * Observed fixing rate. Interpretation depends on `quote_convention`.
+   */
+  observed_fixing?: number | null;
+  /**
    * Optional settlement currency calendar.
    */
   quote_calendar_id?: string | null;
   /**
-   * Quote convention for contract_rate and fixing_rate.
+   * Quote convention for contract_rate and observed_fixing.
    */
   quote_convention: "base_per_settlement" | "settlement_per_base";
   scenario_pricing_overrides?: ScenarioPricingOverrides;
@@ -880,218 +880,6 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-  /**
-   * PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-   *
-   * This is an **already-discounted** adjustment to the net present value.
-   * It is added directly to the NPV without further discounting.
-   *
-   * # Sign Convention
-   *
-   * For CDS, CDS index, and CDS tranche instruments, a positive amount is
-   * paid by the protection buyer: it decreases buyer NPV and increases
-   * seller NPV. Other instrument families may treat the amount as an
-   * explicitly signed PV adjustment and document that convention locally.
-   *
-   * # Relationship to CDS Dated Upfront
-   *
-   * For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-   * - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-   * - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-   *
-   * Both can be set simultaneously without double-counting.
-   */
-  upfront_payment?: D_1A6C2Ccee66D90A3A469 | null;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface D_1A6C2Ccee66D90A3A469 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Model selection and tree pricing parameters.

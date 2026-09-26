@@ -620,21 +620,184 @@ export type Id5 = string;
  */
 export type Date11 = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date12 = string;
-/**
  * Opaque string identifier.
  */
 export type Id6 = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date13 = string;
-/**
  * Opaque string identifier.
  */
 export type Id7 = string;
+/**
+ * Currency in which variation margin is paid.
+ */
+export type Currency =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWL";
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date12 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date13 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -672,23 +835,27 @@ export interface DA3D5F3B41D0C911162Ff {
  *
  * ```rust
  * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
  * use finstack_quant_valuations::instruments::fixed_income::bond_future::{
  *     BondFuture, BondFutureSpecs, DeliverableBond,
  * };
- * use finstack_quant_valuations::instruments::{Attributes, Position};
+ * use finstack_quant_valuations::instruments::{Attributes, ListedFutureTerms, Position};
  * use time::macros::date;
  *
  * # fn main() -> finstack_quant_core::Result<()> {
+ * // 10 UST 10Y contracts ($100,000 face each, $1,000 per price point).
  * let future = BondFuture::builder()
  *     .id(InstrumentId::new("TYH5"))
- *     .notional(Money::from((1_000_000_i64, Currency::USD)))
- *     .expiry(date!(2025 - 03 - 20))
+ *     .terms(ListedFutureTerms::new(
+ *         10.0,
+ *         1_000.0,
+ *         Currency::USD,
+ *         125.50,
+ *         date!(2025 - 03 - 20),
+ *         date!(2025 - 03 - 31),
+ *         Position::Long,
+ *     )?)
  *     .delivery_start(date!(2025 - 03 - 21))
- *     .delivery_end(date!(2025 - 03 - 31))
- *     .quoted_price(125.50)
- *     .position(Position::Long)
  *     .contract_specs(BondFutureSpecs::ust_10y())
  *     .deliverable_basket(vec![DeliverableBond {
  *         bond_id: InstrumentId::new("US912828XG33"),
@@ -733,27 +900,11 @@ export interface DD7F0Aa83744A0794Bfe5 {
    * @minItems 1
    */
   deliverable_basket: [D_83D45912Dd5Fd6Adb40F, ...D_83D45912Dd5Fd6Adb40F[]];
-  delivery_end: Date11;
-  delivery_start: Date12;
+  delivery_start: Date11;
   discount_curve_id: Id6;
-  expiry: Date13;
   id: Id7;
   instrument_pricing_overrides?: InstrumentPricingOverrides1;
   metric_pricing_overrides?: MetricPricingOverrides1;
-  notional: Money5;
-  /**
-   * Position side (Long or Short)
-   */
-  position: "long" | "short";
-  /**
-   * Contract/entry futures price (e.g., 125.50 for 125-16/32).
-   *
-   * Used only for mark-to-market: `base_value` returns model-minus-contract
-   * value for a long position. Basis, implied-repo and invoice helpers take
-   * the current futures price as an explicit argument instead.
-   * Current-settlement variation margin is a separate cash-P&L workflow.
-   */
-  quoted_price: number;
   /**
    * Optional repo/financing curve identifier.
    *
@@ -766,6 +917,7 @@ export interface DD7F0Aa83744A0794Bfe5 {
    */
   repo_curve_id?: Id2 | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides1;
+  terms: D_55A54D75602Dabdf9121;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -783,13 +935,9 @@ export interface Attributes {
   tags?: string[];
 }
 /**
- * Contract specifications (contract size, standard coupon, repo day count)
+ * Contract specifications (standard coupon, standard maturity, repo day count)
  */
 export interface D_5193595B8B998A0Dc94C {
-  /**
-   * Face value of a single contract (e.g., $100,000 for UST)
-   */
-  contract_size: number;
   /**
    * Day-count convention for implied repo rate annualization.
    *
@@ -2474,218 +2622,6 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-  /**
-   * PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-   *
-   * This is an **already-discounted** adjustment to the net present value.
-   * It is added directly to the NPV without further discounting.
-   *
-   * # Sign Convention
-   *
-   * For CDS, CDS index, and CDS tranche instruments, a positive amount is
-   * paid by the protection buyer: it decreases buyer NPV and increases
-   * seller NPV. Other instrument families may treat the amount as an
-   * explicitly signed PV adjustment and document that convention locally.
-   *
-   * # Relationship to CDS Dated Upfront
-   *
-   * For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-   * - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-   * - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-   *
-   * Both can be set simultaneously without double-counting.
-   */
-  upfront_payment?: D_1A6C2Ccee66D90A3A469 | null;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface D_1A6C2Ccee66D90A3A469 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Model selection and tree pricing parameters.
@@ -3937,181 +3873,6 @@ export interface MetricPricingOverrides1 {
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Currency-tagged monetary amount.
- */
-export interface Money5 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
  * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides1 {
@@ -4138,4 +3899,58 @@ export interface ScenarioPricingOverrides1 {
    * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
    */
   scenario_spread_shock_bp?: number | null;
+}
+/**
+ * Standard listed position and lifecycle terms. `terms.multiplier` is the
+ * currency value of one full price point (per-contract face / 100),
+ * `terms.entry_price` the trade price per 100 face, `terms.last_trading_date`
+ * the last trading day and `terms.settlement_date` the last delivery date.
+ */
+export interface D_55A54D75602Dabdf9121 {
+  /**
+   * Number of exchange contracts. Fractional values are permitted for
+   * portfolio aggregation but must be finite and strictly positive.
+   */
+  contracts: number;
+  currency: Currency;
+  /**
+   * Trade fill price in the same price-point units as the market mark.
+   */
+  entry_price: number;
+  last_trading_date: Date12;
+  /**
+   * Settlement-currency value of one full price point per contract.
+   */
+  multiplier: number;
+  /**
+   * Long or short position direction.
+   */
+  position: "long" | "short";
+  /**
+   * Optional live exchange mark, in price points.
+   */
+  quoted_price?: number | null;
+  /**
+   * Cash or physical final settlement convention.
+   */
+  settlement?:
+    | {
+        type: "cash";
+      }
+    | {
+        /**
+         * Deliverable asset, grade, location, or basket identifier.
+         */
+        asset: string;
+        /**
+         * Physical units delivered per exchange contract.
+         */
+        quantity_per_contract: number;
+        type: "physical";
+      };
+  settlement_date: Date13;
+  /**
+   * Optional official final settlement price, in price points.
+   */
+  settlement_price?: number | null;
 }

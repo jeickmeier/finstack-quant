@@ -670,7 +670,7 @@
               "type": "null"
             }
           ],
-          "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread).\n\n**Convention**: this curve must represent ZERO-RECOVERY (pure hazard)\nrisky discounting, i.e. `risky_df = rf_df * survival_probability`. The\npricer converts it to recovery-adjusted discounting via the blend\n`risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a\nmarket recovery-adjusted spread curve here double-counts `(1 - R)` and\noverstates the credit discount."
+          "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/d_557de6d70142abc041e8",
@@ -880,17 +880,6 @@
             "number",
             "null"
           ]
-        },
-        "upfront_payment": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_d5bd42d8b6ec6c31d786"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "PV adjustment at valuation date (primarily credit-instrument upfront quotes).\n\nThis is an **already-discounted** adjustment to the net present value.\nIt is added directly to the NPV without further discounting.\n\n# Sign Convention\n\nFor CDS, CDS index, and CDS tranche instruments, a positive amount is\npaid by the protection buyer: it decreases buyer NPV and increases\nseller NPV. Other instrument families may treat the amount as an\nexplicitly signed PV adjustment and document that convention locally.\n\n# Relationship to CDS Dated Upfront\n\nFor CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:\n- **`upfront_payment`**: PV adjustment at `as_of`, added directly\n- **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date\n\nBoth can be set simultaneously without double-counting."
         }
       },
       "type": "object"
@@ -4780,9 +4769,9 @@
           ],
           "description": "Calendar used to apply the payment delay."
         },
-        "payment_delay_days": {
+        "payment_lag_days": {
           "default": 0,
-          "description": "Payment delay in business days after the accrual end date.",
+          "description": "Payment lag in business days after the accrual end date.",
           "format": "int32",
           "maximum": 31,
           "minimum": 0,

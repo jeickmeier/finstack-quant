@@ -59,6 +59,9 @@ calendar_id: string | null,
  */
 detachment_points: Array<number>,
 /**
- * Whether to use IMM dates for coupon schedules.
+ * Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
+ * standard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the
+ * default) for a schedule generated from the convention frequency and
+ * stub. `imm` is rejected.
  */
-use_imm_dates: boolean, };
+roll_rule: string, };

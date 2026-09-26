@@ -8,6 +8,9 @@
       "expiry": "2024-12-20",
       "id": "LOOKBACK-SPX-FIXED-CALL",
       "lookback_type": "fixed_strike",
+      "monitoring": {
+        "type": "continuous"
+      },
       "notional": {
         "amount": "100000",
         "currency": "USD"
@@ -18,7 +21,6 @@
       "spot_id": "SPX-SPOT",
       "strike": 4500.0,
       "underlying_ticker": "SPX",
-      "use_gobet_miri": false,
       "vol_surface_id": "SPX-VOL"
     },
     "type": "lookback_option"

@@ -8,13 +8,6 @@
  */
 export type Id = string;
 /**
- * Future expiry date. For VIX futures this is the final settlement day
- * itself (the Wednesday ~30 days before the expiry of the SPX options
- * used in the settlement calculation), not a date 30 days before
- * settlement.
- */
-export type Date = string;
-/**
  * Unique identifier.
  */
 export type Id1 = string;
@@ -283,8 +276,174 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Final settlement date — the morning Special Opening Quotation (SOQ)
- * of the index is computed on this date (same day as `expiry` for VIX).
+ * Currency in which variation margin is paid.
+ */
+export type Currency =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWL";
+/**
+ * Final date on which the contract trades.
+ */
+export type Date = string;
+/**
+ * Date on which final cash settlement is completed.
  */
 export type Date1 = string;
 /**
@@ -312,28 +471,35 @@ export interface DE1Bd96Bcaa7Ce74B7D1D {
  *
  * Represents a futures contract on a volatility index such as VIX, VXN,
  * or VSTOXX. These contracts provide exposure to expected future volatility.
+ * Position size, multiplier, entry price and lifecycle dates live in the
+ * shared [`ListedFutureTerms`]; `terms.settlement_price` is the official
+ * Special Opening Quotation (SOQ) in index points.
  *
  * # Examples
  *
  * ```rust
- * use finstack_quant_valuations::instruments::equity::vol_index_future::{
- *     VolatilityIndexFuture, VolIndexContractSpecs,
- * };
- * use finstack_quant_valuations::instruments::Position;
+ * use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
+ * use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
  * use finstack_quant_core::currency::Currency;
  * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::money::Money;
  * use finstack_quant_core::types::{CurveId, InstrumentId};
  * use time::Month;
  *
+ * let settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();
  * let future = VolatilityIndexFuture::builder()
  *     .id(InstrumentId::new("VIX-FUT-2025M03"))
- *     .notional(Money::from((100_000_i64, Currency::USD)))
- *     .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())
- *     .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())
- *     .quoted_price(21.50)
- *     .position(Position::Long)
- *     .contract_specs(VolIndexContractSpecs::default())
+ *     .terms(
+ *         ListedFutureTerms::new(
+ *             5.0,
+ *             1_000.0,
+ *             Currency::USD,
+ *             21.50,
+ *             settlement,
+ *             settlement,
+ *             Position::Long,
+ *         )
+ *         .unwrap(),
+ *     )
  *     .discount_curve_id(CurveId::new("USD-OIS"))
  *     .vol_index_curve_id(CurveId::new("VIX"))
  *     .build()
@@ -341,28 +507,13 @@ export interface DE1Bd96Bcaa7Ce74B7D1D {
  * ```
  */
 export interface DF5452489Af2759Ebedff {
-  attributes: Attributes;
-  contract_specs?: DB5C9E0C2F4E12Dfc032F;
+  attributes?: Attributes;
   discount_curve_id: Id;
-  expiry: Date;
   id: Id1;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
-  notional: Money;
-  /**
-   * Position side (Long or Short).
-   */
-  position: "long" | "short";
-  /**
-   * Quoted future price (index points, e.g., 21.50).
-   */
-  quoted_price: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
-  settlement_date: Date1;
-  /**
-   * Final settlement/SOQ fixing in index points.
-   */
-  settlement_fixing?: number | null;
+  terms: DE985818D0Dd0Fa2D4259;
   vol_index_curve_id: Id2;
 }
 /**
@@ -379,30 +530,6 @@ export interface Attributes {
    * User-defined tags for categorization.
    */
   tags?: string[];
-}
-/**
- * Contract specifications.
- */
-export interface DB5C9E0C2F4E12Dfc032F {
-  /**
-   * Index identifier (e.g., "VIX", "VXN", "VSTOXX").
-   */
-  index_id: string;
-  /**
-   * Contract multiplier (USD per index point).
-   * VIX standard: 1000 (each point = $1,000)
-   */
-  multiplier: number;
-  /**
-   * Tick size in index points.
-   * VIX standard: 0.05 points
-   */
-  tick_size: number;
-  /**
-   * Tick value in currency units.
-   * VIX standard: $50 per tick (0.05 × 1000)
-   */
-  tick_value: number;
 }
 /**
  * Instrument-owned pricing inputs.
@@ -483,218 +610,6 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-  /**
-   * PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-   *
-   * This is an **already-discounted** adjustment to the net present value.
-   * It is added directly to the NPV without further discounting.
-   *
-   * # Sign Convention
-   *
-   * For CDS, CDS index, and CDS tranche instruments, a positive amount is
-   * paid by the protection buyer: it decreases buyer NPV and increases
-   * seller NPV. Other instrument families may treat the amount as an
-   * explicitly signed PV adjustment and document that convention locally.
-   *
-   * # Relationship to CDS Dated Upfront
-   *
-   * For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-   * - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-   * - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-   *
-   * Both can be set simultaneously without double-counting.
-   */
-  upfront_payment?: D_1A6C2Ccee66D90A3A469 | null;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface D_1A6C2Ccee66D90A3A469 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Model selection and tree pricing parameters.
@@ -1515,183 +1430,6 @@ export interface DE49387F97C0F9D510642 {
   reporting_currency?: DB556Bbeb1Ecf96C44C5A | null;
 }
 /**
- * Notional exposure in currency units. PV is scaled by
- * `notional.amount() / (multiplier × quoted_price)` to represent
- * the number of contracts.
- */
-export interface Money {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
-}
-/**
  * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides {
@@ -1718,4 +1456,59 @@ export interface ScenarioPricingOverrides {
    * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
    */
   scenario_spread_shock_bp?: number | null;
+}
+/**
+ * Standard listed position and lifecycle terms. `terms.multiplier` is the
+ * settlement-currency value of one index point ($1,000 for CBOE VIX),
+ * `terms.entry_price` is the trade price in index points and
+ * `terms.settlement_date` is the SOQ date on which the final settlement
+ * price is fixed.
+ */
+export interface DE985818D0Dd0Fa2D4259 {
+  /**
+   * Number of exchange contracts. Fractional values are permitted for
+   * portfolio aggregation but must be finite and strictly positive.
+   */
+  contracts: number;
+  currency: Currency;
+  /**
+   * Trade fill price in the same price-point units as the market mark.
+   */
+  entry_price: number;
+  last_trading_date: Date;
+  /**
+   * Settlement-currency value of one full price point per contract.
+   */
+  multiplier: number;
+  /**
+   * Long or short position direction.
+   */
+  position: "long" | "short";
+  /**
+   * Optional live exchange mark, in price points.
+   */
+  quoted_price?: number | null;
+  /**
+   * Cash or physical final settlement convention.
+   */
+  settlement?:
+    | {
+        type: "cash";
+      }
+    | {
+        /**
+         * Deliverable asset, grade, location, or basket identifier.
+         */
+        asset: string;
+        /**
+         * Physical units delivered per exchange contract.
+         */
+        quantity_per_contract: number;
+        type: "physical";
+      };
+  settlement_date: Date1;
+  /**
+   * Optional official final settlement price, in price points.
+   */
+  settlement_price?: number | null;
 }

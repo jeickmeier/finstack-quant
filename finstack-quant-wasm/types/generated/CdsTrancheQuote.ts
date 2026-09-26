@@ -30,7 +30,7 @@
  *     detachment: 0.07,
  *     maturity: Date::from_calendar_date(2029, time::Month::June, 20).unwrap(),
  *     upfront_pct: -0.025,
- *     running_spread_bp: 500.0,
+ *     coupon_bp: 500.0,
  *     convention: CdsConventionKey {
  *         currency: Currency::USD,
  *         doc_clause: CdsDocClause::Cr14,
@@ -70,9 +70,9 @@ maturity: string,
  */
 upfront_pct: number,
 /**
- * Running spread (bp).
+ * Contractual running coupon of the tranche, in basis points.
  */
-running_spread_bp: number,
+coupon_bp: number,
 /**
  * Convention key (currency + doc clause).
  */

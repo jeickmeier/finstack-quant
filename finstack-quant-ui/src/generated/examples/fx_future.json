@@ -6,7 +6,6 @@
       "domestic_discount_curve_id": "USD-OIS",
       "foreign_discount_curve_id": "EUR-OIS",
       "id": "CME-6E-DEC26",
-      "quote_currency": "USD",
       "terms": {
         "contracts": 4.0,
         "currency": "USD",

@@ -111,7 +111,7 @@ export default [
             "tranches": {
               "tranches": [
                 {
-                  "attachment_point": 0,
+                  "attach_pct": 0,
                   "attributes": {},
                   "coupon": {
                     "fixed": {
@@ -127,7 +127,7 @@ export default [
                     "amount": "0",
                     "currency": "USD"
                   },
-                  "detachment_point": 100,
+                  "detach_pct": 100,
                   "frequency": {
                     "count": 3,
                     "unit": "months"

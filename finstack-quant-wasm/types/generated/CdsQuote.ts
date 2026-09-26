@@ -50,7 +50,7 @@
  *         doc_clause: CdsDocClause::Cr14,
  *     },
  *     pillar: Pillar::Tenor("5Y".parse()?),
- *     running_spread_bp: 500.0,
+ *     coupon_bp: 500.0,
  *     upfront_pct: 0.02, // 2% upfront
  *     recovery_rate: 0.40,
  * };
@@ -100,9 +100,9 @@ convention: string,
  */
 pillar: string,
 /**
- * Running spread in basis points (25.0, 100.0, 500.0 or 1000.0).
+ * Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).
  */
-running_spread_bp: number,
+coupon_bp: number,
 /**
  * Upfront payment percentage of notional (e.g. 0.01 for 1%).
  */

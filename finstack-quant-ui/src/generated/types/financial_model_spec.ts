@@ -2987,28 +2987,6 @@ export interface D_1Aae7D4B687142Dd110C {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-  /**
-   * PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-   *
-   * This is an **already-discounted** adjustment to the net present value.
-   * It is added directly to the NPV without further discounting.
-   *
-   * # Sign Convention
-   *
-   * For CDS, CDS index, and CDS tranche instruments, a positive amount is
-   * paid by the protection buyer: it decreases buyer NPV and increases
-   * seller NPV. Other instrument families may treat the amount as an
-   * explicitly signed PV adjustment and document that convention locally.
-   *
-   * # Relationship to CDS Dated Upfront
-   *
-   * For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-   * - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-   * - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-   *
-   * Both can be set simultaneously without double-counting.
-   */
-  upfront_payment?: DD5Bd42D8B6Ec6C31D7861 | null;
 }
 /**
  * Model selection and tree pricing parameters.
@@ -4204,15 +4182,15 @@ export interface D_174Ce9631272C7D7F4F7 {
   call_put?: DFb11B05Db6Ea44C39740 | null;
   conversion: DCda814224Ddf8B157Fc6;
   /**
-   * Credit curve identifier for risky discounting (bond floor).
-   * If not provided, falls back to discount_curve_id (implies no credit spread).
+   * Issuer hazard curve identifier (a `HazardCurve`, as on every credit
+   * instrument). When `None`, the cash component is discounted at the
+   * risk-free `discount_curve_id` (no credit spread).
    *
-   * **Convention**: this curve must represent ZERO-RECOVERY (pure hazard)
-   * risky discounting, i.e. `risky_df = rf_df * survival_probability`. The
-   * pricer converts it to recovery-adjusted discounting via the blend
-   * `risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a
-   * market recovery-adjusted spread curve here double-counts `(1 - R)` and
-   * overstates the credit discount.
+   * The pricer derives the zero-recovery risky discount factor
+   * `risky_df = rf_df × S(t)` from the curve's survival probabilities and
+   * blends it with risk-free discounting as `risky × (1 − R) + rf × R`
+   * using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
+   * used only to convert spread bumps into hazard shifts for CS01.
    */
   credit_curve_id?: D_557De6D70142Abc041E8 | null;
   /**
@@ -11968,9 +11946,9 @@ export interface D_7D1A98F209076E58Ed77 {
    */
   payment_calendar_id?: D_557De6D70142Abc041E8 | null;
   /**
-   * Payment delay in business days after the accrual end date.
+   * Payment lag in business days after the accrual end date.
    */
-  payment_delay_days?: number;
+  payment_lag_days?: number;
   /**
    * Whether any contractual spread is compounded or added afterward.
    */

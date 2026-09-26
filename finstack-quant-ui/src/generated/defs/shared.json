@@ -272,11 +272,11 @@
     "CommodityFuture": {
       "$ref": "#/$defs/CommodityFuture"
     },
+    "CommodityFutureFixing": {
+      "$ref": "#/$defs/CommodityFutureFixing"
+    },
     "CommodityFutureOption": {
       "$ref": "#/$defs/CommodityFutureOption"
-    },
-    "CommodityFutureSettlement": {
-      "$ref": "#/$defs/CommodityFutureSettlement"
     },
     "CommodityOption": {
       "$ref": "#/$defs/CommodityOption"
@@ -902,9 +902,6 @@
     "RebalanceRule": {
       "$ref": "#/$defs/RebalanceRule"
     },
-    "RebateTiming": {
-      "$ref": "#/$defs/RebateTiming"
-    },
     "Recipient": {
       "$ref": "#/$defs/Recipient"
     },
@@ -1132,9 +1129,6 @@
     },
     "VmParameters": {
       "$ref": "#/$defs/VmParameters"
-    },
-    "VolIndexContractSpecs": {
-      "$ref": "#/$defs/VolIndexContractSpecs"
     },
     "VolatilityIndexFuture": {
       "$ref": "#/$defs/VolatilityIndexFuture"
@@ -1447,15 +1441,6 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Original face amount (initial principal balance)."
         },
-        "payment_lag_days": {
-          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "pool_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Pool identifier (CUSIP or internal pool ID)."
@@ -1478,6 +1463,15 @@
           "description": "Annual servicing fee in basis points (`25.0` = 0.25%).\n\nDefaults to `0.0` when omitted.",
           "format": "double",
           "type": "number"
+        },
+        "stated_delay_days": {
+          "description": "Optional custom stated payment delay in days (overrides the agency\nrule). A delay `D` pays on day `D − 30k` of the month `k = (D − 1)/30`\nmonths after the accrual month, rolled Following on the `usny`\ncalendar (55 → 25th of the next month, 75 → 15th two months later).\nMust be at least 1.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "wac": {
           "description": "Weighted average coupon (gross rate on underlying mortgages).",
@@ -1625,7 +1619,7 @@
               "type": "null"
             }
           ],
-          "description": "Explicit settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for\n`settlement_year`/`settlement_month` in\n[`AgencyTba::get_settlement_date`]. Dollar rolls use this to keep leg\npricing consistent with explicit roll settlement dates."
+          "description": "Explicit settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for\n`settlement_year`/`settlement_month` in\n[`AgencyTba::effective_settlement_date`]. Dollar rolls use this to keep leg\npricing consistent with explicit roll settlement dates."
         },
         "settlement_month": {
           "description": "Settlement month (1-12).",
@@ -3067,11 +3061,6 @@
           },
           "type": "array"
         },
-        "participation_rate": {
-          "description": "Participation rate in underlying performance",
-          "format": "double",
-          "type": "number"
-        },
         "past_fixings": {
           "default": [],
           "description": "Observed underlying fixings for seasoned trades (date, level pairs).\n\nFor a mid-life autocallable, every observation date on or before the\nvaluation date must have a matching fixing here; pricing errors\notherwise. Past fixings are evaluated deterministically (autocall,\nmissed memory coupons, discrete knock-in monitoring) and only the\nremaining future observation dates are simulated.",
@@ -3131,7 +3120,6 @@
         "coupons",
         "final_barrier",
         "final_payoff_type",
-        "participation_rate",
         "cap_level",
         "notional",
         "day_count",
@@ -3144,7 +3132,7 @@
       "type": "object"
     },
     "AveragingMethod": {
-      "description": "Averaging method for Asian options.",
+      "description": "Asian averaging method.\n\nSerialized as `\"arithmetic\"` / `\"geometric\"`; this is the single definition\nshared by the Monte Carlo payoffs and the `averaging_method` wire field of\nthe Asian option instruments.",
       "oneOf": [
         {
           "const": "arithmetic",
@@ -3208,16 +3196,16 @@
       "type": "object"
     },
     "BarrierDirection": {
-      "description": "Barrier direction for touch options.",
+      "description": "Side of spot on which a barrier sits.",
       "oneOf": [
         {
           "const": "up",
-          "description": "Barrier is above current spot (spot must rise to touch).",
+          "description": "Barrier is above spot: hit when spot touches or rises above it.",
           "type": "string"
         },
         {
           "const": "down",
-          "description": "Barrier is below current spot (spot must fall to touch).",
+          "description": "Barrier is below spot: hit when spot touches or falls below it.",
           "type": "string"
         }
       ]
@@ -3231,8 +3219,9 @@
           "description": "Attributes for scenario selection and grouping"
         },
         "barrier": {
-          "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Barrier level (price that triggers knock-in/out)"
+          "description": "Barrier level: the absolute underlying price that triggers the\nknock-in/out, in the same quote units as `strike`.",
+          "format": "double",
+          "type": "number"
         },
         "barrier_type": {
           "$ref": "#/$defs/BarrierType",
@@ -3262,15 +3251,12 @@
           "description": "Option expiry date"
         },
         "expiry_fixing": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent."
+          "description": "Terminal underlying fixing observed at expiry, in the same quote units\nas `strike`.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -3318,7 +3304,7 @@
           "description": "Total contractual trade rebate in the payoff currency, independent of\nnotional. Knock-outs pay on a hit according to `rebate_timing`;\nknock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
-          "$ref": "#/$defs/RebateTiming",
+          "$ref": "#/$defs/PayoutTiming",
           "default": "at_hit",
           "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry (a no-hit is only known then),\nso this setting does not affect them. The analytical pricer values\nat-hit rebates via the discounted first-passage closed form. Monte\nCarlo applies at-hit when `rebate_timing == AtHit` via\n`with_rebate_at_hit`; the crate primitive defaults to at-expiry."
         },
@@ -4082,7 +4068,7 @@
     },
     "BondFuture": {
       "additionalProperties": false,
-      "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but\n  do not mutate the selected CTD. [`crate::instruments::Instrument::value`]\n  marks the caller-supplied CTD only; refresh it daily with\n  [`Self::determine_ctd_by_implied_repo`] when the basket can switch.\n- **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureSpecs, DeliverableBond,\n};\nuse finstack_quant_valuations::instruments::{Attributes, Position};\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .expiry(date!(2025 - 03 - 20))\n    .delivery_start(date!(2025 - 03 - 21))\n    .delivery_end(date!(2025 - 03 - 31))\n    .quoted_price(125.50)\n    .position(Position::Long)\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```",
+      "description": "Bond future instrument.\n\nA standardized contract with a basket of eligible deliverables. The short\nchooses the bond to deliver, commonly the cheapest-to-deliver (CTD) bond.\n\n# Contract Mechanics\n\n- **Conversion factors**: Supplied per deliverable, preferably from the exchange.\n- **CTD resolution**: Explicit `ctd_bond_id`, then embedded `ctd_bond.id`,\n  then the sole basket member. A larger basket requires an explicit or embedded CTD.\n- **CTD analysis**: The `determine_ctd*` helpers return ranked candidates but\n  do not mutate the selected CTD. [`crate::instruments::Instrument::value`]\n  marks the caller-supplied CTD only; refresh it daily with\n  [`Self::determine_ctd_by_implied_repo`] when the basket can switch.\n- **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::{\n    BondFuture, BondFutureSpecs, DeliverableBond,\n};\nuse finstack_quant_valuations::instruments::{Attributes, ListedFutureTerms, Position};\nuse time::macros::date;\n\n# fn main() -> finstack_quant_core::Result<()> {\n// 10 UST 10Y contracts ($100,000 face each, $1,000 per price point).\nlet future = BondFuture::builder()\n    .id(InstrumentId::new(\"TYH5\"))\n    .terms(ListedFutureTerms::new(\n        10.0,\n        1_000.0,\n        Currency::USD,\n        125.50,\n        date!(2025 - 03 - 20),\n        date!(2025 - 03 - 31),\n        Position::Long,\n    )?)\n    .delivery_start(date!(2025 - 03 - 21))\n    .contract_specs(BondFutureSpecs::ust_10y())\n    .deliverable_basket(vec![DeliverableBond {\n        bond_id: InstrumentId::new(\"US912828XG33\"),\n        conversion_factor: 0.8234,\n    }])\n    .discount_curve_id(CurveId::new(\"USD-TREASURY\"))\n    .attributes(Attributes::new())\n    .build()?;\nassert_eq!(future.deliverable_basket.len(), 1);\n# Ok(())\n# }\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -4090,7 +4076,7 @@
         },
         "contract_specs": {
           "$ref": "#/$defs/BondFutureSpecs",
-          "description": "Contract specifications (contract size, standard coupon, repo day count)"
+          "description": "Contract specifications (standard coupon, standard maturity, repo day count)"
         },
         "ctd_bond": {
           "anyOf": [
@@ -4122,10 +4108,6 @@
           "minItems": 1,
           "type": "array"
         },
-        "delivery_end": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Last delivery date"
-        },
         "delivery_start": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "First delivery date"
@@ -4133,10 +4115,6 @@
         "discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Financing/discount curve identifier.\n\nUsed to carry the CTD bond forward to the delivery date (the cost of\nfinancing the position) whenever no explicit [`repo_curve_id`](Self::repo_curve_id)\nis set. Must be provisionable as a discount curve in the market context."
-        },
-        "expiry": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Future expiry date (last trading day)"
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -4149,18 +4127,6 @@
         "metric_pricing_overrides": {
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
-        },
-        "notional": {
-          "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Notional exposure in currency units.\nFor multiple contracts, use notional = contract_specs.contract_size × num_contracts"
-        },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)"
-        },
-        "quoted_price": {
-          "$ref": "#/$defs/NonNegativeF64Wire",
-          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\nUsed only for mark-to-market: `base_value` returns model-minus-contract\nvalue for a long position. Basis, implied-repo and invoice helpers take\nthe current futures price as an explicit argument instead.\nCurrent-settlement variation margin is a separate cash-P&L workflow."
         },
         "repo_curve_id": {
           "anyOf": [
@@ -4176,16 +4142,16 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
+        },
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position and lifecycle terms. `terms.multiplier` is the\ncurrency value of one full price point (per-contract face / 100),\n`terms.entry_price` the trade price per 100 face, `terms.last_trading_date`\nthe last trading day and `terms.settlement_date` the last delivery date."
         }
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
+        "terms",
         "delivery_start",
-        "delivery_end",
-        "quoted_price",
-        "position",
         "contract_specs",
         "deliverable_basket",
         "discount_curve_id",
@@ -4195,13 +4161,8 @@
     },
     "BondFutureSpecs": {
       "additionalProperties": false,
-      "description": "Contract specifications for bond futures.\n\nDefines the standard parameters for a bond future contract: contract\nsize, the notional bond parameters used for conversion factor\ncalculations, and the implied-repo day count.\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`delivery_end` and the caller-supplied invoice settlement date, so the\nspec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.contract_size, 100_000.0);\nassert_eq!(specs.standard_coupon, 0.06);\n```",
+      "description": "Contract specifications for bond futures.\n\nDefines the notional bond parameters used for conversion factor\ncalculations and the implied-repo day count. Contract size lives on the\nfuture's `terms`: `terms.multiplier` is the currency value of one full\nprice point, i.e. one hundredth of the per-contract face (1,000 for a\n$100,000 UST 10Y contract).\n\nDelivery timing is carried by the future's explicit `delivery_start` /\n`terms.settlement_date` and the caller-supplied invoice settlement date, so\nthe spec holds no settlement lag or holiday calendar.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;\n\n// UST 10-year contract specs\nlet specs = BondFutureSpecs::default(); // UST 10Y defaults\nassert_eq!(specs.standard_coupon, 0.06);\n```",
       "properties": {
-        "contract_size": {
-          "description": "Face value of a single contract (e.g., $100,000 for UST)",
-          "format": "double",
-          "type": "number"
-        },
         "repo_day_count": {
           "$ref": "#/$defs/RepoDayCountWire",
           "default": "act_360",
@@ -4219,7 +4180,6 @@
         }
       },
       "required": [
-        "contract_size",
         "standard_coupon",
         "standard_maturity_years"
       ],
@@ -5303,6 +5263,23 @@
           "$ref": "#/$defs/PayReceive",
           "description": "Protection buyer/seller perspective"
         },
+        "upfront": {
+          "description": "Contractual upfront payment `(payment date, amount)` on the index\nnotional. A positive amount is paid by the protection buyer to the\nseller; a negative amount by the seller to the buyer. It is\ndiscounted from its payment date and dropped once that date is before\nthe valuation date.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+            },
+            {
+              "$ref": "#/$defs/d_4ba43030fede59fe5993"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "version": {
           "description": "Version number within series",
           "format": "uint16",
@@ -5361,20 +5338,21 @@
           "default": {},
           "description": "Additional attributes"
         },
-        "cash_settlement_date": {
+        "cds_maturity": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Underlying CDS maturity date"
+        },
+        "coupon_bp": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
-        },
-        "cds_maturity": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Underlying CDS maturity date"
+          "default": null,
+          "description": "Contractual running coupon `c` of the underlying CDS, in basis points\n(e.g., `100` for the standard CDX.NA.IG coupon, `500` for the\nstandard CDX.NA.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
         },
         "credit_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -5408,12 +5386,10 @@
           "description": "Unique instrument identifier"
         },
         "index_factor": {
-          "description": "Optional index factor scaling for the index underlying.\n\nThis is the **current** index factor `f` at valuation. See\n[`Self::strike_index_factor`] for the original factor `f0` attached\nto a clean-price strike.",
+          "default": 1,
+          "description": "Current index factor `f` at valuation: the surviving fraction of the\noriginal index notional, in `(0, 1]`. Defaults to `1.0` (no settled\ndefaults) and scales the notional only when `underlying_is_index`.\nSee [`Self::strike_index_factor`] for the original factor `f0`\nattached to a clean-price strike.",
           "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": "number"
         },
         "instrument_pricing_overrides": {
           "$ref": "#/$defs/d_c08279a20372931820e0",
@@ -5436,18 +5412,27 @@
           "$ref": "#/$defs/OptionType",
           "description": "Option type (Call = right to buy protection, Put = right to sell protection)"
         },
+        "premium_settlement_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Payment date of the option premium, returned by the settlement-date\naccessor. This does not change variance time or front-end protection;\nthe option value excludes the separately agreed trade premium."
+        },
         "protection_start_convention": {
           "$ref": "#/$defs/ProtectionStartConvention",
           "default": "spot",
           "description": "Convention used to select the synthetic underlying CDS accrual start\nwhen `underlying_effective_date` is not explicitly supplied."
         },
-        "realized_index_loss": {
-          "description": "Realized cumulative index loss from option inception to valuation\ndate, expressed per unit of original index notional.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this unset.",
+        "realized_loss": {
+          "default": 0,
+          "description": "Realized (settled) cumulative index loss from option inception to\nvaluation date, as a decimal fraction of the original index notional\nin `[0, 1]`. Defaults to `0.0`.\n\nBloomberg CDSO treats index options as no-knockout. Settled losses\nafter option inception are therefore deterministic payoff adjustments\nat exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name\noptions knock out instead and must leave this at `0.0`.",
           "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "type": "number"
         },
         "recovery_rate": {
           "description": "Recovery rate assumption",
@@ -5473,18 +5458,6 @@
             "number",
             "null"
           ]
-        },
-        "underlying_cds_coupon": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Contractual coupon `c` of the underlying CDS, expressed as a decimal\nrate (e.g., 0.01 for the 100 bp standard CDX coupon, 0.05 for the\n500 bp standard CDX.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated."
         },
         "underlying_convention": {
           "$ref": "#/$defs/CdsConvention",
@@ -5563,11 +5536,6 @@
       "additionalProperties": false,
       "description": "CDS Tranche instrument definition (boilerplate)",
       "properties": {
-        "accumulated_loss": {
-          "description": "Accumulated realized loss as fraction of original portfolio notional",
-          "format": "double",
-          "type": "number"
-        },
         "attach_pct": {
           "description": "Attachment point in percent (e.g., 0.0 for equity)",
           "format": "double",
@@ -5588,6 +5556,11 @@
             "string",
             "null"
           ]
+        },
+        "coupon_bp": {
+          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+          "format": "double",
+          "type": "number"
         },
         "credit_index_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -5646,10 +5619,15 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Notional amount of the tranche"
         },
-        "running_coupon_bp": {
-          "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
+        "realized_loss": {
+          "description": "Realized (settled) loss on the reference pool as a decimal fraction of\nthe original portfolio notional, in `[0, 1]`.",
           "format": "double",
           "type": "number"
+        },
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "default": "none",
+          "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -5666,10 +5644,10 @@
           "$ref": "#/$defs/TrancheSide",
           "description": "Tranche side (buy/sell protection)"
         },
-        "standard_imm_dates": {
-          "default": false,
-          "description": "Whether to enforce standard IMM dates (20th of Mar, Jun, Sep, Dec).\n\nDefaults to `false` so [`Self::new`] and the builder honor\n`ScheduleParams` frequency. Use [`Self::standard`] or set this to\n`true` for IMM rolls.",
-          "type": "boolean"
+        "stub": {
+          "$ref": "#/$defs/StubKind",
+          "default": "short_front",
+          "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`."
         },
         "upfront": {
           "default": null,
@@ -5698,13 +5676,13 @@
         "detach_pct",
         "notional",
         "maturity",
-        "running_coupon_bp",
+        "coupon_bp",
         "frequency",
         "day_count",
         "discount_curve_id",
         "credit_index_id",
         "side",
-        "accumulated_loss",
+        "realized_loss",
         "attributes"
       ],
       "type": "object"
@@ -6388,6 +6366,10 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes."
         },
+        "correlation": {
+          "$ref": "#/$defs/CorrelationWire",
+          "description": "Gaussian-copula correlation between the two CMS rates, a decimal in `[-1, 1]`."
+        },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
           "description": "Day count convention."
@@ -6447,11 +6429,6 @@
         "short_vol_surface_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Swaption volatility surface for short tenor."
-        },
-        "spread_correlation": {
-          "description": "Rank correlation between the two CMS rates.",
-          "format": "double",
-          "type": "number"
         },
         "strike": {
           "description": "Strike spread (in decimal, e.g., 0.005 = 50bp).",
@@ -6527,7 +6504,7 @@
         "short_vol_surface_id",
         "discount_curve_id",
         "forward_curve_id",
-        "spread_correlation",
+        "correlation",
         "day_count",
         "attributes"
       ],
@@ -6996,11 +6973,7 @@
           "$ref": "#/$defs/OptionType",
           "description": "Option type (call or put)."
         },
-        "quantity": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Contract quantity in commodity units."
-        },
-        "realized_fixings": {
+        "past_fixings": {
           "default": [],
           "description": "Already observed fixings for seasoned options (ex-date, price pairs).",
           "items": {
@@ -7018,6 +6991,10 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Contract quantity in commodity units."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -7105,7 +7082,7 @@
     },
     "CommodityForward": {
       "additionalProperties": false,
-      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_price if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
+      "description": "Commodity forward or futures contract.\n\nRepresents a commitment to buy or sell a commodity at a specified future\ndate at a predetermined price. Can be physically settled (delivery) or\ncash settled (price difference).\n\n# Pricing\n\nForward value is calculated as:\n```text\nNPV = sign(position) × (F - K) × Q × M × DF(T)\n```\nwhere:\n- sign = +1.0 for Long, -1.0 for Short\n- F = Forward price from price curve (or quoted_forward if provided)\n- K = Contract price (entry price). If None, treated as at-market (K = F)\n- Q = Quantity\n- M = Contract multiplier\n- DF(T) = Discount factor to settlement date\n\n# At-Market vs Off-Market\n\n- **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)\n- **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\n// At-market long forward (NPV ≈ 0)\nlet at_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n\n// Off-market forward with specific contract price\nlet off_market = CommodityForward::builder()\n    .id(InstrumentId::new(\"WTI-FWD-2025M03-TRADE\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"CL\", \"BBL\", Currency::USD))\n    .quantity(1000.0)\n    .multiplier(1.0)\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .position(Position::Long)\n    .contract_price_opt(Some(72.0)) // Entry price\n    .forward_curve_id(CurveId::new(\"WTI-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid forward\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -7191,7 +7168,7 @@
           "$ref": "#/$defs/PositiveF64Wire",
           "description": "Contract quantity in units."
         },
-        "quoted_price": {
+        "quoted_forward": {
           "description": "Optional quoted forward price (overrides curve lookup for F).\n\nThis is a market price override, not the contract entry price.\nUse `contract_price` for the trade entry price K.",
           "format": "double",
           "type": [
@@ -7226,7 +7203,7 @@
             "null"
           ]
         },
-        "settlement_lag_days": {
+        "settlement_days": {
           "description": "Settlement lag in business days (T+N).\n\nDefaults to 2 for most commodity markets (T+2). If `convention` is set,\nuses the convention's default unless explicitly overridden here.\n\n# Market Standards\n\n| Market | Settlement |\n|--------|------------|\n| Energy (WTI, Brent, NG) | T+2 |\n| Precious metals | T+2 |\n| Base metals (LME) | T+2 |\n| Power | T+1 |",
           "format": "uint32",
           "minimum": 0,
@@ -7273,6 +7250,10 @@
           "default": {},
           "description": "Attributes for selection and reporting."
         },
+        "fixing": {
+          "$ref": "#/$defs/CommodityFutureFixing",
+          "description": "Final-settlement price fixing rule (single observation or average)."
+        },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Unique instrument identifier."
@@ -7293,10 +7274,6 @@
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement": {
-          "$ref": "#/$defs/CommodityFutureSettlement",
-          "description": "Official final-settlement observation rule."
-        },
         "terms": {
           "$ref": "#/$defs/ListedFutureTerms",
           "description": "Standard listed position and lifecycle terms."
@@ -7311,48 +7288,12 @@
         "underlying",
         "terms",
         "price_curve_id",
-        "settlement"
+        "fixing"
       ],
       "type": "object"
     },
-    "CommodityFutureOption": {
-      "additionalProperties": false,
-      "description": "Exchange-listed option on an arbitrary commodity futures contract.",
-      "properties": {
-        "attributes": {
-          "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
-          "default": {},
-          "description": "Attributes for selection and reporting."
-        },
-        "id": {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Unique instrument identifier."
-        },
-        "instrument_pricing_overrides": {
-          "$ref": "#/$defs/d_c08279a20372931820e0",
-          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
-        },
-        "metric_pricing_overrides": {
-          "$ref": "#/$defs/d_00292b2cd9779815232f",
-          "description": "Metric-time pricing configuration."
-        },
-        "scenario_pricing_overrides": {
-          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
-          "description": "Scenario-only pricing adjustments."
-        },
-        "terms": {
-          "$ref": "#/$defs/FutureOptionTerms",
-          "description": "Caller-supplied option-on-future pricing and settlement terms."
-        }
-      },
-      "required": [
-        "id",
-        "terms"
-      ],
-      "type": "object"
-    },
-    "CommodityFutureSettlement": {
-      "description": "Exchange final-settlement rule for a linear commodity future.",
+    "CommodityFutureFixing": {
+      "description": "Final-settlement price fixing rule for a linear commodity future: which\nobservations set the official settlement price and how they are averaged.\nThe cash/physical delivery method lives in `terms.settlement`.",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -7392,7 +7333,7 @@
               },
               "type": "array"
             },
-            "realized_fixings": {
+            "past_fixings": {
               "default": [],
               "description": "Official prices already fixed, keyed by observation date.",
               "items": {
@@ -7423,6 +7364,42 @@
           "type": "object"
         }
       ]
+    },
+    "CommodityFutureOption": {
+      "additionalProperties": false,
+      "description": "Exchange-listed option on an arbitrary commodity futures contract.",
+      "properties": {
+        "attributes": {
+          "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "default": {},
+          "description": "Attributes for selection and reporting."
+        },
+        "id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Unique instrument identifier."
+        },
+        "instrument_pricing_overrides": {
+          "$ref": "#/$defs/d_c08279a20372931820e0",
+          "description": "Instrument-owned pricing inputs: the flat option volatility in\n`market_quotes.implied_volatility` (required while live) and optional\ntree-step overrides."
+        },
+        "metric_pricing_overrides": {
+          "$ref": "#/$defs/d_00292b2cd9779815232f",
+          "description": "Metric-time pricing configuration."
+        },
+        "scenario_pricing_overrides": {
+          "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "description": "Scenario-only pricing adjustments."
+        },
+        "terms": {
+          "$ref": "#/$defs/FutureOptionTerms",
+          "description": "Caller-supplied option-on-future pricing and settlement terms."
+        }
+      },
+      "required": [
+        "id",
+        "terms"
+      ],
+      "type": "object"
     },
     "CommodityOption": {
       "additionalProperties": false,
@@ -7740,11 +7717,7 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
-        "quantity": {
-          "$ref": "#/$defs/PositiveF64Wire",
-          "description": "Notional quantity per period."
-        },
-        "realized_fixings": {
+        "past_fixings": {
           "default": [],
           "description": "Realized floating-index fixings as `(date, price)` pairs.\n\nFloating-leg observations with date strictly before the valuation date\nread from this store; a missing past fixing is an error — no silent\nsubstitution of today's spot . Observations on or\nafter the valuation date project from the price curve.",
           "items": {
@@ -7762,6 +7735,10 @@
             "type": "array"
           },
           "type": "array"
+        },
+        "quantity": {
+          "$ref": "#/$defs/PositiveF64Wire",
+          "description": "Notional quantity per period."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -8394,7 +8371,7 @@
               "type": "null"
             }
           ],
-          "description": "Credit curve identifier for risky discounting (bond floor).\nIf not provided, falls back to discount_curve_id (implies no credit spread).\n\n**Convention**: this curve must represent ZERO-RECOVERY (pure hazard)\nrisky discounting, i.e. `risky_df = rf_df * survival_probability`. The\npricer converts it to recovery-adjusted discounting via the blend\n`risky * (1 - R) + rf * R` using [`Self::recovery_rate`]. Supplying a\nmarket recovery-adjusted spread curve here double-counts `(1 - R)` and\noverstates the credit discount."
+          "description": "Issuer hazard curve identifier (a `HazardCurve`, as on every credit\ninstrument). When `None`, the cash component is discounted at the\nrisk-free `discount_curve_id` (no credit spread).\n\nThe pricer derives the zero-recovery risky discount factor\n`risky_df = rf_df × S(t)` from the curve's survival probabilities and\nblends it with risk-free discounting as `risky × (1 − R) + rf × R`\nusing [`Self::recovery_rate`]. The hazard curve's own recovery rate is\nused only to convert spread bumps into hazard shifts for CS01."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -9737,25 +9714,6 @@
       "title": "Decimal",
       "type": "string"
     },
-    "d_1a6c2ccee66d90a3a469": {
-      "additionalProperties": false,
-      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
-      "properties": {
-        "amount": {
-          "$ref": "#/$defs/d_703dc73c441b9ae46f2b",
-          "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not."
-        },
-        "currency": {
-          "$ref": "#/$defs/d_dda2192a4245995f4b0a",
-          "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion."
-        }
-      },
-      "required": [
-        "amount",
-        "currency"
-      ],
-      "type": "object"
-    },
     "d_1b2ccb88c9229e7463e8": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "ISO 8601 calendar date string.",
@@ -10871,11 +10829,6 @@
       ],
       "title": "RecoveryModelSpec",
       "type": "object"
-    },
-    "d_703dc73c441b9ae46f2b": {
-      "description": "Exact decimal encoded only as a JSON string.",
-      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
-      "type": "string"
     },
     "d_73686c0456fd11c88d3e": {
       "description": "Prepayment curve shape.",
@@ -12304,17 +12257,6 @@
             "number",
             "null"
           ]
-        },
-        "upfront_payment": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_1a6c2ccee66d90a3a469"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "PV adjustment at valuation date (primarily credit-instrument upfront quotes).\n\nThis is an **already-discounted** adjustment to the net present value.\nIt is added directly to the NPV without further discounting.\n\n# Sign Convention\n\nFor CDS, CDS index, and CDS tranche instruments, a positive amount is\npaid by the protection buyer: it decreases buyer NPV and increases\nseller NPV. Other instrument families may treat the amount as an\nexplicitly signed PV adjustment and document that convention locally.\n\n# Relationship to CDS Dated Upfront\n\nFor CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:\n- **`upfront_payment`**: PV adjustment at `as_of`, added directly\n- **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date\n\nBoth can be set simultaneously without double-counting."
         }
       },
       "type": "object"
@@ -14248,806 +14190,6 @@
         }
       ]
     },
-    "d_dda2192a4245995f4b0a": {
-      "description": "ISO 4217 currency enumeration",
-      "oneOf": [
-        {
-          "const": "AED",
-          "description": "UAE Dirham (784)",
-          "type": "string"
-        },
-        {
-          "const": "AFN",
-          "description": "Afghani (971)",
-          "type": "string"
-        },
-        {
-          "const": "ALL",
-          "description": "Lek (8)",
-          "type": "string"
-        },
-        {
-          "const": "AMD",
-          "description": "Armenian Dram (51)",
-          "type": "string"
-        },
-        {
-          "const": "ANG",
-          "description": "Netherlands Antillean Guilder (532)",
-          "type": "string"
-        },
-        {
-          "const": "AOA",
-          "description": "Kwanza (973)",
-          "type": "string"
-        },
-        {
-          "const": "ARS",
-          "description": "Argentine Peso (32)",
-          "type": "string"
-        },
-        {
-          "const": "AUD",
-          "description": "Australian Dollar (36)",
-          "type": "string"
-        },
-        {
-          "const": "AWG",
-          "description": "Aruban Florin (533)",
-          "type": "string"
-        },
-        {
-          "const": "AZN",
-          "description": "Azerbaijan Manat (944)",
-          "type": "string"
-        },
-        {
-          "const": "BAM",
-          "description": "Convertible Mark (977)",
-          "type": "string"
-        },
-        {
-          "const": "BBD",
-          "description": "Barbados Dollar (52)",
-          "type": "string"
-        },
-        {
-          "const": "BDT",
-          "description": "Taka (50)",
-          "type": "string"
-        },
-        {
-          "const": "BGN",
-          "description": "Bulgarian Lev (975)",
-          "type": "string"
-        },
-        {
-          "const": "BHD",
-          "description": "Bahraini Dinar (48)",
-          "type": "string"
-        },
-        {
-          "const": "BIF",
-          "description": "Burundi Franc (108)",
-          "type": "string"
-        },
-        {
-          "const": "BMD",
-          "description": "Bermudian Dollar (60)",
-          "type": "string"
-        },
-        {
-          "const": "BND",
-          "description": "Brunei Dollar (96)",
-          "type": "string"
-        },
-        {
-          "const": "BOB",
-          "description": "Boliviano (68)",
-          "type": "string"
-        },
-        {
-          "const": "BRL",
-          "description": "Brazilian Real (986)",
-          "type": "string"
-        },
-        {
-          "const": "BSD",
-          "description": "Bahamian Dollar (44)",
-          "type": "string"
-        },
-        {
-          "const": "BTN",
-          "description": "Ngultrum (64)",
-          "type": "string"
-        },
-        {
-          "const": "BWP",
-          "description": "Pula (72)",
-          "type": "string"
-        },
-        {
-          "const": "BYN",
-          "description": "Belarusian Ruble (933)",
-          "type": "string"
-        },
-        {
-          "const": "BZD",
-          "description": "Belize Dollar (84)",
-          "type": "string"
-        },
-        {
-          "const": "CAD",
-          "description": "Canadian Dollar (124)",
-          "type": "string"
-        },
-        {
-          "const": "CDF",
-          "description": "Congolese Franc (976)",
-          "type": "string"
-        },
-        {
-          "const": "CHF",
-          "description": "Swiss Franc (756)",
-          "type": "string"
-        },
-        {
-          "const": "CLF",
-          "description": "Unidad de Fomento (990)",
-          "type": "string"
-        },
-        {
-          "const": "CLP",
-          "description": "Chilean Peso (152)",
-          "type": "string"
-        },
-        {
-          "const": "CNY",
-          "description": "Yuan Renminbi (156)",
-          "type": "string"
-        },
-        {
-          "const": "COP",
-          "description": "Colombian Peso (170)",
-          "type": "string"
-        },
-        {
-          "const": "CRC",
-          "description": "Costa Rican Colon (188)",
-          "type": "string"
-        },
-        {
-          "const": "CUC",
-          "description": "Peso Convertible (931)",
-          "type": "string"
-        },
-        {
-          "const": "CUP",
-          "description": "Cuban Peso (192)",
-          "type": "string"
-        },
-        {
-          "const": "CVE",
-          "description": "Cabo Verde Escudo (132)",
-          "type": "string"
-        },
-        {
-          "const": "CZK",
-          "description": "Czech Koruna (203)",
-          "type": "string"
-        },
-        {
-          "const": "DJF",
-          "description": "Djibouti Franc (262)",
-          "type": "string"
-        },
-        {
-          "const": "DKK",
-          "description": "Danish Krone (208)",
-          "type": "string"
-        },
-        {
-          "const": "DOP",
-          "description": "Dominican Peso (214)",
-          "type": "string"
-        },
-        {
-          "const": "DZD",
-          "description": "Algerian Dinar (12)",
-          "type": "string"
-        },
-        {
-          "const": "EGP",
-          "description": "Egyptian Pound (818)",
-          "type": "string"
-        },
-        {
-          "const": "ERN",
-          "description": "Nakfa (232)",
-          "type": "string"
-        },
-        {
-          "const": "ETB",
-          "description": "Ethiopian Birr (230)",
-          "type": "string"
-        },
-        {
-          "const": "EUR",
-          "description": "Euro (978)",
-          "type": "string"
-        },
-        {
-          "const": "FJD",
-          "description": "Fiji Dollar (242)",
-          "type": "string"
-        },
-        {
-          "const": "FKP",
-          "description": "Falkland Islands Pound (238)",
-          "type": "string"
-        },
-        {
-          "const": "GBP",
-          "description": "Pound Sterling (826)",
-          "type": "string"
-        },
-        {
-          "const": "GEL",
-          "description": "Lari (981)",
-          "type": "string"
-        },
-        {
-          "const": "GHS",
-          "description": "Ghana Cedi (936)",
-          "type": "string"
-        },
-        {
-          "const": "GIP",
-          "description": "Gibraltar Pound (292)",
-          "type": "string"
-        },
-        {
-          "const": "GMD",
-          "description": "Dalasi (270)",
-          "type": "string"
-        },
-        {
-          "const": "GNF",
-          "description": "Guinean Franc (324)",
-          "type": "string"
-        },
-        {
-          "const": "GTQ",
-          "description": "Quetzal (320)",
-          "type": "string"
-        },
-        {
-          "const": "GYD",
-          "description": "Guyana Dollar (328)",
-          "type": "string"
-        },
-        {
-          "const": "HKD",
-          "description": "Hong Kong Dollar (344)",
-          "type": "string"
-        },
-        {
-          "const": "HNL",
-          "description": "Lempira (340)",
-          "type": "string"
-        },
-        {
-          "const": "HRK",
-          "description": "Kuna (191)",
-          "type": "string"
-        },
-        {
-          "const": "HTG",
-          "description": "Gourde (332)",
-          "type": "string"
-        },
-        {
-          "const": "HUF",
-          "description": "Forint (348)",
-          "type": "string"
-        },
-        {
-          "const": "IDR",
-          "description": "Rupiah (360)",
-          "type": "string"
-        },
-        {
-          "const": "ILS",
-          "description": "New Israeli Sheqel (376)",
-          "type": "string"
-        },
-        {
-          "const": "INR",
-          "description": "Indian Rupee (356)",
-          "type": "string"
-        },
-        {
-          "const": "IQD",
-          "description": "Iraqi Dinar (368)",
-          "type": "string"
-        },
-        {
-          "const": "IRR",
-          "description": "Iranian Rial (364)",
-          "type": "string"
-        },
-        {
-          "const": "ISK",
-          "description": "Iceland Krona (352)",
-          "type": "string"
-        },
-        {
-          "const": "JMD",
-          "description": "Jamaican Dollar (388)",
-          "type": "string"
-        },
-        {
-          "const": "JOD",
-          "description": "Jordanian Dinar (400)",
-          "type": "string"
-        },
-        {
-          "const": "JPY",
-          "description": "Yen (392)",
-          "type": "string"
-        },
-        {
-          "const": "KES",
-          "description": "Kenyan Shilling (404)",
-          "type": "string"
-        },
-        {
-          "const": "KGS",
-          "description": "Som (417)",
-          "type": "string"
-        },
-        {
-          "const": "KHR",
-          "description": "Riel (116)",
-          "type": "string"
-        },
-        {
-          "const": "KMF",
-          "description": "Comorian Franc (174)",
-          "type": "string"
-        },
-        {
-          "const": "KPW",
-          "description": "North Korean Won (408)",
-          "type": "string"
-        },
-        {
-          "const": "KRW",
-          "description": "Won (410)",
-          "type": "string"
-        },
-        {
-          "const": "KWD",
-          "description": "Kuwaiti Dinar (414)",
-          "type": "string"
-        },
-        {
-          "const": "KYD",
-          "description": "Cayman Islands Dollar (136)",
-          "type": "string"
-        },
-        {
-          "const": "KZT",
-          "description": "Tenge (398)",
-          "type": "string"
-        },
-        {
-          "const": "LAK",
-          "description": "Lao Kip (418)",
-          "type": "string"
-        },
-        {
-          "const": "LBP",
-          "description": "Lebanese Pound (422)",
-          "type": "string"
-        },
-        {
-          "const": "LKR",
-          "description": "Sri Lanka Rupee (144)",
-          "type": "string"
-        },
-        {
-          "const": "LRD",
-          "description": "Liberian Dollar (430)",
-          "type": "string"
-        },
-        {
-          "const": "LSL",
-          "description": "Loti (426)",
-          "type": "string"
-        },
-        {
-          "const": "LYD",
-          "description": "Libyan Dinar (434)",
-          "type": "string"
-        },
-        {
-          "const": "MAD",
-          "description": "Moroccan Dirham (504)",
-          "type": "string"
-        },
-        {
-          "const": "MDL",
-          "description": "Moldovan Leu (498)",
-          "type": "string"
-        },
-        {
-          "const": "MGA",
-          "description": "Malagasy Ariary (969)",
-          "type": "string"
-        },
-        {
-          "const": "MKD",
-          "description": "Denar (807)",
-          "type": "string"
-        },
-        {
-          "const": "MMK",
-          "description": "Kyat (104)",
-          "type": "string"
-        },
-        {
-          "const": "MNT",
-          "description": "Tugrik (496)",
-          "type": "string"
-        },
-        {
-          "const": "MOP",
-          "description": "Pataca (446)",
-          "type": "string"
-        },
-        {
-          "const": "MRU",
-          "description": "Ouguiya (929)",
-          "type": "string"
-        },
-        {
-          "const": "MUR",
-          "description": "Mauritius Rupee (480)",
-          "type": "string"
-        },
-        {
-          "const": "MVR",
-          "description": "Rufiyaa (462)",
-          "type": "string"
-        },
-        {
-          "const": "MWK",
-          "description": "Malawi Kwacha (454)",
-          "type": "string"
-        },
-        {
-          "const": "MXN",
-          "description": "Mexican Peso (484)",
-          "type": "string"
-        },
-        {
-          "const": "MYR",
-          "description": "Malaysian Ringgit (458)",
-          "type": "string"
-        },
-        {
-          "const": "MZN",
-          "description": "Mozambique Metical (943)",
-          "type": "string"
-        },
-        {
-          "const": "NAD",
-          "description": "Namibia Dollar (516)",
-          "type": "string"
-        },
-        {
-          "const": "NGN",
-          "description": "Naira (566)",
-          "type": "string"
-        },
-        {
-          "const": "NIO",
-          "description": "Cordoba Oro (558)",
-          "type": "string"
-        },
-        {
-          "const": "NOK",
-          "description": "Norwegian Krone (578)",
-          "type": "string"
-        },
-        {
-          "const": "NPR",
-          "description": "Nepalese Rupee (524)",
-          "type": "string"
-        },
-        {
-          "const": "NZD",
-          "description": "New Zealand Dollar (554)",
-          "type": "string"
-        },
-        {
-          "const": "OMR",
-          "description": "Rial Omani (512)",
-          "type": "string"
-        },
-        {
-          "const": "PAB",
-          "description": "Balboa (590)",
-          "type": "string"
-        },
-        {
-          "const": "PEN",
-          "description": "Sol (604)",
-          "type": "string"
-        },
-        {
-          "const": "PGK",
-          "description": "Kina (598)",
-          "type": "string"
-        },
-        {
-          "const": "PHP",
-          "description": "Philippine Peso (608)",
-          "type": "string"
-        },
-        {
-          "const": "PKR",
-          "description": "Pakistan Rupee (586)",
-          "type": "string"
-        },
-        {
-          "const": "PLN",
-          "description": "Zloty (985)",
-          "type": "string"
-        },
-        {
-          "const": "PYG",
-          "description": "Guarani (600)",
-          "type": "string"
-        },
-        {
-          "const": "QAR",
-          "description": "Qatari Rial (634)",
-          "type": "string"
-        },
-        {
-          "const": "RON",
-          "description": "Romanian Leu (946)",
-          "type": "string"
-        },
-        {
-          "const": "RSD",
-          "description": "Serbian Dinar (941)",
-          "type": "string"
-        },
-        {
-          "const": "RUB",
-          "description": "Russian Ruble (643)",
-          "type": "string"
-        },
-        {
-          "const": "RWF",
-          "description": "Rwanda Franc (646)",
-          "type": "string"
-        },
-        {
-          "const": "SAR",
-          "description": "Saudi Riyal (682)",
-          "type": "string"
-        },
-        {
-          "const": "SBD",
-          "description": "Solomon Islands Dollar (90)",
-          "type": "string"
-        },
-        {
-          "const": "SCR",
-          "description": "Seychelles Rupee (690)",
-          "type": "string"
-        },
-        {
-          "const": "SDG",
-          "description": "Sudanese Pound (938)",
-          "type": "string"
-        },
-        {
-          "const": "SEK",
-          "description": "Swedish Krona (752)",
-          "type": "string"
-        },
-        {
-          "const": "SGD",
-          "description": "Singapore Dollar (702)",
-          "type": "string"
-        },
-        {
-          "const": "SHP",
-          "description": "Saint Helena Pound (654)",
-          "type": "string"
-        },
-        {
-          "const": "SLE",
-          "description": "Leone (925)",
-          "type": "string"
-        },
-        {
-          "const": "SLL",
-          "description": "Leone (694)",
-          "type": "string"
-        },
-        {
-          "const": "SOS",
-          "description": "Somali Shilling (706)",
-          "type": "string"
-        },
-        {
-          "const": "SRD",
-          "description": "Surinam Dollar (968)",
-          "type": "string"
-        },
-        {
-          "const": "SSP",
-          "description": "South Sudanese Pound (728)",
-          "type": "string"
-        },
-        {
-          "const": "STN",
-          "description": "Dobra (930)",
-          "type": "string"
-        },
-        {
-          "const": "SYP",
-          "description": "Syrian Pound (760)",
-          "type": "string"
-        },
-        {
-          "const": "SZL",
-          "description": "Lilangeni (748)",
-          "type": "string"
-        },
-        {
-          "const": "THB",
-          "description": "Baht (764)",
-          "type": "string"
-        },
-        {
-          "const": "TJS",
-          "description": "Somoni (972)",
-          "type": "string"
-        },
-        {
-          "const": "TMT",
-          "description": "Turkmenistan New Manat (934)",
-          "type": "string"
-        },
-        {
-          "const": "TND",
-          "description": "Tunisian Dinar (788)",
-          "type": "string"
-        },
-        {
-          "const": "TOP",
-          "description": "Pa'anga (776)",
-          "type": "string"
-        },
-        {
-          "const": "TRY",
-          "description": "Turkish Lira (949)",
-          "type": "string"
-        },
-        {
-          "const": "TTD",
-          "description": "Trinidad and Tobago Dollar (780)",
-          "type": "string"
-        },
-        {
-          "const": "TWD",
-          "description": "New Taiwan Dollar (901)",
-          "type": "string"
-        },
-        {
-          "const": "TZS",
-          "description": "Tanzanian Shilling (834)",
-          "type": "string"
-        },
-        {
-          "const": "UAH",
-          "description": "Hryvnia (980)",
-          "type": "string"
-        },
-        {
-          "const": "UGX",
-          "description": "Uganda Shilling (800)",
-          "type": "string"
-        },
-        {
-          "const": "USD",
-          "description": "US Dollar (840)",
-          "type": "string"
-        },
-        {
-          "const": "UYU",
-          "description": "Peso Uruguayo (858)",
-          "type": "string"
-        },
-        {
-          "const": "UZS",
-          "description": "Uzbekistan Sum (860)",
-          "type": "string"
-        },
-        {
-          "const": "VED",
-          "description": "Bolívar Soberano (926)",
-          "type": "string"
-        },
-        {
-          "const": "VES",
-          "description": "Bolívar Soberano (928)",
-          "type": "string"
-        },
-        {
-          "const": "VND",
-          "description": "Dong (704)",
-          "type": "string"
-        },
-        {
-          "const": "VUV",
-          "description": "Vatu (548)",
-          "type": "string"
-        },
-        {
-          "const": "WST",
-          "description": "Tala (882)",
-          "type": "string"
-        },
-        {
-          "const": "XAF",
-          "description": "CFA Franc BEAC (950)",
-          "type": "string"
-        },
-        {
-          "const": "XCD",
-          "description": "East Caribbean Dollar (951)",
-          "type": "string"
-        },
-        {
-          "const": "XOF",
-          "description": "CFA Franc BCEAO (952)",
-          "type": "string"
-        },
-        {
-          "const": "XPF",
-          "description": "CFP Franc (953)",
-          "type": "string"
-        },
-        {
-          "const": "YER",
-          "description": "Yemeni Rial (886)",
-          "type": "string"
-        },
-        {
-          "const": "ZAR",
-          "description": "Rand (710)",
-          "type": "string"
-        },
-        {
-          "const": "ZMW",
-          "description": "Zambian Kwacha (967)",
-          "type": "string"
-        },
-        {
-          "const": "ZWL",
-          "description": "Zimbabwe Dollar (932)",
-          "type": "string"
-        }
-      ]
-    },
     "d_e42076b4d2ef6e393ce5": {
       "description": "Which structural parameter to calibrate in the MC engine.",
       "oneOf": [
@@ -15673,7 +14815,7 @@
     },
     "Deposit": {
       "additionalProperties": false,
-      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `spot_lag_days`: Number of business days from trade date to spot date (default: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + spot_lag` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
+      "description": "Simple deposit instrument with optional quoted rate.\n\nRepresents a single-period deposit where principal is exchanged\nat start and principal plus interest at maturity.\n\n# Market Convention Fields\n\nThe instrument supports optional settlement convention fields for proper\nbusiness-day adjusted cashflow generation:\n\n- `settlement_days`: T+N business days from trade date to spot (effective start) date (market convention: 2 for USD/EUR/JPY, 0 for GBP)\n- `business_day_convention`: Business day convention for date adjustment (default: ModifiedFollowing)\n- `calendar_id`: Holiday calendar identifier for business day logic (e.g., \"nyse\", \"target\")\n\nWhen these fields are set, the effective start date is computed as\n`start + settlement_days` adjusted by the business day convention. In this case,\n`start` is treated as the trade date; otherwise it is the accrual start date.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -15739,9 +14881,10 @@
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
         },
-        "spot_lag_days": {
-          "description": "Optional spot lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
-          "format": "int32",
+        "settlement_days": {
+          "description": "Optional T+N settlement (spot) lag in business days from trade date to effective start.\n\nMarket convention: T+2 for USD/EUR/JPY, T+0 for GBP.\nIf not set, the raw `start` date is used without adjustment.",
+          "format": "uint32",
+          "minimum": 0,
           "type": [
             "integer",
             "null"
@@ -17486,7 +16629,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Capital protection: max(floor, participation * min(S_T/S_0, cap))",
+          "description": "Capital protection: max(floor, participation_rate * min(S_T/S_0, cap_level))",
           "properties": {
             "capital_protection": {
               "additionalProperties": false,
@@ -17495,10 +16638,16 @@
                   "description": "Minimum return floor (e.g., 1.0 for 100% protection)",
                   "format": "double",
                   "type": "number"
+                },
+                "participation_rate": {
+                  "description": "Decimal multiplier on the capped performance ratio (1.0 = 100%).",
+                  "format": "double",
+                  "type": "number"
                 }
               },
               "required": [
-                "floor"
+                "floor",
+                "participation_rate"
               ],
               "type": "object"
             }
@@ -17510,19 +16659,19 @@
         },
         {
           "additionalProperties": false,
-          "description": "Participation: 1 + participation_rate * max(0, S_T/S_0 - 1)",
+          "description": "Participation: 1 + participation_rate * max(0, min(S_T/S_0, cap_level) - 1)",
           "properties": {
             "participation": {
               "additionalProperties": false,
               "properties": {
-                "rate": {
-                  "description": "Participation rate in upside (e.g., 1.0 for 100% participation)",
+                "participation_rate": {
+                  "description": "Decimal multiplier on the capped upside (1.0 = 100% participation).",
                   "format": "double",
                   "type": "number"
                 }
               },
               "required": [
-                "rate"
+                "participation_rate"
               ],
               "type": "object"
             }
@@ -18645,7 +17794,7 @@
           "type": "integer"
         },
         "face_value": {
-          "description": "Face value of contract (e.g., $1,000,000 for Eurodollar/SOFR futures)",
+          "description": "Face value of one contract in currency units (e.g., $1,000,000 for\nEurodollar/SOFR futures)",
           "format": "double",
           "type": "number"
         },
@@ -18653,17 +17802,11 @@
           "description": "Tick size in price points (e.g., 0.0025 = 0.25bp for SOFR futures)",
           "format": "double",
           "type": "number"
-        },
-        "tick_value": {
-          "description": "Tick value in currency units (e.g., $6.25 for 3M SOFR)",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
         "face_value",
         "tick_size",
-        "tick_value",
         "delivery_months"
       ],
       "type": "object"
@@ -18988,15 +18131,18 @@
           "description": "Quote currency (the pricing/settlement currency, formerly domestic_currency)"
         },
         "rebate": {
-          "description": "Optional rebate amount (paid if the barrier condition is met, dimensionless;\nsee `rebate_timing` for when a knock-out rebate pays)",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_4ba43030fede59fe5993"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total contractual trade rebate, paid in the quote (settlement)\ncurrency and independent of notional. Knock-outs pay on a hit according\nto `rebate_timing`; knock-ins pay at expiry only if no hit occurred."
         },
         "rebate_timing": {
-          "$ref": "#/$defs/RebateTiming",
+          "$ref": "#/$defs/PayoutTiming",
           "default": "at_hit",
           "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry, so this setting does not affect\nthem. The analytical pricer values at-hit rebates via the discounted\nfirst-passage closed form. Monte Carlo applies at-hit when\n`rebate_timing == AtHit` via `with_rebate_at_hit`; the crate primitive\ndefaults to at-expiry."
         },
@@ -19325,10 +18471,6 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
-        "quote_currency": {
-          "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "description": "Quote and variation-margin currency."
-        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
@@ -19343,13 +18485,12 @@
         },
         "terms": {
           "$ref": "#/$defs/ListedFutureTerms",
-          "description": "Standard listed position and lifecycle terms."
+          "description": "Standard listed position and lifecycle terms. `terms.currency` is the\nquote currency of the pair and the variation-margin currency."
         }
       },
       "required": [
         "id",
         "base_currency",
-        "quote_currency",
         "terms",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id"
@@ -19481,7 +18622,7 @@
     },
     "FxSpot": {
       "additionalProperties": false,
-      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_lag_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_lag_days` overrides that default.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
+      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD and USD↔TRY and T+2 otherwise (including EUR/USD). An explicit\n`settlement_days` overrides that default; `settlement_date` overrides both.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -19551,7 +18692,7 @@
           "default": {},
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement": {
+        "settlement_date": {
           "anyOf": [
             {
               "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
@@ -19561,11 +18702,12 @@
             }
           ],
           "default": null,
-          "description": "Optional settlement date (T+2 typically for spot)"
+          "description": "Optional explicit settlement (value) date"
         },
-        "settlement_lag_days": {
-          "description": "Optional settlement lag in business days when `settlement` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
-          "format": "int32",
+        "settlement_days": {
+          "description": "Optional T+N settlement lag in business days when `settlement_date` is not provided.\n\n`None` uses the pair-aware default: T+1 for USD↔CAD and USD↔TRY, T+2 otherwise.",
+          "format": "uint32",
+          "minimum": 0,
           "type": [
             "integer",
             "null"
@@ -19702,14 +18844,14 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "description": "Attributes for scenario selection and grouping"
         },
-        "barrier_direction": {
-          "$ref": "#/$defs/BarrierDirection",
-          "description": "Barrier direction (up or down)"
-        },
-        "barrier_level": {
+        "barrier": {
           "description": "Barrier level (exchange rate that triggers the touch)",
           "format": "double",
           "type": "number"
+        },
+        "barrier_direction": {
+          "$ref": "#/$defs/BarrierDirection",
+          "description": "Barrier direction (up or down)"
         },
         "base_currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -19752,9 +18894,9 @@
               "type": "null"
             }
           ],
-          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_touch`."
+          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_barrier_breached`."
         },
-        "observed_touch": {
+        "observed_barrier_breached": {
           "description": "Observed barrier event state for expired valuations.\n\n`Some(true)` means the barrier was touched during the option life,\n`Some(false)` means it was observed not to have touched, and `None`\nmeans the historical touch state is unavailable.\n\nThis is only required once the option has expired. Without it, a\ntouched-and-reverted path cannot be distinguished from an untouched path\nusing the terminal spot alone.",
           "type": [
             "boolean",
@@ -19790,7 +18932,7 @@
         "id",
         "base_currency",
         "quote_currency",
-        "barrier_level",
+        "barrier",
         "touch_type",
         "barrier_direction",
         "payout_amount",
@@ -22150,7 +21292,7 @@
     },
     "InterestRateFuture": {
       "additionalProperties": false,
-      "description": "Interest Rate Future instrument.",
+      "description": "Interest Rate Future instrument.\n\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]. `terms.multiplier` is the settlement-currency\nvalue of one full price point per contract (`tick_value / tick_size`, e.g.\n$2,500 for CME SR3), `terms.last_trading_date` is the last trading day and\n`terms.settlement_date` is the date after which the position carries no\nvalue (the last trading day for term-rate contracts, the reference-period\nend for in-arrears overnight contracts).",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -22168,10 +21310,6 @@
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve identifier"
         },
-        "expiry": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Future expiry/delivery date"
-        },
         "fixing_calendar_id": {
           "description": "Optional overnight fixing calendar identifier.\n\nRequired only when the contract currency has no registered standard\novernight calendar. Otherwise the currency standard is used.",
           "type": [
@@ -22188,7 +21326,7 @@
               "type": "null"
             }
           ],
-          "description": "Underlying rate fixing date.\n\nDefaults to `expiry` when omitted."
+          "description": "Underlying rate fixing date.\n\nDefaults to `terms.last_trading_date` when omitted."
         },
         "fixing_index_id": {
           "anyOf": [
@@ -22217,10 +21355,6 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Exposure size expressed in currency units. PV is scaled by\n`notional.amount() / contract_specs.face_value` to support\nmultiples of the standard contract."
-        },
         "period_end": {
           "anyOf": [
             {
@@ -22243,15 +21377,6 @@
           ],
           "description": "Rate period start date.\n\nDefaults to 2 calendar days after fixing date when omitted."
         },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)"
-        },
-        "quoted_price": {
-          "description": "Quoted future price (e.g., 99.25)",
-          "format": "double",
-          "type": "number"
-        },
         "rate_averaging": {
           "$ref": "#/$defs/RateAveragingMethod",
           "description": "Rate settlement method defined by the exchange contract."
@@ -22260,13 +21385,9 @@
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement_price": {
-          "description": "Optional official final settlement price in futures price points.\n\nRequired after the last trading date for in-arrears contracts whose\nfinal settlement occurs after trading terminates.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position, multiplier, price and lifecycle terms."
         },
         "vol_surface_id": {
           "anyOf": [
@@ -22282,11 +21403,8 @@
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
-        "quoted_price",
+        "terms",
         "day_count",
-        "position",
         "contract_specs",
         "discount_curve_id",
         "forward_curve_id",
@@ -22916,15 +22034,12 @@
           "description": "Option expiry date"
         },
         "expiry_fixing": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent."
+          "description": "Terminal underlying fixing observed at expiry, in the same quote units\nas `strike`.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -22942,31 +22057,32 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
+        "monitoring": {
+          "$ref": "#/$defs/Monitoring",
+          "default": {
+            "type": "continuous"
+          },
+          "description": "Contractual monitoring of the path extremum.\n\n`continuous` (default) prices with the Goldman-Sosin-Gatto closed form.\n`discrete` observes the extremum only on the strictly increasing\n`observation_dates` (no later than expiry) and prices by Monte Carlo."
+        },
         "notional": {
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Notional amount"
         },
         "observed_max": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Observed maximum spot price since inception (required for Floating Put / Fixed Call)"
+          "description": "Observed maximum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Put / Fixed Call once seasoned).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "observed_min": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Observed minimum spot price since inception (required for Floating Call / Fixed Put)"
+          "description": "Observed minimum underlying level since inception, in the same quote\nunits as `strike` (required for Floating Call / Fixed Put once seasoned).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
@@ -22991,11 +22107,6 @@
         "underlying_ticker": {
           "description": "Underlying asset ticker symbol",
           "type": "string"
-        },
-        "use_gobet_miri": {
-          "default": false,
-          "description": "Whether to use Monte Carlo with Gobet-Miri correction for discrete monitoring.\n\nWhen `true`, `value()` dispatches to `npv_mc()` for discrete-monitoring-corrected\npricing using Monte Carlo simulation.\n\n**Defaults to `false`** (analytical continuous pricing).\nSet to `true` for production pricing of discretely-monitored lookbacks.",
-          "type": "boolean"
         },
         "vol_surface_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -23399,7 +22510,7 @@
     },
     "Ndf": {
       "additionalProperties": false,
-      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (fixing_rate = None)\nForward rate uses the explicit override or covered interest rate parity\nwith both currency curves.\n\n## Post-Fixing (fixing_rate = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
+      "description": "Non-Deliverable Forward (NDF) instrument.\n\nRepresents a cash-settled forward contract on a restricted currency pair.\nThe position is long base currency (restricted) and short settlement currency.\n\n# Quote Convention\n\nNDFs support two quote conventions via the `quote_convention` field:\n\n- **BasePerSettlement** (default): Rate quoted as base per settlement (e.g., 7.25 CNY/USD)\n- **SettlementPerBase**: Rate quoted as settlement per base (e.g., 0.138 USD/CNY)\n\nSee [`NdfQuoteConvention`] for details on the settlement formulas.\n\n# Pricing\n\n## Pre-Fixing (observed_fixing = None)\nForward rate uses the explicit override or covered interest rate parity\nwith both currency curves.\n\n## Post-Fixing (observed_fixing = Some)\nUses the observed fixing rate for settlement calculation.\n\nThe settlement formula depends on `quote_convention`:\n\n**BasePerSettlement:**\n```text\nSettlement = Notional_base × (1/F_fixing - 1/F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n**SettlementPerBase:**\n```text\nSettlement = Notional_base × (F_fixing - F_contract)\nPV = Settlement × DF_settlement(T)\n```\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF-3M\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .build()\n    .expect(\"Valid NDF\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -23429,15 +22540,6 @@
         "fixing_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
           "description": "Fixing date (rate observation date, typically T-2 before maturity)."
-        },
-        "fixing_rate": {
-          "default": null,
-          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "fixing_source_enum": {
           "anyOf": [
@@ -23496,6 +22598,15 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Notional amount in base currency."
         },
+        "observed_fixing": {
+          "default": null,
+          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "quote_calendar_id": {
           "default": null,
           "description": "Optional settlement currency calendar.",
@@ -23506,7 +22617,7 @@
         },
         "quote_convention": {
           "$ref": "#/$defs/NdfQuoteConvention",
-          "description": "Quote convention for contract_rate and fixing_rate."
+          "description": "Quote convention for contract_rate and observed_fixing."
         },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
@@ -23931,9 +23042,9 @@
           ],
           "description": "Calendar used to apply the payment delay."
         },
-        "payment_delay_days": {
+        "payment_lag_days": {
           "default": 0,
-          "description": "Payment delay in business days after the accrual end date.",
+          "description": "Payment lag in business days after the accrual end date.",
           "format": "int32",
           "maximum": 31,
           "minimum": 0,
@@ -24393,16 +23504,16 @@
       ]
     },
     "PayoutTiming": {
-      "description": "Payout timing for touch options.",
+      "description": "When a barrier-triggered cash amount is paid.\n\nUsed for a knock-out rebate (`rebate_timing`) and for a one-touch payout\n(`payout_timing`). At-expiry payments are discounted from expiry; at-hit\npayments are discounted from the first-passage time. Knock-in rebates\nalways pay at expiry (only then is it known that no hit occurred), so this\nsetting does not affect them.",
       "oneOf": [
         {
           "const": "at_hit",
-          "description": "Payout occurs immediately when barrier is hit (for one-touch).",
+          "description": "Paid the moment the barrier is hit (market standard).",
           "type": "string"
         },
         {
           "const": "at_expiry",
-          "description": "Payout is deferred to expiry regardless of when barrier is hit.",
+          "description": "Paid at expiry regardless of when the barrier is hit.",
           "type": "string"
         }
       ]
@@ -24939,6 +24050,10 @@
             "null"
           ]
         },
+        "coupon_bp": {
+          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
+          "description": "Contractual running coupon in basis points (e.g., `100` = 1% per\nannum, the standard CDX.NA.IG coupon; `500` for high yield)."
+        },
         "day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
           "description": "Day count convention"
@@ -24955,13 +24070,9 @@
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
           "description": "Payment frequency"
         },
-        "spread_bp": {
-          "$ref": "#/$defs/d_18f3ba1ec18ab2be13b2",
-          "description": "Fixed spread in basis points (e.g., 100 = 100bp = 1%)"
-        },
-        "standard_imm_dates": {
-          "description": "Whether to use the standard quarterly CDS roll grid (20 March,\nJune, September and December), including a final maturity stub.\nRequires quarterly `frequency` and `ShortFront` `stub`. Set false\nfor bespoke schedules generated from the supplied frequency/stub.",
-          "type": "boolean"
+        "roll_rule": {
+          "$ref": "#/$defs/RollRule",
+          "description": "Premium roll-date grid. `cds_imm` selects the standard quarterly CDS\nroll grid (20 March, June, September and December), including a final\nmaturity stub, and requires quarterly `frequency` and `short_front`\n`stub`. `none` generates a bespoke schedule from the supplied\n`frequency` and `stub`. The equity-futures `imm` grid is rejected."
         },
         "start": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -24974,12 +24085,12 @@
         }
       },
       "required": [
-        "standard_imm_dates",
+        "roll_rule",
         "start",
         "end",
         "frequency",
         "day_count",
-        "spread_bp",
+        "coupon_bp",
         "discount_curve_id"
       ],
       "type": "object"
@@ -25324,10 +24435,10 @@
       "properties": {
         "credit_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-          "description": "Credit curve identifier for default probabilities"
+          "description": "Hazard curve identifier for default probabilities"
         },
         "recovery_rate": {
-          "description": "Recovery rate (0.0 to 1.0)",
+          "description": "Recovery rate as a decimal fraction in `[0.0, 1.0)`",
           "format": "double",
           "type": "number"
         },
@@ -25652,7 +24763,7 @@
     },
     "RangeAccrual": {
       "additionalProperties": false,
-      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_fixings_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
+      "description": "Range accrual instrument.\n\nRange accrual notes pay coupons that accrue only when a reference rate or asset\nstays within a specified range. The accrual is proportional to the number of\nobservation dates where the underlying is within [lower_bound, upper_bound].\n\n# Bounds Interpretation\n\nThe `bounds_type` field controls how `lower_bound` and `upper_bound` are interpreted:\n- `Absolute`: Bounds are absolute price levels (e.g., 4500.0 for SPX at 4700)\n- `RelativeToInitialSpot`: Bounds are multipliers of the initial spot (e.g., 0.95 = 95%)\n\n# Historical Fixings\n\nFor mid-life valuations, use `past_observations_in_range` to specify how many past\nobservations were in range. The pricer will add this to expected future fixings.\n\n# Rate-Linked Underlyings: Pricing Routing\n\nThe rate-linked fields (`rate_index_id`, `projection_curve_id`,\n`reference_tenor`) describe the contract but are **not priceable by the\nstandalone `RangeAccrual` pricers**, which support equity/FX (GBM)\nunderlyings only and return a validation error when these fields are set.\nPrice rate-linked range accrual notes through\n[`CallableRangeAccrual`](crate::instruments::exotics::callable_range_accrual)\n(whose `range_accrual` field carries these [`RangeAccrualTerms`]), which\nmodels the reference rate under HW1F and reconstructs the term rate per\nobservation.",
       "properties": {
         "accrual_start_date": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -25719,7 +24830,7 @@
           },
           "type": "array"
         },
-        "past_fixings_in_range": {
+        "past_observations_in_range": {
           "description": "Number of past observations that were in range (for mid-life valuations).\nIf None, past observations are not included in the accrual calculation.",
           "format": "uint",
           "minimum": 0,
@@ -25793,7 +24904,7 @@
           "description": "Spot price identifier"
         },
         "total_past_observations": {
-          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_fixings_in_range` is set.",
+          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -25885,7 +24996,7 @@
           },
           "type": "array"
         },
-        "past_fixings_in_range": {
+        "past_observations_in_range": {
           "description": "Number of past observations that were in range (for mid-life valuations).\nIf None, past observations are not included in the accrual calculation.",
           "format": "uint",
           "minimum": 0,
@@ -25955,7 +25066,7 @@
           "description": "Spot price identifier"
         },
         "total_past_observations": {
-          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_fixings_in_range` is set.",
+          "description": "Total number of past observations (for mid-life valuations).\nMust be provided if `past_observations_in_range` is set.",
           "format": "uint",
           "minimum": 0,
           "type": [
@@ -26585,21 +25696,6 @@
             "business_day_convention"
           ],
           "type": "object"
-        }
-      ]
-    },
-    "RebateTiming": {
-      "description": "Timing of a knock-out rebate payment.\n\nMarket-standard KO rebates pay **at hit** (the moment the barrier is\nbreached); paying at expiry is the less common variant. Knock-in rebates\nalways pay at expiry by definition (only at expiry is it known that the\noption failed to knock in), so this setting does not affect them.",
-      "oneOf": [
-        {
-          "const": "at_hit",
-          "description": "Rebate is paid at the barrier hit time (market standard for KO rebates).",
-          "type": "string"
-        },
-        {
-          "const": "at_expiry",
-          "description": "Rebate is paid at option expiry.",
-          "type": "string"
         }
       ]
     },
@@ -29834,7 +28930,7 @@
       "additionalProperties": false,
       "description": "Structured credit tranche with attachment/detachment points",
       "properties": {
-        "attachment_point": {
+        "attach_pct": {
           "description": "Lower structural boundary as a percent of the capital structure\n(`0.0` for the first-loss class). `None` until\n[`TrancheStructure::new`] derives it from the balance shares in\npayment-priority order; a declared value must match that share\nwithin the structure's thickness tolerance.",
           "format": "double",
           "type": [
@@ -29862,8 +28958,8 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Accumulated deferred interest (if payment has been deferred)"
         },
-        "detachment_point": {
-          "description": "Upper structural boundary as a percent of the capital structure\n(`100.0` for the most senior class); derived like\n[`Self::attachment_point`] when `None`.",
+        "detach_pct": {
+          "description": "Upper structural boundary as a percent of the capital structure\n(`100.0` for the most senior class); derived like\n[`Self::attach_pct`](field@Self::attach_pct) when `None`.",
           "format": "double",
           "type": [
             "number",
@@ -30485,29 +29581,16 @@
     },
     "VolatilityIndexFuture": {
       "additionalProperties": false,
-      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::{\n    VolatilityIndexFuture, VolIndexContractSpecs,\n};\nuse finstack_quant_valuations::instruments::Position;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .notional(Money::from((100_000_i64, Currency::USD)))\n    .expiry(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .settlement_date(Date::from_calendar_date(2025, Month::March, 19).unwrap())\n    .quoted_price(21.50)\n    .position(Position::Long)\n    .contract_specs(VolIndexContractSpecs::default())\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
+      "description": "Volatility Index Future instrument.\n\nRepresents a futures contract on a volatility index such as VIX, VXN,\nor VSTOXX. These contracts provide exposure to expected future volatility.\nPosition size, multiplier, entry price and lifecycle dates live in the\nshared [`ListedFutureTerms`]; `terms.settlement_price` is the official\nSpecial Opening Quotation (SOQ) in index points.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;\nuse finstack_quant_valuations::instruments::{ListedFutureTerms, Position};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();\nlet future = VolatilityIndexFuture::builder()\n    .id(InstrumentId::new(\"VIX-FUT-2025M03\"))\n    .terms(\n        ListedFutureTerms::new(\n            5.0,\n            1_000.0,\n            Currency::USD,\n            21.50,\n            settlement,\n            settlement,\n            Position::Long,\n        )\n        .unwrap(),\n    )\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_index_curve_id(CurveId::new(\"VIX\"))\n    .build()\n    .expect(\"Valid future\");\n```",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "default": {},
           "description": "Attributes for scenario selection and tagging"
-        },
-        "contract_specs": {
-          "$ref": "#/$defs/VolIndexContractSpecs",
-          "default": {
-            "index_id": "VIX",
-            "multiplier": 1000,
-            "tick_size": 0.05,
-            "tick_value": 50
-          },
-          "description": "Contract specifications."
         },
         "discount_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
           "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing."
-        },
-        "expiry": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Future expiry date. For VIX futures this is the final settlement day\nitself (the Wednesday ~30 days before the expiry of the SPX options\nused in the settlement calculation), not a date 30 days before\nsettlement."
         },
         "id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -30521,35 +29604,13 @@
           "$ref": "#/$defs/d_00292b2cd9779815232f",
           "description": "Metric-time pricing configuration."
         },
-        "notional": {
-          "$ref": "#/$defs/d_4ba43030fede59fe5993",
-          "description": "Notional exposure in currency units. PV is scaled by\n`notional.amount() / (multiplier × quoted_price)` to represent\nthe number of contracts."
-        },
-        "position": {
-          "$ref": "#/$defs/Position",
-          "description": "Position side (Long or Short)."
-        },
-        "quoted_price": {
-          "description": "Quoted future price (index points, e.g., 21.50).",
-          "format": "double",
-          "type": "number"
-        },
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
         },
-        "settlement_date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX)."
-        },
-        "settlement_fixing": {
-          "default": null,
-          "description": "Final settlement/SOQ fixing in index points.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
+        "terms": {
+          "$ref": "#/$defs/ListedFutureTerms",
+          "description": "Standard listed position and lifecycle terms. `terms.multiplier` is the\nsettlement-currency value of one index point ($1,000 for CBOE VIX),\n`terms.entry_price` is the trade price in index points and\n`terms.settlement_date` is the SOQ date on which the final settlement\nprice is fixed."
         },
         "vol_index_curve_id": {
           "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
@@ -30558,14 +29619,9 @@
       },
       "required": [
         "id",
-        "notional",
-        "expiry",
-        "settlement_date",
-        "quoted_price",
-        "position",
+        "terms",
         "discount_curve_id",
-        "vol_index_curve_id",
-        "attributes"
+        "vol_index_curve_id"
       ],
       "type": "object"
     },
@@ -30602,38 +29658,6 @@
       "required": [
         "id",
         "terms"
-      ],
-      "type": "object"
-    },
-    "VolIndexContractSpecs": {
-      "additionalProperties": false,
-      "description": "Contract specifications for volatility index futures.\n\nVIX futures have standardized specifications set by CBOE:\n- Standard multiplier: $1,000 per index point\n- Minimum tick: 0.05 index points ($50)\n- Weekly and monthly expiries available",
-      "properties": {
-        "index_id": {
-          "description": "Index identifier (e.g., \"VIX\", \"VXN\", \"VSTOXX\").",
-          "type": "string"
-        },
-        "multiplier": {
-          "description": "Contract multiplier (USD per index point).\nVIX standard: 1000 (each point = $1,000)",
-          "format": "double",
-          "type": "number"
-        },
-        "tick_size": {
-          "description": "Tick size in index points.\nVIX standard: 0.05 points",
-          "format": "double",
-          "type": "number"
-        },
-        "tick_value": {
-          "description": "Tick value in currency units.\nVIX standard: $50 per tick (0.05 × 1000)",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "multiplier",
-        "tick_size",
-        "tick_value",
-        "index_id"
       ],
       "type": "object"
     },

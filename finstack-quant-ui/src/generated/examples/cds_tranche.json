@@ -1,11 +1,11 @@
 {
   "instrument": {
     "spec": {
-      "accumulated_loss": 0.0,
       "attach_pct": 0.0,
       "attributes": {},
       "business_day_convention": "following",
       "calendar_id": null,
+      "coupon_bp": 100.0,
       "credit_index_id": "CDX.NA.IG.HAZARD",
       "day_count": "act_360",
       "detach_pct": 3.0,
@@ -22,10 +22,11 @@
         "amount": "10000000",
         "currency": "USD"
       },
-      "running_coupon_bp": 100.0,
+      "realized_loss": 0.0,
+      "roll_rule": "cds_imm",
       "series": 42,
       "side": "buy_protection",
-      "standard_imm_dates": true,
+      "stub": "short_front",
       "upfront": null
     },
     "type": "cds_tranche"

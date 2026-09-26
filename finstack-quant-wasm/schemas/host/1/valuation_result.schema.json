@@ -1984,8 +1984,8 @@
     "TranchePricingResult": {
       "description": "Tranche-level pricing result.",
       "properties": {
-        "attachment": {
-          "description": "Attachment point (percentage)",
+        "attach_pct": {
+          "description": "Attachment point in percent of the capital structure (0 = first loss).",
           "format": "double",
           "type": "number"
         },
@@ -1994,8 +1994,8 @@
           "format": "double",
           "type": "number"
         },
-        "detachment": {
-          "description": "Detachment point (percentage)",
+        "detach_pct": {
+          "description": "Detachment point in percent of the capital structure (100 = most senior).",
           "format": "double",
           "type": "number"
         },
@@ -2053,8 +2053,8 @@
         "expected_loss",
         "unexpected_loss",
         "expected_shortfall",
-        "attachment",
-        "detachment",
+        "attach_pct",
+        "detach_pct",
         "wal",
         "credit_duration",
         "draw_option_cost"

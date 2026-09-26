@@ -6,6 +6,17 @@
       "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
       "description": "Valuation date."
     },
+    "credit_curve_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hazard curve ID (`credit_curve_id`) used (omitted for `discounting` model)."
+    },
     "currency": {
       "$ref": "#/$defs/d_be98333e68c25ab5ae57",
       "description": "Reporting currency used for row PVs and `total_pv`."
@@ -20,17 +31,6 @@
         "$ref": "#/$defs/d_674830a94dacf97e7ac8"
       },
       "type": "array"
-    },
-    "hazard_curve_id": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Hazard curve ID used (omitted for `discounting` model)."
     },
     "instrument_id": {
       "description": "Instrument identifier.",

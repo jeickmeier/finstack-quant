@@ -328,10 +328,6 @@ export interface DFe7Fd429Ac42D87Faa68 {
  */
 export interface D_1376Bb75255Ac32C8B77 {
   /**
-   * Accumulated realized loss as fraction of original portfolio notional
-   */
-  accumulated_loss: number;
-  /**
    * Attachment point in percent (e.g., 0.0 for equity)
    */
   attach_pct: number;
@@ -341,6 +337,10 @@ export interface D_1376Bb75255Ac32C8B77 {
    * Optional holiday calendar id
    */
   calendar_id?: string | null;
+  /**
+   * Running coupon in basis points (e.g., 100 = 1.00%)
+   */
+  coupon_bp: number;
   credit_index_id: Id;
   day_count: DayCount;
   /**
@@ -363,9 +363,17 @@ export interface D_1376Bb75255Ac32C8B77 {
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;
   /**
-   * Running coupon in basis points (e.g., 100 = 1.00%)
+   * Realized (settled) loss on the reference pool as a decimal fraction of
+   * the original portfolio notional, in `[0, 1]`.
    */
-  running_coupon_bp: number;
+  realized_loss: number;
+  /**
+   * Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates
+   * (20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke
+   * schedule from `frequency` and `stub`. The equity-futures `imm` grid is
+   * rejected. Use [`Self::standard`] for the IMM constructor.
+   */
+  roll_rule?: "none" | "imm" | "cds_imm";
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Series number (e.g., 37)
@@ -376,13 +384,10 @@ export interface D_1376Bb75255Ac32C8B77 {
    */
   side: "buy_protection" | "sell_protection";
   /**
-   * Whether to enforce standard IMM dates (20th of Mar, Jun, Sep, Dec).
-   *
-   * Defaults to `false` so [`Self::new`] and the builder honor
-   * `ScheduleParams` frequency. Use [`Self::standard`] or set this to
-   * `true` for IMM rolls.
+   * Stub convention for a bespoke (`roll_rule = none`) coupon schedule.
+   * Defaults to `short_front`.
    */
-  standard_imm_dates?: boolean;
+  stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
   /**
    * Optional upfront payment (date, amount). Positive means paid by protection buyer.
    *
@@ -500,218 +505,6 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-  /**
-   * PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-   *
-   * This is an **already-discounted** adjustment to the net present value.
-   * It is added directly to the NPV without further discounting.
-   *
-   * # Sign Convention
-   *
-   * For CDS, CDS index, and CDS tranche instruments, a positive amount is
-   * paid by the protection buyer: it decreases buyer NPV and increases
-   * seller NPV. Other instrument families may treat the amount as an
-   * explicitly signed PV adjustment and document that convention locally.
-   *
-   * # Relationship to CDS Dated Upfront
-   *
-   * For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-   * - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-   * - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-   *
-   * Both can be set simultaneously without double-counting.
-   */
-  upfront_payment?: D_1A6C2Ccee66D90A3A469 | null;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface D_1A6C2Ccee66D90A3A469 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Model selection and tree pricing parameters.

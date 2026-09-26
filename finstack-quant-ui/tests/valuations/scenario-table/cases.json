@@ -1,6 +1,6 @@
 {
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-  "instrumentSha256": "a912d2942997206de0404ec2d5c3b91a75d612c17009578108b175774938913f",
+  "instrumentSha256": "234d97c2dbc0bf9325098189f639a6b0b9a8a6457c54e1e3c67b6cc1ddaafeae",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
   "marketSha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474",
   "asOf": "2024-01-01",
@@ -90,8 +90,8 @@
               "tranches": [
                 {
                   "id": "CLONOTES-A",
-                  "attachment_point": 0,
-                  "detachment_point": 100,
+                  "attach_pct": 0,
+                  "detach_pct": 100,
                   "seniority": "senior",
                   "rating": null,
                   "original_balance": {
@@ -340,8 +340,8 @@
               "tranches": [
                 {
                   "id": "CLONOTES-A",
-                  "attachment_point": 0,
-                  "detachment_point": 100,
+                  "attach_pct": 0,
+                  "detach_pct": 100,
                   "seniority": "senior",
                   "rating": null,
                   "original_balance": {

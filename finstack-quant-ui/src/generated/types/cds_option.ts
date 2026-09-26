@@ -2,13 +2,13 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
- * ISO 8601 calendar date string.
+ * Underlying CDS maturity date
  */
 export type Date = string;
 /**
- * ISO 8601 calendar date string.
+ * Exact decimal encoded as a JSON string.
  */
-export type Date1 = string;
+export type Decimal = string;
 /**
  * Credit curve identifier
  */
@@ -17,6 +17,10 @@ export type Id = string;
  * Discount curve identifier
  */
 export type Id1 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -290,10 +294,6 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "ZMW"
   | "ZWL";
 /**
- * Exact decimal encoded as a JSON string.
- */
-export type Decimal = string;
-/**
  * Volatility surface identifier
  */
 export type Id3 = string;
@@ -330,13 +330,18 @@ export interface D_0688739575C4B1492597 {
  */
 export interface DDc0C483409E01928615C {
   attributes?: Attributes;
+  cds_maturity: Date;
   /**
-   * Payment date of the option premium, returned by the settlement-date
-   * accessor. This does not change variance time or front-end protection;
-   * the option value excludes the separately agreed trade premium.
+   * Contractual running coupon `c` of the underlying CDS, in basis points
+   * (e.g., `100` for the standard CDX.NA.IG coupon, `500` for the
+   * standard CDX.NA.HY coupon). When `None`, the synthetic underlying
+   * CDS uses `strike` as its running coupon — the appropriate single-name
+   * SNAC default where the trade is struck at the par spread. For CDS
+   * index options where the index has a fixed standard coupon different
+   * from the option strike, set this explicitly so the strike-adjustment
+   * term `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated.
    */
-  cash_settlement_date?: Date | null;
-  cds_maturity: Date1;
+  coupon_bp?: Decimal | null;
   credit_curve_id: Id;
   discount_curve_id: Id1;
   /**
@@ -344,7 +349,7 @@ export interface DDc0C483409E01928615C {
    * Must be on or after expiry and before CDS maturity. Discounting uses
    * this date; spread variance ends at legal expiry.
    */
-  exercise_settlement_date?: Date | null;
+  exercise_settlement_date?: Date1 | null;
   /**
    * Exercise style
    */
@@ -352,13 +357,13 @@ export interface DDc0C483409E01928615C {
   expiry: Date2;
   id: Id2;
   /**
-   * Optional index factor scaling for the index underlying.
-   *
-   * This is the **current** index factor `f` at valuation. See
-   * [`Self::strike_index_factor`] for the original factor `f0` attached
-   * to a clean-price strike.
+   * Current index factor `f` at valuation: the surviving fraction of the
+   * original index notional, in `(0, 1]`. Defaults to `1.0` (no settled
+   * defaults) and scales the notional only when `underlying_is_index`.
+   * See [`Self::strike_index_factor`] for the original factor `f0`
+   * attached to a clean-price strike.
    */
-  index_factor?: number | null;
+  index_factor?: number;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Whether the option knocks out if the underlying defaults before
@@ -373,20 +378,27 @@ export interface DDc0C483409E01928615C {
    */
   option_type: "call" | "put";
   /**
+   * Payment date of the option premium, returned by the settlement-date
+   * accessor. This does not change variance time or front-end protection;
+   * the option value excludes the separately agreed trade premium.
+   */
+  premium_settlement_date?: Date1 | null;
+  /**
    * Convention used to select the synthetic underlying CDS accrual start
    * when `underlying_effective_date` is not explicitly supplied.
    */
   protection_start_convention?: "spot" | "forward";
   /**
-   * Realized cumulative index loss from option inception to valuation
-   * date, expressed per unit of original index notional.
+   * Realized (settled) cumulative index loss from option inception to
+   * valuation date, as a decimal fraction of the original index notional
+   * in `[0, 1]`. Defaults to `0.0`.
    *
    * Bloomberg CDSO treats index options as no-knockout. Settled losses
    * after option inception are therefore deterministic payoff adjustments
    * at exercise (DOCS 2055833 Eq. 2.5 and DOCS 2151513). Single-name
-   * options knock out instead and must leave this unset.
+   * options knock out instead and must leave this at `0.0`.
    */
-  realized_index_loss?: number | null;
+  realized_loss?: number;
   /**
    * Recovery rate assumption
    */
@@ -421,17 +433,6 @@ export interface DDc0C483409E01928615C {
    */
   strike_index_factor?: number | null;
   /**
-   * Contractual coupon `c` of the underlying CDS, expressed as a decimal
-   * rate (e.g., 0.01 for the 100 bp standard CDX coupon, 0.05 for the
-   * 500 bp standard CDX.HY coupon). When `None`, the synthetic underlying
-   * CDS uses `strike` as its running coupon — the appropriate single-name
-   * SNAC default where the trade is struck at the par spread. For CDS
-   * index options where the index has a fixed standard coupon different
-   * from the option strike, set this explicitly so the strike-adjustment
-   * term `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated.
-   */
-  underlying_cds_coupon?: Decimal | null;
-  /**
    * Convention used by the underlying CDS contract.
    *
    * This controls the CDS schedule, settlement lag, business day convention,
@@ -445,7 +446,7 @@ export interface DDc0C483409E01928615C {
    * option expiry; in that case premium accrues from this date while
    * protection starts at expiry.
    */
-  underlying_effective_date?: Date | null;
+  underlying_effective_date?: Date1 | null;
   /**
    * If true, the underlying is a CDS index; else single-name CDS.
    *
@@ -552,218 +553,6 @@ export interface DB0A5Fc543381Da6A5722 {
    * Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).
    */
   quoted_z_spread?: number | null;
-  /**
-   * PV adjustment at valuation date (primarily credit-instrument upfront quotes).
-   *
-   * This is an **already-discounted** adjustment to the net present value.
-   * It is added directly to the NPV without further discounting.
-   *
-   * # Sign Convention
-   *
-   * For CDS, CDS index, and CDS tranche instruments, a positive amount is
-   * paid by the protection buyer: it decreases buyer NPV and increases
-   * seller NPV. Other instrument families may treat the amount as an
-   * explicitly signed PV adjustment and document that convention locally.
-   *
-   * # Relationship to CDS Dated Upfront
-   *
-   * For CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:
-   * - **`upfront_payment`**: PV adjustment at `as_of`, added directly
-   * - **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date
-   *
-   * Both can be set simultaneously without double-counting.
-   */
-  upfront_payment?: D_1A6C2Ccee66D90A3A469 | null;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- */
-export interface D_1A6C2Ccee66D90A3A469 {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
 }
 /**
  * Model selection and tree pricing parameters.

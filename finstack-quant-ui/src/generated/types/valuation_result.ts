@@ -3018,17 +3018,17 @@ export interface Money10 {
  */
 export interface DD845B68D12Fbaca7791F {
   /**
-   * Attachment point (percentage)
+   * Attachment point in percent of the capital structure (0 = first loss).
    */
-  attachment: number;
+  attach_pct: number;
   /**
    * Credit duration (price sensitivity to credit spread)
    */
   credit_duration: number;
   /**
-   * Detachment point (percentage)
+   * Detachment point in percent of the capital structure (100 = most senior).
    */
-  detachment: number;
+  detach_pct: number;
   draw_option_cost: Money11;
   expected_loss: Money12;
   expected_shortfall: Money13;

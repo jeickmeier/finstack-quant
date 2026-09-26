@@ -1118,18 +1118,20 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/roll_rule",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/6/properties/roll_rule",
+    "default": "none",
+    "description": "Coupon roll-date grid for the synthetic tranches: `cds_imm` for the\nstandard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the\ndefault) for a schedule generated from the convention frequency and\nstub. `imm` is rejected.",
+    "ref": "#/$defs/RollRule",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule"
+  },
+  {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/series",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/6/properties/series",
     "description": "Series number of the credit index.",
     "format": "uint16",
     "maximum": 65535,
     "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/use_imm_dates",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/6/properties/use_imm_dates",
-    "default": false,
-    "description": "Whether to use IMM dates for coupon schedules."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/7",
@@ -2901,6 +2903,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsConventionKey"
   },
   {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/1/oneOf/1/properties/coupon_bp",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/1/oneOf/1/properties/coupon_bp",
+    "description": "Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/1/oneOf/1/properties/entity",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/1/oneOf/1/properties/entity",
     "description": "Reference entity name."
@@ -2923,12 +2931,6 @@ export default [
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/1/oneOf/1/properties/recovery_rate",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/1/oneOf/1/properties/recovery_rate",
     "description": "Recovery rate assumption.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/1/oneOf/1/properties/running_spread_bp",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/1/oneOf/1/properties/running_spread_bp",
-    "description": "Running spread in basis points (25.0, 100.0, 500.0 or 1000.0).",
     "format": "double"
   },
   {
@@ -3264,6 +3266,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsConventionKey"
   },
   {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/2/properties/coupon_bp",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/2/properties/coupon_bp",
+    "description": "Contractual running coupon of the tranche, in basis points.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/2/properties/detachment",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/2/properties/detachment",
     "description": "Detachment point (decimal, e.g. 0.07).",
@@ -3292,12 +3300,6 @@ export default [
     "description": "Maturity date.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/2/properties/running_spread_bp",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/2/properties/running_spread_bp",
-    "description": "Running spread (bp).",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/2/properties/series",
@@ -7527,6 +7529,29 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType/oneOf/1",
     "const": "normal",
     "description": "Normal (Bachelier) implied volatility, absolute rate units."
+  },
+  {
+    "path": "#/$defs/d_fa1f99a63e484452eafa",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule",
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+  },
+  {
+    "path": "#/$defs/d_fa1f99a63e484452eafa/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule/oneOf/0",
+    "const": "none",
+    "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid)."
+  },
+  {
+    "path": "#/$defs/d_fa1f99a63e484452eafa/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule/oneOf/1",
+    "const": "imm",
+    "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec."
+  },
+  {
+    "path": "#/$defs/d_fa1f99a63e484452eafa/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule/oneOf/2",
+    "const": "cds_imm",
+    "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
   },
   {
     "path": "#/$defs/d_fc123a39e4a8423ed13b",

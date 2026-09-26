@@ -104,7 +104,7 @@
       "tranches": {
         "tranches": [
           {
-            "attachment_point": 0.0,
+            "attach_pct": 0.0,
             "attributes": {},
             "coupon": {
               "fixed": {
@@ -120,7 +120,7 @@
               "amount": "0",
               "currency": "USD"
             },
-            "detachment_point": 100.0,
+            "detach_pct": 100.0,
             "frequency": {
               "count": 3,
               "unit": "months"

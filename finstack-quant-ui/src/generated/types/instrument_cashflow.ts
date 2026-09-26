@@ -6,6 +6,10 @@
  */
 export type Date = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Reporting currency used for row PVs and `total_pv`.
  */
 export type Currency =
@@ -169,9 +173,9 @@ export type Currency =
   | "ZMW"
   | "ZWL";
 /**
- * Discount curve ID used.
+ * Opaque string identifier.
  */
-export type Id = string;
+export type Id1 = string;
 /**
  * Row currency (matters for `XccySwap` / `FxSwap`).
  */
@@ -340,33 +344,29 @@ export type Currency1 =
  */
 export type Date1 = string;
 /**
- * Discount curve used for this row.
+ * Opaque string identifier.
  */
-export type Id1 = string;
+export type Id2 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date2 = string;
-/**
- * Opaque string identifier.
- */
-export type Id2 = string;
 
 /**
  * Native cashflow rows, reporting-currency PV and reconciliation status.
  */
 export interface InstrumentCashflowWire {
   as_of: Date;
+  /**
+   * Hazard curve ID (`credit_curve_id`) used (omitted for `discounting` model).
+   */
+  credit_curve_id?: Id | null;
   currency: Currency;
-  discount_curve_id: Id;
+  discount_curve_id: Id1;
   /**
    * Per-row enriched cashflows.
    */
   flows: D_674830A94Dacf97E7Ac8[];
-  /**
-   * Hazard curve ID used (omitted for `discounting` model).
-   */
-  hazard_curve_id?: Id2 | null;
   /**
    * Instrument identifier.
    */
@@ -414,7 +414,7 @@ export interface D_674830A94Dacf97E7Ac8 {
   conditional_default_prob?: number | null;
   currency: Currency1;
   date: Date1;
-  discount_curve_id: Id1;
+  discount_curve_id: Id2;
   /**
    * `df(as_of, date)`.
    */

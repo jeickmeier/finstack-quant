@@ -2,6 +2,7 @@
   "instrument": {
     "spec": {
       "attributes": {},
+      "correlation": 0.85,
       "day_count": "act_360",
       "discount_curve_id": "USD-OIS",
       "expiry_date": "2027-03-29",
@@ -23,7 +24,6 @@
         "unit": "years"
       },
       "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
-      "spread_correlation": 0.85,
       "strike": 0.005,
       "swap_convention": "usd_sofr"
     },

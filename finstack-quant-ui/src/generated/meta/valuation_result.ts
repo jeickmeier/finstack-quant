@@ -3203,9 +3203,9 @@ export default [
     "description": "Tranche-level pricing result."
   },
   {
-    "path": "#/$defs/d_d845b68d12fbaca7791f/properties/attachment",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/attachment",
-    "description": "Attachment point (percentage)",
+    "path": "#/$defs/d_d845b68d12fbaca7791f/properties/attach_pct",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/attach_pct",
+    "description": "Attachment point in percent of the capital structure (0 = first loss).",
     "format": "double"
   },
   {
@@ -3215,9 +3215,9 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_d845b68d12fbaca7791f/properties/detachment",
-    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/detachment",
-    "description": "Detachment point (percentage)",
+    "path": "#/$defs/d_d845b68d12fbaca7791f/properties/detach_pct",
+    "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/TranchePricingResult/properties/detach_pct",
+    "description": "Detachment point in percent of the capital structure (100 = most senior).",
     "format": "double"
   },
   {
