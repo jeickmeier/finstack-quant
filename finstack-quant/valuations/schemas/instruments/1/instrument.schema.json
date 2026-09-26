@@ -5674,8 +5674,8 @@
           "description": "Type of collateral (general vs special)"
         },
         "instrument_id": {
-          "description": "Identifier for the collateral instrument",
-          "type": "string"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Identifier of the collateral security (for special collateral, the\nspecial security itself)."
         },
         "market_value_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -5705,9 +5705,10 @@
         },
         {
           "additionalProperties": false,
-          "description": "Special collateral (specific securities in high demand, may trade at lower rates)",
+          "description": "Special collateral (specific securities in high demand, may trade at lower rates)\n\nThe special security is identified by [`CollateralSpec::instrument_id`].",
           "properties": {
             "special": {
+              "additionalProperties": false,
               "properties": {
                 "rate_adjustment_bp": {
                   "description": "Optional special rate adjustment in basis points (negative = lower rate)",
@@ -5716,15 +5717,8 @@
                     "number",
                     "null"
                   ]
-                },
-                "security_id": {
-                  "description": "Identifier of the specific security",
-                  "type": "string"
                 }
               },
-              "required": [
-                "security_id"
-              ],
               "type": "object"
             }
           },
@@ -12001,7 +11995,8 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention"
+          "default": "act_365f",
+          "description": "Day count convention (defaults to ACT/365F)."
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -12070,7 +12065,6 @@
         "payout_type",
         "payout_amount",
         "expiry",
-        "day_count",
         "notional",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
@@ -12385,7 +12379,7 @@
           "default": "modified_following",
           "description": "Business day convention to apply when adjusting settlement (default: ModifiedFollowing)\n\nNote: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align\nwith ISDA standard FX settlement conventions."
         },
-        "discount_curve_id": {
+        "domestic_discount_curve_id": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
@@ -12492,10 +12486,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency (foreign)."
         },
-        "base_notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
-        },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Domestic discount curve id (quote currency)."
@@ -12546,6 +12536,10 @@
             "null"
           ]
         },
+        "notional": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
+        },
         "quote_calendar_id": {
           "default": null,
           "description": "Optional quote currency calendar for spot/settlement adjustment metadata.",
@@ -12570,7 +12564,7 @@
         "quote_currency",
         "near_date",
         "far_date",
-        "base_notional",
+        "notional",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "attributes"
@@ -12600,7 +12594,8 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention"
+          "default": "act_365f",
+          "description": "Day count convention (defaults to ACT/365F)."
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -12679,7 +12674,6 @@
         "payout_amount",
         "payout_timing",
         "expiry",
-        "day_count",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "vol_surface_id",
@@ -12713,7 +12707,8 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for time calculations"
+          "default": "act_365f",
+          "description": "Day count convention for time calculations (defaults to ACT/365F)."
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -12860,7 +12855,6 @@
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "vol_surface_id",
-        "day_count",
         "attributes"
       ],
       "type": "object"
@@ -16254,9 +16248,13 @@
           "description": "Base currency (restricted/non-deliverable currency, numerator)."
         },
         "contract_rate": {
-          "description": "Contract forward rate. Interpretation depends on `quote_convention`.",
+          "default": null,
+          "description": "Contract forward rate. Interpretation depends on `quote_convention`.\n`None` values the NDF at-market.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -16266,7 +16264,7 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Fixing date (rate observation date, typically T-2 before maturity)."
         },
-        "fixing_source_enum": {
+        "fixing_source": {
           "anyOf": [
             {
               "$ref": "#/$defs/NdfFixingSource"
@@ -16323,14 +16321,6 @@
             "null"
           ]
         },
-        "quote_calendar_id": {
-          "default": null,
-          "description": "Optional settlement currency calendar.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "quote_convention": {
           "$ref": "#/$defs/NdfQuoteConvention",
           "description": "Quote convention for contract_rate and observed_fixing."
@@ -16358,6 +16348,14 @@
           "default": {},
           "description": "Scenario-only pricing adjustments."
         },
+        "settlement_calendar_id": {
+          "default": null,
+          "description": "Optional settlement currency calendar.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "settlement_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Settlement currency (freely convertible, typically USD, denominator and PV currency)."
@@ -16370,7 +16368,6 @@
         "fixing_date",
         "maturity",
         "notional",
-        "contract_rate",
         "domestic_discount_curve_id",
         "quote_convention",
         "attributes"
@@ -16378,7 +16375,7 @@
       "type": "object"
     },
     "NdfFixingSource": {
-      "description": "Official NDF fixing source/benchmark.\n\nNDF settlements reference official fixing rates published by central banks\nor designated fixing bodies. Using the correct fixing source is critical\nfor proper settlement calculations.\n\n# Market Standards\n\n| Currency | Fixing Source | Publisher | Settlement |\n|----------|---------------|-----------|------------|\n| CNY | PBOC | People's Bank of China | USD T+2 |\n| CNH | CNHFIX | Treasury Markets Association (HK) | USD T+2 |\n| INR | RBI | Reserve Bank of India | USD T+2 |\n| KRW | KFTC | Korea Financial Telecommunications | USD T+1 |\n| BRL | PTAX | Banco Central do Brasil | USD T+2 |\n| TWD | TAIFX | Taipei Forex Inc. | USD T+2 |\n| PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |\n| IDR | JISDOR | Bank Indonesia | USD T+2 |\n| MYR | BNM | Bank Negara Malaysia | USD T+2 |\n\n# Example\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))\n    .build()\n    .expect(\"Valid NDF\");\n```",
+      "description": "Official NDF fixing source/benchmark.\n\nNDF settlements reference official fixing rates published by central banks\nor designated fixing bodies. Using the correct fixing source is critical\nfor proper settlement calculations.\n\n# Market Standards\n\n| Currency | Fixing Source | Publisher | Settlement |\n|----------|---------------|-----------|------------|\n| CNY | PBOC | People's Bank of China | USD T+2 |\n| CNH | CNHFIX | Treasury Markets Association (HK) | USD T+2 |\n| INR | RBI | Reserve Bank of India | USD T+2 |\n| KRW | KFTC | Korea Financial Telecommunications | USD T+1 |\n| BRL | PTAX | Banco Central do Brasil | USD T+2 |\n| TWD | TAIFX | Taipei Forex Inc. | USD T+2 |\n| PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |\n| IDR | JISDOR | Bank Indonesia | USD T+2 |\n| MYR | BNM | Bank Negara Malaysia | USD T+2 |\n\n# Example\n\n```rust\nuse finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet ndf = Ndf::builder()\n    .id(InstrumentId::new(\"USDCNY-NDF\"))\n    .base_currency(Currency::CNY)\n    .settlement_currency(Currency::USD)\n    .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())\n    .notional(Money::from((10_000_000_i64, Currency::CNY)))\n    .contract_rate(7.25)\n    .domestic_discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .quote_convention(NdfQuoteConvention::BasePerSettlement)\n    .fixing_source_opt(Some(NdfFixingSource::Pboc))\n    .build()\n    .expect(\"Valid NDF\");\n```",
       "oneOf": [
         {
           "const": "PBOC",
@@ -18350,7 +18347,8 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention."
+          "default": "act_365f",
+          "description": "Day count convention (defaults to ACT/365F)."
         },
         "div_yield_id": {
           "anyOf": [
@@ -18479,7 +18477,6 @@
         "base_currency",
         "quote_currency",
         "correlation",
-        "day_count",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "spot_id",
@@ -25441,10 +25438,6 @@
         "spec": {
           "attributes": {},
           "base_currency": "EUR",
-          "base_notional": {
-            "amount": "1000000",
-            "currency": "EUR"
-          },
           "domestic_discount_curve_id": "USD-OIS",
           "far_date": "2024-07-05",
           "far_rate": 1.12,
@@ -25452,6 +25445,10 @@
           "id": "FXSWAP-EURUSD-6M",
           "near_date": "2024-01-05",
           "near_rate": 1.1,
+          "notional": {
+            "amount": "1000000",
+            "currency": "EUR"
+          },
           "quote_currency": "USD"
         },
         "type": "fx_swap"
@@ -25500,7 +25497,7 @@
           "contract_rate": 7.25,
           "domestic_discount_curve_id": "USD-OIS",
           "fixing_date": "2025-03-13",
-          "fixing_source_enum": "PBOC",
+          "fixing_source": "PBOC",
           "id": "USDCNY-NDF-3M",
           "maturity": "2025-03-15",
           "notional": {

@@ -301,7 +301,6 @@ fn test_repo_with_multiple_currencies() {
 #[test]
 fn test_special_collateral_without_rate_adjustment() {
     let collateral = CollateralSpec::special(
-        "SPECIAL_ID",
         "SPECIAL_BOND",
         500_000.0,
         "SPECIAL_BOND_PRICE",

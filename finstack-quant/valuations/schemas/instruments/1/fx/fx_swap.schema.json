@@ -20,10 +20,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency (foreign)."
         },
-        "base_notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
-        },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Domestic discount curve id (quote currency)."
@@ -74,6 +70,10 @@
             "null"
           ]
         },
+        "notional": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
+        },
         "quote_calendar_id": {
           "default": null,
           "description": "Optional quote currency calendar for spot/settlement adjustment metadata.",
@@ -98,7 +98,7 @@
         "quote_currency",
         "near_date",
         "far_date",
-        "base_notional",
+        "notional",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "attributes"
@@ -138,10 +138,6 @@
         "spec": {
           "attributes": {},
           "base_currency": "EUR",
-          "base_notional": {
-            "amount": "1000000",
-            "currency": "EUR"
-          },
           "domestic_discount_curve_id": "USD-OIS",
           "far_date": "2024-07-05",
           "far_rate": 1.12,
@@ -149,6 +145,10 @@
           "id": "FXSWAP-EURUSD-6M",
           "near_date": "2024-01-05",
           "near_rate": 1.1,
+          "notional": {
+            "amount": "1000000",
+            "currency": "EUR"
+          },
           "quote_currency": "USD"
         },
         "type": "fx_swap"

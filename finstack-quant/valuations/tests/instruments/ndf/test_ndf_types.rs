@@ -28,7 +28,7 @@ fn test_ndf_builder() {
     assert_eq!(ndf.id.as_str(), "TEST-NDF");
     assert_eq!(ndf.base_currency, Currency::CNY);
     assert_eq!(ndf.settlement_currency, Currency::USD);
-    assert_eq!(ndf.contract_rate, 7.25);
+    assert_eq!(ndf.contract_rate, Some(7.25));
     assert!(!ndf.is_fixed());
 }
 
@@ -46,16 +46,16 @@ fn test_ndf_builder_with_optional_fields() {
         .foreign_discount_curve_id_opt(Some(CurveId::new("CNY-OIS")))
         .observed_fixing_opt(Some(7.30))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
-        .fixing_source_enum_opt(Some(NdfFixingSource::Cnhfix))
+        .fixing_source_opt(Some(NdfFixingSource::Cnhfix))
         .quoted_spot_opt(Some(7.25))
         .base_calendar_id_opt(Some("CNY".into()))
-        .quote_calendar_id_opt(Some("USD".into()))
+        .settlement_calendar_id_opt(Some("USD".into()))
         .attributes(Attributes::new().with_tag("ndf"))
         .build()
         .expect("should build");
 
     assert_eq!(ndf.observed_fixing, Some(7.30));
-    assert_eq!(ndf.fixing_source_enum, Some(NdfFixingSource::Cnhfix));
+    assert_eq!(ndf.fixing_source, Some(NdfFixingSource::Cnhfix));
     assert!(ndf.foreign_discount_curve_id.is_some());
     assert!(ndf.is_fixed());
     assert!(ndf.attributes.has_tag("ndf"));
@@ -216,13 +216,13 @@ fn test_ndf_common_currencies() {
         .contract_rate(83.0)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
-        .fixing_source_enum_opt(Some(NdfFixingSource::Rbi))
+        .fixing_source_opt(Some(NdfFixingSource::Rbi))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
 
     assert_eq!(ndf_inr.base_currency, Currency::INR);
-    assert_eq!(ndf_inr.fixing_source_enum, Some(NdfFixingSource::Rbi));
+    assert_eq!(ndf_inr.fixing_source, Some(NdfFixingSource::Rbi));
 
     // Test with BRL (Brazilian Real)
     let ndf_brl = Ndf::builder()
@@ -235,11 +235,11 @@ fn test_ndf_common_currencies() {
         .contract_rate(5.0)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .quote_convention(NdfQuoteConvention::BasePerSettlement)
-        .fixing_source_enum_opt(Some(NdfFixingSource::Ptax))
+        .fixing_source_opt(Some(NdfFixingSource::Ptax))
         .attributes(Attributes::new())
         .build()
         .expect("should build");
 
     assert_eq!(ndf_brl.base_currency, Currency::BRL);
-    assert_eq!(ndf_brl.fixing_source_enum, Some(NdfFixingSource::Ptax));
+    assert_eq!(ndf_brl.fixing_source, Some(NdfFixingSource::Ptax));
 }

@@ -1285,7 +1285,7 @@ mod tests {
             .quote_currency(Currency::USD)
             .near_date(Date::from_calendar_date(2024, Month::January, 3).expect("Valid test date"))
             .far_date(Date::from_calendar_date(2024, Month::July, 3).expect("Valid test date"))
-            .base_notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id("USD-OIS".into())
             .foreign_discount_curve_id("EUR-OIS".into())
             .near_rate_opt(Some(1.10))

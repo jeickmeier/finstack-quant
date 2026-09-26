@@ -49,7 +49,7 @@ pub struct FxSwap {
     )]
     pub far_date: Date,
     /// Notional amount in base currency (exchanged on near, reversed on far)
-    pub base_notional: Money,
+    pub notional: Money,
     /// Domestic discount curve id (quote currency)
     pub domestic_discount_curve_id: CurveId,
     /// Foreign discount curve id (base currency)
@@ -118,7 +118,7 @@ struct FxSwapUnchecked {
     )]
     far_date: Date,
     /// Notional amount in base currency (exchanged on near, reversed on far).
-    base_notional: Money,
+    notional: Money,
     /// Domestic discount curve id (quote currency).
     domestic_discount_curve_id: CurveId,
     /// Foreign discount curve id (base currency).
@@ -158,7 +158,7 @@ impl TryFrom<FxSwapUnchecked> for FxSwap {
             quote_currency: value.quote_currency,
             near_date: value.near_date,
             far_date: value.far_date,
-            base_notional: value.base_notional,
+            notional: value.notional,
             domestic_discount_curve_id: value.domestic_discount_curve_id,
             foreign_discount_curve_id: value.foreign_discount_curve_id,
             near_rate: value.near_rate,
@@ -183,21 +183,21 @@ impl FxSwap {
             self.quote_currency,
             "FxSwap",
         )?;
-        if self.base_notional.currency() != self.base_currency {
+        if self.notional.currency() != self.base_currency {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "FxSwap base_notional currency ({}) must match base_currency ({})",
-                self.base_notional.currency(),
+                "FxSwap notional currency ({}) must match base_currency ({})",
+                self.notional.currency(),
                 self.base_currency
             )));
         }
         crate::instruments::common_impl::validation::validate_money_finite(
-            self.base_notional,
-            "FxSwap base_notional",
+            self.notional,
+            "FxSwap notional",
         )?;
         crate::instruments::common_impl::validation::validate_money_gt(
-            self.base_notional,
+            self.notional,
             0.0,
-            "FxSwap base_notional",
+            "FxSwap notional",
         )?;
         if self.near_date > self.far_date {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -233,7 +233,7 @@ impl FxSwap {
             .far_date(
                 Date::from_calendar_date(2024, time::Month::July, 5).expect("Valid example date"),
             )
-            .base_notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .near_rate_opt(Some(1.10))
@@ -255,7 +255,7 @@ impl FxSwap {
         quote_currency: Currency,
         trade_date: Date,
         far_tenor: Tenor,
-        base_notional: Money,
+        notional: Money,
         domestic_discount_curve_id: impl Into<CurveId>,
         foreign_discount_curve_id: impl Into<CurveId>,
         base_calendar_id: Option<String>,
@@ -293,7 +293,7 @@ impl FxSwap {
             .quote_currency(quote_currency)
             .near_date(near_date)
             .far_date(far_date)
-            .base_notional(base_notional)
+            .notional(notional)
             .domestic_discount_curve_id(domestic_discount_curve_id.into())
             .foreign_discount_curve_id(foreign_discount_curve_id.into())
             .base_calendar_id_opt(base_calendar_id.map(Into::into))
@@ -311,7 +311,7 @@ impl FxSwap {
     /// * `quote_currency` - Currency exchanged as the quote leg.
     /// * `near_date` - Explicit near-leg settlement date.
     /// * `far_date` - Explicit far-leg settlement date.
-    /// * `base_notional` - Positive base-currency amount on both legs.
+    /// * `notional` - Positive base-currency amount on both legs.
     /// * `domestic_discount_curve_id` - Quote-currency discount curve.
     /// * `foreign_discount_curve_id` - Base-currency discount curve.
     #[allow(clippy::too_many_arguments)]
@@ -321,7 +321,7 @@ impl FxSwap {
         quote_currency: Currency,
         near_date: Date,
         far_date: Date,
-        base_notional: Money,
+        notional: Money,
         domestic_discount_curve_id: impl Into<CurveId>,
         foreign_discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
@@ -331,7 +331,7 @@ impl FxSwap {
             .quote_currency(quote_currency)
             .near_date(near_date)
             .far_date(far_date)
-            .base_notional(base_notional)
+            .notional(notional)
             .domestic_discount_curve_id(domestic_discount_curve_id.into())
             .foreign_discount_curve_id(foreign_discount_curve_id.into())
             .attributes(Attributes::new())
@@ -407,10 +407,10 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
         }
 
         // Currency safety check before expensive calculations
-        if self.base_notional.currency() != self.base_currency {
+        if self.notional.currency() != self.base_currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
                 expected: self.base_currency,
-                actual: self.base_notional.currency(),
+                actual: self.notional.currency(),
             });
         }
 
@@ -440,10 +440,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         use super::pricing_helper::FxSwapPricingContext;
 
-        if self.base_notional.currency() != self.base_currency {
+        if self.notional.currency() != self.base_currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
                 expected: self.base_currency,
-                actual: self.base_notional.currency(),
+                actual: self.notional.currency(),
             });
         }
         if crate::instruments::fx::shared::event_has_occurred(self.far_date, as_of) {
@@ -462,9 +462,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
         }
 
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;
-        let base_amount = self.base_notional.amount();
-        let near_quote = self.base_notional.amount() * ctx.contract_near_rate;
-        let far_quote = self.base_notional.amount() * ctx.contract_far_rate;
+        let base_amount = self.notional.amount();
+        let near_quote = self.notional.amount() * ctx.contract_near_rate;
+        let far_quote = self.notional.amount() * ctx.contract_far_rate;
 
         let near_base = self.single_cashflow_schedule(
             as_of,
@@ -571,7 +571,7 @@ mod tests {
             .quote_currency(Currency::USD)
             .near_date(date(2024, Month::July, 5)) // Far date is actually earlier
             .far_date(date(2024, Month::January, 5))
-            .base_notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .near_rate_opt(Some(1.10))

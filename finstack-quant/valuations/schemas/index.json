@@ -178,7 +178,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1018354,
+      "bytes": 1018565,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -282,7 +282,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-      "bytes": 186813,
+      "bytes": 186805,
       "kind": "input",
       "path": "schemas/instruments/1/equity/levered_real_estate_equity.schema.json",
       "summary": "Property equity net of its financing stack.",
@@ -354,7 +354,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1017319,
+      "bytes": 1017530,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -514,7 +514,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_digital_option.schema.json",
-      "bytes": 7338,
+      "bytes": 7374,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_digital_option.schema.json",
       "summary": "FX option paying a fixed amount if in the money.",
@@ -554,7 +554,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
-      "bytes": 6961,
+      "bytes": 6970,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_spot.schema.json",
       "summary": "Spot foreign-exchange trade.",
@@ -562,7 +562,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_swap.schema.json",
-      "bytes": 5575,
+      "bytes": 5560,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_swap.schema.json",
       "summary": "Near- and far-leg FX swap.",
@@ -570,7 +570,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json",
-      "bytes": 9159,
+      "bytes": 9195,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_touch_option.schema.json",
       "summary": "FX option paying on barrier touch or no-touch.",
@@ -578,7 +578,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_variance_swap.schema.json",
-      "bytes": 11412,
+      "bytes": 11448,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_variance_swap.schema.json",
       "summary": "Swap on realised FX variance.",
@@ -586,7 +586,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/ndf.schema.json",
-      "bytes": 14203,
+      "bytes": 14275,
       "kind": "input",
       "path": "schemas/instruments/1/fx/ndf.schema.json",
       "summary": "Non-deliverable forward cash-settled against a fixing.",
@@ -594,7 +594,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/quanto_option.schema.json",
-      "bytes": 8026,
+      "bytes": 8061,
       "kind": "input",
       "path": "schemas/instruments/1/fx/quanto_option.schema.json",
       "summary": "Option on a foreign asset settled in the domestic currency at a fixed rate.",
@@ -602,7 +602,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1107395,
+      "bytes": 1107596,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -714,7 +714,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/repo.schema.json",
-      "bytes": 20319,
+      "bytes": 20311,
       "kind": "input",
       "path": "schemas/instruments/1/rates/repo.schema.json",
       "summary": "Repurchase agreement against posted collateral.",

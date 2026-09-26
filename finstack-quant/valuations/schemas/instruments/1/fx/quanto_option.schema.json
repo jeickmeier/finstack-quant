@@ -39,7 +39,8 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention."
+          "default": "act_365f",
+          "description": "Day count convention (defaults to ACT/365F)."
         },
         "div_yield_id": {
           "anyOf": [
@@ -168,7 +169,6 @@
         "base_currency",
         "quote_currency",
         "correlation",
-        "day_count",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "spot_id",

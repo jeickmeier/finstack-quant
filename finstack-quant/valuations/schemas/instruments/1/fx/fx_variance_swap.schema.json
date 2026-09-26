@@ -26,7 +26,8 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for time calculations"
+          "default": "act_365f",
+          "description": "Day count convention for time calculations (defaults to ACT/365F)."
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -173,7 +174,6 @@
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
         "vol_surface_id",
-        "day_count",
         "attributes"
       ],
       "type": "object"

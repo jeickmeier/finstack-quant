@@ -120,7 +120,9 @@ pub struct FxTouchOption {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub monitoring_start_date: Option<Date>,
-    /// Day count convention
+    /// Day count convention (defaults to ACT/365F).
+    #[serde(default = "crate::serde_defaults::day_count_act365f")]
+    #[builder(default = finstack_quant_core::dates::DayCount::Act365F)]
     pub day_count: DayCount,
     /// Domestic currency discount curve ID
     pub domestic_discount_curve_id: CurveId,

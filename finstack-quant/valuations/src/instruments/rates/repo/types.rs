@@ -65,15 +65,15 @@ impl std::str::FromStr for RepoType {
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum CollateralType {
     /// General collateral (standard market rates)
     #[default]
     General,
     /// Special collateral (specific securities in high demand, may trade at lower rates)
+    ///
+    /// The special security is identified by [`CollateralSpec::instrument_id`].
     Special {
-        /// Identifier of the specific security
-        security_id: String,
         /// Optional special rate adjustment in basis points (negative = lower rate)
         rate_adjustment_bp: Option<f64>,
     },
@@ -86,8 +86,9 @@ pub enum CollateralType {
 pub struct CollateralSpec {
     /// Type of collateral (general vs special)
     pub collateral_type: CollateralType,
-    /// Identifier for the collateral instrument
-    pub instrument_id: String,
+    /// Identifier of the collateral security (for special collateral, the
+    /// special security itself).
+    pub instrument_id: InstrumentId,
     /// Quantity/face value of collateral
     pub quantity: f64,
     /// Market value identifier in MarketContext (e.g., "BOND_ABC_PRICE")
@@ -96,8 +97,14 @@ pub struct CollateralSpec {
 
 impl CollateralSpec {
     /// Create a new collateral specification.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_id` - Identifier of the collateral security.
+    /// * `quantity` - Face value or unit quantity of collateral held.
+    /// * `market_value_id` - `MarketContext` price id used to value one unit.
     pub fn new(
-        instrument_id: impl Into<String>,
+        instrument_id: impl Into<InstrumentId>,
         quantity: f64,
         market_value_id: impl Into<PriceId>,
     ) -> Self {
@@ -110,18 +117,22 @@ impl CollateralSpec {
     }
 
     /// Create special collateral specification.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_id` - Identifier of the special security.
+    /// * `quantity` - Face value or unit quantity of collateral held.
+    /// * `market_value_id` - `MarketContext` price id used to value one unit.
+    /// * `rate_adjustment_bp` - Optional special-rate adjustment in basis
+    ///   points added to the repo rate (negative lowers the rate).
     pub fn special(
-        security_id: impl Into<String>,
-        instrument_id: impl Into<String>,
+        instrument_id: impl Into<InstrumentId>,
         quantity: f64,
         market_value_id: impl Into<PriceId>,
         rate_adjustment_bp: Option<f64>,
     ) -> Self {
         Self {
-            collateral_type: CollateralType::Special {
-                security_id: security_id.into(),
-                rate_adjustment_bp,
-            },
+            collateral_type: CollateralType::Special { rate_adjustment_bp },
             instrument_id: instrument_id.into(),
             quantity,
             market_value_id: market_value_id.into(),

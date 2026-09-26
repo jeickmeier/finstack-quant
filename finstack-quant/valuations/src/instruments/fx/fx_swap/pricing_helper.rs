@@ -41,7 +41,7 @@ pub(crate) struct FxSwapPricingContext {
     /// Whether far leg should be included (far_date >= as_of)
     pub(crate) include_far: bool,
     /// Base notional amount
-    pub(crate) base_notional: f64,
+    pub(crate) notional: f64,
 }
 
 impl FxSwapPricingContext {
@@ -122,7 +122,7 @@ impl FxSwapPricingContext {
         let contract_near_rate = swap.near_rate.unwrap_or(model_spot);
         let contract_far_rate = swap.far_rate.unwrap_or(model_forward);
 
-        let base_notional = swap.base_notional.amount();
+        let notional = swap.notional.amount();
 
         Ok(Self {
             df_dom_near,
@@ -135,7 +135,7 @@ impl FxSwapPricingContext {
             contract_far_rate,
             include_near,
             include_far,
-            base_notional,
+            notional,
         })
     }
 
@@ -188,10 +188,10 @@ impl FxSwapPricingContext {
     pub(crate) fn pv_foreign_leg_base(&self) -> f64 {
         let mut pv = 0.0;
         if self.include_near {
-            pv += self.base_notional * self.df_for_near;
+            pv += self.notional * self.df_for_near;
         }
         if self.include_far {
-            pv -= self.base_notional * self.df_for_far;
+            pv -= self.notional * self.df_for_far;
         }
         pv
     }
@@ -200,10 +200,10 @@ impl FxSwapPricingContext {
     pub(crate) fn pv_foreign_leg_base_with_dfs(&self, df_for_near: f64, df_for_far: f64) -> f64 {
         let mut pv = 0.0;
         if self.include_near {
-            pv += self.base_notional * df_for_near;
+            pv += self.notional * df_for_near;
         }
         if self.include_far {
-            pv -= self.base_notional * df_for_far;
+            pv -= self.notional * df_for_far;
         }
         pv
     }
@@ -214,10 +214,10 @@ impl FxSwapPricingContext {
     pub(crate) fn pv_domestic_leg(&self) -> f64 {
         let mut pv = 0.0;
         if self.include_near {
-            pv -= self.base_notional * self.contract_near_rate * self.df_dom_near;
+            pv -= self.notional * self.contract_near_rate * self.df_dom_near;
         }
         if self.include_far {
-            pv += self.base_notional * self.contract_far_rate * self.df_dom_far;
+            pv += self.notional * self.contract_far_rate * self.df_dom_far;
         }
         pv
     }
@@ -232,10 +232,10 @@ impl FxSwapPricingContext {
     ) -> f64 {
         let mut pv = 0.0;
         if self.include_near {
-            pv -= self.base_notional * near_rate * df_dom_near;
+            pv -= self.notional * near_rate * df_dom_near;
         }
         if self.include_far {
-            pv += self.base_notional * far_rate * df_dom_far;
+            pv += self.notional * far_rate * df_dom_far;
         }
         pv
     }
@@ -349,7 +349,7 @@ mod tests {
             .quote_currency(Currency::USD)
             .near_date(near_date)
             .far_date(far_date)
-            .base_notional(Money::from((10_000_000_i64, Currency::EUR)))
+            .notional(Money::from((10_000_000_i64, Currency::EUR)))
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .near_rate_opt(Some(1.0850))
@@ -362,7 +362,7 @@ mod tests {
         let total_pv = ctx.total_pv();
 
         // Explicit four-cashflow, per-currency discounting.
-        let n = swap.base_notional.amount();
+        let n = swap.notional.amount();
         let domestic = market.get_discount("USD-OIS").expect("usd");
         let foreign = market.get_discount("EUR-OIS").expect("eur");
         let df_dom_near = domestic

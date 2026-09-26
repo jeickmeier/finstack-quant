@@ -638,7 +638,7 @@ def fx_swap(idx: int) -> tuple[str, dict]:
             "quote_currency": "USD",
             "near_date": "2025-01-17",
             "far_date": f"{far_year}-07-17",
-            "base_notional": {"amount": "1000000", "currency": "EUR"},
+            "notional": {"amount": "1000000", "currency": "EUR"},
             "domestic_discount_curve_id": "USD-OIS",
             "foreign_discount_curve_id": "EUR-OIS",
             "near_rate": 1.08,

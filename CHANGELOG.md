@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+### FX and money market (2026-09-24)
+
+The FX family's quote-currency discount curve is `domestic_discount_curve_id`
+on every instrument, including FxSpot; the base-currency notional is
+`notional` on every instrument, including FxSwap; Ndf names its
+settlement-currency calendar `settlement_calendar_id` and its fixing benchmark
+`fixing_source`; an agreed forward rate is optional on both FxForward and Ndf,
+with `None` meaning at-market; every FX option-style instrument defaults
+`day_count` to ACT/365F; and repo collateral is identified once, by
+`CollateralSpec.instrument_id`. Retired keys are rejected by
+`deny_unknown_fields` (`tests/instruments/fx_money_market_wire_keys.rs`).
+Numbers do not change.
+
+#### Changed (BREAKING)
+
+- `FxSpot.discount_curve_id` (now `domestic_discount_curve_id`, still
+  optional). Rust / JSON.
+- `FxSwap.base_notional` (now `notional`), including the builder setter and the
+  `from_trade_date` / `from_broken_dates` parameters. Rust / JSON.
+- `Ndf.quote_calendar_id` (now `settlement_calendar_id`), including the builder
+  setter and the `from_trade_date` parameter. Rust / JSON.
+- `Ndf.fixing_source_enum` (now `fixing_source`; builder `fixing_source_opt`).
+  Rust / JSON.
+- `Ndf.contract_rate` is now `Option<f64>`: omit it to value the NDF at-market
+  (zero settlement amount and PV), as FxForward already allows. Rust / JSON.
+- `FxDigitalOption.day_count`, `FxTouchOption.day_count`,
+  `QuantoOption.day_count` and `FxVarianceSwap.day_count` are now optional on
+  the wire and in the builder, defaulting to ACT/365F like FxOption and
+  FxBarrierOption. Rust / JSON.
+- `CollateralSpec.instrument_id` is now the `InstrumentId` newtype. Rust / JSON
+  (wire shape unchanged).
+
+#### Removed
+
+- `CollateralType::Special.security_id`: the special security is identified by
+  `CollateralSpec.instrument_id`. `CollateralSpec::special` drops its
+  `security_id` argument. Rust / JSON.
+
 ### Loan and facility terms (2026-09-24)
 
 A facility's size is `commitment` and its drawn balance `drawn`; a loan,

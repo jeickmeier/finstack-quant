@@ -177,7 +177,7 @@ fn ndf_fx01_base_per_settlement_matches_finite_difference_one_pct() {
     );
     let mut reciprocal = ndf.clone();
     reciprocal.quote_convention = NdfQuoteConvention::SettlementPerBase;
-    reciprocal.contract_rate = ndf.contract_rate.recip();
+    reciprocal.contract_rate = ndf.contract_rate.map(f64::recip);
     assert!((fx01_of(&reciprocal, &base_market, as_of) - fx01).abs() < 1e-8);
     assert!(
         (reciprocal

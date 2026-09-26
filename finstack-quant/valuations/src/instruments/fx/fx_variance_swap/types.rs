@@ -127,7 +127,9 @@ pub struct FxVarianceSwap {
     pub foreign_discount_curve_id: CurveId,
     /// FX volatility surface ID
     pub vol_surface_id: CurveId,
-    /// Day count convention for time calculations
+    /// Day count convention for time calculations (defaults to ACT/365F).
+    #[serde(default = "crate::serde_defaults::day_count_act365f")]
+    #[builder(default = finstack_quant_core::dates::DayCount::Act365F)]
     pub day_count: DayCount,
     /// Instrument-owned pricing inputs.
     #[builder(default)]

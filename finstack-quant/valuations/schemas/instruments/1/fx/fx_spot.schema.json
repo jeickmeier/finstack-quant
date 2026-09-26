@@ -24,7 +24,7 @@
           "default": "modified_following",
           "description": "Business day convention to apply when adjusting settlement (default: ModifiedFollowing)\n\nNote: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align\nwith ISDA standard FX settlement conventions."
         },
-        "discount_curve_id": {
+        "domestic_discount_curve_id": {
           "anyOf": [
             {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"

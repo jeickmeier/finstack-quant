@@ -17,7 +17,7 @@ use finstack_quant_valuations::instruments::rates::repo as _;
 fn test_general_collateral_creation() {
     let collateral = CollateralSpec::new("TREASURY", 1_000_000.0, "TREASURY_BOND_PRICE");
 
-    assert_eq!(collateral.instrument_id, "TREASURY");
+    assert_eq!(collateral.instrument_id.as_str(), "TREASURY");
     assert_eq!(collateral.quantity, 1_000_000.0);
     assert_eq!(collateral.market_value_id, "TREASURY_BOND_PRICE");
     assert!(matches!(
@@ -29,21 +29,16 @@ fn test_general_collateral_creation() {
 #[test]
 fn test_special_collateral_creation() {
     let collateral = CollateralSpec::special(
-        "ON_THE_RUN_10Y",
         "TREASURY_10Y",
         1_000_000.0,
         "TREASURY_10Y_PRICE",
         Some(-25.0),
     );
 
-    assert_eq!(collateral.instrument_id, "TREASURY_10Y");
+    assert_eq!(collateral.instrument_id.as_str(), "TREASURY_10Y");
 
     match &collateral.collateral_type {
-        CollateralType::Special {
-            security_id,
-            rate_adjustment_bp,
-        } => {
-            assert_eq!(security_id, "ON_THE_RUN_10Y");
+        CollateralType::Special { rate_adjustment_bp } => {
             assert_eq!(*rate_adjustment_bp, Some(-25.0));
         }
         _ => panic!("Expected special collateral type"),

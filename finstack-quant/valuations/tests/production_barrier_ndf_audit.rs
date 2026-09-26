@@ -48,13 +48,13 @@ fn production_barrier_ndf_reciprocal_quotes_keep_long_base_payoff() {
     inverse.notional = Money::from((7_000_000_i64, Currency::CNY));
     inverse.fixing_date = date!(2024 - 06 - 28);
     inverse.maturity = date!(2024 - 07 - 02);
-    inverse.contract_rate = 7.0;
+    inverse.contract_rate = Some(7.0);
     inverse.observed_fixing = Some(8.0);
     inverse.domestic_discount_curve_id = "USD-OIS".into();
     inverse.quote_convention = NdfQuoteConvention::BasePerSettlement;
     let mut direct = inverse.clone();
     direct.quote_convention = NdfQuoteConvention::SettlementPerBase;
-    direct.contract_rate = 1.0 / 7.0;
+    direct.contract_rate = Some(1.0 / 7.0);
     direct.observed_fixing = Some(1.0 / 8.0);
     // Long 7m CNY loses USD value when CNY weakens from 7 to 8 per USD:
     // 7m / 8 - 7m / 7 = -125,000 USD in either quotation convention.

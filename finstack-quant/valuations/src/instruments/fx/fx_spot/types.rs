@@ -64,7 +64,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::InstrumentId;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 
 /// FX Spot instrument (1 unit of `base` priced in `quote`).
@@ -128,7 +128,7 @@ pub struct FxSpot {
     /// (a 1–2 day effect for standard spot lags).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub discount_curve_id: Option<finstack_quant_core::types::CurveId>,
+    pub domestic_discount_curve_id: Option<CurveId>,
     /// Notional amount in base currency.
     pub notional: Money,
     /// Instrument-owned pricing inputs.
@@ -202,7 +202,7 @@ struct FxSpotUnchecked {
     /// cashflow. When absent the settlement amount is reported undiscounted
     /// (a 1–2 day effect for standard spot lags).
     #[serde(default)]
-    discount_curve_id: Option<finstack_quant_core::types::CurveId>,
+    domestic_discount_curve_id: Option<CurveId>,
     /// Notional amount in base currency.
     notional: Money,
     /// Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
@@ -245,7 +245,7 @@ impl TryFrom<FxSpotUnchecked> for FxSpot {
             settlement_date: value.settlement_date,
             settlement_days: value.settlement_days,
             quoted_spot: value.quoted_spot,
-            discount_curve_id: value.discount_curve_id,
+            domestic_discount_curve_id: value.domestic_discount_curve_id,
             notional: value.notional,
             instrument_pricing_overrides: value.instrument_pricing_overrides,
             metric_pricing_overrides: value.metric_pricing_overrides,
@@ -272,7 +272,7 @@ impl FxSpot {
             settlement_date: None,
             settlement_days: None,
             quoted_spot: None,
-            discount_curve_id: None,
+            domestic_discount_curve_id: None,
             notional: Money::from((1_i64, base_currency)),
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -581,7 +581,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
         let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
-        if let Some(discount_curve) = &self.discount_curve_id {
+        if let Some(discount_curve) = &self.domestic_discount_curve_id {
             deps.add_discount_curve(discount_curve.clone());
         }
         deps.add_fx_pair(self.base_currency, self.quote_currency);
@@ -597,7 +597,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
         // discount curve; without one the flow is reported undiscounted
         // (1–2 days of carry for standard spot lags).
         let disc = self
-            .discount_curve_id
+            .domestic_discount_curve_id
             .as_ref()
             .map(|id| market.get_discount(id))
             .transpose()?;
@@ -1009,7 +1009,8 @@ mod tests {
             .expect("valid rate")
             .with_settlement_date(settle);
         let mut discounted = undiscounted.clone();
-        discounted.discount_curve_id = Some(finstack_quant_core::types::CurveId::new("USD-OIS"));
+        discounted.domestic_discount_curve_id =
+            Some(finstack_quant_core::types::CurveId::new("USD-OIS"));
 
         let pv_undisc = undiscounted.value(&market, as_of).expect("pv");
         let pv_disc = discounted.value(&market, as_of).expect("pv");

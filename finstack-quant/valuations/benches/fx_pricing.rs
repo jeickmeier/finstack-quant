@@ -110,7 +110,7 @@ fn bench_fx_swap_pv(c: &mut Criterion) {
             .quote_currency(Currency::USD)
             .near_date(near_date)
             .far_date(far_date)
-            .base_notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
+            .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
             .domestic_discount_curve_id("USD-OIS".into())
             .foreign_discount_curve_id("EUR-OIS".into())
             .build()

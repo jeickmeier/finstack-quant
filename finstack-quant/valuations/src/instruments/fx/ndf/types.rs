@@ -119,7 +119,7 @@ impl std::str::FromStr for NdfQuoteConvention {
 ///     .contract_rate(7.25)
 ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
 ///     .quote_convention(NdfQuoteConvention::BasePerSettlement)
-///     .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))
+///     .fixing_source_opt(Some(NdfFixingSource::Pboc))
 ///     .build()
 ///     .expect("Valid NDF");
 /// ```
@@ -331,7 +331,12 @@ pub struct Ndf {
     /// Contract forward rate. Interpretation depends on `quote_convention`:
     /// - BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)
     /// - SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)
-    pub contract_rate: f64,
+    ///
+    /// `None` values the NDF at-market: the contract rate equals the market
+    /// forward, so the settlement amount and PV are zero.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract_rate: Option<f64>,
     /// Settlement currency discount curve ID.
     pub domestic_discount_curve_id: CurveId,
     /// Quote convention for contract_rate and observed_fixing.
@@ -353,7 +358,7 @@ pub struct Ndf {
     /// See [`NdfFixingSource`] for supported benchmarks and their typical currencies.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fixing_source_enum: Option<NdfFixingSource>,
+    pub fixing_source: Option<NdfFixingSource>,
     /// Optional spot rate override for forward rate calculation.
     /// Interpretation depends on `quote_convention`.
     #[builder(optional)]
@@ -373,7 +378,7 @@ pub struct Ndf {
     /// Optional settlement currency calendar.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quote_calendar_id: Option<finstack_quant_core::types::CalendarId>,
+    pub settlement_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
     #[builder(default)]
@@ -427,7 +432,9 @@ struct NdfUnchecked {
     /// Notional amount in base currency.
     notional: Money,
     /// Contract forward rate. Interpretation depends on `quote_convention`.
-    contract_rate: f64,
+    /// `None` values the NDF at-market.
+    #[serde(default)]
+    contract_rate: Option<f64>,
     /// Settlement currency discount curve ID.
     domestic_discount_curve_id: CurveId,
     /// Quote convention for contract_rate and observed_fixing.
@@ -440,7 +447,7 @@ struct NdfUnchecked {
     observed_fixing: Option<f64>,
     /// Official fixing source/benchmark enum for type-safe specification.
     #[serde(default)]
-    fixing_source_enum: Option<NdfFixingSource>,
+    fixing_source: Option<NdfFixingSource>,
     /// Optional spot rate override for forward rate calculation.
     #[serde(default)]
     quoted_spot: Option<f64>,
@@ -452,7 +459,7 @@ struct NdfUnchecked {
     base_calendar_id: Option<String>,
     /// Optional settlement currency calendar.
     #[serde(default)]
-    quote_calendar_id: Option<String>,
+    settlement_calendar_id: Option<String>,
     /// Instrument-owned pricing inputs.
     #[serde(default)]
     instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
@@ -482,11 +489,11 @@ impl TryFrom<NdfUnchecked> for Ndf {
             quote_convention: value.quote_convention,
             foreign_discount_curve_id: value.foreign_discount_curve_id,
             observed_fixing: value.observed_fixing,
-            fixing_source_enum: value.fixing_source_enum,
+            fixing_source: value.fixing_source,
             quoted_spot: value.quoted_spot,
             quoted_forward: value.quoted_forward,
             base_calendar_id: value.base_calendar_id.map(Into::into),
-            quote_calendar_id: value.quote_calendar_id.map(Into::into),
+            settlement_calendar_id: value.settlement_calendar_id.map(Into::into),
             instrument_pricing_overrides: value.instrument_pricing_overrides,
             metric_pricing_overrides: value.metric_pricing_overrides,
             scenario_pricing_overrides: value.scenario_pricing_overrides,
@@ -520,7 +527,7 @@ impl Ndf {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
             .quoted_forward_opt(Some(7.25))
-            .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))
+            .fixing_source_opt(Some(NdfFixingSource::Pboc))
             .attributes(
                 Attributes::new()
                     .with_tag("ndf")
@@ -556,13 +563,13 @@ impl Ndf {
     ///     .contract_rate(7.25)
     ///     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
     ///     .quote_convention(NdfQuoteConvention::BasePerSettlement)
-    ///     .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))
+    ///     .fixing_source_opt(Some(NdfFixingSource::Pboc))
     ///     .build()
     ///     .unwrap();
     /// assert!(ndf_cny.validate_fixing_source().is_ok());
     /// ```
     pub fn validate_fixing_source(&self) -> Result<()> {
-        if let Some(fixing_source) = &self.fixing_source_enum {
+        if let Some(fixing_source) = &self.fixing_source {
             if let Some(expected_currency) = fixing_source.typical_currency() {
                 if expected_currency != self.base_currency {
                     return Err(finstack_quant_core::Error::Validation(format!(
@@ -607,7 +614,9 @@ impl Ndf {
             )));
         }
 
-        Self::validate_rate("contract_rate", self.contract_rate)?;
+        if let Some(rate) = self.contract_rate {
+            Self::validate_rate("contract_rate", rate)?;
+        }
         if let Some(rate) = self.observed_fixing {
             Self::validate_rate("observed_fixing", rate)?;
         }
@@ -623,9 +632,9 @@ impl Ndf {
 
     /// Get the effective fixing source as a string.
     ///
-    /// Returns the enum display name if `fixing_source_enum` is set.
+    /// Returns the enum display name if `fixing_source` is set.
     pub fn effective_fixing_source(&self) -> Option<String> {
-        self.fixing_source_enum
+        self.fixing_source
             .as_ref()
             .map(|fixing_enum| fixing_enum.to_string())
     }
@@ -643,7 +652,7 @@ impl Ndf {
     /// * `contract_rate` - Contract forward rate
     /// * `domestic_discount_curve_id` - Settlement/quote currency discount curve
     /// * `base_calendar_id` - Optional base currency calendar
-    /// * `quote_calendar_id` - Optional quote/settlement currency calendar
+    /// * `settlement_calendar_id` - Optional settlement currency calendar
     /// * `settlement_days` - T+N spot lag in business days (typically 2)
     /// * `fixing_offset_days` - Days before maturity for fixing (typically 2)
     /// * `business_day_convention` - Business day convention
@@ -659,7 +668,7 @@ impl Ndf {
         contract_rate: f64,
         domestic_discount_curve_id: impl Into<CurveId>,
         base_calendar_id: Option<String>,
-        quote_calendar_id: Option<String>,
+        settlement_calendar_id: Option<String>,
         settlement_days: u32,
         fixing_offset_days: i64,
         business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
@@ -672,15 +681,15 @@ impl Ndf {
 
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
         // delay a USD pair's spot date (FX spot convention
-        // finding). For NDFs the settlement currency (typically USD) is the
-        // quote side of the pair.
+        // finding). For NDFs the settlement currency (typically USD) takes the
+        // second-currency slot of the pair.
         let spot_date = fx_spot_date_for_pair(
             trade_date,
             settlement_days,
             base_currency,
             settlement_currency,
             base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+            settlement_calendar_id.as_deref(),
         )?;
         let maturity = add_fx_standard_tenor(
             spot_date,
@@ -688,13 +697,13 @@ impl Ndf {
             business_day_convention,
             end_of_month,
             base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+            settlement_calendar_id.as_deref(),
         )?;
 
         // Fixing date is typically T-2 before maturity using joint-business-day stepping.
         let joint_cal = ResolvedCalendarPair::resolve(
             base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+            settlement_calendar_id.as_deref(),
         )?;
         let mut fixing_unadjusted = maturity;
         if fixing_offset_days >= 0 {
@@ -718,7 +727,7 @@ impl Ndf {
             fixing_unadjusted,
             finstack_quant_core::dates::BusinessDayConvention::Preceding,
             base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+            settlement_calendar_id.as_deref(),
         )?;
 
         Self::builder()
@@ -732,7 +741,7 @@ impl Ndf {
             .domestic_discount_curve_id(domestic_discount_curve_id.into())
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
             .base_calendar_id_opt(base_calendar_id.map(Into::into))
-            .quote_calendar_id_opt(quote_calendar_id.map(Into::into))
+            .settlement_calendar_id_opt(settlement_calendar_id.map(Into::into))
             .attributes(Attributes::new())
             .build()
     }
@@ -896,8 +905,13 @@ impl Ndf {
         } else {
             self.estimate_forward_rate(market, as_of)?
         };
-        Self::validate_rate("contract_rate", self.contract_rate)?;
         Self::validate_rate("observed_fixing", observed_fixing)?;
+        // At-market NDF: the contract rate equals the market forward, so the
+        // settlement amount is zero.
+        let Some(contract_rate) = self.contract_rate else {
+            return Ok(0.0);
+        };
+        Self::validate_rate("contract_rate", contract_rate)?;
 
         // Express both rates in settlement currency per unit of base, then
         // value the same long-base position under either quotation convention.
@@ -906,7 +920,7 @@ impl Ndf {
             NdfQuoteConvention::SettlementPerBase => rate,
         };
         Ok(self.notional.amount()
-            * (settlement_per_base(observed_fixing) - settlement_per_base(self.contract_rate)))
+            * (settlement_per_base(observed_fixing) - settlement_per_base(contract_rate)))
     }
 }
 
@@ -1084,7 +1098,7 @@ mod tests {
     #[test]
     fn test_ndf_base_per_settlement_settlement_formula() {
         let mut ndf = Ndf::example();
-        ndf.contract_rate = 7.25;
+        ndf.contract_rate = Some(7.25);
         ndf.observed_fixing = Some(7.30);
         // Long 10m CNY loses USD value on the five-cent depreciation.
         let expected = -500_000.0 / 52.925;
@@ -1095,10 +1109,23 @@ mod tests {
     }
 
     #[test]
+    fn test_ndf_without_contract_rate_settles_at_market() {
+        // At-market: the contract rate equals the market forward, so the
+        // settlement amount is exactly zero whatever the fixing.
+        let mut ndf = Ndf::example();
+        ndf.contract_rate = None;
+        ndf.observed_fixing = Some(7.30);
+        let settlement = ndf
+            .settlement_amount(&MarketContext::new(), ndf.fixing_date)
+            .expect("settlement");
+        assert_eq!(settlement, 0.0);
+    }
+
+    #[test]
     fn test_ndf_settlement_per_base_settlement_formula() {
         let mut ndf = Ndf::example();
         ndf.quote_convention = NdfQuoteConvention::SettlementPerBase;
-        ndf.contract_rate = 0.138;
+        ndf.contract_rate = Some(0.138);
         ndf.observed_fixing = Some(0.140);
         let settlement = ndf
             .settlement_amount(&MarketContext::new(), ndf.fixing_date)
@@ -1224,7 +1251,7 @@ mod tests {
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))
+            .fixing_source_opt(Some(NdfFixingSource::Pboc))
             .attributes(Attributes::new())
             .build()
             .expect("should build");
@@ -1245,7 +1272,7 @@ mod tests {
             .contract_rate(83.50)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .fixing_source_enum_opt(Some(NdfFixingSource::Pboc)) // Wrong! PBOC is for CNY
+            .fixing_source_opt(Some(NdfFixingSource::Pboc)) // Wrong! PBOC is for CNY
             .attributes(Attributes::new())
             .build()
             .expect_err("builder should reject fixing source mismatch");
@@ -1271,7 +1298,7 @@ mod tests {
             .contract_rate(7.25)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .fixing_source_enum_opt(Some(NdfFixingSource::Pboc))
+            .fixing_source_opt(Some(NdfFixingSource::Pboc))
             .attributes(Attributes::new())
             .build()
             .expect("should build");

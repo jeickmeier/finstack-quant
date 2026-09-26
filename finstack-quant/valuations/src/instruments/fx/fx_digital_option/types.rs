@@ -100,7 +100,9 @@ pub struct FxDigitalOption {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
-    /// Day count convention
+    /// Day count convention (defaults to ACT/365F).
+    #[serde(default = "crate::serde_defaults::day_count_act365f")]
+    #[builder(default = finstack_quant_core::dates::DayCount::Act365F)]
     pub day_count: DayCount,
     /// Notional amount in base currency
     pub notional: Money,

@@ -103,7 +103,6 @@ pub fn corporate_collateral() -> CollateralSpec {
 /// Create special collateral with rate adjustment.
 pub fn special_collateral(rate_adjustment_bp: f64) -> CollateralSpec {
     CollateralSpec::special(
-        "SPECIAL_BOND_ID",
         "SPECIAL_BOND",
         500_000.0,
         "SPECIAL_BOND_PRICE",

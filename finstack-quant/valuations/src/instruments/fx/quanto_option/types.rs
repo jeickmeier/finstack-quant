@@ -63,7 +63,9 @@ pub struct QuantoOption {
     pub quote_currency: Currency,
     /// Correlation between equity price and FX rate
     pub correlation: f64, // Correlation between equity and FX
-    /// Day count convention
+    /// Day count convention (defaults to ACT/365F).
+    #[serde(default = "crate::serde_defaults::day_count_act365f")]
+    #[builder(default = finstack_quant_core::dates::DayCount::Act365F)]
     pub day_count: finstack_quant_core::dates::DayCount,
     /// Discount curve ID (domestic currency)
     pub domestic_discount_curve_id: CurveId,
@@ -150,7 +152,8 @@ struct QuantoOptionUnchecked {
     quote_currency: Currency,
     /// Correlation between equity price and FX rate.
     correlation: f64,
-    /// Day count convention.
+    /// Day count convention (defaults to ACT/365F).
+    #[serde(default = "crate::serde_defaults::day_count_act365f")]
     day_count: finstack_quant_core::dates::DayCount,
     /// Discount curve ID (domestic currency).
     domestic_discount_curve_id: CurveId,
